@@ -1,0 +1,218 @@
+diff --git a/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs b/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
+index dabe28fb1..86defcf67 100644
+--- a/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
++++ b/plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
+@@ -165,3 +165,16 @@ test("each lazy reference stays under its per-file byte bound", () => {
+     assert.ok(bytes <= bound, `${f}: ${bytes} B over ${bound} B bound`);
+   }
+ });
++
++// D76: the shared-tree guidance lets disjoint host-commit dispatches run in parallel, keeps self-committing ones
++// sequenced or worktree-isolated, and names the binding refusal that enforces it. The reference is the only copy
++// (no repo-root source, no generated vendored copy), so the source is the file under the skill directory.
++test("workflow-dispatch.md states the D76 parallel host-commit rule and the binding refusal that enforces it", () => {
++  const text = readRef("workflow-dispatch.md").replace(/\s+/gu, " ");
++  assert.match(text, /Parallel host-commit dispatches \(PO decision D76\)/u);
++  assert.match(text, /native-host-commit/u);
++  assert.match(text, /write scopes are disjoint MAY run in parallel in a shared tree/u);
++  assert.match(text, /Self-committing dispatches stay sequenced or each in its own `isolation: "worktree"`/u);
++  assert.match(text, /`DBG-SCOPE-OVERLAP`/u);
++  assert.match(text, /the overlapping paths and the repair/u);
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 1d7eaf009..fec6dc012 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -25,6 +25,10 @@
+  *                                    compound `AC-E<epic>-<story>-<nn>`, found in the Markdown
+  *                                    shapes below, item id `<feature>.<slug>`, no backlog item)
+  *
++ * PO decision D76: the write scope is admitted only when it is disjoint from every other running dispatch of the
++ * checkout (open dispatch record, owner not provably gone); an overlap is DBG-SCOPE-OVERLAP, naming the dispatch,
++ * the overlapping paths and the repair. The overlap predicate is the pure `scopesOverlap` of lib/slice-queue.mjs.
++ *
+  * The generator calls no model and runs no mutating git command. `binding` writes no file and
+  * leaves the judgment fields (goal, context, DoD, forbidden, stop) as template placeholders;
+  * `build` (PO decision D78) fills them from a closed package through
+@@ -32,7 +36,7 @@
+  */
+ import { createHash } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, resolve, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import {
+@@ -58,6 +62,8 @@ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
+ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
+ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
++import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
++import { scopesOverlap } from "../lib/slice-queue.mjs";
+ import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+ import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+@@ -159,6 +165,43 @@ function defaultQueueRow(root, sliceId) {
+   } catch { return null; }
+ }
+ 
++const BRIEFING_SCAN_LIMIT = 500;
++const BRIEFING_READ_LIMIT = 1048576;
++
++/** The allowed paths of every generated briefing directly under scratch/, by dispatch id (read-only, bounded, never throws). */
++function briefedWriteScopes(root) {
++  const scopes = new Map();
++  let names = [];
++  try { names = readdirSync(resolve(root, "scratch")).filter((name) => name.endsWith(".md")).sort().slice(0, BRIEFING_SCAN_LIMIT); } catch { return scopes; }
++  for (const name of names) {
++    const bytes = readRepoFile(root, `scratch/${name}`);
++    if (!bytes || bytes.byteLength > BRIEFING_READ_LIMIT || !bytes.includes(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2))) continue;
++    try {
++      const parsed = parseNativeGoldfishBriefing(bytes.toString("utf8"));
++      if (parsed.ok && !scopes.has(parsed.binding.dispatchId)) scopes.set(parsed.binding.dispatchId, [...parsed.binding.allowedPaths]);
++    } catch { /* a file that is not a briefing is not a source of scopes */ }
++  }
++  return scopes;
++}
++
++/**
++ * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read.
++ * A dispatch is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably
++ * gone (the existing liveness readback: alive, or unjudgeable, which is the usual Claude case). Its scope is the
++ * governed queue row's write scope, else the allowed paths of its generated briefing under scratch/; `writeScope`
++ * is null when neither exists. A checkout whose records cannot be read has no running dispatch to judge.
++ */
++function defaultRunningDispatches(root) {
++  let records;
++  try { records = readDispatchRecordLiveness(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
++  if (records.length === 0) return [];
++  const briefed = briefedWriteScopes(root);
++  return records.map((entry) => ({
++    dispatchId: entry.taskId, verdict: entry.verdict, record: entry.record,
++    writeScope: defaultQueueRow(root, entry.taskId)?.writeScope ?? briefed.get(entry.taskId) ?? null,
++  }));
++}
++
+ /** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
+ function defaultRegistryLock(root) {
+   try { return sessionAuthorityRegistry.inspectSessionAuthorityLock({ repository: inspectSignedDescriptorCustodyRepository(root) }); } catch { return null; }
+@@ -479,6 +522,21 @@ export function generateDispatchBinding(options, deps = {}) {
+     }
+   }
+ 
++  // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
++  // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
++  const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
++  const unreadable = others.filter((entry) => !Array.isArray(entry.writeScope) || entry.writeScope.length === 0);
++  for (const entry of others) {
++    if (unreadable.includes(entry)) continue;
++    const pairs = [];
++    for (const path of allowedPaths) for (const theirs of entry.writeScope) if (scopesOverlap([path], [theirs])) pairs.push(path === theirs ? path : `${path} (against ${theirs})`);
++    if (pairs.length === 0) continue;
++    refuse("DBG-SCOPE-OVERLAP", `the write scope of ${dispatchId} overlaps the write scope of running dispatch ${entry.dispatchId} (${entry.record ?? "open dispatch record"}, owner ${entry.verdict ?? "unknown"}) on ${pairs.join(", ")}; two dispatches writing the same paths in one checkout overwrite each other. repair, one of: bind this dispatch with a write scope disjoint from ${entry.dispatchId} (drop or narrow the overlapping --path); wait until ${entry.dispatchId} has a terminal dispatch record and bind again; if ${entry.dispatchId} is abandoned, finalize its record with a terminal outcome through the sanctioned dispatch-record writer; or run this dispatch in its own worktree`);
++  }
++  if (unreadable.length > 0) {
++    warnings.push({ code: "DBG-RUNNING-SCOPE-UNKNOWN", message: `the write scope of running dispatch(es) ${unreadable.map((entry) => entry.dispatchId).join(", ")} could not be read (no governed queue row and no generated briefing under scratch/), so this binding was not checked against them; confirm the scopes are disjoint before dispatching` });
++  }
++
+   // Agent definition: effort, model alias and the maxTurns cliff.
+   const resolved = resolveAgentModel(agentType, { agentsDir });
+   if (!resolved) refuse("DBG-AGENT-UNRESOLVED", `no agent definition with a model for ${agentType} under the plugin agents directory`);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 3d01b5fe7..4578d382b 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -695,3 +695,71 @@ test("init-dispatch-record prints a valid opening v4 record whose digests come f
+   assert.equal(missing.code, "IDR-BRIEFING-UNREADABLE");
+   assert.match(missing.message, /repair: /u);
+ });
++
++// --- D76: the binding admits a write scope only when it is disjoint from every running dispatch ---
++
++const PATH_B = "plugins/x/other.mjs";
++const running = (over = {}) => ({ dispatchId: "ALF-RUN", writeScope: [PATH_B, "plugins/x/other.test.mjs"], verdict: "alive", ...over });
++
++test("D76 a write scope that overlaps a running dispatch is refused DBG-SCOPE-OVERLAP, naming the dispatch, the overlap and the repair", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running({ writeScope: [PATH_A, PATH_B] })] }));
++  assert.equal(result.ok, false, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.code, "DBG-SCOPE-OVERLAP", result.message);
++  assert.ok(result.message.includes("ALF-RUN"), "names the running dispatch");
++  assert.ok(result.message.includes(PATH_A), "names the overlapping path");
++  assert.match(result.message, /repair, one of: /u);
++  assert.match(result.message, /disjoint/u);
++  assert.match(result.message, /worktree/u);
++  assert.equal(result.skeleton, undefined);
++});
++
++test("D76 a glob in the running dispatch's scope overlaps a literal path of this one", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running({ writeScope: ["plugins/x/**"] })] }));
++  assert.equal(result.code, "DBG-SCOPE-OVERLAP", JSON.stringify(result).slice(0, 300));
++  assert.ok(result.message.includes("plugins/x/**"));
++});
++
++test("D76 a disjoint scope is admitted, and so is a call with no running dispatch or only its own earlier record", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running()] })).ok, true, "disjoint");
++  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [] })).ok, true, "none running");
++  const own = running({ dispatchId: "ALF-T1", writeScope: [PATH_A, CHECK] });
++  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [own] })).ok, true, "a rebind is not held against itself");
++});
++
++test("D76 a running dispatch whose scope cannot be read never blocks and is announced as a warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { runningDispatches: () => [running({ writeScope: null, verdict: "unjudgeable" })] }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  const warning = result.warnings.find((entry) => entry.code === "DBG-RUNNING-SCOPE-UNKNOWN");
++  assert.ok(warning, JSON.stringify(result.warnings));
++  assert.ok(warning.message.includes("ALF-RUN"));
++});
++
++test("D76 the default reader finds a running dispatch from its open record and its generated briefing, and ignores a finished one", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
++  const init = spawnSync("git", ["-C", fx.root, "init", "-q"], { encoding: "utf8", env });
++  assert.equal(init.status, 0, init.stderr);
++  const other = runDispatchBriefing(argvOf(fx, { "--dispatch-id": "ALF-RUN", "--check": "plugins/x/other.test.mjs", "--path": PATH_A }), depsOf(fx));
++  assert.equal(other.ok, true, JSON.stringify(other));
++  mkdirSync(join(fx.root, "scratch"), { recursive: true });
++  mkdirSync(join(fx.root, "evidence"), { recursive: true });
++  writeFileSync(join(fx.root, "scratch", "briefing-ALF-RUN.md"), other.skeleton);
++  const record = join(fx.root, "evidence", "dispatch-record-ALF-RUN.json");
++  writeFileSync(record, JSON.stringify({ taskId: "ALF-RUN", outcome: "in-progress" }));
++  const deps = depsOf(fx);
++  delete deps.queueRow;
++  const refused = runDispatchBriefing(argvOf(fx), deps);
++  assert.equal(refused.code, "DBG-SCOPE-OVERLAP", JSON.stringify(refused).slice(0, 300));
++  assert.ok(refused.message.includes("ALF-RUN") && refused.message.includes(PATH_A));
++  writeFileSync(record, JSON.stringify({ taskId: "ALF-RUN", outcome: "succeeded" }));
++  assert.equal(runDispatchBriefing(argvOf(fx), deps).ok, true, "a terminal record is not a running dispatch");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index 7285a3c1b..3e8112aeb 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -138,6 +138,17 @@ that will `git commit` in the shared tree, or give each its own
+ `isolation: "worktree"`, rather than running them concurrently in
+ `parallel()` against the same checkout.
+ 
++**Parallel host-commit dispatches (PO decision D76).** The rule above is about
++dispatches that run `git commit` themselves. Host-commit dispatches (the
++`native-host-commit` briefing form, which never commit) whose write scopes are
++disjoint MAY run in parallel in a shared tree: the orchestrator verifies and
++commits each result by its own paths. Self-committing dispatches stay
++sequenced or each in its own `isolation: "worktree"`. The briefing binding
++(`dispatch-briefing.mjs`) enforces the admission: it refuses a write scope
++that overlaps a running dispatch (`DBG-SCOPE-OVERLAP`), naming that dispatch,
++the overlapping paths and the repair (narrow the scope, wait for the other
++dispatch, finalize an abandoned record, or use a worktree).
++
+ ## Tool-call budget — the ~50-call termination cliff
+ 
+ `guardrails/token-budget.md` (TB-06, Claude compatibility projection)

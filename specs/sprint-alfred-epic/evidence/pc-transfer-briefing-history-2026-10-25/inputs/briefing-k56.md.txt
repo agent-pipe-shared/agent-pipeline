@@ -1,0 +1,26 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k56/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; replace `<name>` with `k56`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, `--glob`, multi-path rg, other pipelines and composed commands are refused. A `git commit` needs a clone identity: read `git config user.name` and `git config user.email` in the MAIN checkout and set them once with `git -C scratch/clones/k56 config user.name ...` and `... user.email ...`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K56-D140-DOC-FIXES/2026-10-23 · Role Goldfish`
+
+## Briefing K56-D140-DOC-FIXES: the two documentation findings that PO decision D140 orders fixed before the fresh Reader course
+
+### 1. Goal
+PO decision D140 (find it: `rg -n "D140" scratch/clones/k56/specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`, else `docs/state.md`) orders two documentation findings of the earlier bounded Reader rounds fixed by documentation commits before the fresh 2+1 Reader course at content freeze. The backlog item is `backlog/items/2026-09-27-bounded-reader-terminal-binding.md` (read its Triage, "Terminal record attempt 2026-10-22" and "Blocker analysis"). The two findings:
+1. Round 1 (`specs/sprint-alfred-epic/evidence/reader-review/phase-one/round-20260923a.md`), finding 7: the Codex host contract content (relocation from a user-facing document into the linked threat model, or an explicit record that the relocation is not wanted).
+2. Round 4 (`specs/sprint-alfred-epic/evidence/reader-review/` — find `round-20260927b.md` with `find`), finding 4: the retained README availability passage.
+Read each finding in full, then read the document it names. A reader guessed the targets are `README.md` and `docs/threat-model.md`; treat that as UNVERIFIED and use what the finding itself names. Make the minimal documentation change that resolves each finding exactly as the finding and D140 ask (English, public-user tone for README: no internal jargon, no machine paths, no secrets; per CLAUDE.md language rule). If a finding offers a choice you cannot settle from D140 or the finding text, take the smaller change and list the alternative in your report. If a finding no longer applies to the current text (already fixed), say so with the commit and make no edit.
+
+### 2. Context files
+The item above; the two round files; the documents they name; `docs/documentation-quality.md` or the reader protocol the item cites (read only if named); `docs/state.md` top block (context only).
+
+### 3. DoD checks
+`node --test scratch/clones/k56/harness/scripts/check-doc-contracts.test.mjs` shows no NEW red case compared with the same command before your first edit (record both counts; it is known to have pre-existing reds). If the repository has a doc-link or doc-reader-binding check that covers the files you touch (`node harness/scripts/check-doc-reader-binding.mjs`, run it with the clone as root if it takes a root), run it and report. One commit per finding by explicit pathspec; message files under the clone's `scratch/commit-msg/`; Conventional Commits `docs(...)`; trailers exactly `AI-Assisted: true` and `Dispatch: K56-D140-DOC-FIXES (goldfish)`. If a touched document is classified or protected in a way that refuses the commit (`OG-DOC-*`, governance inventory), report the exact refusal instead of improvising.
+
+### 4. Forbidden
+Product code and test changes; `CLAUDE.md`, `.claude/**`, `docs/state.md`, `specs/**`, `backlog/**` edits (the Reader evidence files are read only); touching the MAIN checkout other than writing `scratch/agent-out/*`; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths or secrets in any file; Advisor; running a Reader course (that is a later, separate step).
+
+### 5. Stop conditions
+A finding whose target document you cannot identify from the finding text (report, do not guess); the fix needing a design decision D140 does not make; more than 2 failed attempts at one problem; tool budget at 80 percent (commit what is verified, report the rest).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k56`. Tool budget: base cap 60, closing allowance +5. TASK_ID: K56-D140-DOC-FIXES. Status wording per the common briefing (never "done").

@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { resolvePublicationReviewRequirement } from "./publication-review-requirement.mjs";
+
+const feature = { activeFeature: { id: "feature" } };
+
+test("approved profile rank determines review duty without equating mini to package rigor", () => {
+  assert.deepEqual(resolvePublicationReviewRequirement({ ...feature, planSubmission: { profile: "mini" } }),
+    { required: false, code: "REVIEW-LOW-RIGOR" });
+  assert.deepEqual(resolvePublicationReviewRequirement({ ...feature, planSubmission: { profile: "feature" } }),
+    { required: true, code: "REVIEW-PROFILE-REQUIRED" });
+});
+
+test("unknown or malformed required profile cannot waive review", () => {
+  assert.equal(resolvePublicationReviewRequirement(feature).required, true);
+  assert.equal(resolvePublicationReviewRequirement({ ...feature, planSubmission: { profile: "other" } }).required, true);
+  assert.equal(resolvePublicationReviewRequirement({ ...feature, rigorHistory: [{}], planSubmission: { profile: "mini" } }).required, true);
+});
+
+test("a registered package cannot be downgraded by a mini submission", (t) => {
+  const rootDir = mkdtempSync(join(tmpdir(), "g20-package-"));
+  t.after(() => rmSync(rootDir, { recursive: true, force: true }));
+  mkdirSync(join(rootDir, "specs/feature"), { recursive: true });
+  writeFileSync(join(rootDir, "specs/feature/lifecycle.json"), "{}\n");
+  assert.deepEqual(resolvePublicationReviewRequirement({ ...feature, planSubmission: { profile: "mini" } }, { rootDir }),
+    { required: true, code: "REVIEW-PACKAGE-INVALID" });
+});

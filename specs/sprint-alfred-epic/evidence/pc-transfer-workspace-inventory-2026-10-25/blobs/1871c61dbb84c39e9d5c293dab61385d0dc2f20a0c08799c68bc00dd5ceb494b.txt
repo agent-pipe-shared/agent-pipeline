@@ -1,0 +1,17 @@
+import { writeFileSync } from "node:fs";
+import { checkRepository } from "./harness/scripts/check-doc-contracts.mjs";
+const r = checkRepository(process.cwd());
+const by = new Map();
+const kinds = new Map();
+for (const f of r.findings) {
+  const m = /^DOC-CONTRACT (.+?):(\d+) -> (.*?): (.*)$/.exec(f);
+  const key = m ? m[1] : f.slice(0, 120);
+  by.set(key, (by.get(key) ?? 0) + 1);
+  const k = m ? m[4].slice(0, 50) : "other";
+  kinds.set(k, (kinds.get(k) ?? 0) + 1);
+}
+let out = `total ${r.findings.length}\n`;
+for (const [k, v] of by) out += `${v} ${k}\n`;
+for (const [k, v] of kinds) out += `KIND ${v} ${k}\n`;
+out += JSON.stringify(r.stats) + "\n";
+writeFileSync(".diag-doc.out", out);

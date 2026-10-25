@@ -1,0 +1,17 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-decided.md` and the files named in them are your ONLY input. Read `scratch/clones/k102/templates/prompts/agent-obligations.md` first, then the common file. Clone name: `k102`. Base: the rehearsal clone (C27 registrations are in it).
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K102-DESIGN-TRAILER-PIN-REGISTRATION/2026-10-23 · Role Goldfish`
+
+## K102-DESIGN-TRAILER-PIN-REGISTRATION: register the one pin the case-completion checker still reports as VULNERABLE-UNREGISTERED
+
+### 1. Goal
+In the rehearsal clone `node harness/scripts/check-verify-case-completion.mjs` (find the exact script path and flags with `find harness/scripts -name "check-verify-case-completion*"`; run it exactly as its test/header documents, alone) exits 2 with ONE finding: `VULNERABLE-UNREGISTERED pin-installed-design-trailer-example-is-rejected-by-git-guard-tests` for `plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs`. The same finding appears on main HEAD, so C27's claim "exits 0" was stale. Find how C27 registers pins (`specs/sprint-alfred-epic/evidence/held-patches/k82-c16-verify-suites-cumulative.patch`, `k79-*` notes, `harness/verify-suites.json`, `harness/config/verify-case-completion-augmentations.v1.json`, the checker header) and add the SMALLEST correct registration in the bundle state: if the pin is a real suite that Verify should run, register it as a suite entry in `harness/verify-suites.json` the same way its neighbouring `lib/pins/*` entries are registered (protected file: diff), plus an augmentation line only if the checker requires it (the augmentation file is also in the C27 patch; do not duplicate what is there). If the right answer is reclassification (the file is not a suite), say why and do that instead. Also run `harness/scripts/check-verify-suite-registration.mjs` (expect 1085 + 1 registered and 0 unregistered after your change; report the exact numbers) and `check-verify-case-completion` (expect exit 0). Run the pin itself once (`node --test <pin>`) to report its count (the registration must not register a red suite: if it is red, STOP and report its failure text, no registration). Count ONCE alone before/after: the two checkers, the pin, the tests of the checkers (`find harness/scripts -name "check-verify-*test*"`). Deliver `scratch/agent-out/K102-DESIGN-TRAILER-PIN-REGISTRATION-k102-protected.diff` (a stacked-on-the-bundle diff, ceremony row C27c) plus notes with a proposed commit message (`chore(verify): register the installed design trailer example pin`; trailers exactly `AI-Assisted: true` and `Dispatch: K102-DESIGN-TRAILER-PIN-REGISTRATION (goldfish)`). Do not touch C28 digests: this change must not alter any of the six Critic-contract files (verify that with `git diff --stat`).
+
+### 2. Context files
+`specs/sprint-alfred-epic/evidence/held-patches/k91-sitting-rehearsal.notes.md` lines 43 and 62; the C27 row in `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`; `harness/verify-suites.json`.
+
+### 3. DoD
+Checker exit 0 in the clone (or a reasoned reclassification), counts, diff, notes.
+
+### 4. Task id
+TASK_ID: K102-DESIGN-TRAILER-PIN-REGISTRATION.

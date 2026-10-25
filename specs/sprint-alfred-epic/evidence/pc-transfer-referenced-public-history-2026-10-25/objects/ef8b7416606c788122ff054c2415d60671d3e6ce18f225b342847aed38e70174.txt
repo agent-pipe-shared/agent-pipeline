@@ -1,0 +1,24 @@
+// Scratch probe (K150): run a test file in the clone with private TMPDIR, optional case filter, print failing stderr heads.
+// Usage: node scratch/k150-run.mjs <clone-dir> <test-file> [filter]
+import { spawnSync } from "node:child_process";
+import { mkdirSync, chmodSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+const [dir, file, filter] = process.argv.slice(2);
+const tmp = join(homedir(), "pipeline-test-tmp", "k150-direct");
+mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+delete env.NODE_TEST_CONTEXT;
+if (filter) env.PIPELINE_CODEX_PRETOOL_TEST_FILTER = filter;
+const r = spawnSync(process.execPath, [file], { cwd: resolve(dir), encoding: "utf8", env, timeout: 3600000, maxBuffer: 256 * 1024 * 1024 });
+const clip = (s, n) => (s.length > n ? s.slice(0, n) + "\n...[clipped]" : s);
+if (process.argv[5]) {
+  const re = new RegExp(process.argv[5]);
+  const lines = ((r.stdout ?? "") + "\n" + (r.stderr ?? "")).split("\n");
+  const hit = lines.map((l, i) => (re.test(l) ? i : -1)).filter((i) => i >= 0).slice(0, 12);
+  for (const i of hit) process.stdout.write(`@${i}: ${lines.slice(Math.max(0, i - 2), i + 8).join("\n")}\n----\n`);
+  process.stdout.write(`exit ${r.status}; total lines ${lines.length}\n`);
+  process.exit(r.status ?? 1);
+}
+process.stdout.write(`exit ${r.status}\n--- stdout ---\n${clip(r.stdout ?? "", 3000)}\n--- stderr ---\n${clip(r.stderr ?? "", 14000)}\n`);
+process.exit(r.status ?? 1);

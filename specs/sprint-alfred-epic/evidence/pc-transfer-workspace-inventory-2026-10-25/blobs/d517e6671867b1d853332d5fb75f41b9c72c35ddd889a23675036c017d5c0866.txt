@@ -1,0 +1,8 @@
+win32 node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"
+  parse={"schema":"pipeline.guard-command.v1","dialect":"windows-direct","segments":[{"executable":"node","argv":["${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"]}],"operators":[],"redirects":[],"parseStatus":"accepted","denialCode":null}
+win32 node "$FOO/x.mjs"
+  parse={"schema":"pipeline.guard-command.v1","dialect":"windows-direct","segments":[{"executable":"node","argv":["$FOO/x.mjs"]}],"operators":[],"redirects":[],"parseStatus":"accepted","denialCode":null}
+linux node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"
+  parse={"schema":"pipeline.guard-command.v1","dialect":null,"segments":[],"operators":[],"redirects":[],"parseStatus":"denied","denialCode":"GUARD-PARSE-UNSUPPORTED"}
+linux node "$FOO/x.mjs"
+  parse={"schema":"pipeline.guard-command.v1","dialect":null,"segments":[],"operators":[],"redirects":[],"parseStatus":"denied","denialCode":"GUARD-PARSE-UNSUPPORTED"}

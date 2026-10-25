@@ -1,0 +1,487 @@
+diff --git a/plugins/pipeline-core/lib/consumer-verify.mjs b/plugins/pipeline-core/lib/consumer-verify.mjs
+index 340a2acfb..df10a4672 100644
+--- a/plugins/pipeline-core/lib/consumer-verify.mjs
++++ b/plugins/pipeline-core/lib/consumer-verify.mjs
+@@ -22,7 +22,7 @@ function commandEntry(value, label) {
+ export function readConsumerVerifyConfiguration(rootDir) {
+   const artifact = resolveAuthorityArtifactPath("calibration", { rootDir });
+   const projectIdentity = readProjectCalibrationIdentity({ rootDir });
+-  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}`);
++  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}${projectIdentity.message === undefined ? "" : ` - ${projectIdentity.message}`}`);
+   if (!artifact.exists) throw new Error("VEP-NO-CALIBRATION: no project calibration found.");
+   const calibrationBytes = readFileSync(artifact.path);
+   if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("VEP-PROJECT-IDENTITY: PCI-SOURCE-DRIFT");
+diff --git a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+index 7bbea26c1..e2f7ad632 100644
+--- a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
++++ b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+@@ -557,7 +557,7 @@ const observe4 = (root) => ({
+ test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older commit and leaves a dirty checkout, its worktree list and the session-authority registry untouched", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, PO decision K7)" : false, timeout: 300000 }, () => {
+   const root = join(FIXTURE, "m4-root");
+   mkdirSync(join(root, ".claude"), { recursive: true });
+-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m4", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "m4-root", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+   writeFileSync(join(root, "README.md"), "# Fixture\n");
+   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+   prepareConsumerVerify({ rootDir: root });
+@@ -612,7 +612,7 @@ function waitFor5(path, label) {
+ test("PARWORK-M5a: the real producer CLI and the repair inspect run while another process holds the registry boundary; afterwards no lock, no retired-lock directory remain, the registry reads and the session descriptors are unchanged", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, ALF-K13)" : false, timeout: 300000 }, async () => {
+   const root = join(FIXTURE, "m5-root");
+   mkdirSync(join(root, ".claude"), { recursive: true });
+-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m5", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "m5-root", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
+   writeFileSync(join(root, "README.md"), "# Fixture\n");
+   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+   prepareConsumerVerify({ rootDir: root });
+diff --git a/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs b/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
+index 7037bf9af..c3660701f 100644
+--- a/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
++++ b/plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs
+@@ -3,11 +3,21 @@
+  * Pin: pipeline.project-calibration-retains-new-project-placeholder (AC-232).
+  *
+  * No backlog item and no public original exist; the acceptance pinned here is
+- * the Elephant-fixed reconstruction S1-S8 (pending PO release):
++ * the reconstruction S1-S8, RELEASED by the PO (2026-10-23, batch 11), with S4
++ * following the PO's released wording R1 (AC-232: an aliased identity is refused):
+  *   S1 initial   placeholder "new-project" w/o metadata -> root-derived, physical root name
+  *   S2 resume    root-derived metadata resolves; differing stored name -> PCI-NAME-MISMATCH
+  *   S3 substituted root -> PCI-ROOT-MISMATCH
+- *   S4 alias     non-placeholder w/o metadata -> configured-alias; metadata alias accepted
++ *   S4 alias     a non-placeholder name that is not the root-derived name is refused
++ *                PCI-ALIAS-REFUSED, with or without metadata (follows R1); the message
++ *                names the stored name, the root name and the repair; a name equal to
++ *                the root name is no alias and resolves
++ *   S4x          exception (PO decision 2026-10-23, row 42): the Agent-Pipeline source checkout
++ *                (tracked .claude/pipeline.json project "agent-pipeline" AND tracked
++ *                .claude-plugin/marketplace.json name/owner.name "agent-pipeline", one plugin
++ *                pipeline-core at ./plugins/pipeline-core) keeps its stored alias in a root with
++ *                any name, typed identityMode "source-checkout"; copying one file, untracked
++ *                files, a deviating marketplace or any other alias stay refused
+  *   S5 missing   no calibration -> PCI-CALIBRATION-MISSING; no project -> PCI-PROJECT-MISSING
+  *   S6 invalid   INVALID / PROJECT-INVALID / METADATA-INVALID / CALIBRATION-DRIFT
+  *   S7 onboarding writes a root-derived identity, never the placeholder
+@@ -17,7 +27,8 @@
+  */
+ import assert from 'node:assert/strict';
+ import { test } from 'node:test';
+-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
++import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
++import { spawnSync } from 'node:child_process';
+ import { join } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import {
+@@ -114,25 +125,200 @@ test('S3 a calibration copied from another root is refused PCI-ROOT-MISMATCH', (
+   assert.equal(read(copy).code, 'PCI-ROOT-MISMATCH');
+ });
+ 
+-test('S4 a non-placeholder project without metadata resolves configured-alias', () => {
++// QG-04 restatement (bounded): PO decision 2026-10-23 (batch 11), "S4 FOLLOWS R1".
++// The two S4 cases below previously asserted that an aliased identity (a
++// non-placeholder stored name that is not the root-derived name) RESOLVES as
++// configured-alias, with or without metadata. R1 (AC-232, released 2026-10-16)
++// says the opposite: "If the identity is ... aliased ... the system shall refuse
++// to treat the calibration as bound to the project and shall report why". The
++// intent of S4 is unchanged: the alias question has a defined, tested outcome.
++// Only the outcome flips from "accepted" to "refused PCI-ALIAS-REFUSED"; the
++// refusal message names the stored name, the root-derived name and the repair.
++// Scope: only these two cases; nothing else in S1-S3, S5-S8 is touched.
++const ALIAS_REFUSED = (r, stored, rootName) => {
++  assert.equal(r.status, 'unavailable');
++  assert.equal(r.code, 'PCI-ALIAS-REFUSED');
++  assert.equal(r.kind, null);
++  assert.equal(r.project, null);
++  assert.ok(r.message.includes(`"${stored}"`), 'message names the stored name');
++  assert.ok(r.message.includes(`"${rootName}"`), 'message names the root-derived name');
++  assert.match(r.message, /regenerate the project identity or set "project" to the root name/u);
++};
++
++test('S4 a non-placeholder project without metadata that is not the root name is refused PCI-ALIAS-REFUSED', () => {
+   const root = fixture('dir-name');
+   calib(root, { project: 'my-alias' });
++  ALIAS_REFUSED(read(root), 'my-alias', 'dir-name');
++});
++
++test('S4 metadata kind configured-alias whose name is not the root name is refused PCI-ALIAS-REFUSED', () => {
++  const root = fixture('dir-name2');
++  calib(root, { project: 'my-alias', projectIdentity: meta(root, 'configured-alias') });
++  ALIAS_REFUSED(read(root), 'my-alias', 'dir-name2');
++});
++
++test('S4 a stored name equal to the root name is no alias and resolves without metadata', () => {
++  const root = fixture('same-as-root');
++  calib(root, { project: 'same-as-root' });
+   const r = read(root);
+   assert.equal(r.status, 'resolved');
+-  assert.equal(r.kind, 'configured-alias');
+-  assert.equal(r.project, 'my-alias');
++  assert.equal(r.kind, 'root-derived');
++  assert.equal(r.project, 'same-as-root');
+   assert.deepEqual(r.configuredValue, { status: 'selected', reason: null });
+ });
+ 
+-test('S4 metadata kind configured-alias is accepted', () => {
+-  const root = fixture('dir-name2');
+-  calib(root, { project: 'my-alias', projectIdentity: meta(root, 'configured-alias') });
++test('S4 metadata kind configured-alias whose name equals the root name resolves', () => {
++  const root = fixture('same-as-root2');
++  calib(root, { project: 'same-as-root2', projectIdentity: meta(root, 'configured-alias') });
+   const r = read(root);
+   assert.equal(r.status, 'resolved');
+   assert.equal(r.kind, 'configured-alias');
+-  assert.equal(r.project, 'my-alias');
++  assert.equal(r.project, 'same-as-root2');
++});
++
++test('S4 the alias refusal reaches the consumer fail-closed with the repair in its message', () => {
++  const root = fixture('consumer-dir');
++  calib(root, { project: 'my-alias', verify: null });
++  assert.throws(() => readConsumerVerifyConfiguration(root), (error) =>
++    error.message.startsWith('VEP-PROJECT-IDENTITY: PCI-ALIAS-REFUSED')
++    && error.message.includes('"my-alias"') && error.message.includes('"consumer-dir"')
++    && /regenerate the project identity or set "project" to the root name/u.test(error.message));
+ });
+ 
++// S4x: PO decision 2026-10-23 (batch 12, row 42): S4 stays R1 for consumer projects; THIS
++// repository (the Agent-Pipeline source checkout) gets a typed exemption that does not depend on
++// the checkout directory name. The exemption is decided by the same identity facts the reader-review
++// skill uses (tracked regular .claude/pipeline.json with project "agent-pipeline" AND tracked regular
++// .claude-plugin/marketplace.json: name and owner.name "agent-pipeline", exactly one plugin
++// "pipeline-core" at ./plugins/pipeline-core), observed from the Git index of the root, never from the
++// directory name and never from a calibration field.
++const gitEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
++const git = (root, ...args) => {
++  const result = spawnSync('git', args, { cwd: root, env: gitEnv(), encoding: 'utf8' });
++  assert.equal(result.status, 0, result.stderr);
++};
++const MARKETPLACE = ['.claude-plugin', 'marketplace.json'];
++const realFile = (segments) => join(repository, ...segments);
++/**
++ * Fixture repo (arbitrary directory name) holding copies of the real identity files. Both
++ * calibration tiers get the bytes of the real project/pipeline.json: at the time of writing the
++ * real .claude/pipeline.json differs from it (PCI-CALIBRATION-DRIFT, an unrelated refusal that
++ * the exemption deliberately does not touch), so the tiers are made byte-equal here.
++ */
++const sourceFixture = (name, { skip = [], track = true, edit = {} } = {}) => {
++  const root = fixture(name);
++  git(root, 'init', '-q');
++  for (const segments of [NEUTRAL, LEGACY, MARKETPLACE]) {
++    const key = segments.join('/');
++    if (skip.includes(key)) continue;
++    mkdirSync(join(root, ...segments.slice(0, -1)), { recursive: true });
++    if (edit[key] !== undefined) writeFileSync(join(root, ...segments), edit[key]);
++    else copyFileSync(realFile(segments === LEGACY ? NEUTRAL : segments), join(root, ...segments));
++  }
++  if (track) git(root, 'add', '-A');
++  return root;
++};
++const realMarketplace = () => JSON.parse(readFileSync(realFile(MARKETPLACE), 'utf8'));
++const SOURCE_REFUSED = (root, label = 'case') => {
++  const r = read(root);
++  assert.equal(r.status, 'unavailable', label);
++  assert.equal(r.code, 'PCI-ALIAS-REFUSED', label);
++  assert.equal(r.identityMode, undefined, label);
++};
++
++test('S4x the real identity files of this repository resolve in a root with an arbitrary name, typed source-checkout', () => {
++  const root = sourceFixture('machine-two-checkout');
++  const r = read(root);
++  assert.equal(r.status, 'resolved');
++  assert.equal(r.project, 'agent-pipeline');
++  assert.equal(r.identityMode, 'source-checkout');
++  assert.deepEqual(r.configuredValue, { status: 'selected', reason: null });
++});
++
++test('S4x the source-checkout identity reaches consumer verify without PCI-ALIAS-REFUSED', () => {
++  const root = sourceFixture('another-directory-name');
++  const cfg = readConsumerVerifyConfiguration(root);
++  assert.equal(cfg.project, 'agent-pipeline');
++  assert.equal(cfg.projectIdentity.identityMode, 'source-checkout');
++});
++
++test('S4x a root really named agent-pipeline is no alias and carries no source-checkout mode', () => {
++  const root = sourceFixture('agent-pipeline');
++  const r = read(root);
++  assert.equal(r.status, 'resolved');
++  assert.equal(r.kind, 'root-derived');
++  assert.equal(r.identityMode, undefined);
++});
++
++test('S4x a consumer-shaped repository with the same stored alias is still refused PCI-ALIAS-REFUSED', () => {
++  const root = fixture('consumer-shaped');
++  git(root, 'init', '-q');
++  calib(root, { project: 'agent-pipeline', verify: null });
++  git(root, 'add', '-A');
++  SOURCE_REFUSED(root);
++  assert.throws(() => readConsumerVerifyConfiguration(root), (error) =>
++    error.message.startsWith('VEP-PROJECT-IDENTITY: PCI-ALIAS-REFUSED'));
++});
++
++test('S4x a repository that copies only the marketplace file is refused PCI-ALIAS-REFUSED', () => {
++  SOURCE_REFUSED(sourceFixture('copies-marketplace', { skip: ['.claude/pipeline.json'] }));
++});
++
++test('S4x a repository that copies only the calibration file is refused PCI-ALIAS-REFUSED', () => {
++  SOURCE_REFUSED(sourceFixture('copies-calibration', { skip: ['.claude-plugin/marketplace.json'] }));
++});
++
++test('S4x both identity files present but not tracked by Git are refused PCI-ALIAS-REFUSED', () => {
++  SOURCE_REFUSED(sourceFixture('untracked-copy', { track: false }));
++});
++
++test('S4x both identity files in a directory that is not a Git repository are refused PCI-ALIAS-REFUSED', () => {
++  const root = fixture('not-a-repository');
++  for (const segments of [NEUTRAL, LEGACY, MARKETPLACE]) {
++    mkdirSync(join(root, ...segments.slice(0, -1)), { recursive: true });
++    copyFileSync(realFile(segments === LEGACY ? NEUTRAL : segments), join(root, ...segments));
++  }
++  SOURCE_REFUSED(root);
++});
++
++test('S4x a marketplace that deviates from the closed identity is refused PCI-ALIAS-REFUSED', () => {
++  const variants = {
++    'other name': (m) => ({ ...m, name: 'someone-else' }),
++    'other owner': (m) => ({ ...m, owner: { name: 'someone-else' } }),
++    'extra plugin': (m) => ({ ...m, plugins: [...m.plugins, { ...m.plugins[0], name: 'second' }] }),
++    'other plugin name': (m) => ({ ...m, plugins: [{ ...m.plugins[0], name: 'not-pipeline-core' }] }),
++    'other plugin source': (m) => ({ ...m, plugins: [{ ...m.plugins[0], source: './elsewhere' }] }),
++  };
++  for (const [label, change] of Object.entries(variants)) {
++    const edited = JSON.stringify(change(realMarketplace()));
++    SOURCE_REFUSED(sourceFixture('variant', { edit: { '.claude-plugin/marketplace.json': edited } }), label);
++  }
++});
++
++test('S4x a stored alias other than agent-pipeline is refused even in the source-checkout shape', () => {
++  const root = sourceFixture('other-alias', {
++    edit: { 'project/pipeline.json': '{"project":"my-alias"}', '.claude/pipeline.json': '{"project":"my-alias"}' },
++  });
++  SOURCE_REFUSED(root);
++});
++
++test('S4x root-derived metadata keeps PCI-NAME-MISMATCH in the source-checkout shape', () => {
++  const root = sourceFixture('metadata-root');
++  const text = JSON.stringify({ project: 'agent-pipeline', projectIdentity: meta(root) });
++  calib(root, text, NEUTRAL);
++  calib(root, text, LEGACY);
++  assert.equal(read(root).code, 'PCI-NAME-MISMATCH');
++});
++
++test('S4x a symbolic-link marketplace file is refused PCI-ALIAS-REFUSED',
++  { skip: process.platform === 'win32' ? HOST_LIMITATION : false }, () => {
++    const root = sourceFixture('linked-marketplace', { skip: ['.claude-plugin/marketplace.json'] });
++    mkdirSync(join(root, '.claude-plugin'), { recursive: true });
++    symlinkSync(realFile(MARKETPLACE), join(root, ...MARKETPLACE), 'file');
++    git(root, 'add', '-A');
++    SOURCE_REFUSED(root);
++  });
++
+ test('S5 no calibration file is refused PCI-CALIBRATION-MISSING', () => {
+   const r = read(fixture());
+   assert.equal(r.status, 'unavailable');
+@@ -182,8 +368,12 @@ test('S6 neutral and legacy calibration present and not byte-equal is refused PC
+   assert.equal(read(root).code, 'PCI-CALIBRATION-DRIFT');
+ });
+ 
++// QG-04 fixture restatement (bounded): PO decision 2026-10-23 "S4 follows R1". The fixture
++// stored the alias "alpha" under a differently named root and relied on alias acceptance
++// only incidentally; the case's intent (byte-equal tiers do not drift) is unchanged, so
++// the fixture root is now named like its stored project.
+ test('S6 byte-equal neutral and legacy calibrations do not drift', () => {
+-  const root = fixture();
++  const root = fixture('alpha');
+   calib(root, { project: 'alpha' }, NEUTRAL);
+   calib(root, { project: 'alpha' }, LEGACY);
+   assert.equal(read(root).status, 'resolved');
+diff --git a/plugins/pipeline-core/lib/project-calibration-identity.mjs b/plugins/pipeline-core/lib/project-calibration-identity.mjs
+index 22aace40c..696bb2f27 100644
+--- a/plugins/pipeline-core/lib/project-calibration-identity.mjs
++++ b/plugins/pipeline-core/lib/project-calibration-identity.mjs
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: SUL-1.0
++import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+ import { basename, join, resolve } from "node:path";
+@@ -86,6 +87,74 @@ function unavailable(reason, code, rootSha256 = null, source = null) {
+     project: null, rootSha256,
+     configuredValue: Object.freeze({ status: "unavailable", reason }), source, code });
+ }
++/** R1: an aliased identity is not bound to the project; the refusal says why and how to repair it. */
++function aliasRefused(stored, current, source) {
++  const refusal = unavailable("alias-refused", "PCI-ALIAS-REFUSED", current.rootSha256, source);
++  return Object.freeze({ ...refusal,
++    message: `the calibration stores project "${stored}" but the root-derived project name is "${current.project}"; `
++      + `an aliased identity is refused. Repair: regenerate the project identity or set "project" to the root name "${current.project}".` });
++}
++
++// Source-checkout exemption (PO decision 2026-10-23, batch 12, row 42). The Agent-Pipeline source
++// checkout stores the alias "agent-pipeline" and lives in differently named directories on the PO's
++// machines, so R1's alias refusal would refuse this repository itself. The exemption is decided by the
++// facts the reader-review skill uses, observed from the Git index of the selected root: a tracked regular
++// .claude/pipeline.json whose project is "agent-pipeline" AND a tracked regular .claude-plugin/marketplace.json
++// whose name and owner.name are "agent-pipeline" with exactly one plugin "pipeline-core" at
++// ./plugins/pipeline-core. It never reads the directory name and no calibration field can select it.
++const SOURCE_PROJECT = "agent-pipeline";
++const SOURCE_CALIBRATION_PATH = ".claude/pipeline.json";
++const SOURCE_MARKETPLACE_PATH = ".claude-plugin/marketplace.json";
++const SOURCE_PLUGIN_NAME = "pipeline-core";
++const SOURCE_PLUGIN_SOURCE = "./plugins/pipeline-core";
++const MAX_IDENTITY_FILE_BYTES = 64 * 1024;
++function gitOutput(root, args, deps) {
++  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
++  const result = (deps.spawnSync ?? spawnSync)("git", args, { cwd: root, env, encoding: "utf8", shell: false, timeout: 5000 });
++  return result.error === undefined && result.status === 0 ? String(result.stdout) : null;
++}
++function readTrackedJson(root, relative, io) {
++  const target = join(root, ...relative.split("/"));
++  const info = io.lstatSync(target);
++  if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_IDENTITY_FILE_BYTES) return null;
++  const value = JSON.parse(io.readFileSync(target, "utf8"));
++  return object(value) ? value : null;
++}
++function isAgentPipelineSourceCheckout(current, io, deps) {
++  try {
++    const top = gitOutput(current.root, ["rev-parse", "--show-toplevel"], deps);
++    if (top === null) return false;
++    const toplevel = typeof io.realpathSync.native === "function"
++      ? io.realpathSync.native(top.trim()) : io.realpathSync(top.trim());
++    if (toplevel !== current.root) return false;
++    const listing = gitOutput(current.root,
++      ["ls-files", "--stage", "-z", "--", SOURCE_CALIBRATION_PATH, SOURCE_MARKETPLACE_PATH], deps);
++    if (listing === null) return false;
++    const modes = new Map();
++    for (const entry of listing.split("\0").filter(Boolean)) {
++      const match = /^(\d{6}) [0-9a-f]{40,64} 0\t(.+)$/u.exec(entry);
++      if (match === null || modes.has(match[2])) return false;
++      modes.set(match[2], match[1]);
++    }
++    for (const path of [SOURCE_CALIBRATION_PATH, SOURCE_MARKETPLACE_PATH]) {
++      if (!["100644", "100755"].includes(modes.get(path))) return false;
++    }
++    const calibration = readTrackedJson(current.root, SOURCE_CALIBRATION_PATH, io);
++    const marketplace = readTrackedJson(current.root, SOURCE_MARKETPLACE_PATH, io);
++    if (calibration === null || marketplace === null || calibration.project !== SOURCE_PROJECT) return false;
++    const plugins = marketplace.plugins;
++    return marketplace.name === SOURCE_PROJECT && object(marketplace.owner) && marketplace.owner.name === SOURCE_PROJECT
++      && Array.isArray(plugins) && plugins.length === 1 && object(plugins[0])
++      && plugins[0].name === SOURCE_PLUGIN_NAME && plugins[0].source === SOURCE_PLUGIN_SOURCE;
++  } catch { return false; }
++}
++/** R1 outcome for a stored name that is not the root-derived name: refuse, except for the source checkout. */
++function aliasOutcome(project, current, source, io, deps) {
++  if (project === SOURCE_PROJECT && isAgentPipelineSourceCheckout(current, io, deps)) {
++    return Object.freeze({ ...resolved(current, project, "configured-alias", source), identityMode: "source-checkout" });
++  }
++  return aliasRefused(project, current, source);
++}
+ function resolved(current, project, kind, source, placeholder = false) {
+   return Object.freeze({ schema: SCHEMA, status: "resolved", kind, project,
+     rootSha256: current.rootSha256,
+@@ -150,11 +219,16 @@ export function readProjectCalibrationIdentity({ rootDir = process.cwd(), deps =
+     if (metadata.kind === "root-derived" && project !== current.project) {
+       return unavailable("name-mismatch", "PCI-NAME-MISMATCH", current.rootSha256, source);
+     }
++    if (project !== current.project) return aliasOutcome(project, current, source, io, deps);
+     return resolved(current, project, metadata.kind, source);
+   }
+   // The historical seed is unavailable as a configured identity. Its factual
+   // physical-root replacement is a different observed source, even if the
+   // real directory itself is legitimately called "new-project".
+   if (project === "new-project") return resolved(current, current.project, "root-derived", source, true);
+-  return resolved(current, project, "configured-alias", source);
++  // R1 (AC-232, PO decision 2026-10-23 "S4 follows R1"): an aliased identity is
++  // refused. A stored name equal to the physical root name is no alias.
++  // The source checkout alone is exempt (typed identityMode "source-checkout"; PO decision 2026-10-23, row 42).
++  if (project !== current.project) return aliasOutcome(project, current, source, io, deps);
++  return resolved(current, project, "root-derived", source);
+ }
+diff --git a/plugins/pipeline-core/scripts/consumer-verify-check.mjs b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+index 85f352123..bc2f54027 100644
+--- a/plugins/pipeline-core/scripts/consumer-verify-check.mjs
++++ b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+@@ -16,7 +16,7 @@ export function runConsumerVerifyCheck(check, commandId = null) {
+     const artifact = resolveAuthorityArtifactPath("calibration", { rootDir: root });
+     if (!["ready", "missing"].includes(artifact.authorityStatus)) throw new Error(`project authority is ${artifact.authorityStatus}`);
+     const projectIdentity = readProjectCalibrationIdentity({ rootDir: root });
+-    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}`);
++    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}${projectIdentity.message === undefined ? "" : ` - ${projectIdentity.message}`}`);
+     const calibrationBytes = readFileSync(artifact.path);
+     if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("project calibration identity: PCI-SOURCE-DRIFT");
+     const calibration = JSON.parse(calibrationBytes.toString("utf8"));
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+index 28153d438..d4b2936b6 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.mjs
+@@ -68,7 +68,7 @@
+ import { randomBytes, createHash } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ 
+ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+ import { readRigorVerifyObservation } from "../lib/rigor-lifecycle.mjs";
+@@ -279,9 +279,16 @@ function mkdirPrivate(base, path) {
+   }
+ }
+ 
++/**
++ * The temporary named-commit worktree directory carries the NAME OF THE CHECKOUT ROOT: the project
++ * calibration identity is root-derived and an aliased identity is refused (AC-232 / R1, PO decision
++ * 2026-10-23), so a worktree directory named differently from the project would refuse its own commit.
++ */
++function commitWorktreePath(root, container) { return join(container, basename(resolve(root))); }
++
+ /** Remove a temporary named-commit worktree. Never throws; reports whether it is really gone. */
+ function removeCommitWorktree(root, container) {
+-  try { git(root, ["worktree", "remove", "--force", join(container, "checkout")], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
++  try { git(root, ["worktree", "remove", "--force", commitWorktreePath(root, container)], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* the filesystem removal below still runs */ }
+   try { rmSync(container, { recursive: true, force: true }); } catch { /* reported through the return value */ }
+   try { git(root, ["worktree", "prune"], COMMIT_WORKTREE_TIMEOUT_MS); } catch { /* a stale admin record is pruned by the next worktree command */ }
+   return !existsSync(container);
+@@ -321,9 +328,9 @@ async function produceVerifyEvidenceForCommit({ root, commit, ...options }) {
+   try {
+     mkdirPrivate(common, hooks);
+     // An empty hooks directory: a post-checkout hook of the shared repository must not run for this plumbing.
+-    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", join(container, "checkout"), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
++    try { git(root, ["-c", `core.hooksPath=${hooks}`, "worktree", "add", "--detach", "--quiet", commitWorktreePath(root, container), sha], COMMIT_WORKTREE_TIMEOUT_MS); }
+     catch { fail("VEP-COMMIT-WORKTREE", `Could not create the temporary worktree for commit ${sha}.`); }
+-    const produced = await produceVerifyEvidence({ ...options, rootDir: join(container, "checkout"), commit: null });
++    const produced = await produceVerifyEvidence({ ...options, rootDir: commitWorktreePath(root, container), commit: null });
+     // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
+     writeEvidence(root, target, produced.evidence);
+     result = { ...produced, outPath: target };
+diff --git a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+index 6ce40a438..b7e099eff 100644
+--- a/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
++++ b/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
+ import { spawn, spawnSync } from "node:child_process";
+ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { basename, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test from "node:test";
+ 
+@@ -35,7 +35,9 @@ function git(root, args) { return run("git", ["-C", root, ...args]).trim(); }
+ function fixture(verifyCommand) {
+   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
+   mkdirSync(join(root, ".claude"), { recursive: true });
+-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "fixture-project", verify: verifyCommand }, null, 2)}\n`);
++  // Fixture restatement (QG-04, bounded; PO decision 2026-10-23 "S4 follows R1", AC-232): an aliased
++  // identity is now refused, so the fixture project is named like its root. No assertion changed.
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root), verify: verifyCommand }, null, 2)}\n`);
+   writeFileSync(join(root, "README.md"), "# Fixture\n");
+   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+   prepareConsumerVerify({ rootDir: root });
+@@ -422,7 +424,7 @@ test("a calibration naming no verify command cannot produce success at any bound
+   const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
+   try {
+     mkdirSync(join(root, ".claude"), { recursive: true });
+-    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "no-verify" }, null, 2)}\n`);
++    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root) }, null, 2)}\n`);
+     writeFileSync(join(root, "README.md"), "# Baseline-only fixture\n");
+     prepareConsumerVerify({ rootDir: root });
+     git(root, ["init", "-q"]);

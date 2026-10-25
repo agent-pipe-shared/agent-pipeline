@@ -1,0 +1,30 @@
+// Helper (untracked): RED evidence for K104 in the throwaway clone scratch/clones/k104-apply (apply both diffs, then break one thing at a time).
+// usage: node scratch/k104-red.mjs
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+const clone = resolve("scratch/clones/k104-apply");
+const P = "plugins/pipeline-core/";
+for (const name of ["protected", "unprotected"]) execFileSync("git", ["-C", clone, "apply", resolve(`scratch/agent-out/K104-FANOUT-GUARD-LOAD-FAULT-k93-${name}.diff`)]);
+const run = (label, file) => {
+  const tmp = join(homedir(), "pipeline-test-tmp", `k104-red-${label}`); mkdirSync(tmp, { recursive: true, mode: 0o700 });
+  const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp }; delete env.NODE_TEST_CONTEXT;
+  const r = spawnSync(process.execPath, ["--test", file], { cwd: clone, encoding: "utf8", env, timeout: 600000 });
+  const out = (r.stdout ?? "") + (r.stderr ?? "");
+  const num = (k) => (new RegExp(`^ℹ ${k} (\\d+)`, "m").exec(out) ?? [])[1] ?? "?";
+  const failing = [...new Set([...out.matchAll(/^\s*✖ (.+?) \(\d/gm)].map((m) => m[1]))].slice(0, 6);
+  console.log(`${label}: exit ${r.status} tests ${num("tests")} pass ${num("pass")} fail ${num("fail")} ${file}`);
+  for (const f of failing) console.log(`   FAILING: ${f.slice(0, 160)}`);
+  if (num("tests") === "?") console.log(`   tail: ${out.trim().split("\n").slice(-8).join(" | ").slice(0, 700)}`);
+};
+run("green-applied", `${P}lib/dispatch-scope-overlap.test.mjs`);
+// RED 1: the baseline script (no --scope-overlap mode) with everything else applied.
+copyFileSync(resolve("scratch/clones/k91", `${P}scripts/dispatch-record-liveness.mjs`), join(clone, `${P}scripts/dispatch-record-liveness.mjs`));
+run("red-script-mode-missing", `${P}lib/dispatch-scope-overlap.test.mjs`);
+copyFileSync(resolve("scratch/clones/k93", `${P}scripts/dispatch-record-liveness.mjs`), join(clone, `${P}scripts/dispatch-record-liveness.mjs`));
+// RED 2: the K93 import edge back into the hook (the load fault itself).
+const guard = join(clone, `${P}hooks/guard-dispatch.mjs`);
+writeFileSync(guard, readFileSync(guard, "utf8").replace('import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";\n', 'import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";\nimport { readRunningDispatches as __k93Edge } from "../lib/dispatch-record-liveness.mjs";\n'));
+run("red-static-edge-pin", `${P}lib/dispatch-scope-overlap.test.mjs`);
+run("red-static-edge-briefing-suite", `${P}scripts/dispatch-briefing.test.mjs`);

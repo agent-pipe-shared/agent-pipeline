@@ -1,0 +1,16 @@
+{"schema":"pipeline.project-onboarding-plan.v3","status":"rolled-back","root":"<repo-root>/scratch/clones/g4/scratch/alf07b-plain-mMnq7K","diagnostics":[{"path":"$.transaction","code":"apply_failed","message":"GS-GIT-UNAVAILABLE","repair":"repair the root and run inspect then plan again"}]}
++ actual - expected
+
++ 'rolled-back'
+- 'activation-required'
+
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding-plan.v3","status":"rolled-back","root":"<repo-root>/scratch/clones/g4/scratch/alf07b-plain-mMnq7K","diagnostics":[{"path":"$.transaction","code":"apply_failed","message":"GS-GIT-UNAVAILABLE","repair":"repair the root and run inspect then plan again"}]}
++ actual - expected
+
++ 'rolled-back'
+- 'activation-required'
+
+    at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g4/plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs:347:12)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1382:25)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

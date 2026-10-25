@@ -1,0 +1,79 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 32d911ffc..4576c5c1d 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1,8 +1,8 @@
+ {
+   "schema": "pipeline.product-capability-inventory.v3",
+   "sourceBaseline": {
+-    "commit": "da6a48021390768841f1ab025b84862d5f146b49",
+-    "tree": "fffbcc5e755969ffdeccca34dec7f476ed6364eb"
++    "commit": "204962d788d4af8a8db59591339a26e7bf5075d7",
++    "tree": "ab549413afb879faa47f3b27d52bfedd433c35a9"
+   },
+   "criticReview": {
+     "status": "required-before-publication",
+@@ -234,6 +234,7 @@
+         "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-coordinator-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-native-dispatch-pretool-tests",
++        "verify-phase:harness/scripts/verify.mjs:antigravity-native-read-credential-roots-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-refresh-host-tests",
+@@ -425,6 +426,7 @@
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-model-enforcement-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
++        "verify-phase:harness/scripts/verify.mjs:dispatch-record-liveness-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
+@@ -480,6 +482,7 @@
+         "verify-phase:harness/scripts/verify.mjs:governance-scope-win32-acl-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-devplan-approval-unverified-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-devplan-design-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-devplan-design-approval-v7-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-devplan-policy-tests",
+@@ -532,6 +535,7 @@
+         "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-guard-override-capability-scan-tests",
++        "verify-phase:harness/scripts/verify.mjs:human-guard-override-disjoint-isolation-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-guard-override-disjoint-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
+         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
+@@ -631,6 +635,7 @@
+         "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
++        "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-inspect-prefilter-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+@@ -707,6 +712,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-design-generator-repeats-large-source-material-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-design-intake-generator-omits-question-answers-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-design-package-parent-metadata-false-drift-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-design-phase-d64-criterion-parser-and-sanitized-review-chain-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-design-phase-runs-critic-advisor-and-readiness-instead-of-one-review-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-design-trailer-verifier-lost-after-closure-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-design-workflow-package-omits-contract-tests",
+@@ -812,6 +818,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-session-readiness-drops-to-partial-after-bootstrap-ready-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-shell-classifier-faults-on-heredoc-body-text-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-shell-grammar-file-is-a-kernel-path-without-capability-placement-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-sign-intent-disclosure-scan-blocks-for-minutes-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-signature-ceremony-requires-operator-work-and-breaks-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-signed-descriptor-custody-handles-an-unborn-repository-tests",
+@@ -958,6 +965,7 @@
+         "verify-phase:harness/scripts/verify.mjs:report-interruptions-tests",
+         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
+         "verify-phase:harness/scripts/verify.mjs:repository-path-identity-tests",
++        "verify-phase:harness/scripts/verify.mjs:required-evidence-not-ignored-tests",
+         "verify-phase:harness/scripts/verify.mjs:requirement-traceability-tests",
+         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
+         "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",

@@ -1,0 +1,38 @@
+{
+  "taskId": "patch-guard-canonical-fixture-qualification-20260929",
+  "status": "waiting-for-disjoint-product-dependency",
+  "testSourceSha256": "ea3f3f22d579dd391b51873536956656f666f511f88492864016ff36f2bd5836",
+  "actualSelected": { "exitCode": 1, "passed": 1, "failed": 2, "SourceStable": true },
+  "fixtureProofBeforeActualGuardCLI": [
+    "public portable seed and explicit synthetic intake consent",
+    "canonical initialize-runtime and existing disposable host restart readback seam",
+    "producer-defined ignored host runner allowlist",
+    "public planProjectOnboardingKickoffV4/applyProjectOnboardingKickoffV4 with no fakeDeps",
+    "sanctioned discard-feature",
+    "activeFeature absent; discardedFeatures length 1",
+    "classifyOnboardingContinuity valid",
+    "observeGovernanceScope active",
+    "actual Source inspect session ready",
+    "actual requireProjectOnboardingReady ready"
+  ],
+  "failure": {
+    "source": "plugins/pipeline-core/lib/protected-baseline.mjs",
+    "line": 131,
+    "branch": "dynamicContinuityEntries requires Array.isArray(parsed.closedFeatures)",
+    "diagnostic": "PB-DYNAMIC-UNAVAILABLE: dynamic continuity class unavailable; static baseline remains active: closedFeatures is not an array",
+    "realGuardCLIStatus": 1,
+    "canonicalContract": "pipeline-state discard-feature preserves absent closedFeatures; onboarding-continuity.mjs:2790 documents valid discarded-only State and uses closedFeatures ?? []",
+    "qualification": "genuine READY canonical fixture compatibility failure; no manual State mutation or assertion weakening"
+  },
+  "historicalAttendedCLIRefusal": {
+    "kind": "preserved transcript summary; earlier fixed selected raw files were superseded by this distinct authorized library-seam run",
+    "actualAttempts": 2,
+    "code": "CHAT-GATE-NOT-ATTENDED",
+    "command": "project-onboarding-v3.mjs kickoff plan --root disposable-root --goal Exercise native patch guards --language en --runner codex",
+    "disposition": "abandoned; no spoof TTY or retry of refused attended CLI"
+  },
+  "full28": "not run; Root explicitly delayed until protected-baseline compatibility owner closes",
+  "priorFullReceipt": "scratch/0.7-final-source-patch-guard-qualification-20260929/manifest.json",
+  "priorFullManifestSha256": "03aea4efa4adbf81a850a967fcd8b7f89aa95bf2d5671d4174993dd9b4646d36",
+  "priorFullCounts": { "passed": 21, "failed": 7 }
+}

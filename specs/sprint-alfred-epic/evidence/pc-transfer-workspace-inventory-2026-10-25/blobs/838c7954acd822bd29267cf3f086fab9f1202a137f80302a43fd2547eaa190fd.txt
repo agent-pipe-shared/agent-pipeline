@@ -1,0 +1,7 @@
+docs(parallel-work): reduce the cancelled-slice section to a one-paragraph repair and link the Coordinator term
+
+Reader round 20261023b findings 29 (cancelled-slice section only) and 44:
+the refusal code and the recon-note repair stay; the duty-end detail is cut.
+
+AI-Assisted: true
+Dispatch: K124-READER-FIX2-GROUP-D (goldfish)

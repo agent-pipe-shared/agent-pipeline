@@ -1,0 +1,21 @@
+import { readFileSync, writeFileSync } from "node:fs";
+const P = "docs/product-capability-inventory.json";
+const text = readFileSync(P, "utf8");
+const data = JSON.parse(text);
+const P2 = "verify-phase:harness/scripts/verify.mjs:";
+const add = ["pin-antigravity-global-refresh-recovers-and-installs-a-runner-view-tests","pin-antigravity-refresh-validates-the-source-before-retiring-the-managed-copy-tests","pin-consumer-approved-plan-reaches-the-first-item-host-commit-tests","pin-consumer-spec-criterion-binds-the-first-item-delivery-tests","pin-design-package-parent-metadata-false-drift-tests","pin-gg11-admits-env-templates-and-test-fixtures-tests","pin-resume-hint-inspect-is-admitted-in-every-lifecycle-state-tests","session-cleanup-lost-binding-tests","session-power-address-repair-tests","guard-dispatch-budget-grant-notice-tests"].map((n) => P2 + n);
+let found = 0;
+const walk = (o) => {
+  if (Array.isArray(o)) {
+    if (o.includes(P2 + "session-authority-repair-tests")) {
+      found += 1;
+      for (const a of add) if (!o.includes(a)) o.push(a);
+      const before = o.slice(); o.sort();
+      writeFileSync(".diag-inv.out", `sorted-before-equal-original-order-ignoring-new: ${JSON.stringify(before.filter((x) => !add.includes(x)).join() === o.filter((x) => !add.includes(x)).join())}\n`);
+    }
+    o.forEach(walk);
+  } else if (o && typeof o === "object") Object.values(o).forEach(walk);
+};
+walk(data);
+writeFileSync(P, JSON.stringify(data, null, 2) + (text.endsWith("\n") ? "\n" : ""));
+console.log("arrays patched", found);

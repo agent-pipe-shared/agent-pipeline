@@ -1,0 +1,4 @@
+import { writeFileSync } from "node:fs";
+import { checkVerifyCaseCompletion } from "./harness/scripts/check-verify-case-completion.mjs";
+const r = checkVerifyCaseCompletion({ root: process.cwd() });
+writeFileSync(".diag-vcc.out", JSON.stringify({ ok: r.ok, n: r.findings.length, registered: r.registeredCount, vulnerable: r.vulnerableCount, registry: r.registryCount }) + "\n");

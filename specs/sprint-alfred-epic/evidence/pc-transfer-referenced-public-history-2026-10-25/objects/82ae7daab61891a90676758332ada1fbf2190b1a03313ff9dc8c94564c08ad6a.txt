@@ -1,0 +1,160 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 9ad0b3d06..8f1092a69 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -852,6 +852,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-announce-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-argv-closure-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-chat-catalogue-repair-tests",
++        "verify-phase:harness/scripts/verify.mjs:pipeline-state-calibration-recovery-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-close-audit-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-discard-feature-tests",
+@@ -1102,6 +1103,7 @@
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
++        "verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-native-type-cache-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-private-state-observation-memo-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 2f2e22283..d0552f738 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -1332,6 +1332,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "pipeline-state-calibration-recovery-tests",
++      "path": "plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "pipeline-state-close-audit-tests",
+       "path": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+@@ -1973,6 +1978,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "windows-authority-readiness-tests",
++      "path": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "windows-private-state-tests",
+       "path": "plugins/pipeline-core/lib/windows-private-state.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 6e9546c28..03e2c04de 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3934,6 +3934,50 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "pipeline-state-calibration-recovery-tests",
++      "file": "plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs",
++      "invariantPinned": "Calibration phase and Verify command transitions preserve exact Source and State recovery, refuse forged or concurrent writes, and report partial repair without false readiness.",
++      "nonOverlapNote": "Unique K156 calibration recovery course; the existing calibration transition and pipeline-state suites retain their own established cases.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "KCR001",
++          "KCR002",
++          "KCR003",
++          "KCR004",
++          "KCR005",
++          "KCR006",
++          "KCR007",
++          "KCR008",
++          "KCR009",
++          "KCR010",
++          "KCR011"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "windows-authority-readiness-tests",
++      "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
++      "invariantPinned": "Windows authority readiness aggregates closed project, plugin and private path observations, refuses inherited mutation and unknown native causes, and remains read-only.",
++      "nonOverlapNote": "Unique G19 readiness decision suite; native preflight integration and Windows ACL pins retain their own contracts.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "WAR001",
++          "WAR002",
++          "WAR003",
++          "WAR004",
++          "WAR005",
++          "WAR006",
++          "WAR007",
++          "WAR008",
++          "WAR009"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs
+index 101e85c2e..c462480f9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs
+@@ -7,7 +7,7 @@ import fs from "node:fs";
+ import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+ import { syncBuiltinESMExports } from "node:module";
+ import { join, resolve } from "node:path";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { fileURLToPath } from "node:url";
+ import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+ import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
+@@ -19,6 +19,8 @@ import { observeCurrentPlanApprovalForCalibration, run } from "./pipeline-state.
+ const BASELINE = "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"";
+ const COMMAND = "node --test src/change.test.mjs";
+ const SOURCE_REPO = fileURLToPath(new URL("../../..", import.meta.url));
++const cases = [];
++function test(name, run) { cases.push({ id: `KCR${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ const git = (root, ...args) => {
+   const result = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
+   assert.equal(result.status, 0, result.stderr);
+@@ -352,3 +354,6 @@ test("live Source serialization refuses concurrent same and different commands",
+   assert.equal(completed, 0, "first Source command completes after the hold");
+   assert.equal(spawnSync(process.execPath, [cli,"configure-verify","--verify-command",COMMAND], { cwd: root, encoding: "utf8" }).status, 0);
+ });
++
++if (cases.length !== 11) throw new Error("calibration recovery case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+index 4adffd94d..ae26a3a0b 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+-import test from 'node:test';
++import { registerTestCaseCompletion } from './test-case-completion.mjs';
+ import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
+ 
+ const roots = {
+@@ -8,6 +8,8 @@ const roots = {
+   pluginRoot: 'C:\\Users\\owner\\plugins\\pipeline-core',
+   privateRoot: 'D:\\work\\repo\\.git\\agent-pipeline',
+ };
++const cases = [];
++function test(name, run) { cases.push({ id: `WAR${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
+ 
+ test('foreign inherited Modify at the repository root remains refused with bounded recovery', () => {
+   const calls = [];
+@@ -105,3 +107,6 @@ test('direct consumers receive only closed native causes', () => {
+   assert.equal(windowsAuthorityCause({ reason: 'WIN-AUTH-ANCESTOR-MUTATION' }), 'WIN-AUTH-ANCESTOR-MUTATION');
+   assert.equal(windowsAuthorityCause({ reason: 'private path and SID' }), 'WIN-AUTH-OBSERVATION-UNAVAILABLE');
+ });
++
++if (cases.length !== 9) throw new Error('Windows authority readiness case count drift');
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });

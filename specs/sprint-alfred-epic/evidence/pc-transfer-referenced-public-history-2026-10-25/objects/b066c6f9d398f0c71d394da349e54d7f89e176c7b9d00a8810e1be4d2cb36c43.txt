@@ -1,0 +1,1 @@
+{"schema":"pipeline.project-resource-observations.v1","candidate":{"commit":"1b7fc4f0424c617c19039903ba4f88aece3116f2","tree":"8dd3f8d2c4757580aa89595da94f1da758e6b2e0"},"resources":[{"id":"project-resource-headroom","limit":null,"measurement":null}]}

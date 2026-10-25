@@ -1,0 +1,13 @@
+import {mkdirSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {resolve} from 'node:path';
+const root=resolve('scratch/clones/d124-current-carry-qualification');
+const syntheticHome=resolve('scratch/agent-out/d124-current-carry-qualification/synthetic-home');
+mkdirSync(syntheticHome,{recursive:true,mode:0o700});
+const child=spawnSync(process.execPath,['--test','plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs'],{
+ cwd:root,encoding:'utf8',env:{...process.env,HOME:syntheticHome,USERPROFILE:syntheticHome,XDG_CONFIG_HOME:syntheticHome,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null'},
+});
+process.stdout.write(child.stdout??'');
+process.stderr.write(child.stderr??'');
+if(child.error)process.stderr.write(String(child.error));
+process.exitCode=child.status??1;

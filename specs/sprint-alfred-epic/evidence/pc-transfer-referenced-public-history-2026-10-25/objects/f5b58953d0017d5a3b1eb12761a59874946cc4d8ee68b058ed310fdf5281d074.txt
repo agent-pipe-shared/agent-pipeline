@@ -1,0 +1,52 @@
+# G23 original M7 qualification — updated continuation report
+
+Status: original local suite qualification completed on the isolated clone. This
+is test evidence only; it makes no native Windows, installed-runner, host, or
+Main integration claim. No process handle is live.
+
+## Source and scope
+
+- Candidate commit: `32b398bf7c5bd03ba9184bea09305893ea4fbd61`
+- Candidate tree: `926a91a3f1718477cfd1234f2e7b4b8a375ac65f`
+- Original pinned test blob: `6bc1268be7633c3a21d8ddd8e500a657389efb67`
+- Local test-only patch blob: `0e04863b248b5b66576a885f839d8268a40af5fb`
+- Only tracked local change: `plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs`
+- No Main, production source, registry, matrix, cache, profile, or commit change.
+
+## Evidence
+
+- Baseline M7/M8: command `node scratch/agent-out/g23-original-m7/safe-capture.mjs focused-m7-m8 focused-m7-m8.txt '^M7|^M8'`; exit 0; 5 passed, 0 failed. Artifact: `focused-m7-m8.txt`.
+- Observation regression RED: command `node scratch/agent-out/g23-original-m7/safe-capture.mjs observation-red observation-red.txt '^A4'`; exit 1; 0 passed, 1 failed. The old result parser failed to throw on `{error, status:null, stdout:"", stderr:""}`, so `assert.throws` observed no exception. Artifact: `observation-red.txt`.
+- Child-observation correction GREEN: command `node scratch/agent-out/g23-original-m7/safe-capture.mjs observation-green observation-green.txt '^A4'`; exit 0; 1 passed. Artifact: `observation-green.txt`.
+- Corrected M7/M8: command `node scratch/agent-out/g23-original-m7/safe-capture.mjs corrected-m7-m8 corrected-m7-m8.txt '^M7|^M8'`; exit 0; 5 passed, 0 failed. Artifact: `corrected-m7-m8.txt`.
+- Final observer + M7/M8: command `node scratch/agent-out/g23-original-m7/safe-capture.mjs final-observer-m7-m8 final-observer-m7-m8.txt '^A4|^M7|^M8'`; exit 0; 6 passed, 0 failed, 0 skipped, 0 todo. Artifact: `final-observer-m7-m8.txt` (SHA-256 `c1508d4aa1fbc2aea3cd5314de7890b35381a57ee6ecdd67466ee2b68d4c3650`).
+- Full original file, run once after the focused pass: command `node scratch/agent-out/g23-original-m7/safe-capture.mjs full-original full-original.txt`; exit 0; 23 passed, 0 failed, 1 skipped (U3 typed Linux/WSL host limitation), 0 todo. Artifact: `full-original.txt` (SHA-256 `714bc7e2c4fd602c63d0c492dd7cf69c5e72f413751df1002da40361a4cf53fc`).
+
+The final focused and full captures execute the final Claude terminal-exit
+validation and A4 assertions. The child adapter observer accepts
+Codex’s valid status-0 empty-output allow, requires its typed deny JSON, checks
+Antigravity’s explicit allow/deny JSON and corresponding status, and throws on
+spawn error, signal, nonterminal status, or malformed payload. Existing
+behavioral examiners remain intact.
+
+## Final hashes and limits
+
+- Clone root: `<repo-root>/scratch/clones/g23-original-m7-qualification`; HEAD `32b398bf7c5bd03ba9184bea09305893ea4fbd61`; tree `926a91a3f1718477cfd1234f2e7b4b8a375ac65f`; dirty only for the authorized test path.
+- Original test blob: `6bc1268be7633c3a21d8ddd8e500a657389efb67`; final test blob: `0e04863b248b5b66576a885f839d8268a40af5fb`; final test SHA-256: `09b63b7742144e5f23644f76ee3973b10be548f1b112004c3a6beb54834882bf`.
+- Safe-capture launcher SHA-256: `5f5da2421f0361f31a210ad5e34c4c8330e6613de54d7111117a5943f8f42c06`, matching the custody-bound inert launcher snapshot. The exact inert patch remains `specs/sprint-alfred-epic/evidence/post-stamp-handoff-2026-10-25/g23.proposal.patch.txt`, SHA-256 `8bca872f6496c15a31289c01072446667c434ece779762443cd30fb7c68a3c50`.
+- Windows-only U3, native Windows, installed-runner and user-host behavior:
+  no claims.
+- No actual credential, `.apsp`, account, key, anchor, or profile data was read.
+- All test processes used the synthetic preload before test imports; structured
+  `NODE_OPTIONS` propagated it to adapter children. Evidence was captured by
+  `capture-evidence.mjs` under ignored `scratch/agent-out/g23-original-m7/`.
+- No dispatch record was created, per the briefing’s explicit PO-approved
+  first-write exception. No commit was made.
+- Verify, independent review, final integration, and PO acceptance remain parent-owned and pending.
+
+## Deviations
+
+- At entry, one read-only shell call combined multiple `cat` operands despite the closed-shell rule; it made no writes. A first preflight attempt with `--role goldfish` produced no output; the exact skill command without that argument then returned `status: ready` and is the status reported here. No bootstrap confirmation was printed because the full loaded-authority confirmation facts were not completed.
+
+The exact uncommitted diff is in the clone at the path above. The early ignored
+checkpoint is `checkpoint.md` in this output directory.

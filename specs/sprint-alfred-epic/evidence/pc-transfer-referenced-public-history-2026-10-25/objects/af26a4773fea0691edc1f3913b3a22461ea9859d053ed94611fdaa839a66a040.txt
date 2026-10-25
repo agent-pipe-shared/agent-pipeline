@@ -1,0 +1,36 @@
+import os from "node:os";
+import { mkdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const root = process.cwd();
+const preload = fileURLToPath(new URL("./codex-ready-fixture-user-preload.mjs", import.meta.url));
+const filter = process.argv[2] === "--focused"
+  ? "Bash, apply_patch, Edit and Write each reach their intended guard family"
+  : process.argv[2] === "--author-repair"
+    ? "Pipeline Author Repair selects one exact source root and consumes one patch"
+    : null;
+const captureName = filter === null ? "full39" : filter.startsWith("Pipeline Author Repair") ? "author-repair" : "focused";
+process.env.HOME = fileURLToPath(new URL("./codex-push-test-home", import.meta.url));
+process.env.USERPROFILE = process.env.HOME;
+process.env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE = process.env.HOME;
+process.env.NODE_OPTIONS = `--import=${preload}`;
+if (filter !== null) {
+  process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER = filter;
+} else {
+  delete process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER;
+}
+os.userInfo = () => ({ uid: 65000, gid: 65000, username: "pipeline-fixture", homedir: process.env.HOME, shell: "" });
+mkdirSync(process.env.HOME, { recursive: true });
+
+const result = spawnSync(process.execPath, [
+  "plugins/pipeline-core/scripts/capture-evidence.mjs",
+  "--out", `scratch/agent-out/codex-ready-fixture-authoring-${captureName}.json`,
+  "--label", `codex-ready-fixture-authoring-${captureName}`,
+  "--", process.execPath, "--import", preload,
+  "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+], { cwd: root, env: process.env, encoding: "utf8", timeout: 240_000 });
+process.stdout.write(result.stdout ?? "");
+process.stderr.write(result.stderr ?? "");
+if (result.error) throw result.error;
+process.exitCode = result.status ?? 1;

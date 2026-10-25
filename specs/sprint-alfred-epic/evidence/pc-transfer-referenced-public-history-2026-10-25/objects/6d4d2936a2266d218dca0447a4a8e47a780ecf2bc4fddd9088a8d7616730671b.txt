@@ -1,0 +1,137 @@
+C7 clone proof at HEAD 7c2d7c6fc3686f491880e80acbb993ef713da089: 39 suites, baseline (unpatched clone) vs patched (scratch/c7/pipeline-state.patched.mjs installed).
+- SAME harness/scripts/check-auth-gate-inventory-drift.test.mjs: baseline exit 0 35/35; patched exit 0 35/35
+- SAME harness/scripts/pipeline-state.test.mjs: baseline exit 0 1/1; patched exit 0 1/1
+- SAME plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs: baseline exit 1 12/13; patched exit 1 12/13
+    baseline failure: DAGA007 reject missing duplicate blank oversize and flag-form attribution
+- DIFF plugins/pipeline-core/hooks/design-course-command-admission.test.mjs: baseline exit 0 17/17; patched exit 1 0/17
+    new failure in patched: K3G001 awaiting-approval inspect requests explicit review receipt for feature and epic
+    new failure in patched: K3G002 course inspect returns exact retirement without authority or state access
+    new failure in patched: K3G003 retained readiness argv stays narrow for every runner and execution is retired
+    new failure in patched: K3G004 guard refuses arbitrary script root runner source digest identity output and extra argv
+    new failure in patched: K3G005 inspect rejects extra flags and every agent signing shape including run-v2
+    new failure in patched: K3G006 mini keeps present-plan while feature package and runner hints cannot restore the course
+    new failure in patched: K3G007 retained v2 argv stays narrow with curation and resume while execution is retired
+    new failure in patched: K3G008 readiness requires current queue and distinct dispatch plus bounded receipt preparation and Codex descriptor
+    new failure in patched: K3G009 run-v2 rejects extra signing collision and stale or foreign curation references
+    new failure in patched: K3G010 physical source and preparation aliases never gain admission
+    new failure in patched: K3G011 source and current submission changes invalidate previously emitted commands
+    new failure in patched: K3G012 profile acknowledgement plan remains a strict agent diagnostic with indivisible profile reason pair
+    new failure in patched: K3G013 profile acknowledgement apply stays human-only for agent tools with ready tty and malformed or reordered flags
+    new failure in patched: K3G014 actual inspect advisor and resumed v2 CLI refuse before dispatch signing or publication
+    new failure in patched: K3G015 trusted approve-push chat argv reaches the real guard under committed global policy
+    new failure in patched: K3G016 global chat push admission rejects malformed duplicate extra root-spoof and foreign script argv
+    new failure in patched: K3G017 signature legacy default and uncommitted or invalid chat policies never admit agent push approval
+- SAME plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs: baseline exit 0 389/392; patched exit 0 389/392
+- SAME plugins/pipeline-core/lib/design-workflow-evidence-descendant.test.mjs: baseline exit 0 14/14; patched exit 0 14/14
+- SAME plugins/pipeline-core/lib/design-workflow-package-route.test.mjs: baseline exit 1 14/15; patched exit 1 14/15
+    baseline failure: R4-T0-6 regression: present-plan keeps its unchanged refusal text and still forwards the validator code
+- SAME plugins/pipeline-core/lib/onboarding-continuity.test.mjs: baseline exit 1 267/306; patched exit 1 267/306
+    baseline failure: OBC055 planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS)
+    baseline failure: OBC059 cleanup descriptor bind and release use exact state CAS without touching other fields
+    baseline failure: OBC060 bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state
+    baseline failure: OBC062 bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound
+    baseline failure: OBC119 authentic post-privatization kickoff seed promotes revision 1 to revision 2
+    baseline failure: OBC120 post-privatization promotion promotion-history-temp-fsync crash recovers with the same bound plan
+    baseline failure: OBC121 post-privatization promotion promotion-history-rename crash recovers with the same bound plan
+    baseline failure: OBC122 post-privatization promotion promotion-history-published crash recovers with the same bound plan
+    baseline failure: OBC123 post-privatization promotion promotion-handover-temp-fsync crash recovers with the same bound plan
+    baseline failure: OBC124 post-privatization promotion promotion-handover-rename crash recovers with the same bound plan
+    baseline failure: OBC125 post-privatization promotion promotion-handover-published crash recovers with the same bound plan
+    baseline failure: OBC126 post-privatization promotion promotion-cleanup-binding-published crash recovers with the same bound plan
+    baseline failure: OBC127 post-privatization promotion promotion-state-temp-fsync crash recovers with the same bound plan
+    baseline failure: OBC128 post-privatization promotion promotion-state-rename crash recovers with the same bound plan
+    baseline failure: OBC129 post-privatization promotion promotion-state-published crash recovers with the same bound plan
+    baseline failure: OBC132 a crash after the handover publication rolls forward, never backward
+    baseline failure: OBC134 promotion crash at promotion-history-temp-fsync leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC135 promotion crash at promotion-history-rename leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC136 promotion crash at promotion-history-published leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC137 promotion crash at promotion-handover-temp-fsync leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC138 promotion crash at promotion-handover-rename leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC139 promotion crash at promotion-handover-published leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC140 promotion crash at promotion-cleanup-binding-published leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC141 promotion crash at promotion-state-temp-fsync leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC142 promotion crash at promotion-state-rename leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC143 promotion crash at promotion-state-published leaves the provisional kickoff anchors byte for byte
+    baseline failure: OBC147 legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay
+    baseline failure: OBC148 legacy promotion cleanup recovery is crash-replay safe after private binding publication
+    baseline failure: OBC149 ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay
+    baseline failure: OBC150 legacy promotion cleanup mismatch history-binding fails closed
+    baseline failure: OBC151 legacy promotion cleanup mismatch state-feature fails closed
+    baseline failure: OBC153 post-privatization kickoff rejects revision-two
+    baseline failure: OBC154 post-privatization kickoff rejects authority-drift
+    baseline failure: OBC155 post-privatization kickoff rejects dispatch
+    baseline failure: OBC156 post-privatization kickoff rejects blocker
+    baseline failure: OBC157 post-privatization kickoff rejects queue-mutation
+    baseline failure: OBC158 post-privatization kickoff rejects result
+    baseline failure: OBC159 post-privatization kickoff rejects decision
+    baseline failure: OBC160 post-privatization kickoff rejects false-history
+- SAME plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs: baseline exit 1 7/11; patched exit 1 7/11
+    baseline failure: [AC-113 present-plan ignored bound path] the review report is git-ignored: present-plan refuses before the PO signs, writes no request
+    baseline failure: [AC-113 present-plan ignored bound path] a design companion is git-ignored: present-plan refuses before the PO signs, writes no request
+    baseline failure: [AC-113 present-plan ignored bound path] the review receipt itself is git-ignored: present-plan refuses before the PO signs, writes no request
+    baseline failure: [AC-113 present-plan ignored bound path] control: with every bound path tracked, the same fixture still presents
+- DIFF plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs: baseline exit 0 10/11; patched exit 1 0/11
+    new failure in patched: AC-123 present-plan: one and two distinct review receipts are admitted by the real guard in design phase
+    new failure in patched: AC-123 present-plan: admission stays narrow (no broad grammar relaxation)
+    new failure in patched: AC-123 present-plan RED: a scratch mirror with widened receipt count admits what production refuses
+    new failure in patched: AC-123 present-plan RED: a scratch mirror without the duplicate check admits what production refuses
+    new failure in patched: AC-123 emitted command: the concrete present-plan action inspect emits is admitted by the real guard
+    new failure in patched: AC-123 emitted command: mini inspect with a local git user.name emits the prescribed present-plan verb as a ready command the guard admits as emitted
+    new failure in patched: AC-123 submit-plan, reopen-design and set-phase prescribed by the course are admitted; wrong shapes are not
+    new failure in patched: AC-123 design-course-session --run-v2: exact current shape admitted for every runner, retired execution refuses before dependencies
+    new failure in patched: AC-123 design-course-session --run-v2: tampered shapes stay refused (no broad relaxation)
+    new failure in patched: AC-123 continuity-* writers are not catalogue-admitted lifecycle verbs of the current course
+- SAME plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs: baseline exit 0 5/5; patched exit 0 5/5
+- SAME plugins/pipeline-core/lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs: baseline exit 0 10/10; patched exit 0 10/10
+- SAME plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs: baseline exit 1 2/6; patched exit 1 2/6
+    baseline failure: case A: configure-verify names the unmet condition (approved-companion-removed) and a repair
+    baseline failure: case A: configure-verify names the unmet condition (authority-source-edited) and a repair
+    baseline failure: case A: configure-verify names the unmet condition (state-file-not-private) and a repair
+    baseline failure: case A: the unmet conditions are pairwise distinguishable (no two collapse to one code)
+- SAME plugins/pipeline-core/lib/pins/configure-verify-output-lacks-a-walkable-commit-route.test.mjs: baseline exit 0 8/8; patched exit 0 8/8
+- SAME plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs: baseline exit 0 6/6; patched exit 0 6/6
+- SAME plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs: baseline exit 0 4/4; patched exit 0 4/4
+- SAME plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs: baseline exit 0 9/9; patched exit 0 9/9
+- DIFF plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs: baseline exit 0 23/23; patched exit 1 22/23
+    new failure in patched: present-plan path (real CLI run): the spawned present-plan --review-receipt route hands over one signature with no Advisor or readiness stage
+- SAME plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs: baseline exit 0 8/8; patched exit 0 8/8
+- SAME plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs: baseline exit 0 17/18; patched exit 0 17/18
+- SAME plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs: baseline exit 0 4/5; patched exit 0 4/5
+- SAME plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs: baseline exit 0 24/25; patched exit 0 24/25
+- SAME plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs: baseline exit 0 21/21; patched exit 0 21/21
+- SAME plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs: baseline exit 0 11/12; patched exit 0 11/12
+- DIFF plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs: baseline exit 0 11/11; patched exit 1 9/11
+    new failure in patched: approve-plan independently refuses staging drafts and pre-authority banners outside staging
+    new failure in patched: set-feature initializes revision-0 continuity so submit-plan succeeds without continuity-init
+- SAME plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs: baseline exit 0 27/27; patched exit 0 27/27
+- SAME plugins/pipeline-core/lib/po-gate-authority.test.mjs: baseline exit 0 1/1; patched exit 0 1/1
+- DIFF plugins/pipeline-core/lib/project-onboarding-v3.test.mjs: baseline exit 0 1/1; patched exit 1 0/1
+    new failure in patched: plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+- SAME plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs: baseline exit 0 3/3; patched exit 0 3/3
+- DIFF plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs: baseline exit 0 14/14; patched exit 1 6/14
+    new failure in patched: DABC001 compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State
+    new failure in patched: DABR001 route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command
+    new failure in patched: DABR002 route 2: one design proof, approve-plan, and the closed v9 accepted-contract record
+    new failure in patched: DABR003 route 3: the boundary library admits the current approved v9 accepted-contract record
+    new failure in patched: DABR004 route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve
+    new failure in patched: DABV001 decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt
+    new failure in patched: DABX001 retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED
+    new failure in patched: DABX002 retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan)
+- SAME plugins/pipeline-core/scripts/pipeline-state-approve-announce.test.mjs: baseline exit 0 1/1; patched exit 0 1/1
+- SAME plugins/pipeline-core/scripts/pipeline-state-inspect.test.mjs: baseline exit 0 26/26; patched exit 0 26/26
+- SAME plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs: baseline exit 0 14/14; patched exit 0 14/14
+- DIFF plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs: baseline exit 1 16/18; patched exit 1 13/18
+    new failure in patched: submit-plan honors the exact generator-identical acknowledgement exemption
+    new failure in patched: submit-plan records modified non-exempt feature bytes without granting approval
+    new failure in patched: submit-plan records feature authority independently of an exempt bootstrap observation
+    baseline failure: submit-plan mini still refuses missing historical acknowledgement without mutation
+    baseline failure: inspect exposes one typed PO approval action after submit and presentation, independent of runner
+- SAME plugins/pipeline-core/scripts/pipeline-state.test.mjs: baseline exit 0 1/1; patched exit 0 1/1
+- SAME plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs: baseline exit 1 5/7; patched exit 1 5/7
+    baseline failure: in-process driver follows returned actions and preserves the Codex legacy-advisory approval boundary
+- SAME plugins/pipeline-core/scripts/push-init.test.mjs: baseline exit 0 32/32; patched exit 0 32/32
+- SAME plugins/pipeline-core/scripts/r7-3-bound-paths.test.mjs: baseline exit 1 12/13; patched exit 1 12/13
+    baseline failure: R7-3d every path-naming field of the repository's live State has a classification
+- SAME plugins/pipeline-core/scripts/rebind-approval.test.mjs: baseline exit 0 6/7; patched exit 0 6/7
+    baseline failure: inspect of an approval that cannot be verified on this checkout lists rebind-approval alongside reopen-design # TODO onboarding inspect on the throwaway clone returns status partial (partial_authority, nextAction null) because the clone is not an onboarded project; the ready branch that calls designToImplementationHandoverAction is never reached, so the reopen-design precondition cannot be established on this fixture
+Result: DIFFERENCES FOUND.

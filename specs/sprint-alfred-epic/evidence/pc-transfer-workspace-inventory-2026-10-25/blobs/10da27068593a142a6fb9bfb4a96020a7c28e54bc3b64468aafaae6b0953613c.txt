@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import test from "node:test";
+import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+
+const scratch = join(process.cwd(), "scratch", "g20-publication-guard-fixtures");
+mkdirSync(scratch, { recursive: true });
+const guardPath = join(process.cwd(), "plugins", "pipeline-core", "hooks", "guard-push.mjs");
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+
+test("guard uses the proposed push commit for review, despite HEAD and dirty package changes", () => {
+  const dir = mkdtempSync(join(scratch, "repo-"));
+  try {
+    const git = (...args) => {
+      const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", shell: false });
+      assert.equal(result.status, 0, `fixture git ${args[0]}: ${result.stderr}`);
+      return result.stdout.trim();
+    };
+    git("init", "-q", "-b", "main");
+    git("config", "user.name", "Fixture");
+    git("config", "user.email", "fixture@example.invalid");
+    const controller = createGovernanceScopeController({ hostStateRoot: join(dir, ".git", "fixture-hoststate") });
+    const plan = controller.planDecision({ rootDir: dir, decision: "enroll", by: "fixture" });
+    assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+    git("remote", "add", "delivery", "https://example.invalid/right.git");
+    mkdirSync(join(dir, ".claude"));
+    mkdirSync(join(dir, "specs", "feature"), { recursive: true });
+    writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n");
+    const planPath = "specs/feature/prd.md", specPath = "specs/feature/spec.md";
+    const planBytes = "# PRD\n", specBytes = "# Spec\n";
+    writeFileSync(join(dir, planPath), planBytes);
+    writeFileSync(join(dir, specPath), specBytes);
+    const profileSha256 = "a".repeat(64);
+    const submission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: "feature", planPath,
+      planSha256: hash(planBytes), specPath, specSha256: hash(specBytes), profile: "mini", profileSha256,
+      submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z" };
+    const poGateAuthority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en",
+      sourceSha256: "b".repeat(64), runtimeSha256: "c".repeat(64), receiptSha256: "d".repeat(64),
+      repositoryFingerprint: "e".repeat(64), planPath, planSha256: submission.planSha256,
+      specPath, specSha256: submission.specSha256 };
+    const state = { schema: "pipeline.state.v0", activeFeature: { id: "feature", planPath, phase: "implementation" },
+      planApproved: true, planSubmission: submission,
+      planApproval: { schema: CURRENT_APPROVAL_SCHEMA, approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z",
+        submissionSha256: sha256CanonicalJson(submission), profileSha256, poGateAuthority,
+        priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null } };
+    const statePath = join(dir, ".claude", "pipeline-state.json");
+    writeFileSync(statePath, JSON.stringify(state));
+    git("add", ".claude/pipeline.yaml", ".claude/pipeline-state.json", planPath, specPath);
+    git("commit", "-qm", "approved mini fixture");
+    const miniCommit = git("rev-parse", "HEAD");
+
+    function check(commit, command = `git push delivery ${commit}:refs/heads/test`) {
+      const result = spawnSync(process.execPath, [guardPath], { cwd: dir, encoding: "utf8", shell: false,
+        input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: dir }, timeout: 10000 });
+      assert.equal(result.error, undefined, "guard subprocess must complete without spawn error or timeout");
+      assert.equal(result.signal, null, "guard subprocess must not be killed");
+      assert.equal(result.status, 2, `guard must reach a blocking outcome: ${result.stderr}`);
+      return result;
+    }
+    const reviewFailure = /candidate-bound independent review and Verify (?:evidence )?are unavailable/;
+    const downstreamVerify = /evidence\/verify-latest\.json missing/;
+    const mini = check(miniCommit);
+    assert.match(mini.stderr, downstreamVerify, "synthetic approved mini reaches the downstream Verify gate");
+    assert.doesNotMatch(mini.stderr, reviewFailure, mini.stderr);
+    const packagePath = join(dir, "specs", "feature", "lifecycle.json");
+    writeFileSync(packagePath, JSON.stringify({ feature: { id: "feature", rigor: 1 } }));
+    git("add", "specs/feature/lifecycle.json");
+    git("commit", "-qm", "registered package fixture");
+    const packageCommit = git("rev-parse", "HEAD");
+    const differentHeadMini = check(miniCommit);
+    assert.match(differentHeadMini.stderr, downstreamVerify);
+    assert.doesNotMatch(differentHeadMini.stderr, reviewFailure, "different HEAD must not change the pushed mini");
+    assert.match(check(packageCommit).stderr, reviewFailure, "registered package requires consumed review");
+    unlinkSync(packagePath);
+    assert.match(check(packageCommit).stderr, reviewFailure, "dirty package removal must not waive review");
+    writeFileSync(statePath, JSON.stringify({ ...state, planApproved: false }));
+    const dirtyStateMini = check(miniCommit);
+    assert.match(dirtyStateMini.stderr, downstreamVerify);
+    assert.doesNotMatch(dirtyStateMini.stderr, reviewFailure, "dirty state must not revoke pushed mini");
+    git("add", ".claude/pipeline-state.json");
+    git("commit", "-qm", "revoked approval fixture");
+    assert.match(check(git("rev-parse", "HEAD")).stderr, reviewFailure, "pushed revoked approval cannot waive review");
+    writeFileSync(statePath, JSON.stringify({ ...state, planApproval: null }));
+    git("add", ".claude/pipeline-state.json");
+    git("commit", "-qm", "missing approval fixture");
+    assert.match(check(git("rev-parse", "HEAD")).stderr, reviewFailure, "missing approval cannot waive review");
+
+    const checkpointManifest = "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\npushDestinationPolicy:\n  schema: pipeline.push-destination-policy.v1\n  checkpointNamespace: refs/heads/feat/\n";
+    writeFileSync(join(dir, ".claude", "pipeline.yaml"), checkpointManifest);
+    git("branch", "feat/checkpoint", packageCommit);
+    git("switch", "-f", "feat/checkpoint");
+    writeFileSync(join(dir, ".claude", "pipeline.yaml"), checkpointManifest);
+    const checkpoint = check(packageCommit, "git push delivery feat/checkpoint:refs/heads/feat/checkpoint");
+    assert.equal(checkpoint.status, 2);
+    assert.match(checkpoint.stderr, /feature checkpoint/);
+    assert.doesNotMatch(checkpoint.stderr, reviewFailure, "checkpoint is its own unqualified lane");
+
+    writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n  security:\n    mode: blocking\n    type: automated\n");
+    mkdirSync(join(dir, "evidence"));
+    const tree = git("rev-parse", `${miniCommit}^{tree}`);
+    const payload = { schema: "pipeline.security-evidence.v1", exitCode: 0, commit: miniCommit,
+      candidate: { status: "clean", commit: miniCommit, tree, inputSha256: "a".repeat(64),
+        repositorySha256: hash("https://example.invalid/wrong.git"),
+        inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
+        snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true } },
+      policy: { configurationSha256: "c".repeat(64), sha256: "d".repeat(64) } };
+    const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(",")}]`
+      : value && typeof value === "object" ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`
+        : JSON.stringify(value);
+    writeFileSync(join(dir, "evidence", "security-latest.json"),
+      JSON.stringify({ ...payload, payloadSha256: hash(canonical(payload)) }));
+    const wrongDestination = check(miniCommit);
+    assert.equal(wrongDestination.status, 2);
+    assert.match(wrongDestination.stderr, /candidate repository identity does not match the effective push destination/);
+    assert.doesNotMatch(wrongDestination.stderr, /wrong\.git|right\.git/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

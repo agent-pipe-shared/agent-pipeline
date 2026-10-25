@@ -1,0 +1,1456 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 9889b731d..f581d0f54 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -195,15 +195,37 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+     }
+     if (old.size !== 0 || added.length === 0 || changed.length !== added.length + 1) return false;
+     const newPaths = new Set();
++    const addedByPath = new Map();
+     for (const entry of added) {
+       if (!object(entry) || entry.authority !== false || entry.mutability !== "immutable"
+         || entry.retention !== "retain" || !SHA256.test(entry.sha256)
+         || typeof entry.path !== "string" || !entry.path.startsWith(`specs/${featureId}/evidence/`)
+-        || !entry.path.endsWith(".json") || newPaths.has(entry.path)) return false;
++        || ![".json", ".log"].some(suffix => entry.path.endsWith(suffix)) || newPaths.has(entry.path)) return false;
+       newPaths.add(entry.path);
++      addedByPath.set(entry.path, entry);
+       regularBlobAt(root, commit, entry.path);
+       if (digest(gitBytes(root, ["show", `${commit}:${entry.path}`], "CCA-EVIDENCE-READ")) !== entry.sha256) return false;
+     }
++    const requiredLogs = new Set();
++    const parentTree = gitBytes(root, ["rev-parse", `${parents[1]}^{tree}`], "CCA-RANGE-READ").toString("utf8").trim();
++    for (const entry of added.filter(row => row.path.endsWith(".json"))) {
++      const bytes = gitBytes(root, ["show", `${commit}:${entry.path}`], "CCA-EVIDENCE-READ");
++      let diagnostic;
++      try { diagnostic = JSON.parse(bytes.toString("utf8")); } catch { continue; }
++      if (diagnostic?.schema !== "pipeline.critic-diagnostic-evidence.v1") continue;
++      if (diagnostic.candidate?.commit !== parents[1] || diagnostic.candidate?.tree !== parentTree) return false;
++      const required = [diagnostic.targeted?.log, diagnostic.fullVerify?.evidence].filter(Boolean);
++      for (const ref of required) {
++        if (!object(ref) || addedByPath.get(ref.path)?.sha256 !== ref.sha256) return false;
++        requiredLogs.add(ref.path);
++      }
++      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree},
++        readArtifact: path => {
++          if (!addedByPath.has(path)) throw new Error("unregistered diagnostic member");
++          return gitBytes(root, ["show", `${commit}:${path}`], "CCA-EVIDENCE-READ");
++        } });
++    }
++    if ([...addedByPath.keys()].some(path => path.endsWith(".log") && !requiredLogs.has(path))) return false;
+     return changed.every((path) => path === manifestPath || newPaths.has(path));
+   } catch { return false; }
+ }
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index f33e5b9b3..2855ddb4c 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -5,7 +5,7 @@ const completionCases = [];
+ function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
++import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+@@ -315,6 +315,42 @@ test("CCA13 an authority change cannot hide in an evidence registration commit",
+   assert.deepEqual(result.correctionCommits, [changedCommit]);
+ });
+ 
++function diagnosticCarryCase() {
++  const fx = registeredFixture();
++  const logPath = `specs/${fx.featureId}/evidence/targeted.log`;
++  const jsonPath = `specs/${fx.featureId}/evidence/diagnostic.json`;
++  const tree = git(fx.root, ["rev-parse", `${fx.candidateCommit}^{tree}`]);
++  const log = "command: node synthetic-check\nlabel: targeted-check\nexitCode: 0\n--- stdout ---\npass\n--- stderr ---\n";
++  const value = { schema: "pipeline.critic-diagnostic-evidence.v1", producer: "critic-diagnostic-evidence",
++    assurance: "captured-process-output-not-host-attested", candidate: {commit:fx.candidateCommit,tree},
++    spec: {path:fx.manifestPath,sha256:hash(readFileSync(join(fx.root,fx.manifestPath)))},
++    guardrails:[], fullVerify:{status:"not-run",evidence:null},
++    targeted:{label:"targeted-check",status:"passed",exitCode:0,log:{path:logPath,sha256:hash(log)}}, pending:["full-verify"] };
++  const json = `${JSON.stringify(value)}\n`;
++  writeFileSync(join(fx.root,logPath),log);
++  writeFileSync(join(fx.root,jsonPath),json);
++  const entries = [fx.entry,
++    {...fx.entry,path:jsonPath,sha256:hash(json)},
++    {...fx.entry,path:logPath,sha256:hash(log)}];
++  writeFileSync(join(fx.root,fx.manifestPath),`${JSON.stringify(fx.manifest(entries))}\n`);
++  git(fx.root,["add","."]); git(fx.root,["commit","-qm","register diagnostic bundle"]);
++  const candidateCommit=git(fx.root,["rev-parse","HEAD"]);
++  const source=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit});
++  assert.deepEqual(source.evidenceOnlyCommits,[fx.candidateCommit,candidateCommit]);
++  assert.deepEqual(source.correctionCommits,[]);
++  writeFileSync(join(fx.root,logPath),"changed diagnostic output\n");
++  git(fx.root,["add","."]); git(fx.root,["commit","-qm","change diagnostic content"]);
++  const changedCommit=git(fx.root,["rev-parse","HEAD"]);
++  const changed=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit:changedCommit});
++  assert.deepEqual(changed.correctionCommits,[changedCommit]);
++  const unrelated=`specs/${fx.featureId}/evidence/unregistered.log`;
++  writeFileSync(join(fx.root,unrelated),"unregistered\n");
++  git(fx.root,["add","."]); git(fx.root,["commit","-qm","add unregistered log"]);
++  const unregisteredCommit=git(fx.root,["rev-parse","HEAD"]);
++  const unregistered=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit:unregisteredCommit});
++  assert.deepEqual(unregistered.correctionCommits,[changedCommit,unregisteredCommit]);
++}
++
+ test("CCA14 one full and three successive parent-bound DIFF reviews are admitted", () => {
+   for (const retainedCount of [1, 2, 3]) {
+     const rows = fourRoundHistory(retainedCount);
+@@ -370,4 +406,5 @@ test("CCA18 dropping retained registration cannot create new genesis in the runt
+   assert.equal(actual.decision.code, "CCA-REGISTRATION-REMOVED");
+ });
+ 
++test("CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle", diagnosticCarryCase);
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 6ce3ea346..d8ee65239 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -160,7 +160,7 @@ function ensureStore(c) {
+ }
+ function reference(root, commit, p, role = "spec") {
+   p = normalizePacketPath(p);
+-  if ((p.startsWith(".") && !(role === "guardrail" && p === ".claude/pipeline.yaml"))
++  if ((p.startsWith(".") && !(role === "guardrail" && [".claude/pipeline.yaml", ".claude/pipeline.json"].includes(p)))
+     || p.startsWith("scratch/") || p.startsWith("evidence/")) fail("CGB-REFERENCE");
+   const row = git(root, ["ls-tree", "-z", commit, "--", p]);
+   const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\0]+)\0$/u.exec(row);
+@@ -542,6 +542,40 @@ export function appendGenericCriticBatchCorrection(input) { return invoke(() =>
+ export function readGenericCriticBatchAdmission(input) { return invoke(() => readAdmission(input)); }
+ export function reserveGenericCriticBatchAdmission(input) { return invoke(() => reserveAdmission(input)); }
+ export function readReservedGenericCriticBatchAdmission(input) { return invoke(() => readReservedAdmission(input)); }
++/** Diagnose a held transaction without treating a partial publication as a disposable lock. */
++export function inspectGenericCriticBatchRecovery({ controlRoot }) {
++  return invoke(() => {
++    const c = readContext(controlRoot);
++    const lock = join(c.root, "transaction.lock");
++    if (!existsSync(lock)) fail("CGB-RECOVERY-NOT-HELD");
++    const held = directory(lock);
++    const names = readdirSync(c.root).sort(compare);
++    const lockNames = readdirSync(lock).sort(compare);
++    if (names.length > 4096 || lockNames.length > 4096) fail("CGB-BOUND");
++    if (!eq(stableJson(join(c.root, "repository.json")), c.repository)) fail("CGB-CONTROL");
++    let emptyStore = eq(names, ["logical", "origins", "repository.json", "transaction.lock"]) && lockNames.length === 0;
++    const indexes = {};
++    for (const name of ["logical", "origins"]) {
++      if (!existsSync(join(c.root, name))) { emptyStore = false; indexes[name] = null; continue; }
++      directory(join(c.root, name));
++      indexes[name] = readdirSync(join(c.root, name)).sort(compare);
++      if (indexes[name].length > 4096) fail("CGB-BOUND");
++      if (indexes[name].length !== 0) emptyStore = false;
++    }
++    const snapshot = { repositoryFingerprint: c.fingerprint, root: [directory(c.root).dev, directory(c.root).ino], lock: [held.dev, held.ino, String(held.ctimeMs)], names, lockNames, indexes };
++    return Object.freeze({ schema: "pipeline.critic-generic-batch-recovery.v1", status: emptyStore ? "empty-store-held" : "partial-held", digestSha256: sha256Canonical(snapshot) });
++  });
++}
++/** A digest binds inspection, but cannot attest that the lock owner has exited. */
++export function recoverGenericCriticBatchEmptyStore({ controlRoot, digestSha256 }) {
++  return invoke(() => {
++    if (!SHA.test(digestSha256)) fail("CGB-RECOVERY-SHAPE");
++    const observed = inspectGenericCriticBatchRecovery({ controlRoot });
++    if (observed.digestSha256 !== digestSha256) fail("CGB-RECOVERY-STALE");
++    if (observed.status !== "empty-store-held") fail("CGB-RECOVERY-PARTIAL");
++    fail("CGB-RECOVERY-OWNER-UNPROVEN");
++  });
++}
+ /** Shared source-bound declaration reader; presence/bindings do not attest semantic coherence. */
+ export function readCriticReviewUnit(input) {
+   return invoke(() => {
+@@ -604,10 +638,10 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       if(existsSync(deliveryIndex) && (!owned || !eq(stableJson(deliveryIndex).batchRef,owned.batchRef)))fail("CGB-CONFLICT");
+       if (!owned) {
+         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
+-        ensureStore(c);
+-        const batchId=randomBytes(16).toString("hex");
+         const declaredScope={logicalWorkIds:work,specification:reference(input.repoRoot,packet.candidate.commit,unitRef.specPath),
+           guardrails:packet.references.filter(r=>r.kind==="guardrail").map(r=>reference(input.repoRoot,packet.candidate.commit,r.path,"guardrail")),reviewUnit:unit};
++        ensureStore(c);
++        const batchId=randomBytes(16).toString("hex");
+         const value={schema:GENERIC_CRITIC_BATCH_V2_SCHEMA,batchId,repositoryFingerprint:c.fingerprint,declaredScope,originTargets:[target]};
+         const batchRef={batchId,registrationSha256:sha256Canonical(value)};
+         createDirectory(join(c.root,batchId));createDirectory(join(c.root,batchId,"members"));
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 902d710bb..eec21566e 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -1,18 +1,21 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import {registerTestCaseCompletion} from "./test-case-completion.mjs";
+-import {spawnSync} from "node:child_process";
++import {spawn,spawnSync} from "node:child_process";
+ import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,writeFileSync,chmodSync} from "node:fs";
+ import {tmpdir} from "node:os";
+ import {join} from "node:path";
+ import {isSuccessfulSpawn} from "./successful-spawn.mjs";
+ import {produceCriticDiagnostic} from "./critic-diagnostic-producer.mjs";
+-import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership} from "./critic-generic-batch.mjs";
++import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership,reserveFeatureCriticReviewUnitOwnership} from "./critic-generic-batch.mjs";
+ import {admitSessionCriticReview,finalizeSessionCriticReview,runSessionCriticFinalizerCli} from "../scripts/session-critic-finalizer.mjs";
+ import {sha256Canonical,CRITIC_DISPATCH_LIMITS} from "./review-economy.mjs";
+-import {readConsumedSessionAdmission,prepareCandidatePacket,sha256,canonicalJson} from "../scripts/critic-packet-preflight.mjs";
++import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket,sha256,canonicalJson} from "../scripts/critic-packet-preflight.mjs";
++import {readCriticCourseAdmission} from "./critic-course-admission.mjs";
++import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
++import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -158,7 +161,7 @@ function commit(root, message) {
+   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+   return git(root, ["rev-parse", "HEAD"]);
+ }
+-function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", unitOverride = {} } = {}) {
++function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", unitOverride = {}, feature = false } = {}) {
+   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
+   git(root, ["init", "-q", "-b", "main"]);
+   mkdirSync(join(root, ".claude"));
+@@ -167,9 +170,22 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
+   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+   writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
+   writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify(unit(unitOverride)));
++  if(feature){
++    const directory=join(root,"specs/course-feature");
++    mkdirSync(join(directory,"design"),{recursive:true}); mkdirSync(join(directory,"evidence"));
++    writeFileSync(join(directory,"spec.md"),"# Feature spec\nAC-1 AC-2\n");
++    const reviewUnit=JSON.stringify(unit({...unitOverride,specPath:"specs/course-feature/spec.md"}));
++    writeFileSync(join(directory,"design/critic-review-unit.json"),reviewUnit);
++    const artifacts=[{class:"spec",path:"specs/course-feature/spec.md",authority:true},
++      {class:"design",path:"specs/course-feature/design/critic-review-unit.json",sha256:sha256(reviewUnit),authority:false,mutability:"immutable",retention:"retain"}];
++    writeFileSync(join(directory,"lifecycle.json"),`${JSON.stringify({schema:"pipeline.feature-package.v1",feature:{id:"course-feature"},state:"approved",artifacts})}\n`);
++    writeFileSync(join(root,".claude/pipeline.json"),JSON.stringify({project:"fixture",verify:"node verify.mjs"}));
++    writeFileSync(join(root,".claude/settings.json"),JSON.stringify({fixture:true}));
++  }
+   const emptyTree = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
+   const base = rootCandidate ? emptyTree : commit(root, "base");
+   if (!rootCandidate) writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\nSource candidate.\n");
++  if(feature)writeFileSync(join(root,"specs/course-feature/spec.md"),"# Feature spec\nAC-1 AC-2\nSource candidate.\n");
+   const historicalCandidate = commit(root, rootCandidate ? "root source candidate" : "source candidate");
+   const recordPath = `evidence/dispatch-record-${taskId}.json`;
+   const record = {
+@@ -203,10 +219,120 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
+   writeFileSync(join(root, "evidence/dispatch-record-correction-owner.json"), JSON.stringify({...record,taskId:"correction-owner"}));
+   const recordCommit = commit(root, "persist authored dispatch record");
+   writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\nDescendant candidate.\n");
++  if(feature)writeFileSync(join(root,"specs/course-feature/spec.md"),"# Feature spec\nAC-1 AC-2\nDescendant candidate.\n");
+   const candidate = commit(root, "descendant candidate");
+   const tree = git(root, ["rev-parse", `${candidate}^{tree}`]);
+   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
+   return { root, base, historicalCandidate, recordCommit, candidate, tree, taskId, recordPath, recordBytes };
+ }
+ 
++test("generated pipeline JSON is an exact committed guardrail reference",()=>{
++  const fx=fixture();try{
++    const calibration=JSON.stringify({project:"fixture",verify:"node verify.mjs"});
++    writeFileSync(join(fx.root,".claude/pipeline.json"),calibration);
++    fx.candidate=commit(fx.root,"generated manifest");
++    const d=declaration(fx,{guardrailPaths:[".claude/pipeline.json"]});
++    const result=register(fx,d);
++    assert.equal(result.replay,false);
++    const saved=JSON.parse(readFileSync(join(fx.root,".git/agent-pipeline/critic-packets/generic-batches",result.batchRef.batchId,"registration.json")));
++    assert.deepEqual(saved.declaredScope.guardrails.map(row=>[row.path,row.sha256]),[[".claude/pipeline.json",sha256(calibration)]]);
++    rejected(()=>register(fx,{...d,guardrailPaths:[".claude/credentials.json"]}),"CGB-REFERENCE");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("rejected guardrail leaves no held transaction and retry can register",()=>{
++  const fx=fixture();try{
++    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
++    rejected(()=>register(fx,declaration(fx,{guardrailPaths:[".claude/missing.json"]})),"CGB-REFERENCE");
++    assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
++    assert.ok(register(fx).batchRef);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("live owner and partial effects keep a digest-bound transaction hold",async()=>{
++  const fx=fixture();try{
++    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
++    const store=join(controlRoot,"generic-batches");
++    mkdirSync(store,{recursive:true,mode:0o700});
++    chmodSync(join(fx.root,".git/agent-pipeline"),0o700);
++    chmodSync(controlRoot,0o700); chmodSync(store,0o700);
++    for(const name of ["logical","origins"])mkdirSync(join(store,name),{mode:0o700});
++    const commonDir=join(fx.root,".git");
++    const repository={schema:"pipeline.critic-generic-repository.v1",repoRoot:fx.root,commonDir,
++      repositoryFingerprint:derivePoGateRepositoryFingerprint({gitCommonDir:commonDir,primaryRoot:fx.root})};
++    const file=join(store,"repository.json");
++    writeFileSync(file,canonicalJson(repository),{mode:0o600});
++    const lock=join(store,"transaction.lock");
++    const child=spawn(process.execPath,["--input-type=module","-e",
++      "import {mkdirSync,rmdirSync} from 'node:fs'; mkdirSync(process.argv[1],{mode:0o700}); console.log('held'); process.stdin.once('data',()=>{rmdirSync(process.argv[1]); process.exit(0);});",lock],
++      {stdio:["pipe","pipe","pipe"]});
++    try {
++    await new Promise((resolve,reject)=>{child.stdout.once("data",bytes=>bytes.toString().includes("held")?resolve():reject(new Error("holder not ready")));child.once("error",reject);child.once("exit",()=>reject(new Error("holder exited before inspection")));});
++    const inspected=inspectGenericCriticBatchRecovery({controlRoot});
++    assert.equal(inspected.status,"empty-store-held");
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:"0".repeat(64)}),"CGB-RECOVERY-STALE");
++    writeFileSync(join(store,"logical/foreign.json"),"{}");
++    const partial=inspectGenericCriticBatchRecovery({controlRoot});
++    assert.equal(partial.status,"partial-held");
++    assert.notEqual(partial.digestSha256,inspected.digestSha256);
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256}),"CGB-RECOVERY-STALE");
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:partial.digestSha256}),"CGB-RECOVERY-PARTIAL");
++    rmSync(join(store,"logical/foreign.json"));
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256}),"CGB-RECOVERY-OWNER-UNPROVEN");
++    assert.equal(existsSync(lock),true);
++    } finally {
++      const exit=new Promise(resolve=>child.once("exit",resolve));
++      child.stdin.write("release\n");
++      assert.equal(await exit,0);
++    }
++    assert.equal(existsSync(lock),false);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("feature reserve validates packet guardrails before store effects and can retry",()=>{
++  const fx=fixture({feature:true});try{
++    const featureRoot=join(fx.root,"specs/course-feature");
++    const logPath="specs/course-feature/evidence/targeted.log";
++    const jsonPath="specs/course-feature/evidence/diagnostic.json";
++    const diagnostic=produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,
++      specPath:"specs/course-feature/spec.md",command:[process.execPath,"-e","console.log('feature fixture pass')"],
++      logPath:"evidence/feature-targeted.log"});
++    const log=readFileSync(join(fx.root,"evidence/feature-targeted.log"));
++    writeFileSync(join(fx.root,logPath),log);
++    diagnostic.targeted.log.path=logPath;
++    const bytes=`${JSON.stringify(diagnostic)}\n`;
++    writeFileSync(join(fx.root,jsonPath),bytes);
++    const manifestPath=join(featureRoot,"lifecycle.json");
++    const manifest=JSON.parse(readFileSync(manifestPath));
++    for(const [path,content] of [[logPath,log],[jsonPath,bytes]])manifest.artifacts.push({class:"candidate-evidence",path,
++      sha256:sha256(content),authority:false,mutability:"immutable",retention:"retain"});
++    writeFileSync(manifestPath,`${JSON.stringify(manifest)}\n`);
++    // The evidence transport admits exactly the manifest and its declared members. The
++    // generic fixture's untracked root captures must not ride into this registration commit.
++    git(fx.root,["add","specs/course-feature/lifecycle.json",logPath,jsonPath]);
++    git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","register feature diagnostic"]);
++    const registrationCommit=git(fx.root,["rev-parse","HEAD"]);
++    const courseInput={repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,
++      registrationCommit,requestedMode:"full",acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
++    const projection=readCriticCourseAdmission(courseInput);
++    assert.equal(projection.decision.status,"admitted",JSON.stringify(projection.decision));
++    const {decision,...subject}=projection;
++    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
++    mkdirSync(controlRoot,{recursive:true,mode:0o700});
++    chmodSync(join(fx.root,".git/agent-pipeline"),0o700);chmodSync(controlRoot,0o700);
++    const route={routeId:"feature-fixture",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",
++      modelTier:"higher-capability",effortTier:"xhigh",assurance:"functional-equivalent-read-only; OS isolation not asserted",projectionDigest:"a".repeat(64)};
++    const preflightSha256="b".repeat(64);
++    const sessionBinding={schema:"pipeline.session-critic-packet-binding.v1",sessionId:"feature-fixture",preflightSha256,
++      assurance:route.assurance,freshContext:true,historyInherited:false,mayDelegate:false};
++    const reserveFor=(packetId,guardrail)=>{
++      prepareCandidatePacket({repoRoot:fx.root,controlRoot,packetId,taskId:fx.taskId,projectId:"pipeline",
++        baseCommit:fx.base,candidateCommit:fx.candidate,rulesetOid:fx.base,route,sessionBinding,
++        references:[{kind:"spec",path:"specs/course-feature/spec.md"},{kind:"guardrail",path:guardrail}]});
++      claimCandidatePacket({controlRoot,packetId,adapter:route.adapter,claimantNonce:"c".repeat(64)});
++      return reserveFeatureCriticReviewUnitOwnership({repoRoot:fx.root,controlRoot,packetId,preflightSha256,courseInput,
++        sourceSha256:sha256Canonical(subject),decisionSha256:sha256Canonical(decision)});
++    };
++    rejected(()=>reserveFor("d".repeat(32),".claude/settings.json"),"CGB-REFERENCE");
++    assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
++    assert.ok(reserveFor("e".repeat(32),".claude/pipeline.json").reservation);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.mjs b/plugins/pipeline-core/lib/model-family-host-store.mjs
+index 45d079fa6..b34309efb 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.mjs
+@@ -20,6 +20,8 @@ import { dirname, join, resolve, sep } from "node:path";
+ import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+ import { verifyModelFamilyAuthority, verifyAggregateDesignModelFamilyAuthority, verifyModelFamilyPinDecision } from "./model-family-authority.mjs";
+ import { evaluateModelFamilySelection } from "./model-family-latest-selection.mjs";
++import { validateDesignReviewExecutionRequest } from "./design-review-execution-request.mjs";
++import { createDesignReviewReceipt } from "./design-review-receipt.mjs";
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+ const OID = /^[a-f0-9]{40}$/u;
+@@ -205,6 +207,22 @@ function safeRead(path, limit = MAX_BYTES) {
+   } finally { closeSync(fd); }
+ }
+ 
++function readTrackedReviewBytes(root,path) {
++  if(typeof path!=='string'||!path||path.startsWith('/')||/[\\\x00-\x1f:]/u.test(path)
++    ||path.split('/').some(part=>!part||part==='.'||part==='..'))throw new Error('DRE_PATH');
++  const file=join(root,path),before=lstatSync(file);
++  if(!before.isFile()||before.isSymbolicLink()||before.size<1||before.size>MAX_BYTES
++    ||before.nlink!==1||realpathSync(file)!==file)throw new Error('DRE_FILE');
++  const fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
++  try{
++    const pinned=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),named=lstatSync(file);
++    if(pinned.dev!==before.dev||pinned.ino!==before.ino||bytes.length!==pinned.size
++      ||after.dev!==pinned.dev||after.ino!==pinned.ino||after.mtimeMs!==pinned.mtimeMs
++      ||named.dev!==pinned.dev||named.ino!==pinned.ino||named.size!==pinned.size)throw new Error('DRE_RACE');
++    return bytes;
++  }finally{closeSync(fd);}
++}
++
+ function writeNew(path, value, limit = MAX_BYTES) {
+   const bytes = Buffer.from(`${canonicalizeJson(value)}\n`, "utf8");
+   if (bytes.length > limit) throw new Error("STORE_SIZE");
+@@ -228,6 +246,24 @@ function writeNew(path, value, limit = MAX_BYTES) {
+   syncDirectory(dirname(path));
+ }
+ 
++function writeNewText(path, text, limit = MAX_BYTES) {
++  const bytes = Buffer.from(text, 'utf8');
++  if (!text || bytes.length > limit) throw new Error('STORE_SIZE');
++  const temp = join(dirname(path), `.stage-${randomBytes(16).toString('hex')}`);
++  const fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
++    | (constants.O_NOFOLLOW ?? 0), 0o600);
++  try {
++    let offset = 0;
++    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset);
++    fsyncSync(fd);
++    linkSync(temp, path);
++  } finally {
++    closeSync(fd);
++    try { unlinkSync(temp); } catch {}
++  }
++  syncDirectory(dirname(path));
++}
++
+ function replaceAtomic(path, value) {
+   const bytes = Buffer.from(`${canonicalizeJson(value)}\n`, "utf8");
+   if (bytes.length > MAX_BYTES) throw new Error("STORE_SIZE");
+@@ -1109,6 +1145,93 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+     held.closed=true;modelControlledDrivers.get(trustedSources.launchDriver).returned.delete(invocation.receipt.receiptSha256);
+     return {ok:true,status:'closed',code:'MODEL-FAMILY-INVOCATION-CLOSED',receiptSha256:invocation.receipt.receiptSha256,assurance:'controlled-unit-method',sourceRefs:proof.sourceFacts};
+   }
++  function readReleasedInvocationMemberRef({invocation}={}) {
++    const held=modelLaunched.get(invocation);
++    if(!held?.closed||!frozenHandles.has(invocation))return fail('MODEL-FAMILY-ORIGINAL-MEMBER-UNAVAILABLE');
++    try{return {ok:true,memberRef:authorityLifecycle.releasedMemberRef(held.handle)};}
++    catch{return fail('MODEL-FAMILY-ORIGINAL-MEMBER-UNAVAILABLE');}
++  }
++  async function publishOriginalDesignReview({invocation,validatedHandle,request,receiptInput}={}) {
++    const held=modelLaunched.get(invocation),checked=validateDesignReviewExecutionRequest(request);
++    if(!held||held.closed||!held.returned||!held.native||!checked.ok
++      ||!frozenHandles.has(invocation)||!receiptInput||typeof receiptInput!=='object')return fail('DRE-NATIVE-ORIGIN-UNAVAILABLE');
++    let native;
++    try{const {readValidatedNativeCriticReturn}=await import('../scripts/codex-native-critic-host.mjs');native=readValidatedNativeCriticReturn(validatedHandle);}catch{return fail('DRE-NATIVE-ORIGIN-UNAVAILABLE');}
++    let author;
++    try{const {readOriginalAuthorModelInvocation}=await import('./design-review-original-custody.mjs');
++      author=readOriginalAuthorModelInvocation({repository:authorityLifecycle.repository.primaryRoot,
++        reference:receiptInput.originalAuthorReference,candidate:request.candidate});}
++    catch{return fail('DRE-AUTHOR-ORIGIN-UNAVAILABLE');}
++    if(!author?.ok||author.receipt.receiptSha256!==request.authorExecutionSha256
++      ||author.receipt.runner===invocation.receipt.runner&&author.receipt.sessionId===invocation.receipt.sessionId
++        &&author.receipt.invocationId===invocation.receipt.invocationId)
++      return fail('DRE-AUTHOR-ORIGIN-UNAVAILABLE');
++    const coverage=native.receipt?.sourceCoverage;
++    if(native.receipt?.status!=='reviewed'||native.receipt?.reviewScope?.kind!=='current-artifacts'
++      ||native.receipt?.dispatch?.candidateCommit!==request.candidate.commit
++      ||native.receipt?.dispatch?.candidateTree!==request.candidate.tree
++      ||invocation.receipt.candidateCommit!==request.candidate.commit
++      ||invocation.receipt.candidateTree!==request.candidate.tree
++      ||invocation.receipt.taskRoute!=='duty.critic_high_risk'||invocation.receipt.role!=='frontier'
++      ||native.receipt.route?.model!==invocation.receipt.selectedModelId
++      ||!Array.isArray(coverage)||digest([...coverage].sort((a,b)=>a.path.localeCompare(b.path)))!==digest(request.sources)
++      ||native.verdict?.pass!==true||native.verdict?.findings?.length!==0)return fail('DRE-NATIVE-SUBJECT-DRIFT');
++    const allPaths=new Map(request.sources.map(row=>[row.path,row]));
++    const {prdPath,specPath,companionPaths,reportPath,receiptPath,previousPath=null}=receiptInput;
++    if(!allPaths.has(prdPath)||specPath!==request.specPath||!allPaths.has(specPath)
++      ||!Array.isArray(companionPaths)||companionPaths.length<1||companionPaths.some(path=>!allPaths.has(path))
++      ||new Set([prdPath,specPath,...companionPaths]).size!==request.sources.length
++      ||typeof reportPath!=='string'||typeof receiptPath!=='string')return fail('DRE-RECEIPT-PATHS');
++    const root=join(authorityLifecycle.repository.commonDir,'agent-pipeline','model-family-host');
++    const report=`# Original design review\nVerdict: pass.\nNative verdict SHA256: ${digest(native.verdict)}\n`;
++    const reportSha256=createHash('sha256').update(report).digest('hex');
++    const source=path=>({path,sha256:allPaths.get(path).sha256});
++    let previous=null;
++    if(request.round===2){
++      if(typeof previousPath!=='string')return fail('DRE-PREDECESSOR-UNAVAILABLE');
++      let bytes;try{bytes=readTrackedReviewBytes(authorityLifecycle.repository.primaryRoot,previousPath);}catch{return fail('DRE-PREDECESSOR-UNAVAILABLE');}
++      if(createHash('sha256').update(bytes).digest('hex')!==request.previousReceiptSha256)return fail('DRE-PREDECESSOR-DRIFT');
++      previous={path:previousPath,bytes};
++    }
++    let specBytes;try{specBytes=readTrackedReviewBytes(authorityLifecycle.repository.primaryRoot,specPath);}catch{return fail('DRE-SPEC-UNAVAILABLE');}
++    if(createHash('sha256').update(specBytes).digest('hex')!==allPaths.get(specPath).sha256)return fail('DRE-SPEC-DRIFT');
++    const created=createDesignReviewReceipt({featureId:request.featureId,previous,
++      sources:{prd:source(prdPath),spec:source(specPath),companions:companionPaths.map(source)},
++      reviewer:{runner:invocation.receipt.runner,model:invocation.receipt.selectedModelId},
++      report:{path:reportPath,sha256:reportSha256,originalSha256:reportSha256},
++      openFindingIds:[],reviewedAt:new Date(clock()).toISOString(),specBytes});
++    if(!created.ok||created.receipt.round!==request.round)return fail('DRE-RECEIPT-UNAVAILABLE');
++    const receiptText=Buffer.from(created.bytes).toString('utf8');
++    const publication={schema:'pipeline.design-review-original-publication.v1',requestSha256:checked.requestSha256,
++      reportSha256,receiptSha256:created.sha256,receiptText,reportPath,receiptPath,
++      modelInvocationReceiptSha256:invocation.receipt.receiptSha256,modelInvocationKey:invocation.key,
++      nativeReceiptSha256:digest(native.receipt),nativeVerdictSha256:digest(native.verdict),
++      authorExecutionSha256:request.authorExecutionSha256,
++      originalAuthorReference:structuredClone(receiptInput.originalAuthorReference)};
++    const requestPath=join(root,'design-reviews','requests',checked.requestSha256+'.json');
++    const reportFile=join(root,'design-reviews','reports',reportSha256+'.md');
++    const publicationPath=join(root,'design-reviews','publications',created.sha256+'.json');
++    const token=Object.freeze({});
++    modelOriginalTerminalTokens.set(token,{repository:authorityLifecycle.repository,invocation,
++      requestSha256:checked.requestSha256,reportSha256,receiptSha256:created.sha256,
++      requestFileSha256:createHash('sha256').update(`${canonicalizeJson(request)}\n`).digest('hex')});
++    let publicationHandle;
++    try{ownedLifetime({receiptSha256:invocation.receipt.receiptSha256,kind:'design-review-publication'},()=>{
++      publicationHandle=authorityLifecycle.currentHandle();
++      for(const sub of ['design-reviews','design-reviews/requests','design-reviews/reports','design-reviews/publications'])
++        ensureDir(join(root,sub),true);
++      writeNew(requestPath,request);writeNewText(reportFile,report);writeNew(publicationPath,publication);
++      return token;
++    });}catch{return fail('DRE-PUBLICATION-UNAVAILABLE');}
++    if(!authorityLifecycle.terminal(held.handle,token))return fail('DRE-TERMINAL-UNAVAILABLE');
++    held.closed=true;
++    const modelMemberRef=authorityLifecycle.releasedMemberRef(held.handle);
++    const locator={schema:'pipeline.design-review-source-locator.v1',requestSha256:checked.requestSha256,
++      receiptSha256:created.sha256,reportSha256,originalInvocationSha256:invocation.receipt.receiptSha256,
++      sourceRevisionSha256:authorityDigest({candidate:request.candidate,sources:request.sources,criteria:request.criteria}),modelMemberRef};
++    return {ok:true,code:'DRE-MODEL-SOURCE-PUBLISHED',locator,report,receiptBytes:created.bytes,
++      publicationMemberRef:authorityLifecycle.releasedMemberRef(publicationHandle),assurance:'model-source-native-return',independentCriticPass:false};
++  }
+   function prepareControlledWriteDiagnostic(input = {}) {
+     if (!own(input, ["key", "assignment", "diagnosticHandle"]) || !validKey(input.key)) {
+       return fail("MODEL-FAMILY-WRITE-DIAGNOSTIC-REQUIRED");
+@@ -1141,7 +1264,8 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+   controller = Object.freeze({ activate() { return ownedLifetime({kind:'activation'},()=>{const loaded=loadAuthority();return loaded?.value?.authoritySha256?store.activate(loaded.value):loaded;}); },
+     transitionAuthority:(input)=>ownedLifetime({kind:'transition'},()=>transitionAuthority(input)),
+     prepare:(input)=>ownedLifetime({kind:'prepare'},()=>prepare(input)), prepareControlledWriteDiagnostic, prepareControlledTransitionObservation,
+-    prelaunch, admitNativeRequest, launch, disposeInvocation, readState:store.readState });
++    prelaunch, admitNativeRequest, launch, disposeInvocation, readReleasedInvocationMemberRef,
++    publishOriginalDesignReview, readState:store.readState });
+   modelDiagnosticControllers.set(controller, { scope: diagnosticScope, rootDir,
+     authorityLifecycle, launchDriver: trustedSources.launchDriver });
+   return controller;
+@@ -1165,7 +1289,7 @@ export const MODEL_FAMILY_HOST_STORE_LIMITS = Object.freeze({ freshMs: FRESH_MS,
+   maxBytes: MAX_BYTES, maxReceipts: MAX_RECEIPTS });
+ 
+ // AUTH-I08: actual physical model-store authority owner, no native promise.
+-const modelAuthorityOwners = new Map(), modelAuthorityPorts = new WeakMap(), modelControlledDrivers = new WeakMap(), modelTerminalTokens = new WeakMap();
++const modelAuthorityOwners = new Map(), modelAuthorityPorts = new WeakMap(), modelControlledDrivers = new WeakMap(), modelTerminalTokens = new WeakMap(), modelOriginalTerminalTokens = new WeakMap();
+ /** A bounded unit-method driver owns its completion. This never launches a host. */
+ export function createControlledModelFamilyHostDriver(){
+   const returned=new Map();
+@@ -1178,6 +1302,22 @@ function modelMethodTerminalToken(invocation,repository,launchDriver){
+   const token=Object.freeze({});modelTerminalTokens.set(token,{invocation,repository,launchDriver});return token;
+ }
+ function modelMethodTerminalRead(token,identity){
++  const original=modelOriginalTerminalTokens.get(token);
++  if(original){
++    if(identity?.receiptSha256!==original.invocation.receipt.receiptSha256||!frozenHandles.has(original.invocation))return null;
++    const root=join(original.repository.commonDir,'agent-pipeline','model-family-host');
++    const specification=[
++      ['receipts',join(root,'receipts',digest(original.invocation.key)+'.json'),({value})=>validInvocationReceipt(value)&&value.receiptSha256===identity.receiptSha256?value:null],
++      ['design-review-requests',join(root,'design-reviews','requests',original.requestSha256+'.json'),({value})=>validateDesignReviewExecutionRequest(value).ok?value:null],
++      ['design-review-reports',join(root,'design-reviews','reports',original.reportSha256+'.md'),({value})=>typeof value==='string'?{sha256:createHash('sha256').update(value).digest('hex')}:null],
++      ['design-review-publications',join(root,'design-reviews','publications',original.receiptSha256+'.json'),({value})=>value?.schema==='pipeline.design-review-original-publication.v1'?value:null],
++    ];
++    const read=specification.map(([namespaceId,filePath,semantic])=>authorityReadSource({namespaceId,filePath,semantic,...(namespaceId==='design-review-reports'?{format:'utf8'}:{})}));
++    if(read[1].sourceFact.sha256!==original.requestFileSha256||read[2].sourceFact.sha256!==original.reportSha256
++      ||read[3].value.receiptSha256!==original.receiptSha256||read[3].value.requestSha256!==original.requestSha256
++      ||read[3].value.reportSha256!==original.reportSha256||read[3].value.modelInvocationReceiptSha256!==identity.receiptSha256)return null;
++    return {terminal:'completed',sourceFacts:read.map(row=>row.sourceFact)};
++  }
+   const held=modelTerminalTokens.get(token);if(!held||!frozenHandles.has(held.invocation)||!validKey(held.invocation.key)||identity?.receiptSha256!==held.invocation.receipt.receiptSha256)return null;
+   const driver=modelControlledDrivers.get(held.launchDriver);if(!driver||driver.returned.get(identity.receiptSha256)!==digest(held.invocation.receipt))return null;
+   const read=authorityReadSource({namespaceId:'receipts',filePath:join(held.repository.commonDir,'agent-pipeline','model-family-host','receipts',digest(held.invocation.key)+'.json'),semantic:({value})=>{if(!validInvocationReceipt(value)||receiptDigest(value)!==identity.receiptSha256||digest(value)!==digest(held.invocation.receipt))authorityOwnerFailure('model-family-host:terminal-receipt-drift');return value;}});
+@@ -1186,10 +1326,26 @@ function modelMethodTerminalRead(token,identity){
+ function modelAuthorityOwner(repository) {
+   const repo=authorityActualRepository(repository),key=JSON.stringify(repo);
+   if(modelAuthorityOwners.has(key))return modelAuthorityOwners.get(key);
+-  const namespaces=['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes'];
++  const namespaces=['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes',
++    'design-review-requests','design-review-reports','design-review-publications'];
+   const scan=()=>authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','model-family-host'),namespaceIds:namespaces,classifyEntry(entry){
+     const {relativePath:p,value}=entry;
+     if(/^authority-lifetimes\/[a-f0-9]{64}\.json$/.test(p))return authorityClassifyLifetime(entry,'model-family-host',namespaces[5],repo);
++    if(/^design-reviews\/requests\/[a-f0-9]{64}\.json$/.test(p)
++      &&validateDesignReviewExecutionRequest(value).ok
++      &&p===`design-reviews/requests/${validateDesignReviewExecutionRequest(value).requestSha256}.json`)
++      return {namespaceId:namespaces[6],active:false,semantic:value};
++    if(/^design-reviews\/reports\/[a-f0-9]{64}\.md$/.test(p)
++      &&(() => { try { new TextDecoder('utf-8',{fatal:true}).decode(entry.bytes); return true; } catch { return false; } })()
++      &&p===`design-reviews/reports/${createHash('sha256').update(entry.bytes).digest('hex')}.md`)
++      return {namespaceId:namespaces[7],active:false,semantic:{sha256:createHash('sha256').update(entry.bytes).digest('hex')}};
++    if(/^design-reviews\/publications\/[a-f0-9]{64}\.json$/.test(p)
++      &&value?.schema==='pipeline.design-review-original-publication.v1'
++      &&SHA.test(value.receiptSha256??'')&&SHA.test(value.requestSha256??'')
++      &&SHA.test(value.reportSha256??'')&&SHA.test(value.modelInvocationReceiptSha256??'')
++      &&typeof value.receiptText==='string'&&createHash('sha256').update(value.receiptText).digest('hex')===value.receiptSha256
++      &&p===`design-reviews/publications/${value.receiptSha256}.json`)
++      return {namespaceId:namespaces[8],active:false,semantic:value};
+     if(p===MARKER&&strictObject(value,['schema','activationId','authoritySha256','createdAt'])&&value.schema==='pipeline.model-family-host-activation.v1'&&SHA.test(value.activationId??'')&&SHA.test(value.authoritySha256??'')&&validTime(value.createdAt))return {namespaceId:namespaces[0],active:true,semantic:value};
+     if(p===STATE&&strictObject(value,['schema','generation','stateFile','stateSha256'])&&value.schema==='pipeline.model-family-host-state-pointer.v1'&&Number.isSafeInteger(value.generation)&&value.generation>=0&&SHA.test(value.stateSha256??'')&&value.stateFile===`generation-${value.generation}-${value.stateSha256}.json`)return {namespaceId:namespaces[1],active:false,semantic:value};
+     if(/^generation-\d+-[a-f0-9]{64}\.json$/.test(p)&&validateState(value)&&p===`generation-${value.generation}-${digest(value)}.json`)return {namespaceId:namespaces[2],active:false,semantic:value};
+@@ -1198,7 +1354,7 @@ function modelAuthorityOwner(repository) {
+     authorityOwnerFailure('model-family-host:unknown-or-invalid-entry');
+   }});
+   // A host must explicitly prove terminal disposal; a verified result alone is insufficient.
+-  const owner=authorityCreateDomainOwner({repository:repo,producerId:'model-family-host',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(){const rootPath=join(repo.commonDir,'agent-pipeline','model-family-host');return {mutablePaths:[MARKER,STATE,LOCK].map(p=>join(rootPath,p)),creations:[{rootPath,relativePattern:'^(?:activation\\.json|current\\.json|generation-[0-9]+-[a-f0-9]{64}\\.json|receipts/[a-f0-9]{64}\\.json|\\.writer\\.lock)$'}]};},terminalObservation:modelMethodTerminalRead,sourceModulePaths:[import.meta.url,...['model-family-runtime-host.mjs','model-family-invocation.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs'].map(p=>new URL(p,import.meta.url).href)].map(authorityFileURLToPath)});
++  const owner=authorityCreateDomainOwner({repository:repo,producerId:'model-family-host',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(){const rootPath=join(repo.commonDir,'agent-pipeline','model-family-host');return {mutablePaths:[MARKER,STATE,LOCK].map(p=>join(rootPath,p)),creations:[{rootPath,relativePattern:'^(?:activation\\.json|current\\.json|generation-[0-9]+-[a-f0-9]{64}\\.json|receipts/[a-f0-9]{64}\\.json|design-reviews/(?:requests|publications)/[a-f0-9]{64}\\.json|design-reviews/reports/[a-f0-9]{64}\\.md|\\.writer\\.lock)$'}]};},terminalObservation:modelMethodTerminalRead,sourceModulePaths:[import.meta.url,...['model-family-runtime-host.mjs','model-family-invocation.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs','design-review-execution-producer.mjs'].map(p=>new URL(p,import.meta.url).href),new URL('../scripts/codex-native-critic-host.mjs',import.meta.url).href].map(authorityFileURLToPath)});
+   modelAuthorityOwners.set(key,owner);modelAuthorityPorts.set(owner.port,repo);return owner;
+ }
+ export function createModelFamilyHostAuthorityProducerPort({repository}){return modelAuthorityOwner(repository).port;}
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.test.mjs b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+index 4ae725a6b..b658f99ae 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+@@ -4,20 +4,23 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, linkSync, symlinkSync } from "node:fs";
+ import { spawn } from "node:child_process";
+ import { join, resolve } from "node:path";
++import { validatePrivateParent, validateCreatedHome } from "../scripts/codex-critic-private-parent-fixture.mjs";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ // Production-shaped fixtures: a real Git checkout whose authority lifecycle is built the way model-family-runtime-host.mjs builds it.
+ import { mkdirSync } from "node:fs";
+ import { execFileSync } from "node:child_process";
+-import { nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+-import { createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
++import { createModelFamilyHostAuthorityLifecycle, createModelFamilyHostAuthorityProducerPort } from "./model-family-host-store.mjs";
++import { readAuthoritySourceFile, authorityDomainDigest } from "./session-authority-domain-owner.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+-import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } from "./session-authority-registry.mjs";
++import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityMemberRecord } from "./session-authority-registry.mjs";
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
+ import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+-import { createModelFamilyHostController, readHeldModelFamilyInvocation,
++import { createModelFamilyHostController, readHeldModelFamilyInvocation, createControlledModelFamilyHostDriver,
+   consumeModelFamilyHostDriverContext } from "./model-family-host-store.mjs";
++import { readOriginalAuthorModelInvocation } from "./design-review-original-custody.mjs";
++import { prepareOriginalDesignReview, readPreparedOriginalDesignReview } from "../scripts/design-review-dispatch.mjs";
+ import { createModelFamilyMainPrelaunch } from "./model-family-main-prelaunch.mjs";
+ import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
+ import { MODEL_FAMILY_HOST_STORE_LIMITS } from "./model-family-host-store.mjs";
+@@ -185,7 +188,8 @@ async function actualS2Port({ modelId = "model-fixture-62", version = [6, 2] } =
+   return { host, handle: compatible.value.discovery, contractSha256: discoveryDigest(contract), context: prep().context };
+ }
+ 
+-function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute = route.taskRoute } = {}) {
++function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute = route.taskRoute,
++  reviewSources = false } = {}) {
+   const data = signedBundle({ taskRoute });
+   let authorityReads = 0;
+   let preparations = 0;
+@@ -199,10 +203,23 @@ function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute
+     readCurrentCandidate() { return { ...currentCandidate }; },
+     launchDriver() { launched += 1; return { ok: true, value: { launched: true } }; },
+   };
+-  // The authority walk refuses any group/world-writable ancestor, so the checkout cannot live under a shared /tmp:
+-  // it is created beneath the owned checkout's scratch/ (the same convention the native-goldfish fixtures use).
+-  const repoDir = mkdtempSync(join(nativeContractFixtureParent(), "model-family-host-store-fixture-"));
++  // This Git fixture contains private Model/registry state, so each root is a
++  // unique Source-validated private child, distinct from ordinary /tmp fixtures.
++  const privateParent='/run/user/1000/ap-g17';
++  validatePrivateParent(privateParent);
++  const repoDir = mkdtempSync(join(privateParent, "g8-model-family-host-store-fixture-"));
++  validateCreatedHome(repoDir);
+   execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
++  if(reviewSources){
++    mkdirSync(join(repoDir,"specs/unit"),{recursive:true,mode:0o700});
++    writeFileSync(join(repoDir,"specs/unit/prd.md"),"Fixture PRD\n");
++    writeFileSync(join(repoDir,"specs/unit/spec.md"),"## Acceptance criteria\n\n- **AC-1:** Original source is reviewed.\n");
++    execFileSync("git",["add","--","specs/unit/prd.md","specs/unit/spec.md"],{cwd:repoDir,stdio:"ignore"});
++    execFileSync("git",["-c","user.name=Fixture","-c","user.email=fixture@example.invalid",
++      "-c","core.hooksPath=/dev/null","commit","-q","-m","fixture"],{cwd:repoDir,stdio:"ignore"});
++    const git=args=>execFileSync("git",args,{cwd:repoDir,encoding:"utf8"}).trim();
++    currentCandidate={candidateCommit:git(["rev-parse","HEAD"]),candidateTree:git(["rev-parse","HEAD^{tree}"])};
++  }
+   // The session-authority registry only initializes over a repository that carries a manifest and a pipeline State
+   // with a continuity object; the host's lifetimes reserve their members in that registry (same inputs as the prelaunch fixture).
+   mkdirSync(join(repoDir, ".claude"), { recursive: true, mode: 0o700 });
+@@ -1195,4 +1212,98 @@ test("D113 the settle step refuses a write the continuation made outside the beg
+   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+ });
+ 
++test("G8 original publication rejects a controlled Model token and creates no review artifact", async () => {
++  const f = fixture();
++  try {
++    activate(f);
++    const held = invoke(f, key('g8-controlled-refusal'));
++    assert.equal(held.ok, true, held.code);
++    const launched = f.controller.launch({ invocation: held.value,
++      packetBindingSha256: held.value.receipt.packetBindingSha256 });
++    assert.equal(launched.ok, true, launched.code);
++    const refused = await f.controller.publishOriginalDesignReview({ invocation: held.value,
++      validatedHandle: Object.freeze({}), request: {}, receiptInput: {} });
++    assert.equal(refused.code, 'DRE-NATIVE-ORIGIN-UNAVAILABLE');
++    assert.equal(existsSync(join(f.root, 'model-family-host', 'design-reviews')), false);
++  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
++});
++
++test("G8 author lookup reads a genuinely released controlled Model member without granting independent review", () => {
++  const f=fixture();
++  try{
++    f.source.launchDriver=createControlledModelFamilyHostDriver().launchDriver;
++    activate(f);
++    const authorKey=key('g8-author-original'),prepared=invoke(f,authorKey);
++    assert.equal(prepared.ok,true,prepared.code);
++    const launched=f.controller.launch({invocation:prepared.value,
++      packetBindingSha256:prepared.value.receipt.packetBindingSha256});
++    assert.equal(launched.ok,true,launched.code);
++    const closed=f.controller.disposeInvocation({invocation:prepared.value});
++    assert.equal(closed.ok,true,closed.code);
++    assert.equal(closed.assurance,'controlled-unit-method');
++    const member=f.controller.readReleasedInvocationMemberRef({invocation:prepared.value});
++    assert.equal(member.ok,true,member.code);
++    const reference={modelMemberRef:member.memberRef,invocationKey:authorKey,
++      receiptSha256:prepared.value.receipt.receiptSha256};
++    const candidate={commit:prepared.value.receipt.candidateCommit,tree:prepared.value.receipt.candidateTree};
++    const read=readOriginalAuthorModelInvocation({repository:f.repoDir,reference,candidate});
++    const repo=inspectSignedDescriptorCustodyRepository(f.repoDir);
++    const producerPort=createModelFamilyHostAuthorityProducerPort({repository:repo});
++    const record=withSessionAuthorityBoundary({repository:repo},boundary=>
++      inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef:member.memberRef}));
++    const receiptFile=join(repo.commonDir,'agent-pipeline','model-family-host','receipts',
++      authorityDomainDigest(authorKey)+'.json');
++    const physical=readAuthoritySourceFile({namespaceId:'receipts',filePath:receiptFile,
++      semantic:({value})=>value});
++    const offline=readHeldModelFamilyInvocation({rootDir:f.root,key:authorKey});
++    const factMatches=record.record.sourceFacts.map(fact=>({namespaceId:fact.namespaceId,
++      path:fact.pathSha256===physical.sourceFact.pathSha256,
++      bytes:fact.sha256===physical.sourceFact.sha256,
++      identity:authorityDomainDigest(fact.identity)===authorityDomainDigest(physical.sourceFact.identity),
++      semantic:fact.semanticSha256===physical.sourceFact.semanticSha256}));
++    assert.equal(read.ok,true,JSON.stringify({code:read.code,phase:record.record.phase,
++      released:Boolean(record.releaseRecord),offline:offline.ok,
++      value:offline.ok&&authorityDomainDigest(offline.value)===authorityDomainDigest(physical.value),
++      factMatches}));
++    assert.equal(read.receipt.receiptSha256,reference.receiptSha256);
++    assert.equal(readOriginalAuthorModelInvocation({repository:f.repoDir,
++      reference:{...reference,receiptSha256:sha('forged')},candidate}).ok,false);
++    assert.equal(readOriginalAuthorModelInvocation({repository:f.repoDir,
++      reference:{...reference,modelMemberRef:{...member.memberRef,sha256:sha('forged')}},candidate}).ok,false);
++  }finally{rmSync(f.repoDir,{recursive:true,force:true});}
++});
++
++test("G8 original request preparation binds a released author member and current committed sources", () => {
++  const f=fixture({reviewSources:true});
++  try{
++    f.source.launchDriver=createControlledModelFamilyHostDriver().launchDriver;
++    activate(f);
++    const authorKey=key('g8-author-request'),prepared=invoke(f,authorKey);
++    assert.equal(prepared.ok,true,prepared.code);
++    const launched=f.controller.launch({invocation:prepared.value,
++      packetBindingSha256:prepared.value.receipt.packetBindingSha256});
++    assert.equal(launched.ok,true,launched.code);
++    const closed=f.controller.disposeInvocation({invocation:prepared.value});
++    assert.equal(closed.ok,true,closed.code);
++    assert.equal(closed.assurance,'controlled-unit-method');
++    const member=f.controller.readReleasedInvocationMemberRef({invocation:prepared.value});
++    assert.equal(member.ok,true,member.code);
++    const originalAuthorReference={modelMemberRef:member.memberRef,invocationKey:authorKey,
++      receiptSha256:prepared.value.receipt.receiptSha256};
++    const request=prepareOriginalDesignReview({repository:f.repoDir,
++      sourcePaths:['specs/unit/prd.md','specs/unit/spec.md'],specPath:'specs/unit/spec.md',
++      featureId:'unit',originalAuthorReference,round:1});
++    assert.equal(request.ok,true,request.code);
++    const read=readPreparedOriginalDesignReview(request.preparedHandle);
++    assert.equal(read.ok,true,read.code);
++    assert.equal(read.request.authorExecutionSha256,originalAuthorReference.receiptSha256);
++    assert.deepEqual(read.request.candidate,{commit:f.currentCandidate().candidateCommit,
++      tree:f.currentCandidate().candidateTree});
++    assert.deepEqual(read.request.criteria.ids,['AC-1']);
++    assert.equal(readPreparedOriginalDesignReview(Object.freeze({})).code,'DRE-PREPARED-HANDLE-REQUIRED');
++    writeFileSync(join(f.repoDir,'specs/unit/spec.md'),'Changed\n');
++    assert.equal(readPreparedOriginalDesignReview(request.preparedHandle).code,'DRE-PREPARATION-DRIFT');
++  }finally{rmSync(f.repoDir,{recursive:true,force:true});}
++});
++
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/model-family-invocation.mjs b/plugins/pipeline-core/lib/model-family-invocation.mjs
+index d5c487d04..45eb2e15f 100644
+--- a/plugins/pipeline-core/lib/model-family-invocation.mjs
++++ b/plugins/pipeline-core/lib/model-family-invocation.mjs
+@@ -227,8 +227,17 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
+     held.closed=true;for(const binding of held.bindings)bindingHandles.delete(binding);held.bindings.clear();invocationHandles.delete(invocation);
+     return immutableSnapshot(result);
+   }
++  async function publishOriginalDesignReview({invocation,validatedHandle,request,receiptInput}={}) {
++    const held=invocationHandles.get(invocation);
++    if(!held||held.closed||typeof held.store.publishOriginalDesignReview!=='function')return fail('DRE-NATIVE-ORIGIN-UNAVAILABLE');
++    try{
++      const published=await held.store.publishOriginalDesignReview({invocation:held.invocation,validatedHandle,request,receiptInput});
++      if(published?.ok)held.closed=true;
++      return published;
++    }catch{return fail('DRE-PUBLICATION-UNAVAILABLE');}
++  }
+   return Object.freeze({ observeActivation, prepareModelFamilyInvocation, prepareCurrentModelFamilyInvocation, bindModelFamilyInvocation,
+-    launchModelFamilyInvocation, disposeModelFamilyInvocation, readHeld });
++    launchModelFamilyInvocation, disposeModelFamilyInvocation, publishOriginalDesignReview, readHeld });
+ }
+ 
+ // Lazy: creating the entry at module load calls createModelFamilyRuntimeHost while
+diff --git a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+index ebb2e4b09..c1e3b274b 100644
+--- a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
++++ b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+@@ -93,8 +93,8 @@ function nativeJoinedRead(filePath,privateRecord){
+   if(before.dev!==volume||after.dev!==volume||before.ino!==inode||after.ino!==inode||before.size!==after.size||before.mtimeNs!==after.mtimeNs||before.ctimeNs!==after.ctimeNs||before.nlink!==1n||after.nlink!==1n||BigInt(native.bytes.length)!==after.size)authorityOwnerFailure('domain-native-subject-join');
+   return {...native,identity:{dev:volume.toString(),ino:inode.toString(),mode:Number(after.mode),nlink:1}};
+ }
+-function readWindowsDomainSource(namespaceId,filePath,semantic){
+-  const native=nativeJoinedRead(filePath,true),bytes=native.bytes,value=json(bytes),meaning=semantic({value,bytes});
++function readWindowsDomainSource(namespaceId,filePath,semantic,format='json'){
++  const native=nativeJoinedRead(filePath,true),bytes=native.bytes,value=format==='utf8'?new TextDecoder('utf-8',{fatal:true}).decode(bytes):json(bytes),meaning=semantic({value,bytes});
+   if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
+   const sourceFact={namespaceId,pathSha256:digest(filePath),sha256:hash(bytes),size:bytes.length,identity:native.identity,semanticSha256:digest(meaning)};
+   nativeFactCustody.set(sourceFact,native.nativeFactsSha256);return {value,bytes,sourceFact};
+@@ -116,9 +116,9 @@ function readModuleContext(filePath){
+   if(!chain(dirname(filePath))||realpathSync(filePath)!==filePath)authorityOwnerFailure('domain-source-context-path');
+   let fd;try{const before=lstatSync(filePath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o022)!==0||before.size>LIMIT.file)authorityOwnerFailure('domain-source-context-ownership');fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);if(!same(stability(before),stability(opened)))authorityOwnerFailure('domain-source-context-race');const buffer=Buffer.alloc(LIMIT.file+1);let size=0;while(size<buffer.length){const count=readSync(fd,buffer,size,buffer.length-size,size);if(!count)break;size+=count;}const after=lstatSync(filePath),final=fstatSync(fd);if(size>LIMIT.file||size!==final.size||!same(stability(opened),stability(final))||!same(stability(final),stability(after)))authorityOwnerFailure('domain-source-context-race');return {pathSha256:digest(filePath),sha256:hash(buffer.subarray(0,size)),identity:identity(final),size};}finally{if(fd!==undefined)closeSync(fd);}
+ }
+-export function readAuthoritySourceFile({namespaceId,filePath,semantic}){
+-  if(typeof namespaceId!=='string'||!namespaceId||typeof semantic!=='function'||!chain(dirname(filePath),windowsAuthorityBoundary(filePath)))authorityOwnerFailure('domain-source-input');
+-  if(process.platform==='win32')return readWindowsDomainSource(namespaceId,filePath,semantic);
++export function readAuthoritySourceFile({namespaceId,filePath,semantic,format='json'}){
++  if(typeof namespaceId!=='string'||!namespaceId||typeof semantic!=='function'||!['json','utf8'].includes(format)||!chain(dirname(filePath),windowsAuthorityBoundary(filePath)))authorityOwnerFailure('domain-source-input');
++  if(process.platform==='win32')return readWindowsDomainSource(namespaceId,filePath,semantic,format);
+   let fd;try{
+     const before=lstatSync(filePath);owned(before);if(before.size>LIMIT.file)authorityOwnerFailure('domain-source-size');
+     fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);owned(opened);
+@@ -126,7 +126,7 @@ export function readAuthoritySourceFile({namespaceId,filePath,semantic}){
+     function boundedRead(){const chunks=[];let offset=0;while(offset<=LIMIT.file){const chunk=Buffer.alloc(Math.min(65536,LIMIT.file+1-offset)),size=readSync(fd,chunk,0,chunk.length,offset);if(size===0)break;chunks.push(chunk.subarray(0,size));offset+=size;}if(offset>LIMIT.file)authorityOwnerFailure('domain-source-size');return Buffer.concat(chunks,offset);}
+     const bytes=boundedRead(),afterRead=fstatSync(fd),again=boundedRead(),final=fstatSync(fd),after=lstatSync(filePath);owned(afterRead);owned(final);owned(after);
+     if(!same(stability(opened),stability(afterRead))||!same(stability(afterRead),stability(final))||!same(stability(final),stability(after))||bytes.length!==after.size||!bytes.equals(again))authorityOwnerFailure('domain-source-race');
+-    const value=json(bytes),meaning=semantic({value,bytes});if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
++    const value=format==='utf8'?new TextDecoder('utf-8',{fatal:true}).decode(bytes):json(bytes),meaning=semantic({value,bytes});if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
+     return {value,bytes,sourceFact:{namespaceId,pathSha256:digest(filePath),sha256:hash(bytes),size:bytes.length,identity:identity(after),semanticSha256:digest(meaning)}};
+   }finally{if(fd!==undefined)closeSync(fd);}
+ }
+@@ -259,7 +259,7 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+   };
+   const port=Object.freeze(Object.fromEntries(Object.entries(methods).map(([name,method])=>[name,(...args)=>{assertContext();return method(...args);}])));
+   function reserve(identity){const handle=Object.freeze({}),binding=digest({producerId,repoSha,identity,nonce:randomBytes(32).toString('hex')}),operation={phase:'reserved',handle,identity:structuredClone(identity),binding,file:null,sha256:null,result:null,terminalFacts:null,effectFacts:[],beforeFacts:scan().memberships.flatMap(m=>m.sourceFacts)};handles.set(handle,operation);live.set(binding,operation);const reserved=withSessionAuthorityBoundary({repository:repo},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,association:{state:'unbound',target:null},operationHandle:handle}));operation.member=reserved;if(producerId==='local-worker-supervisor'&&identity?.enrollment===true){const initial=readInitialMember(operation);if(initial.sourceFact.sha256!==reserved.memberRef.sha256||initial.sourceFact.size!==reserved.memberRef.size||initial.value.phase!=='reserved'||initial.value.sourceFacts.length!==0)authorityOwnerFailure(producerId+':initial-reservation-CAS');operation.initialMember={value:structuredClone(initial.value),sourceFact:structuredClone(initial.sourceFact)};}operation.file=join(lifetimeRoot,binding+'.json');const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:binding,phase:'armed',identitySha256:digest(identity)};withSessionAuthorityBoundary({repository:repo},boundary=>{operation.sha256=publish(repo,operation.file,record,null,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.phase='armed';if(operation.initialMember){operation.initialLifetimeFact=initialLifetimeRead(operation).sourceFact;if(initialLifetimeWindow)authorityOwnerFailure(producerId+':initial-reservation-reentrant');initialLifetimeWindow={operation};}try{operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef,operationHandle:handle})};}finally{if(initialLifetimeWindow?.operation===operation)initialLifetimeWindow=null;}});return handle;}
+-  function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
++  function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;for(const fact of proof.sourceFacts){const prior=operation.effectFacts.find(row=>row.pathSha256===fact.pathSha256);if(prior&&!same(prior,fact))authorityOwnerFailure(producerId+':terminal-source-conflict');if(!prior)operation.effectFacts.push(fact);}operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
+   function observeEffects(handle){const operation=handles.get(handle);if(!operation||(operation.phase!=='armed'&&!(operation.phase==='running'&&activeTransitions.has(operation))))authorityOwnerFailure(producerId+':effect-handle');return withSessionAuthorityBoundary({repository:repo},boundary=>{const current=scan().memberships.flatMap(m=>m.sourceFacts);operation.effectFacts=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));operation.phase='running';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:operation.effectFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};});}
+   const asyncPhases=new Map();
+   function effectTransition(handle,effect){
+@@ -364,7 +364,9 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+   }
+ 
+   function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){asyncPhases.delete(handle);throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(value=>{settleAsyncPhase(handle);return finish(value);},error=>{try{settleAsyncPhase(handle);}catch{}observeEffects(handle);throw error;}):finish(result);});}
+-  const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
++  const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,
++    releasedMemberRef(handle){const operation=handles.get(handle);if(!operation||operation.phase!=='terminal-observed'||!operation.member?.memberRef)authorityOwnerFailure(producerId+':released-member-unavailable');return structuredClone(operation.member.memberRef);},
++    currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
+   controlledModelDomainOwners.set(owner,{port,producerId,repository:repo,assertContext});
+   publicationOwners.set(port,{repo,handles});
+   return owner;
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 0d5012f68..9c945f9fb 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -36,7 +36,7 @@ const definitions = [
+   ['managed-codex',codex,'ManagedCodex',['dispatch'],['design-readiness-processes','advisor-processes'],['lib/codex-host-process-journal.mjs','lib/codex-host-process-supervisor.mjs','lib/native-managed-authority-support.mjs','lib/session-authority-domain-owner.mjs']],
+   ['agy-session-consent',consent,'AgySessionConsent',['armed-capability'],['agy-session-consent','agy-session-consent-revocations'],['lib/agy-session-authority.mjs']],
+   ['agy-family-dispatch',agy,'AgyFamilyDispatch',['dispatch','armed-capability'],['agy-host-observed','registered-opaque-context-lifetimes'],['lib/agy-session-dispatch.mjs','lib/agy-host-observed-store.mjs']],
+-  ['model-family-host',model,'ModelFamilyHost',['armed-capability'],['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes'],['lib/model-family-host-store.mjs','lib/model-family-runtime-host.mjs','lib/model-family-invocation.mjs','lib/session-authority-domain-owner.mjs']],
++  ['model-family-host',model,'ModelFamilyHost',['armed-capability'],['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes','design-review-requests','design-review-reports','design-review-publications'],['lib/model-family-host-store.mjs','lib/model-family-runtime-host.mjs','lib/model-family-invocation.mjs','lib/session-authority-domain-owner.mjs','lib/design-review-execution-producer.mjs','scripts/codex-native-critic-host.mjs']],
+   ['afk-ledger',afk,'AfkLedger',['armed-capability'],['registered-activations','activation-generations','writer-recovery-locks'],['lib/afk-ledger.mjs','lib/afk-transaction-host.mjs','lib/session-authority-domain-owner.mjs']],
+   ['session-power',power,'SessionPower',['armed-capability'],['session-power-records','session-power-locks'],['lib/session-power.mjs','lib/session-authority-domain-owner.mjs']],
+   ['local-worker-supervisor',worker,'LocalWorkerSupervisor',['dispatch','armed-capability'],['registered-external-state-roots','supervisor-state','supervisor-lifecycle'],['lib/local-worker-supervisor.mjs','lib/local-supervisor-state.mjs','lib/session-authority-domain-owner.mjs']],
+@@ -655,6 +655,22 @@ export function inspectSourceOwnedSessionAuthorityMemberRecord(input) {
+   if(!member)fail('SDC-AUTHORITY-CAS','member-record-not-current');
+   return freeze({memberRef:member.ref,producerRef:current.rows[index].record.ref,catalogueRef:current.catalogue.ref,record:structuredClone(member.value),releaseRef:member.release?.ref??null,releaseRecord:member.release?structuredClone(member.release.value):null});
+ }
++/** Exact publication-fact lookup inside one producer's current registry row. */
++export function inspectSourceOwnedSessionAuthorityMemberByPublicationFact(input) {
++  exact(input,['boundary','producerPort','sourceFact'],'publication-member-inspection');
++  const repo=boundary(input.boundary),{pairs,index}=selectPort(repo,input.boundary,input.producerPort);
++  sourceFacts([input.sourceFact],['design-review-publications']);
++  const current=stateRead(repo,pairs),matches=current.rows[index].members.filter(member=>
++    member.value.phase==='released'&&member.release&&
++    member.value.sourceFacts.some(fact=>equal(fact,input.sourceFact))&&
++    member.release.value.sourceFacts.some(fact=>equal(fact,input.sourceFact)));
++  if(matches.length!==1)fail(matches.length?'SDC-AUTHORITY-CAS':'SDC-AUTHORITY-UNAVAILABLE',
++    matches.length?'publication-member-ambiguous':'publication-member-absent');
++  const member=matches[0];
++  return freeze({memberRef:member.ref,producerRef:current.rows[index].record.ref,
++    catalogueRef:current.catalogue.ref,record:structuredClone(member.value),
++    releaseRef:member.release.ref,releaseRecord:structuredClone(member.release.value)});
++}
+ export function inspectSourceOwnedSessionAuthorityStateRefresh(input) {
+   exact(input,['boundary','producerPort','stateWriteHandle','ownerWitness'],'state-refresh-inspection');
+   const repo=boundary(input.boundary),ticket=stateWriteRefreshTickets.get(input.ownerWitness);
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.mjs b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+index aab06e5bc..cb2d9a13c 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+@@ -1204,6 +1204,76 @@ export function readNativeCriticCapturedReturn(context) {
+   return structuredClone(value);
+ }
+ 
++// A current-process Source inspection. Serialized custody files cannot mint
++// this handle or reconstruct the original prepared family context.
++const inspectedOriginalSessionReturns = new WeakMap();
++function originalSessionReturnFailure(code) { const error = new Error(code); error.code = code; throw error; }
++function frozenOriginalSessionReturn(value) {
++  const copy=structuredClone(value),seen=new WeakSet();
++  const freeze=item=>{if(item&&typeof item==='object'&&!seen.has(item)){seen.add(item);for(const child of Object.values(item))freeze(child);Object.freeze(item);}return item;};
++  return freeze(copy);
++}
++function inspectOriginalSessionCriticReturnValue({context,repoRoot,preparedSha256}) {
++  const held=heldPreparedFamilyContext(context);
++  if(realpathSync(repoRoot)!==held.repoRoot||held.preparedSha256!==preparedSha256)
++    originalSessionReturnFailure('CRITIC-FAMILY-PREPARED-CONTEXT-REQUIRED');
++  assertOriginalFamilyCustody(held);
++  const prepared=readJsonBounded(held.preparedPath).value;
++  validatePrepared(prepared,held.repoRoot,context);
++  if(canonicalJson(prepared.sessionPacketBinding??null)!==canonicalJson(held.originalPacketBinding??null))
++    originalSessionReturnFailure('CRITIC-FAMILY-SESSION-PACKET-DRIFT');
++  const paths=familyCustodyPaths(held);
++  const invocation=readJsonBounded(paths.invocation).value;
++  const consumed=readJsonBounded(paths.consumed).value;
++  const execution=readJsonBounded(paths.execution).value;
++  const original=readHeldCriticFamilyExecution(held.route);
++  const route=recheckHeldCriticFamilyRoute(held.route);
++  if(!original.ok||!route.ok||invocation.schema!=='pipeline.critic-family-prepared-custody.v1'
++    ||invocation.preparedSha256!==preparedSha256||familyDigest(invocation.receipt)!==familyDigest(route.receipt)
++    ||consumed.schema!=='pipeline.critic-family-consumption.v1'||consumed.preparedSha256!==preparedSha256
++    ||!['pipeline.critic-family-native-custody.v1','pipeline.critic-family-native-custody.v2'].includes(execution.schema)
++    ||execution.preparedSha256!==preparedSha256
++    ||consumed.packetSha256!==familyDigest(execution.packet)
++    ||consumed.nativeRequestSha256!==familyDigest(execution.nativeRequest)
++    ||familyDigest(execution.execution)!==familyDigest(original.value)
++    ||original.value.packetSha256!==familyDigest(execution.packet)
++    ||original.value.nativeResultSha256!==familyDigest(execution.nativeResult)
++    ||!held.generatedHostReturn||familyDigest(held.generatedHostReturn)!==familyDigest(execution.hostReturn)
++    ||!held.nativeResult||familyDigest(held.nativeResult)!==familyDigest(execution.nativeResult))
++    originalSessionReturnFailure('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
++  const validated=validateHostReturn(prepared,preparedSha256,execution.hostReturn);
++  if(execution.packet?.candidate?.commit!==prepared.review.commit
++    ||execution.packet?.candidate?.tree!==prepared.review.tree
++    ||execution.nativeRequest?.candidateCommit!==prepared.review.commit
++    ||execution.nativeRequest?.candidateTree!==prepared.review.tree
++    ||validated.result.candidate_commit!==prepared.review.commit
++    ||validated.result.candidate_tree!==prepared.review.tree)
++    originalSessionReturnFailure('CRITIC-FAMILY-SUBJECT-DRIFT');
++  return frozenOriginalSessionReturn({schema:'pipeline.original-session-critic-return.v1',
++    preparedSha256,dispatchId:prepared.dispatchId,
++    candidate:{base:prepared.review.base,commit:prepared.review.commit,tree:prepared.review.tree},
++    diff:{path:prepared.review.diffReferencePath,referenceSetSha256:prepared.bindings.referenceSetSha256,
++      reviewFingerprintSha256:prepared.bindings.reviewFingerprintSha256},
++    originalInvocation:invocation.receipt,originalDispatch:execution.packet,
++    originalChild:execution.nativeResult,reviewerResult:validated.result,
++    verdict:validated.result.verdict,reviewPass:validated.reviewPass,
++    hostReturn:execution.hostReturn,
++    sessionPacketBinding:prepared.sessionPacketBinding??null});
++}
++export function inspectOriginalSessionCriticReturn({context,repoRoot,preparedSha256}={}) {
++  const projection=inspectOriginalSessionCriticReturnValue({context,repoRoot,preparedSha256});
++  const handle=Object.freeze(Object.create(null));
++  inspectedOriginalSessionReturns.set(handle,{context,repoRoot,preparedSha256,projectionSha256:familyDigest(projection)});
++  return handle;
++}
++export function readInspectedOriginalSessionCriticReturn(handle) {
++  const held=inspectedOriginalSessionReturns.get(handle);
++  if(!held)originalSessionReturnFailure('CRITIC-FAMILY-ORIGINAL-SOURCE-HANDLE-REQUIRED');
++  const projection=inspectOriginalSessionCriticReturnValue(held);
++  if(familyDigest(projection)!==held.projectionSha256)originalSessionReturnFailure('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
++  return projection;
++}
++
+ /** Persisted JSON cannot reconstruct the original publication capture.
+  * Qualified construction ports still require a fresh preparation. */
+ export function createNativeCriticPreparedContextFactory({ familyInvocationEntry, familyRuntimeHost, familyExecutionPorts } = {}) {
+@@ -1324,14 +1394,43 @@ function stageExactFile(path, value) {
+   return atomicWriteExclusive(path, value);
+ }
+ 
++function readOriginalSessionPacketBinding(repoRoot,packetId,request,inspectClaimedSessionAdmissionFn) {
++  if(typeof packetId!=='string'||!/^[a-f0-9]{32}$/.test(packetId))fail('CRITIC-FAMILY-SESSION-PACKET-ID');
++  if(typeof inspectClaimedSessionAdmissionFn!=='function')fail('CRITIC-FAMILY-SESSION-PACKET-READER-UNAVAILABLE');
++  const commonRaw=gitText(repoRoot,['rev-parse','--git-common-dir']);
++  const common=realpathSync(isAbsolute(commonRaw)?commonRaw:resolve(repoRoot,commonRaw));
++  const {packet,admission}=inspectClaimedSessionAdmissionFn({controlRoot:join(common,'agent-pipeline','critic-packets'),packetId});
++  const expectedReferences=[{kind:'spec',path:request.spec_path},
++    ...request.guardrail_paths.map(path=>({kind:'guardrail',path}))]
++    .map(row=>({...row,candidateBlobOid:gitText(repoRoot,['rev-parse',`${request.candidate_commit}:${row.path}`])}))
++    .sort((a,b)=>`${a.kind}:${a.path}`.localeCompare(`${b.kind}:${b.path}`));
++  if(packet.packetId!==packetId||packet.request.taskId!==request.task_id
++    ||packet.request.trigger!==request.trigger_row||packet.route.runner!=='codex'
++    ||packet.ruleset.oid!==request.ruleset_sha
++    ||packet.candidate.base!==request.review_base
++    ||packet.candidate.commit!==request.candidate_commit
++    ||packet.candidate.tree!==request.candidate_tree
++    ||canonicalJson(packet.references)!==canonicalJson(expectedReferences)
++    ||!SHA256.test(packet.diff.sha256??''))fail('CRITIC-FAMILY-SESSION-PACKET-SUBJECT');
++  return Object.freeze({packetId,packetDigest:sha256(canonicalJson(packet)),claimSha256:admission.claimSha256,
++    sessionId:admission.sessionId,preflightSha256:admission.preflightSha256,diffSha256:packet.diff.sha256});
++}
++
+ export function prepareNativeCritic(options, deps = {}) {
+   const activation = createModelFamilyRuntimeHost({ cwd: options.repoRoot }).observeActivation();
+   if (!activation?.ok) fail(activation?.code ?? "CRITIC-FAMILY-ACTIVATION-UNCERTAIN");
+-  if (activation.status === "inactive") return prepareNativeCriticCore(options, deps);
++  if (activation.status === "inactive") {
++    if(options.sessionPacketId!==undefined)fail('CRITIC-FAMILY-SESSION-PACKET-ROUTE-UNAVAILABLE');
++    return prepareNativeCriticCore(options, deps);
++  }
+   if (activation.status !== "active") fail("CRITIC-FAMILY-ACTIVATION-UNCERTAIN");
+   return (async () => {
+     const repoRoot = assertGitRepository(options.repoRoot, "candidate repository");
+     const request = validateCriticRequest(structuredClone(readJsonBounded(options.requestPath).value));
++    const packetReader=options.sessionPacketId===undefined?null:
++      (await import('./critic-packet-preflight.mjs')).inspectClaimedSessionAdmission;
++    const originalPacketBinding=options.sessionPacketId===undefined?null:
++      readOriginalSessionPacketBinding(repoRoot,options.sessionPacketId,request,packetReader);
+     const route = await resolveSessionCodexCriticRoute({ rootDir: repoRoot, candidateCommit: request.candidate_commit,
+       dutyId: request.trigger_row === "T1" ? "critic_high_risk" : "critic_normal",
+       familyInvocationEntry: deps.familyInvocationEntry, familyRuntimeHost: deps.familyRuntimeHost,
+@@ -1339,9 +1438,10 @@ export function prepareNativeCritic(options, deps = {}) {
+     const checked = recheckHeldCriticFamilyRoute(route);
+     if (!checked.ok) fail(checked.code);
+     const context = Object.freeze(Object.create(null));
+-    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath: options.preparedPath, requestSha256: sha256(canonicalJson(request)), preparedSha256: null };
++    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath: options.preparedPath, requestSha256: sha256(canonicalJson(request)), preparedSha256: null,
++      originalPacketBinding,packetReader };
+     preparedFamilyContexts.set(context, held);
+-    const result = prepareNativeCriticCore(options, deps, context);
++    const result = prepareNativeCriticCore(options, deps, context, originalPacketBinding,packetReader);
+     held.preparedSha256 = result.preparedSha256;
+     held.protectedSnapshots = Object.fromEntries(Object.entries(protectedRootPathMap(repoRoot, options.pipelineRoot, options.observers ?? [])).map(([name, root]) => [name, captureRepositoryFingerprint(root)]));
+     assertFingerprintMapEqual(readJsonBounded(options.preparedPath).value.bindings.protectedBefore, Object.fromEntries(Object.entries(held.protectedSnapshots).map(([name, snapshot]) => [name, snapshot.sha256])), "prepared publication capture");
+@@ -1351,7 +1451,7 @@ export function prepareNativeCritic(options, deps = {}) {
+   })();
+ }
+ 
+-function prepareNativeCriticCore(options, deps = {}, familyContext = null) {
++function prepareNativeCriticCore(options, deps = {}, familyContext = null, originalPacketBinding = null,packetReader=null) {
+   if (!options.pipelineRoot) fail("pipelineRoot is required; implicit installed-plugin provenance is forbidden");
+   (deps.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+     rootDir: options.repoRoot,
+@@ -1374,6 +1474,9 @@ function prepareNativeCriticCore(options, deps = {}, familyContext = null) {
+   if (new Set([preparedPath, dispatchStatePath, reviewRoot]).size !== 3) fail("control paths must be distinct");
+   const requestRecord = readJsonBounded(options.requestPath);
+   const request = validateCriticRequest(structuredClone(requestRecord.value));
++  const currentPacketBinding=options.sessionPacketId===undefined?null:
++    readOriginalSessionPacketBinding(repoRoot,options.sessionPacketId,request,packetReader);
++  if(canonicalJson(currentPacketBinding)!==canonicalJson(originalPacketBinding))fail('CRITIC-FAMILY-SESSION-PACKET-DRIFT');
+   const protectedBefore = protectedFingerprintMap(repoRoot, pipelineRoot, observers);
+   assertRepositoryClean(repoRoot, "candidate");
+   validateCandidate(repoRoot, request);
+@@ -1418,6 +1521,7 @@ function prepareNativeCriticCore(options, deps = {}, familyContext = null) {
+     nonce,
+     expectedTaskName,
+     request,
++    ...(currentPacketBinding===null?{}:{sessionPacketBinding:currentPacketBinding}),
+     reviewPlan,
+     route,
+     hostContract: {
+@@ -1724,9 +1828,19 @@ function validatePrepared(prepared, repoRoot, familyContext = null) {
+   exactKeys(prepared, [
+     "schema", "createdAt", "dispatchId", "nonce", "expectedTaskName", "request", "reviewPlan", "route", "hostContract", "sources", "review",
+     "governance", "references", "verify", "assurance", "residualRisks", "bindings",
++    ...(Object.hasOwn(prepared,'sessionPacketBinding')?['sessionPacketBinding']:[]),
+   ], "prepared packet");
+   if (prepared.schema !== "pipeline.codex-critic-prepared.v1") fail("prepared packet schema mismatch");
+   validateCriticRequest(structuredClone(prepared.request));
++  if(Object.hasOwn(prepared,'sessionPacketBinding')){
++    const binding=prepared.sessionPacketBinding;
++    exactKeys(binding,['packetId','packetDigest','claimSha256','sessionId','preflightSha256','diffSha256'],'session packet binding');
++    const current=readOriginalSessionPacketBinding(repoRoot,binding.packetId,prepared.request,
++      preparedFamilyContexts.get(familyContext)?.packetReader);
++    if(canonicalJson(binding)!==canonicalJson(current)
++      ||canonicalJson(preparedFamilyContexts.get(familyContext)?.originalPacketBinding??null)!==canonicalJson(binding))
++      fail('CRITIC-FAMILY-SESSION-PACKET-DRIFT');
++  }
+   const expectedReviewPlan = admitCriticReview(prepared.request);
+   exactKeys(prepared.reviewPlan, ["mode", "admissionCode", "affectedInvariantIds"], "prepared review plan");
+   if (JSON.stringify(prepared.reviewPlan) !== JSON.stringify(expectedReviewPlan)) fail("prepared review plan drift");
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+index 3b6ec28be..214ee10c8 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+@@ -14,7 +14,7 @@ import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-sourc
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "../lib/model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "../lib/model-family-codex-adapter.mjs";
+ import { readHeldModelFamilyInvocation } from "../lib/model-family-host-store.mjs";
+-import { readNativeCriticPreparedContext, readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, recordNativeCriticPreparedExecution, readNativeCriticCapturedReturn } from "./codex-critic-host.mjs";
++import { readNativeCriticPreparedContext, readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, recordNativeCriticPreparedExecution, readNativeCriticCapturedReturn, inspectOriginalSessionCriticReturn, readInspectedOriginalSessionCriticReturn } from "./codex-critic-host.mjs";
+ import { launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
+ import { PassThrough } from "node:stream";
+ import { pathToFileURL } from "node:url";
+@@ -3238,12 +3238,12 @@ await checkAsync("active native PREPARE retains original private signed route an
+    const isolated = await import(new URL(`./codex-critic-host.mjs?custody=${dutyId}`,import.meta.url));
+    assert.equal(isolated.readNativeCriticPreparedContext(output),null,"isolated producer has no original result WeakMap");
+    const factory = isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports});
+-   const restored = await factory.reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
+-   assert.throws(()=>isolated.readNativeCriticPreparedRoute(structuredClone(restored),{repoRoot:repo,preparedSha256:output.preparedSha256}),/CONTEXT-REQUIRED/);
++   await assert.rejects(factory.reconstruct({repoRoot:repo,preparedPath:output.preparedPath}),/REPREPARE-REQUIRED/);
++   assert.throws(()=>isolated.readNativeCriticPreparedRoute(structuredClone(context),{repoRoot:repo,preparedSha256:output.preparedSha256}),/CONTEXT-REQUIRED/);
+    const familyReturnPath=join(root,`family-${dutyId}-return.json`),familyReceiptPath=join(root,`family-${dutyId}-receipt.json`);
+    writeJson(familyReturnPath,launched.value.hostReturn);
+-   const final = isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,
+-     dispatchStatePath:join(root,`family-${dutyId}-state.json`),returnPath:familyReturnPath,receiptPath:familyReceiptPath,familyContext:restored});
++   const final = finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,
++     dispatchStatePath:join(root,`family-${dutyId}-state.json`),returnPath:familyReturnPath,receiptPath:familyReceiptPath,familyContext:context});
+    assert.equal(final.reviewPass,true); assert.equal(f.launches(),1);
+    assert.equal(readJsonBounded(familyReceiptPath).value.route.requestedModel,route.model);
+   } finally { f.cleanup(); }
+@@ -3257,18 +3257,64 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
+    const prefix=join(root,`consumer-${dutyId}`),p=`${prefix}-request.json`;
+    const exportContext={provider:"OpenAI",service:"synthetic-native-family-fixture",hostGate:"additional-check-required",providerGate:"not-observed",observedEndpoint:null};
+    writeJson(p,{...request,trigger_row:dutyId==="critic_high_risk"?"T1":"T2"});
+-   const output=await prepareNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,requestPath:p,preparedPath:`${prefix}-prepared.json`,dispatchStatePath:`${prefix}-state.json`,reviewRoot:`${prefix}-review`},
+-    {familyInvocationEntry:f.entry,familyExecutionPorts:f.ports,invocationId:`native-consumer-${dutyId}`,runVerify:checkout=>{
++   const outerRequest=readJsonBounded(p).value,packetId=(dutyId==="critic_high_risk"?"a":"b").repeat(32);
++   const {prepareCandidatePacket,claimCandidatePacket,publishClaimedSessionAdmission,
++     inspectClaimedSessionAdmission,SESSION_PACKET_BINDING_SCHEMA}=await import('./critic-packet-preflight.mjs');
++   mkdirSync(join(repo,'evidence'),{recursive:true});
++   writeJson(join(repo,'evidence',`dispatch-record-${outerRequest.task_id}.json`),{
++     schema:'pipeline.dispatch-record.v3',taskId:outerRequest.task_id,agentType:'default',
++     model:'gpt-5.6-luna',effort:'medium',rulesetSha:outerRequest.ruleset_sha,
++     dispatcher:'elephant',outcome:'completed',commits:[outerRequest.candidate_commit],
++     candidateCommit:outerRequest.candidate_commit,resultSha256:'a'.repeat(64),
++     log:[{phase:'verify',toolUseCount:1}],
++     report:{text:'fixture source candidate',changedFiles:['specs/review.md','policies/guard.md']},
++     criticRequired:{schema:'pipeline.critic-required-decision.v1',
++       trigger:{schema:'pipeline.critic-trigger-input.v1',rigorLevel:2,riskClass:'high',riskFlag:true,
++         diff:{mechanical:false,architecture:false,guardrails:true,security:false}},appliedRow:'T1'}});
++   const { produceCriticDiagnostic } = await import('../lib/critic-diagnostic-producer.mjs');
++   writeJson(join(repo,'evidence','verify.json'),produceCriticDiagnostic({root:repo,
++     candidate:outerRequest.candidate_commit,specPath:outerRequest.spec_path,
++     guardrailPaths:outerRequest.guardrail_paths,
++     command:[process.execPath,'-e',"console.log('fixture targeted result')"],
++     logPath:'evidence/targeted.log'}));
++   const packetControl=join(repo,".git","agent-pipeline","critic-packets");
++   mkdirSync(packetControl,{recursive:true,mode:0o700});
++   const preflightSha256="f".repeat(64);
++   const outer=prepareCandidatePacket({repoRoot:repo,controlRoot:packetControl,packetId,
++     taskId:outerRequest.task_id,projectId:"pipeline",baseCommit:outerRequest.review_base,
++     candidateCommit:outerRequest.candidate_commit,rulesetOid:outerRequest.ruleset_sha,
++     trigger:outerRequest.trigger_row,
++     route:{routeId:"session-critic",runner:"codex",adapter:"codex-functional-equivalent",
++       provider:"openai",modelTier:"fixture",effortTier:"xhigh",
++       assurance:"functional-equivalent-read-only; OS isolation not asserted",projectionDigest:preflightSha256},
++     references:[{kind:"spec",path:outerRequest.spec_path},
++       ...outerRequest.guardrail_paths.map(path=>({kind:"guardrail",path}))],
++     sessionBinding:{schema:SESSION_PACKET_BINDING_SCHEMA,sessionId:`session-${dutyId}`,
++       preflightSha256,assurance:"functional-equivalent-read-only; OS isolation not asserted",
++       freshContext:true,historyInherited:false,mayDelegate:false}});
++   claimCandidatePacket({controlRoot:packetControl,packetId,adapter:outer.packet.route.adapter,
++     claimantNonce:"3".repeat(64)});
++   const claimed=publishClaimedSessionAdmission({controlRoot:packetControl,packetId,
++     preflightSha256,courseSourceSha256:"4".repeat(64),courseDecisionSha256:"5".repeat(64)});
++   assert.equal(claimed.ok,true);
++   const prepareOptions={repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,requestPath:p,preparedPath:`${prefix}-prepared.json`,dispatchStatePath:`${prefix}-state.json`,reviewRoot:`${prefix}-review`,sessionPacketId:packetId};
++   const prepareDeps={familyInvocationEntry:f.entry,familyExecutionPorts:f.ports,invocationId:`native-consumer-${dutyId}`,runVerify:checkout=>{
+      mkdirSync(join(checkout,"evidence"),{recursive:true});writeJson(join(checkout,"evidence","verify-latest.json"),{schema:"pipeline.verify-evidence.v0",commit:candidate.commit,tree:candidate.tree,exitCode:0,steps:[{name:"synthetic",exitCode:0}]});
+      const grantPath="evidence/family-export.json";writeJson(join(checkout,grantPath),{scope:{recipient:{provider:exportContext.provider,runner:"codex",service:exportContext.service},purpose:"critic",sourceRoots:["specs"],evidenceRoots:["evidence"]}});
+      const grantArgs=["--root",checkout,"--request",grantPath],grantPlan=runCriticExportConsent(["plan",...grantArgs]);
+      assert.equal(runCriticExportConsent(["record",...grantArgs,"--plan-sha256",grantPlan.planSha256,"--decision-reference","test-fixture:family-native","--decision-sha256","e".repeat(64)]).ok,true);
+      rmSync(join(checkout,grantPath));
+-     return {command:"node verify.mjs",stdoutSha256:sha256("ok"),stderrSha256:sha256(""),stdoutBytes:2,stderrBytes:0,completedTestSteps:1}; }});
++     return {command:"node verify.mjs",stdoutSha256:sha256("ok"),stderrSha256:sha256(""),stdoutBytes:2,stderrBytes:0,completedTestSteps:1}; }};
++   await assert.rejects(prepareNativeCritic({...prepareOptions,sessionPacketId:"c".repeat(32)},prepareDeps),error=>error?.code==='CPP-ABSENT');
++   const wrongRequestPath=`${prefix}-wrong-task.json`;
++   writeJson(wrongRequestPath,{...outerRequest,task_id:'different-critic-fixture'});
++   await assert.rejects(prepareNativeCritic({...prepareOptions,requestPath:wrongRequestPath},prepareDeps),/SESSION-PACKET-SUBJECT/);
++   const output=await prepareNativeCritic(prepareOptions,prepareDeps);
+    const context=readNativeCriticPreparedContext(output),prepared=readJsonBounded(output.preparedPath).value,review=prepared.review.root;
+    const reviewArtifacts=prepared.references.filter(({source})=>source==="review");
+    const reviewFingerprintAtPrepare=captureRepositoryFingerprint(review,reviewArtifacts);
+-   const protectedAtPrepare={candidate:captureRepositoryFingerprint(repo).sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
++   const candidateAtPrepare=captureRepositoryFingerprint(repo);
++   const protectedAtPrepare={candidate:candidateAtPrepare.sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
+     "observer.private":captureRepositoryFingerprint(observers.find(o=>o.name==="private").root).sha256,
+     "observer.shared":captureRepositoryFingerprint(observers.find(o=>o.name==="shared").root).sha256};
+    const route=readNativeCriticPreparedRoute(context,{repoRoot:review,preparedSha256:output.preparedSha256});
+@@ -3290,18 +3336,48 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
+    const deps={familyContext:context,preparedSha256:output.preparedSha256,onCustodyError:error=>{custodyError=error;},nowMs,resolveRoute:()=>{throw new Error("must not reselect prepared family");},readFileSync:path=>path==="/proc/version"?"Linux Microsoft":path==="/proc/self/mountinfo"?`1 0 0:1 / ${review} rw - ext4 /dev/root rw\n`:"boot"};
+    const invalid=await invokeCodexNativeCriticHost(input,{...deps,familyContext:structuredClone(context)});assert.equal(invalid.status,"unavailable");assert.equal(f.launches(),0);
+    const reviewed=await invokeCodexNativeCriticHost(input,deps);if(custodyError)throw custodyError;if(reviewed.status!=="reviewed"&&f.admissionError())throw f.admissionError();assert.equal(reviewed.status,"reviewed",JSON.stringify(reviewed));assert.equal(f.launches(),1);
++   const sourceHandle=inspectOriginalSessionCriticReturn({context,repoRoot:repo,preparedSha256:output.preparedSha256});
++   const inspected=readInspectedOriginalSessionCriticReturn(sourceHandle);
++   assert.equal(inspected.candidate.commit,candidate.commit);
++   assert.equal(inspected.candidate.tree,candidate.tree);
++   assert.equal(inspected.reviewerResult.verdict.pass,true);
++   assert.equal(inspected.originalDispatch.candidate.commit,candidate.commit);
++   assert.deepEqual(inspected.sessionPacketBinding,{packetId,
++     packetDigest:claimed.admission.packetDigest,
++     claimSha256:claimed.admission.claimSha256,
++     sessionId:claimed.admission.sessionId,preflightSha256,
++     diffSha256:claimed.packet.diff.sha256});
++   assert.equal(inspectClaimedSessionAdmission({controlRoot:packetControl,packetId}).admission.packetDigest,
++     inspected.sessionPacketBinding.packetDigest);
++   const {admitOriginalCriticSource}=await import('../lib/session-critic-original-source-admission.mjs');
++   const finalizerSource=admitOriginalCriticSource({sourceContext:{context,preparedSha256:output.preparedSha256},
++     root:repo,packet:claimed.packet,packetDigest:claimed.admission.packetDigest,
++     admission:claimed.admission,sessionId:claimed.admission.sessionId,verdict:inspected.verdict});
++   assert.equal(finalizerSource.recheck().sessionPacketBinding.claimSha256,claimed.admission.claimSha256);
++   assert.throws(()=>readInspectedOriginalSessionCriticReturn(structuredClone(sourceHandle)),/ORIGINAL-SOURCE-HANDLE-REQUIRED/);
+    const captured=readNativeCriticCapturedReturn(context);writeJson(`${prefix}-return.json`,captured);
+-   const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));const restored=await isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
++   const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));
++   await assert.rejects(isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath}),/REPREPARE-REQUIRED/);
+    const reviewFingerprintBeforeFinalize=captureRepositoryFingerprint(review,reviewArtifacts);
+-   const protectedBeforeFinalize={candidate:captureRepositoryFingerprint(repo).sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
++   const candidateBeforeFinalize=captureRepositoryFingerprint(repo);
++   const protectedBeforeFinalize={candidate:candidateBeforeFinalize.sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
+     "observer.private":captureRepositoryFingerprint(observers.find(o=>o.name==="private").root).sha256,
+     "observer.shared":captureRepositoryFingerprint(observers.find(o=>o.name==="shared").root).sha256};
+-   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||JSON.stringify(protectedBeforeFinalize)!==JSON.stringify(prepared.bindings.protectedBefore)){
++   const publicCandidate=({administrative,...rest})=>rest;
++   const administrativeEntries=inventory=>new Map(inventory.git.map(entry=>[entry.path,entry]));
++   const beforeAdmin=administrativeEntries(candidateAtPrepare.administrativeInventory),afterAdmin=administrativeEntries(candidateBeforeFinalize.administrativeInventory);
++   const adminChanged=[...new Set([...beforeAdmin.keys(),...afterAdmin.keys()])].filter(path=>JSON.stringify(beforeAdmin.get(path))!==JSON.stringify(afterAdmin.get(path)));
++   const sourceOnlyAdmin=adminChanged.every(path=>path.startsWith('agent-pipeline/'));
++   const candidateGitStable=JSON.stringify(publicCandidate(candidateAtPrepare.detail))===JSON.stringify(publicCandidate(candidateBeforeFinalize.detail))
++     &&candidateAtPrepare.detail.administrative.detail.index.sha256===candidateBeforeFinalize.detail.administrative.detail.index.sha256
++     &&candidateAtPrepare.detail.administrative.detail.worktreeLink.mode===candidateBeforeFinalize.detail.administrative.detail.worktreeLink.mode;
++   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256
++     ||!candidateGitStable||!sourceOnlyAdmin||Object.keys(protectedBeforeFinalize).filter(key=>key!=='candidate').some(key=>protectedBeforeFinalize[key]!==prepared.bindings.protectedBefore[key])){
+     const changed=(before,after)=>Object.keys(before).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key]));
+     const detailChanges=Object.fromEntries(Object.keys(reviewFingerprintAtPrepare.detail).filter(key=>JSON.stringify(reviewFingerprintAtPrepare.detail[key])!==JSON.stringify(reviewFingerprintBeforeFinalize.detail[key])).map(key=>[key,{before:reviewFingerprintAtPrepare.detail[key],after:reviewFingerprintBeforeFinalize.detail[key]}]));
+-    assert.fail(`CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=${reviewFingerprintAtPrepare.sha256===prepared.bindings.reviewFingerprintSha256}; reviewDetailsChanged=${JSON.stringify(detailChanges)}; protectedChanged=${JSON.stringify(changed(prepared.bindings.protectedBefore,protectedBeforeFinalize))}`);
++    assert.fail(`CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=${reviewFingerprintAtPrepare.sha256===prepared.bindings.reviewFingerprintSha256}; reviewDetailsChanged=${JSON.stringify(detailChanges)}; protectedChanged=${JSON.stringify(changed(prepared.bindings.protectedBefore,protectedBeforeFinalize))}; candidateGitStable=${candidateGitStable}; sourceOnlyAdmin=${sourceOnlyAdmin}; adminChangedCount=${adminChanged.length}`);
+    }
+-   const final=isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:restored});assert.equal(final.reviewPass,true);
++   const final=finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:context});assert.equal(final.reviewPass,true);
+    const replay=await invokeCodexNativeCriticHost(input,deps);assert.equal(replay.status,"unavailable");assert.equal(f.launches(),1);
+   }finally{f.cleanup();}
+  }
+diff --git a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+index 9076eea69..2f966ee3f 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+@@ -25,6 +25,13 @@ export function readHeldCriticFamilyExecution(route) {
+   const execution = heldFamilyRoutes.get(route)?.execution;
+   return execution ? { ok: true, value: structuredClone(execution) } : { ok: false, code: "CRITIC-FAMILY-EXECUTION-REQUIRED" };
+ }
++/** Only the original held route can reach its Model invocation's Source publisher. */
++export async function publishHeldCriticOriginalDesignReview({route,validatedHandle,request,receiptInput}={}) {
++  const held=heldFamilyRoutes.get(route),checked=recheckHeldCriticFamilyRoute(route);
++  if(!held||!checked.ok||!held.execution||typeof held.entry.publishOriginalDesignReview!=='function')
++    return {ok:false,code:'DRE-NATIVE-ORIGIN-UNAVAILABLE'};
++  return held.entry.publishOriginalDesignReview({invocation:held.invocation,validatedHandle,request,receiptInput});
++}
+ export function validateSessionCodexCriticRoute(route) {
+   if (route?.dutyId === "critic_high_risk") return validateCriticHighRiskRoute(route);
+   if (route?.dutyId !== "critic_normal") familyFailure("CRITIC-FAMILY-DUTY-INVALID");
+diff --git a/plugins/pipeline-core/scripts/codex-native-critic-host.mjs b/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
+index 366f154df..871d143df 100644
+--- a/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
+@@ -25,7 +25,7 @@ import {
+   validateNativeCriticTuple,
+ } from "../lib/codex-native-critic-policy.mjs";
+ import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest } from "../lib/codex-native-critic-tools.mjs";
+-import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, criticFamilyExecutionPortsReady, launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
++import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, criticFamilyExecutionPortsReady, launchHeldCriticFamilyRoute, publishHeldCriticOriginalDesignReview } from "./codex-critic-session-route.mjs";
+ import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
+ import { readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, captureNativeCriticPreparedReturn } from "./codex-critic-host.mjs";
+ import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
+@@ -42,6 +42,18 @@ const VERDICT = "scripts/critic-verdict.schema.json";
+ const PROVIDER = "openai";
+ const MAX_BYTES = 8 * 1024 * 1024;
+ const validatedNativeReturns = new WeakMap();
++const validatedResultHandles = new WeakMap();
++const originalPublications = new WeakMap();
++export function readOriginalDesignReviewPublication(result) {
++  const value=originalPublications.get(result);
++  if(!value)throw new Error('DRE-ORIGINAL-PUBLICATION-REQUIRED');
++  return structuredClone(value);
++}
++export function readValidatedNativeCriticReturnHandle(result) {
++  const handle = validatedResultHandles.get(result);
++  if (!handle) throw new Error("CRITIC-NATIVE-ORIGINAL-RESULT-HANDLE-REQUIRED");
++  return handle;
++}
+ export function readValidatedNativeCriticReturn(handle) {
+   const value = validatedNativeReturns.get(handle);
+   if (!value) throw new Error("CRITIC-NATIVE-VALIDATED-RETURN-HANDLE-REQUIRED");
+@@ -63,6 +75,7 @@ const FAILURE_CODES = new Set([
+   "child-spawn-failed", "child-timeout", "child-stream-overflow", "child-output-invalid", "child-policy-invalid",
+   "child-lifecycle-invalid", "child-verdict-invalid", "child-write-attempt", "child-request-invalid",
+   "child-prompt-invalid", "child-protocol-error", "child-exit-error", "child-terminal-invalid",
++  "original-source-publication-unavailable",
+ ]);
+ const CHILD_FAILURE_CODE_MAP = new Map([
+   ["request-invalid", "child-request-invalid"],
+@@ -561,12 +574,24 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
+       }),
+     }),
+   };
++  let originalHandle = null;
++  let originalPublication = null;
+   if (familyRoute) {
+     const handle = Object.freeze(Object.create(null));
+     validatedNativeReturns.set(handle, { packet: dispatchPacket, nativeRequest: request, nativeResult: child,
+       verdict: checked.verdict, receipt, elapsedMs: Math.max(1, Date.now() - startedAt) });
+     try { captureNativeCriticPreparedReturn(dependencies.familyContext, handle); }
+     catch (error) { if (typeof dependencies.onCustodyError === "function") dependencies.onCustodyError(error); return executionFailure("child-output-invalid", terminal, checked.lifecycle); }
++    originalHandle = handle;
++    if(dependencies.originalDesignReview){
++      const requested=dependencies.originalDesignReview;
++      originalPublication=await publishHeldCriticOriginalDesignReview({route:familyRoute,validatedHandle:handle,
++        request:requested.request,receiptInput:requested.receiptInput});
++      if(!originalPublication?.ok)return executionFailure('original-source-publication-unavailable',terminal,checked.lifecycle);
++    }
+   }
+-  return { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt, exportConsent };
++  const result = { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt, exportConsent };
++  if (originalHandle) validatedResultHandles.set(result, originalHandle);
++  if (originalPublication) originalPublications.set(result, originalPublication);
++  return result;
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 93e20dc71..39333144b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -382,6 +382,7 @@ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
++import { readAndAdmitOriginalDesignReviews } from "../lib/design-review-original-custody.mjs";
+ import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+@@ -9441,6 +9442,13 @@ function readDesignApprovalInputs(dir, submission, paths) {
+     const summaries = receipts.map(entry => summarizeDesignReviewReceipt(entry));
+     const refused = summaries.find(entry => !entry.ok);
+     if (refused) return refused;
++    // Both active present-plan binding paths call this physical input reader.
++    // The closed Source route refuses a receipt without original custody before
++    // either request or State companion effects are prepared.
++    const custody = readAndAdmitOriginalDesignReviews({ repository: dir, featureId: submission.featureId,
++      receipts: receipts.map((entry,index)=>({...entry,
++        reportBytes:physicalRebindFile(dir,summaries[index].summary.report.path)?.bytes})) });
++    if (!custody.ok) return custody;
+     const latest = summaries.at(-1).summary;
+     const companions = latest.sources.companions.map(entry => entry.path);
+     const bound = [...new Set([submission.planPath, submission.specPath, ...companions, ...paths, ...summaries.map(entry => entry.summary.report.path)])];
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index ad73ca4dc..7aa5a49d3 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -40,6 +40,7 @@ import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRe
+ import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+ import { DESIGN_APPROVAL_REQUEST_SCHEMA, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { readAndAdmitOriginalDesignReviews } from "../lib/design-review-original-custody.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+@@ -385,11 +386,14 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+       if (!summary.ok || summary.summary.featureId !== record.binding.featureId) throw Error("DAB-SIGN-RECEIPT-INVALID");
+       const report = observe(summary.summary.report.path);
+       if (report.sha256 !== summary.summary.report.sha256) throw Error("DAB-SIGN-REPORT-DRIFT");
+-      return { path: ref.path, bytes: file.bytes, summary: summary.summary };
++      return { path: ref.path, bytes: file.bytes, reportBytes: report.bytes, summary: summary.summary };
+     });
+     const source = ref => ({ path: ref.path, sha256: observe(ref.path).sha256 });
+     const currentSources = { prd: source(record.binding.sources.prd), spec: source(record.binding.sources.spec),
+       companions: receipts.at(-1).summary.sources.companions.map(ref => ({ path: ref.path, sha256: observe(ref.path, { optional: true })?.sha256 ?? null })) };
++    const custody = readAndAdmitOriginalDesignReviews({ repository: root, featureId: record.binding.featureId,
++      receipts: receipts.map(({ path, bytes, reportBytes }) => ({ path, bytes, reportBytes })) });
++    if (!custody.ok) return null;
+     const checked = verifyDesignApprovalRequest({ request: physicalRequest, featureId: record.binding.featureId,
+       receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources });
+     if (!checked.ok || checked.intentSha256 !== intentSha256) return null;
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index debd7fbce..6689a9c2c 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -15,6 +15,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { reserveFeatureCriticReviewUnitOwnership } from "../lib/critic-generic-batch.mjs";
++import { admitOriginalCriticSource, OriginalCriticSourceAdmissionError } from "../lib/session-critic-original-source-admission.mjs";
+ import {
+   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
+   buildGovernanceReviewAction,
+@@ -514,19 +515,29 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+     || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
+   const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
+ 
++  // A claimed packet proves what was prepared, not that an independent child
++  // ran and returned this verdict. Source reopens the original invocation and
++  // terminal custody before any result, receipt or governance event is written.
++  const originalSource = admitOriginalCriticSource({ sourceContext: options.originalSourceContext,
++    root, packet, packetDigest: prepared.packetDigest, admission: admitted.admission,
++    sessionId: id, verdict: options.verdict });
++
+   let event = null;
+   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
+   validateResult(result, prepared.packet);
+   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
++  originalSource.consume();
+   const recorded = (deps.recordCandidateResultFn ?? recordCandidateResult)({ controlRoot: controlRootFor(root), packetId, result }, deps.packetDependencies);
+   const receipt = validateSessionCriticReceipt(receiptFor(recorded.record.body));
+   if (canonicalJson(receipt) !== canonicalJson(expectedReceipt)) fail("SCF-RECEIPT-BINDING");
++  originalSource.recheck();
+   const consumed = (deps.consumeCandidatePacketFn ?? consumeCandidatePacket)({ controlRoot: controlRootFor(root), packetId, receipt }, deps.packetDependencies);
+   if (consumed.replay === true) fail("SCF-FIRST-CONSUME-REPLAY");
+   const readback = (deps.consumeCandidatePacketFn ?? consumeCandidatePacket)({ controlRoot: controlRootFor(root), packetId, receipt }, deps.packetDependencies);
+   if (readback.replay !== true || canonicalJson(readback.record.body) !== canonicalJson(receipt)) fail("SCF-RECEIPT-READBACK");
+ 
+   if (eventRequested) {
++    originalSource.recheck();
+     event = (deps.buildGovernanceReviewActionFn ?? buildGovernanceReviewAction)({
+       schema: GOVERNANCE_REVIEW_SOURCE_SCHEMA,
+       receiptSha256: sha256(canonicalJson(readback.record.body)),
+@@ -749,7 +760,8 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+       output: Object.freeze({
+         schema: SESSION_CRITIC_CLI_ERROR_SCHEMA,
+         status: "rejected",
+-        code: error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
++        code: error instanceof SessionCriticFinalizerError || error instanceof OriginalCriticSourceAdmissionError
++          || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
+       }),
+     });
+   }
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index acbdb7340..e2bd8565a 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -539,7 +539,10 @@ test("receipt validation is closed and refuses provider metadata", () => {
+   } finally { cleanup(fx); }
+ });
+ 
+-test("closed CLI admits before verdict and finalizes only that durable packet", () => {
++// QG-04: the old positive expected a caller-written verdict to become a review
++// receipt. Baseline evidence is retained at scratch/r2-critic-baseline-cli.json;
++// its completion was the defect, not independent Critic evidence.
++test("closed CLI admits a packet but refuses a caller-written verdict without original Source", () => {
+   const fx = fixture({ taskId: "ALF-CLI-HISTORY-01" });
+   try {
+     // The CLI only reads physical scratch request files, and a non-feature review names its registered batch (v3).
+@@ -550,9 +553,34 @@ test("closed CLI admits before verdict and finalizes only that durable packet",
+     assert.equal(admission.output.packetId, "6".repeat(32));
+     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+     const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
+-    assert.equal(result.exitCode, 0);
+-    assert.equal(result.output.status, "completed");
+-    assert.equal(result.output.receipt.session.id, "session-cli-1");
++    assert.equal(result.exitCode, 2);
++    assert.equal(result.output.code, "SCF-ORIGINAL-SOURCE-REQUIRED");
++    assert.equal(existsSync(join(fx.root, "evidence", "review-action.json")), false);
++    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32), "result.json")), false);
++    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32), "receipt.json")), false);
++    const forgedPath = writeScratchRequest(fx, "forged-source-request.json", {
++      ...cliBatchRequest(fx), nativeReturn: { schema: "pipeline.codex-native-host-return.v1", reviewed: true },
++    });
++    const forged = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", forgedPath]);
++    assert.equal(forged.exitCode, 2);
++    assert.equal(forged.output.code, "SCF-REQUEST");
++    const replay = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
++    assert.equal(replay.exitCode, 2);
++    assert.equal(replay.output.code, "SCF-ORIGINAL-SOURCE-REQUIRED");
++    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32), "receipt.json")), false);
++  } finally { cleanup(fx); }
++});
++
++test("a copied or caller-created Source context cannot finalize a claimed packet", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "d".repeat(32) });
++    const forged = { context: { native: true, reviewed: true }, preparedSha256: "a".repeat(64) };
++    assert.throws(() => finalizeSessionCriticReview({ ...request, originalSourceContext: forged }),
++      (error) => error.code === "SCF-ORIGINAL-SOURCE-UNAVAILABLE");
++    const packetDir = join(fx.root, ".git", "agent-pipeline", "critic-packets", request.packetId);
++    assert.equal(existsSync(join(packetDir, "result.json")), false);
++    assert.equal(existsSync(join(packetDir, "receipt.json")), false);
+   } finally { cleanup(fx); }
+ });
+ 

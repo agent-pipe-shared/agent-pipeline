@@ -1,0 +1,68 @@
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.test.mjs b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+index 5ae8be57c..cf6998d9f 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+@@ -23,9 +23,14 @@ import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
+ import { MODEL_FAMILY_HOST_STORE_LIMITS } from "./model-family-host-store.mjs";
+ 
+ const cases = [];
+-function test(name, run) {
++// D66(a): `test(name, { todo: "<typed reason naming the backlog item>" }, run)` registers a TYPED PENDING case (completion mode
++// "todo"): the body still runs unchanged and its failure is reported as todo, never as a pass; the reason is source-visible.
++function test(name, optionsOrRun, maybeRun) {
++  const options = typeof optionsOrRun === "function" ? {} : optionsOrRun;
++  const run = typeof optionsOrRun === "function" ? optionsOrRun : maybeRun;
++  if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
+   const id = `MFHS${String(cases.length + 1).padStart(3, "0")}`;
+-  cases.push({ id, name, run: async (...args) => {
++  cases.push({ id, name, ...(options.todo === undefined ? {} : { mode: "todo" }), run: async (...args) => {
+     try { return await run(...args); }
+     catch (error) { process.stderr.write(`${id} ${name}: ${error?.stack ?? error}\n`); throw error; }
+   } });
+@@ -907,7 +912,7 @@ function spawnTransitionWriter(rootDir, data) {
+   });
+ }
+ 
+-test("real competing transition and prepare serialize on the stored generation", async () => {
++test("real competing transition and prepare serialize on the stored generation", { todo: "typed-pending: D66(a), E31; binding backlog item pipeline.a-member-reserved-by-another-process-is-refused-as-unowned (cross-process ownership of the domain owner moves after 0.7.0); assertions unchanged" }, async () => {
+   const f = fixture();
+   try {
+     activate(f);
+@@ -1040,7 +1045,7 @@ function spawnConcurrentWriter(rootDir, hostData) {
+ // E30 (specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md): this case is a LATENT RED, deliberately left
+ // failing; a member reserved by another process is refused as unowned. Bound to backlog item
+ // 2026-10-19-a-member-reserved-by-another-process-is-refused-as-unowned.md. No retry on unowned-retained-member.
+-test("real process contention serializes same-key replay and different invocation CAS generations", async () => {
++test("real process contention serializes same-key replay and different invocation CAS generations", { todo: "typed-pending: D66(a), E30; binding backlog item pipeline.a-member-reserved-by-another-process-is-refused-as-unowned (cross-process ownership of the domain owner moves after 0.7.0); assertions unchanged" }, async () => {
+   assert.equal(MODEL_FAMILY_HOST_STORE_LIMITS.casRetries, 2);
+   for (const sameInvocation of [true, false]) {
+     const f = fixture();
+diff --git a/plugins/pipeline-core/lib/model-family-invocation.test.mjs b/plugins/pipeline-core/lib/model-family-invocation.test.mjs
+index 94fccdc88..25d14fdf6 100644
+--- a/plugins/pipeline-core/lib/model-family-invocation.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-invocation.test.mjs
+@@ -7,7 +7,14 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ const cases = [];
+-function test(name, run) { cases.push({ id: `MFI${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
++// D66(a): `test(name, { todo: "<typed reason naming the backlog item>" }, run)` registers a TYPED PENDING case (completion mode
++// "todo"): the body still runs unchanged and its failure is reported as todo, never as a pass; the reason is source-visible.
++function test(name, optionsOrRun, maybeRun) {
++  const options = typeof optionsOrRun === "function" ? {} : optionsOrRun;
++  const run = typeof optionsOrRun === "function" ? optionsOrRun : maybeRun;
++  if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
++  cases.push({ id: `MFI${String(cases.length + 1).padStart(3, "0")}`, name, ...(options.todo === undefined ? {} : { mode: "todo" }), run });
++}
+ import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+ import { createModelFamilyInvocationEntry } from "./model-family-invocation.mjs";
+ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
+@@ -503,7 +510,7 @@ test("same synthetic signed S4 authority advances Luna 6 to 7 under real S2 hand
+   } finally { f.cleanup(); }
+ });
+ 
+-test("overlapping asynchronous S2 captures keep each signed invocation bound to its own catalogue", async () => {
++test("overlapping asynchronous S2 captures keep each signed invocation bound to its own catalogue", { todo: "typed-pending: D66(a); binding backlog item pipeline.a-member-reserved-by-another-process-is-refused-as-unowned (a member reserved by another owner instance is refused as unowned; cross-owner ownership moves after 0.7.0); assertions unchanged" }, async () => {
+   const catalogues = new Map([
+     ["overlap-left", [{ modelId: "gpt-6-sol", version: [6] }]],
+     ["overlap-right", [{ modelId: "gpt-6-sol", version: [6] }, { modelId: "gpt-6.1-sol", version: [6, 1] }]],

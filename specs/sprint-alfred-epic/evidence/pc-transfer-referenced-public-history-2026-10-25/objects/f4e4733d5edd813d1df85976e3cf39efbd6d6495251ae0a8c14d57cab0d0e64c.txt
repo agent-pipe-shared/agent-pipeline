@@ -1,0 +1,96 @@
+{
+  "schema": "pipeline.scratch-default-signing-successor.v1",
+  "status": "targeted-evidence-passed",
+  "sourceHead": "a780ace45ae66a12acadf65ff6193a48c2f080b7",
+  "rulesetSha": "f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6",
+  "version": "0.7.0+codex.20260928194946.0cace08c",
+  "inventory": [
+    {
+      "path": "plugins/pipeline-core/lib/critic-route-v3.mjs",
+      "preimageFile": "preimages/0.txt",
+      "preimageSha256": "cf73338a71b8a142b250483d102461b65118a3d9a88044e9801309c953b44b5c",
+      "postimageFile": "postimages/0.txt",
+      "postimageSha256": "836269446c3f535df8c8c51235b68f8977563fb3592b37a95a99860b9313d7ab"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-approval.mjs",
+      "preimageFile": "preimages/1.txt",
+      "preimageSha256": "d1128b3864250d276fa865f75f7f0a391ac4f1462a171d4fb2df720989ebdcd2",
+      "postimageFile": "postimages/1.txt",
+      "postimageSha256": "5a06e1754436c7c6b3384f458f350479988332b645bbbaa2c23eddde155573a1"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-route-v3.test.mjs",
+      "preimageFile": null,
+      "preimageSha256": null,
+      "postimageFile": "postimages/2.txt",
+      "postimageSha256": "68415d7a4748ae44e2702df5e6a7d5ad5610038b0062f9376aa7f8caf091a71c"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/design-workflow-signing-default.test.mjs",
+      "preimageFile": null,
+      "preimageSha256": null,
+      "postimageFile": "postimages/3.txt",
+      "postimageSha256": "2e29bfc6a317d2506801aaa40bb60e8a4fe8b638823472df4ae1f84a4e64acb3"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "plugins/pipeline-core/lib/po-approval-proof.mjs",
+      "sourceSha256": "df04c60c72f311387b2d2d02b5dad9c9c891dc94a92ef57e6a1e1fb255420ff4",
+      "proposalChanges": false
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sourceSha256": "dcd79b001fbfb879090ed1760f1b1ce3ab96c7a1d4eeaa323b6de8e197f92a98",
+      "proposalChanges": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+      "sourceSha256": "6fd0fbfc85ddb6be8746748cd739157fa9654d19f78fbd65932b9252cfd4c425",
+      "proposalChanges": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-workflow-package.mjs",
+      "sourceSha256": "2d7839e040adfce0844642f41ea555998ed21163d8b13c52bd0d2e48c6f18840",
+      "proposalChanges": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-readiness-host-evidence.mjs",
+      "sourceSha256": "33d2543eaaecf2fae3618bdd934420d1f44bb174e7006ffc1ddc4f15b9b6f856",
+      "proposalChanges": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-readiness-runner-host-store.mjs",
+      "sourceSha256": "969c72de945fadf008d92c67da4a25396bccb8a476d03eb74d4e708bdaf18f0b",
+      "proposalChanges": false
+    }
+  ],
+  "evidence": [
+    {
+      "path": "evidence/targeted.actual.log",
+      "sha256": "31d8a36447506eddf58dc21e5cc6a8615cd350705b3cc20472787b87bd27c11d"
+    },
+    {
+      "path": "evidence/targeted.actual.json",
+      "sha256": "daaecf24d87b8ae7dc950fed62804b3cb842f4a471abdb70d2b5f5c0095f9a46"
+    },
+    {
+      "path": "evidence/historical-ordering-reproduction.json",
+      "sha256": "3dedda7a68e7fbd5f4a685386c0fd59b0fe014be4f0ca9db13cb9c535fddb994"
+    }
+  ],
+  "patchSha256": "9122794b31e2fc070ae9ec9cd94dcbb5d6a363d20aaa881bba0df5ff9f27ad32",
+  "reportSha256": "c48813a8dff497e51355acfeb2b50354781dca4355983fde7c7c53a9e761507d",
+  "registrationSha256": "7b07678d4a5b8b72bdcc51da2d560723713b2b428143b9ae3fab688479facdea",
+  "authorityClass": "synthetic-readiness-default-validator-disposable-key",
+  "liveClaudeCalls": 0,
+  "providerCalls": 0,
+  "actualOperatorKeys": 0,
+  "sourceWrites": 0,
+  "pending": [
+    "Root Source delivery/registration",
+    "Independent Critic",
+    "Live runner qualification if required by Root"
+  ]
+}

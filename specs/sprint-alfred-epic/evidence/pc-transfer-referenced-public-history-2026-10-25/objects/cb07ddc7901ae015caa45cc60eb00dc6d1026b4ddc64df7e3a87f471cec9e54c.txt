@@ -1,0 +1,40 @@
+# Installed Guard und Workspace-Inspect: Lifecycle-Differenz
+
+Read-only Komponentenklärung auf HEAD `914270f1a9e372af3213c09d3cf4160fbba22dcf`. Keine Source-, State-, Runtime- oder HEAD-Änderung; keine erneute Bootstrap-/Reviewrunde. Der bereits ausgeführte Guard-Beleg ist `scratch/readiness-activation-plugin-guard-admission-914270f1.result.json`.
+
+## Ergebnis
+
+Die Statuslabels beruhen auf **unterschiedlichen Beobachtungen**. Der installierte Guard prüft die tatsächlichen aktuellen PRD-/Spec-Dateidigests. Workspace `pipeline-state inspect` prüft hier nur die Struktur der gespeicherten Submission. Die beiden aktuellen Dateidigests weichen tatsächlich von der Submission ab. `PLAN-LIFECYCLE-CURRENT` aus diesem Inspect ist deshalb kein Nachweis unveränderter Plan-/Spec-Bytes.
+
+Der angebotene **Pipeline Author Repair ist für die exakte Plugin23-Aktion der gültige vorgesehene Freigabeweg**. Der aktuelle Denial enthält keinen nicht übersteuerbaren Lifecycle-Ready-Code. `reopen-design` muss daher nicht als zusätzliche Voraussetzung vor dieser eng gebundenen Source-Reparatur ausgeführt werden. Die Freigabe ist noch zu autorisieren und exakt einmal zu konsumieren; das vorhandene Angebot allein ist keine Schreibfreigabe oder Implementation-/PO-Planfreigabe.
+
+## Konkrete Ursache
+
+Installed Root: `<home>/.codex/plugins/cache/agent-pipeline-local/pipeline-core/0.7.0+codex.20260927174722.15c963ef`.
+
+- Installed `hooks/guard-devplan.mjs:474` berechnet `fileSha256` über echte Repository-Dateien. Zeilen 480–491 wählen Submission-Plan/Spec, ersatzweise `planApproval.poGateAuthority`, und übergeben die ermittelten Digests an `derivePlanLifecycle(state, observation)`.
+- Workspace `plugins/pipeline-core/scripts/pipeline-state.mjs:11810` ruft im `inspect`-Case **`derivePlanLifecycle(base)` ohne Observation** auf. Zeile 11828 bildet daraus Status/Lifecycle; `buildInspectNextAction` wird anschließend aus demselben strukturellen Ergebnis erzeugt.
+- `plugins/pipeline-core/lib/plan-spec-state-v2.mjs:453` behandelt nicht übergebene Observation-Digests als unbeschränkt. `currentSubmission` gibt dagegen bei beobachteter Digestabweichung `null` zurück. Zeilen 575–624 leiten daraus `draft`, `PLAN-LIFECYCLE-DIGEST-DRIFT` und `reopen-design` ab; ohne diese Observation bleibt die strukturell gültige Submission `awaiting-approval`/`PLAN-LIFECYCLE-CURRENT`.
+- Die DWP-Einsammlung ist der reguläre `awaiting-approval`-Pfad: Workspace `pipeline-state.mjs:3956` ff. verlangt vor der finalen PO-Entscheidung ein vollständiges Design-Workflow-Package. Dieser Pfad ist keine Hash-Prüfung der bereits eingereichten Dateien.
+
+Aktuelle, ausschließlich öffentliche Plan-/Spec-Bindungen:
+
+| Datei | Gespeicherte Submission SHA256 (`project/pipeline-state.json:490` ff.) | Tatsächliche Datei SHA256 |
+|---|---|---|
+| `specs/sprint-alfred-epic/prd_sprint-alfred-epic.md` | `0e30f76bac4b8f5842f2b49be73ce7620e4f4cf77bb504c9e221c1949d43f76b` | `c98674205a6342059319355e314601544baae81c06295b74be51dbda1bec4ace` |
+| `specs/sprint-alfred-epic/spec.md` | `167b99e5a565e204a13cc4f1cd4312b70dfe631b78236dc75bb0e061d09a73b9` | `828f786ea61fe94fd175e097906d7280539b1c8e9472533faeef190cfa8476ad` |
+
+Der State enthält aktuell `planApproved:false`, aktive Phase `design`. Es wurde kein privater State-/Prozess-/Nonce-Inhalt veröffentlicht.
+
+Die installierte und die Workspace-Datei `plan-spec-state-v2.mjs` haben unterschiedliche Gesamthashes (`c23bfd411022dbac01232559d59440c39d56419214ab4e4b1e2a34f527508e18` bzw. `d2f8690a830231651afa9797c3b74396817dc8defd0f20fbda39d5d978d91459`). Der direkte Diff zeigt jedoch ausschließlich den inzwischen ergänzten retained-approval-Schutz in `submitPlan` ab Zeile 699. `derivePlanLifecycle`, `submissionMatchesObservation` und `currentSubmission` sind in den beiden Kopien identisch. Die konkrete Labeldifferenz wird dadurch nicht verursacht.
+
+## Warum Author Repair hier vorgesehen ist
+
+- Installed `lib/human-guard-override.mjs:1386` erkennt als nicht übersteuerbare Recovery ausdrücklich `GUARD-LIFECYCLE-NOT-READY` anhand des Codes. Das ist kein pauschales Verbot aller `guard-devplan`-Denials. `recordHumanGuardDenial` prüft diese harte Grenze zuerst (Zeile 3019), ebenso `consumeHumanGuardOverride` (Zeile 4076).
+- Installed `lib/human-guard-override.test.mjs:145` hält diesen Unterschied ausdrücklich fest: Lifecycle-Ready allein oder zusammen mit einer gewöhnlichen Devplan-Denial kann nie eine HGO-Route erzeugen/konsumieren. Der vorhandene Plugin23-Beleg enthält ausschließlich die konkrete Devplan-Draft-/Stale-Denial und ausdrücklich das Author-Repair-Angebot, keine solche harte Co-Denial.
+- Installed `lib/human-guard-override.mjs:1994` ff. klassifiziert ausschließlich Pipeline-Source-Pfade als Author-Repair-Candidate. Gemischte Source-/Nicht-Source-Pfade werden abgelehnt. Bei exakt gewähltem Source-Root entsteht `pipeline-author-repair`.
+- `planHumanGuardOverride` prüft Request, Ablaufzeit, Repository/Policy-/Pluginbindung und den exakten ausgewählten Pipeline-Source-Root (`lib/human-guard-override.mjs:3198`, insbesondere 3244–3255). Es setzt für einen gültigen Candidate den Mode `pipeline-author-repair`.
+- Installed `hooks/codex-pretool-guard.mjs:620` rendert diese ausgewählte Route. Der echte Plugin23-Beleg nennt Request `7147bf6756c759d0ede0376bde810e66c0faf4b590609ce4384e04da5b2b9b43` und Source-Root `<repo-root>/plugins/pipeline-core`.
+- Bei einer später exakt konsumierten gültigen Capability beendet der installierte Adapter den Guard erfolgreich (`codex-pretool-guard.mjs:530–535`). Das bestätigt, dass die vorausgegangene Devplan-Denial durch diese explizite eng begrenzte Route reparierbar ist.
+
+Die Policy-Trennung Plugin23/Author-Repair und Wiring2/Standard bleibt korrekt. Dieser Bericht verändert weder diese Request-Bindungen noch die weitere reguläre Plan-/DWP-Freigabe. Er erzeugt kein neues Backlog-Item und beansprucht keinen formalen Gate-PASS.

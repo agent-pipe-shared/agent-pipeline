@@ -1,0 +1,190 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { prospectiveSocketBytes, validatePrivateParent, validateCreatedHome } from './codex-critic-private-parent-fixture.mjs';
+
+const scratch = join(process.cwd(), 'scratch', 'g17-actual-fixtures');
+let fixture, host, launchHeldCriticFamilyRoute, prepareSelectedCriticRoleDispatch;
+
+test('private-parent preflight is length-first and uses strict production ancestry', () => {
+  assert.throws(() => prospectiveSocketBytes('relative'), /G17-PRIVATE-PARENT/);
+  assert.throws(() => validatePrivateParent('/' + 'x'.repeat(43), {
+    lstatSync: () => { throw new Error('unexpected stat'); }, realpathSync: () => { throw new Error('unexpected realpath'); }, getuid: () => 1,
+  }), /G17-SOCKET-LENGTH/);
+  const safe = '/g17';
+  const ports = {
+    lstatSync: () => ({ isDirectory: () => true, isSymbolicLink: () => false, mode: 0o40700, uid: 1, dev: 1, ino: 1, gid: 1 }),
+    realpathSync: path => path, getuid: () => 1,
+  };
+  assert.equal(validatePrivateParent(safe, ports).bytes, Buffer.byteLength('/g17/g17c-000000/.apsp/0000000000000000/000000000000000000000000.sock'));
+  assert.throws(() => validatePrivateParent(safe, { ...ports,
+    lstatSync: () => ({ ...ports.lstatSync(), mode: 0o40722 }),
+  }), /SP-ADDRESS: unsafe address ancestry/);
+});
+
+async function exercise({ duringChild, afterChildStart, beforeLaunch } = {}) {
+  const snapshots = [];
+  const root = mkdtempSync(join(scratch, 'route-'));
+  try {
+    const source = join(root, 'candidate');
+    mkdirSync(source);
+    const candidate = fixture.createCandidate(source);
+    const privateObserver = fixture.createObserver(join(root, 'private-observer'));
+    const sharedObserver = fixture.createObserver(join(root, 'shared-observer'));
+    const rulesetRoot = join(root, 'ruleset');
+    fixture.run('git', ['clone', '-q', source, rulesetRoot], root);
+    const ruleset = fixture.run('git', ['rev-parse', 'HEAD'], rulesetRoot);
+    const observers = fixture.parseObserverArgs([`private=${privateObserver}`, `shared=${sharedObserver}`]);
+    const f = await fixture.signedPreparedCriticFixture('critic_high_risk', source, root);
+    try {
+      const repo = f.root;
+      const requestPath = join(root, 'request.json');
+      fixture.writeJson(requestPath, fixture.requestFor(candidate, ruleset));
+      const preparedPath = join(root, 'prepared.json');
+      const statePath = join(root, 'state.json');
+      const output = await host.prepareNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root,
+        observers, requestPath, preparedPath, dispatchStatePath: statePath, reviewRoot: join(root, 'review') },
+      { requireProjectOnboardingReadyFn: () => ({ schema: 'pipeline.project-onboarding-ready-gate.v1', status: 'ready', intent: 'dispatch' }),
+        familyInvocationEntry: f.entry, familyExecutionPorts: f.ports, invocationId: 'actual-baseline',
+        runVerify: checkout => {
+          mkdirSync(join(checkout, 'evidence'), { recursive: true });
+          fixture.writeJson(join(checkout, 'evidence', 'verify-latest.json'), { schema: 'pipeline.verify-evidence.v0', exitCode: 0, commit: candidate.commit, tree: candidate.tree, steps:[{name:'synthetic',exitCode:0}] });
+          if (process.env.G17_CASE === 'v4') fixture.prepareV4Consent(checkout);
+          return { command: 'node verify.mjs', stdoutSha256: fixture.sha256('ok'), stderrSha256: fixture.sha256(''),
+            stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
+        } });
+      const context = host.readNativeCriticPreparedContext(output);
+      const route = host.readNativeCriticPreparedRoute(context, { repoRoot: repo, preparedSha256: output.preparedSha256 });
+      const prepared = fixture.readJsonBounded(preparedPath).value;
+      f.setReturn(fixture.successfulReturn(prepared, output.preparedSha256));
+      const selection = prepareSelectedCriticRoleDispatch({ input: { sandboxRuntime: { repoRoot: repo },
+        dispatch: { candidateCommit: candidate.commit, candidateTree: candidate.tree }, referencePaths: ['specs/review.md'] },
+        route, resultDestination: { kind: 'return' } });
+      assert.equal(selection.status, 'prepared', selection.code);
+      const nativeRequest = { model: route.model, effort: route.effort };
+      const args = { repo, root, preparedPath, candidate, context, host };
+      if (duringChild) f.setChildEffect(() => duringChild(args));
+      const snap = phase => {
+        const admin = {};
+        const walk = (directory, prefix = '') => {
+          for (const entry of readdirSync(directory, { withFileTypes: true })) {
+            const path = prefix + entry.name, absolute = join(directory, entry.name), stat = lstatSync(absolute);
+            admin[path] = { mode: stat.mode, hash: entry.isFile() ? fixture.sha256(readFileSync(absolute)) : entry.isSymbolicLink() ? fixture.sha256(readlinkSync(absolute)) : null };
+            if (entry.isDirectory()) walk(absolute, path + '/');
+          }
+        };
+        walk(join(repo, '.git'));
+        snapshots.push({ phase, detail: host.captureRepositoryFingerprint(repo).detail, admin });
+      };
+      snap('prepared');
+      let returned;
+      if (process.env.G17_CASE === 'v4') {
+        returned = await fixture.exerciseV4Consumer({ f, host, context, output, root, repo, candidate, route, prepared });
+        assert.equal(fixture.readJsonBounded(`${preparedPath}.family-execution`).value.schema, 'pipeline.critic-family-native-custody.v4');
+      } else {
+      host.consumeNativeCriticPreparedContext(context, { packet: selection.packet, nativeRequest });
+      beforeLaunch?.(args);
+      let childFailure;
+      const launched = await launchHeldCriticFamilyRoute({ route, packet: selection.packet, nativeRequest,
+        beforeReservations: () => host.checkNativeCriticPreparedState(context),
+        beforeChildStart: () => { host.captureNativeCriticChildStart(context); snap('child-start'); },
+        afterChildEnd: () => { try { host.checkNativeCriticChildEnd(context); } catch (error) { childFailure = error; throw error; } },
+        afterHostSettled: () => host.captureNativeCriticHostSettled(context) });
+      snap('launched');
+      if (childFailure) throw childFailure;
+      assert.equal(launched.ok, true, launched.code);
+      host.recordNativeCriticPreparedExecution(context, { packet: selection.packet, nativeRequest, nativeResult: launched.value });
+      returned = launched.value.hostReturn;
+      }
+      if (afterChildStart) afterChildStart(args);
+      const isolated = await import(`./codex-critic-host.mjs?actual=${Date.now()}-${Math.random()}`);
+      const restored = await isolated.createNativeCriticPreparedContextFactory({ familyInvocationEntry: f.entry,
+        familyExecutionPorts: f.ports }).reconstruct({ repoRoot: repo, preparedPath });
+      snap('reconstructed');
+      const returnPath = join(root, 'return.json');
+      fixture.writeJson(returnPath, returned);
+      return isolated.finalizeNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, observers,
+        preparedPath, dispatchStatePath: statePath, returnPath, receiptPath: join(root, 'receipt.json'), familyContext: restored });
+    } finally {
+      if (process.env.G17_PHASE_AUDIT) {
+        for (let i = 1; i < snapshots.length; i++) {
+          const before = snapshots[i-1], after = snapshots[i];
+          console.log(JSON.stringify({ phase: after.phase, changed: [...new Set([...Object.keys(before.admin), ...Object.keys(after.admin)])]
+            .filter(path => JSON.stringify(before.admin[path]) !== JSON.stringify(after.admin[path])),
+            changedParts: Object.keys(after.detail).filter(key => JSON.stringify(before.detail[key]) !== JSON.stringify(after.detail[key])) }));
+        }
+      }
+      f.cleanup();
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+test('actual prepared route accepts host reservations and finalizes a clean child',
+  { skip: !process.env.G17_PRIVATE_PARENT && 'requires explicit operator supplied private parent' }, async () => {
+    const parent = process.env.G17_PRIVATE_PARENT;
+    validatePrivateParent(parent); // strict real ancestry before the first fixture write
+    const fixtureHome = mkdtempSync(join(parent, 'g17c-'));
+    const ownedHome = lstatSync(fixtureHome);
+    const originalUserInfo = os.userInfo;
+    try {
+      validateCreatedHome(fixtureHome);
+      const actualUser = originalUserInfo();
+      os.userInfo = () => ({ ...actualUser, homedir: fixtureHome });
+      syncBuiltinESMExports();
+      mkdirSync(scratch, { recursive: true });
+      fixture = await import('./codex-critic-actual-fixture.mjs');
+      host = await import('./codex-critic-host.mjs');
+      ({ launchHeldCriticFamilyRoute } = await import('./codex-critic-session-route.mjs'));
+      ({ prepareSelectedCriticRoleDispatch } = await import('./codex-critic-selected-host.mjs'));
+      const group = process.env.G17_CASE || 'positive';
+      if (group === 'positive' || group === 'v4') {
+        const final = await exercise();
+        assert.equal(final.reviewPass, true);
+      } else if (group === 'mutations') {
+        const cases = {
+          worktree: ({repo}) => writeFileSync(join(repo, 'specs/review.md'), 'child mutation\n'),
+          index: ({repo}) => fixture.run('git', ['update-index', '--assume-unchanged', 'specs/review.md'], repo),
+          HEAD: ({repo, candidate}) => fixture.run('git', ['update-ref', 'HEAD', candidate.base], repo),
+          'admin-config': ({repo}) => fixture.run('git', ['config', 'g17.child', 'true'], repo),
+          'admin-session-authority': ({repo}) => writeFileSync(join(repo, '.git', 'agent-pipeline', 'session-authority', 'child.json'), '{}\n'),
+          'admin-empty-directory': ({repo}) => mkdirSync(join(repo, '.git', 'child-empty')),
+        };
+        for (const [name, mutate] of Object.entries(cases)) {
+          await assert.rejects(exercise({duringChild: mutate}), /repository mutation observed/, name);
+          console.log(JSON.stringify({ independentActualMutation: name, refused: true }));
+        }
+        await assert.rejects(exercise({afterChildStart: cases.worktree}), /repository mutation observed/);
+        console.log(JSON.stringify({ independentPostSettlementMutation: 'worktree', refused: true }));
+      } else if (group === 'custody') {
+        const changeJson = (path, mutate) => { const value = fixture.readJsonBounded(path).value; mutate(value); fixture.writeJson(path, value); };
+        const cases = {
+          missing: ({preparedPath}) => rmSync(`${preparedPath}.family-child-start`),
+          forged: ({preparedPath}) => changeJson(`${preparedPath}.family-child-start`, value => {value.protected.candidate = '0'.repeat(64);}),
+          'forged-linked': ({preparedPath}) => {
+            changeJson(`${preparedPath}.family-child-start`, value => {value.protected.candidate = '0'.repeat(64);});
+            changeJson(`${preparedPath}.family-execution`, value => {value.childStartSha256 = fixture.readJsonBounded(`${preparedPath}.family-child-start`).sha256;});
+          },
+          'old-v3': ({preparedPath}) => changeJson(`${preparedPath}.family-execution`, value => {delete value.hostSettledSha256;}),
+          'old-v4': ({preparedPath}) => changeJson(`${preparedPath}.family-execution`, value => {value.schema='pipeline.critic-family-native-custody.v4'; delete value.hostSettledSha256;}),
+          'old-receipt': ({preparedPath}) => changeJson(`${preparedPath}.family-invocation`, value => {value.receipt.receiptSha256='0'.repeat(64);}),
+        };
+        for (const [name, mutate] of Object.entries(cases)) {
+          await assert.rejects(exercise({afterChildStart: mutate}), name.startsWith('old-v') ? /CRITIC-FAMILY-REPREPARE-REQUIRED/ : /ENOENT|DRIFT/, name);
+          console.log(JSON.stringify({ independentCustody: name, refused: true }));
+        }
+        await assert.rejects(exercise({afterChildStart: ({host,context}) => host.captureNativeCriticChildStart(context)}), /BASELINE-REPLAY/);
+        console.log(JSON.stringify({ independentCustody: 'replay', refused: true }));
+      } else throw new Error('unknown G17_CASE');
+    } finally {
+      os.userInfo = originalUserInfo;
+      syncBuiltinESMExports();
+      const present = lstatSync(fixtureHome, { throwIfNoEntry: false });
+      if (present && present.dev === ownedHome.dev && present.ino === ownedHome.ino && present.isDirectory()) {
+        rmSync(fixtureHome, { recursive: true, force: true });
+      }
+    }
+  });

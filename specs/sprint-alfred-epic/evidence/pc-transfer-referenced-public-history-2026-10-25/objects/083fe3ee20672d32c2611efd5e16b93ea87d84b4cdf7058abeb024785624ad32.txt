@@ -1,0 +1,25 @@
+// Helper (untracked): prove the split moved code verbatim and kept the exact public export surface.
+import { readFileSync } from "node:fs";
+const dir = "scratch/clones/k81/plugins/pipeline-core/lib/";
+const orig = readFileSync("scratch/agent-out/k81-lineage-original.mjs", "utf8").split("\n");
+const lin = readFileSync(dir + "critic-review-lineage.mjs", "utf8").split("\n");
+const core = readFileSync(dir + "critic-review-lineage-core.mjs", "utf8").split("\n");
+const norm = (l) => l.replace(/^export (const|function) /u, "$1 ");
+const bag = new Map();
+for (const l of [...lin, ...core].map(norm)) bag.set(l, (bag.get(l) ?? 0) + 1);
+let missing = 0;
+for (const l of orig.map(norm)) {
+  if (l.trim() === "") continue;
+  const n = bag.get(l) ?? 0;
+  if (n === 0) { missing++; console.log("MISSING original line:", l.slice(0, 120)); } else bag.set(l, n - 1);
+}
+console.log("original non-blank lines not found verbatim in the split files:", missing);
+const added = [];
+for (const [l, n] of bag) if (n > 0 && l.trim() !== "") added.push(l);
+console.log("lines present only in the split files (imports/exports/header):", added.length);
+for (const l of added) console.log("  +", l.slice(0, 110));
+// public export surface
+const mod = await import(new URL("../" + dir + "critic-review-lineage.mjs", import.meta.url));
+const names = Object.keys(mod).sort();
+const expected = [...readFileSync("scratch/agent-out/k81-lineage-original.mjs", "utf8").matchAll(/^export (?:const|function) ([A-Za-z0-9_$]+)/gmu)].map((m) => m[1]).sort();
+console.log("export surface identical:", JSON.stringify(names) === JSON.stringify(expected), names.length, expected.length);

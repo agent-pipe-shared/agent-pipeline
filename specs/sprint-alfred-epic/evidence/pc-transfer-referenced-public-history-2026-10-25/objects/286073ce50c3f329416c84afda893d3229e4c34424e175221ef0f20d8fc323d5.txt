@@ -1,0 +1,77 @@
+// C7 drop-in proof by real clones (the symlink mirror fails path-bound guard admission even unpatched).
+// Run from the repository root: node scratch/c7/clone-proof.mjs [patched-file] [label]
+// Clones HEAD twice under a private dir outside the checkout, installs the patched pipeline-state.mjs into one,
+// runs every suite that drives submit-plan/present-plan in both, and compares per-file results.
+// The source repository is only read (git clone reads it; nothing is written into it except scratch/c7 output).
+import { execFileSync, spawn } from "node:child_process";
+import { copyFileSync, mkdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+
+const ROOT = resolve(".");
+const PATCHED = process.argv[2] ?? "scratch/c7/pipeline-state.patched.mjs";
+const LABEL = process.argv[3] ?? "c7-proof";
+const BASE = join(homedir(), "pipeline-test-tmp", LABEL);
+const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+const suites = execFileSync("git", ["grep", "-l", "-e", "submit-plan", "-e", "present-plan", "--",
+  "plugins/pipeline-core/*.test.mjs", "harness/*.test.mjs"], { cwd: ROOT, encoding: "utf8" }).trim().split("\n").sort();
+
+rmSync(BASE, { recursive: true, force: true });
+mkdirSync(BASE, { recursive: true, mode: 0o700 });
+chmodSync(BASE, 0o700);
+
+function clone(name) {
+  const dir = join(BASE, name);
+  execFileSync("git", ["clone", "-q", "--no-hardlinks", ROOT, dir], { stdio: "inherit" });
+  execFileSync("git", ["checkout", "-q", "--detach", head], { cwd: dir });
+  return dir;
+}
+
+function runSuite(dir, file, tmp) {
+  return new Promise((done) => {
+    const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.CLAUDE_PROJECT_DIR;
+    const child = spawn(process.execPath, ["--test", "--test-reporter=tap", file], { cwd: dir, env });
+    let out = "";
+    child.stdout.on("data", (c) => { out += c; });
+    child.stderr.on("data", (c) => { out += c; });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 900000);
+    child.on("close", (status, signal) => {
+      clearTimeout(timer);
+      const num = (k) => { const m = out.match(new RegExp(`^# ${k} (\\d+)`, "m")); return m ? Number(m[1]) : null; };
+      const failing = [...out.matchAll(/^not ok \d+ - (.*)$/gm)].map((m) => m[1]);
+      done({ file, status, signal, tests: num("tests"), pass: num("pass"), fail: num("fail"), failing, out });
+    });
+  });
+}
+
+async function variant(name, install) {
+  const dir = clone(name);
+  if (install) copyFileSync(resolve(ROOT, install), join(dir, "plugins/pipeline-core/scripts/pipeline-state.mjs"));
+  const tmp = join(BASE, `${name}-tmp`);
+  mkdirSync(tmp, { recursive: true, mode: 0o700 });
+  const results = [];
+  for (const file of suites) {
+    const r = await runSuite(dir, file, tmp);
+    writeFileSync(join(ROOT, "scratch/c7", `${LABEL}-${name}-${file.replaceAll("/", "__")}.txt`), r.out);
+    results.push(r);
+  }
+  return results;
+}
+
+const [baseline, patched] = await Promise.all([variant("baseline", null), variant("patched", PATCHED)]);
+const lines = [`C7 clone proof at HEAD ${head}: ${suites.length} suites, baseline (unpatched clone) vs patched (${PATCHED} installed).`];
+let differs = false;
+for (let i = 0; i < suites.length; i++) {
+  const b = baseline[i]; const p = patched[i];
+  const same = b.status === p.status && JSON.stringify(b.failing) === JSON.stringify(p.failing) && b.pass === p.pass;
+  if (!same) differs = true;
+  lines.push(`- ${same ? "SAME" : "DIFF"} ${suites[i]}: baseline exit ${b.status} ${b.pass}/${b.tests}; patched exit ${p.status} ${p.pass}/${p.tests}`);
+  for (const f of p.failing.filter((x) => !b.failing.includes(x))) lines.push(`    new failure in patched: ${f}`);
+  for (const f of b.failing) lines.push(`    baseline failure: ${f}`);
+}
+lines.push(`Result: ${differs ? "DIFFERENCES FOUND" : "patched behaves identically to baseline on every suite"}.`);
+writeFileSync(join(ROOT, "scratch/c7", `${LABEL}-summary.txt`), lines.join("\n") + "\n");
+console.log(lines.join("\n"));
+process.exit(differs ? 1 : 0);

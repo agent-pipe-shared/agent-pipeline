@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-transfer-ready/snapshot.json",
-  "sha256": "f59812a53dd4b8c8fa06bfd7deae6d54a48ebc48fce6db6ed4ff8de47ced6514",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
+  "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63",
   "measuredAt": "2026-10-25",
   "head": "869dafa521c19fb04699dbd1f493d1ca2a5a3e0f",
   "counts": {
@@ -13,5 +13,5 @@
   },
   "index": 71.5,
   "total": 207,
-  "scope": "Same207 identities. Checkout25→50, original full guard/current READY read/helper help50→75 after committed Source and actual Main99/405+3skip/88 checks. Other stage identities preserved; all second-run high findings remain0.7.0, no release acceptance."
+  "scope": "Portability-only amendment: same207 identities, stages and counts. Replace three scratch-only G10/G19/G20/G21 capture locators with committed sanitized transports; no rerun or new assurance."
 }

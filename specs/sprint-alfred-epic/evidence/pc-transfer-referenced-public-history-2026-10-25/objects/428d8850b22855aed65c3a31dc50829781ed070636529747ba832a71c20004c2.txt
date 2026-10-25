@@ -1,0 +1,62 @@
+command: node --test plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+label: g32-scanner-red
+exitCode: 1
+head: eac1d2dc8a4dbbf6117f4499d8cc8a23f65ffbd3
+tree: ae59ba836876caf93aa4bed681c0bd8ff093a703
+dirty: true
+--- stdout ---
+✖ security evidence follows one effective push destination across a remote rename (308.891169ms)
+✖ security evidence refuses no remote and ambiguous remotes unless one is selected (7.015849ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 489.434553
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/security-remote-identity.test.mjs:24:1
+✖ security evidence follows one effective push destination across a remote rename (308.891169ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + null
+  - 'a235604564f5f938532c680f6f01e49d8c740304f61c9ce2c70244e22832c821'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/security-remote-identity.test.mjs:35:10)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 'a235604564f5f938532c680f6f01e49d8c740304f61c9ce2c70244e22832c821',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/security-remote-identity.test.mjs:42:1
+✖ security evidence refuses no remote and ambiguous remotes unless one is selected (7.015849ms)
+  AssertionError [ERR_ASSERTION]: fixture git remote failed
+  
+  2 !== 0
+  
+      at git (file://<repo-root>/plugins/pipeline-core/scripts/security-remote-identity.test.mjs:16:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/security-remote-identity.test.mjs:43:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

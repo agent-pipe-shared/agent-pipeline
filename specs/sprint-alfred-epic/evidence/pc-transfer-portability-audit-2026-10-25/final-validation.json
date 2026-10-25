@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.final-transfer-portability-validation.v1",
+  "basis": "index membership and actual file bytes before final commit; production unchanged",
+  "manifests": [
+    {
+      "manifest": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/portable-custody.json",
+      "sha256": "f1f2014bcae3d935e7aff1b8d33eac3e052211a1bcc0b5c559adba81266135e5",
+      "artifacts": 188
+    },
+    {
+      "manifest": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/custody.json",
+      "sha256": "8926eea391fb396c1859777ece8aa38cbb7ba550623f5e26daac7db274173230",
+      "artifacts": 38
+    },
+    {
+      "manifest": "specs/sprint-alfred-epic/evidence/pc-transfer-briefing-history-2026-10-25/custody.json",
+      "sha256": "bb21bd08be2fca9dadc4fe49855f029af03bc0e45e3ab42f560ad6e4f2fd21f3",
+      "artifacts": 525
+    },
+    {
+      "manifest": "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/custody.json",
+      "sha256": "308e99f00e61490be575184f97285cd770163fa409676bc0ef137e78b580d3d4",
+      "artifacts": 5
+    },
+    {
+      "manifest": "specs/sprint-alfred-epic/evidence/pc-transfer-referenced-public-history-2026-10-25/custody.json",
+      "sha256": "d1c3745dbeae4f1f980efc9c8dde81451110e6218954635ccfe4bdf743fb3954",
+      "artifacts": 348
+    },
+    {
+      "manifest": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/inventory.json",
+      "sha256": "07021850c5c851180a83466b3d2af075030cc49bde009bde3997cfe25d26c590",
+      "artifacts": 1021
+    }
+  ],
+  "artifactRecords": 2125,
+  "uniqueTransports": 1812,
+  "immutableSnapshots": 27,
+  "currentSnapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
+  "currentSnapshotSha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63",
+  "matrix": {
+    "25": 6,
+    "50": 17,
+    "75": 184,
+    "100": 0,
+    "UNKNOWN": 0
+  },
+  "currentSnapshotStructuredScratchDependencies": 0,
+  "activeHandoverLinksChecked": 27,
+  "ignoredEvidenceFiles": 0
+}

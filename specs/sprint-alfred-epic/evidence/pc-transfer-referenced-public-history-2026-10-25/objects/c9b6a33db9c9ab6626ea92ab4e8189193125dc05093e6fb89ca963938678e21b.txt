@@ -1,0 +1,69 @@
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const main = process.argv[2], clone = process.argv[3];
+if (!main || !clone) throw Error('main and clone roots required');
+const out = join(main, 'scratch/agent-out/g8-native-producer-contract-draft');
+const own = ['plugins/pipeline-core/lib/design-review-execution-producer.mjs', 'plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs', 'plugins/pipeline-core/scripts/design-review-dispatch.mjs'];
+const sha = value => createHash('sha256').update(value).digest('hex');
+const json = (name,value) => writeFileSync(join(out,name), JSON.stringify(value,null,2)+'\n');
+const snapshot = JSON.parse(readFileSync(join(main,'scratch/agent-out/happy-path-candidate-source-20261025/binding.json')));
+for (const file of snapshot.files) if (sha(readFileSync(join(clone,file.path))) !== file.sha256) throw Error('frozen source changed: '+file.path);
+const sourcePatch = readFileSync(join(main,'scratch/agent-out/happy-path-candidate-source-20261025/candidate.patch'));
+if (sha(sourcePatch) !== snapshot.patchSha256) throw Error('source patch changed');
+let patch = '';
+for (const path of own) {
+  try { patch += execFileSync('git',['diff','--no-index','--','/dev/null',path],{cwd:clone,encoding:'utf8'}); }
+  catch (error) { if (error.status !== 1) throw error; patch += error.stdout; }
+}
+writeFileSync(join(out,'prototype.patch'),patch);
+const captures = ['red-preparation.json','prototype-tests.json','compatibility-tests.json','receipt-cli-tests.json','architecture-baseline.json'];
+for (const name of captures) copyFileSync(join(clone,'scratch/agent-out/g8-native-producer-contract-draft',name),join(out,name));
+const { prepareDesignReviewExecutionFromDisk } = await import(pathToFileURL(join(clone,'plugins/pipeline-core/scripts/design-review-dispatch.mjs')));
+const preparation = prepareDesignReviewExecutionFromDisk({root:clone,featureId:'sprint-alfred-epic',
+  sourcePaths:['specs/sprint-alfred-epic/prd_sprint-alfred-epic.md','specs/sprint-alfred-epic/spec.md'],
+  specPath:'specs/sprint-alfred-epic/spec.md',authorExecutionSha256:sha('unresolved-author-reference-for-proposal-only'),round:1,previousReceiptSha256:null});
+if (!preparation.ok) throw Error('actual source preparation failed: '+preparation.code);
+json('actual-source-preparation.json',preparation);
+json('resource-observations.json',{schema:'pipeline.project-resource-observations.v1',candidate:preparation.request.candidate,resources:[]});
+const path = {type:'string',minLength:1,maxLength:240,pattern:'^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[\\\\:\\u0000-\\u001f])[^/]+(?:/[^/]+)*$'};
+const hash = {type:'string',pattern:'^[a-f0-9]{64}$'};
+const oid = {type:'string',pattern:'^(?:[a-f0-9]{40}|[a-f0-9]{64})$'};
+const object = properties => ({type:'object',additionalProperties:false,required:Object.keys(properties),properties});
+json('request.schema.json',{$schema:'https://json-schema.org/draft/2020-12/schema',$id:'pipeline.design-review-execution-request.proposed.v1',
+  ...object({schema:{const:'pipeline.design-review-execution-request.proposed.v1'},status:{const:'proposed'},
+    featureId:{type:'string',pattern:'^[a-z][a-z0-9-]{0,63}$'},candidate:object({commit:{type:'string',pattern:'^[a-f0-9]{40}$'},tree:oid}),
+    sources:{type:'array',minItems:2,maxItems:66,items:object({path,sha256:hash,blobOid:oid,mode:{enum:['100644','100755']}})},specPath:path,
+    criteria:object({specSha256:hash,ids:{type:'array',minItems:1,maxItems:4096,uniqueItems:true,items:{type:'string',pattern:'^AC-(?:[1-9][0-9]*|E[1-9][0-9]*-[1-9][0-9]*-[0-9]{2})$'}},sha256:hash}),
+    authorExecutionSha256:hash,reviewerDuty:{const:'critic'},round:{enum:[1,2]},previousReceiptSha256:{anyOf:[{type:'null'},hash]},
+    assurance:object({class:{const:'proposed-preparation'},native:{const:false},independentCriticPass:{const:false}})}),
+  description:'Structural projection only. Producer validator additionally enforces sorted unique paths/criteria, Spec equality, criteria digest and round predecessor relation. No identity or execution authority.'});
+json('origin-locator.schema.json',{$schema:'https://json-schema.org/draft/2020-12/schema',$id:'pipeline.design-review-origin-locator.proposed.v1',
+  ...object({schema:{const:'pipeline.design-review-origin-locator.proposed.v1'},requestSha256:hash,receiptSha256:hash,reportSha256:hash,originalInvocationSha256:hash,sourceRevisionSha256:hash}),
+  description:'Proposed locator only. Requires independent Source registry original-publication readback; never an admission credential.'});
+json('decision.proposed.json',{schema:'pipeline.architecture-decision.v1',id:'draft-original-design-review-producer-custody',
+  title:'Original design review subject and existing Source custody',status:'proposed',digest:sha(readFileSync(join(out,'proposed-contract.md'))),scope:'project',date:'2026-10-25'});
+const dependencies = ['plugins/pipeline-core/lib/model-family-runtime-host.mjs','plugins/pipeline-core/lib/model-family-host-store.mjs',
+  'plugins/pipeline-core/lib/session-authority-registry.mjs','plugins/pipeline-core/lib/session-authority-domain-owner.mjs',
+  'plugins/pipeline-core/scripts/codex-critic-host.mjs','plugins/pipeline-core/scripts/codex-native-critic-host.mjs',
+  'plugins/pipeline-core/scripts/codex-critic-session-route.mjs','plugins/pipeline-core/lib/codex-native-critic-policy.mjs',
+  'plugins/pipeline-core/lib/critic-accepted-contract.mjs','plugins/pipeline-core/lib/design-review-receipt.mjs',
+  'plugins/pipeline-core/lib/design-approval-binding.mjs','plugins/pipeline-core/scripts/pipeline-state.mjs'];
+const artifactNames = ['proposed-contract.md','proposed-integration.diff','decision.proposed.json','request.schema.json','origin-locator.schema.json','prototype.patch','actual-source-preparation.json','report.md','resource-observations.json','resource-report.json',...captures];
+json('binding.json',{schema:'pipeline.g8-design-producer-proposal-binding.v1',status:'proposed',base:snapshot.base,sourcePatchSha256:snapshot.patchSha256,
+  sourcePathCount:snapshot.files.length,frozenSourceUnchanged:true,prototypePatchSha256:sha(patch),
+  files:own.map(path=>({path,sha256:sha(readFileSync(join(clone,path)))})),
+  dependencies:dependencies.map(path=>({path,sha256:sha(readFileSync(join(clone,path)))})),
+  artifacts:artifactNames.map(path=>({path,sha256:sha(readFileSync(join(out,path)))})),
+  productionActivated:false,independentPositiveQualified:false,nativeCalls:0,criticCalls:0,
+  priorAttempt:'scratch/agent-out/g8-design-review-provenance/report.md',
+  assurance:'Inert proposal preparation only; original native producer/admission and active consumer integration remain unimplemented.'});
+const {validateAgainstSchema} = await import(pathToFileURL(join(clone,'plugins/pipeline-core/lib/schema-lite.mjs')));
+const decision=JSON.parse(readFileSync(join(out,'decision.proposed.json')));
+const schema=JSON.parse(readFileSync(join(clone,'schemas/pipeline.architecture-decision.v1.json')));
+if (!validateAgainstSchema(decision,schema).valid) throw Error('decision schema invalid');
+console.log(JSON.stringify({schema:'pipeline.g8-proposal-export-result.v1',status:'prepared-proposed',frozenSourcePaths:snapshot.files.length,
+  patchSha256:sha(patch),decisionSha256:sha(readFileSync(join(out,'decision.proposed.json'))),actualSourcePreparation:true,
+  criteriaCount:preparation.request.criteria.ids.length,independentPositiveQualified:false,changedPaths:own}));

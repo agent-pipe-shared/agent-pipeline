@@ -1,0 +1,9 @@
+// K140 helper: apply the two diffs to the throwaway clone (check first, then for real).
+import { execFileSync } from "node:child_process";
+const clone = "scratch/clones/k140-check";
+const diffs = ["scratch/agent-out/K140-checker-protected.diff", "scratch/agent-out/K140-checker-unprotected.diff"];
+const abs = (p) => new URL("../" + p, import.meta.url).pathname;
+for (const d of diffs) execFileSync("git", ["-C", clone, "apply", "--check", abs(d)], { stdio: "inherit" });
+console.log("apply --check clean on the k133 state");
+for (const d of diffs) execFileSync("git", ["-C", clone, "apply", abs(d)], { stdio: "inherit" });
+console.log("applied for real");

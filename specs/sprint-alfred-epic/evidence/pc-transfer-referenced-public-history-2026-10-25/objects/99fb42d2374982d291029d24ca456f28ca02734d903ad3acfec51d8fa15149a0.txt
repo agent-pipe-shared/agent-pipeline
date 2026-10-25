@@ -1,0 +1,17 @@
+docs(setup): make the global installer choice the documented default Antigravity route
+
+PO decision 2026-10-23: SETUP.md told the reader to clone the release outside
+the project and then choose Workspace-Local, which the installer refuses
+(ATR-WORKSPACE-SOURCE-OUTSIDE) since D79, and there is no way back from global
+to workspace (ATR-OTHER-SCOPE-CONFLICT).
+
+- SETUP.md: Global topology refresh is the documented default; Workspace-Local
+  is the documented alternative with its source-inside-the-workspace condition;
+  upgrade readback covers both registries; the "Not verified" paragraph now says
+  the PO's Antigravity run checks which workspaces Agy loads for a global
+  registration. Refusal codes, headings and the inert-outside-opted-in
+  paragraph are unchanged.
+- GEMINI.md: step 1 and its heading match, kept short, linking to SETUP.
+
+AI-Assisted: true
+Dispatch: K131-AGY-GLOBAL-DEFAULT-DOC (goldfish)

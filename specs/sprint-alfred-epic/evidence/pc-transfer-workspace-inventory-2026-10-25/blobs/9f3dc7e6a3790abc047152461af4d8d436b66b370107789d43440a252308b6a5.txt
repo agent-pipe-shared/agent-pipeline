@@ -1,0 +1,8 @@
+docs(completion-report): explain the 41 baseline against 25 items and 564 entries against 529 files
+
+Reader round 20261023b findings 12 and 50: state that the Critic-skip
+baseline sum and the registration entry count count different things than
+the 25 items and 529 test files, using only the report's own evidence.
+
+AI-Assisted: true
+Dispatch: K124-READER-FIX2-GROUP-D (goldfish)

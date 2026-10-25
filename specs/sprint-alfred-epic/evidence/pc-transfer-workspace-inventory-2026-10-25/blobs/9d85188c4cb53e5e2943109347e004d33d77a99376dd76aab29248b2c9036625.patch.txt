@@ -1,0 +1,90 @@
+diff --git a/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md b/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md
+index be4cf9ea8..eb1884eba 100644
+--- a/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md
++++ b/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md
+@@ -94,3 +94,15 @@ Remaining Claude/Windows-specific frictions:
+   request (the writer itself also refuses a backslash path). The nearest literal "missing" strings are `close journal missing for CAS` and
+   siblings in `scripts/publication-close-journal.mjs`, which belong to the close flow, not to draft. The PO phrase most plausibly maps to V-1
+   (the `continuity-cas` refusal), which is admitted on this head.
++
++### Extension 2026-10-22 (PO decisions, ALF-K35)
++
++- **Dynamic Workflow prompt: typed warning, not a refusal.** A Goldfish `agent()` call in a Workflow script whose prompt cannot be resolved
++  statically (interpolation, a named const or other expression) stays admitted; `guard-dispatch.mjs` now emits the advisory
++  `GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED` naming the cause, that no route record was written for the call, and one repair (a static string
++  literal prompt built from `templates/prompts/goldfish-task.md`). What is recorded for static literals is unchanged.
++- **Critic and other non-Goldfish roles are out of scope of V-10.** Reasoning: V-10 binds a route digest to the briefing a Goldfish implements
++  against, keyed by the `Slice:` id of a governed queue item. A Critic reviews a fixed candidate and has no slice of its own (`critic-review.md`
++  carries no `Slice:` line), so a slice-keyed record would either collide with the Goldfish it reviews or need a new key and store with no
++  governed effect. The Critic is already measured by the template-bound preflight and contamination checks. This answers the open route-policy
++  question of the K28 measurement above as a disposition, not as a defect.
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+index 607c892d3..6ce392f6e 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+@@ -785,6 +785,45 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
+     assert.equal(readRoute(slice), null);
+   });
+ 
++  // PO decision 2026-10-22 (ALF-K35): the gap above is not closed by a refusal but by a typed advisory. The call is still admitted and
++  // still unrecorded (the case above is unchanged); the hook now says so, names the cause and the one repair.
++  const WARN_CODE = "GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED";
++  test("V-10 typed warning: an unresolvable Goldfish agent() prompt in a Workflow script is admitted with an advisory naming the cause, the missing record and one repair", () => {
++    const slice = "ALF-V10-WIRE-DYNAMIC-WARN";
++    const briefing = v10wBriefing(slice);
++    const cases = {
++      interpolation: { script: `const sliceId = '${slice}';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${v10wBriefing("${sliceId}")}\` });`, cause: /\$\{/u },
++      "named const": { script: `const BRIEFING = \`${briefing}\`;\nawait agent({ agentType: '${V10W_ROLE}', prompt: BRIEFING });`, cause: /identifier|expression|variable/iu },
++    };
++    for (const [name, { script, cause }] of Object.entries(cases)) {
++      const res = runHook(dynamicScript(script));
++      assert.equal(res.code, 0, `${name}: still admitted: ${res.stderr.slice(0, 300)}`);
++      assert.ok(res.stderr.includes(WARN_CODE), `${name}: typed advisory code expected: ${res.stderr.slice(0, 300)}`);
++      assert.match(res.stderr, cause, `${name}: names the cause`);
++      assert.ok(res.stderr.includes("no route record was written for this call"), `${name}: says what is missing`);
++      assert.ok(res.stderr.includes("templates/prompts/goldfish-task.md") && res.stderr.includes("static string literal"), `${name}: one repair`);
++      assert.equal(readRoute(slice), null, `${name}: nothing recorded`);
++    }
++  });
++
++  test("V-10 typed warning scope: a static literal, a non-Goldfish role and a script without agent() calls get no advisory; a static literal beside a dynamic one is still recorded", () => {
++    const staticSlice = "ALF-V10-WIRE-DYNAMIC-WARN-STATIC";
++    const quiet = runHook(dynamicScript(staticCall(v10wBriefing(staticSlice))));
++    assert.equal(quiet.code, 0, quiet.stderr.slice(0, 300));
++    assert.ok(!quiet.stderr.includes(WARN_CODE), "a static literal is recorded and needs no advisory");
++    assert.equal(readRoute(staticSlice)?.briefingSha256, sha256Of(v10wBriefing(staticSlice)));
++    const critic = runHook(dynamicScript("const P = 'x';\nawait agent({ agentType: 'pipeline-core:critic', prompt: P });"));
++    assert.ok(!critic.stderr.includes(WARN_CODE), "Critic and other non-Goldfish roles are out of scope of V-10 (PO 2026-10-22)");
++    const plain = runHook(dynamicScript("const n = 1 + 1;"));
++    assert.equal(plain.code, 0);
++    assert.ok(!plain.stderr.includes(WARN_CODE));
++    const mixedSlice = "ALF-V10-WIRE-DYNAMIC-WARN-MIXED";
++    const mixed = runHook(dynamicScript(`${staticCall(v10wBriefing(mixedSlice))}\nconst S = 'a';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${v10wBriefing("${S}")}\` });`));
++    assert.equal(mixed.code, 0, mixed.stderr.slice(0, 300));
++    assert.ok(mixed.stderr.includes(WARN_CODE), "the dynamic call beside the static one is flagged");
++    assert.equal(readRoute(mixedSlice)?.briefingSha256, sha256Of(v10wBriefing(mixedSlice)), "the static call is still recorded");
++  });
++
+   test("V-10 typed gap RED proof: a guard that did record the run-time prompt, or one that refused it, fails the same check", () => {
+     const slice = "ALF-V10-WIRE-DYNAMIC-RED";
+     assert.throws(() => checkDynamicWorkflowGap({ send: () => ({ code: 0, stderr: "" }), read: () => ({ sliceId: slice }) }), /records no route/u);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index e048abe28..7285a3c1b 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -224,6 +224,15 @@ fails immediately — it needs the plugin prefix: `'pipeline-core:goldfish-imple
+ 2026-08-18: a two-agent parallel dispatch failed outright on the first
+ attempt with bare names before this was known.
+ 
++## A Goldfish `agent()` prompt must be a static string literal
++
++Write the `prompt` of every Goldfish `agent()` call as a static string literal (single-, double- or
++backtick-quoted, no `${...}` interpolation, no variable or helper call), built from
++`templates/prompts/goldfish-task.md`. The guard reads the literal to bind the briefing's route digest (V-10) and
++to record the admitted route. A prompt it cannot resolve statically (interpolation, a named const, a built
++string) is still admitted, but no route record is written for that call, and the guard says so with
++`GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED`. Critic and other non-Goldfish roles are out of scope of V-10.
++
+ ## The binding and field 6 come from the generator, not from memory
+ 
+ For a native-host-commit Goldfish dispatch, Agent tool and Workflow `agent()` alike, generate the

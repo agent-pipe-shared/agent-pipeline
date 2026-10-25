@@ -1,0 +1,44 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: source-catalogue-suite
+exitCode: 0
+head: 20392c08f1648356783b362e238f63500af2662f
+tree: c11dc524b0929d460bda43e10e4b9c626ab329fe
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.611231ms)
+✔ a clean fixture passes (0.854724ms)
+✔ an allowlisted occurrence passes (0.264042ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.259894ms)
+✔ multiple prefix hits on one line each produce a finding (0.161096ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.279692ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (0.566937ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (153.296986ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (11.823403ms)
+Error: Result bootstrap apply inputs are stale or conflicting; zero mutation.
+✔ legacy MAC journal recovers the exact pre-fence postimage and yields the signed package preview (72.255817ms)
+✔ legacy journal repairs Result-before-State and replays each interrupted repair phase (271.208853ms)
+✔ legacy journal refuses forged proof, altered historical prefix and PRD drift without writing (137.868405ms)
+✔ retired legacy journal exposes one exact signed repair preview and then the existing package reconcile (228.272165ms)
+✔ signed legacy repair replays after interruption without consuming another approval (137.589976ms)
+✔ signed legacy preview refuses source drift and forged repair replay without new writes (291.116907ms)
+✔ win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (120.584704ms)
+✔ win32: an insecure DACL assessment on the private result-bootstrap directory still fails closed (81.622878ms)
+✔ AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence (82.978479ms)
+✔ registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview (202.439784ms)
+✔ registered bootstrap interruption and replay retain a single provable reconciliation plan (320.382405ms)
+✔ registered package authority drift refuses bootstrap before Result, State or manifest mutation (48.817281ms)
+✔ AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation (406.566353ms)
+✔ AC-047-143/148: active work, nonnull authority, State/document drift, absent/fenced and unsafe Result targets fail closed (502.025102ms)
+✔ AC-047-149: bootstrap requires a current implementing Plan lifecycle before any Result or State mutation (230.517424ms)
+✔ controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects (34480.520563ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37958.503793
+
+--- stderr ---

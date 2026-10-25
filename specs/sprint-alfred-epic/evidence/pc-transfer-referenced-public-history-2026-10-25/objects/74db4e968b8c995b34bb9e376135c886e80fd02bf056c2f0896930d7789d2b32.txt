@@ -1,0 +1,9 @@
+command: node --check scratch/clones/g20-qualification/plugins/pipeline-core/hooks/guard-push.mjs
+label: g20-syntax
+exitCode: 0
+head: 1e57d58014a2a5c00b3ba5409aa6a9a01aa976d5
+tree: d2cc59df43fc810e7569c6bc7da228290c461963
+dirty: true
+--- stdout ---
+
+--- stderr ---

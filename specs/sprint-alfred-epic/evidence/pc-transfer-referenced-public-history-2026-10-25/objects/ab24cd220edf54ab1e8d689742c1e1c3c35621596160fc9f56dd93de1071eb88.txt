@@ -1,0 +1,14 @@
+base GREEN exit 0 sig null secs 4 tests 55 pass 55 fail 0 skip 0 todo 0 plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+base GREEN exit 0 sig null secs 3 tests 13 pass 13 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs
+base GREEN exit 0 sig null secs 1 tests 40 pass 40 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/slice-queue.test.mjs
+base GREEN exit 0 sig null secs 66 tests 19 pass 19 fail 0 skip 0 todo 0 plugins/pipeline-core/scripts/slice-queue.test.mjs
+base GREEN exit 0 sig null secs 0 tests 11 pass 11 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs
+red RED exit 1 sig null secs 4 tests 62 pass 57 fail 5 skip 0 todo 0 plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+green GREEN exit 0 sig null secs 5 tests 62 pass 62 fail 0 skip 0 todo 0 plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+after GREEN exit 0 sig null secs 8 tests 62 pass 62 fail 0 skip 0 todo 0 plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+after GREEN exit 0 sig null secs 2 tests 13 pass 13 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs
+after GREEN exit 0 sig null secs 1 tests 40 pass 40 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/slice-queue.test.mjs
+after GREEN exit 0 sig null secs 0 tests 11 pass 11 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs
+after GREEN exit 0 sig null secs 87 tests 15 pass 15 fail 0 skip 0 todo 0 plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs
+after GREEN exit 0 sig null secs 1 tests 9 pass 9 fail 0 skip 0 todo 0 harness/scripts/check-consumer-safe-paths.test.mjs
+after GREEN exit 0 sig null secs 69 tests 19 pass 19 fail 0 skip 0 todo 0 plugins/pipeline-core/scripts/slice-queue.test.mjs

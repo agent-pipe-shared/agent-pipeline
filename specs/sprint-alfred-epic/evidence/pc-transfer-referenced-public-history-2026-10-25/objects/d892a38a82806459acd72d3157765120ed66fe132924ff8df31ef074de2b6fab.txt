@@ -1,0 +1,12 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index a7d728fb6..b3968b540 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -989,6 +989,7 @@
+         "verify-phase:harness/scripts/verify.mjs:run-codex-critic-isolation-tests",
+         "verify-phase:harness/scripts/verify.mjs:run-codex-critic-probe-split-tests",
+         "verify-phase:harness/scripts/verify.mjs:run-codex-isolation-control-decomposition-tests",
++        "verify-phase:harness/scripts/verify.mjs:run-parallel-tests",
+         "verify-phase:harness/scripts/verify.mjs:runner-contracts.schema-tests",
+         "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
+         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",

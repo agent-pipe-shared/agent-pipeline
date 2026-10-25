@@ -1,0 +1,187 @@
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+index 1ce878bb0..03bd3b816 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+@@ -69,6 +69,10 @@ const LIFECYCLE_GUARD_BUDGET = Object.freeze({
+ const STDIN_TIMEOUT_MS = 1_000;
+ const STDIN_MAX_BYTES = 1024 * 1024;
+ const NESTED_GUARD_BUDGETS = Object.freeze({
++  // A recorded production push-guard run needed 14,090ms. Give this
++  // proof-heavy guard a bounded 24s share while preserving 8s for the
++  // adapter's typed fail-closed recovery inside the unchanged 42s ceiling.
++  "guard-push.mjs": { capMs: 24_000, reserveMs: 8_000 },
+   "guard-apply-patch.mjs": { capMs: 36_000, reserveMs: 5_000 },
+   default: { capMs: 8_000, reserveMs: 5_000 },
+ });
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index 94b9b49fc..bd9759feb 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -44,7 +44,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
+ const checkFilter = process.env.PIPELINE_CODEX_PRETOOL_TEST_FILTER ?? "";
+ const shardIndex = Number.parseInt(process.env.PIPELINE_CODEX_PRETOOL_TEST_SHARD ?? "", 10);
+ const shardCount = 3;
+-const totalChecks = 37;
++const totalChecks = 39;
+ const shardResults = [];
+ const readyLifecycleEnvByRoot = new Map();
+ const readyLifecycleExternalParents = new Set();
+@@ -221,7 +221,7 @@ function refreshReadyFixtureVendorCopy(root) {
+   assert.equal(ready.status, "ready", JSON.stringify(ready));
+ }
+ 
+-function createReadyLifecycleFixture(mode = "chat") {
++function createReadyLifecycleFixture(mode = "chat", { currentDesignAuthoring = false } = {}) {
+   // TEST-ONLY fixture inputs below are explicit synthetic PO answers. The
+   // real CLI creates authority/checkpoint state; the real readback consumer
+   // verifies its ticket and digests before the native adapter probes it.
+@@ -303,7 +303,9 @@ function createReadyLifecycleFixture(mode = "chat") {
+   // public lifecycle route so every HGO consumer below exercises the current
+   // bootstrap contract rather than an obsolete pre-design shortcut.
+   const designStop = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+-  assert.equal(designStop.nextAction?.kind, "architecture-design-required", JSON.stringify(designStop));
++  assert.equal(designStop.nextAction?.kind,
++    currentDesignAuthoring ? "design-authoring-required" : "architecture-design-required",
++    JSON.stringify(designStop));
+   const contract = "docs/hgo-fixture-contract.md";
+   const verification = "tests/hgo-fixture.test.mjs";
+   mkdirSync(join(root, "docs"), { recursive: true });
+@@ -401,6 +403,9 @@ function readyLifecycleFixture(mode = "chat") {
+ function run(input, root = fixture(), {
+   claudeProjectDir = root,
+   hookCwd = root,
++  adapterScript = adapter,
++  timeoutMs = 8_000,
++  nodeOptions = process.env.NODE_OPTIONS,
+ } = {}) {
+   const envelope = typeof input === "string" ? input : {
+     cwd: root,
+@@ -411,12 +416,16 @@ function run(input, root = fixture(), {
+   writeFileSync(inputPath, typeof envelope === "string" ? envelope : JSON.stringify(envelope));
+   const inputFd = openSync(inputPath, "r");
+   try {
+-    return spawnSync(process.execPath, [adapter], {
++    return spawnSync(process.execPath, [adapterScript], {
+       cwd: hookCwd,
+-      env: { ...(readyLifecycleEnvByRoot.get(root) ?? process.env), CLAUDE_PROJECT_DIR: claudeProjectDir },
++      env: {
++        ...(readyLifecycleEnvByRoot.get(root) ?? process.env),
++        CLAUDE_PROJECT_DIR: claudeProjectDir,
++        ...(nodeOptions === undefined ? {} : { NODE_OPTIONS: nodeOptions }),
++      },
+       encoding: "utf8",
+       stdio: [inputFd, "pipe", "pipe"],
+-      timeout: 8_000,
++      timeout: timeoutMs,
+     });
+   } finally {
+     closeSync(inputFd);
+@@ -579,6 +588,108 @@ check("lifecycle guard timeout derives from adapter budget and preserves recover
+   assert.match(source, /\}, LIFECYCLE_GUARD_BUDGET\);/u);
+ });
+ 
++check("push guard gets a bounded share sized above the recorded run while other guards retain defaults", () => {
++  const source = readFileSync(adapter, "utf8");
++  const outerBudget = Number(source.match(/const HOOK_BUDGET_MS = ([\d_]+);/u)?.[1].replaceAll("_", ""));
++  const push = source.match(/"guard-push\.mjs": \{ capMs: ([\d_]+), reserveMs: ([\d_]+) \}/u);
++  const defaults = source.match(/default: \{ capMs: ([\d_]+), reserveMs: ([\d_]+) \}/u);
++  assert.equal(outerBudget, 42_000);
++  assert.ok(push, "push guard must have its own explicit bounded share");
++  const [, pushCapText, pushReserveText] = push;
++  const pushCap = Number(pushCapText.replaceAll("_", ""));
++  const pushReserve = Number(pushReserveText.replaceAll("_", ""));
++  assert.ok(pushCap > 14_090, "push share must exceed the observed successful 14,090ms run");
++  assert.ok(Number.isFinite(pushCap) && pushCap < outerBudget);
++  assert.ok(Number.isFinite(pushReserve) && pushReserve >= 5_000);
++  assert.ok(pushCap + pushReserve < outerBudget, "push timeout must leave recovery headroom under the outer cap");
++  assert.deepEqual(defaults?.slice(1).map((value) => Number(value.replaceAll("_", ""))), [8_000, 5_000]);
++  assert.match(source, /if \(available <= 0\) return timedOutSpawnResult\(\);/u,
++    "outer exhaustion must remain a typed fail-closed timeout");
++
++  // Production boundedSpawn chooses min(cap, outer - elapsed - reserve).
++  // A preceding default guard consuming its full cap still leaves the push
++  // guard's full share and more than the declared reserve before outer timeout.
++  const afterPriorDefault = outerBudget - 8_000;
++  const available = afterPriorDefault - pushReserve;
++  const timeout = Math.max(1, Math.min(pushCap, available));
++  assert.equal(timeout, pushCap);
++  assert.ok(afterPriorDefault - timeout >= pushReserve);
++  const exhaustedElapsed = outerBudget - pushReserve;
++  assert.ok(outerBudget - exhaustedElapsed - pushReserve <= 0,
++    "an exhausted outer budget must deny before spawning another child");
++});
++
++check("production adapter gives a slow push guard its dedicated share", () => {
++  const readyTemplate = createReadyLifecycleFixture("chat", { currentDesignAuthoring: true });
++  const makeReadyRoot = () => {
++    const parent = mkdtempSync(join(tmpdir(), "codex-ready-push-budget-clone-"));
++    const root = join(parent, "project");
++    cpSync(readyTemplate, root, { recursive: true, dereference: false });
++    readyLifecycleEnvByRoot.set(root, readyLifecycleEnvByRoot.get(readyTemplate));
++    readyLifecycleCloneParents.add(parent);
++    return root;
++  };
++  const baselineRoot = makeReadyRoot();
++  const candidateRoot = makeReadyRoot();
++  const hungRoot = makeReadyRoot();
++  assert.equal(observeGovernanceScope({ rootDir: candidateRoot }).requiresEnforcement, true,
++    JSON.stringify(observeGovernanceScope({ rootDir: candidateRoot })));
++  const repoRoot = join(pluginRoot, "..", "..");
++  const adapterFixture = mkdtempSync(join(repoRoot, "scratch", "codex-push-budget-adapter-"));
++  const copiedPluginRoot = join(adapterFixture, "pipeline-core");
++  cpSync(pluginRoot, copiedPluginRoot, { recursive: true, dereference: false });
++  const copiedAdapter = join(copiedPluginRoot, "hooks", "codex-pretool-guard.mjs");
++  const candidateAdapterSource = readFileSync(copiedAdapter, "utf8");
++  writeFileSync(join(copiedPluginRoot, "hooks", "guard-push.mjs"),
++    `#!/usr/bin/env node\nawait new Promise((resolve) => setTimeout(resolve, 9_200));\nprocess.exit(0);\n`);
++  const preload = join(adapterFixture, "synthetic-user-info.mjs");
++  writeFileSync(preload, [
++    'import os from "node:os";',
++    'os.userInfo = () => ({ uid: 65000, gid: 65000, username: "pipeline-fixture", homedir: process.env.HOME, shell: "" });',
++    "",
++  ].join("\n"));
++  assert.match(process.env.HOME ?? "", /codex-push-test-home/u, "test runner must provide a synthetic HOME");
++  try {
++    const invocation = {
++      tool_name: "Bash",
++      tool_input: { command: "git push origin deadbeef:refs/heads/test" },
++    };
++    const options = {
++      adapterScript: copiedAdapter,
++      // This harness timeout allows the unchanged 42s production adapter
++      // ceiling plus process startup/cleanup overhead.
++      timeoutMs: 50_000,
++      nodeOptions: `--import=${preload}`,
++    };
++    writeFileSync(copiedAdapter, candidateAdapterSource.replace(
++      '"guard-push.mjs": { capMs: 24_000, reserveMs: 8_000 },',
++      '"guard-push.mjs": { capMs: 8_000, reserveMs: 5_000 },',
++    ));
++    const baselineResult = run(invocation, baselineRoot, options);
++    const baseline = decision(baselineResult);
++    assert.equal(baseline.permissionDecision, "deny");
++    assert.match(baselineResult.stderr, /nested-guard-failed guard="guard-push\.mjs" failure="ETIMEDOUT"/u);
++
++    writeFileSync(copiedAdapter, candidateAdapterSource);
++    const candidateResult = run(invocation, candidateRoot, options);
++    // Codex treats the adapter's normal exit with no PreToolUse payload as
++    // implicit allow; the adapter emits JSON only when denying.
++    assert.equal(candidateResult.status, 0, candidateResult.stderr);
++    assert.equal(candidateResult.stdout, "");
++    assert.equal(candidateResult.stderr, "");
++    assert.doesNotMatch(candidateResult.stderr, /nested-guard-failed guard="guard-push\.mjs" failure="ETIMEDOUT"/u);
++
++    writeFileSync(join(copiedPluginRoot, "hooks", "guard-push.mjs"),
++      `#!/usr/bin/env node\nawait new Promise((resolve) => setTimeout(resolve, 30_000));\nprocess.exit(0);\n`);
++    const hungResult = run(invocation, hungRoot, options);
++    const hung = decision(hungResult);
++    assert.equal(hung.permissionDecision, "deny");
++    assert.match(hungResult.stderr, /nested-guard-failed guard="guard-push\.mjs" failure="ETIMEDOUT"/u);
++  } finally {
++    rmSync(adapterFixture, { recursive: true, force: true });
++  }
++});
++
+ check("Bash, apply_patch, Edit and Write each reach their intended guard family", () => {
+   const root = readyLifecycleFixture("chat");
+   writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({

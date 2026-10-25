@@ -1,0 +1,447 @@
+diff --git a/README.md b/README.md
+index 301515096..282e50a63 100644
+--- a/README.md
++++ b/README.md
+@@ -11,15 +11,16 @@ inspect later.
+   stakes warrant it, a PRD or spec with EARS-style acceptance criteria linked
+   to tests and review.
+ - **Preserve architecture across sessions:** assess the impact of a change,
+-  record significant choices in ADRs, and use an OKF-based, machine-readable
+-  map and architecture-fitness checks where the project has adopted them.
++  record significant choices in ADRs and, in the forthcoming `0.7.0`
++  line, use an OKF-based, machine-readable map and architecture-fitness checks
++  where the project has adopted them.
+ - **Keep agent work bounded:** split implementation into fresh-context tasks
+   with explicit scope, handovers, and role/model effort matched to the work.
+ - **Verify the actual candidate:** apply configured project policies and
+   Git/write guardrails, then run tests and security checks against the exact
+-  candidate. Depending on the project's setup, these cover secrets,
+-  dependency vulnerabilities, licenses, and static analysis; optional SBOM
+-  and provenance checks make supply-chain inputs inspectable.
++  candidate. Depending on the project's setup, these cover secret detection,
++  dependency vulnerability scanning, static analysis, and license checks;
++  optional SBOM and provenance checks make supply-chain inputs inspectable.
+ - **Separate review from authority:** obtain independent Critic findings,
+   while people retain plan acceptance, go/no-go, and approval of consequential
+   external actions.
+@@ -33,6 +34,10 @@ inspect later.
+ > normal consumer adoption flow, continue with [PIPELINE_FLOW](PIPELINE_FLOW.md)
+ > for the lifecycle, and then use [Usage](docs/usage.md). The links below are
+ > optional reference.
++>
++> **Documentation line `0.7.0`:** until it is released, keep the approved
++> GitHub-distributed version you already use; a maintainer's local candidate is
++> not an installation source. Release status: [overview](docs/overview.md).
+ 
+ ## The problem
+ 
+@@ -51,9 +56,9 @@ Four deliberately separated roles carry the model:
+ 
+ - **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
+   final sign-off.
+-- **Elephant** — the long-lived orchestrator session. Turns your intent into a spec,
+-  breaks it into small tasks, dispatches them, and prepares a go/no-go
+-  recommendation for the Product Owner.
++- **Elephant** — the role name of the Coordinator: the long-lived main session that
++  dispatches work. Turns your intent into a spec, breaks it into small tasks,
++  dispatches them, and prepares a go/no-go recommendation for the Product Owner.
+ - **Goldfish** — a fresh-context implementor subagent. Owns one complete, independently
+   checkable acceptance criterion or backlog outcome: analysis, test cases, code,
+   targeted checks and fixes stay in the same context. Reports actual evidence.
+@@ -63,26 +68,20 @@ Four deliberately separated roles carry the model:
+ Around those roles:
+ 
+ - **Review before expensive final qualification** — targeted, candidate-bound
+-  checks and Security evidence prepare an independent Critic review. Findings
+-  are corrected by one fresh Correction Goldfish for the coherent batch, with
+-  one full review and at most three delta reviews; review stops on PASS. Full Verify then
+-  qualifies the reviewed candidate. A later Verify rerun alone does not
+-  invalidate a content-bound Critic review.
+-- **Specs with checkable acceptance criteria** — every task has a Definition of
+-  Done something or someone can actually check, not a "done"-on-a-feeling.
++  checks and Security evidence prepare an independent Critic review; Full Verify
++  then qualifies the reviewed candidate. The review-budget rule is in
++  [Usage](docs/usage.md#deliver-work-after-readiness).
+ - **Git and write-path guardrails** — configured integrations can refuse unsafe
+   commands, protected-path writes, force-pushes, history rewrites, and skipped
+-  hooks. The exact live controls depend on the installed runner and project
+-  configuration; see [enforcement](docs/enforcement.md).
++  hooks. What actually applies depends on the installed runner and project
++  configuration; [enforcement](docs/enforcement.md) lists the hook registrations
++  of the plugin source and what a registration does and does not establish.
+ - **A model/token policy** — role-tiered model routing (design / implement /
+   mechanic / review / optional advisor) configured to your own subscription.
+   It supports task-appropriate routing; it does not estimate your cost.
+ - **Evidence discipline** — "done" means a machine-written log or output, the exact
+   command, and its exit code — never a model-formulated claim that something
+   "should work."
+-- **Explicit human authority** — plan, acceptance, and remote-action decisions
+-  remain with the human where the project calibration and action require them;
+-  evidence never creates that authority.
+ 
+ > **What you can inspect:** a candidate-bound Verify receipt, security-scan
+ > status, review and approval records where the project requires them, and a
+@@ -94,29 +93,11 @@ Around those roles:
+ > documents what is and is not measured. It is not an onboarding estimate,
+ > runner comparison, or promise for your project.
+ 
+-## The front door: optional design pre-stage
+-
+-Before the pipeline itself there's deliberately no mandatory step, just a
+-front door: idea → optional design brainstorming with any chat AI (guide +
+-standard prompt + lean export template under
+-[`docs/design/README.md`](docs/design/README.md)) → requirements export →
+-feeds the pipeline. If a requirement looks large at triage (multiple
+-modules/projects affected, new architecture, several plausible options, a
+-larger security/data surface), the Elephant flags it **non-blocking** and
+-links the guide — you can always skip the design pre-stage and go straight to
+-work. An external design export never gets a free pass: the Elephant
+-challenges it and re-derives it through the normal path (interview → spec →
+-readiness) instead of adopting it as an already-approved design. For large
+-topics, the Elephant also proposes a cut into several self-contained backlog
+-items and waits for confirmation or correction — the existing per-item PRD
+-review stays the only check point, nothing new is added. Details:
+-[`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
+-
+ ## How it works
+ 
+ ```mermaid
+ flowchart LR
+-    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
++    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(Coordinator)"]
+     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
+     Goldfish -->|"evidence"| Gates["Targeted checks<br/>(tests, security, lint)"]
+     Gates -.->|"fail"| Goldfish
+@@ -127,41 +108,20 @@ flowchart LR
+     Elephant -->|"go/no-go recommendation"| PO
+ ```
+ 
+-> **Documentation line: `0.7.0`.** Until this line is released, consumer
+-> repositories should continue to use the approved GitHub-distributed version
+-> they already have; a maintainer's local candidate is neither an installation
+-> source nor evidence that its release gates passed. The detailed release
+-> status is kept in the [release-scope overview](docs/overview.md).
+-
+ <a id="capability-architecture-adoption-and-fitness"></a>
+ <!-- capability:architecture-adoption-and-fitness -->
+ 
+-The next distributed architecture capability adds decision assessment, a module
+-inventory, machine-readable maps, and baseline/fitness checks. In an existing
+-repository, start with the read-only adoption status and proposal described in
++The architecture capability of the forthcoming `0.7.0` line is described, with
++its adoption route for an existing repository, in
+ [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+-Only then does the repository owner choose an explicitly bounded adoption
+-decision. A valid deferred decision remains valid until its stated review or
+-expiry date, explicit supersession, or a changed decision — an ordinary commit
+-does not turn it into a partial lifecycle state.
+-
+-## Bring your own architecture rules & guardrails
+-
+-A project can bring its own house rules, split into two classes: **guidelines**
+-are recommended principles you may deliberately deviate from, as long as the
+-deviation is named; **policies** are binding rules whose enforcement follows
+-their evaluation route. Start from the templates under
+-[`governance/examples/`](governance/examples/README.md), copy the selected
+-rules into project-owned paths, and configure those paths through the
+-`governance` block in the project's manifest.
+ 
+-Once configured, enforcement differs by class: applicable guidelines feed into
+-the plan and become the Critic's review benchmark — an unnamed deviation is the
+-finding, not the deviation itself. Evaluated machine-checkable policies can
+-fail their applicable gate; human-checkable items become explicit obligations
+-in the applicable review. A pattern played all the way through — from house
+-rule to enforced rule — lives in the
+-[worked example](governance/examples/worked-example.md).
++**The front door: optional design pre-stage.** There is deliberately no
++mandatory step before the pipeline: idea → optional design brainstorming with
++any chat AI → requirements export → feeds the pipeline. You can always skip it;
++the guide, prompt and export template are under
++[`docs/design/README.md`](docs/design/README.md), and an external design export
++is re-derived through the normal path, never adopted as already approved. Details:
++[`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
+ 
+ ## Three dials, not one size fits all
+ 
+@@ -169,7 +129,8 @@ The method uses calibrated strictness: teams can match the written contract
+ and implementation effort to the delivery's actual stakes. Three configuration
+ choices shape that work:
+ 
+-- **Rigor per task** — issue-only / delta-spec / spec-anchored
++- **Rigor per task** — issue-only / delta-spec / spec-anchored, which are Rigor
++  0 / 1 / 2 in [Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review)
+ - **Governance mode per rule set** — advisory / enforcing / off
+ - **Work profile per topic** — epic / feature / mini (model and effort per
+   phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
+@@ -180,12 +141,40 @@ costly or externally visible impact can require stronger independent review
+ and human approval even for a short change or a `mini` profile. See
+ [Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review).
+ 
++## Bring your own architecture rules & guardrails
++
++A project can bring its own house rules, split into two classes: **guidelines**
++are recommended principles you may deliberately deviate from, as long as the
++deviation is named; **policies** are binding rules whose enforcement follows
++their evaluation route. Start from the templates under
++[`governance/examples/`](governance/examples/README.md), copy the selected
++rules into project-owned paths, and configure those paths through the
++`governance` block in the project's manifest.
++
++How each class takes effect, and how to wire it in, is in
++[Setup, step 4](SETUP.md#4-optional-manifest-governance-and-ritual-extensions);
++a pattern played all the way through — from house rule to enforced rule —
++lives in the [worked example](governance/examples/worked-example.md).
++
+ ## Learn more
+ 
+ Follow the canonical [documentation map](docs/README.md): it keeps adoption,
+ enforcement, evidence, security, cost, and maintainer references in one order.
+ For the normative contract, read [`docs/operating-model.md`](docs/operating-model.md).
+-- [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission; see [`docs/licensing.md`](docs/licensing.md).
++
++### Maintainer and runtime reference
++
++Source maintainers can find checkout commands and the V3 authority sequence in
++[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
++can enforce configured guards, while the methodology remains portable; see
++[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
++and setup requirements.
++
++## License and price
++
++[`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available
++Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional
++Permission; see [`docs/licensing.md`](docs/licensing.md).
+ 
+ > **Price today: 0 EUR.** That covers personal use and internal business use,
+ > including inside a commercial company. Monetizing Agent-Pipeline itself
+@@ -196,14 +185,6 @@ For the normative contract, read [`docs/operating-model.md`](docs/operating-mode
+ > keep the license they came with. This notice does not amend the current
+ > license. See [Licensing](docs/licensing.md).
+ 
+-### Maintainer and runtime reference
+-
+-Source maintainers can find checkout commands and the V3 authority sequence in
+-[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
+-can enforce configured guards, while the methodology remains portable; see
+-[`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
+-and setup requirements.
+-
+ ## Acknowledgments
+ 
+ This operating model is a synthesis, not an invention. It adapts and builds on
+diff --git a/docs/README.md b/docs/README.md
+index 843571867..abfcc6ac5 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -1,14 +1,19 @@
+ # Documentation map
+ 
+-The canonical reader path is the top-level [README](../README.md),
+-[`SETUP.md`](../SETUP.md), [`PIPELINE_FLOW.md`](../PIPELINE_FLOW.md), and then
+-[`usage.md`](usage.md). Use the rest of this map as
+-reference; `overview.md` is a short companion, not a competing front door.
++The reader path is the Newcomer box of the top-level [README](../README.md).
++Use the rest of this map as reference; [`overview.md`](overview.md) is a short
++companion, not a competing front door.
++
++**Terms:** *PO* means Product Owner, the human who decides. The *Coordinator*
++is the main session that dispatches work (the README calls this role the
++Elephant).
+ 
+ **Command convention:** In user-repository examples, `<plugin-root>` is the
+-installed directory of the approved GitHub-distributed `pipeline-core` plugin.
++installed directory of the approved GitHub-distributed `pipeline-core` plugin;
++`<absolute-plugin-root>` is the same directory written as an absolute path.
++`<project-root>` and `<repo>` are the root of the governed repository.
+ Run commands from the governed repository unless the example says otherwise.
+-It never means a maintainer checkout.
++`<plugin-root>` never means a maintainer checkout.
+ 
+ **Audience rule:** This map, Setup, Usage, the flow, enforcement, evidence,
+ security, cost, onboarding, and operation pages describe what an application
+@@ -28,52 +33,40 @@ evidence; they are not copy-and-run instructions for a consumer project.
+ - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
+   — read-only status and proposal before an existing project adopts the
+   architecture controls.
++- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
++  integration boundaries.
+ - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
+   preview-first migration and the Codex lifecycle V4.
++- [`migration.md`](migration.md) — pointer to the current onboarding and V3
++  authority upgrade routes in Setup.
+ - [`onboarding-recovery.md`](onboarding-recovery.md) — exceptional, explicitly
+   returned recovery paths after a typed onboarding or migration failure; not
+   a routine first-install checklist.
+ - [`runtime-boundary.md`](runtime-boundary.md) and
+   [`runner-support.md`](runner-support.md) — what is shared methodology and
+   what the installed runner can actually enforce.
++- [`macos-support.md`](macos-support.md) — macOS acceptance status; no native
++  macOS support is claimed.
+ 
+-## Enforcement, evidence, security, and measurement
++## Enforcement, security, and measurement
+ 
+-- [`enforcement.md`](enforcement.md) — configured guard and lifecycle
+-  enforcement, including runner limits.
+-- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts
+-  and offline evidence viewing; artifacts are not compliance
+-  certification or authority.
++- [`enforcement.md`](enforcement.md) — the hook registrations declared by the
++  plugin source manifests, per runner event; not an inventory of what an
++  installed release enforces.
+ - [`security-controls.md`](security-controls.md) — scanner/control boundaries,
+   framework mappings, waivers, and runtime limits.
+ - [`cost-and-measurement.md`](cost-and-measurement.md) — what small Greenfield
+   trials and Verify receipts actually measure, what remains estimated or
+   unavailable, and why they are not a cost forecast.
+-- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
+-  integration boundaries.
+ 
+-## Product and governance reference
+-
+-- [`overview.md`](overview.md) — the integrated Phoenix foundation and the
+-  active Nova product stream.
+-- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
+-  release: product scope, release boundary, and non-claims at that time.
+-- [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
+-  review, evidence, and human authority.
+-- [`codex-onboarding-threat-model.md`](codex-onboarding-threat-model.md) —
+-  trust boundaries and residual risks for the Codex lifecycle V4.
+-- [`phoenix-governance-threat-model.md`](phoenix-governance-threat-model.md) —
+-  governance and external-action threat model.
+-- [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
+-  — execution-plane scope, evidence, and intentionally excluded claims.
+-- [`change-control.md`](change-control.md) — promotion gate that reconciles
+-  Pipeline human authority with an authenticated external change receipt.
+-- [`organization-policy-packs.md`](organization-policy-packs.md) — governance
+-  floors and document-publication rules an organization pack can add on top of
+-  the Pipeline's own authority, without creating a second authority system.
+-
+-## Governance and audit evidence
++## Audit and evidence
+ 
++- [`audit-and-evidence.md`](audit-and-evidence.md) — candidate-bound receipts
++  and offline evidence viewing; artifacts are not compliance
++  certification or authority.
++- [`audit-evidence-overview.md`](audit-evidence-overview.md) — structured index
++  of controls, evidence artifacts, human gates, and exception paths for a
++  technical or compliance reviewer.
+ - [`audit-bundles.md`](audit-bundles.md) — create-only, offline-verifiable
+   copy of one completed Feature Package's validated artifacts; evidence, not
+   a compliance claim.
+@@ -94,17 +87,48 @@ evidence; they are not copy-and-run instructions for a consumer project.
+   sanitized references binding a Pipeline artifact to an external system
+   object, with credentials and coordinates kept out of the reference.
+ 
++## Product and governance reference
++
++- [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
++  review, evidence, and human authority.
++- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
++  Nova product strands.
++- [`design-decisions.md`](design-decisions.md) — the "why" behind the method.
++- [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
++  release: product scope, release boundary, and non-claims at that time.
++- [`whats-new-0.5.0.md`](whats-new-0.5.0.md) — what was new in the `0.5.0`
++  release, for users coming from `0.4.x`.
++- [`licensing.md`](licensing.md) — the Public Core license (SUL-1.0 with the
++  Agent-Pipeline Additional Permission).
++- [`change-control.md`](change-control.md) — promotion gate that reconciles
++  Pipeline human authority with an authenticated external change receipt.
++- [`organization-policy-packs.md`](organization-policy-packs.md) — governance
++  floors and document-publication rules an organization pack can add on top of
++  the Pipeline's own authority, without creating a second authority system.
++
+ ## Operations and reference
+ 
+ - [`observation-intake.md`](observation-intake.md) — public observation intake,
+   privacy routing, triage, and backlog-link governance.
+ - [`github-issue-operations.md`](github-issue-operations.md) — project-scoped
+   GitHub login, issue operations, and safety boundaries.
++- [`design/README.md`](design/README.md) — optional design pre-stage.
++- [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
++
++## Maintainer reference
++
++These documents are classified as maintainer material in the repository's
++documentation governance.
++
+ - [`po-human-approval.md`](po-human-approval.md) — the one-time external-key
+   setup and the bounded human signing commands; agent-side preparation remains
+   agent work.
+ - [`human-authorization-inventory.md`](human-authorization-inventory.md) —
+   reference inventory of every Pipeline authority mechanism and its limits.
+-- [`design/README.md`](design/README.md) — optional design pre-stage.
+-- [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
++- [`codex-onboarding-threat-model.md`](codex-onboarding-threat-model.md) —
++  trust boundaries and residual risks for the Codex lifecycle V4.
++- [`phoenix-governance-threat-model.md`](phoenix-governance-threat-model.md) —
++  governance and external-action threat model.
++- [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
++  — execution-plane scope, evidence, and intentionally excluded claims.
+ - [`adr/`](adr/) — durable decisions and rationale.
+diff --git a/docs/overview.md b/docs/overview.md
+index 57d9f5d14..1c281e495 100644
+--- a/docs/overview.md
++++ b/docs/overview.md
+@@ -18,39 +18,28 @@ checks, and typed architecture impact at feature close. Begin with the
+ read-only [adoption status and proposal](usage.md#assess-architecture-adoption-in-an-existing-project)
+ in the repository you intend to govern.
+ 
++**Names.** *Alfred* is the working name of this `0.7.0` scope. *Phoenix* and
++*Nova* are the two product strands it integrates. *Sprint Alfred* is the
++maintainer sprint that builds the scope.
++
+ | Product strand | What it contributes to this release scope | Status |
+ | --- | --- | --- |
+ | Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
+-| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Nova A/B implementation is present in the repository; final 0.7 candidate-bound issue-criteria acceptance remains pending. |
+-
+-The documented Greenfield route is covered for Claude, Codex, and Antigravity:
+-from an empty directory through public onboarding actions, plan approval and a
+-real verify command to the first implementation step. A runner follows the
+-returned Driver action and fills only its named human placeholders. That makes
+-the next step discoverable instead of relying on an agent remembering internal
+-commands.
+-
+-Runner integrations are intentionally described by their evidence. A common
+-methodology does not mean that every host has identical native hooks, sandbox
+-isolation, model identity, or platform coverage. Missing, stale, malformed, or
++| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Implemented in the repository; final `0.7.0` acceptance pending. |
++
++**Status.** The `0.7.0` candidate is not yet qualified: it still needs
++criterion-level evidence, full Verify, security checks, independent review, and
++any applicable human acceptance, and host-dependent behavior needs readback from
++the runner that actually executes it. This overview claims neither a released
++nor a fully accepted `0.7.0`.
++
++The documented Greenfield route (empty directory to first implementation step)
++is covered for Claude, Codex, and Antigravity; see [Usage](usage.md). Runner
++integrations are described by their evidence: a common methodology does not
++mean that every host has identical native hooks, sandbox isolation, model
++identity, or platform coverage. Missing, stale, malformed, or
+ candidate-mismatched evidence stays a typed non-success.
+ 
+-## What is not yet qualified for 0.7
+-
+-Closing a Nova backlog item records that its delivery work was handled; it is
+-not a substitute for checking every issue acceptance criterion against the
+-final integrated 0.7 tree. Nova A/B source includes runner and workflow
+-capabilities, but the current candidate still needs criterion-level evidence,
+-full Verify, security checks, independent review, and any applicable human
+-acceptance. Host-dependent behavior also needs readback from the runner that
+-actually executes it. This overview therefore does not claim a released or
+-fully accepted Nova B package, nor does it demote the integrated implementation
+-back to a future roadmap promise.
+-
+-For the product entry point, use the top-level [README](../README.md). For
+-the normal next documents, use the [documentation map](README.md):
+-[Usage](usage.md) gives the routine journey, while [enforcement](enforcement.md),
+-[audit and evidence](audit-and-evidence.md), [security controls](security-controls.md),
+-[cost and measurement](cost-and-measurement.md), and [parallel work](parallel-work.md)
+-provide the relevant reference boundaries. [Operating Model](operating-model.md)
+-is the normative process contract.
++For the product entry point, use the top-level [README](../README.md); for
++everything else, the [documentation map](README.md). The
++[Operating Model](operating-model.md) is the normative process contract.

@@ -1,0 +1,35 @@
+// Builds scratch/c15/verify.mjs: HEAD harness/scripts/verify.mjs plus two import lines and the two
+// repairAddressRootQuietly diagnostics around the runVerifyJournal call (ceremony C15 drop-in).
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
+const source = readFileSync("harness/scripts/verify.mjs", "utf8");
+const edits = [
+  [
+    'import { readFileSync } from "node:fs";\n',
+    'import { readFileSync } from "node:fs";\nimport { userInfo } from "node:os";\n',
+  ],
+  [
+    'import { runVerifyJournal } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";\n',
+    'import { runVerifyJournal } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";\nimport { repairAddressRootQuietly } from "../../plugins/pipeline-core/lib/session-power-address-repair.mjs";\n',
+  ],
+  [
+    "          verifyRun = await runVerifyJournal({\n",
+    "          console.error(`VERIFY-ADDRESS-REPAIR-BEFORE: ${JSON.stringify(repairAddressRootQuietly({ home: userInfo().homedir }))}`);\n"
+    + "          verifyRun = await runVerifyJournal({\n",
+  ],
+  [
+    "            signal: verifyCancellation.signal,\n          });\n",
+    "            signal: verifyCancellation.signal,\n          });\n"
+    + "          console.error(`VERIFY-ADDRESS-REPAIR-AFTER: ${JSON.stringify(repairAddressRootQuietly({ home: userInfo().homedir }))}`);\n",
+  ],
+];
+let output = source;
+for (const [from, to] of edits) {
+  const occurrences = output.split(from).length - 1;
+  if (occurrences !== 1) throw new Error(`expected exactly one occurrence, found ${occurrences}: ${JSON.stringify(from.slice(0, 60))}`);
+  output = output.replace(from, () => to);
+}
+mkdirSync("scratch/c15", { recursive: true });
+writeFileSync("scratch/c15/verify.mjs", output);
+console.log(JSON.stringify({ file: "scratch/c15/verify.mjs", bytes: Buffer.byteLength(output), sha256: createHash("sha256").update(output).digest("hex") }));

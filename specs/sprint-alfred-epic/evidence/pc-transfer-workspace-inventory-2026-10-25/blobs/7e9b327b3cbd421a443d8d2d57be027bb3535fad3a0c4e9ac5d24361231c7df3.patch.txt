@@ -1,0 +1,101 @@
+diff --git a/plugins/pipeline-core/lib/guard/entry-gates.mjs b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+index e177fd363..3cf0012e3 100644
+--- a/plugins/pipeline-core/lib/guard/entry-gates.mjs
++++ b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+@@ -1,10 +1,12 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Guard module "entry-gates" (layer 3), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
++import { execFileSync } from "node:child_process";
+ import { readFileSync } from "node:fs";
+ import { isAbsolute, join, relative, resolve, sep } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { checkPlanningAdoptionDisposition } from "../../scripts/architecture-adoption.mjs";
+-import { evaluateArchitectureFitness } from "../../scripts/architecture-fitness.mjs";
++import { evaluateArchitectureFitness, inspectFitnessModelMaterialization, runFitnessQualification } from "../../scripts/architecture-fitness.mjs";
+ import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
+ import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
+ import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
+@@ -218,6 +220,48 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies
+   );
+ }
+ 
++export const FITNESS_MODEL_NOT_QUALIFIED_CODE = "GUARD-FITNESS-MODEL-NOT-QUALIFIED";
++const FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
++
++function currentHeadCommit(root) {
++  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
++}
++
++/**
++ * AC-155 (PO decision 2026-10-22, report-only): at the implementation boundary a materialized fitness model is executed
++ * as a candidate check bound to HEAD. A model that did not qualify (never ran, unreadable, not bound to this candidate,
++ * not passing) is reported by name and is not counted as qualified; the transition is never blocked (exit 0). A project
++ * without a materialized model is untouched, and nothing is stored.
++ */
++export function fitnessModelQualificationObservation(root, command, dependencies = {}) {
++  if (!isImplementationAuthorityTransition(command, root, dependencies)) return null;
++  let result;
++  try {
++    const materialization = inspectFitnessModelMaterialization(root);
++    if (!materialization.materialized) return null;
++    let candidateCommit = null;
++    try {
++      const head = (dependencies.resolveHeadCommitFn ?? currentHeadCommit)(root);
++      candidateCommit = typeof head === "string" ? head.trim() : null;
++    } catch { candidateCommit = null; }
++    result = (dependencies.runFitnessQualificationFn ?? runFitnessQualification)({
++      rootDir: root,
++      mode: "candidate",
++      candidateCommit,
++      ...(dependencies.evaluateArchitectureFitnessFn ? { evaluate: dependencies.evaluateArchitectureFitnessFn } : {}),
++    });
++    if (result?.status === "qualified" || result?.status === "not-applicable") return null;
++    result = { ...result, candidateCommit };
++  } catch {
++    result = { code: "FITNESS-MODEL-EVALUATION-FAILED", candidateCommit: null };
++  }
++  const commit = /^[a-f0-9]{40}$/u.test(result.candidateCommit ?? "") ? result.candidateCommit : "<HEAD>";
++  return verdict(
++    0,
++    `WARNING (guard-lifecycle-ready): ${FITNESS_MODEL_NOT_QUALIFIED_CODE}: the materialized fitness model architecture/fitness-model.json is not counted as qualified (${result.code ?? "FITNESS-MODEL-NOT-QUALIFIED"}): no passing candidate run bound to ${commit} was observed. Repair: node ${FITNESS_SCRIPT} --qualify --root . --commit ${commit}. This observation does not block the transition.\n`,
++  );
++}
++
+ /**
+  * B1 is report-only until measured C1 calibration and an explicit PO
+  * promotion decision (Alfred Spec §5.1). The PO may decide the immediate
+diff --git a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+index 6bb13268a..2a95ae9bb 100644
+--- a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
++++ b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+@@ -11,7 +11,7 @@ import { HOST_INIT_CROSS_VIEW_STATUSES, INTAKE_LIFECYCLE_STATUSES, LAUNCH_SCRIPT
+ import { exactReadyReceipt, verdict } from "./verdict.mjs";
+ import { blocked, externalRestartOnly } from "./denial-route.mjs";
+ import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
+-import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, minimumRigorObservation } from "./entry-gates.mjs";
++import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
+ import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
+ import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ import { isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
+@@ -375,12 +375,19 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+       dependencies,
+     );
+     if (fitnessVerdict !== null) return fitnessVerdict;
++    const qualificationVerdict = fitnessModelQualificationObservation(
++      root,
++      input.tool_input.command ?? input.tool_input.CommandLine,
++      dependencies,
++    );
+     const rigorVerdict = minimumRigorObservation(
+       root,
+       input.tool_input.command ?? input.tool_input.CommandLine,
+       dependencies,
+     );
+-    if (rigorVerdict !== null) return rigorVerdict;
++    if (qualificationVerdict !== null || rigorVerdict !== null) {
++      return verdict(0, `${qualificationVerdict?.stderr ?? ""}${rigorVerdict?.stderr ?? ""}`);
++    }
+   }
+   if (ownsVerificationContext && !isSourceOwnedContinuityVerificationCommand(
+     input.tool_input.command ?? input.tool_input.CommandLine, root, dependencies,

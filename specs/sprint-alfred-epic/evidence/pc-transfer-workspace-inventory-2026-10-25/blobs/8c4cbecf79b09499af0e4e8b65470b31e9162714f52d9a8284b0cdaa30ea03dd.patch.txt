@@ -1,0 +1,761 @@
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index f5caa10f1..54d5df022 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -681,8 +681,7 @@
+     {
+       "name": "git-null-device-sites-tests",
+       "path": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+-      "disposition": "legacy-process-only",
+-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++      "disposition": "required"
+     },
+     {
+       "name": "git-stash-readonly-tests",
+@@ -832,8 +831,7 @@
+     {
+       "name": "human-guard-override-disjoint-tests",
+       "path": "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs",
+-      "disposition": "legacy-process-only",
+-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++      "disposition": "required"
+     },
+     {
+       "name": "human-role-label-tests",
+@@ -1261,8 +1259,7 @@
+     {
+       "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
+       "path": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+-      "disposition": "legacy-process-only",
+-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++      "disposition": "required"
+     },
+     {
+       "name": "pin-devplan-lane-admits-the-producer-materialize-step-tests",
+@@ -1272,8 +1269,7 @@
+     {
+       "name": "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
+       "path": "plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
+-      "disposition": "legacy-process-only",
+-      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++      "disposition": "required"
+     },
+     {
+       "name": "pipeline-start-v3-tests",
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 1350f23cd..c7e4d9d40 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -114,6 +114,12 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   // The exact baseline identity digest prevents an offsetting removal/addition
+   // from satisfying the count; exact delta decisions pin the unchanged classifier.
+   const baselineVulnerableCount = 266;
++  // Restated 2026-10-22 (QG-04, own commit; ALF-K23): git-null-device-sites-tests, human-guard-override-disjoint-tests,
++  // pin-denial-names-a-diagnosis-it-refuses-tests and pin-windows-authority-ancestors-above-repository-are-human-controlled-tests
++  // adopted the full completion protocol (each is asserted `required` below). The classifier reads the converted sources: the
++  // first two no longer import node:test, so they count as top-level-assertions (same assertion sites); the Windows pin keeps
++  // only the root before/after hooks from node:test and no longer registers a test( call, so it is no longer classified
++  // vulnerable and leaves this list. No identity is removed from the pinned sets and no other row changes.
+   const newlyCounted = [
+     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
+     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
+@@ -150,7 +156,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
+     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
+     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
+-    ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","node-test-single",14],
++    ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",14],
+     ["git-stash-readonly-tests","plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs","top-level-assertions",7],
+     ["gitleaks-repair-ignore-cli-tests","plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs","top-level-assertions",2],
+     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
+@@ -158,7 +164,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",140],
+     ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",9],
+     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
+-    ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","node-test-single",57],
++    ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",57],
+     ["install-agy-inline-candidate-tests","plugins/pipeline-core/install-agy.inline-candidate.test.mjs","top-level-assertions",54],
+     ["install-snapshot-progress-tests","plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs","top-level-assertions",17],
+     ["installed-bootstrap-import-closure-tests","plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs","top-level-assertions",17],
+@@ -171,7 +177,6 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",10],
+     ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",34],
+     ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",9],
+-    ["pin-windows-authority-ancestors-above-repository-are-human-controlled-tests","plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs","node-test-single",22],
+     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
+     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
+     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
+@@ -304,6 +309,10 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     "design-course-command-admission-tests",
+     "design-course-coordinator-tests",
+     "design-course-session-tests",
++    "git-null-device-sites-tests",
++    "human-guard-override-disjoint-tests",
++    "pin-denial-names-a-diagnosis-it-refuses-tests",
++    "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
+   ]) assert.equal(registry.entries.find((entry) => entry.name === name)?.disposition, "required", name);
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/git-null-device-sites.test.mjs b/plugins/pipeline-core/lib/git-null-device-sites.test.mjs
+index 107ec87f4..2df4a3165 100644
+--- a/plugins/pipeline-core/lib/git-null-device-sites.test.mjs
++++ b/plugins/pipeline-core/lib/git-null-device-sites.test.mjs
+@@ -2,7 +2,7 @@
+ //
+ // R7-1a: git child environments in these modules take the null-device value from GIT_NULL_DEVICE,
+ // never from a win32 "NUL" literal (Git for Windows 2.56 rejects NUL).
+-import test from "node:test";
++import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import assert from "node:assert/strict";
+ import { readFileSync } from "node:fs";
+ import { spawnSync } from "node:child_process";
+@@ -13,17 +13,22 @@ import { courseGitBytes } from "./critic-verify-lifecycle.mjs";
+ 
+ const MODULES = ["calibration-verify-commit-transition.mjs", "critic-verify-lifecycle.mjs"];
+ 
+-for (const name of MODULES) {
++// Stable case ids, in registration order; never renumbered (append new cases at the end).
++const cases = [];
++const check = (id, name, run) => cases.push({ id, name, run });
++
++for (const [index, name] of MODULES.entries()) {
+   const source = readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
++  const ids = [`GND00${index * 2 + 1}`, `GND00${index * 2 + 2}`];
+ 
+-  test(`${name}: no win32 "NUL" literal as a git env or -c value`, () => {
++  check(ids[0], `${name}: no win32 "NUL" literal as a git env or -c value`, () => {
+     const offenders = source.split(/\r?\n/u)
+       .map((text, i) => ({ line: i + 1, text }))
+       .filter(({ text }) => /["'`]NUL["'`]/u.test(text));
+     assert.deepEqual(offenders, []);
+   });
+ 
+-  test(`${name}: git null-device values come from GIT_NULL_DEVICE`, () => {
++  check(ids[1], `${name}: git null-device values come from GIT_NULL_DEVICE`, () => {
+     assert.match(source, /import\s*\{[^}]*\bGIT_NULL_DEVICE\b[^}]*\}\s*from\s*"\.\/git-null-device\.mjs"/u);
+     assert.match(source, /GIT_CONFIG_GLOBAL:\s*GIT_NULL_DEVICE\b/u);
+     assert.doesNotMatch(source, /GIT_CONFIG_(?:GLOBAL|SYSTEM):\s*"\/dev\/null"/u);
+@@ -31,11 +36,11 @@ for (const name of MODULES) {
+   });
+ }
+ 
+-test("shared constant is /dev/null", () => {
++check("GND005", "shared constant is /dev/null", () => {
+   assert.equal(GIT_NULL_DEVICE, "/dev/null");
+ });
+ 
+-test("critic-verify-lifecycle courseGitBytes hands the stub git the GIT_NULL_DEVICE env values", () => {
++check("GND006", "critic-verify-lifecycle courseGitBytes hands the stub git the GIT_NULL_DEVICE env values", () => {
+   let seen = null;
+   const stub = (command, args, options) => {
+     seen = { command, args, env: options.env };
+@@ -52,14 +57,18 @@ test("critic-verify-lifecycle courseGitBytes hands the stub git the GIT_NULL_DEV
+ const realGit = spawnSync("git", ["--version"], { encoding: "utf8" });
+ const gitAvailable = !realGit.error && realGit.status === 0;
+ 
+-test("real git accepts GIT_CONFIG_GLOBAL=GIT_NULL_DEVICE (exit 0)", { skip: gitAvailable ? false : "git not on PATH" }, () => {
++check("GND007", "real git accepts GIT_CONFIG_GLOBAL=GIT_NULL_DEVICE (exit 0)", (context) => {
++  if (!gitAvailable) { context.skip("git not on PATH"); return; }
+   const result = spawnSync("git", ["config", "--global", "--list"], {
+     encoding: "utf8", env: { ...process.env, GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_NOSYSTEM: "1" } });
+   assert.equal(result.error, undefined);
+   assert.equal(result.status, 0, result.stderr);
+ });
+ 
+-test("real git runs through courseGitBytes with the constant", { skip: gitAvailable ? false : "git not on PATH" }, () => {
++check("GND008", "real git runs through courseGitBytes with the constant", (context) => {
++  if (!gitAvailable) { context.skip("git not on PATH"); return; }
+   const out = courseGitBytes(dirname(fileURLToPath(import.meta.url)), ["--version"]);
+   assert.match(out.toString("utf8"), /^git version /u);
+ });
++
++registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs b/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs
+index 05dc39859..95892ceb6 100644
+--- a/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs
+@@ -39,7 +39,6 @@ import { delimiter, dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ import { availableParallelism } from "node:os";
+-import nodeTest from "node:test";
+ import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
+ 
+ import {
+@@ -54,6 +53,7 @@ import {
+   recordHumanGuardDenial,
+ } from "./human-guard-override.mjs";
+ import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
++import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ 
+ const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+ const SCRIPT_PATH = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+@@ -184,8 +184,15 @@ function assertDriftRefusal(root, result, label, driftedChecks, requestSha256 =
+ // the main thread only registers one node:test case per body and awaits that body's result. Every
+ // assertion still executes, in the same code, against the same real module; a failure in a worker
+ // is rethrown in the matching case with its message and stack. HGO_DISJOINT_WORKERS bounds the pool.
++//
++// Case completion. The main thread declares every case through registerTestCaseCompletion (at the end of this
++// file) under a stable id HGODnnn, assigned in registration order and never renumbered (append new cases at the
++// end). A worker thread re-enters this file only to run ONE body: it returns before the registration, so it never
++// declares cases, never writes the completion descriptor and never registers a node:test case of its own.
+ // ---------------------------------------------------------------------------------------------
+ 
++const cases = [];
++const hgodId = (ordinal) => `HGOD${String(ordinal).padStart(3, "0")}`;
+ const CASES = new Map();
+ const WORKERS = Math.max(1, Number(process.env.HGO_DISJOINT_WORKERS) || Math.min(8, Math.max(2, availableParallelism())));
+ const jobs = new Map();
+@@ -205,7 +212,7 @@ function pump() {
+       pump();
+     };
+     const worker = new Worker(fileURLToPath(import.meta.url), { workerData: { hgoCase: name } });
+-    worker.once("message", finish);
++    worker.once("message", (result) => { finish(result); void worker.terminate(); });
+     worker.once("error", (error) => finish({ ok: false, message: String(error?.stack ?? error) }));
+     worker.once("exit", (code) => finish({ ok: false, message: `worker for "${name}" exited (${code}) without a result` }));
+   }
+@@ -216,19 +223,23 @@ function runCase(name) {
+   return jobs.get(name);
+ }
+ 
+-function test(name, body) {
++function test(id, name, body) {
+   assert.ok(!CASES.has(name), `duplicate case name: ${name}`);
+   CASES.set(name, body);
+   if (!isMainThread) return;
+-  nodeTest(name, async (t) => {
+-    const result = await runCase(name);
+-    if (!result.ok) throw new Error(result.message);
+-    if (result.skipped) t.skip(result.skipped);
++  cases.push({
++    id,
++    name,
++    run: async (context) => {
++      const result = await runCase(name);
++      if (!result.ok) throw new Error(result.message);
++      if (result.skipped) context.skip(result.skipped);
++    },
+   });
+ }
+ 
+-for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
+-  test(`${toolName}: three independently signed disjoint actions are delivered sequentially without re-signing`, () => {
++for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", patchInput]].entries()) {
++  test(hgodId(k * 6 + 1), `${toolName}: three independently signed disjoint actions are delivered sequentially without re-signing`, () => {
+     const root = fixture();
+     try {
+       const files = ["one.md", "two.md", "three.md"];
+@@ -246,7 +257,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: an unrelated worktree edit between arming and consumption does not invalidate`, () => {
++  test(hgodId(k * 6 + 2), `${toolName}: an unrelated worktree edit between arming and consumption does not invalidate`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("target.md") });
+@@ -258,7 +269,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: target byte, absence and ancestry drift still fail closed`, () => {
++  test(hgodId(k * 6 + 3), `${toolName}: target byte, absence and ancestry drift still fail closed`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("existing-a.md") });
+@@ -277,7 +288,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: symlink replacement of a signed target fails closed`, (t) => {
++  test(hgodId(k * 6 + 4), `${toolName}: symlink replacement of a signed target fails closed`, (t) => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("existing-b.md") });
+@@ -292,7 +303,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: expiry, denial-set and tool-input drift still fail closed`, () => {
++  test(hgodId(k * 6 + 5), `${toolName}: expiry, denial-set and tool-input drift still fail closed`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("exp.md") });
+@@ -307,7 +318,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: HEAD/tree movement after arming still fails closed`, () => {
++  test(hgodId(k * 6 + 6), `${toolName}: HEAD/tree movement after arming still fails closed`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("headbound.md") });
+@@ -324,8 +335,8 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+ }
+ 
+ // ALF-C-W1-05B: the remaining members of the original acceptance's drift matrix.
+-for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
+-  test(`${toolName}: ancestor replaced by a directory link fails closed`, (t) => {
++for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", patchInput]].entries()) {
++  test(hgodId(12 + k * 6 + 1), `${toolName}: ancestor replaced by a directory link fails closed`, (t) => {
+     const root = fixture();
+     try {
+       mkdirSync(join(root, "sub", "dir"), { recursive: true });
+@@ -341,7 +352,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: project guard-policy drift after arming fails closed`, () => {
++  test(hgodId(12 + k * 6 + 2), `${toolName}: project guard-policy drift after arming fails closed`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("policy.md") });
+@@ -352,7 +363,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: plugin (override machinery) drift after arming fails closed`, () => {
++  test(hgodId(12 + k * 6 + 3), `${toolName}: plugin (override machinery) drift after arming fails closed`, () => {
+     const root = fixture();
+     // The plugin identity binds the plugin root's location as well as its bytes, so the mirror is the
+     // plugin root for the WHOLE flow: only its content differs between arming and consumption.
+@@ -382,7 +393,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: lifecycle state drift after arming fails closed`, () => {
++  test(hgodId(12 + k * 6 + 4), `${toolName}: lifecycle state drift after arming fails closed`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("state.md") });
+@@ -393,7 +404,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: replay of a consumed capability and of its signed proof fails closed`, () => {
++  test(hgodId(12 + k * 6 + 5), `${toolName}: replay of a consumed capability and of its signed proof fails closed`, () => {
+     const root = fixture();
+     try {
+       const { recorded, plan, proof, shared } = signAndArm(root, { toolName, toolInput: build("replay.md") });
+@@ -414,7 +425,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: audit-integrity drift after arming fails closed`, () => {
++  test(hgodId(12 + k * 6 + 6), `${toolName}: audit-integrity drift after arming fails closed`, () => {
+     const root = fixture();
+     try {
+       signAndArm(root, { toolName, toolInput: build("audit.md") });
+@@ -437,7 +448,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+ // (Edit, Write, apply_patch). The loops above drive Write and apply_patch; this one drives Edit.
+ // ---------------------------------------------------------------------------------------------
+ 
+-test("Edit: three independently signed disjoint actions are delivered sequentially without re-signing", () => {
++test(hgodId(25), "Edit: three independently signed disjoint actions are delivered sequentially without re-signing", () => {
+   const root = fixture();
+   try {
+     const files = ["README.md", "existing-a.md", "existing-b.md"];
+@@ -453,7 +464,7 @@ test("Edit: three independently signed disjoint actions are delivered sequential
+   }
+ });
+ 
+-test("Edit: an unrelated worktree edit does not invalidate, a target byte change fails closed", () => {
++test(hgodId(26), "Edit: an unrelated worktree edit does not invalidate, a target byte change fails closed", () => {
+   const root = fixture();
+   try {
+     signAndArm(root, { toolName: "Edit", toolInput: editInput("README.md") });
+@@ -473,8 +484,8 @@ test("Edit: an unrelated worktree edit does not invalidate, a target byte change
+ // unrelated worktree edit before arming does not void a signature over a disjoint action.
+ // ---------------------------------------------------------------------------------------------
+ 
+-for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInput]]) {
+-  test(`${toolName}: HEAD movement between signing and arming is refused at the arming boundary`, () => {
++for (const [k, [toolName, build]] of [["Write", writeInput], ["apply_patch", patchInput]].entries()) {
++  test(hgodId(26 + k * 3 + 1), `${toolName}: HEAD movement between signing and arming is refused at the arming boundary`, () => {
+     const root = fixture();
+     try {
+       const signed = signAndArm(root, { toolName, toolInput: build("arming-head.md"), arm: false });
+@@ -490,7 +501,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: target byte drift between signing and arming is refused at the arming boundary`, () => {
++  test(hgodId(26 + k * 3 + 2), `${toolName}: target byte drift between signing and arming is refused at the arming boundary`, () => {
+     const root = fixture();
+     try {
+       const signed = signAndArm(root, { toolName, toolInput: build("existing-a.md"), arm: false });
+@@ -504,7 +515,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+     }
+   });
+ 
+-  test(`${toolName}: an unrelated worktree edit between signing and arming still arms and consumes`, () => {
++  test(hgodId(26 + k * 3 + 3), `${toolName}: an unrelated worktree edit between signing and arming still arms and consumes`, () => {
+     const root = fixture();
+     try {
+       const signed = signAndArm(root, { toolName, toolInput: build("arming-disjoint.md"), arm: false });
+@@ -522,7 +533,7 @@ for (const [toolName, build] of [["Write", writeInput], ["apply_patch", patchInp
+ // Acceptance bullet 2: every Bash action and a plugin installation stay on the legacy contract.
+ // ---------------------------------------------------------------------------------------------
+ 
+-test("Bash: whole-repository binding -- an unrelated worktree edit between arming and consumption fails closed", () => {
++test(hgodId(33), "Bash: whole-repository binding -- an unrelated worktree edit between arming and consumption fails closed", () => {
+   const root = fixture();
+   try {
+     const commands = ["node --version", "node --help", "node --v8-options"].map((command) => ({ command }));
+@@ -557,7 +568,7 @@ function withClosedCodexRegistry(fn) {
+   finally { process.env[key] = original; rmSync(dir, { recursive: true, force: true }); }
+ }
+ 
+-test("plugin installation: binding follows the attested install source, planned on the legacy v3 contract, never target-bound", () => {
++test(hgodId(34), "plugin installation: binding follows the attested install source, planned on the legacy v3 contract, never target-bound", () => {
+   withClosedCodexRegistry(() => {
+     const root = fixture({ pushApproval: "chat" });
+     try {
+@@ -605,7 +616,7 @@ test("plugin installation: binding follows the attested install source, planned
+ // Acceptance bullet 4: the signing preparer discloses the serial dependence of status-bound actions.
+ // ---------------------------------------------------------------------------------------------
+ 
+-test("AC-160 serial-dependence disclosure: status-bound Bash signing preparation discloses it, a native Write does not", () => {
++test(hgodId(35), "AC-160 serial-dependence disclosure: status-bound Bash signing preparation discloses it, a native Write does not", () => {
+   const root = fixture();
+   try {
+     // The disclosure index is judged against the wall clock, so this case records with the real time.
+@@ -659,7 +670,16 @@ if (!isMainThread) {
+     }
+   }
+   parentPort.postMessage(message);
+-} else if (!process.execArgv.some((arg) => arg.startsWith("--test-name-pattern") || arg.startsWith("--test-skip-pattern"))) {
++  // A worker's only job is the one body above. Parking here until the parent terminates this thread (see pump)
++  // keeps it from reaching the completion registration below: only the main thread declares the cases. The live
++  // listener keeps the thread from idling out (which would print an unsettled-await warning) before that.
++  parentPort.on("message", () => {});
++  await new Promise(() => {});
++}
++
++registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
++
++if (!process.execArgv.some((arg) => arg.startsWith("--test-name-pattern") || arg.startsWith("--test-skip-pattern"))) {
+   // Start every body now so the pool overlaps them; with a name filter only the selected cases start (lazily).
+   for (const name of CASES.keys()) void runCase(name);
+ }
+diff --git a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+index ce39faa77..f5ebf556b 100644
+--- a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
++++ b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+@@ -3,6 +3,7 @@
+ // denial names must be admitted by the shell lane in the state that produced that denial.
+ // Verbs are captured from the real emitter text (designAdvisoryRemediation); each command is spelled
+ // exactly as the catalogue's own definition (sanctioned-args-scripts.mjs) requires.
++import { registerTestCaseCompletion } from '../test-case-completion.mjs';
+ import assert from 'node:assert/strict';
+ import { fileURLToPath } from 'node:url';
+ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+@@ -18,8 +19,6 @@ const blockedDraft = { devPlanGateVerdictFn: () => ({ verdict: 'block', reason:
+ 
+ // Fixture: an existing single-link regular review receipt under scratch/ (relative path, as the catalogue demands).
+ const receiptRel = 'scratch/denial-diagnosis-pin-receipt.json';
+-mkdirSync(join(root, 'scratch'), { recursive: true });
+-writeFileSync(join(root, receiptRel), '{}');
+ const SHAPES = {
+   'reopen-design': '--by tester',
+   'present-plan': `--by tester --review-receipt ${receiptRel}`,
+@@ -27,35 +26,47 @@ const SHAPES = {
+   'set-phase': '--phase implementation',
+ };
+ const build = (verb, tail = SHAPES[verb]) => `node "${script}" ${verb} ${tail}`.trim();
+-try {
+-  let namedTotal = 0;
+-  const seen = new Set();
+-  for (const code of CODES) {
+-    const text = designAdvisoryRemediation(code);
+-    const named = VERBS.filter(verb => text.includes(verb));
+-    assert.ok(named.length > 0, `${code}: remediation names no recovery verb`);
+-    for (const verb of named) {
+-      namedTotal += 1; seen.add(verb);
+-      const command = build(verb);
+-      const sanctioned = isSanctionedLifecycleCommand(command, root, {});
+-      const hit = devPlanShellRefusalHit(command, root, blockedDraft);
+-      assert.ok(sanctioned === true && hit === null,
+-        `${code}: named command "${verb}" is refused in the state that produced the denial (sanctioned=${sanctioned}, lane=${hit?.lane ?? 'none'})`);
++
++// Every case below is registered through the case-completion protocol (registerTestCaseCompletion at the end of
++// this file). Ids are stable and in registration order; never renumber, append new cases at the end.
++const cases = [];
++const check = (id, name, run) => cases.push({ id, name, run });
++
++// The original module-level block of this pin (it ran before any node:test case, outside any case): the
++// emitted-verb admission check over the four design-advisory denial codes. It is now declared case DND001, so an
++// assertion failure here is a failed case and no longer ends the file before the cases below are registered.
++check('DND001', 'the four design-advisory denials name only recovery verbs the shell lane admits, and a misspelt verb is refused', () => {
++  mkdirSync(join(root, 'scratch'), { recursive: true });
++  writeFileSync(join(root, receiptRel), '{}');
++  try {
++    let namedTotal = 0;
++    const seen = new Set();
++    for (const code of CODES) {
++      const text = designAdvisoryRemediation(code);
++      const named = VERBS.filter(verb => text.includes(verb));
++      assert.ok(named.length > 0, `${code}: remediation names no recovery verb`);
++      for (const verb of named) {
++        namedTotal += 1; seen.add(verb);
++        const command = build(verb);
++        const sanctioned = isSanctionedLifecycleCommand(command, root, {});
++        const hit = devPlanShellRefusalHit(command, root, blockedDraft);
++        assert.ok(sanctioned === true && hit === null,
++          `${code}: named command "${verb}" is refused in the state that produced the denial (sanctioned=${sanctioned}, lane=${hit?.lane ?? 'none'})`);
++      }
+     }
++    assert.ok(namedTotal >= CODES.length);
++    assert.ok(seen.has('reopen-design'), 'reopen-design must be named by at least one denial');
++    // Meaningful-RED mirror: a wrongly spelled named command (missing receipt flag value) is NOT admitted,
++    // so the admission assertion above discriminates spelling rather than passing vacuously.
++    assert.equal(isSanctionedLifecycleCommand(build('present-plan', '--by tester --review-receipt scratch/does-not-exist.json'), root, {}), false);
++    assert.equal(isSanctionedLifecycleCommand(build('set-phase', '--by tester'), root, {}), false);
++    console.log(`ok: ${namedTotal} named recovery commands admitted across ${CODES.length} denial codes (verbs: ${[...seen].join(',')})`);
++  } finally {
++    rmSync(join(root, receiptRel), { force: true });
+   }
+-  assert.ok(namedTotal >= CODES.length);
+-  assert.ok(seen.has('reopen-design'), 'reopen-design must be named by at least one denial');
+-  // Meaningful-RED mirror: a wrongly spelled named command (missing receipt flag value) is NOT admitted,
+-  // so the admission assertion above discriminates spelling rather than passing vacuously.
+-  assert.equal(isSanctionedLifecycleCommand(build('present-plan', '--by tester --review-receipt scratch/does-not-exist.json'), root, {}), false);
+-  assert.equal(isSanctionedLifecycleCommand(build('set-phase', '--by tester'), root, {}), false);
+-  console.log(`ok: ${namedTotal} named recovery commands admitted across ${CODES.length} denial codes (verbs: ${[...seen].join(',')})`);
+-} finally {
+-  rmSync(join(root, receiptRel), { force: true });
+-}
++});
+ 
+ // --- AC-148 correction (Critic C6b F2), added 2026-10-16 ---
+-const { test } = await import('node:test');
+ const { readFileSync } = await import('node:fs');
+ const policySource = readFileSync(fileURLToPath(new URL('../guard-devplan-policy.mjs', import.meta.url)), 'utf8');
+ // Every denial code the emitter file knows (quoted DAA-/DWP- literals), plus an unknown code (fallthrough branch)
+@@ -64,7 +75,7 @@ const ALL_CODES = [...new Set([...policySource.matchAll(/"((?:DAA|DWP)-[A-Z0-9-]
+ const inspectCommand = `node "${fileURLToPath(new URL('../../scripts/design-advisory-admission.mjs', import.meta.url))}" inspect --repo-root ${root} --feature f --plan p --spec s`;
+ const refusedNames = text => /design-advisory-admission|\binspect\b|\.mjs\b|\bnode\b/u.test(text);
+ 
+-test('headline case: the diagnosis command the original defect named is refused, so no rendered denial may name it', () => {
++check('DND002', 'headline case: the diagnosis command the original defect named is refused, so no rendered denial may name it', () => {
+   // Precondition: under the denial-producing state the guard really refuses it (opaque-script-execution).
+   const hit = devPlanShellRefusalHit(inspectCommand, root, blockedDraft);
+   assert.equal(hit?.lane, 'opaque-script-execution');
+@@ -77,7 +88,7 @@ test('headline case: the diagnosis command the original defect named is refused,
+   }
+   assert.ok(!refusedNames(designAdvisoryRemediation()), 'undefined code: rendered denial names a refused script command');
+ });
+-test('DLR035 receipt: a DLR035 denial has no dedicated emitter and names only admitted recovery verbs', () => {
++check('DND003', 'DLR035 receipt: a DLR035 denial has no dedicated emitter and names only admitted recovery verbs', () => {
+   const text = designAdvisoryRemediation('DLR035');
+   assert.ok(text.includes('(DLR035)'), 'DLR035 receipt is rendered in the denial header');
+   assert.ok(!refusedNames(text));
+@@ -91,7 +102,7 @@ test('DLR035 receipt: a DLR035 denial has no dedicated emitter and names only ad
+     } finally { rmSync(join(root, receiptRel), { force: true }); }
+   }
+ });
+-test('all denial codes: every recovery verb a rendered denial names is admitted in the producing state', () => {
++check('DND004', 'all denial codes: every recovery verb a rendered denial names is admitted in the producing state', () => {
+   mkdirSync(join(root, 'scratch'), { recursive: true });
+   writeFileSync(join(root, receiptRel), '{}');
+   try {
+@@ -107,7 +118,7 @@ test('all denial codes: every recovery verb a rendered denial names is admitted
+     assert.ok(named >= ALL_CODES.length, 'every code must name at least one recovery verb');
+   } finally { rmSync(join(root, receiptRel), { force: true }); }
+ });
+-test('exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
++check('DND005', 'exact rendered recovery text: the denial spelling is observed against the guard, not a hand-built spelling', () => {
+   const text = designAdvisoryRemediation('DAA-DESIGN-SOURCE-DRIFT');
+   const rendered = /Run (reopen-design --by <human attribution>)/u.exec(text)?.[1];
+   assert.equal(rendered, 'reopen-design --by <human attribution>', 'denial text no longer renders the pinned recovery spelling');
+@@ -148,7 +159,7 @@ const buildPushInit = async (options) => {
+ };
+ const pushInitCommand = (argv) => `node "${join(pluginDir, 'scripts', 'push-init.mjs')}" ${argv.join(' ')}`;
+ 
+-test('inventory: the denial texts that name a command are exactly the classified ones', () => {
++check('DND006', 'inventory: the denial texts that name a command are exactly the classified ones', () => {
+   assert.deepEqual(namedCommandHits(), [
+     'hooks/guard-git.mjs :: then run: node',
+     'hooks/guard-push.mjs :: Run: node',
+@@ -157,7 +168,7 @@ test('inventory: the denial texts that name a command are exactly the classified
+   ], 'a denial that names a command is new or was removed: classify it in this file (admitted, or a todo with its patch)');
+ });
+ 
+-test('GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned and not lane-refused in the blocked state', async () => {
++check('DND007', 'GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned and not lane-refused in the blocked state', async () => {
+   const { START_PREFLIGHT_SCRIPT } = await import(new URL('../guard/constants.mjs', import.meta.url));
+   const source = readFileSync(fileURLToPath(new URL('../guard/bootstrap-receipt.mjs', import.meta.url)), 'utf8');
+   assert.ok(source.includes('Run exactly: node "${START_PREFLIGHT_SCRIPT}"'), 'the denial no longer names the preflight script as pinned');
+@@ -166,21 +177,21 @@ test('GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned
+   assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null);
+ });
+ 
+-test('guard-push checkpoint denial: control, the default push-init argv is sanctioned', async () => {
++check('DND008', 'guard-push checkpoint denial: control, the default push-init argv is sanctioned', async () => {
+   assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({})), root, {}), true);
+   assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({ base: 'main' })), root, {}), true);
+ });
+ 
+-test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
+-  { todo: false },
++// DND009 and DND010 were registered with `{ todo: false }` (the explicit "not a todo" form of the node:test option;
++// it changes nothing). A defect that needs a protected guard file is pinned by setting `mode: 'todo'` on the case.
++check('DND009', 'guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
+   async () => {
+     const argv = await buildPushInit({ checkpoint: true });
+     assert.equal(isSanctionedLifecycleCommand(pushInitCommand(argv), root, {}), true, `refused: ${argv.join(' ')}`);
+     assert.equal(devPlanShellRefusalHit(pushInitCommand(argv), root, blockedDraft), null);
+   });
+ 
+-test('guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
+-  { todo: false },
++check('DND010', 'guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
+   async () => {
+     const source = readFileSync(join(pluginDir, 'hooks', 'guard-push.mjs'), 'utf8');
+     const named = /"Run: (node <plugin-root>\/scripts\/push-init\.mjs --root <project-dir> --by <name> --remote <remote> --destination refs\/heads\/<branch> --checkpoint) prints/u.exec(source)?.[1];
+@@ -190,7 +201,7 @@ test('guard-push checkpoint denial: the text names a complete, runnable push-ini
+     assert.equal(isSanctionedLifecycleCommand(concrete, root, {}), true, `named command refused: ${concrete}`);
+   });
+ 
+-test('observed limit: the commands GG-22 and the dispatch-record lane name are refused only while the lifecycle gate blocks', () => {
++check('DND011', 'observed limit: the commands GG-22 and the dispatch-record lane name are refused only while the lifecycle gate blocks', () => {
+   // Neither script is in the sanctioned catalogue; both are admitted in the states that produce those denials (a commit and a
+   // dispatch-record write, which need an approved plan) because the opaque-script lane only fires on a blocking gate verdict.
+   const allow = { devPlanGateVerdictFn: () => ({ verdict: 'allow', reason: 'fixture' }) };
+@@ -203,3 +214,34 @@ test('observed limit: the commands GG-22 and the dispatch-record lane name are r
+     assert.equal(devPlanShellRefusalHit(command, root, allow), null);
+   }
+ });
++
++// --- Second half of the item (PO decision D117, decision BI), added 2026-10-22 ---
++// An approved feature whose approval cannot be re-verified degrades to ONE advisory instead of locking every write. The lane-level
++// proof (both lanes, real state, negative controls) is hooks/guard-devplan-approval-unverified.test.mjs; these cases pin the
++// advisory's own contract against the diagnosis rule this file exists for. They are green only with the D117 guard change applied.
++check('DND012', 'D117 advisory: typed code, what was not verified, one repair verb that is admitted, and no refused script command', async () => {
++  const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
++  const advisory = policy.unverifiedApprovalAdvisory({ ok: false, code: 'DWP-PACKAGE-PHYSICAL' }, { planApproval: { designWorkflowPackagePath: 'evidence/package.json' } });
++  assert.ok(advisory, 'DWP-PACKAGE-PHYSICAL (the code this item was filed for) must degrade to an advisory');
++  assert.equal(advisory.code, 'GUARD-DEVPLAN-APPROVAL-UNVERIFIED');
++  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: run reopen-design']) {
++    assert.ok(advisory.text.includes(needle), `advisory must contain: ${needle}`);
++  }
++  assert.ok(!refusedNames(advisory.text), 'the advisory names a script command the lane refuses');
++  assert.equal(advisory.text.split('Repair:').length - 1, 1, 'exactly one repair');
++  const verb = VERBS.find(v => advisory.text.includes(v));
++  assert.equal(verb, 'reopen-design');
++  mkdirSync(join(root, 'scratch'), { recursive: true });
++  try {
++    assert.equal(isSanctionedLifecycleCommand(build(verb), root, {}), true, 'the named repair verb is admitted in the lifecycle state');
++    assert.equal(devPlanShellRefusalHit(build(verb), root, blockedDraft), null);
++  } finally { rmSync(join(root, receiptRel), { force: true }); }
++});
++check('DND013', 'D117 advisory: the other codes of the former denial still block (the denial keeps naming only admitted verbs)', async () => {
++  const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
++  for (const code of ['DWP-APPROVAL-DIGEST-DRIFT', 'DAA-PO-APPROVAL-TRUST-MISMATCH', 'DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP', 'DAA-DESIGN-SOURCE-DRIFT']) {
++    assert.equal(policy.unverifiedApprovalAdvisory({ ok: false, code }, {}), null, `${code} must not degrade`);
++  }
++});
++
++registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs b/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
+index 1f813e476..8a903426a 100644
+--- a/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
++++ b/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
+@@ -11,6 +11,7 @@
+ // PIPELINE_ANCESTOR_PIN_CODE_ROOT is a replay seam only: it points the pin at a scratch mirror of an earlier source state
+ // (layout <root>/lib and <root>/scripts) so the pin can be proven RED without editing production.
+ import test from 'node:test';
++import {registerTestCaseCompletion} from '../test-case-completion.mjs';
+ import assert from 'node:assert/strict';
+ import {createHash} from 'node:crypto';
+ import {mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, rmdirSync, symlinkSync, writeFileSync, existsSync} from 'node:fs';
+@@ -84,14 +85,25 @@ test.after(() => {
+   rmSync(fixture.base, {recursive: true, force: true});
+ });
+ 
+-const winTest = (name, fn) => test(name, {skip: isWindows ? false : HOST_LIMITATION}, fn);
++// Cases are registered through the case-completion protocol (registerTestCaseCompletion at the end of this file).
++// Ids are stable and in registration order; never renumber, append new cases at the end. Off win32 each case is
++// declared and disposed as a skip carrying the HOST-LIMITATION reason, exactly as the former `skip` option did.
++const cases = [];
++const winTest = (id, name, fn) => cases.push({
++  id,
++  name,
++  run: async (context) => {
++    if (!isWindows) { context.skip(HOST_LIMITATION); return; }
++    await fn(context);
++  },
++});
+ 
+-winTest('control: the fixture ancestor really grants a foreign principal write and the strict ancestor check refuses it', async () => {
++winTest('WAA001', 'control: the fixture ancestor really grants a foreign principal write and the strict ancestor check refuses it', async () => {
+   const {backend} = await load();
+   assert.throws(() => backend.observeWindowsAuthorityAncestor({path: fixture.base}), refusal('WIN-AUTH-ANCESTOR-MUTATION'));
+ });
+ 
+-winTest('an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts', async () => {
++winTest('WAA002', 'an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts', async () => {
+   const {backend} = await load();
+   const observed = backend.observeWindowsAuthorityAncestor({path: fixture.base, boundaryRoot: fixture.clean.root});
+   assert.match(observed.nativeFacts, FACTS);
+@@ -107,7 +119,7 @@ winTest('an ancestor strictly above the repository root that grants a foreign pr
+   run(systemExe('icacls.exe'), [fixture.base, '/remove:g', '*S-1-1-0']);
+ });
+ 
+-winTest('the same foreign write grant at or below the repository root is still refused with the existing code', async () => {
++winTest('WAA003', 'the same foreign write grant at or below the repository root is still refused with the existing code', async () => {
+   const {backend} = await load();
+   for (const [path, boundaryRoot] of [
+     [fixture.rootBad.root, fixture.rootBad.root], // the root itself
+@@ -119,7 +131,7 @@ winTest('the same foreign write grant at or below the repository root is still r
+   }
+ });
+ 
+-winTest('a reparse point or a non-directory ancestor above the root is still refused', async () => {
++winTest('WAA004', 'a reparse point or a non-directory ancestor above the root is still refused', async () => {
+   const {backend} = await load();
+   const target = join(fixture.base, 'target');
+   const link = join(fixture.base, 'link');
+@@ -131,7 +143,7 @@ winTest('a reparse point or a non-directory ancestor above the root is still ref
+   assert.throws(() => backend.observeWindowsAuthorityAncestor({path: file, boundaryRoot: join(file, 'inner')}), refusal('WIN-AUTH-ALIAS'));
+ });
+ 
+-winTest('the boundary input is closed: unknown keys and relative or malformed roots are refused before any native call', async () => {
++winTest('WAA005', 'the boundary input is closed: unknown keys and relative or malformed roots are refused before any native call', async () => {
+   const {backend} = await load();
+   for (const input of [
+     {path: fixture.base, boundaryRoot: 'relative\\root'},
+@@ -141,7 +153,7 @@ winTest('the boundary input is closed: unknown keys and relative or malformed ro
+   ]) assert.throws(() => backend.observeWindowsAuthorityAncestor(input), refusal(input.boundaryRoot === 'relative\\root' || input.boundaryRoot === 'D:\\x\\..\\y' ? 'WIN-AUTH-PATH' : 'WIN-AUTH-INPUT'));
+ });
+ 
+-winTest('the native helper re-proves the relation itself: a path that is not strictly above the root is refused even if the JS layer is bypassed', async () => {
++winTest('WAA006', 'the native helper re-proves the relation itself: a path that is not strictly above the root is refused even if the JS layer is bypassed', async () => {
+   const {state} = await load();
+   const executable = state.WINDOWS_POWERSHELL_PATHS.find((candidate) => existsSync(candidate));
+   assert.ok(executable, 'Windows PowerShell');
+@@ -155,7 +167,7 @@ winTest('the native helper re-proves the relation itself: a path that is not str
+   assert.equal(ask({operation: 'ancestor-above-root', path: fixture.base, boundaryRoot: fixture.clean.root}).ok, true);
+ });
+ 
+-winTest('verify-journal registration (the Full Verify journal step) accepts a foreign-writable ancestor above the repository root', async () => {
++winTest('WAA007', 'verify-journal registration (the Full Verify journal step) accepts a foreign-writable ancestor above the repository root', async () => {
+   const {journal} = await load();
+   const common = fixture.clean.git;
+   const runId = 'ancestor-pin-run';
+@@ -171,7 +183,7 @@ winTest('verify-journal registration (the Full Verify journal step) accepts a fo
+   assert.ok(existsSync(records));
+ });
+ 
+-winTest('verify-journal registration still refuses a foreign write grant at the repository root or below it', async () => {
++winTest('WAA008', 'verify-journal registration still refuses a foreign write grant at the repository root or below it', async () => {
+   const {journal} = await load();
+   for (const repository of [fixture.rootBad, fixture.belowBad]) {
+     assert.throws(() => journal.registerRunRecordOwner({
+@@ -182,3 +194,5 @@ winTest('verify-journal registration still refuses a foreign write grant at the
+     }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED \(cause: WIN-AUTH-ANCESTOR-MUTATION\)/u, repository.root);
+   }
+ });
++
++registerTestCaseCompletion({cases, fd: 3, maxBytes: 65536});

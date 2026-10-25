@@ -1,0 +1,869 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 1339ab023..c1cad9eee 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -423,6 +423,7 @@
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-calibration-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-budget-core-tests",
++        "verify-phase:harness/scripts/verify.mjs:dispatch-model-enforcement-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-strip-for-critic-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-tests",
+@@ -487,6 +488,7 @@
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-grant-notice-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-budget-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-fanout-tests",
++        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-model-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-native-worker-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
+         "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
+@@ -938,6 +940,7 @@
+         "verify-phase:harness/scripts/verify.mjs:push-prepare-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-release-flow-docs-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:r7-3-bound-paths-tests",
++        "verify-phase:harness/scripts/verify.mjs:read-command-diagnosis-tests",
+         "verify-phase:harness/scripts/verify.mjs:read-option-operands-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebase-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:rebind-approval-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index c19fabf57..8724cf75a 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -349,6 +349,12 @@
+       "invariantPinned": "Exact source-registry preparation, PO proof activation, CAS readback and tamper refusal",
+       "nonOverlapNote": "The operator-facing source registry writer is distinct from read-only source admission"
+     },
++    {
++      "name": "read-command-diagnosis-tests",
++      "file": "plugins/pipeline-core/lib/read-command-diagnosis.test.mjs",
++      "invariantPinned": "The unsupported-read refusal can name the single flag the closed shell grammar objects to, and never grants or blames an operand",
++      "nonOverlapNote": "Distinct from the grammar admission suites: this one pins only the diagnosis helper and the refusal's Rejected element line"
++    },
+     {
+       "name": "goldfish-commit-command-flow-tests",
+       "file": "plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs",
+@@ -2357,6 +2363,18 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs"
+     },
++    {
++      "name": "dispatch-model-enforcement-tests",
++      "file": "plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs",
++      "invariantPinned": "A Claude Task/Agent dispatch must name a model that a configured duty route selects: no model and an unrouted model are refused with a typed finding, a duty mismatch is a warning, an unreadable route source gives no opinion",
++      "nonOverlapNote": "Pins the pure decision module; the hook wiring is pinned by guard-dispatch-model-tests"
++    },
++    {
++      "name": "guard-dispatch-model-tests",
++      "file": "plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs",
++      "invariantPinned": "hooks/guard-dispatch.mjs refuses a Claude Task/Agent dispatch with no model or with a model no configured duty route selects, and admits one that names a configured model",
++      "nonOverlapNote": "Hook-level D84 cases kept apart from the guard-dispatch corpus, which sits at its accepted line bound"
++    },
+     {
+       "name": "dispatch-briefing-route-record-tests",
+       "file": "plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs",
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index c38c826f0..af70b6ec9 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -19,7 +19,8 @@ const SEARCH_BOOLEAN = new Set([
+   "-x", "--line-regexp", "-l", "--files-with-matches",
+   "--files-without-match", "--no-messages", "--no-heading",
+   // TR-B-F (T74): match-output spellings. They change only what is printed from operands the checks below already admitted.
+-  "-o", "--only-matching",
++  // -h is NOT among them: in ripgrep it is the short help flag; the filename spellings are -I/--no-filename and -H/--with-filename.
++  "-o", "--only-matching", "-c", "--count", "-I", "--no-filename", "-H", "--with-filename",
+ ]);
+ const SEARCH_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+@@ -498,3 +499,32 @@ export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
+   if (!sinkOk) return false;
+   return gitShowObject || validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
+ }
++
++/**
++ * D64 (backlog: lifecycle-coordination-commands-refused-as-implementation-writes): index changes, working-tree
++ * changes and pure observations are classified separately. Unstaging Pipeline-generated files
++ * (`git restore --staged`, a soft or mixed `git reset`, `git rm --cached`) rewrites the index and never a
++ * working-tree byte, so the write-target classifier does not treat it as a working-tree write. ALLOWLIST of flags
++ * per verb, fail closed: any other flag (an abbreviated long option such as `--stag`, `--worktree`, `-W`, `-SW`,
++ * `--hard`, `--patch`) keeps the verb a writer. Operands (revisions, pathspecs, a `--source` value) are not flags
++ * and are not inspected; a staged protected path is still judged by the commit-time evaluators. `args` are the
++ * tokens after the subcommand. Precedent: guard/gate-strength-lane.mjs already admits `git rm --cached`.
++ */
++const GIT_INDEX_ONLY_FORMS = new Map([
++  ["restore", { flags: new Set(["--staged", "-S", "--source", "-s", "-q", "--quiet"]), requires: new Set(["--staged", "-S"]) }],
++  ["reset", { flags: new Set(["--soft", "--mixed", "-q", "--quiet"]), requires: null }],
++  ["rm", { flags: new Set(["--cached", "-r", "-q", "--quiet", "-n", "--dry-run", "-f", "--force", "--ignore-unmatch"]), requires: new Set(["--cached"]) }],
++]);
++
++export function isGitIndexOnlyInvocation(verb, args) {
++  const form = GIT_INDEX_ONLY_FORMS.get(verb);
++  if (form === undefined) return false;
++  let seenRequired = form.requires === null;
++  for (const arg of args) {
++    if (arg === "--") break;
++    if (!arg.startsWith("-")) continue;
++    if (!(form.flags.has(arg) || (verb === "restore" && arg.startsWith("--source=")))) return false;
++    if (form.requires?.has(arg)) seenRequired = true;
++  }
++  return seenRequired;
++}
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index b53303ace..f078e27d3 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -84,7 +84,8 @@ import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../
+ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+-import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
++import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
++import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -662,6 +663,9 @@ if (isDirectInvocation(import.meta.url)) {
+   // T6-A: a Claude Task/Agent call binds this hook process to its own hook-observed session owner.
+   if (["Task", "Agent"].includes(input?.tool_name)) {
+     enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
++  } else if (input?.tool_name === "spawn_agent") {
++    // GDW01: a Codex governed item dispatch binds its hook-observed owner the same way (runner-neutral).
++    enterCodexHookSessionOwner({ root: input.cwd ?? process.cwd(), input });
+   }
+ 
+   // The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted
+@@ -671,6 +675,17 @@ if (isDirectInvocation(import.meta.url)) {
+   const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
+   const prompt = toolInput.prompt ?? toolInput.message ?? "";
+ 
++  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance.
++  if (["Task", "Agent"].includes(input?.tool_name)) {
++    const modelCheck = evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
++    const modelWarnings = dispatchModelWarningText(modelCheck);
++    if (modelWarnings !== "") process.stderr.write(modelWarnings);
++    if (!modelCheck.ok) {
++      process.stderr.write(dispatchModelRefusalText(modelCheck));
++      process.exit(2);
++    }
++  }
++
+   let dispatches;
+   if (Array.isArray(toolInput.Subagents)) {
+     // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 99bcf63fb..990217103 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -4097,10 +4097,10 @@ test("NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the
+   try {
+     markGovernedFixture(path);
+     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+-    for (const base of [null, "HEAD~3"]) {
+-      const argv = buildPushInitArgv({ root: path, by: "tester", remote: "origin", destination: "refs/heads/main", base });
++    for (const [options, admitted] of [[{ base: null }, true], [{ base: "HEAD~3" }, true], [{ checkpoint: true }, true], [{ base: "HEAD~3", candidate: "HEAD", recordRef: "refs/heads/rec" }, true], [{ base: "HEAD~3", checkpoint: true }, false]]) { // last row: push-init's two modes never combine
++      const argv = buildPushInitArgv({ root: path, by: "tester", remote: "origin", destination: "refs/heads/main", ...options });
+       const command = `node '${PUSH_INIT_SCRIPT}' ${argv.map((token) => `'${token}'`).join(" ")}`;
+-      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
++      assert.equal(isSanctionedLifecycleCommand(command, path), admitted, command);
+     }
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 868fab4ae..c95e36131 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -2237,7 +2237,7 @@ if (pushDestination.lane === CHECKPOINT_LANE) {
+       emit(2, [
+         "BLOCKED (guard-push feature checkpoint): signature mode requires a current approval bound to this exact commit, remote and destination.",
+         `Reason: ${checkpointApproval.code} (${checkpointApproval.reason}).`,
+-        "Run: push-init.mjs --checkpoint prints the single attended authorize-critical command for this commit; record the result with approve-push, then retry the push.",
++        "Run: node <plugin-root>/scripts/push-init.mjs --root <project-dir> --by <name> --remote <remote> --destination refs/heads/<branch> --checkpoint prints the single attended authorize-critical command for this commit (<plugin-root> is the absolute plugin root path the bootstrap printed); record the result with approve-push, then retry the push.",
+       ]);
+     }
+   }
+diff --git a/plugins/pipeline-core/hooks/guard-push.test.mjs b/plugins/pipeline-core/hooks/guard-push.test.mjs
+index 1a02ca84d..adcebde0b 100644
+--- a/plugins/pipeline-core/hooks/guard-push.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.test.mjs
+@@ -2302,7 +2302,7 @@ function freshRepoIn(parentDir, name) {
+   writeFileSync(join(dir, "checkpoint.txt"), "checkpoint\n");
+   gitAt(dir, "add", ".claude/pipeline.yaml", "checkpoint.txt");
+   gitAt(dir, "commit", "-q", "-m", "checkpoint\n\nCheckpoint-Intent: remote backup before refactor");
+-  check("PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["signature mode requires", "CHECKPOINT-APPROVAL-STATE-MISSING", "push-init.mjs --checkpoint"] });
++  check("PG-CHECKPOINT block configured clean signature-mode checkpoint without an approval record", "git push origin feat/checkpoint:refs/heads/feat/checkpoint", dir, BLOCK, { stderrIncludes: ["signature mode requires", "CHECKPOINT-APPROVAL-STATE-MISSING", "push-init.mjs --root", "--checkpoint prints"] });
+   check("PG-CHECKPOINT block main never receives checkpoint relaxation", "git push origin feat/checkpoint:refs/heads/main", dir, BLOCK, { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"] });
+   check("PG-CHECKPOINT block release/stable destination remains on strict evidence lane", "git push origin feat/checkpoint:refs/heads/release/0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
+   check("PG-CHECKPOINT block tags remain on strict evidence lane", "git push origin feat/checkpoint:refs/tags/v0.6.2", dir, BLOCK, { stderrIncludes: ["evidence/verify-latest.json missing"] });
+diff --git a/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs b/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
+index ce7b02ceb..c8c0e1dcf 100644
+--- a/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
++++ b/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
+@@ -162,7 +162,9 @@ try {
+     // Stops the class returning one guard at a time: a bare file_path read is blind to
+     // NotebookEdit, and blindness here means fail-open.
+     for (const name of ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-lifecycle-ready.mjs"]) {
+-      const source = code(readFileSync(join(HOOKS, name), "utf8"));
++      const GUARD_LIB = join(HOOKS, "..", "lib", "guard");
++      const source = code(readFileSync(join(HOOKS, name), "utf8")
++        + (name === "guard-lifecycle-ready.mjs" ? readdirSync(GUARD_LIB).filter((f) => f.endsWith(".mjs") && !f.endsWith(".test.mjs")).map((f) => readFileSync(join(GUARD_LIB, f), "utf8")).join("\n") : ""));
+       assert.ok(source.includes("writeTargetPath"), `${name} does not use the shared write-target reader`);
+       assert.doesNotMatch(source, /tool_input\?\.file_path|tool_input\.file_path/u,
+         `${name} still reads tool_input.file_path directly`);
+diff --git a/plugins/pipeline-core/lib/claude-hook-session-owner.mjs b/plugins/pipeline-core/lib/claude-hook-session-owner.mjs
+index 9ca116b86..d3d1502a9 100644
+--- a/plugins/pipeline-core/lib/claude-hook-session-owner.mjs
++++ b/plugins/pipeline-core/lib/claude-hook-session-owner.mjs
+@@ -28,6 +28,8 @@ import { loadSessionDescriptor, startSessionDescriptor } from "./worktree-lifecy
+ // ('physical-readback' | 'controlled-unit-method'); the descriptor is a physical readback, so the
+ // owner reports 'physical-readback' and carries this label separately as `ownerSource`.
+ export const CLAUDE_HOOK_SESSION_OWNER_SOURCE = "claude-hook-session-descriptor";
++// GDW01 (PO 2026-10-21): the same fallback for a Codex `spawn_agent` hook input, labelled as its own source.
++export const CODEX_HOOK_SESSION_OWNER_SOURCE = "codex-hook-session-descriptor";
+ const CLAUDE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
+ 
+ let entered = null;
+@@ -39,10 +41,20 @@ export function claudeHookDescriptorSessionId(sessionId) {
+ 
+ /** Enter the scope from a parsed Claude hook input. Returns whether a usable id was bound. */
+ export function enterClaudeHookSessionOwner({ root, input } = {}) {
++  return enterHookSessionOwner(root, claudeHookDescriptorSessionId(input?.session_id), CLAUDE_HOOK_SESSION_OWNER_SOURCE);
++}
++
++/** Enter the scope from a parsed Codex hook input (`spawn_agent`). Returns whether a usable id was bound. */
++export function enterCodexHookSessionOwner({ root, input } = {}) {
++  const sessionId = input?.session_id;
++  const descriptorSessionId = typeof sessionId === "string" && CLAUDE_SESSION_ID.test(sessionId) ? `codex-${sessionId}` : null;
++  return enterHookSessionOwner(root, descriptorSessionId, CODEX_HOOK_SESSION_OWNER_SOURCE);
++}
++
++function enterHookSessionOwner(root, descriptorSessionId, ownerSource) {
+   entered = null;
+-  const descriptorSessionId = claudeHookDescriptorSessionId(input?.session_id);
+   if (!descriptorSessionId || typeof root !== "string" || root === "") return false;
+-  try { entered = { primaryRoot: realpathSync(resolve(root)), descriptorSessionId }; } catch { entered = null; }
++  try { entered = { primaryRoot: realpathSync(resolve(root)), descriptorSessionId, ownerSource }; } catch { entered = null; }
+   return entered !== null;
+ }
+ 
+@@ -70,7 +82,7 @@ export function readClaudeHookSessionOwner({ repository } = {}) {
+   }
+   if (loaded.repo?.commonDir !== repository.commonDir) return null;
+   return Object.freeze({ sessionId: loaded.sessionId, descriptorSha256: loaded.descriptorSha256,
+-    ownerNonceSha256: ownerNonceDigest(loaded.ownerNonce), ownerSource: CLAUDE_HOOK_SESSION_OWNER_SOURCE });
++    ownerNonceSha256: ownerNonceDigest(loaded.ownerNonce), ownerSource: entered.ownerSource });
+ }
+ 
+ function ownerNonceDigest(nonce) { return createHash("sha256").update(Buffer.from(nonce)).digest("hex"); }
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 4ecff7ef9..2c6fe0e80 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -788,6 +788,20 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+   "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+   "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
++  // Closure additions 2026-10-21 (GMWKC01): first-party imports of kernel paths that were never listed.
++  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit
++  // writers; orphan-member-step <- onboarding-continuity; budget-notice <- hooks/guard-dispatch-budget;
++  // answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight.
++  "plugins/pipeline-core/lib/advisory-answered-receipt.mjs",
++  "plugins/pipeline-core/lib/read-command-diagnosis.mjs",
++  "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
++  "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
++  "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
++  "plugins/pipeline-core/lib/node-sandbox-probe.mjs",
++  "plugins/pipeline-core/lib/pipeline-owned-files.mjs",
++  "plugins/pipeline-core/lib/session-authority-observers.mjs",
++  "plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs",
++  "plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs",
+   "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+   "plugins/pipeline-core/lib/session-authority-registry.mjs",
+   "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 182a1f733..6877fec27 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,8 +11,8 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+-import { exactRoot, simpleWords } from "./shell-grammar.mjs";
++import { ARCHITECTURE_BASELINE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+ 
+@@ -123,9 +123,91 @@ function sanctionedDesignCourseArgs(args, root) {
+   } catch { return false; }
+ }
+ 
++// D64 (catalogue-admit-prescribed-lifecycle-verbs): closed argument grammars for the fixed installed entry points the
++// Pipeline prescribes before the first implementation dispatch. Each grammar mirrors the script's OWN argv parser, pins
++// the root to the observed root, bounds every value, and admits nothing the script would not accept; a producer-derived
++// value flag (a time, a digest, a runner, a model) is never admitted. Inputs must be physical regular files, an output
++// must be a new .json under specs/, evidence/ or docs/, so none of these is a general write primitive.
++const MODEL_ROLE_ROUTE = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
++const NATIVE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++const RECEIPT_OUT = /^(?:specs|evidence|docs)\/[A-Za-z0-9._/-]{1,200}\.json$/u;
++const FINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
++const REQUESTED_ROUTE = /^[A-Za-z0-9][\x21-\x7e]{0,127}$/u;
++const OBSERVED_IDENTITY = /^[A-Za-z0-9][A-Za-z0-9._:[\]-]{0,127}$/u;
++const GIT_REVISION = /^[A-Za-z0-9][A-Za-z0-9._/~^@-]{0,127}$/u;
++const GIT_OBJECT_ID = /^[a-f0-9]{7,64}$/u;
++
++function sanctionedModelRoleDispatchSelectArgs(args, root) {
++  const antigravity = args.length === 8;
++  if (args.length !== 6 && !antigravity) return false;
++  if (args[0] !== "--repo-root" || args[1] !== root || args[2] !== "--runner" || args[4] !== "--task-route") return false;
++  if (!["codex", "claude", "antigravity"].includes(args[3]) || (args[3] === "antigravity") !== antigravity) return false;
++  return MODEL_ROLE_ROUTE.test(args[5])
++    && (!antigravity || (args[6] === "--host-session-id" && NATIVE_SESSION_ID.test(args[7])));
++}
++
++function sanctionedRegisterFeaturePackageArgs(args, root) {
++  return exactRoot(args, root, 0) && (args.length === 2 || (args.length === 3 && args[2] === "--add-review-unit"));
++}
++
++function sanctionedDesignReviewReceiptArgs(args, root) {
++  try {
++    if (args[0] !== "create") return false;
++    const companions = [], findings = [], remainder = [];
++    for (let index = 1; index < args.length; index += 1) {
++      if (args[index] === "--companion" || args[index] === "--open-finding") {
++        if (args[index + 1] === undefined) return false;
++        (args[index] === "--companion" ? companions : findings).push(args[index + 1]);
++        index += 1;
++      } else remainder.push(args[index]);
++    }
++    if (companions.length > 8 || findings.length > 64
++      || new Set(companions).size !== companions.length || new Set(findings).size !== findings.length) return false;
++    const input = (path) => physicalDesignCoursePath(root, path, { required: true });
++    if (!companions.every(input) || !findings.every((id) => FINDING_ID.test(id))) return false;
++    return matchFlagSpec(remainder, {
++      requiredValue: {
++        "--repo": (value) => value === root,
++        "--feature": (value) => DESIGN_COURSE_ID.test(value),
++        "--report": input,
++        "--prd": input,
++        "--spec": input,
++        "--out": (value) => RECEIPT_OUT.test(value) && physicalDesignCoursePath(root, value),
++      },
++      optionalValue: {
++        "--previous": input,
++        "--requested-route": (value) => REQUESTED_ROUTE.test(value),
++        "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
++      },
++    });
++  } catch { return false; }
++}
++
++// Read-only assessment forms and the documented help only. --compile-summary writes
++// project/architecture-decisions.compiled.json and --validate reads an arbitrary path: neither is admitted here.
++function sanctionedArchitectureBaselineArgs(args, root) {
++  if (args.length === 1) return args[0] === "--help" || args[0] === "-h";
++  const matched = matchFlagSpec(args, {
++    requiredValue: { "--root": (value) => value === root },
++    optionalValue: {
++      "--format": (value) => value === "json" || value === "text",
++      "--diff": (value) => GIT_REVISION.test(value) && !value.includes(".."),
++      "--from": (value) => GIT_OBJECT_ID.test(value),
++      "--through": (value) => GIT_OBJECT_ID.test(value),
++    },
++  });
++  if (!matched) return false;
++  const has = (flag) => args.includes(flag);
++  return !(has("--diff") && (has("--from") || has("--through"))) && has("--from") === has("--through");
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
++  if (script === MODEL_ROLE_DISPATCH_SELECT_SCRIPT) return sanctionedModelRoleDispatchSelectArgs(args, root);
++  if (script === DESIGN_REVIEW_RECEIPT_SCRIPT) return sanctionedDesignReviewReceiptArgs(args, root);
++  if (script === REGISTER_FEATURE_PACKAGE_SCRIPT) return sanctionedRegisterFeaturePackageArgs(args, root);
++  if (script === ARCHITECTURE_BASELINE_SCRIPT) return sanctionedArchitectureBaselineArgs(args, root);
+   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root, options);
+   // NVA-K-DRIVERREACH: admitted read-only by exact argv shape (sanctionedDriverArgs() above)
+   // -- grants no authority beyond ONBOARDING_SCRIPT's own admissions just above, since every
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index a4ee5810a..fe73aaf9a 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -178,6 +178,13 @@ export const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../s
+ 
+ export const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));
+ 
++// D64 (catalogue-admit-prescribed-lifecycle-verbs): fixed installed entry points the Pipeline prescribes before the
++// first implementation dispatch. Their closed argument grammars live in command-catalogue.mjs.
++export const MODEL_ROLE_DISPATCH_SELECT_SCRIPT = fileURLToPath(new URL("../../scripts/model-role-dispatch-select.mjs", import.meta.url));
++export const DESIGN_REVIEW_RECEIPT_SCRIPT = fileURLToPath(new URL("../../scripts/design-review-receipt.mjs", import.meta.url));
++export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
++export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
++
+ export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
+ 
+ export const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../../scripts/settings-allowlist-merge.mjs", import.meta.url));
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index 2f94a3d67..9258e3762 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -191,6 +191,11 @@ function opaqueScriptExecutionCandidate(words, root) {
+     const first = args[0] ?? "";
+     if (["--version", "--help", "-h"].includes(first)) return null;
+     script = first.startsWith("-") ? ".pipeline-opaque-execution" : first;
++  } else if (["perl", "ruby", "php", "lua"].includes(executable.replace(/\.exe$/u, ""))) {
++    // Any other script interpreter is no wider than `node <script>` (approved-lifecycle-state pin, 0.7.0 acceptance).
++    const first = args[0] ?? "";
++    if (["--version", "-v", "-V", "--help", "-h"].includes(first)) return null;
++    script = first.startsWith("-") ? ".pipeline-opaque-execution" : first;
+   }
+   if (script === null || script === "") return null;
+   const absolute = resolve(root, script);
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 3b313b5da..2e8bd12c7 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -14,6 +14,7 @@ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+ import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
++import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCommand, qp4OperandResolvesOutsideRoot, rejectedGrammarElement, retryActionsForDeniedCommand, win32QuotedDrivePathCommand } from "./shell-grammar.mjs";
+ import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
+@@ -380,7 +381,12 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       );
+       outsideRoot = isOutsideRootSingleCommandRead(rejected, root) || qp4OperandResolvesOutsideRoot(rejected, root);
+     } catch { outsideRoot = false; }
+-    return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, []));
++    // Name the one flag the grammar objects to when a single flag is the whole reason (null otherwise; nothing is granted).
++    let flag = null;
++    if (!outsideRoot) {
++      try { flag = firstUnadmittedFlag(input.tool_input.command ?? input.tool_input.CommandLine, root); } catch { flag = null; }
++    }
++    return withLifts(lifts, blocked(outsideRoot ? READ_SCOPE_DENIAL_CODE : READ_COMMAND_UNSUPPORTED_CODE, null, [], "", flag === null ? null : `the flag "${flag}"`));
+   }
+   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+     return withLifts(lifts, verdict(0));
+diff --git a/plugins/pipeline-core/lib/guard/grammar-denials.mjs b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+index ea2f23069..a750d469e 100644
+--- a/plugins/pipeline-core/lib/guard/grammar-denials.mjs
++++ b/plugins/pipeline-core/lib/guard/grammar-denials.mjs
+@@ -51,7 +51,7 @@ export const READ_COMMAND_UNSUPPORTED_CODE = "GUARD-READ-COMMAND-UNSUPPORTED";
+ 
+ export const READ_COMMAND_UNSUPPORTED_GUIDANCE = "The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).";
+ 
+-export const READ_COMMAND_UNSUPPORTED_NOTE = "This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below, or use the Read, Glob or Grep tools for reads inside the project.";
++export const READ_COMMAND_UNSUPPORTED_NOTE = "This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.";
+ 
+ // NVA-I-GRAMMAR (PO, 2026-08-28, backlog: 2026-08-27-shell-grammar-reads-quoted-content-as-
+ // shell-syntax.md): "wichtig ist, dass der guard das erlaubte grammar immer auch sagt" -- the
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 08aae2699..bf7359b42 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -129,15 +129,23 @@ export function sanctionedPushInitArgs(args, root) {
+   const isDestinationValue = (value) => typeof value === "string" && /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(value);
+   const isRemoteValue = (value) => typeof value === "string" && /^[A-Za-z0-9._-]{1,80}$/u.test(value);
+   const nonEmptyNotFlagValue = (value) => typeof value === "string" && value.trim() !== "" && !value.startsWith("--");
+-  return matchFlagSpec(args, {
++  const matched = matchFlagSpec(args, {
+     requiredValue: {
+       "--root": (value) => value === root,
+       "--by": nonEmptyNotFlagValue,
+       "--remote": isRemoteValue,
+       "--destination": isDestinationValue,
+     },
+-    optionalValue: { "--base": nonEmptyNotFlagValue },
++    optional: { "--checkpoint": true },
++    optionalValue: {
++      "--base": nonEmptyNotFlagValue,
++      "--candidate": nonEmptyNotFlagValue,
++      "--record-ref": nonEmptyNotFlagValue,
++    },
+   });
++  // push-init.mjs usage: [--checkpoint | --base <ref> --candidate <ref> [--record-ref <ref>]]. Its parseArgs() accepts each flag, and
++  // buildPushInitArgv() emits all of them; the two modes never combine, so the guard admits no mix either.
++  return matched && !(args.includes("--checkpoint") && ["--base", "--candidate", "--record-ref"].some((flag) => args.includes(flag)));
+ }
+ 
+ export function sanctionedTranscriptRecoveryArgs(args, root) {
+@@ -381,6 +389,8 @@ export function sanctionedPipelineStateArgs(args, root) {
+   // `inspect` is a pure read of the current working tree and intentionally has no
+   // `--root` override; the caller must run it from the repository it is inspecting.
+   if (args[0] === "inspect") return args.length === 1;
++  // D64: `--help`, `-h` and `help` only print the command list (pipeline-state.mjs "--help" case) and write nothing.
++  if (args[0] === "--help" || args[0] === "-h" || args[0] === "help") return args.length === 1;
+   // Closed canonical enrollment routes; the writer owns all CAS, consent and lock checks.
+   if (args[0] === "inspect-enrollment-retirement") {
+     return exactRoot(args, root, 1) && args.length === 3;
+diff --git a/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs b/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
+index 7ea6eae68..ead2ca2c3 100644
+--- a/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
++++ b/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
+@@ -132,7 +132,7 @@ for (const command of [
+   "rg -c needle README.md | head -n 3",
+ ]) {
+   test(`P5 addendum shape (needs the rg option set widened): ${command}`,
+-    { todo: "needs a protected guard file: hooks/guard-command-grammar.mjs SEARCH_BOOLEAN lacks -c/--count/-I/--no-filename/-H/--with-filename (patch h1-patch-02)" },
++    { todo: false },
+     () => { assert.equal(guard(command), true); });
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 290344ef7..8cbc1c64b 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -354,3 +354,150 @@ test("AC-123 continuity-* writers are not catalogue-admitted lifecycle verbs of
+     }
+   });
+ });
++
++
++// ---- D64 (0.7.0, blocker): every fixed installed entry point the Pipeline prescribes before the first implementation
++// dispatch is admitted, in its documented closed argument forms, in the lifecycle state that prescribes it ----
++const scriptsDir = join(pluginRoot, "scripts");
++const selectScript = join(scriptsDir, "model-role-dispatch-select.mjs");
++const receiptScript = join(scriptsDir, "design-review-receipt.mjs");
++const registerScript = join(scriptsDir, "register-feature-package.mjs");
++const baselineScript = join(scriptsDir, "architecture-baseline.mjs");
++const bootstrapScript = join(scriptsDir, "model-role-bootstrap.mjs");
++const scriptAction = (script, ...argv) => node([script, ...argv]);
++// Both the catalogue verdict and the real guard (no readiness, no override) must agree.
++function bothAdmit(action, f, label) {
++  assert.equal(admitted(action, f), true, `${label}: catalogue`);
++  assert.equal(guardCode(action, f), 0, `${label}: real guard`);
++}
++function bothRefuse(action, f, label) {
++  assert.equal(admitted(action, f), false, `${label}: catalogue`);
++  assert.equal(guardCode(action, f), 2, `${label}: real guard`);
++}
++
++test("D64 pipeline-state documented help and readback forms are admitted", () => {
++  withFixture("feature", f => {
++    for (const word of ["--help", "-h", "help"]) bothAdmit(stateAction(word), f, word);
++    bothAdmit(stateAction("inspect"), f, "inspect");
++    bothRefuse(stateAction("--help", "--extra"), f, "help with an extra argument");
++    bothRefuse(stateAction("help", "inspect"), f, "help with a topic");
++  });
++});
++
++test("D64 route selection: the documented closed forms are admitted, near-misses are not", () => {
++  withFixture("feature", f => {
++    const select = (...rest) => scriptAction(selectScript, "--repo-root", f.root, ...rest);
++    for (const runner of ["codex", "claude"]) bothAdmit(select("--runner", runner, "--task-route", "profile.critic.review"), f, runner);
++    bothAdmit(select("--runner", "codex", "--task-route", "duty.advisory.fallback"), f, "duty route");
++    bothAdmit(select("--runner", "antigravity", "--task-route", "profile.critic.review", "--host-session-id", "hook-session-1"), f, "antigravity");
++    const refusals = [
++      ["foreign root", scriptAction(selectScript, "--repo-root", join(f.root, ".."), "--runner", "codex", "--task-route", "duty.x")],
++      ["relative root", scriptAction(selectScript, "--repo-root", ".", "--runner", "codex", "--task-route", "duty.x")],
++      ["unknown runner", select("--runner", "other", "--task-route", "duty.x")],
++      ["antigravity without a host session id", select("--runner", "antigravity", "--task-route", "duty.x")],
++      ["codex with a host session id", select("--runner", "codex", "--task-route", "duty.x", "--host-session-id", "s1")],
++      ["route with a path separator", select("--runner", "codex", "--task-route", "../x")],
++      ["route starting with a dash", select("--runner", "codex", "--task-route", "--help")],
++      ["extra flag", select("--runner", "codex", "--task-route", "duty.x", "--extra", "1")],
++      ["swapped flag order", scriptAction(selectScript, "--runner", "codex", "--repo-root", f.root, "--task-route", "duty.x")],
++      ["missing route", select("--runner", "codex")],
++    ];
++    for (const [label, action] of refusals) bothRefuse(action, f, label);
++  });
++});
++
++function receiptFixture(f) {
++  mkdirSync(join(f.root, "specs", f.featureId, "review"), { recursive: true });
++  const report = `specs/${f.featureId}/review/design-review-1.md`;
++  const report2 = `specs/${f.featureId}/review/design-review-2.md`;
++  writeFileSync(join(f.root, report), "# Critic report\n\nVerdict: PASS\n");
++  writeFileSync(join(f.root, report2), "# Critic report round 2\n\nVerdict: PASS\n");
++  writeFileSync(join(f.root, `specs/${f.featureId}/review/receipt-1.json`), "{}\n");
++  return { report, report2, prd: f.sources.prd.path, spec: f.sources.spec.path, out: `specs/${f.featureId}/review/receipt-new.json` };
++}
++const receiptCreate = (f, r, over = {}) => {
++  const flags = { "--repo": f.root, "--feature": f.featureId, "--report": r.report, "--prd": r.prd, "--spec": r.spec, "--out": r.out, ...over };
++  return scriptAction(receiptScript, "create", ...Object.entries(flags).flatMap(([flag, value]) => (value === null ? [] : [flag, value])));
++};
++
++test("D64 design-review receipt production: the documented forms are admitted, derived-value flags and unsafe paths are not", () => {
++  withFixture("feature", f => {
++    const r = receiptFixture(f);
++    bothAdmit(receiptCreate(f, r), f, "initial round");
++    bothAdmit(scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report2, "--prd", r.prd, "--spec", r.spec,
++      "--previous", `specs/${f.featureId}/review/receipt-1.json`, "--open-finding", "F-1", "--open-finding", "F-2", "--companion", f.sources.design.path,
++      "--requested-route", "claude-sonnet-5-5", "--observed-identity", "claude-sonnet-5-5", "--out", r.out), f, "delta round with companions and findings");
++    const refusals = [
++      ["a flag that supplies a derived value", receiptCreate(f, r, { "--reviewed-at": "2026-10-22T00:00:00.000Z" })],
++      ["a digest flag", receiptCreate(f, r, { "--sha256": "a".repeat(64) })],
++      ["foreign repo", receiptCreate(f, r, { "--repo": join(f.root, "..") })],
++      ["missing --out", receiptCreate(f, r, { "--out": null })],
++      ["out outside specs, evidence and docs", receiptCreate(f, r, { "--out": "src/receipt.json" })],
++      ["out that is not json", receiptCreate(f, r, { "--out": `specs/${f.featureId}/review/receipt-new.js` })],
++      ["out traversal", receiptCreate(f, r, { "--out": "specs/../src/receipt.json" })],
++      ["absolute report", receiptCreate(f, r, { "--report": join(f.root, r.report) })],
++      ["traversal in the report", receiptCreate(f, r, { "--report": "specs/feature-test/../../outside.md" })],
++      ["report that does not exist", receiptCreate(f, r, { "--report": `specs/${f.featureId}/review/absent.md` })],
++      ["unknown subcommand", scriptAction(receiptScript, "verify", "--repo", f.root)],
++      ["a duplicated single flag", scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report, "--report", r.report2, "--prd", r.prd, "--spec", r.spec, "--out", r.out)],
++      ["a duplicated companion", scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report, "--prd", r.prd, "--spec", r.spec, "--companion", r.prd, "--companion", r.prd, "--out", r.out)],
++      ["an open finding that is a flag", scriptAction(receiptScript, "create", "--repo", f.root, "--feature", f.featureId, "--report", r.report, "--prd", r.prd, "--spec", r.spec, "--open-finding", "--out", "--out", r.out)],
++    ];
++    for (const [label, action] of refusals) bothRefuse(action, f, label);
++  });
++});
++
++test("D64 design-review receipt production: a linked input or a linked output directory is never admitted", (t) => {
++  return withFixture("feature", f => {
++    const r = receiptFixture(f);
++    const link = `specs/${f.featureId}/review/linked-report.md`;
++    try {
++      symlinkSync(join(f.root, r.report), join(f.root, link), "file");
++      symlinkSync(join(f.root, "specs", f.featureId, "review"), join(f.root, "specs", "review-alias"), "dir");
++    } catch (error) { t.skip(`${HOST_LIMITATION} (${error?.code ?? "unknown"})`); return; }
++    bothRefuse(receiptCreate(f, r, { "--report": link }), f, "file link as report");
++    bothRefuse(receiptCreate(f, r, { "--out": "specs/review-alias/receipt-new.json" }), f, "output below a linked directory");
++  });
++});
++
++test("D64 feature-package registration: exactly the documented forms are admitted", () => {
++  withFixture("feature", f => {
++    bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
++    for (const [label, argv] of [["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
++      ["review unit before root", ["--add-review-unit", "--root", f.root]], ["double review unit", ["--root", f.root, "--add-review-unit", "--add-review-unit"]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
++  });
++});
++
++test("D64 architecture baseline diagnosis: the read-only assessment forms and --help are admitted; the writing and file-reading forms are not", () => {
++  withFixture("feature", f => {
++    const base = (...rest) => scriptAction(baselineScript, "--root", f.root, ...rest);
++    bothAdmit(base(), f, "assessment");
++    bothAdmit(base("--format", "json"), f, "json");
++    bothAdmit(base("--diff", "HEAD~1", "--format", "text"), f, "diff");
++    bothAdmit(base("--from", "a".repeat(40), "--through", "b".repeat(40)), f, "range");
++    bothAdmit(scriptAction(baselineScript, "--help"), f, "--help");
++    bothAdmit(scriptAction(baselineScript, "-h"), f, "-h");
++    for (const [label, action] of [
++      ["compile-summary writes project/architecture-decisions.compiled.json", base("--compile-summary")],
++      ["validate reads an arbitrary path", scriptAction(baselineScript, "--validate", "docs/adr/0001.md")],
++      ["foreign root", scriptAction(baselineScript, "--root", join(f.root, ".."))],
++      ["unknown format", base("--format", "yaml")],
++      ["diff value that is a flag", base("--diff", "--compile-summary")],
++      ["diff together with a range", base("--diff", "main", "--from", "a".repeat(40), "--through", "b".repeat(40))],
++      ["half a range", base("--from", "a".repeat(40))],
++      ["help with a root", base("--help")],
++      ["repeated flag", base("--format", "json", "--format", "text")],
++    ]) bothRefuse(action, f, label);
++  });
++});
++
++test("D64 model-role bootstrap admits a host session and is a decision, not an admission: it stays refused here", () => {
++  withFixture("feature", f => {
++    // model-role-bootstrap.mjs ADMITS the session's role receipt into the host store after readback; whether the
++    // guard may pre-admit that write for the agent is a product decision (see the D64 report), so it is pinned refused.
++    bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex"), f, "bootstrap");
++  });
++});
+diff --git a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+index 0c11a5f92..ce39faa77 100644
+--- a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
++++ b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+@@ -151,7 +151,7 @@ const pushInitCommand = (argv) => `node "${join(pluginDir, 'scripts', 'push-init
+ test('inventory: the denial texts that name a command are exactly the classified ones', () => {
+   assert.deepEqual(namedCommandHits(), [
+     'hooks/guard-git.mjs :: then run: node',
+-    'hooks/guard-push.mjs :: Run: push-init.mjs',
++    'hooks/guard-push.mjs :: Run: node',
+     'lib/guard/bootstrap-receipt.mjs :: Run exactly: node',
+     'lib/guard/dispatch-record-lane.mjs :: use plugins/pipeline-core/scripts/capture-evidence.mjs',
+   ], 'a denial that names a command is new or was removed: classify it in this file (admitted, or a todo with its patch)');
+@@ -172,7 +172,7 @@ test('guard-push checkpoint denial: control, the default push-init argv is sanct
+ });
+ 
+ test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
+-  { todo: 'needs a protected guard file: sanctionedPushInitArgs() does not admit --checkpoint/--candidate/--record-ref (patch h1-patch-01)' },
++  { todo: false },
+   async () => {
+     const argv = await buildPushInit({ checkpoint: true });
+     assert.equal(isSanctionedLifecycleCommand(pushInitCommand(argv), root, {}), true, `refused: ${argv.join(' ')}`);
+@@ -180,7 +180,7 @@ test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is
+   });
+ 
+ test('guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
+-  { todo: 'needs a protected guard file: guard-push.mjs prints the bare "push-init.mjs --checkpoint" (patch h1-patch-01)' },
++  { todo: false },
+   async () => {
+     const source = readFileSync(join(pluginDir, 'hooks', 'guard-push.mjs'), 'utf8');
+     const named = /"Run: (node <plugin-root>\/scripts\/push-init\.mjs --root <project-dir> --by <name> --remote <remote> --destination refs\/heads\/<branch> --checkpoint) prints/u.exec(source)?.[1];
+diff --git a/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs b/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs
+index af2c52a31..776bd761e 100644
+--- a/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs
++++ b/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs
+@@ -46,13 +46,24 @@ check('retired --input spelling is not admitted', () => {
+   assert.notEqual(hit, null, 'the retired spelling must not be admitted');
+   assert.ok(hit?.fault === true || hit?.verdict === 'block');
+ });
+-// FINDING (expected failing): the lane returns null for `perl scratch/<file>`, because
+-// opaqueScriptExecutionCandidate() only classifies node/python/shell interpreters. Tracked by
+-// backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md
+-check('todo: opaque perl interpreter route is not admitted (backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md)', () => {
++// Other script interpreters are no wider than `node <scratch script>`: opaqueScriptExecutionCandidate()
++// classifies perl/ruby/php/lua like python and the shells (0.7.0 acceptance of
++// backlog/items/2026-10-04-approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.md).
++check('opaque perl interpreter route is not admitted', () => {
+   const hit = devPlanShellRefusalHit('perl scratch/run-materialize.pl', root, dependencies());
+   assert.notEqual(hit, null, `perl route admitted: lane returned ${JSON.stringify(hit)}`);
+-}, 'todo');
++});
++check('every other script interpreter (ruby, php, lua, inline perl code) is refused like node', () => {
++  for (const command of ['ruby scratch/run.rb', 'php scratch/run.php', 'lua scratch/run.lua', 'perl.exe scratch/run.pl', 'perl -e "print 1"']) {
++    const hit = devPlanShellRefusalHit(command, root, dependencies());
++    assert.notEqual(hit, null, `${command}: admitted, lane returned ${JSON.stringify(hit)}`);
++  }
++});
++check('interpreter version probes stay admitted', () => {
++  for (const command of ['perl --version', 'ruby --version', 'php --version', 'lua -v']) {
++    assert.equal(devPlanShellRefusalHit(command, root, dependencies()), null, command);
++  }
++});
+ check('node scratch script with an extra argument is not admitted', () => {
+   const hit = devPlanShellRefusalHit('node scratch/x.mjs extra-arg', root, dependencies());
+   assert.notEqual(hit, null, `node scratch with extra arg admitted: lane returned ${JSON.stringify(hit)}`);
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index af49a6ac0..5a9c76989 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -143,3 +143,95 @@ test('AC-207 point 5: design-course end-to-end on Git Bash reaches present-plan
+     ? 'not implemented: the native Windows Git Bash end-to-end run still has to be written on this host class (AC-207 point 5, owner Coordinator, PO decision K7)'
+     : `host-limitation: the Git Bash end-to-end run needs a native Windows host with Git for Windows; this host is ${process.platform} (owner Coordinator, PO decision K7). The POSIX admission of every prescribed verb is pinned by catalogue-admit-prescribed-lifecycle-verbs.test.mjs.`);
+ });
++
++
++// ---- D64 (0.7.0, major): index changes, working-tree changes and pure observations are classified separately ----
++// An unstage of Pipeline-generated files is an index change, not a working-tree write: it must cross the devplan shell
++// lane, while every form that can put different bytes in the working tree stays refused.
++const draftLaneHit = command => devPlanShellRefusalHit(command, root, deps);
++
++test('D64 index-only git forms are not working-tree writes: the unstage of generated files crosses the draft shell lane', () => {
++  for (const command of [
++    'git restore --staged -- src/generated.ts',
++    'git restore --staged src/generated.ts src/other.ts',
++    'git restore -S -- src/generated.ts',
++    'git restore --source=HEAD --staged -- src/generated.ts',
++    'git restore --source HEAD --staged -- src/generated.ts',
++    'git reset -q -- src/generated.ts',
++    'git reset HEAD -- src/generated.ts',
++    'git reset --mixed HEAD -- src/generated.ts',
++    'git rm --cached src/generated.ts',
++    'git rm -r --cached -- src',
++  ]) assert.equal(draftLaneHit(command), null, command);
++});
++
++test('D64 control: every git form that can change working-tree bytes stays refused as a working-tree write', () => {
++  for (const command of [
++    'git restore src/generated.ts',
++    'git restore --worktree src/generated.ts',
++    'git restore --staged --worktree src/generated.ts',
++    'git restore -SW src/generated.ts',
++    'git restore -S -W src/generated.ts',
++    'git restore --stag src/generated.ts',
++    'git restore --staged --patch src/generated.ts',
++    'git restore --source=HEAD src/generated.ts',
++    'git checkout -- src/generated.ts',
++    'git checkout HEAD -- src/generated.ts',
++    'git reset --hard -- src/generated.ts',
++    'git reset --merge src/generated.ts',
++    'git rm src/generated.ts',
++    'git rm --force src/generated.ts',
++    'git clean -f src/generated.ts',
++    'git stash push src/generated.ts',
++  ]) assert.equal(draftLaneHit(command)?.lane, 'git-working-tree-write', command);
++});
++
++// State machine (D64): run the proposed action, retry the original, show progress. A recovery whose retry meets the same
++// refusal fails. Real git in a disposable repository; the verdict is the real draft shell lane.
++function recoveryMakesProgress({ original, recoveries, execute, observe }) {
++  const first = draftLaneHit(original);
++  if (first === null) return { admittedFirst: true, progress: true };
++  for (const recovery of recoveries) {
++    assert.equal(draftLaneHit(recovery), null, `the named recovery must itself be admitted: ${recovery}`);
++    execute(recovery);
++  }
++  const retry = draftLaneHit(original);
++  return { admittedFirst: false, progress: retry === null || retry.lane !== first.lane || observe() };
++}
++
++test('D64 state machine: unstaging generated files makes progress on the first try and leaves the working tree untouched', async () => {
++  const { spawnSync } = await import('node:child_process');
++  const { readFileSync, existsSync } = await import('node:fs');
++  const repoDir = mkdtempSync(join(repo, 'scratch', 'alf-d64-index-'));
++  try {
++    const git = (...args) => spawnSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: repoDir, encoding: 'utf8' });
++    assert.equal(git('init', '-q').status, 0);
++    // `git restore --staged` needs a resolvable HEAD: give the disposable repository one empty base commit.
++    assert.equal(git('commit', '-q', '--allow-empty', '-m', 'fixture base').status, 0);
++    mkdirSync(join(repoDir, 'src'), { recursive: true });
++    writeFileSync(join(repoDir, 'src/generated.ts'), 'generated bytes\n');
++    assert.equal(git('add', '--', 'src/generated.ts').status, 0);
++    assert.match(git('diff', '--cached', '--name-only').stdout, /src\/generated\.ts/u, 'precondition: the file is staged');
++    const original = 'git restore --staged -- src/generated.ts';
++    const outcome = recoveryMakesProgress({
++      original, recoveries: [], execute: () => {}, observe: () => false,
++    });
++    assert.equal(outcome.admittedFirst, true, 'the unstage is admitted without any recovery or override');
++    const words = original.split(' ').slice(1);
++    assert.equal(git(...words).status, 0, 'the admitted command really runs');
++    assert.equal(git('diff', '--cached', '--name-only').stdout.trim(), '', 'progress: nothing is staged any more');
++    assert.equal(readFileSync(join(repoDir, 'src/generated.ts'), 'utf8'), 'generated bytes\n', 'the working-tree bytes are untouched');
++    assert.equal(existsSync(join(repoDir, 'src/generated.ts')), true);
++    // The identical retry meets no refusal (the loop of the observed run is gone).
++    assert.equal(draftLaneHit(original), null);
++  } finally { rmSync(repoDir, { recursive: true, force: true }); }
++});
++
++test('D64 state machine harness fails a recovery whose retry meets the same refusal', () => {
++  const original = 'git restore src/generated.ts';
++  const outcome = recoveryMakesProgress({
++    original, recoveries: ['node scratch/forensics.mjs'], execute: () => {}, observe: () => false,
++  });
++  assert.equal(outcome.admittedFirst, false);
++  assert.equal(outcome.progress, false, 'the same refusal after the recovery is no progress');
++});
+diff --git a/plugins/pipeline-core/lib/protected-test-paths.mjs b/plugins/pipeline-core/lib/protected-test-paths.mjs
+index f9c51525c..61435920c 100644
+--- a/plugins/pipeline-core/lib/protected-test-paths.mjs
++++ b/plugins/pipeline-core/lib/protected-test-paths.mjs
+@@ -63,7 +63,7 @@ import { isPhysicalScratchTarget } from "./physical-scratch-boundary.mjs";
+ import { existsSync, readFileSync } from "node:fs";
+ import { basename, join } from "node:path";
+ 
+-import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
++import { isGitIndexOnlyInvocation, parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
+ import { scanShell } from "./git-cmd.mjs";
+ import {
+   LEGACY_GUARD_CONFIG,
+@@ -931,7 +931,7 @@ export function extractShellWriteTargets({ command, root, toolName = "Bash", pla
+       const isGit = executable === "git";
+       const verbIndex = isGit ? gitVerbIndex(argv) : 0;
+       const verb = isGit ? (argv[verbIndex] ?? null) : null;
+-      const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "");
++      const gitWrite = isGit && GIT_WRITE_VERBS.has(verb ?? "") && !isGitIndexOnlyInvocation(verb, argv.slice(verbIndex + 1));
+       if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
+       // Match only the direct, closed stash readers; every other stash form stays a writer.
+       if (gitWrite && verb === "stash" && verbIndex === 0) {
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+index c77d710af..763455eaa 100644
+--- a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -59,7 +59,7 @@ test("RCD8: the unsupported-read refusal is the typed code today", async () => {
+ });
+ 
+ test("RCD9: the refusal names the flag it objects to",
+-  { todo: "needs a protected guard file: lib/guard/evaluate.mjs does not pass the diagnosed flag as the rejected element (patch h1-patch-03)" },
++  { todo: false },
+   async () => {
+     const result = await refusal("rg --hidden needle README.md");
+     assert.match(String(result.stderr), /Rejected element: the flag "--hidden"\./u);

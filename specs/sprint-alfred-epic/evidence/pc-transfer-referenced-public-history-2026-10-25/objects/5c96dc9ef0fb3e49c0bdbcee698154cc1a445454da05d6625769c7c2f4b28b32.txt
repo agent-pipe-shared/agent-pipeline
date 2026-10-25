@@ -1,0 +1,52 @@
+// Helper (untracked): export the K105 INCREMENT on top of the K96 edits, then verify with git apply --check in a throwaway clone of k91.
+// usage: node scratch/k105-export.mjs
+import { execFileSync } from "node:child_process";
+import { copyFileSync, existsSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const git = (dir, ...args) => execFileSync("git", ["-C", dir, ...args], { maxBuffer: 256 * 1024 * 1024 });
+const k96 = resolve("scratch/clones/k96");
+const inc = resolve("scratch/k105-inc");
+const out = resolve("scratch/agent-out");
+const task = "K105-CLAUDE-NATIVE-READ-CREDENTIAL-CODE";
+const isProtected = (p) => /^plugins\/pipeline-core\/(hooks\/guard-[^/]+\.mjs|lib\/guard\/)/u.test(p);
+
+rmSync(inc, { recursive: true, force: true });
+execFileSync("git", ["clone", "-q", "--local", k96, inc]);
+git(inc, "config", "user.name", "K105 Goldfish");
+git(inc, "config", "user.email", "k105@example.invalid");
+git(inc, "apply", resolve(out, "K105-base-snapshot.diff"));
+git(inc, "add", "-A");
+git(inc, "commit", "-q", "-m", "k96 base");
+const changed = git(k96, "diff", "--name-only").toString().split("\n").filter(Boolean);
+for (const p of changed) copyFileSync(join(k96, p), join(inc, p));
+const incChanged = git(inc, "diff", "--name-only").toString().split("\n").filter(Boolean);
+const prot = incChanged.filter(isProtected);
+const unprot = incChanged.filter((p) => !isProtected(p));
+writeFileSync(join(out, `${task}-k96-protected.diff`), prot.length ? git(inc, "diff", "--no-color", "--", ...prot) : "");
+writeFileSync(join(out, `${task}-k96-unprotected.diff`), unprot.length ? git(inc, "diff", "--no-color", "--", ...unprot) : "");
+console.log("protected:", prot.join(" "));
+console.log("unprotected:", unprot.join(" "));
+
+// apply-check chain in a throwaway clone of k91: K96 diffs, then K105 diffs.
+const chk = resolve("scratch/k105-chk");
+rmSync(chk, { recursive: true, force: true });
+execFileSync("git", ["clone", "-q", "--local", resolve("scratch/clones/k91"), chk]);
+const k96p = resolve(out, "K96-M7-M5-READ-BLOCKS-k96-protected.diff");
+const k96u = resolve(out, "K96-M7-M5-READ-BLOCKS-k96-unprotected.diff");
+const k105p = resolve(out, `${task}-k96-protected.diff`);
+const k105u = resolve(out, `${task}-k96-unprotected.diff`);
+for (const f of [k96p, k96u]) { git(chk, "apply", "--check", f); git(chk, "apply", f); console.log("applied", f.split("/").pop()); }
+for (const f of [k105p, k105u]) {
+  if (!existsSync(f) || execFileSync("wc", ["-c", f]).toString().trim().startsWith("0 ")) { console.log("empty", f.split("/").pop()); continue; }
+  git(chk, "apply", "--check", f); console.log("check OK", f.split("/").pop());
+  git(chk, "apply", f);
+}
+// Combined result must equal the k96 clone's working tree for the changed paths.
+for (const p of changed) {
+  const a = execFileSync("git", ["-C", chk, "hash-object", p]).toString().trim();
+  const b = execFileSync("git", ["-C", k96, "hash-object", p]).toString().trim();
+  console.log(a === b ? "identical" : "DIFFERS", p);
+}
+rmSync(inc, { recursive: true, force: true });
+rmSync(chk, { recursive: true, force: true });

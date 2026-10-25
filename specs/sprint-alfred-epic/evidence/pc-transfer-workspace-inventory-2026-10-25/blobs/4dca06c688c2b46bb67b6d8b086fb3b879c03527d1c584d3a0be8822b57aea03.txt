@@ -1,0 +1,20 @@
+0 | New-Item -Path scratch/made -ItemType Directory -Force
+    
+0 | New-Item -Path scratch/nested/new.md -ItemType File
+    
+0 | Set-Content -LiteralPath scratch/nested/report.md -Value report
+    
+0 | Set-Content -Path scratch/nested/report.md -Value report -Encoding utf8
+    
+0 | Add-Content -LiteralPath scratch/nested/report.md -Value more
+    
+2 | New-Item -Path '<repo-root>/scratch/clones/g4/scratch/dbg9-UPJcSD/project/scratch/nested/abs.md' -ItemType File
+    BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: New-Item is limited to physically contained scratch files and directories. 
+2 | Set-Content -LiteralPath '<repo-root>/scratch/clones/g4/scratch/dbg9-UPJcSD/project/scratch/nested/abs.md' -Value x
+    BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files. 
+0 | ALIAS Set-Content -LiteralPath scratch/nested/a.md -Value x
+    
+2 | ALIAS Set-Content -LiteralPath '<repo-root>/scratch/clones/g4/scratch/dbg9-UPJcSD/project-alias/scratch/nested/a.md' -Value x
+    BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files. 
+2 | ALIAS Set-Content -LiteralPath src/a.md -Value x
+    BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: content writes are limited to physically contained scratch files. 

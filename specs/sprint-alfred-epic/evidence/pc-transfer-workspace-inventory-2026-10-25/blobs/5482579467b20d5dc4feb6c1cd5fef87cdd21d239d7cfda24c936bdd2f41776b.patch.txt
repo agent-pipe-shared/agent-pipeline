@@ -1,0 +1,206 @@
+diff --git a/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md b/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md
+index 7d3179e6a..2a18619c1 100644
+--- a/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md
++++ b/backlog/items/2026-09-27-design-generator-repeats-large-source-material.md
+@@ -138,3 +138,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **HOST-SESSION-NEEDED** — The host response budget for the same large input needs a real host measurement
+   Item states native token counts, host output budget and display truncation are unknown. Needs a real Codex (and Claude) host turn with the 14 KB input to observe truncation; the byte-level measurement (47,815 vs 2,153 bytes) is already done and is not the gap.
++
++## Reconciled 2026-10-23
++
++Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
++
++- "Controlled Codex CLI measurement (2026-09-28)": "Stored duplication and routine `pendingAsks` compaction remain open."
++  Both are closed: the stored-duplication half by commit `38e1758a4` (`fix(pipeline-core): keep raw intake material out of
++  tracked design files`; the pin asserts zero copies of the request in design-input, PRD and Spec), the `pendingAsks`
++  half by the "Extension 2026-10-22" section (driver output 23,033 to 13,802 bytes, each ask and the primary action
++  printed once). Pins: `plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs`
++  (history includes `0080379a7` each published ask once, `e82601a5b` collect-input primary action once).
++- "Producer-to-guard summary parity (2026-09-28)" ("No productive integration occurred", "source integration ...
++  remain pending"): statements of the preparation state of that date; whether the summary route has since been
++  integrated was not re-verified in this sweep, so these sentences are marked as dated history, not as current state.
++- Blocker analysis 2026-10-22 frames only the host gap (a real Codex/Claude host turn with the 14 KB input for output
++  budget and truncation). That remains the only open acceptance bullet ("The host response remains below its output
++  budget"), together with the two residues the 2026-10-22 extension already names: cross-call `pendingAsks` compaction
++  (needs a persisted shown-digest, a design decision not yet made) and the "do not hand-edit" versus "elaborate before
++  binding" header contradiction (not re-checked in this sweep).
++- Triage: the block under "## Triage" is a bare heading and no repository decision with an id settles this item, so it is
++  left as is. No status change is made here.
+diff --git a/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md b/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md
+index 6692ac5d5..8af418421 100644
+--- a/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md
++++ b/backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md
+@@ -117,3 +117,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+   Deferred past the 0.7.0 candidate by PO decision of 2026-10-16 together with lifecycle-read-scope-blocks-host-declared-system-skill (AC-209); item triage 2026-10-17 says AC-147 is not counted against the 0.7.0 local test candidate. When taken up it needs an installed Codex session.
+ - **DEFERRED** — The PO deferral past 0.7.0 stands; scope for the post-0.7.0 release is undecided
+   Nothing blocks 0.7.0: the deferral is recorded (item triage 2026-10-17, PO decision 2026-10-16). The post-0.7.0 scope is a later planning decision, not a candidate blocker.
++
++## Reconciled 2026-10-23
++
++Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
++
++- Description ("The installed lifecycle guard refuses the ordinary read-only `cat` with `GUARD-READ-SCOPE-OUTSIDE-ROOT`
++  ... its only offered route requires a human signature") and Proposal ("Bind the exact physically verified skill
++  instruction files from the active host catalog into the session's read authorities"): the reading-outside-the-repository
++  premise changed after the 2026-10-17 triage. PO decision D96 (2026-10-22) makes reads outside the repository generally
++  allowed except credentials, runner-neutral; D108 keeps a private exception only for RECURSIVE directory searches over
++  `.codex/skills`, `.codex/sessions` and `.claude/projects` ("single files there read like any other file outside").
++  Built in commit `5b3990a37` (`passive-read-policy.mjs`, with the restated pins `passive-read-policy.test.mjs` and
++  `guard-lifecycle-ready.test.mjs`). So a single read of a declared `SKILL.md` outside the root is no longer a
++  `GUARD-READ-SCOPE-OUTSIDE-ROOT` refusal by policy; the pin case ALF-B8-AC147 in
++  `plugins/pipeline-core/lib/passive-read-policy.test.mjs` holds the skill file readable by its own physical name and
++  refused through a project-local or host alias. The catalog-bound authority described in the Proposal is therefore no
++  longer the only route to the read.
++- Triage "No repair or release acceptance is claimed": still true for the installed-host proof. Acceptance bullet 4
++  (installed host readback of the actual route) and the catalog-identity bullet 3 are not evidenced by D96 and stay
++  with the deferred Codex-host half (D57 Q3: native-host item after 0.7.0; D63 deferral of the catalog half of AC-147).
++  The item stays open on that basis; no status change is made here.
+diff --git a/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md b/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md
+index 0ae53d5b9..fb500d658 100644
+--- a/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md
++++ b/backlog/items/2026-09-29-disjoint-signed-hgo-actions-invalidate-one-another.md
+@@ -58,3 +58,21 @@ target preimages, so dropping the comparison would also admit target drift.
+ Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+ 
+ - **CORRECTED the same day (the survey was wrong):** the v4 native contract is ALREADY IMPLEMENTED in `human-guard-override.mjs` (commits `348b421f3`, `a9aeb9d63`, `32cd213b7`; suite `human-guard-override-disjoint.test.mjs`, 35 cases HGOD001-035 covering the Acceptance bullets, 35 pass measured alone in a clone). No protected patch and no signature is needed. What remains: re-triage (this file still says `status: open`), an independent Opus Critic read of those commits (D119), and PO acceptance.
++
++## Reconciled 2026-10-23
++
++Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
++
++- Description and Acceptance ("makes a second, independently signed and armed action unusable"; "Until a safe contract is
++  implemented, the signing preparer must disclose that separately signed dirty-worktree actions are serially dependent"):
++  the native Edit/Write/apply_patch contract is implemented. Decision D132 (2026-10-22, Elephant correction) records that
++  the v4 native contract needs no patch and no signature: commits `348b421f3` (`fix(pipeline-core): bind apply_patch
++  overrides to native target preimages`), `a9aeb9d63` (`test(pipeline-core): cover every drift and replay case of
++  disjoint signed overrides`) and `32cd213b7` (`test(pipeline-core): run the disjoint HGO cases in parallel workers`),
++  suite `plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs` (cases registered as HGODnnn; D132 records
++  35/35 measured, not re-run in this sweep). The Bash and plugin-installation lanes keep strict whole-repository
++  binding by the Acceptance text itself.
++- Blocker analysis 2026-10-22 (first, survey-based sentence "re-triage" and the earlier survey that treated the item as
++  needing a protected patch): the survey was wrong on this item, per the CORRECTED paragraph and D132. Remaining, and
++  not agent work: an independent Opus Critic read (D119) and PO acceptance. The item has no Triage block, so none was
++  filled; the front-matter `status: open` is left unchanged.
+diff --git a/backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md b/backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md
+index 1e733a4dd..4ecfd14d1 100644
+--- a/backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md
++++ b/backlog/items/2026-10-04-design-course-run-v2-refuses-its-own-documented-routes.md
+@@ -41,10 +41,10 @@ revision path:
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
+-- **Assignment (if accepted):**
+-- **Date:**
++- **Decision:** superseded in its acceptance by D125 (2026-10-22): ADR-0085 supersedes the Advisor-plus-readiness design course for this item.
++- **Rationale:** D125 restates the acceptance against the single-review route (fallback evidence goes to the present-plan review-receipt route); the `--run-v2` course now refuses with the typed retirement `DESIGN-COURSE-RETIRED`, so the documented-route defects no longer describe a live path. See "Reconciled 2026-10-23".
++- **Assignment (if accepted):** none for the retired course; any remaining revision-path check is judged against the single-review route.
++- **Date:** 2026-10-23 (filled from D125 of 2026-10-22)
+ 
+ ### Blocker analysis 2026-10-22
+ 
+@@ -52,3 +52,21 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **PO-DECISION** (decided: D125) — Decide whether retiring the course resolves the item (moot) or the revision path still needs a zero-override test
+   Question: is the design course retired for 0.7.0 so the item is moot, or must the revision path (new authoring dispatch, resume after failed stage, Advisor fixture on Windows) still run with zero overrides?
++
++## Reconciled 2026-10-23
++
++Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
++
++- Description (K5-9, K5-8, K5-11, K3-16 and the revision-path gap) and Acceptance ("every course step ... runs from
++  emitted commands that the guard admits, with zero overrides"; "The Advisor host fixture runs on native Windows"): they
++  read as a live `--run-v2` defect. ADR-0085 (`docs/adr/0085-one-review-one-signature-design-approval.md`) retired the
++  Advisor-plus-readiness course behaviorally: `runDesignCourseV2` and the `--run-v2` CLI return the typed
++  `DESIGN-COURSE-RETIRED` (`plugins/pipeline-core/lib/retired-design-codes.mjs`) before parsing, state access, dispatch
++  or publication, so none of the listed refusals can occur. Evidence: the retargeted cases in
++  `plugins/pipeline-core/scripts/design-course-session.test.mjs` (`deepEqual(..., RETIRED)` for the function and the CLI)
++  and the sibling pins that name the same code.
++- Blocker-analysis question ("is the design course retired for 0.7.0 so the item is moot, or must the revision path ...
++  still run with zero overrides?"): answered by PO decision D125 (2026-10-22), which supersedes the design course for this
++  item and restates its acceptance against the single-review route. The Triage block is filled from D125 today.
++- Not decided here: whether the single-review route needs its own zero-override revision test; that is judged under the
++  restated acceptance, not under the retired course. No status change is made here.
+diff --git a/backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md b/backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md
+index d1a42f84f..5bd0e471c 100644
+--- a/backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md
++++ b/backlog/items/2026-10-05-dispatch-record-log-stays-empty-despite-mandatory-phase-entries.md
+@@ -49,7 +49,31 @@ Added acceptance (0.7.0, minor):
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
+-- **Assignment (if accepted):**
+-- **Date:**
++- **Decision:** accepted and built; the empty-log rule is decided by D77 (K6, 2026-10-21): a new terminal v3/v4 record with an empty log is refused at write, committed v3 history stays readable.
++- **Rationale:** the check belongs on the write path (`dispatch-record-write.mjs`) so a record cannot end empty, while history written before the rule remains readable; the cause measurement and the generated skeleton are covered by the pin. See "Reconciled 2026-10-23".
++- **Assignment (if accepted):** none open; the F-06 skeleton acceptance is delivered by `init-dispatch-record`. Independent Critic read and PO acceptance pending.
++- **Date:** 2026-10-23 (filled from D77 of 2026-10-21)
++
++## Reconciled 2026-10-23
++
++Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
++
++- Description and Proposal ("left the dispatch record's `log` empty"; "consider a mechanical check at dispatch close that
++  rejects a terminal record with an empty `log`"): built. Commit `f7321f418` (`fix(dispatch-record): refuse an empty
++  terminal log at write, keep v3 history readable (AC-163, D77)`) makes `writeDispatchRecordObject` refuse a NEW terminal
++  v3/v4 record with `log: []` (code `record-log`) and leaves no file; a terminal v4 record with an empty log is also
++  rejected at read; committed terminal v3 history stays readable; the completed-undelivered observation keeps its
++  documented empty-log exception. Earlier related commit: `edfc80d4c`.
++- Proposal ("measure why entries are skipped (budget pressure vs. ordering vs. wording)"): measured in commit `8753e566c`
++  (`fix(dispatch-record): measure why log entries are skipped and carry them on existing record writes`), which also
++  changes the three Goldfish agent definitions, `roles/goldfish.md` and `templates/prompts/goldfish-task.md` so log
++  entries ride on writes the Goldfish already makes. The ordering cause (a record opened after the first commit that cites
++  its task id is refused) is pinned as "MEASURED ordering (a)/(b)".
++- "Added acceptance (0.7.0, minor): A dispatch record and a design review can be started from a generated, valid
++  skeleton" and the sentence "no scaffolder exists. There is no `init-dispatch-record`": the dispatch-record skeleton is
++  `plugins/pipeline-core/scripts/init-dispatch-record.mjs` (commit `d4b792e73`, AC-163; case "init-dispatch-record prints
++  a valid opening v4 record ..." in `plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`); the design-review half
++  is the receipt producer `scripts/design-review-receipt.mjs` (digests derived from disk, case "a design review receipt
++  is generated with every digest derived from disk" in the pin file).
++- All of the above is pinned in `plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs`.
++  Independent Critic read and PO acceptance remain pending; no status change is made here.
+diff --git a/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md b/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
+index 4ebc233af..c0c258d41 100644
+--- a/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
++++ b/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
+@@ -28,10 +28,10 @@ approved feature whose approval cannot be re-verified must degrade to advisory,
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
+-- **Assignment (if accepted):**
+-- **Date:**
++- **Decision:** accepted and built; the second half (PO decision BI, advisory degradation of an unverifiable approval) is decided by D117 (2026-10-22).
++- **Rationale:** D117 builds the advisory degradation now (`GUARD-DEVPLAN-APPROVAL-UNVERIFIED`), and the first half (every denial names an admitted command) is pinned per denial code in `lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs`; see "Reconciled 2026-10-23".
++- **Assignment (if accepted):** none open for the BI half; the "Not covered" residue in the 2026-10-22 extension stays a documented limit. Independent Critic read and PO acceptance pending.
++- **Date:** 2026-10-23 (filled from the 2026-10-22 extensions)
+ 
+ ## Extension 2026-10-22: every other denial that names a command
+ 
+@@ -74,3 +74,21 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **NOT-BLOCKED** — Triage the item and decide the scope of PO decision BI (degrade an unverifiable approval to advisory)
+   The scope of BI is decided and built: item extension 2026-10-22 records PO decision D117 (only DWP-PACKAGE-PHYSICAL qualifies; GUARD-DEVPLAN-APPROVAL-UNVERIFIED advisory; hooks/guard-devplan-approval-unverified.test.mjs). Only the empty Triage block is left, which an agent can fill.
++
++## Reconciled 2026-10-23
++
++Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
++
++- Description and Proposal ("Running exactly that command is refused by the same guard" and "an approved feature whose
++  approval cannot be re-verified must degrade to advisory, never lock all execution"): both halves are built. The
++  advisory half is PO decision D117 (2026-10-22), commit `3b1649817` (`feat(guard): degrade an unverifiable design
++  approval to one advisory (D117)`), lane proof `plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs`.
++  The first half (denial names a command the guard refuses): the `push-init --checkpoint` spelling was admitted by
++  commit `cbfcc602e` (`fix(guard): admit push-init --checkpoint and print a runnable command in the checkpoint
++  denial`), and the pin `plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs` holds the source
++  inventory with the earlier `todo` cases now real (`todo: false`).
++- Triage ("Decision / Rationale / Assignment / Date" empty) and the Blocker-analysis line "Only the empty Triage block is
++  left": filled today from D117.
++- Still open, unchanged: the "Not covered" residue of the 2026-10-22 extension (denials not introduced by a
++  "Run"/"then run" phrasing; PO-run human-guard-override commands, attended by design). Independent Critic read and PO
++  acceptance of the D117 change remain pending; no status change is made here.

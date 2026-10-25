@@ -1,0 +1,469 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 3c367597c..15f7cc932 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -8,6 +8,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ |---|---|---|
+ | Stamp the three runner manifests with a candidate version after the content is frozen | `scripts/stamp-candidate.mjs` | the three manifests (`--dry-run` writes nothing) |
+ | Run test files on isolated Linux workers in parallel | `scripts/run-parallel.mjs` | worker clones and temp dirs only |
++| Run the Full Verify (candidate mode, no reuse) in a clone with a private HOME, a short TMPDIR and a red-step summary | `scripts/full-verify.mjs` | output file, verify's run record in the clone, temp dirs |
+ | Run test files one after the other with a private TMPDIR | `scripts/run-in.mjs` (uses `scripts/run-quiet.mjs`) | none tracked |
+ | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
+ | The capability inventory gate went red after a suite, hook or skill was added | `scripts/rebaseline-inventory.mjs` | the `sourceBaseline` block of the inventory (protected file) |
+diff --git a/harness/scripts/check-verify-suite-append.mjs b/harness/scripts/check-verify-suite-append.mjs
+index 7204e371c..3395eeceb 100644
+--- a/harness/scripts/check-verify-suite-append.mjs
++++ b/harness/scripts/check-verify-suite-append.mjs
+@@ -92,13 +92,87 @@ function exactDuplicateRepairShape(entry) {
+     && /historical/iu.test(entry.reason) && entry.reason.length >= 40;
+ }
+ 
++// K143 (Full Verify V3): the third narrow, historical, unsigned exception kind. Commit 91f728f85
++// extended the caseCompletion.caseIds lists of existing rows in place (a row rewrite, not an
++// insertion) next to one inserted row. The entry names that one commit, its parent and both
++// registry digests; the witness derives the rest from bytes: every prior row survives in order,
++// byte-identical except that its caseCompletion.caseIds strictly extend (same order, same maxBytes).
++const REWRITE_ENTRY_SCHEMA = "pipeline.verify-suite-case-list-extension-entry.v1";
++const REWRITE_ENTRY_KEYS = ["commit", "owner", "parent", "postimageSha256", "preimageSha256", "reason", "schema", "signed"]
++  .sort().join("\0");
++
++function exactRewriteShape(entry) {
++  return entry !== null && typeof entry === "object" && !Array.isArray(entry)
++    && Object.keys(entry).sort().join("\0") === REWRITE_ENTRY_KEYS
++    && entry.schema === REWRITE_ENTRY_SCHEMA
++    && fullOid(entry.commit) && fullOid(entry.parent) && entry.commit !== entry.parent
++    && SHA256.test(entry.preimageSha256 ?? "") && SHA256.test(entry.postimageSha256 ?? "")
++    && entry.owner === "Elephant" && entry.signed === false
++    && typeof entry.reason === "string" && /unsigned/u.test(entry.reason)
++    && /historical/iu.test(entry.reason) && entry.reason.length >= 40;
++}
++
++function extendsCaseList(before, after) {
++  const prior = before?.caseCompletion?.caseIds;
++  const next = after?.caseCompletion?.caseIds;
++  if (!Array.isArray(prior) || !Array.isArray(next) || next.length <= prior.length
++    || !(after.caseCompletion.maxBytes >= before.caseCompletion.maxBytes)) return false;
++  let at = 0;
++  for (const id of prior) {
++    while (at < next.length && next[at] !== id) at += 1;
++    if (at === next.length) return false;
++    at += 1;
++  }
++  const { caseIds: _a, maxBytes: _b, ...beforeRest } = before.caseCompletion;
++  const { caseIds: _c, maxBytes: _d, ...afterRest } = after.caseCompletion;
++  return canonical(beforeRest) === canonical(afterRest);
++}
++
++/** Pure witness: digests match the entry and `after` is `before` with in-place case-list extensions and insertions only. */
++export function evaluateCaseListExtension({ entry, commit, parent, beforeBytes, afterBytes } = {}) {
++  if (!exactRewriteShape(entry)) return fail("VSA-REWRITE-SHAPE");
++  if (commit !== entry.commit || parent !== entry.parent
++    || sha256Hex(beforeBytes) !== entry.preimageSha256 || sha256Hex(afterBytes) !== entry.postimageSha256) {
++    return fail("VSA-REWRITE-AUTHORIZATION");
++  }
++  const before = parseRegistry(beforeBytes);
++  const after = parseRegistry(afterBytes);
++  if (!before || !after || after.suites.length < before.suites.length) return fail("VSA-REWRITE-SHAPE");
++  let at = 0;
++  let extended = 0;
++  for (const prior of before.suites) {
++    const key = canonical(prior);
++    while (at < after.suites.length) {
++      const row = after.suites[at];
++      if (canonical(row) === key) break;
++      if (row?.name === prior.name && row?.file === prior.file && extendsCaseList(prior, row)
++        && canonical({ ...row, caseCompletion: prior.caseCompletion }) === key) { extended += 1; break; }
++      at += 1;
++    }
++    if (at === after.suites.length) return fail("VSA-REWRITE-PRIOR-ENTRY-CHANGED");
++    at += 1;
++  }
++  if (extended === 0) return fail("VSA-REWRITE-NO-EXTENSION");
++  const names = new Set();
++  const files = new Set();
++  for (const row of after.suites) {
++    if (!validIdentity(row) || names.has(row.name) || files.has(row.file)) return fail("VSA-REWRITE-ENTRY");
++    names.add(row.name);
++    files.add(row.file);
++  }
++  return { ok: true, code: "VSA-REWRITE-VERIFIED", extendedRows: extended };
++}
++
+ function exactRecoveryShape(value) {
+   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+   const keys = Object.keys(value).sort().join("\0");
+-  if (keys !== "entries\0schema" && keys !== "duplicateRepairs\0entries\0schema") return false;
++  if (!["entries\0schema", "duplicateRepairs\0entries\0schema", "entries\0rewrites\0schema",
++    "duplicateRepairs\0entries\0rewrites\0schema"].includes(keys)) return false;
+   if (Object.hasOwn(value, "duplicateRepairs")
+     && !(Array.isArray(value.duplicateRepairs) && value.duplicateRepairs.length === 1
+       && exactDuplicateRepairShape(value.duplicateRepairs[0]))) return false;
++  if (Object.hasOwn(value, "rewrites")
++    && !(Array.isArray(value.rewrites) && value.rewrites.length === 1 && exactRewriteShape(value.rewrites[0]))) return false;
+   return value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
+     && value.entries.length === 1 && exactEntryShape(value.entries[0]);
+ }
+@@ -242,6 +316,26 @@ export function evaluateDuplicateRepair({
+   return { ok: true, code: "VSA-DUPREPAIR-VERIFIED" };
+ }
+ 
++function readRewrite(root, read) {
++  try {
++    const value = parseStrictJson(read(resolve(root, RECOVERY), "utf8"));
++    return exactRecoveryShape(value) && Object.hasOwn(value, "rewrites") ? value.rewrites[0] : null;
++  } catch { return null; }
++}
++
++function bindRewrite({ root, run, read, entry }) {
++  if (!entry) return null;
++  try {
++    if (run(["show", "HEAD:" + RECOVERY]) !== read(resolve(root, RECOVERY), "utf8")) return null;
++    const line = run(["rev-list", "--parents", "-n", "1", entry.commit]).trim().split(/\s+/u);
++    if (line.length !== 2 || line[0] !== entry.commit || line[1] !== entry.parent) return null;
++    const beforeBytes = run(["show", entry.parent + ":" + REGISTRY]);
++    const afterBytes = run(["show", entry.commit + ":" + REGISTRY]);
++    const result = evaluateCaseListExtension({ entry, commit: entry.commit, parent: entry.parent, beforeBytes, afterBytes });
++    return result.ok ? { entry, beforeBytes } : null;
++  } catch { return null; }
++}
++
+ function bindDuplicateRepair({ root, run, read, entry }) {
+   if (!entry) return null;
+   try {
+@@ -320,7 +414,10 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+     if (!OID.test(head)) return fail("VSA-HEAD");
+     const worktree = read(resolve(root, REGISTRY), "utf8");
+     const entry = readRecovery(root, read);
+-    const recovery = bindRecovery({ root, run, read, candidateBytes: worktree, entry });
++    const rewrite = bindRewrite({ root, run, read, entry: readRewrite(root, read) });
++    // The b7 restoration is proven against the registry state just before the recorded in-place
++    // case-list extension when one is recorded; every commit after it is checked by the walk below.
++    const recovery = bindRecovery({ root, run, read, candidateBytes: rewrite ? rewrite.beforeBytes : worktree, entry });
+     const configCommits = run(["log", "--first-parent", "--reverse", "--format=%H", "--", CONFIG])
+       .trim().split("\n").filter(Boolean);
+     let introduction = null;
+@@ -361,6 +458,9 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+           && before === recovery.defectBytes && after === recovery.restoredBytes) {
+           // This is the one exact defect-to-restoration transition. Any other
+           // historical failure remains subject to the original prefix policy.
++        } else if (rewrite && commit === rewrite.entry.commit
++          && sha256Hex(before) === rewrite.entry.preimageSha256 && sha256Hex(after) === rewrite.entry.postimageSha256) {
++          // The one recorded in-place case-list extension (bound to this commit and its bytes).
+         } else if (dup && !dupAddSeen && commit === dup.entry.addCommit
+           && sha256Hex(before) === dup.entry.addPreimageSha256 && sha256Hex(after) === dup.entry.addPostimageSha256) {
+           dupAddSeen = true;
+diff --git a/harness/scripts/check-verify-suite-append.test.mjs b/harness/scripts/check-verify-suite-append.test.mjs
+index 72740ac5d..e3d14150d 100644
+--- a/harness/scripts/check-verify-suite-append.test.mjs
++++ b/harness/scripts/check-verify-suite-append.test.mjs
+@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { createHash } from "node:crypto";
+ import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
+-import { checkVerifySuiteAppend, evaluateDuplicateRepair, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
++import { checkVerifySuiteAppend, evaluateCaseListExtension, evaluateDuplicateRepair, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
+ import { evaluateVerifySuiteAppend } from "../../plugins/pipeline-core/lib/verify-suite-append-policy.mjs";
+ 
+ function fixture(run) {
+@@ -329,6 +329,27 @@ test("evaluateDuplicateRepair derives the shape from the bytes: no duplicate add
+   assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(changedPrior) })).ok, false);
+ });
+ 
++test("evaluateCaseListExtension admits only an in-place case-list extension bound to its exact bytes (K143 V3)", () => {
++  const row = (name, ids, extra = {}) => ({ name, file: `${name}.test.mjs`, caseCompletion: { caseIds: ids, maxBytes: 65536 }, ...extra });
++  const text = (suites) => JSON.stringify({ schema: "pipeline.verify-suites.v1", suites }, null, 2) + "\n";
++  const sha = (value) => createHash("sha256").update(value).digest("hex");
++  const before = text([row("a", ["A1", "A2"]), row("b", ["B1"])]);
++  const after = text([row("a", ["A1", "A2", "A3"]), row("c", ["C1"]), row("b", ["B1"])]);
++  const entry = (b, a) => ({ schema: "pipeline.verify-suite-case-list-extension-entry.v1", commit: "b".repeat(40), parent: "a".repeat(40), preimageSha256: sha(b), postimageSha256: sha(a), owner: "Elephant", signed: false, reason: "Historical, unsigned exception recorded by the Elephant for a test." });
++  const run = (e, b, a, over = {}) => evaluateCaseListExtension({ entry: e, commit: "b".repeat(40), parent: "a".repeat(40), beforeBytes: b, afterBytes: a, ...over });
++  assert.equal(run(entry(before, after), before, after).ok, true);
++  assert.equal(run(entry(before, after), before, after, { commit: "c".repeat(40) }).code, "VSA-REWRITE-AUTHORIZATION");
++  const reordered = text([row("a", ["A2", "A1", "A3"]), row("b", ["B1"])]);
++  assert.equal(run(entry(before, reordered), before, reordered).ok, false, "a reordered case list is not an extension");
++  const shrunk = text([row("a", ["A1"]), row("b", ["B1"])]);
++  assert.equal(run(entry(before, shrunk), before, shrunk).ok, false);
++  const otherChange = text([row("a", ["A1", "A2", "A3"], { invariantPinned: "x" }), row("b", ["B1"])]);
++  assert.equal(run(entry(before, otherChange), before, otherChange).code, "VSA-REWRITE-PRIOR-ENTRY-CHANGED");
++  const insertOnly = text([row("a", ["A1", "A2"]), row("c", ["C1"]), row("b", ["B1"])]);
++  assert.equal(run(entry(before, insertOnly), before, insertOnly).code, "VSA-REWRITE-NO-EXTENSION");
++  assert.equal(run({ ...entry(before, after), signed: true }, before, after).code, "VSA-REWRITE-SHAPE");
++});
++
+ test("full history traversal refuses a rewrite when recovery is missing or invalid", () => {
+   const invalidRecovery = JSON.stringify({
+     schema: "pipeline.verify-suite-history-recovery.v1",
+diff --git a/harness/verify-suite-history-recovery.json b/harness/verify-suite-history-recovery.json
+index 844003d18..5a09514c3 100644
+--- a/harness/verify-suite-history-recovery.json
++++ b/harness/verify-suite-history-recovery.json
+@@ -30,5 +30,17 @@
+       "signed": false,
+       "reason": "Historical, unsigned exception recorded by the Elephant (PO decision D107): the first commit added a second registry row repeating the name and file of an existing row, the second commit removed that row again. Narrow and not extendable: it is bound to these two commits and their registry bytes, so a third commit of the same shape stays refused."
+     }
++  ],
++  "rewrites": [
++    {
++      "schema": "pipeline.verify-suite-case-list-extension-entry.v1",
++      "commit": "91f728f85534e768a19fea62c587a35d10855cf4",
++      "parent": "557035fd83dc4c891b42b090bdb3aa03c4fc0ae2",
++      "preimageSha256": "55c3684c8b06387d888222bf131884dcecd4e18787c25a18879658154a0ddbee",
++      "postimageSha256": "1ee65943c65aea28b2b0f76328ba74b2c733579536287ecefba257cdd3efb763",
++      "owner": "Elephant",
++      "signed": false,
++      "reason": "Historical, unsigned exception recorded by the Elephant (Full Verify finding V3): this one commit extended the caseCompletion case-ID lists of four existing registry rows in place and inserted one row. Narrow and not extendable: it is bound to this commit, its parent and their registry bytes, and the witness re-derives from bytes that every prior row is otherwise unchanged."
++    }
+   ]
+ }
+diff --git a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+index 8496f1732..8aac33aad 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+@@ -153,6 +153,11 @@ function cleanupScratch(path) {
+   try { rmSync(path, { recursive: true, force: true }); } catch { /* best-effort bounded scratch cleanup */ }
+ }
+ 
++// Explicit stdout/stderr ceiling for the scan child. Node's spawnSync default is 1 MiB and a real
++// `--json` report of this repository is about 2.3 MB, so the default killed the child (ENOBUFS)
++// and security-scan exited 2. 64 MiB is about 28x the observed report and still a hard bound.
++const SCAN_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
++
+ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
+   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
+   if (!resolved.installed) {
+@@ -190,7 +195,7 @@ async function runScan({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutM
+ 
+   let res;
+   try {
+-    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", env: scanEnv, timeout: timeoutMs, shell: false });
++    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", env: scanEnv, timeout: timeoutMs, shell: false, maxBuffer: SCAN_MAX_BUFFER_BYTES });
+   } catch (err) {
+     cleanupScratch(scratch);
+     return spawnFailure(err);
+diff --git a/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs b/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
+index 40ca478f7..a4bdd23a3 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
+@@ -13,6 +13,8 @@
+ import assert from "node:assert/strict";
+ import test from "node:test";
+ import path from "node:path";
++import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
+ import { name, CAPABILITY_CONTRACT_V2, run } from "./semgrep.mjs";
+ 
+ // ---------------------------------------------------------------------------
+@@ -338,3 +340,43 @@ test("CAPABILITY_CONTRACT_V2.timeoutContract matches run()'s real default and me
+ test("CAPABILITY_CONTRACT_V2.evidenceFields matches the real findings.map(...) object shape (same shape as gitleaks)", () => {
+   assert.deepEqual(CAPABILITY_CONTRACT_V2.evidenceFields, ["tool", "severity", "rule", "path", "line", "msg"]);
+ });
++
++// ---------------------------------------------------------------------------
++// SEM-B -- the scan's stdout buffer is explicit and bounded (K143-FV-TOOLING, Full Verify V2).
++//
++// Cause: run() called spawnSync without `maxBuffer`, so node's 1 MiB default applied; a real
++// Semgrep --json report of this repository is about 2.3 MB, so the child was killed with
++// ENOBUFS and security-scan exited 2. The bound is 64 MiB: about 28x the observed report, still
++// a hard ceiling (a runaway scanner is cut off, never unbounded memory).
++// ---------------------------------------------------------------------------
++test("SEM-B (a): run() passes an explicit, bounded maxBuffer to the spawn boundary (at least 16 MiB, at most 256 MiB)", async () => {
++  let seen;
++  await run({
++    rootDir: SCAN_ROOT,
++    config: { binaryPath: "semgrep-fixture-binary" },
++    timeoutMs: 5000,
++    spawnFn: (_command, _args, options) => {
++      seen = options;
++      return { status: 0, stdout: JSON.stringify({ results: [] }), stderr: "" };
++    },
++  });
++  assert.equal(typeof seen?.maxBuffer, "number", "spawn options carry no numeric maxBuffer (node's 1 MiB default applies)");
++  assert.ok(Number.isFinite(seen.maxBuffer), "maxBuffer must be finite, not Infinity");
++  assert.ok(seen.maxBuffer >= 16 * 1024 * 1024, `maxBuffer ${seen.maxBuffer} is below 16 MiB; a 2.3 MB report needs real headroom`);
++  assert.ok(seen.maxBuffer <= 256 * 1024 * 1024, `maxBuffer ${seen.maxBuffer} exceeds the 256 MiB ceiling`);
++});
++
++test("SEM-B (b): a real child writing a 3 MB JSON report through the default spawn is parsed, not ENOBUFS", { skip: process.platform === "win32" ? "shebang fixture" : false }, async () => {
++  const dir = mkdtempSync(path.join(tmpdir(), "sem-b-"));
++  try {
++    const binary = path.join(dir, "fake-semgrep");
++    const report = JSON.stringify({ results: [], errors: [], padding: "x".repeat(3 * 1024 * 1024) });
++    writeFileSync(binary, `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(report)});\n`);
++    chmodSync(binary, 0o755);
++    const result = await run({ rootDir: dir, config: { binaryPath: binary }, timeoutMs: 30000 });
++    assert.equal(result.status, "PASS", `expected PASS, got ${result.status}: ${result.reason ?? ""}`);
++    assert.deepEqual(result.findings, []);
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 36cc965f1..9ff8f1bfe 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -114,8 +114,7 @@ recommendation.
+    that is not yet ready, that action names the guided driver,
+    `onboarding-init.mjs --root <root> [--runner <runner>] [--step-cap <n>]`
+    (`scripts/onboarding-init.mjs`) -- it walks the whole onboarding chain
+-   step by step and re-anchors after each apply, replacing what used to be a
+-   manual turn-by-turn `inspect`/apply loop. For an already-ready project the
++   and re-anchors after each apply. For an already-ready project the
+    returned action is the read-only
+    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap`.
+    Accept only ready `pipeline.project-onboarding.v4` native-local or
+@@ -156,9 +155,7 @@ recommendation.
+    `powershell`/`cmd` arrays are each a line already bounded under
+    `COPY_COMMAND_MAX_COLUMNS` — relay it VERBATIM, line for line, from that
+    same tool result. Never hand-reconstruct the command from memory of a
+-   prior turn, even for the identical restart action seen before: a
+-   correctly relayed rendering on one occasion does not carry over to the
+-   next if the command is retyped instead of re-read.
++   prior turn, even for an identical earlier restart action: re-read it.
+ 4. **Confirmation:** after all checks print exactly this line, five concrete
+    fields, no placeholder (additions, role variants → typed references):
+ 
+@@ -216,8 +213,7 @@ recommendation.
+    failed or skipped read must be surfaced honestly, never silently skipped
+    or claimed as done when it was not; this is a MUST-DO consumption step, not
+    a new readiness precondition, so it never blocks or gates the session.
+-   The card is never a gate and capture failure must be surfaced honestly rather
+-   than claimed as persisted context.
++   Capture failure must be surfaced honestly, never claimed as persisted context.
+    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
+    their shapes differ: `intent` is one string; the other three are **arrays** of
+    short strings, at most 4, 4 and 3 entries. Every entry is a distilled
+@@ -383,9 +379,8 @@ lifecycle recovery action. Never bypass a real gate or turn an automated
+ evidence failure into an invented PO approval.
+ 
+ When one of those does require asking, a confirmation with only one real
+-option (proceed or don't, with nothing else meaningfully on offer) is plain
+-text plus waiting for the reply — never `AskUserQuestion`, whose own
+-validator rejects a single-option call outright.
++option (proceed or don't) is plain text plus waiting for the reply — never
++`AskUserQuestion`, whose validator rejects a single-option call.
+ 
+ ## Compact
+ 
+diff --git a/scripts/full-verify.mjs b/scripts/full-verify.mjs
+new file mode 100644
+index 000000000..dccf599ff
+--- /dev/null
++++ b/scripts/full-verify.mjs
+@@ -0,0 +1,90 @@
++// Purpose: run the Full Verify (candidate mode, no receipt reuse) in a clone with a private HOME and a SHORT private TMPDIR,
++//          then print a concise summary of the run record. It exists because three environment effects of a private HOME
++//          turned green steps red in the first dev-build Full Verify: (1) no `init.defaultBranch=main` in the private HOME,
++//          (2) a long TMPDIR pushing a socket path over the 96-byte limit (wsl-ipc-compatibility-tests), (3) node resolved
++//          through a per-shell fnm path that is not stable for child processes.
++// Usage:   node scripts/full-verify.mjs <clone-dir> [<label>] [--reuse]
++//          (run from any checkout; <clone-dir> must be a clean clone whose committed HEAD is the candidate; label defaults to "fv")
++// Inputs:  git identity copied from `git config user.name/user.email` of the current directory; `--reuse` drops --no-reuse.
++// Output:  verify's stdout+stderr in <clone-dir>/scratch/<label>-output.txt; on stdout the exit code, the duration, the output
++//          path and the red step names read from <clone-dir>/evidence/verify-latest.json (the run record). Exit code = verify's.
++// Data:    HOME and TMPDIR under <home>/.fv/<label>/ (recreated each run, outside every repository). The TMPDIR path must stay
++//          under 30 characters; a longer one is refused with exit 2 rather than silently breaking socket-path tests.
++// Read-only toward the source: it writes only the output file, the run record verify itself writes in the clone, and the temp dirs.
++import { spawn, execFileSync } from "node:child_process";
++import { chmodSync, createWriteStream, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { homedir } from "node:os";
++import { delimiter, dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++export const MAX_TMPDIR_CHARS = 29;
++
++/** Pure: a private TMPDIR path is short enough to keep socket paths under the 96-byte limit. */
++export function tmpDirIsShortEnough(path) {
++  return typeof path === "string" && path.length > 0 && path.length <= MAX_TMPDIR_CHARS;
++}
++
++/** Pure: names of the steps that did not exit 0, read from a pipeline.verify-evidence record. */
++export function redStepNames(record) {
++  const steps = Array.isArray(record?.steps) ? record.steps : [];
++  return steps.filter((step) => step && step.exitCode !== 0).map((step) => String(step.name));
++}
++
++/** Pure: the concise summary lines printed at the end of a run. */
++export function summarize({ exitCode, seconds, outputPath, record }) {
++  const red = record === null ? null : redStepNames(record);
++  const total = Array.isArray(record?.steps) ? record.steps.length : 0;
++  return [
++    `verify exit ${exitCode} after ${seconds} s; output in ${outputPath}`,
++    red === null ? "run record: unreadable or absent (evidence/verify-latest.json)" : `steps ${total}, red ${red.length}`,
++    ...(red ?? []).map((name) => `  red: ${name}`),
++  ];
++}
++
++/** Pure: the `.gitconfig` text of the private HOME. */
++export function privateGitConfig({ name, email }) {
++  return `[user]\n\tname = ${name}\n\temail = ${email}\n[init]\n\tdefaultBranch = main\n`;
++}
++
++function main(argv) {
++  const reuse = argv.includes("--reuse");
++  const [cloneArg, label = "fv"] = argv.filter((arg) => arg !== "--reuse");
++  if (!cloneArg) { console.error("usage: full-verify.mjs <clone-dir> [<label>] [--reuse]"); return 2; }
++  const clone = resolve(cloneArg);
++  const base = join(homedir(), ".fv", label);
++  const home = join(base, "h");
++  const tmp = join(base, "t");
++  if (!tmpDirIsShortEnough(tmp)) { console.error(`full-verify: REFUSED: TMPDIR ${tmp.length} chars exceeds ${MAX_TMPDIR_CHARS}; use a shorter label`); return 2; }
++  rmSync(base, { recursive: true, force: true });
++  for (const dir of [base, home, tmp]) { mkdirSync(dir, { recursive: true, mode: 0o700 }); chmodSync(dir, 0o700); }
++  const cfg = (key) => execFileSync("git", ["config", key], { encoding: "utf8" }).trim();
++  const gitConfigGlobal = join(home, ".gitconfig");
++  writeFileSync(gitConfigGlobal, privateGitConfig({ name: cfg("user.name"), email: cfg("user.email") }));
++  // The real node binary, not a per-shell version-manager shim path.
++  const nodeBinary = realpathSync(process.execPath);
++  const env = { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp, GIT_CONFIG_GLOBAL: gitConfigGlobal,
++    PATH: `${dirname(nodeBinary)}${delimiter}${process.env.PATH ?? ""}` };
++  delete env.NODE_TEST_CONTEXT;
++  mkdirSync(join(clone, "scratch"), { recursive: true });
++  const outputRel = `scratch/${label}-output.txt`;
++  const out = createWriteStream(join(clone, outputRel));
++  const started = Date.now();
++  const args = ["harness/scripts/verify.mjs", "--mode", "candidate", ...(reuse ? [] : ["--no-reuse"])];
++  const child = spawn(nodeBinary, args, { cwd: clone, env, stdio: ["ignore", "pipe", "pipe"] });
++  child.stdout.pipe(out, { end: false });
++  child.stderr.pipe(out, { end: false });
++  child.on("close", (code) => {
++    out.end();
++    const recordPath = join(clone, "evidence", "verify-latest.json");
++    let record = null;
++    try { if (existsSync(recordPath)) record = JSON.parse(readFileSync(recordPath, "utf8")); } catch { record = null; }
++    for (const line of summarize({ exitCode: code, seconds: Math.round((Date.now() - started) / 1000), outputPath: outputRel, record })) console.log(line);
++    process.exit(code ?? 1);
++  });
++  return null;
++}
++
++if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  const early = main(process.argv.slice(2));
++  if (early !== null) process.exit(early);
++}
+diff --git a/scripts/run-parallel.test.mjs b/scripts/run-parallel.test.mjs
+index 8b24216cc..e6def5ab1 100644
+--- a/scripts/run-parallel.test.mjs
++++ b/scripts/run-parallel.test.mjs
+@@ -35,6 +35,22 @@ git(work, "config", "user.name", "t");
+ git(work, "config", "user.email", "t@example.invalid");
+ test.after(() => rmSync(sandbox, { recursive: true, force: true }));
+ 
++test("full-verify.mjs pure parts: short TMPDIR bound, red steps from the run record, summary, private git config (K143)", async () => {
++  const fv = await import("./full-verify.mjs");
++  assert.equal(fv.tmpDirIsShortEnough("/home/u/.fv/fv/t"), true);
++  assert.equal(fv.tmpDirIsShortEnough("/home/u/pipeline-test-tmp/a-very-long-label-name/tmp"), false);
++  assert.equal(fv.tmpDirIsShortEnough(""), false);
++  const record = { steps: [{ name: "a", exitCode: 0 }, { name: "b", exitCode: 1 }, { name: "c", exitCode: 2 }] };
++  assert.deepEqual(fv.redStepNames(record), ["b", "c"]);
++  assert.deepEqual(fv.redStepNames(null), []);
++  const lines = fv.summarize({ exitCode: 1, seconds: 7, outputPath: "scratch/fv-output.txt", record });
++  assert.equal(lines[0], "verify exit 1 after 7 s; output in scratch/fv-output.txt");
++  assert.equal(lines[1], "steps 3, red 2");
++  assert.deepEqual(lines.slice(2), ["  red: b", "  red: c"]);
++  assert.match(fv.summarize({ exitCode: 0, seconds: 1, outputPath: "o", record: null })[1], /unreadable or absent/);
++  assert.match(fv.privateGitConfig({ name: "N", email: "e@x" }), /defaultBranch = main/);
++});
++
+ test("a clean source runs its exact HEAD and prints the commit", () => {
+   initSrc(1);
+   const r = run();

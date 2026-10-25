@@ -1,0 +1,10 @@
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+const { parseGuardCommand } = await import(new URL('./plugins/pipeline-core/hooks/guard-command-grammar.mjs', import.meta.url));
+const root = fileURLToPath(new URL('./', import.meta.url)).replace(/[\\/]$/u, '');
+const out = [];
+for (const platform of ['win32', 'linux']) for (const cmd of ['node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"', 'node "$FOO/x.mjs"']) {
+  const p = parseGuardCommand(cmd, root, { platform });
+  out.push(platform + ' ' + cmd + '\n  parse=' + JSON.stringify(p).slice(0, 400));
+}
+writeFileSync(new URL('./dbg4c-out.txt', import.meta.url), out.join('\n'));

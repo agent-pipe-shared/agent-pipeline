@@ -1,0 +1,541 @@
+diff --git a/SETUP.md b/SETUP.md
+index 2e2a3347c..f459abed9 100644
+--- a/SETUP.md
++++ b/SETUP.md
+@@ -93,6 +93,12 @@ the runner's supported integration and follow its setup path. See
+ [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for exact controls,
+ prerequisites, and manual responsibilities.
+ 
++On Windows, ordinary drive, project, source, installed-plugin, and runtime
++image owner or write ACLs are observed but do not block Pipeline readiness. Pipeline-owned
++private authority keeps its stricter custody checks. Read
++[`docs/windows-authority-boundaries.md`](docs/windows-authority-boundaries.md)
++for the Windows guarantee and the scoped POSIX comparison.
++
+ <a id="consumer-onboarding-details"></a>
+ 
+ ### 0. Bind the supported runner integration and fully restart its host
+diff --git a/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs b/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
+index 8a903426a..26719b6af 100644
+--- a/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
++++ b/plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
+@@ -3,9 +3,9 @@
+ // pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures,
+ // governing criterion AC-270 (specs/sprint-alfred-epic/spec.md, bytes 233790..233964), narrowed by the PO decision of
+ // 2026-10-17 (specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md, "Windows authority ancestors above the repository"):
+-// directories STRICTLY ABOVE the repository root are human-controlled. They are still observed and their owner/ACL facts stay
+-// bound into the native facts, but a foreign owner or foreign write grant there no longer refuses. The repository root, every
+-// directory below it and the private state keep every existing strict check; reparse points and non-directories stay refused.
++// Ordinary host, project and plugin ownership/ACLs are integrity observations, not host-hardening gates. Owner/ACL facts stay
++// bound into native observations while foreign ownership/write grants at or below the repository root are accepted. Pipeline-
++// owned private state keeps strict current-user owner and protected-DACL checks; reparse points and non-directories stay refused.
+ //
+ // Cases drive the real backend, the real native helper and the real verify-journal registration path on a real NTFS fixture.
+ // PIPELINE_ANCESTOR_PIN_CODE_ROOT is a replay seam only: it points the pin at a scratch mirror of an earlier source state
+@@ -98,9 +98,12 @@ const winTest = (id, name, fn) => cases.push({
+   },
+ });
+ 
+-winTest('WAA001', 'control: the fixture ancestor really grants a foreign principal write and the strict ancestor check refuses it', async () => {
++winTest('WAA001', 'control: the fixture ancestor really grants a foreign principal write and ordinary observation accepts it', async () => {
+   const {backend} = await load();
+-  assert.throws(() => backend.observeWindowsAuthorityAncestor({path: fixture.base}), refusal('WIN-AUTH-ANCESTOR-MUTATION'));
++  const observed = backend.observeWindowsAuthorityAncestor({path: fixture.base});
++  assert.match(observed.nativeFacts, FACTS);
++  assert.equal(observed.nativeFactsSha256, sha256(observed.nativeFacts));
++  assert.equal(observed.committed, false);
+ });
+ 
+ winTest('WAA002', 'an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts', async () => {
+@@ -119,15 +122,18 @@ winTest('WAA002', 'an ancestor strictly above the repository root that grants a
+   run(systemExe('icacls.exe'), [fixture.base, '/remove:g', '*S-1-1-0']);
+ });
+ 
+-winTest('WAA003', 'the same foreign write grant at or below the repository root is still refused with the existing code', async () => {
++winTest('WAA003', 'foreign write grants at and below the repository root remain observed but do not gate ordinary paths', async () => {
+   const {backend} = await load();
+   for (const [path, boundaryRoot] of [
+     [fixture.rootBad.root, fixture.rootBad.root], // the root itself
+     [fixture.belowBad.git, fixture.belowBad.root], // below the root
+-    [fixture.belowBad.git, fixture.clean.root], // unrelated to the root: no proof, no relaxation
++    [fixture.belowBad.git, fixture.clean.root], // unrelated to the root: descriptor remains observable without granting authority
+   ]) {
+-    assert.throws(() => backend.observeWindowsAuthorityAncestor({path}), refusal('WIN-AUTH-ANCESTOR-MUTATION'), `strict ${path}`);
+-    assert.throws(() => backend.observeWindowsAuthorityAncestor({path, boundaryRoot}), refusal('WIN-AUTH-ANCESTOR-MUTATION'), `bounded ${path}`);
++    for (const input of [{path}, {path, boundaryRoot}]) {
++      const observed = backend.observeWindowsAuthorityAncestor(input);
++      assert.match(observed.nativeFacts, FACTS, path);
++      assert.equal(observed.nativeFactsSha256, sha256(observed.nativeFacts), path);
++    }
+   }
+ });
+ 
+@@ -183,15 +189,20 @@ winTest('WAA007', 'verify-journal registration (the Full Verify journal step) ac
+   assert.ok(existsSync(records));
+ });
+ 
+-winTest('WAA008', 'verify-journal registration still refuses a foreign write grant at the repository root or below it', async () => {
+-  const {journal} = await load();
++winTest('WAA008', 'verify-journal still refuses foreign grants inherited by Pipeline-owned private state', async () => {
++  const {backend, journal} = await load();
+   for (const repository of [fixture.rootBad, fixture.belowBad]) {
++    const privateRoot = join(repository.git, 'agent-pipeline');
++    backend.createWindowsOwnedAuthorityDirectory({path: privateRoot});
++    grantForeignWrite(privateRoot);
++    let registered = false;
+     assert.throws(() => journal.registerRunRecordOwner({
+       gitCommonDir: repository.git,
+       runId: 'ancestor-pin-refused',
+       runPath: join(repository.git, 'agent-pipeline', 'verify', 'runs', 'ancestor-pin-refused'),
+-      registerRecord: ({ensureDirectory}) => { ensureDirectory(join(repository.git, 'agent-pipeline', 'verify', 'records')); return {recordSha256: 'a'.repeat(64)}; },
+-    }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED \(cause: WIN-AUTH-ANCESTOR-MUTATION\)/u, repository.root);
++      registerRecord: ({ensureDirectory}) => { registered = true; ensureDirectory(join(repository.git, 'agent-pipeline', 'verify', 'records')); return {recordSha256: 'a'.repeat(64)}; },
++    }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED \(cause: WIN-AUTH-(?:OWNER|DACL)\)/u, repository.root);
++    assert.equal(registered, true, 'the failure must reach private-directory creation/inspection');
+   }
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs b/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+index 2906ea57f..47b43dd6e 100644
+--- a/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
++++ b/plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+@@ -3,9 +3,8 @@
+ // pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear, governing criterion AC-203
+ // (specs/sprint-alfred-epic/spec.md, bytes 216884..217056), applying the PO decision of 2026-10-17
+ // (specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md, "Windows authority ancestors above the repository"):
+-// directories STRICTLY ABOVE the repository root are human-controlled. Their owner/ACL are still observed and bound into the
+-// native facts, but a foreign owner or foreign write grant there no longer refuses. The repository root, every directory below
+-// it and the private state keep every strict check.
++// Ordinary host/project/source owner and write ACLs are observed and bound into native facts, not used as hardening gates.
++// Pipeline-owned private state keeps its strict owner and protected-DACL checks; path containment and physical alias checks remain.
+ //
+ // Commit b554c495c applied the decision to verify-journal only. The requester/controller callers walked the ancestor chain of a
+ // repository path without the repository root as boundary, so the real controlled-method fixture refused with
+@@ -69,7 +68,7 @@ function makeRepository(name, {rootClean, gitClean}) {
+   return {root, dotGit};
+ }
+ function refusal(error) {
+-  return error?.code === 'SDC-AUTHORITY-UNAVAILABLE' && /^WIN-AUTH-ANCESTOR-(?:MUTATION|OWNER)$/u.test(error.reason ?? '');
++  return error?.code === 'SDC-AUTHORITY-UNAVAILABLE' && /^WIN-AUTH-(?:OWNER|DACL)$/u.test(error.reason ?? '');
+ }
+ function custody(repository) {
+   return loaded.lifecycle.inspectSignedDescriptorCustodyRepository(repository.root);
+@@ -102,9 +101,9 @@ const winTest = (name, fn) => test(name, {skip: isWindows ? false : HOST_LIMITAT
+ const fixtureRootFor = (repository, name) => join(repository.dotGit, 'agent-pipeline', 'controlled-method-fixtures', name);
+ const sessionId = 'ancestor-pin-session';
+ 
+-winTest('control: the fixture base really grants a foreign principal write and the strict ancestor check refuses it', async () => {
++winTest('control: the fixture base really grants a foreign principal write and ordinary observation accepts it', async () => {
+   const {backend} = await load();
+-  assert.throws(() => backend.observeWindowsAuthorityAncestor({path: fixture.base}), refusal);
++  assert.equal(typeof backend.observeWindowsAuthorityAncestor({path: fixture.base}).nativeFactsSha256, 'string');
+ });
+ 
+ winTest('requester storage walks the ancestors of a repository path with the repository root as boundary and keeps its CAS deterministic', async () => {
+@@ -136,24 +135,31 @@ winTest('createControlledMethodRuntimeFixture is not refused by a foreign-writab
+   }
+ });
+ 
+-winTest('control: a foreign write grant at the repository root still refuses requester storage and the controlled fixture', async () => {
++winTest('a foreign write grant at the repository root does not block requester storage or the controlled fixture', async () => {
+   const {runtime, bridge} = await load();
+   const repository = custody(fixture.rootBad);
+-  assert.throws(() => runtime.ensureWindowsRequesterNamespace(runtime.createWindowsRequesterStorage({repository})), refusal);
+-  assert.throws(() => bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.rootBad, 'fx-ancestor-pin'), sessionId}), refusal);
++  const storage = runtime.createWindowsRequesterStorage({repository});
++  assert.equal(typeof runtime.ensureWindowsRequesterNamespace(storage).namespaceSha256, 'string');
++  const controlled = bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.rootBad, 'fx-root-acl'), sessionId});
++  try { assert.equal(typeof controlled.run, 'function'); } finally { await controlled.dispose(); }
+ });
+ 
+-winTest('control: a foreign write grant below the repository root (the common directory) still refuses requester storage and the controlled fixture', async () => {
++winTest('a foreign-writable common directory is accepted but an explicit private-state grant is refused', async () => {
+   const {runtime, bridge} = await load();
+   const repository = custody(fixture.belowBad);
+-  assert.throws(() => runtime.ensureWindowsRequesterNamespace(runtime.createWindowsRequesterStorage({repository})), refusal);
++  const storage = runtime.createWindowsRequesterStorage({repository});
++  assert.equal(typeof runtime.ensureWindowsRequesterNamespace(storage).namespaceSha256, 'string');
++  const privateRoot = join(repository.commonDir, 'agent-pipeline');
++  grantForeignWrite(privateRoot);
++  assert.throws(() => runtime.ensureWindowsRequesterNamespace(storage), refusal);
+   assert.throws(() => bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.belowBad, 'fx-ancestor-pin'), sessionId}), refusal);
+ });
+ 
+ // ---- ALF-C-ANCESTOR-CALLERS4: the remaining repository-path walkers (domain owner, OSV bridge, host-process journal) ------------
+-// Decided design: each walker derives or receives the repository root and passes it as boundaryRoot to
+-// observeWindowsAuthorityAncestor, which relaxes only paths lexically STRICTLY ABOVE it. Case A drives the real domain-owner
+-// namespace read on the real fixture. Cases B and C are structural: the bridge and journal readers need a full signed
++// Each walker derives or receives the repository root and passes it as boundaryRoot to
++// observeWindowsAuthorityAncestor so the observed path relation remains explicit. Ordinary ancestor owner/write ACLs do not gate
++// regardless of relation; Pipeline-owned private entries are checked separately. Case A drives the real domain-owner namespace
++// read on the real fixture. Cases B and C are structural: the bridge and journal readers need a full signed
+ // session-authority catalogue and a live Codex task origin that no cheap fixture reproduces, so the call graph is pinned instead.
+ const NAMESPACE_ID = 'domain-ancestor-pin';
+ const NAMESPACE_RECORD = {schema: 'ancestor-pin-record'};
+@@ -176,12 +182,12 @@ winTest('case A: readAuthorityNamespace is not refused by a foreign-writable anc
+   assert.deepEqual(read.entries.map((entry) => ({...entry.value})), [NAMESPACE_RECORD]); // parseStrictJson returns null-prototype objects
+ });
+ 
+-winTest('case A control: readAuthorityNamespace still refuses at and below the repository root and outside any .git/agent-pipeline', async () => {
++winTest('case A control: private authority remains strict while paths outside its namespace remain refused', async () => {
+   const owner = await ownerModule();
+-  // A foreign write grant on the common directory (below the root), on the root itself, and a directory directly under the
+-  // foreign-writable base that is not inside any <repository>/.git/agent-pipeline (no boundary is derived, so it stays strict).
+-  assert.throws(() => readNamespace(owner, join(fixture.belowBad.dotGit, 'agent-pipeline', NAMESPACE_ID)), refusal);
+-  assert.throws(() => readNamespace(owner, join(fixture.rootBad.dotGit, 'agent-pipeline', NAMESPACE_ID)), refusal);
++  // The root's foreign grant is ordinary. Inject a separate grant onto an existing private namespace to test strict custody.
++  const privateNamespace = seedNamespace(fixture.rootBad);
++  grantForeignWrite(privateNamespace);
++  assert.throws(() => readNamespace(owner, privateNamespace), refusal);
+   const outside = join(fixture.base, 'outside-any-agent-pipeline');
+   mkdirSync(outside);
+   assert.throws(() => readNamespace(owner, outside), refusal);
+@@ -226,7 +232,7 @@ function callsOf(source, name) {
+ 
+ test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the repository root, after a lexical containment check', () => {
+   const source = libSource('session-requester-bridge.mjs');
+-  assert.match(source, /function osvWindowsBoundary\(path,root\)\{/u); // lexical, case-insensitive containment inside the root, else null (strict)
++  assert.match(source, /function osvWindowsBoundary\(path,root\)\{/u); // lexical, case-insensitive containment inside the root, else no bound root
+   assert.match(source, /function osvWindowsAncestors\(path,boundaryRoot=null\)\{/u);
+   assert.match(source, /function osvWindowsRead\(path,maxBytes,privateFile=false,boundaryRoot=null\)\{/u);
+   // osvWindowsRead forwards the identical boundary to the before and the after ancestor read, so its CAS stays deterministic.
+@@ -241,31 +247,29 @@ test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the
+ 
+ test('case C (structural): the host-process journal bounds only the three repository-bearing verification readers', () => {
+   const source = libSource('codex-host-process-journal.mjs');
+-  assert.match(source, /function verificationWindowsBoundary\(path,repository\)\{/u); // contained in repository.primaryRoot, else null (strict)
++  assert.match(source, /function verificationWindowsBoundary\(path,repository\)\{/u); // contained in repository.primaryRoot, else no bound root
+   assert.match(source, /function verificationWindowsRead\(path,maxBytes,repository=null\)\{/u);
+   assert.equal(callsOf(source, 'verificationWindowsBoundary').length, 1);
+   // The boundary is computed once per read and reused by the before and the after ancestry, so the CAS stays deterministic.
+-  // rootIdentity keeps the strict single-path ancestor check; only verificationWindowsRead can pass a boundary.
++  // rootIdentity observes a single path; repository-bearing reads additionally bind their proven boundary into ancestry facts.
+   assert.deepEqual(callsOf(source, 'observeWindowsAuthorityAncestor').map(({caller, args}) => [caller, args.join('|')]), [['rootIdentity', '{path}'], ['verificationWindowsRead', 'boundaryRoot?{path:cursor,boundaryRoot}:{path:cursor}']]);
+-  const reads = callsOf(source, 'verificationWindowsRead').map(({caller, args}) => [caller, args.length === 3 ? args[2] : args.length === 2 ? 'strict' : `${args.length} arguments`]);
++  const reads = callsOf(source, 'verificationWindowsRead').map(({caller, args}) => [caller, args.length === 3 ? args[2] : args.length === 2 ? 'no-boundary' : `${args.length} arguments`]);
+   assert.deepEqual(reads.sort((a, b) => a[0].localeCompare(b[0])), [
+     ['managedWindowsRegistryRecord', 'repository'],
+-    ['readHostJournal', 'strict'],
+-    ['verificationReadTask', 'strict'],
++    ['readHostJournal', 'no-boundary'],
++    ['verificationReadTask', 'no-boundary'],
+     ['verificationWindowsCatalogueRef', 'repository'],
+     ['verificationWindowsRecord', 'repository'],
+-    ['writeHostJournal', 'strict'],
++    ['writeHostJournal', 'no-boundary'],
+   ]);
+ });
+ 
+ // ---- ALF-C-ANCESTOR-CALLERS5: the plugin-module walk of the domain owner (readModuleContext) ---------------------------------
+ // readModuleContext walks the ancestors of a plugin SOURCE MODULE, not of a repository path, so the repository-root boundary of
+-// cases A-C does not apply. The decided boundary is the plugin root that contains lib/, derived once from this module's own
+-// location (never caller-supplied) and consumed by readModuleContext alone, and only for a module lexically inside it. The plugin
+-// root and every directory below it stay strict; POSIX behaviour is unchanged. Case D pins the call graph, case D2 replays the
+-// real session power record write that the host-crash recovery path needs, and its control keeps a module outside the plugin root
+-// strict. Case D2 is RED on the original code on any host whose path above the plugin root grants a foreign principal write
+-// (a default Windows drive root or first-level directory does); elsewhere it is a positive control.
++// cases A-C does not apply. The plugin root is still derived from this module's own location and consumed by readModuleContext
++// alone as provenance input. Ordinary owner/write ACLs at or above that root are observations, not gates; physical containment,
++// directory type, reparse rejection and POSIX checks remain. Case D pins the call graph, while D2 exercises source observation
++// beneath an ordinary foreign-writable ancestor.
+ 
+ test('case D (structural): readModuleContext bounds its ancestor walk only with the plugin root derived from the module location, after a lexical containment check', () => {
+   const source = libSource('session-authority-domain-owner.mjs');
+@@ -276,7 +280,7 @@ test('case D (structural): readModuleContext bounds its ancestor walk only with
+   assert.deepEqual(callsOf(source, 'pluginRootBoundary').map(({caller, args}) => [caller, args.join('|')]), [['readModuleContext', 'filePath']]);
+   const body = source.match(/^function pluginRootBoundary\(filePath\)\{$[\s\S]*?^\}$/mu)?.[0] ?? '';
+   assert.match(body, /process\.platform!=='win32'\|\|typeof filePath!=='string'\)return null;/u); // POSIX never produces a boundary
+-  assert.match(body, /filePath\.toLowerCase\(\)\.startsWith\(base\.toLowerCase\(\)\+sep\)\?PLUGIN_ROOT:null/u); // lexical, case-insensitive, separator-delimited, else strict
++  assert.match(body, /filePath\.toLowerCase\(\)\.startsWith\(base\.toLowerCase\(\)\+sep\)\?PLUGIN_ROOT:null/u); // lexical, case-insensitive, separator-delimited, else no plugin-root binding
+   // The win32 module walk passes the boundary; the POSIX module walk and every other walker keep their call shape unchanged.
+   assert.deepEqual(callsOf(source, 'chain').filter(({caller}) => caller === 'readModuleContext').map(({args}) => args.join('|')), ['dirname(filePath)|pluginRootBoundary(filePath)', 'dirname(filePath)']);
+   assert.deepEqual(callsOf(source, 'chain').filter(({caller}) => caller !== 'readModuleContext').map(({caller, args}) => `${caller}:${args.join('|')}`).sort(), [
+@@ -294,8 +298,8 @@ test('case D (structural): readModuleContext bounds its ancestor walk only with
+ winTest('case D2: the session power record is written although a path above the plugin root grants a foreign principal write', async () => {
+   const power = await import(pathToFileURL(join(pluginRoot, 'lib', 'session-power.mjs')).href);
+   const {lifecycle} = await load();
+-  // The fixture repository lives in the pin's protected fixture area, not under os.tmpdir(): a temp directory may inherit a sandbox
+-  // group's Modify grant onto the repository root itself, which the strict check rightly refuses (the root is the boundary).
++  // The fixture repository lives in the pin's protected fixture area, not under os.tmpdir(), so this case controls the exact
++  // ordinary foreign-writable ancestor independently of incidental host temp policy.
+   const root = realpathSync(mkdtempSync(join(fixture.base, 'power-')));
+   protect(root);
+   const ceiling = {had: Object.hasOwn(process.env, 'GIT_CEILING_DIRECTORIES'), value: process.env.GIT_CEILING_DIRECTORIES};
+@@ -331,11 +335,11 @@ test('case D3 (structural): readRaw on win32 lstat()s the safe path before the s
+   assert.match(line, /const abs=safePath\(repo,path\);let fd;try\{const before=lstatSync\(abs\);/u);
+ });
+ 
+-winTest('case D2 control: a source module outside the plugin root is still refused by the strict ancestor walk', async () => {
++winTest('case D2: a source module outside the plugin root is not rejected solely for an ordinary foreign write grant', async () => {
+   const owner = await ownerModule();
+-  // fixture.base grants a foreign principal write and lies outside the plugin root, so it must stay refused whatever the host above it.
++  // fixture.base grants a foreign principal write; source integrity is established by stable physical identity and content digest.
+   const outside = join(fixture.base, 'outside-plugin-module.mjs');
+   writeFileSync(outside, '// ancestor pin control module\n');
+-  const unreachable = () => { throw new Error('refused before any owner callback'); };
+-  assert.throws(() => owner.createDomainAuthorityOwner({repository: custody(fixture.clean), producerId: 'ancestor-pin', kinds: [], namespaceIds: [NAMESPACE_ID], scan: unreachable, terminalObservation: unreachable, transitionScope: unreachable, sourceModulePaths: [outside]}), refusal);
++  const unreachable = () => { throw new Error('not called by source context observation'); };
++  assert.doesNotThrow(() => owner.createDomainAuthorityOwner({repository: custody(fixture.clean), producerId: 'ancestor-pin', kinds: [], namespaceIds: [NAMESPACE_ID], scan: unreachable, terminalObservation: unreachable, transitionScope: unreachable, sourceModulePaths: [outside]}));
+ });
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index 4428b3cb7..7c5afa582 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -1,11 +1,22 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Read-only Windows custody diagnosis. The native authority backend remains the sole policy oracle.
+ import { win32 } from 'node:path';
++import { createHash } from 'node:crypto';
+ import { existsSync } from 'node:fs';
+ import { inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from './windows-owned-authority-backend.mjs';
+ 
+ export const WINDOWS_AUTHORITY_READINESS_SCHEMA = 'pipeline.windows-authority-readiness.v1';
+ const NATIVE_REASON = /^WIN-AUTH-[A-Z-]{1,64}$/u;
++const SHA256 = /^[a-f0-9]{64}$/u;
++
++function observed(value) {
++  if (value === null || typeof value !== 'object' || Array.isArray(value)
++    || Object.keys(value).sort().join(',') !== 'committed,helperSha256,nativeFacts,nativeFactsSha256'
++    || typeof value.nativeFacts !== 'string' || value.nativeFacts.length === 0
++    || !SHA256.test(value.nativeFactsSha256) || !SHA256.test(value.helperSha256)
++    || value.committed !== false) return false;
++  return createHash('sha256').update(value.nativeFacts).digest('hex') === value.nativeFactsSha256;
++}
+ 
+ function chain(path) {
+   const root = win32.parse(path).root;
+@@ -21,15 +32,9 @@ export function windowsAuthorityCause(error) {
+ }
+ 
+ function guidance(pathClass, reason) {
+-  if (reason === 'WIN-AUTH-ANCESTOR-MUTATION') return {
+-    kind: 'operator-review', mutation: false,
+-    summary: `Inspect the inherited or explicit foreign write ACE on the ${pathClass} directory. Record the actual SID and ACE source; review a single-directory SID-targeted removal or move the repository into a private user-profile directory, then rerun readiness.`,
+-    inspection: ['whoami /user', 'Get-Acl -LiteralPath <exact directory> | Format-List Owner,Access'],
+-    repairPreview: 'At the reviewed ACE source only: icacls <exact directory> /remove:g *<observed SID>. If the ACE is inherited, review inheritance at that one directory before editing; never apply /T.',
+-  };
+   return { kind: 'operator-review', mutation: false,
+-    summary: `Inspect ${pathClass} custody for ${reason}; repair only the named directory after review, or relocate the repository into a private user-profile directory, then rerun readiness.`,
+-    inspection: ['whoami /user', 'Get-Acl -LiteralPath <exact directory> | Format-List Owner,Access'],
++    summary: `Inspect the ${pathClass} path for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
++    inspection: ['Confirm the exact path exists and is a physical non-reparse directory.', 'For private Pipeline authority, inspect its owner and protected DACL.'],
+     repairPreview: null,
+   };
+ }
+@@ -65,7 +70,10 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+       const key = `${path.toLowerCase()}|${privatePath ? 'private' : 'ancestor'}|${boundaryRoot?.toLowerCase() ?? 'strict'}`;
+       let reason = seen.get(key);
+       if (reason === undefined) {
+-        try { probe({ path, boundaryRoot, privatePath, pathClass }); reason = null; }
++        try {
++          const result = probe({ path, boundaryRoot, privatePath, pathClass });
++          reason = observed(result) ? null : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
++        }
+         catch (error) { reason = windowsAuthorityCause(error); }
+         seen.set(key, reason);
+       }
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+index ae26a3a0b..fff8aa3a4 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
++import { createHash } from 'node:crypto';
+ import { registerTestCaseCompletion } from './test-case-completion.mjs';
+ import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
+ 
+@@ -10,67 +11,65 @@ const roots = {
+ };
+ const cases = [];
+ function test(name, run) { cases.push({ id: `WAR${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
++function syntheticObservation() {
++  const nativeFacts = 'synthetic-observation-for-readiness-seam';
++  return { nativeFacts, nativeFactsSha256: createHash('sha256').update(nativeFacts).digest('hex'), helperSha256: 'a'.repeat(64), committed: false };
++}
+ 
+-test('foreign inherited Modify at the repository root remains refused with bounded recovery', () => {
++test('a synthetic valid project-root observation advances readiness without losing its boundary', () => {
+   const calls = [];
+   const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+-    probe(input) {
+-      calls.push(input);
+-      if (input.path === roots.projectRoot && input.pathClass === 'project')
+-        throw Object.assign(new Error('closed'), { reason: 'WIN-AUTH-ANCESTOR-MUTATION' });
+-    },
++    probe(input) { calls.push(input); return syntheticObservation(); },
+   });
+-  assert.equal(result.status, 'unavailable');
+-  assert.equal(result.causes[0].reason, 'WIN-AUTH-ANCESTOR-MUTATION');
+-  assert.equal(result.causes[0].pathClass, 'project');
+-  assert.match(result.causes[0].nextAction.repairPreview, /observed SID/u);
+-  assert.match(result.causes[0].nextAction.repairPreview, /never apply \/T/u);
++  assert.equal(result.status, 'ready');
++  assert.deepEqual(result.causes, []);
+   assert.equal(calls.find(row => row.path === roots.projectRoot && row.pathClass === 'project').boundaryRoot, roots.projectRoot);
+   assert.equal(calls.find(row => row.path === roots.pluginRoot).boundaryRoot, null,
+     'the installed plugin directory is not silently treated as a proven repository root');
++  assert.equal(calls.some(row => row.privatePath), true, 'private authority still receives its distinct strict inspection');
+ });
+ 
+-test('trusted project, plugin and private path observations stay ready without mutation', () => {
++test('synthetic valid project, plugin and private observations advance readiness without mutation', () => {
+   const calls = [];
+-  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe: row => calls.push(row) });
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe: row => { calls.push(row); return syntheticObservation(); } });
+   assert.deepEqual(result, { schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] });
+   assert.equal(calls.filter(row => row.privatePath).length, 1);
+   assert.ok(calls.some(row => row.pathClass === 'project' && row.path === 'D:\\' && row.boundaryRoot === roots.projectRoot));
+ });
+ 
+-test('project, plugin and private failures are aggregated from one read-only pass', () => {
++test('ordinary observation faults and private custody failures remain unavailable', () => {
+   const failures = new Map([
+-    [roots.projectRoot, 'WIN-AUTH-ANCESTOR-MUTATION'],
+-    [roots.pluginRoot, 'WIN-AUTH-ANCESTOR-OWNER'],
++    [roots.projectRoot, 'WIN-AUTH-OBSERVATION-UNAVAILABLE'],
++    [roots.pluginRoot, 'WIN-AUTH-OPEN'],
+     [roots.privateRoot, 'WIN-AUTH-DACL'],
+   ]);
+   const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+     probe({ path }) {
+       if (failures.has(path)) throw Object.assign(new Error('closed'), { reason: failures.get(path) });
++      return syntheticObservation();
+     },
+   });
+   assert.equal(result.status, 'unavailable');
+-  for (const pathClass of ['project', 'plugin', 'private'])
+-    assert.ok(result.causes.some(row => row.pathClass === pathClass && row.reason.startsWith('WIN-AUTH-')));
++  for (const [path, reason] of failures)
++    assert.ok(result.causes.some(row => row.path === path && row.reason === reason), 'expected mapped refusal at ' + path + ' with ' + reason);
+ });
+ 
+-test('a writable plugin ancestor is observed and refused before dispatch', () => {
++test('a synthetic valid plugin-ancestor observation advances readiness without refusing dispatch', () => {
+   const ancestor = 'C:\\Users\\owner\\plugins';
++  const calls = [];
+   const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+-    probe({ path, pathClass }) {
+-      if (pathClass === 'plugin' && path === ancestor)
+-        throw Object.assign(new Error('closed'), { reason: 'WIN-AUTH-ANCESTOR-MUTATION' });
+-    },
++    probe(input) { calls.push(input); return syntheticObservation(); },
+   });
+-  assert.ok(result.causes.some(row => row.pathClass === 'plugin'
+-    && row.path === ancestor && row.reason === 'WIN-AUTH-ANCESTOR-MUTATION'));
++  assert.equal(result.status, 'ready');
++  assert.ok(calls.some(row => row.pathClass === 'plugin' && row.path === ancestor));
++  assert.equal(result.causes.some(row => row.pathClass === 'plugin' && row.path === ancestor), false);
+ });
+ 
+ test('missing private namespace does not manufacture an ACL failure, while its parent is inspected', () => {
+   const calls = [];
+   const result = assessWindowsAuthorityReadiness({ ...roots,
+     exists: path => path !== roots.privateRoot,
+-    probe: row => calls.push(row),
++    probe: row => { calls.push(row); return syntheticObservation(); },
+   });
+   assert.equal(result.status, 'ready');
+   assert.equal(calls.some(row => row.privatePath), false);
+@@ -80,7 +79,7 @@ test('missing private namespace does not manufacture an ACL failure, while its p
+ test('missing plugin prerequisite remains unavailable', () => {
+   const result = assessWindowsAuthorityReadiness({ ...roots,
+     exists: path => path !== roots.pluginRoot,
+-    probe() {},
++    probe: () => syntheticObservation(),
+   });
+   assert.equal(result.status, 'unavailable');
+   assert.ok(result.causes.some(row => row.pathClass === 'plugin' && row.reason === 'WIN-AUTH-OPEN'));
+@@ -93,12 +92,17 @@ test('unknown native failures close without copying arbitrary exception text', (
+   assert.equal(result.status, 'unavailable');
+   assert.ok(result.causes.every(row => row.reason === 'WIN-AUTH-OBSERVATION-UNAVAILABLE'));
+   assert.doesNotMatch(JSON.stringify(result), /private machine path/u);
++  for (const probe of [() => undefined, () => ({ nativeFacts: 'forged' })]) {
++    const missing = assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe });
++    assert.equal(missing.status, 'unavailable');
++    assert.ok(missing.causes.every(row => row.reason === 'WIN-AUTH-OBSERVATION-UNAVAILABLE'));
++  }
+ });
+ 
+ test('a pristine project can inspect existing roots before Git creates its private namespace', () => {
+   const result = assessWindowsAuthorityReadiness({ ...roots,
+     exists: path => !path.toLowerCase().includes('\\.git'),
+-    probe() {},
++    probe: () => syntheticObservation(),
+   });
+   assert.equal(result.status, 'ready');
+ });
+diff --git a/plugins/pipeline-core/lib/windows-native-process-observer.mjs b/plugins/pipeline-core/lib/windows-native-process-observer.mjs
+index 411afaae5..a61bc2b6e 100644
+--- a/plugins/pipeline-core/lib/windows-native-process-observer.mjs
++++ b/plugins/pipeline-core/lib/windows-native-process-observer.mjs
+@@ -10,7 +10,7 @@ import {readWindowsAuthoritySourceModule,observeWindowsAuthorityAncestor} from '
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ import {parseStrictJson} from './governance-event.mjs';
+ 
+-const HELPER_SHA256='db43cfe5b1624ff459f065ef0de622e527dccb1b8a8621e4a4b76a26066585da';
++const HELPER_SHA256='feb0f64ac2290b094c262b62d5334d894c0ce7c91c401b6b8fb23a1decd1c348';
+ const HELPER=fileURLToPath(new URL('./windows-native-process-observer.ps1',import.meta.url));
+ const SHA=/^[a-f0-9]{64}$/u,SID=/^S-1-(?:[0-9]+-){1,14}[0-9]+$/u,TICKS=/^[1-9][0-9]{0,18}$/u;
+ const nativeKeys=['status','pid','parentPid','start','parentStart','sessionId','principalSid','parentPrincipalSid','executable','executableSha256','executableFactsSha256','argv','commandLineSha256','bootIdentity'];
+diff --git a/plugins/pipeline-core/lib/windows-native-process-observer.ps1 b/plugins/pipeline-core/lib/windows-native-process-observer.ps1
+index 0950edeb5..ad295b6e1 100644
+--- a/plugins/pipeline-core/lib/windows-native-process-observer.ps1
++++ b/plugins/pipeline-core/lib/windows-native-process-observer.ps1
+@@ -136,8 +136,6 @@ public static class PipelineProcessObserver {
+  public sealed class ProcessFact { public uint pid,sessionId; public string start,principalSid,executable; }
+  public sealed class ImageFact { public string sha256,factsSha256; }
+  static Exception Refuse(string code) { return new InvalidOperationException(code); }
+- // Fixed Windows servicing principal; no caller-provided account/ACL exceptions.
+- static bool Trusted(string sid,string current) { return sid==current||sid=="S-1-5-18"||sid=="S-1-5-32-544"||sid=="S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"; }
+  public static string Hash(byte[] bytes) { using(var sha=SHA256.Create())return String.Concat(sha.ComputeHash(bytes).Select(v=>v.ToString("x2"))); }
+  public static string TextHash(string text) { return Hash(new UTF8Encoding(false,true).GetBytes(text)); }
+  public static IntPtr Open(uint pid) { var h=OpenProcess(0x1000,false,pid);if(h==IntPtr.Zero)throw Refuse(Marshal.GetLastWin32Error()==87?"WPO-ABSENT":"WPO-PROCESS-ACCESS");return h; }
+@@ -153,11 +151,12 @@ public static class PipelineProcessObserver {
+  public static bool SameCimCreation(ProcessFact process,DateTime creation) { return Int64.Parse(process.start,System.Globalization.CultureInfo.InvariantCulture)/10==creation.ToUniversalTime().Ticks/10; }
+  public static string[] Argv(string text) { if(String.IsNullOrEmpty(text)||text.Length>32768||text.IndexOf('\0')>=0)throw Refuse("WPO-COMMAND-LINE");int count;var p=CommandLineToArgvW(text,out count);if(p==IntPtr.Zero)throw Refuse("WPO-ARGV");try{if(count<1||count>256)throw Refuse("WPO-ARGV");var argv=new string[count];for(int n=0;n<count;n++){argv[n]=Marshal.PtrToStringUni(Marshal.ReadIntPtr(p,n*IntPtr.Size));if(argv[n]==null||argv[n].Length>32768)throw Refuse("WPO-ARGV");}return argv;}finally{LocalFree(p);} }
+  static string Canonical(string p) { if(String.IsNullOrEmpty(p)||p.Length>32768||p.IndexOf('\0')>=0||p.StartsWith(@"\\")||p.Length<3||p.Substring(2).Contains(":"))throw Refuse("WPO-IMAGE-PATH");string full=Path.GetFullPath(p);if(!String.Equals(full,p,StringComparison.OrdinalIgnoreCase))throw Refuse("WPO-IMAGE-PATH");return full.TrimEnd('\\'); }
++ // Process images are ordinary host/source observations: validate and hash descriptor bytes, but do not gate on owner or write ACEs.
+  static string Facts(SafeFileHandle h,string p,bool directory) {
+   FileInfo i;var final=new StringBuilder(32768);uint length=GetFinalPathNameByHandleW(h,final,32768,0);if(!GetFileInformationByHandle(h,out i)||length==0||length>=32768)throw Refuse("WPO-IMAGE-IDENTITY");string actual=final.ToString();if(actual.StartsWith(@"\\?\"))actual=actual.Substring(4);
+   if((i.Attributes&0x400)!=0||((i.Attributes&0x10)!=0)!=directory||(!directory&&i.Links<1)||!String.Equals(actual.TrimEnd('\\'),Canonical(p),StringComparison.OrdinalIgnoreCase))throw Refuse("WPO-IMAGE-ALIAS");
+   IntPtr owner,group,dacl,sacl,sd;if(GetSecurityInfo(h,1,5,out owner,out group,out dacl,out sacl,out sd)!=0||sd==IntPtr.Zero)throw Refuse("WPO-IMAGE-SECURITY");
+-  try{uint size=GetSecurityDescriptorLength(sd);if(size==0||size>65536)throw Refuse("WPO-IMAGE-SECURITY");var raw=new byte[size];Marshal.Copy(sd,raw,0,(int)size);var security=new RawSecurityDescriptor(raw,0);string current=WindowsIdentity.GetCurrent().User.Value;if(security.Owner==null||security.DiscretionaryAcl==null||security.DiscretionaryAcl.Count==0)throw Refuse("WPO-IMAGE-DACL");if(!Trusted(security.Owner.Value,current))throw Refuse("WPO-IMAGE-OWNER");foreach(GenericAce ace in security.DiscretionaryAcl){var a=ace as CommonAce;if(a==null||a.IsCallback)throw Refuse("WPO-IMAGE-DACL");if((a.AceFlags&AceFlags.InheritOnly)!=0)continue;string sid=a.SecurityIdentifier.Value;int mutation=unchecked((int)(directory?0x500D0040u:0x500D0116u));if(a.AceQualifier==AceQualifier.AccessAllowed&&(a.AccessMask&mutation)!=0&&!Trusted(sid,current))throw Refuse("WPO-IMAGE-MUTATION");}
++  try{uint size=GetSecurityDescriptorLength(sd);if(size==0||size>65536)throw Refuse("WPO-IMAGE-SECURITY");var raw=new byte[size];Marshal.Copy(sd,raw,0,(int)size);var security=new RawSecurityDescriptor(raw,0);if(security.Owner==null||security.DiscretionaryAcl==null||security.DiscretionaryAcl.Count==0)throw Refuse("WPO-IMAGE-DACL");foreach(GenericAce ace in security.DiscretionaryAcl){var a=ace as CommonAce;if(a==null||a.IsCallback)throw Refuse("WPO-IMAGE-DACL");}
+    return i.Volume+":"+i.IndexHigh+":"+i.IndexLow+":"+i.Links+":"+i.Attributes+":"+i.SizeHigh+":"+i.SizeLow+":"+i.Creation.dwHighDateTime+":"+i.Creation.dwLowDateTime+":"+i.Write.dwHighDateTime+":"+i.Write.dwLowDateTime+":"+Hash(raw);
+   }finally{LocalFree(sd);}
+  }
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index dd0cc73c2..7344234ff 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -8,7 +8,7 @@ import {isAbsolute,resolve} from 'node:path';
+ import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ 
+-const HELPER_SHA256='09cc5f5eee1991704b0824688d8f87284a904f86c0029056cd15118abd33dd9b';
++const HELPER_SHA256='d7d910b1da43260399c5f8e75c65c3b17e58b2ca2dc4deddb9afa37f946ba25c';
+ const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
+ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-native.ps1 b/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+index 6c4f37407..e2da0ef3c 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
++++ b/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+@@ -140,7 +140,7 @@ public static class PipelineOwnedAuthorityNative {
+  // Compatible WRITE sharing is restricted to this parent; DELETE sharing remains refused.
+  // Private-file and temp handles retain their original exclusive sharing/custody checks.
+  static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
+- // humanControlled is the closed relaxation for a directory strictly above a caller-proven repository root: owner and ACL facts are still hashed into the returned facts, but a foreign owner, ACE shape or write grant no longer refuses. It is never combined with private custody or source images.
++ // Non-private paths are ordinary host/project/source integrity observations: owner and ACL bytes stay hashed into the facts, but their owner or write grants do not gate onboarding or source reads. Private Pipeline authority retains the strict current-SID owner and protected-DACL policy.
+  public static string Verify(SafeFileHandle h,string p,bool directory,bool privateOnly,bool sourceImage=false,bool humanControlled=false) {
+   if(sourceImage&&(directory||privateOnly))throw Refuse("WIN-AUTH-INPUT");
+   if(humanControlled&&(privateOnly||sourceImage||!directory))throw Refuse("WIN-AUTH-INPUT");
+@@ -148,7 +148,6 @@ public static class PipelineOwnedAuthorityNative {
+   if((i.Attributes&0x400)!=0||((i.Attributes&0x10)!=0)!=directory||(!directory&&(sourceImage?i.Links<1:i.Links!=1))||!String.Equals(Final(h),Canonical(p),StringComparison.OrdinalIgnoreCase))throw Refuse("WIN-AUTH-ALIAS");
+   IntPtr owner,group,dacl,sacl,sd;uint rc=GetSecurityInfo(h,1,5,out owner,out group,out dacl,out sacl,out sd);if(rc!=0||sd==IntPtr.Zero)throw Refuse("WIN-AUTH-SECURITY");
+   try{uint length=GetSecurityDescriptorLength(sd);if(length==0||length>65536)throw Refuse("WIN-AUTH-SECURITY");byte[] raw=new byte[length];Marshal.Copy(sd,raw,0,(int)length);var security=new RawSecurityDescriptor(raw,0);if(security.Owner==null||security.DiscretionaryAcl==null||security.DiscretionaryAcl.Count==0)throw Refuse("WIN-AUTH-DACL");if(privateOnly){if(security.Owner.Value!=CurrentSid)throw Refuse("WIN-AUTH-OWNER");if((security.ControlFlags&ControlFlags.DiscretionaryAclProtected)==0)throw Refuse("WIN-AUTH-DACL");foreach(GenericAce ace in security.DiscretionaryAcl){var known=ace as CommonAce;if(known==null||known.IsCallback||known.SecurityIdentifier.Value!=CurrentSid)throw Refuse("WIN-AUTH-DACL");}}
+-   if(!privateOnly&&!humanControlled){string sid=security.Owner.Value;if(sid!=CurrentSid&&sid!="S-1-5-18"&&sid!="S-1-5-32-544")throw Refuse("WIN-AUTH-ANCESTOR-OWNER");foreach(GenericAce ace in security.DiscretionaryAcl){var common=ace as CommonAce;if(common==null||common.IsCallback)throw Refuse("WIN-AUTH-ANCESTOR-ACL");string principal=common.SecurityIdentifier.Value;if(common.AceQualifier==AceQualifier.AccessAllowed&&(common.AccessMask&unchecked((int)0x500D0156))!=0&&principal!=CurrentSid&&principal!="S-1-5-18"&&principal!="S-1-5-32-544")throw Refuse("WIN-AUTH-ANCESTOR-MUTATION");}}
+    return i.Volume+":"+i.IndexHigh+":"+i.IndexLow+":"+i.Links+":"+i.Attributes+":"+(directory?"directory":i.SizeHigh+":"+i.SizeLow)+":"+unchecked((uint)i.Creation.dwHighDateTime)+":"+unchecked((uint)i.Creation.dwLowDateTime)+":"+(directory?"directory":unchecked((uint)i.Write.dwHighDateTime)+":"+unchecked((uint)i.Write.dwLowDateTime))+":"+Hash(raw);
+   }finally{LocalFree(sd);}
+  }

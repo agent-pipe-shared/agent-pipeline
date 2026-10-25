@@ -1,0 +1,226 @@
+diff --git a/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs b/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs
+index 8ade99322..2875bcdf4 100644
+--- a/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs
++++ b/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs
+@@ -30,6 +30,10 @@ const DEFAULT_TTL_MS = 10 * 60 * 1000;
+ // Keep subprocess teardown overhead inside the externally visible five-second PREPARE bound.
+ const PREPARE_DEADLINE_MS = 4_500;
+ const ARTIFACT_KEYS = ["artifactSha256", "callShape", "candidate", "expiresAtEpochMs", "nativeSubagents", "packets", "repositoryRootSha256", "schema"];
++const CRITIC_REVIEW_KEYS = ["authorId", "baseCommit", "diffSha256", "packetSha256", "reviewedPaths"];
++const verifiedCriticContexts = new WeakMap();
++const observedCriticReturns = new WeakMap();
++const inspectedCriticReturns = new WeakMap();
+ const ENTRY_KEYS = new Set(["Model", "Prompt", "Role", "TypeName", "Workspace"]);
+ const NATIVE_WORKSPACES = new Set(["inherit", "branch", "share"]);
+ 
+@@ -56,6 +60,41 @@ function git(root, args, deadlineEpochMs) {
+   } catch { return null; }
+ }
+ 
++function gitBytes(root, args, deadlineEpochMs) {
++  const remainingMs = Math.floor(deadlineEpochMs - performance.now());
++  if (remainingMs < 1) return null;
++  try { return execFileSync("git", args, { cwd: root, shell: false, stdio: ["ignore", "pipe", "ignore"], timeout: remainingMs, maxBuffer: 4 * 1024 * 1024 }); }
++  catch { return null; }
++}
++
++function criticPacketIndex(packets) {
++  const indexes = packets.flatMap((packet, index) => bareRole(packet.role) === "critic" ? [index] : []);
++  return indexes.length === 1 ? indexes[0] : -1;
++}
++
++const CHILD_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++
++function reviewFacts(root, candidate, packets, requested, deadlineEpochMs) {
++  const index = criticPacketIndex(packets);
++  const candidateCommit = candidate.commit ?? candidate.head;
++  if (index < 0 || !exactKeys(requested, ["authorId", "baseCommit", "reviewedPaths"]) || !CHILD_ID.test(requested.authorId ?? "") || !OID.test(requested.baseCommit ?? "")
++    || !Array.isArray(requested.reviewedPaths) || requested.reviewedPaths.length < 1 || requested.reviewedPaths.length > 128
++    || requested.reviewedPaths.some(path => typeof path !== "string" || !path || path.startsWith("/") || path.includes("\\") || path.split("/").some(part => !part || part === "." || part === ".."))) return null;
++  const paths = [...new Set(requested.reviewedPaths)].sort();
++  if (paths.length !== requested.reviewedPaths.length) return null;
++  const baseTree = git(root, ["rev-parse", "--verify", `${requested.baseCommit}^{tree}`], deadlineEpochMs);
++  const ancestry = git(root, ["merge-base", requested.baseCommit, candidateCommit], deadlineEpochMs);
++  if (!OID.test(baseTree ?? "") || ancestry !== requested.baseCommit) return null;
++  const diff = gitBytes(root, ["diff", "--binary", requested.baseCommit, candidateCommit, "--", ...paths], deadlineEpochMs);
++  if (!diff || !diff.length) return null;
++  return { authorId: requested.authorId, baseCommit: requested.baseCommit, diffSha256: sha256(diff), packetSha256: sha256(JSON.stringify(packets[index])), reviewedPaths: paths };
++}
++
++function reviewWorktreeClean(root, paths, deadlineEpochMs) {
++  const status = gitBytes(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ...paths], deadlineEpochMs);
++  return status !== null && status.length === 0;
++}
++
+ function repositoryState(root, deadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS) {
+   let physicalRoot;
+   try { physicalRoot = realpathSync(resolve(root)); }
+@@ -105,7 +144,7 @@ function entriesMatchPackets(nativeSubagents, packets) {
+   ));
+ }
+ 
+-function artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs }) {
++function artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs, criticReview }) {
+   return {
+     schema: AGY_NATIVE_BATCH_ARTIFACT_SCHEMA,
+     repositoryRootSha256: sha256(state.physicalRoot),
+@@ -113,6 +152,7 @@ function artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs }) {
+     expiresAtEpochMs,
+     nativeSubagents: structuredClone(nativeSubagents),
+     packets: structuredClone(packets),
++    ...(criticReview ? { criticReview: structuredClone(criticReview) } : {}),
+   };
+ }
+ 
+@@ -128,7 +168,7 @@ function parseAuthenticatedRetirableArtifact(raw, { state, nativeSubagents, call
+   let artifact;
+   try { artifact = JSON.parse(raw); }
+   catch { return null; }
+-  if (!exactKeys(artifact, ARTIFACT_KEYS) || artifact.schema !== AGY_NATIVE_BATCH_ARTIFACT_SCHEMA
++  if (!exactKeys(artifact, artifact?.criticReview ? [...ARTIFACT_KEYS, "criticReview"] : ARTIFACT_KEYS) || artifact.schema !== AGY_NATIVE_BATCH_ARTIFACT_SCHEMA
+     || !SHA256.test(artifact.artifactSha256 ?? "") || !SHA256.test(artifact.repositoryRootSha256 ?? "")
+     || !Number.isSafeInteger(artifact.expiresAtEpochMs) || !exactKeys(artifact.candidate, ["commit", "tree"])) return null;
+   const { artifactSha256, ...body } = artifact;
+@@ -188,7 +228,7 @@ function publishReplacingRetirable({ temporary, path, state, nativeSubagents, ca
+  * Prepare, but never launch, one native Antigravity invoke_subagent batch.
+  * The caller passes the returned Subagents array unchanged to the runner's built-in tool.
+  */
+-export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagents, callShape = "batch", nowEpochMs = Date.now(), ttlMs = DEFAULT_TTL_MS } = {}) {
++export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagents, callShape = "batch", criticReview, nowEpochMs = Date.now(), ttlMs = DEFAULT_TTL_MS } = {}) {
+   const prepareDeadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS;
+   const state = repositoryState(root, prepareDeadlineEpochMs);
+   if (state === null) return rejected("AGY-NATIVE-ROOT", "root");
+@@ -214,7 +254,15 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
+   }
+   if (!entriesMatchPackets(nativeSubagents, packets)) return rejected("AGY-NATIVE-ARRAY-MISMATCH", "nativeSubagents");
+ 
+-  const body = { ...artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs: nowEpochMs + ttlMs }), callShape };
++  const criticCount = packets.filter(packet => bareRole(packet.role) === "critic").length;
++  if (criticCount > 1) return rejected("AGY-CRITIC-REVIEW-AMBIGUOUS", "packets");
++  const criticIndex = criticPacketIndex(packets);
++  if (criticIndex >= 0 && !criticReview) return rejected("AGY-CRITIC-REVIEW-REQUIRED", "criticReview");
++  if (criticReview && criticIndex < 0) return rejected("AGY-CRITIC-ROLE-REQUIRED", "packets");
++  const boundReview = criticReview && reviewFacts(state.physicalRoot, state, packets, criticReview, prepareDeadlineEpochMs);
++  if (criticReview && (!boundReview || !reviewWorktreeClean(state.physicalRoot, boundReview.reviewedPaths, prepareDeadlineEpochMs))) return rejected("AGY-CRITIC-REVIEW-DRIFT", "criticReview");
++
++  const body = { ...artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs: nowEpochMs + ttlMs, criticReview: boundReview }), callShape };
+   const artifact = { ...body, artifactSha256: sha256(JSON.stringify(body)) };
+   const directory = artifactDirectory(state.commonDir);
+   const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot, callShape);
+@@ -277,7 +325,7 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callSha
+   let artifact;
+   try { artifact = JSON.parse(raw); }
+   catch { return rejected("AGY-NATIVE-ARTIFACT-MALFORMED", "artifact"); }
+-  if (!exactKeys(artifact, ARTIFACT_KEYS) || artifact.schema !== AGY_NATIVE_BATCH_ARTIFACT_SCHEMA
++  if (!exactKeys(artifact, artifact?.criticReview ? [...ARTIFACT_KEYS, "criticReview"] : ARTIFACT_KEYS) || artifact.schema !== AGY_NATIVE_BATCH_ARTIFACT_SCHEMA
+     || !SHA256.test(artifact.artifactSha256 ?? "") || !SHA256.test(artifact.repositoryRootSha256 ?? "")
+     || !Number.isSafeInteger(artifact.expiresAtEpochMs) || !exactKeys(artifact.candidate, ["commit", "tree"])) {
+     return rejected("AGY-NATIVE-ARTIFACT-SHAPE", "artifact");
+@@ -292,6 +340,14 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callSha
+   const artifactTierRefusal = nativeTierRefusal(artifact.nativeSubagents);
+   if (artifactTierRefusal !== null) return rejected(artifactTierRefusal, "Subagents.Model");
+   if (!entriesMatchPackets(nativeSubagents, artifact.packets)) return rejected("AGY-NATIVE-ARRAY-MISMATCH", "Subagents");
++  if (artifact.criticReview && criticPacketIndex(artifact.packets) < 0) return rejected("AGY-CRITIC-ROLE-REQUIRED", "packets");
++
++  if (criticPacketIndex(artifact.packets) >= 0) {
++    const review = artifact.criticReview;
++    if (!exactKeys(review, CRITIC_REVIEW_KEYS) || !SHA256.test(review.diffSha256 ?? "") || !SHA256.test(review.packetSha256 ?? "")) return rejected("AGY-CRITIC-REVIEW-MISSING", "criticReview");
++    const current = reviewFacts(state.physicalRoot, state, artifact.packets, { authorId: review.authorId, baseCommit: review.baseCommit, reviewedPaths: review.reviewedPaths }, prepareDeadlineEpochMs);
++    if (!current || JSON.stringify(current) !== JSON.stringify(review) || !reviewWorktreeClean(state.physicalRoot, review.reviewedPaths, prepareDeadlineEpochMs)) return rejected("AGY-CRITIC-REVIEW-DRIFT", "criticReview");
++  }
+ 
+   const batch = prepareRoleDispatchBatch({
+     root: state.physicalRoot,
+@@ -303,7 +359,7 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callSha
+     || packet.candidate.commit !== state.head || packet.candidate.tree !== state.tree)) {
+     return rejected("AGY-NATIVE-PACKET-BOUNDARY", "packets");
+   }
+-  return {
++  const verdict = {
+     schema: AGY_NATIVE_BATCH_VERDICT_SCHEMA,
+     status: "prepared",
+     code: "AGY-NATIVE-PREPARED",
+@@ -315,6 +371,61 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callSha
+     modelCalls: 0,
+     launcherCalls: 0,
+   };
++  if (artifact.criticReview) {
++    const context = Object.freeze(Object.create(null));
++    verifiedCriticContexts.set(context, { root: state.physicalRoot, artifactSha256, candidate: structuredClone(artifact.candidate), review: structuredClone(artifact.criticReview), packet: structuredClone(artifact.packets[criticPacketIndex(artifact.packets)]), child: structuredClone(nativeSubagents[criticPacketIndex(artifact.packets)]) });
++    verdict.originalCriticContext = context;
++  }
++  return verdict;
++}
++
++/** Controlled fixtures exercise Source mechanics only. The method result is never native/provider attestation. */
++export function captureControlledAgyOriginalCriticReturn({ context, childId, verdict, reportSha256, observedModel } = {}) {
++  const held = verifiedCriticContexts.get(context);
++  if (!held) return { ok: false, code: "AGY-CRITIC-ORIGINAL-CONTEXT-REQUIRED" };
++  if (observedCriticReturns.has(context)) return { ok: false, code: "AGY-CRITIC-ORIGINAL-REPLAY" };
++  if (!CHILD_ID.test(childId ?? "") || childId === held.review.authorId
++    || !["PASS", "FAIL"].includes(verdict) || !SHA256.test(reportSha256 ?? "") || observedModel !== held.child.Model) return { ok: false, code: "AGY-CRITIC-ORIGINAL-CHILD" };
++  const state = repositoryState(held.root);
++  const review = state && reviewFacts(held.root, state, [held.packet], { authorId: held.review.authorId, baseCommit: held.review.baseCommit, reviewedPaths: held.review.reviewedPaths }, performance.now() + PREPARE_DEADLINE_MS);
++  if (!review || JSON.stringify(review) !== JSON.stringify(held.review) || state.head !== held.candidate.commit || state.tree !== held.candidate.tree
++    || !reviewWorktreeClean(held.root, held.review.reviewedPaths, performance.now() + PREPARE_DEADLINE_MS)) return { ok: false, code: "AGY-CRITIC-ORIGINAL-DRIFT" };
++  const value = { schema: "pipeline.agy-original-critic-return.v1", assurance: "controlled-unit-method", preparedSha256: held.artifactSha256,
++    dispatchId: held.packet.dispatchId, candidate: { base: held.review.baseCommit, ...structuredClone(held.candidate) },
++    diff: { sha256: held.review.diffSha256, reviewedPaths: [...held.review.reviewedPaths] },
++    originalDispatch: { packetSha256: held.review.packetSha256, reviewerRole: held.packet.role },
++    originalChild: { childId, model: observedModel, authorId: held.review.authorId },
++    reviewerResult: { verdict, reportSha256 }, verdict, reviewPass: false,
++    hostReturn: { status: "controlled-unit-method", nativeProviderAttested: false } };
++  observedCriticReturns.set(context, value);
++  return { ok: true, status: "method-observed", code: "AGY-CRITIC-ORIGINAL-METHOD-OBSERVED" };
++}
++
++/** The installed AGY hook observes only the pre-call. A native-labelled JSON
++ * return cannot supply the missing original child terminal event. */
++export function captureAgyOriginalCriticNativeReturn() {
++  return { ok: false, code: "AGY-CRITIC-NATIVE-RETURN-UNAVAILABLE" };
++}
++
++/** A caller's JSON cannot become a Source handle. Recheck the original facts on every read. */
++export function inspectOriginalAgyCriticReturn({ context, root } = {}) {
++  const held = verifiedCriticContexts.get(context), value = observedCriticReturns.get(context);
++  if (!held || !value || root !== held.root) return { ok: false, code: "AGY-CRITIC-ORIGINAL-SOURCE-REQUIRED" };
++  const state = repositoryState(held.root);
++  const current = state && reviewFacts(held.root, state, [held.packet], { authorId: held.review.authorId, baseCommit: held.review.baseCommit, reviewedPaths: held.review.reviewedPaths }, performance.now() + PREPARE_DEADLINE_MS);
++  if (!current || JSON.stringify(current) !== JSON.stringify(held.review) || state.head !== held.candidate.commit || state.tree !== held.candidate.tree
++    || !reviewWorktreeClean(held.root, held.review.reviewedPaths, performance.now() + PREPARE_DEADLINE_MS)) return { ok: false, code: "AGY-CRITIC-ORIGINAL-DRIFT" };
++  const handle = Object.freeze(Object.create(null));
++  inspectedCriticReturns.set(handle, { context, value });
++  return { ok: true, handle, assurance: value.assurance };
++}
++
++export function readInspectedOriginalAgyCriticReturn(handle) {
++  const held = inspectedCriticReturns.get(handle);
++  if (!held) return { ok: false, code: "AGY-CRITIC-ORIGINAL-HANDLE-REQUIRED" };
++  const source = verifiedCriticContexts.get(held.context);
++  const checked = inspectOriginalAgyCriticReturn({ context: held.context, root: source?.root });
++  return checked.ok ? { ok: true, value: structuredClone(held.value) } : checked;
+ }
+ 
+ export const antigravityNativeDispatchInternals = Object.freeze({
+diff --git a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
+index fb36e45f1..5fc367c61 100644
+--- a/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
++++ b/plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs
+@@ -15,7 +15,7 @@ export function prepareFromRequest(value, root = value?.root) {
+   const hasBatch = Object.hasOwn(value, "Subagents");
+   const hasFlat = flatFields.some((field) => Object.hasOwn(value, field));
+   const shapeKeys = Object.keys(value).sort();
+-  const baseKeys = ["packets", ...(Object.hasOwn(value, "root") ? ["root"] : [])].sort();
++  const baseKeys = ["packets", ...(Object.hasOwn(value, "root") ? ["root"] : []), ...(Object.hasOwn(value, "criticReview") ? ["criticReview"] : [])].sort();
+   let nativeSubagents;
+   let callShape;
+   if (hasBatch && !hasFlat
+@@ -31,7 +31,7 @@ export function prepareFromRequest(value, root = value?.root) {
+   } else {
+     return { status: "rejected", code: hasBatch && hasFlat ? "AGY-NATIVE-SHAPE-MIXED" : "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
+   }
+-  return prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape });
++  return prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape, criticReview: value.criticReview });
+ }
+ 
+ function requestFromArgv(argv) {

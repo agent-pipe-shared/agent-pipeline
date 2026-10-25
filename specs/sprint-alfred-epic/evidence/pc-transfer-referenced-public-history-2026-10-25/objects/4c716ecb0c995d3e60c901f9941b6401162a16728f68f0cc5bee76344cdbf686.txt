@@ -1,0 +1,9 @@
+// K125 helper: list inventory surfaces that mention architecture, with their owning capability.
+import { readFileSync } from "node:fs";
+const root = process.argv[2];
+const inv = JSON.parse(readFileSync(`${root}/docs/product-capability-inventory.json`, "utf8"));
+for (const c of inv.capabilities) {
+  const hits = c.surfaceIds.filter((s) => /architect|fitness|adoption/i.test(s));
+  if (hits.length) console.log(`${c.id} (${c.surfaceIds.length} surfaces)\n  ${hits.join("\n  ")}`);
+}
+console.log("sourceBaseline", JSON.stringify(inv.sourceBaseline));

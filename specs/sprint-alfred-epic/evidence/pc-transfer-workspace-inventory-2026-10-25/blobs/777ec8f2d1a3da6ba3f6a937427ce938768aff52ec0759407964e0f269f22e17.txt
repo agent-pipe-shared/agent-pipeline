@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: SUL-1.0
+// G30: contained behavioral qualification of a refresh during an already-ready session.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { refreshMandatoryHooks } from './refresh-mandatory-hooks.mjs';
+import * as preCommit from './pre-commit-hook-install.mjs';
+import * as commitMsg from './commit-msg-hook-install.mjs';
+import * as prePush from './pre-push-hook-install.mjs';
+
+const hooks = [
+  { name: 'pre-commit', id: 'pre-commit-hook', module: preCommit },
+  { name: 'commit-msg', id: 'commit-msg-hook', module: commitMsg },
+  { name: 'pre-push', id: 'pre-push-hook', module: prePush },
+];
+const ambient = ['HOME', 'XDG_CONFIG_HOME', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM', 'GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE'];
+const scratch = resolve('scratch');
+mkdirSync(scratch, { recursive: true });
+
+function inside(root, path) {
+  const rel = relative(root, resolve(path));
+  return rel && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+function git(root, ...args) {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+function source(root, label) {
+  const plugin = join(root, `plugin-${label}`);
+  const lib = join(plugin, 'lib');
+  mkdirSync(lib, { recursive: true });
+  writeFileSync(join(plugin, 'protected-baseline.json'), '{}\n');
+  writeFileSync(join(lib, 'governance-scope.mjs'), `export const fixture = ${JSON.stringify(label)};\n`);
+  return lib;
+}
+function fixture(run) {
+  const root = mkdtempSync(join(scratch, 'g30-mid-session-'));
+  const old = new Map(ambient.map(name => [name, process.env[name]]));
+  try {
+    for (const name of ambient) delete process.env[name];
+    const home = join(root, 'home');
+    const project = join(root, 'project');
+    mkdirSync(home); mkdirSync(project);
+    process.env.HOME = home;
+    process.env.XDG_CONFIG_HOME = join(home, '.config');
+    process.env.GIT_CONFIG_GLOBAL = join(home, 'global.gitconfig');
+    process.env.GIT_CONFIG_SYSTEM = join(home, 'system.gitconfig');
+    git(project, 'init', '-q');
+    const common = git(project, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+    const hookDir = join(common, 'hooks');
+    assert.ok(inside(project, common));
+    assert.ok(inside(project, hookDir));
+    git(project, 'config', '--local', 'core.hooksPath', hookDir);
+    for (const hook of hooks) {
+      const hookPath = git(project, 'rev-parse', '--path-format=absolute', '--git-path', `hooks/${hook.name}`);
+      const state = join(common, 'agent-pipeline', `${hook.name}-hook`);
+      for (const path of [hookPath, state]) assert.ok(inside(project, path), path);
+      assert.equal(hookPath, join(hookDir, hook.name));
+    }
+    return run({ root, project, home, common, hookDir });
+  } finally {
+    for (const [name, value] of old) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+function paths({ common, hookDir }, hook) {
+  const state = join(common, 'agent-pipeline', `${hook.name}-hook`);
+  return { hook: join(hookDir, hook.name), marker: join(state, 'install-marker.json') };
+}
+function dependencies(project, lib) {
+  const plans = Object.fromEntries(hooks.map(hook => [hook.id, ({ rootDir }) => hook.module.planInstall({ rootDir, pluginLibDir: lib })]));
+  const applies = Object.fromEntries(hooks.map(hook => [hook.id, ({ rootDir }) => hook.module.applyInstall({ rootDir, pluginLibDir: lib })]));
+  const checkCloneProvisioning = () => ({ checks: hooks.map(hook => {
+    const plan = plans[hook.id]({ rootDir: project });
+    const status = plan.status === 'ready-to-upgrade' ? plan.updateRequired ? 'refresh' : 'current' : plan.status === 'foreign-hook-present' ? 'foreign-owner' : 'install';
+    return { id: hook.id, status, path: plan.hookPath ?? '', repairAction: null };
+  }) });
+  return { plans, applies, checkCloneProvisioning };
+}
+function bytes(f, hooksToRead = hooks) {
+  return hooksToRead.map(hook => readFileSync(paths(f, hook).hook));
+}
+function install(f, lib) {
+  for (const hook of hooks) {
+    const result = hook.module.applyInstall({ rootDir: f.project, pluginLibDir: lib });
+    assert.equal(result.status, 'installed', hook.name);
+  }
+}
+
+test('ready-session trusted source update refreshes only stale managed hooks and reads back current snapshot', () => fixture(f => {
+  const oldLib = source(f.root, 'old');
+  const newLib = source(f.root, 'new');
+  install(f, oldLib);
+  const previous = bytes(f);
+  const previousMarkers = hooks.map(hook => JSON.parse(readFileSync(paths(f, hook).marker, 'utf8')));
+  for (const hook of hooks) {
+    const plan = hook.module.planInstall({ rootDir: f.project, pluginLibDir: newLib });
+    assert.equal(plan.status, 'ready-to-upgrade');
+    assert.equal(plan.updateRequired, true);
+  }
+  const result = refreshMandatoryHooks(f.project, dependencies(f.project, newLib));
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(result.results.map(row => row.status), hooks.map(() => 'refreshed'));
+  for (const [index, hook] of hooks.entries()) {
+    const marker = JSON.parse(readFileSync(paths(f, hook).marker, 'utf8'));
+    assert.ok(isAbsolute(marker.pluginLibDir));
+    assert.ok(inside(f.project, marker.pluginLibDir));
+    assert.ok(marker.pluginLibDir.includes('/runtime-'));
+    assert.equal(hook.module.planInstall({ rootDir: f.project, pluginLibDir: newLib }).updateRequired, false);
+    assert.deepEqual(readFileSync(paths(f, hook).hook), previous[index], 'stable shim path may retain exact bytes');
+    assert.notEqual(marker.pluginLibDir, previousMarkers[index].pluginLibDir);
+  }
+  assert.deepEqual(refreshMandatoryHooks(f.project, dependencies(f.project, newLib)).results.map(row => row.status), hooks.map(() => 'current'));
+}));
+
+test('tampered hook and untrusted source refuse refresh while preserving original hook bytes', () => fixture(f => {
+  const oldLib = source(f.root, 'old');
+  const newLib = source(f.root, 'new');
+  install(f, oldLib);
+  const tampered = paths(f, hooks[0]).hook;
+  writeFileSync(tampered, '#!/bin/sh\necho foreign\n');
+  const before = bytes(f);
+  const sourceFile = join(newLib, 'governance-scope.mjs');
+  const outside = join(f.root, 'untrusted.mjs');
+  writeFileSync(outside, 'export const fixture = "untrusted";\n');
+  unlinkSync(sourceFile);
+  symlinkSync(outside, sourceFile);
+  const refused = refreshMandatoryHooks(f.project, dependencies(f.project, newLib));
+  assert.equal(refused.status, 'failed');
+  assert.equal(refused.results[0].status, 'skipped-foreign-hook-present');
+  assert.deepEqual(refused.results.slice(1).map(row => row.status), ['failed', 'failed']);
+  for (const [index, hook] of hooks.entries()) assert.deepEqual(readFileSync(paths(f, hook).hook), before[index]);
+}));

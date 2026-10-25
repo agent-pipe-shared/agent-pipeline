@@ -1,0 +1,355 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 9889b731d..f581d0f54 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -195,15 +195,37 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
+     }
+     if (old.size !== 0 || added.length === 0 || changed.length !== added.length + 1) return false;
+     const newPaths = new Set();
++    const addedByPath = new Map();
+     for (const entry of added) {
+       if (!object(entry) || entry.authority !== false || entry.mutability !== "immutable"
+         || entry.retention !== "retain" || !SHA256.test(entry.sha256)
+         || typeof entry.path !== "string" || !entry.path.startsWith(`specs/${featureId}/evidence/`)
+-        || !entry.path.endsWith(".json") || newPaths.has(entry.path)) return false;
++        || ![".json", ".log"].some(suffix => entry.path.endsWith(suffix)) || newPaths.has(entry.path)) return false;
+       newPaths.add(entry.path);
++      addedByPath.set(entry.path, entry);
+       regularBlobAt(root, commit, entry.path);
+       if (digest(gitBytes(root, ["show", `${commit}:${entry.path}`], "CCA-EVIDENCE-READ")) !== entry.sha256) return false;
+     }
++    const requiredLogs = new Set();
++    const parentTree = gitBytes(root, ["rev-parse", `${parents[1]}^{tree}`], "CCA-RANGE-READ").toString("utf8").trim();
++    for (const entry of added.filter(row => row.path.endsWith(".json"))) {
++      const bytes = gitBytes(root, ["show", `${commit}:${entry.path}`], "CCA-EVIDENCE-READ");
++      let diagnostic;
++      try { diagnostic = JSON.parse(bytes.toString("utf8")); } catch { continue; }
++      if (diagnostic?.schema !== "pipeline.critic-diagnostic-evidence.v1") continue;
++      if (diagnostic.candidate?.commit !== parents[1] || diagnostic.candidate?.tree !== parentTree) return false;
++      const required = [diagnostic.targeted?.log, diagnostic.fullVerify?.evidence].filter(Boolean);
++      for (const ref of required) {
++        if (!object(ref) || addedByPath.get(ref.path)?.sha256 !== ref.sha256) return false;
++        requiredLogs.add(ref.path);
++      }
++      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree},
++        readArtifact: path => {
++          if (!addedByPath.has(path)) throw new Error("unregistered diagnostic member");
++          return gitBytes(root, ["show", `${commit}:${path}`], "CCA-EVIDENCE-READ");
++        } });
++    }
++    if ([...addedByPath.keys()].some(path => path.endsWith(".log") && !requiredLogs.has(path))) return false;
+     return changed.every((path) => path === manifestPath || newPaths.has(path));
+   } catch { return false; }
+ }
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index f33e5b9b3..2855ddb4c 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -5,7 +5,7 @@ const completionCases = [];
+ function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
++import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+@@ -315,6 +315,42 @@ test("CCA13 an authority change cannot hide in an evidence registration commit",
+   assert.deepEqual(result.correctionCommits, [changedCommit]);
+ });
+ 
++function diagnosticCarryCase() {
++  const fx = registeredFixture();
++  const logPath = `specs/${fx.featureId}/evidence/targeted.log`;
++  const jsonPath = `specs/${fx.featureId}/evidence/diagnostic.json`;
++  const tree = git(fx.root, ["rev-parse", `${fx.candidateCommit}^{tree}`]);
++  const log = "command: node synthetic-check\nlabel: targeted-check\nexitCode: 0\n--- stdout ---\npass\n--- stderr ---\n";
++  const value = { schema: "pipeline.critic-diagnostic-evidence.v1", producer: "critic-diagnostic-evidence",
++    assurance: "captured-process-output-not-host-attested", candidate: {commit:fx.candidateCommit,tree},
++    spec: {path:fx.manifestPath,sha256:hash(readFileSync(join(fx.root,fx.manifestPath)))},
++    guardrails:[], fullVerify:{status:"not-run",evidence:null},
++    targeted:{label:"targeted-check",status:"passed",exitCode:0,log:{path:logPath,sha256:hash(log)}}, pending:["full-verify"] };
++  const json = `${JSON.stringify(value)}\n`;
++  writeFileSync(join(fx.root,logPath),log);
++  writeFileSync(join(fx.root,jsonPath),json);
++  const entries = [fx.entry,
++    {...fx.entry,path:jsonPath,sha256:hash(json)},
++    {...fx.entry,path:logPath,sha256:hash(log)}];
++  writeFileSync(join(fx.root,fx.manifestPath),`${JSON.stringify(fx.manifest(entries))}\n`);
++  git(fx.root,["add","."]); git(fx.root,["commit","-qm","register diagnostic bundle"]);
++  const candidateCommit=git(fx.root,["rev-parse","HEAD"]);
++  const source=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit});
++  assert.deepEqual(source.evidenceOnlyCommits,[fx.candidateCommit,candidateCommit]);
++  assert.deepEqual(source.correctionCommits,[]);
++  writeFileSync(join(fx.root,logPath),"changed diagnostic output\n");
++  git(fx.root,["add","."]); git(fx.root,["commit","-qm","change diagnostic content"]);
++  const changedCommit=git(fx.root,["rev-parse","HEAD"]);
++  const changed=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit:changedCommit});
++  assert.deepEqual(changed.correctionCommits,[changedCommit]);
++  const unrelated=`specs/${fx.featureId}/evidence/unregistered.log`;
++  writeFileSync(join(fx.root,unrelated),"unregistered\n");
++  git(fx.root,["add","."]); git(fx.root,["commit","-qm","add unregistered log"]);
++  const unregisteredCommit=git(fx.root,["rev-parse","HEAD"]);
++  const unregistered=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit:unregisteredCommit});
++  assert.deepEqual(unregistered.correctionCommits,[changedCommit,unregisteredCommit]);
++}
++
+ test("CCA14 one full and three successive parent-bound DIFF reviews are admitted", () => {
+   for (const retainedCount of [1, 2, 3]) {
+     const rows = fourRoundHistory(retainedCount);
+@@ -370,4 +406,5 @@ test("CCA18 dropping retained registration cannot create new genesis in the runt
+   assert.equal(actual.decision.code, "CCA-REGISTRATION-REMOVED");
+ });
+ 
++test("CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle", diagnosticCarryCase);
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 6ce3ea346..d8ee65239 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -160,7 +160,7 @@ function ensureStore(c) {
+ }
+ function reference(root, commit, p, role = "spec") {
+   p = normalizePacketPath(p);
+-  if ((p.startsWith(".") && !(role === "guardrail" && p === ".claude/pipeline.yaml"))
++  if ((p.startsWith(".") && !(role === "guardrail" && [".claude/pipeline.yaml", ".claude/pipeline.json"].includes(p)))
+     || p.startsWith("scratch/") || p.startsWith("evidence/")) fail("CGB-REFERENCE");
+   const row = git(root, ["ls-tree", "-z", commit, "--", p]);
+   const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\0]+)\0$/u.exec(row);
+@@ -542,6 +542,40 @@ export function appendGenericCriticBatchCorrection(input) { return invoke(() =>
+ export function readGenericCriticBatchAdmission(input) { return invoke(() => readAdmission(input)); }
+ export function reserveGenericCriticBatchAdmission(input) { return invoke(() => reserveAdmission(input)); }
+ export function readReservedGenericCriticBatchAdmission(input) { return invoke(() => readReservedAdmission(input)); }
++/** Diagnose a held transaction without treating a partial publication as a disposable lock. */
++export function inspectGenericCriticBatchRecovery({ controlRoot }) {
++  return invoke(() => {
++    const c = readContext(controlRoot);
++    const lock = join(c.root, "transaction.lock");
++    if (!existsSync(lock)) fail("CGB-RECOVERY-NOT-HELD");
++    const held = directory(lock);
++    const names = readdirSync(c.root).sort(compare);
++    const lockNames = readdirSync(lock).sort(compare);
++    if (names.length > 4096 || lockNames.length > 4096) fail("CGB-BOUND");
++    if (!eq(stableJson(join(c.root, "repository.json")), c.repository)) fail("CGB-CONTROL");
++    let emptyStore = eq(names, ["logical", "origins", "repository.json", "transaction.lock"]) && lockNames.length === 0;
++    const indexes = {};
++    for (const name of ["logical", "origins"]) {
++      if (!existsSync(join(c.root, name))) { emptyStore = false; indexes[name] = null; continue; }
++      directory(join(c.root, name));
++      indexes[name] = readdirSync(join(c.root, name)).sort(compare);
++      if (indexes[name].length > 4096) fail("CGB-BOUND");
++      if (indexes[name].length !== 0) emptyStore = false;
++    }
++    const snapshot = { repositoryFingerprint: c.fingerprint, root: [directory(c.root).dev, directory(c.root).ino], lock: [held.dev, held.ino, String(held.ctimeMs)], names, lockNames, indexes };
++    return Object.freeze({ schema: "pipeline.critic-generic-batch-recovery.v1", status: emptyStore ? "empty-store-held" : "partial-held", digestSha256: sha256Canonical(snapshot) });
++  });
++}
++/** A digest binds inspection, but cannot attest that the lock owner has exited. */
++export function recoverGenericCriticBatchEmptyStore({ controlRoot, digestSha256 }) {
++  return invoke(() => {
++    if (!SHA.test(digestSha256)) fail("CGB-RECOVERY-SHAPE");
++    const observed = inspectGenericCriticBatchRecovery({ controlRoot });
++    if (observed.digestSha256 !== digestSha256) fail("CGB-RECOVERY-STALE");
++    if (observed.status !== "empty-store-held") fail("CGB-RECOVERY-PARTIAL");
++    fail("CGB-RECOVERY-OWNER-UNPROVEN");
++  });
++}
+ /** Shared source-bound declaration reader; presence/bindings do not attest semantic coherence. */
+ export function readCriticReviewUnit(input) {
+   return invoke(() => {
+@@ -604,10 +638,10 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       if(existsSync(deliveryIndex) && (!owned || !eq(stableJson(deliveryIndex).batchRef,owned.batchRef)))fail("CGB-CONFLICT");
+       if (!owned) {
+         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
+-        ensureStore(c);
+-        const batchId=randomBytes(16).toString("hex");
+         const declaredScope={logicalWorkIds:work,specification:reference(input.repoRoot,packet.candidate.commit,unitRef.specPath),
+           guardrails:packet.references.filter(r=>r.kind==="guardrail").map(r=>reference(input.repoRoot,packet.candidate.commit,r.path,"guardrail")),reviewUnit:unit};
++        ensureStore(c);
++        const batchId=randomBytes(16).toString("hex");
+         const value={schema:GENERIC_CRITIC_BATCH_V2_SCHEMA,batchId,repositoryFingerprint:c.fingerprint,declaredScope,originTargets:[target]};
+         const batchRef={batchId,registrationSha256:sha256Canonical(value)};
+         createDirectory(join(c.root,batchId));createDirectory(join(c.root,batchId,"members"));
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 902d710bb..eec21566e 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -1,18 +1,21 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import {registerTestCaseCompletion} from "./test-case-completion.mjs";
+-import {spawnSync} from "node:child_process";
++import {spawn,spawnSync} from "node:child_process";
+ import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,writeFileSync,chmodSync} from "node:fs";
+ import {tmpdir} from "node:os";
+ import {join} from "node:path";
+ import {isSuccessfulSpawn} from "./successful-spawn.mjs";
+ import {produceCriticDiagnostic} from "./critic-diagnostic-producer.mjs";
+-import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership} from "./critic-generic-batch.mjs";
++import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership,reserveFeatureCriticReviewUnitOwnership} from "./critic-generic-batch.mjs";
+ import {admitSessionCriticReview,finalizeSessionCriticReview,runSessionCriticFinalizerCli} from "../scripts/session-critic-finalizer.mjs";
+ import {sha256Canonical,CRITIC_DISPATCH_LIMITS} from "./review-economy.mjs";
+-import {readConsumedSessionAdmission,prepareCandidatePacket,sha256,canonicalJson} from "../scripts/critic-packet-preflight.mjs";
++import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket,sha256,canonicalJson} from "../scripts/critic-packet-preflight.mjs";
++import {readCriticCourseAdmission} from "./critic-course-admission.mjs";
++import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
++import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -158,7 +161,7 @@ function commit(root, message) {
+   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+   return git(root, ["rev-parse", "HEAD"]);
+ }
+-function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", unitOverride = {} } = {}) {
++function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", unitOverride = {}, feature = false } = {}) {
+   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
+   git(root, ["init", "-q", "-b", "main"]);
+   mkdirSync(join(root, ".claude"));
+@@ -167,9 +170,22 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
+   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+   writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
+   writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify(unit(unitOverride)));
++  if(feature){
++    const directory=join(root,"specs/course-feature");
++    mkdirSync(join(directory,"design"),{recursive:true}); mkdirSync(join(directory,"evidence"));
++    writeFileSync(join(directory,"spec.md"),"# Feature spec\nAC-1 AC-2\n");
++    const reviewUnit=JSON.stringify(unit({...unitOverride,specPath:"specs/course-feature/spec.md"}));
++    writeFileSync(join(directory,"design/critic-review-unit.json"),reviewUnit);
++    const artifacts=[{class:"spec",path:"specs/course-feature/spec.md",authority:true},
++      {class:"design",path:"specs/course-feature/design/critic-review-unit.json",sha256:sha256(reviewUnit),authority:false,mutability:"immutable",retention:"retain"}];
++    writeFileSync(join(directory,"lifecycle.json"),`${JSON.stringify({schema:"pipeline.feature-package.v1",feature:{id:"course-feature"},state:"approved",artifacts})}\n`);
++    writeFileSync(join(root,".claude/pipeline.json"),JSON.stringify({project:"fixture",verify:"node verify.mjs"}));
++    writeFileSync(join(root,".claude/settings.json"),JSON.stringify({fixture:true}));
++  }
+   const emptyTree = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
+   const base = rootCandidate ? emptyTree : commit(root, "base");
+   if (!rootCandidate) writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\nSource candidate.\n");
++  if(feature)writeFileSync(join(root,"specs/course-feature/spec.md"),"# Feature spec\nAC-1 AC-2\nSource candidate.\n");
+   const historicalCandidate = commit(root, rootCandidate ? "root source candidate" : "source candidate");
+   const recordPath = `evidence/dispatch-record-${taskId}.json`;
+   const record = {
+@@ -203,10 +219,120 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
+   writeFileSync(join(root, "evidence/dispatch-record-correction-owner.json"), JSON.stringify({...record,taskId:"correction-owner"}));
+   const recordCommit = commit(root, "persist authored dispatch record");
+   writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\nDescendant candidate.\n");
++  if(feature)writeFileSync(join(root,"specs/course-feature/spec.md"),"# Feature spec\nAC-1 AC-2\nDescendant candidate.\n");
+   const candidate = commit(root, "descendant candidate");
+   const tree = git(root, ["rev-parse", `${candidate}^{tree}`]);
+   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(produceCriticDiagnostic({ root, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], command: [process.execPath, "-e", `console.log('fixture targeted result'); process.exit(${targetedExitCode})`], logPath: "evidence/targeted.log" }))}\n`);
+   return { root, base, historicalCandidate, recordCommit, candidate, tree, taskId, recordPath, recordBytes };
+ }
+ 
++test("generated pipeline JSON is an exact committed guardrail reference",()=>{
++  const fx=fixture();try{
++    const calibration=JSON.stringify({project:"fixture",verify:"node verify.mjs"});
++    writeFileSync(join(fx.root,".claude/pipeline.json"),calibration);
++    fx.candidate=commit(fx.root,"generated manifest");
++    const d=declaration(fx,{guardrailPaths:[".claude/pipeline.json"]});
++    const result=register(fx,d);
++    assert.equal(result.replay,false);
++    const saved=JSON.parse(readFileSync(join(fx.root,".git/agent-pipeline/critic-packets/generic-batches",result.batchRef.batchId,"registration.json")));
++    assert.deepEqual(saved.declaredScope.guardrails.map(row=>[row.path,row.sha256]),[[".claude/pipeline.json",sha256(calibration)]]);
++    rejected(()=>register(fx,{...d,guardrailPaths:[".claude/credentials.json"]}),"CGB-REFERENCE");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("rejected guardrail leaves no held transaction and retry can register",()=>{
++  const fx=fixture();try{
++    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
++    rejected(()=>register(fx,declaration(fx,{guardrailPaths:[".claude/missing.json"]})),"CGB-REFERENCE");
++    assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
++    assert.ok(register(fx).batchRef);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("live owner and partial effects keep a digest-bound transaction hold",async()=>{
++  const fx=fixture();try{
++    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
++    const store=join(controlRoot,"generic-batches");
++    mkdirSync(store,{recursive:true,mode:0o700});
++    chmodSync(join(fx.root,".git/agent-pipeline"),0o700);
++    chmodSync(controlRoot,0o700); chmodSync(store,0o700);
++    for(const name of ["logical","origins"])mkdirSync(join(store,name),{mode:0o700});
++    const commonDir=join(fx.root,".git");
++    const repository={schema:"pipeline.critic-generic-repository.v1",repoRoot:fx.root,commonDir,
++      repositoryFingerprint:derivePoGateRepositoryFingerprint({gitCommonDir:commonDir,primaryRoot:fx.root})};
++    const file=join(store,"repository.json");
++    writeFileSync(file,canonicalJson(repository),{mode:0o600});
++    const lock=join(store,"transaction.lock");
++    const child=spawn(process.execPath,["--input-type=module","-e",
++      "import {mkdirSync,rmdirSync} from 'node:fs'; mkdirSync(process.argv[1],{mode:0o700}); console.log('held'); process.stdin.once('data',()=>{rmdirSync(process.argv[1]); process.exit(0);});",lock],
++      {stdio:["pipe","pipe","pipe"]});
++    try {
++    await new Promise((resolve,reject)=>{child.stdout.once("data",bytes=>bytes.toString().includes("held")?resolve():reject(new Error("holder not ready")));child.once("error",reject);child.once("exit",()=>reject(new Error("holder exited before inspection")));});
++    const inspected=inspectGenericCriticBatchRecovery({controlRoot});
++    assert.equal(inspected.status,"empty-store-held");
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:"0".repeat(64)}),"CGB-RECOVERY-STALE");
++    writeFileSync(join(store,"logical/foreign.json"),"{}");
++    const partial=inspectGenericCriticBatchRecovery({controlRoot});
++    assert.equal(partial.status,"partial-held");
++    assert.notEqual(partial.digestSha256,inspected.digestSha256);
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256}),"CGB-RECOVERY-STALE");
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:partial.digestSha256}),"CGB-RECOVERY-PARTIAL");
++    rmSync(join(store,"logical/foreign.json"));
++    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256}),"CGB-RECOVERY-OWNER-UNPROVEN");
++    assert.equal(existsSync(lock),true);
++    } finally {
++      const exit=new Promise(resolve=>child.once("exit",resolve));
++      child.stdin.write("release\n");
++      assert.equal(await exit,0);
++    }
++    assert.equal(existsSync(lock),false);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("feature reserve validates packet guardrails before store effects and can retry",()=>{
++  const fx=fixture({feature:true});try{
++    const featureRoot=join(fx.root,"specs/course-feature");
++    const logPath="specs/course-feature/evidence/targeted.log";
++    const jsonPath="specs/course-feature/evidence/diagnostic.json";
++    const diagnostic=produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,
++      specPath:"specs/course-feature/spec.md",command:[process.execPath,"-e","console.log('feature fixture pass')"],
++      logPath:"evidence/feature-targeted.log"});
++    const log=readFileSync(join(fx.root,"evidence/feature-targeted.log"));
++    writeFileSync(join(fx.root,logPath),log);
++    diagnostic.targeted.log.path=logPath;
++    const bytes=`${JSON.stringify(diagnostic)}\n`;
++    writeFileSync(join(fx.root,jsonPath),bytes);
++    const manifestPath=join(featureRoot,"lifecycle.json");
++    const manifest=JSON.parse(readFileSync(manifestPath));
++    for(const [path,content] of [[logPath,log],[jsonPath,bytes]])manifest.artifacts.push({class:"candidate-evidence",path,
++      sha256:sha256(content),authority:false,mutability:"immutable",retention:"retain"});
++    writeFileSync(manifestPath,`${JSON.stringify(manifest)}\n`);
++    // The evidence transport admits exactly the manifest and its declared members. The
++    // generic fixture's untracked root captures must not ride into this registration commit.
++    git(fx.root,["add","specs/course-feature/lifecycle.json",logPath,jsonPath]);
++    git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","register feature diagnostic"]);
++    const registrationCommit=git(fx.root,["rev-parse","HEAD"]);
++    const courseInput={repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,
++      registrationCommit,requestedMode:"full",acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
++    const projection=readCriticCourseAdmission(courseInput);
++    assert.equal(projection.decision.status,"admitted",JSON.stringify(projection.decision));
++    const {decision,...subject}=projection;
++    const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
++    mkdirSync(controlRoot,{recursive:true,mode:0o700});
++    chmodSync(join(fx.root,".git/agent-pipeline"),0o700);chmodSync(controlRoot,0o700);
++    const route={routeId:"feature-fixture",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",
++      modelTier:"higher-capability",effortTier:"xhigh",assurance:"functional-equivalent-read-only; OS isolation not asserted",projectionDigest:"a".repeat(64)};
++    const preflightSha256="b".repeat(64);
++    const sessionBinding={schema:"pipeline.session-critic-packet-binding.v1",sessionId:"feature-fixture",preflightSha256,
++      assurance:route.assurance,freshContext:true,historyInherited:false,mayDelegate:false};
++    const reserveFor=(packetId,guardrail)=>{
++      prepareCandidatePacket({repoRoot:fx.root,controlRoot,packetId,taskId:fx.taskId,projectId:"pipeline",
++        baseCommit:fx.base,candidateCommit:fx.candidate,rulesetOid:fx.base,route,sessionBinding,
++        references:[{kind:"spec",path:"specs/course-feature/spec.md"},{kind:"guardrail",path:guardrail}]});
++      claimCandidatePacket({controlRoot,packetId,adapter:route.adapter,claimantNonce:"c".repeat(64)});
++      return reserveFeatureCriticReviewUnitOwnership({repoRoot:fx.root,controlRoot,packetId,preflightSha256,courseInput,
++        sourceSha256:sha256Canonical(subject),decisionSha256:sha256Canonical(decision)});
++    };
++    rejected(()=>reserveFor("d".repeat(32),".claude/settings.json"),"CGB-REFERENCE");
++    assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
++    assert.ok(reserveFor("e".repeat(32),".claude/pipeline.json").reservation);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

@@ -1,0 +1,33 @@
+// One-off Full Verify launcher: candidate mode, no receipt reuse, in a fresh clone, private HOME and TMPDIR outside every repository.
+// Usage: node scratch/fv-run.mjs <clone-dir> <label>
+import { spawn, execFileSync } from "node:child_process";
+import { chmodSync, createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+
+const [cloneArg, label] = process.argv.slice(2);
+if (!cloneArg || !label) { console.error("usage: fv-run.mjs <clone-dir> <label>"); process.exit(2); }
+const clone = resolve(cloneArg);
+const base = join(homedir(), "pipeline-test-tmp", label);
+const home = join(base, "home");
+const tmp = join(base, "tmp");
+for (const dir of [base, home, tmp]) { mkdirSync(dir, { recursive: true, mode: 0o700 }); chmodSync(dir, 0o700); }
+const gitConfigGlobal = join(home, ".gitconfig");
+const name = execFileSync("git", ["config", "user.name"], { cwd: process.cwd(), encoding: "utf8" }).trim();
+const email = execFileSync("git", ["config", "user.email"], { cwd: process.cwd(), encoding: "utf8" }).trim();
+writeFileSync(gitConfigGlobal, `[user]\n\tname = ${name}\n\temail = ${email}\n`);
+const env = { ...process.env, HOME: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp, GIT_CONFIG_GLOBAL: gitConfigGlobal };
+delete env.NODE_TEST_CONTEXT;
+const outFile = join(clone, "scratch", `${label}-output.txt`);
+mkdirSync(join(clone, "scratch"), { recursive: true });
+const out = createWriteStream(outFile);
+const started = Date.now();
+const child = spawn(process.execPath, ["harness/scripts/verify.mjs", "--mode", "candidate", "--no-reuse"], { cwd: clone, env, stdio: ["ignore", "pipe", "pipe"] });
+child.stdout.pipe(out, { end: false });
+child.stderr.pipe(out, { end: false });
+child.on("close", (code) => {
+  out.end();
+  const seconds = Math.round((Date.now() - started) / 1000);
+  console.log(`verify exit ${code} after ${seconds} s; output in ${outFile.replace(clone + "/", "")} of ${cloneArg}`);
+  process.exit(code ?? 1);
+});

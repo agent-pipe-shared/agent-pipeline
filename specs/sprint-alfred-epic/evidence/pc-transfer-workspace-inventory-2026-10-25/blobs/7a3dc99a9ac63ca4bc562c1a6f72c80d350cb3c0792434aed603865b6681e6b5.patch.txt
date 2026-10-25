@@ -1,0 +1,412 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 4acb3d40e..3c367597c 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -14,6 +14,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | A Reader input (capability inventory, observation governance, reader protocol) changed and the plugin's hash-pinned mirrors must follow, or you want to know whether they already drifted | `scripts/sync-reader-inputs.mjs [<root>] [--check]` | the three mirrors, `reader-inputs/manifest.json` and the two pins in `lib/doc-reader-documentation-snapshot.mjs` (`--check` writes nothing) |
+ | Re-measure the delivery matrix and run the gap rounds | `scripts/delivery-owners.mjs`, `scripts/delivery-agent-items.mjs`, `scripts/matrix-gaps.mjs`, `scripts/gap-inputs.mjs`, `scripts/gap-summary.mjs`, `scripts/gap-collect.mjs`, `scripts/gap-evidence.mjs`, `scripts/delivery-remeasure-inputs.mjs` | see below |
+ | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
++| Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
+ | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
+ 
+ ## Candidate stamp
+@@ -52,6 +53,10 @@ Per item, `mappedCommits` holds the commits in `<base>..<head>` whose message na
+ 
+ Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied from the node `ℹ` summary lines (or the `N/N cases passed` / `N passed, N failed` / `project-onboarding-v3: N cases across ... M shards failed` line of a suite that prints its own, marked `custom`). A failure that is a killed child or a `null !== 0` process failure is retried once and marked `(retried)`; a plain red and a timeout are not. Each finished suite is appended to `<evidence.md>.state.jsonl` and the evidence is rewritten after every suite, so an interrupted pass loses nothing: run again with `--resume` to skip the finished ids. Without `--resume` an existing state file is refused, never overwritten. The evidence has the shape of the `pin-counted-results-*` files (header with HEAD, date, host, node and the runner note; a Red section with the first failing cases; the counted table; a Skipped typed section) and holds repository-relative text only. `node --test scripts/sitting-count-pass.test.mjs` pins the behaviour on fixture suites. A counted pass is evidence for the delivery matrix only when it runs on the tree and host the matrix row names, and nothing else heavy runs at the same time.
+ 
++## Post-sitting check table
++
++`node scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` runs the light end-state checks of the sitting one after the other, each with a private TMPDIR outside every repository and `NODE_TEST_CONTEXT` removed, and prints one row per check (verdict, exit code, seconds, one-line result) and a total. It exits 0 when every selected check is GREEN, 1 otherwise, 2 on bad usage. The checks: `suite-registration` (exit 0 and 1093 registered), `case-completion`, `capability-inventory`, `observation-governance`, `reader-inputs` (`sync-reader-inputs.mjs . --check`, never a rewrite), `backlog-state` (its known-accepted DRIFT lines are tolerated), `architecture-boundary` (the pre-existing `unowned-path` findings keep it at exit 1 and are reported; it is RED on any `over-line-bound` finding), `doc-contracts-test` (76 cases), `consumer-safe-paths-test` (9 cases) and `doc-contracts`. The expected counts are constants at the top of the script; move them when a later commit changes them. `--json <file>` writes the table as JSON and is refused (exit 2) for a path outside `<root>/scratch/`. Heavy suites are not part of it: they belong to the serial count pass above. Before the sitting's protected steps several rows are RED by design (unregistered suites, reader-input drift).
++
+ ## Held-commit rehearsal
+ 
+ `node scripts/rehearse-held.mjs <scratch/clones/<rehearsal> | .> [--only k1,k5]` fetches the head of each build clone named in its `ORDER` table and replays the unprotected, post-sitting commits into the target in that fixed order. `scripts/import-held.mjs` 3-way merges a file where main moved and stops at the first conflict. The `ORDER` table and its skip SHAs are per-run data of the 0.7.0 sprint; edit them when the held set changes. Rehearse in a clone first: with target `.` the commits land in the main checkout.
+diff --git a/scripts/post-sitting-checks.mjs b/scripts/post-sitting-checks.mjs
+new file mode 100644
+index 000000000..7b4b0e848
+--- /dev/null
++++ b/scripts/post-sitting-checks.mjs
+@@ -0,0 +1,130 @@
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: run the light end-state checks of the sitting ONE AFTER THE OTHER and print one table (check, verdict, exit code, seconds, one-line result).
++// Usage:   node scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]
++//          Run from the repository root. --root addresses another checkout (a clone); --only restricts the run to the named checks (see the list below);
++//          --json writes the table as JSON, and the file must lie inside <root>/scratch/ (any other path is refused, exit 2).
++// Checks:  suite-registration, case-completion, capability-inventory, observation-governance, reader-inputs, backlog-state, architecture-boundary,
++//          doc-contracts-test, consumer-safe-paths-test, doc-contracts. Light checks only; the heavy suites belong to scripts/sitting-count-pass.mjs.
++// Verdict: a check is GREEN at exit 0 plus its expected count where one is pinned (EXPECT below: 1093 registered suites, 76 and 9 test cases; update
++//          the constants when a later commit moves them). backlog-state tolerates its known-accepted DRIFT lines (it exits 0 with them).
++//          architecture-boundary exits 1 on the pre-existing unowned-path findings; it is GREEN at exit 0, or at exit 1 with only unowned-path findings,
++//          and RED on any over-line-bound finding (or any other finding kind, or an exit other than 0 or 1).
++// Inputs:  the scripts named above, read from <root>. Each child runs with cwd <root>, a private TMPDIR under <home>/pipeline-test-tmp/post-sitting-<n>
++//          (mode 0700, outside every repository, removed after a GREEN check) and NODE_TEST_CONTEXT removed from its environment.
++// Output:  the table on stdout (repository-relative text only), the optional JSON file. Exit 0 when every selected check is GREEN, 1 otherwise, 2 on bad usage.
++//          Read-only toward tracked files: every check it runs only reads (sync-reader-inputs always runs with --check).
++import { spawnSync } from "node:child_process";
++import { chmodSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
++import { homedir } from "node:os";
++import { isAbsolute, join, relative, resolve, sep } from "node:path";
++import { pathToFileURL } from "node:url";
++import { makeScrubber, parseCounts } from "./sitting-count-pass.mjs";
++
++export const EXPECT = { registered: 1093, docContractsTests: 76, consumerSafeTests: 9 };
++const TIMEOUT_MS = 600000;
++const lastLine = (out) => out.trim().split("\n").filter((l) => l.trim() !== "").at(-1) ?? "(no output)";
++
++// Each judge returns { ok, line } from { status, out }.
++const exitOnly = (okLine) => ({ status, out }) => ({ ok: status === 0, line: okLine ? okLine(out) : lastLine(out) });
++const testJudge = (expected) => ({ status, out }) => {
++  const c = parseCounts(out);
++  return { ok: status === 0 && c.fail === 0 && c.pass === expected, line: `pass ${c.pass ?? "?"} of ${c.tests ?? "?"}, fail ${c.fail ?? "?"} (expected ${expected})` };
++};
++
++export const CHECKS = [
++  { name: "suite-registration", args: ["harness/scripts/check-verify-suite-registration.mjs"], judge: ({ status, out }) => {
++    const n = /(\d+) registered/.exec(out);
++    const count = n ? Number(n[1]) : null;
++    return { ok: status === 0 && count === EXPECT.registered, line: status === 0 ? `${count ?? "?"} registered (expected ${EXPECT.registered})` : lastLine(out) };
++  } },
++  { name: "case-completion", args: ["harness/scripts/check-verify-case-completion.mjs"], judge: exitOnly() },
++  { name: "capability-inventory", args: ["harness/scripts/check-product-capability-inventory.mjs"], judge: exitOnly() },
++  { name: "observation-governance", args: ["harness/scripts/check-observation-governance.mjs"], judge: exitOnly() },
++  { name: "reader-inputs", args: ["scripts/sync-reader-inputs.mjs", ".", "--check"], judge: ({ status, out }) => ({
++    ok: status === 0, line: status === 0 ? "mirrors and pins equal their sources" : `${out.split("\n").filter((l) => l.startsWith("- ")).length} drift line(s), first: ${(out.split("\n").find((l) => l.startsWith("- ")) ?? lastLine(out)).replace(/^- /, "")}`,
++  }) },
++  { name: "backlog-state", args: ["plugins/pipeline-core/scripts/check-backlog-state.mjs"], judge: ({ status, out }) => {
++    const lines = out.split("\n").filter((l) => l.trim() !== "");
++    const drift = lines.filter((l) => l.startsWith("DRIFT")).length;
++    return { ok: status === 0, line: `${lines.filter((l) => !l.startsWith("DRIFT")).at(-1) ?? "(no summary line)"} (${drift} tolerated DRIFT line(s))` };
++  } },
++  { name: "architecture-boundary", args: ["plugins/pipeline-core/scripts/architecture-boundary-check.mjs", "--root", "."], judge: ({ status, out }) => {
++    const kinds = {};
++    for (const m of out.matchAll(/^\s+- \[([a-z-]+)\]/gm)) kinds[m[1]] = (kinds[m[1]] ?? 0) + 1;
++    const over = kinds["over-line-bound"] ?? 0;
++    const other = Object.keys(kinds).filter((k) => k !== "over-line-bound" && k !== "unowned-path").length;
++    const desc = Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ") || "no findings";
++    return { ok: (status === 0 || status === 1) && over === 0 && other === 0, line: `exit ${status}: ${desc}` };
++  } },
++  { name: "doc-contracts-test", args: ["--test", "harness/scripts/check-doc-contracts.test.mjs"], judge: testJudge(EXPECT.docContractsTests) },
++  { name: "consumer-safe-paths-test", args: ["--test", "harness/scripts/check-consumer-safe-paths.test.mjs"], judge: testJudge(EXPECT.consumerSafeTests) },
++  { name: "doc-contracts", args: ["harness/scripts/check-doc-contracts.mjs"], judge: exitOnly() },
++];
++
++export function runChecks({ root = ".", only = [], home = homedir(), log = console.log, execPath = process.execPath } = {}) {
++  const absRoot = resolve(root);
++  for (const n of only) if (!CHECKS.some((c) => c.name === n)) throw Object.assign(new Error(`--only names a check that does not exist: ${n} (known: ${CHECKS.map((c) => c.name).join(", ")})`), { usage: true });
++  if (!existsSync(join(absRoot, "harness", "scripts"))) throw Object.assign(new Error(`--root ${root} is not a repository checkout (no harness/scripts)`), { usage: true });
++  const scrub = makeScrubber({ root: absRoot, home, user: process.env.USER || process.env.USERNAME || "" });
++  const tmpBase = join(home, "pipeline-test-tmp", `post-sitting-${process.pid}`);
++  const rows = [];
++  CHECKS.filter((c) => only.length === 0 || only.includes(c.name)).forEach((c, i) => {
++    const tmp = join(tmpBase, String(i));
++    rmSync(tmp, { recursive: true, force: true });
++    mkdirSync(tmp, { recursive: true, mode: 0o700 });
++    chmodSync(tmp, 0o700);
++    const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
++    delete env.NODE_TEST_CONTEXT;
++    const args = c.args;
++    const t0 = Date.now();
++    const r = spawnSync(execPath, args, { cwd: absRoot, env, encoding: "utf8", timeout: TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
++    const seconds = Math.round((Date.now() - t0) / 100) / 10;
++    const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
++    const timedOut = !!(r.error && r.error.code === "ETIMEDOUT");
++    const verdict = timedOut ? { ok: false, line: "timed out" } : c.judge({ status: r.status, out });
++    if (verdict.ok) rmSync(tmp, { recursive: true, force: true });
++    const row = { check: c.name, command: `node ${args.join(" ")}`, verdict: verdict.ok ? "GREEN" : "RED", exit: r.status, seconds, result: scrub(verdict.line).slice(0, 200) };
++    rows.push(row);
++    log(`${row.verdict.padEnd(5)} ${c.name.padEnd(24)} exit ${String(row.exit).padEnd(4)} ${String(seconds).padStart(5)} s  ${row.result}`);
++  });
++  return { rows, ok: rows.every((r) => r.verdict === "GREEN") };
++}
++
++function parseArgs(argv) {
++  const o = { only: [], root: "." };
++  for (let i = 0; i < argv.length; i++) {
++    const a = argv[i];
++    if (a === "--root" || a === "--json") {
++      if (i + 1 >= argv.length) throw Object.assign(new Error(`${a} needs a value`), { usage: true });
++      o[a.slice(2)] = argv[++i];
++    } else if (a === "--only") {
++      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) o.only.push(argv[++i]);
++      if (o.only.length === 0) throw Object.assign(new Error("--only needs at least one check name"), { usage: true });
++    } else throw Object.assign(new Error(`unknown argument ${a}`), { usage: true });
++  }
++  return o;
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
++  try {
++    const o = parseArgs(process.argv.slice(2));
++    let jsonPath = null;
++    if (o.json) {
++      jsonPath = resolve(o.json);
++      const rel = relative(join(resolve(o.root), "scratch"), jsonPath);
++      if (rel === "" || rel.split(sep)[0] === ".." || isAbsolute(rel)) throw Object.assign(new Error(`--json ${o.json} must be a file inside <root>/scratch/`), { usage: true });
++    }
++    console.log("check                    verdict/exit/seconds/result");
++    const result = runChecks({ root: o.root, only: o.only });
++    console.log(`${result.rows.filter((r) => r.verdict === "GREEN").length} of ${result.rows.length} checks GREEN`);
++    if (jsonPath) {
++      mkdirSync(resolve(jsonPath, ".."), { recursive: true });
++      writeFileSync(jsonPath, `${JSON.stringify({ schema: "pipeline.post-sitting-checks.v1", rows: result.rows, ok: result.ok }, null, 2)}\n`);
++      console.log(`table written: ${o.json}`);
++    }
++    process.exit(result.ok ? 0 : 1);
++  } catch (e) {
++    console.error(`${e.message}\nusage: node scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file inside <root>/scratch/>]`);
++    process.exit(e.usage ? 2 : 1);
++  }
++}
+diff --git a/specs/sprint-alfred-epic/plans/count-pass-suites.json b/specs/sprint-alfred-epic/plans/count-pass-suites.json
+index d8f9378d3..f620c113c 100644
+--- a/specs/sprint-alfred-epic/plans/count-pass-suites.json
++++ b/specs/sprint-alfred-epic/plans/count-pass-suites.json
+@@ -188,9 +188,11 @@
+     "--test",
+     "plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs"
+    ],
+-   "expect": null,
++   "expect": {
++    "minPass": 4
++   },
+    "heavy": false,
+-   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair"
++   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair | K134: expect 4 set from the counted result in evidence/sitting (k118-notes.md, notes/k133-results.md)."
+   },
+   {
+    "id": "codex-bootstrap-in-the-typed-next-action",
+@@ -247,9 +249,11 @@
+     "--test",
+     "plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs"
+    ],
+-   "expect": null,
++   "expect": {
++    "minPass": 2
++   },
+    "heavy": false,
+-   "why": "named as counted in held-patches/k98-refusal-texts"
++   "why": "named as counted in held-patches/k98-refusal-texts | K134: expect 2 set from the counted result in evidence/sitting (k118-notes.md, notes/k133-results.md)."
+   },
+   {
+    "id": "critic-course-admission",
+@@ -640,9 +644,11 @@
+     "--test",
+     "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs"
+    ],
+-   "expect": null,
++   "expect": {
++    "minPass": 2
++   },
+    "heavy": false,
+-   "why": "named as counted in held-patches/k98-refusal-texts"
++   "why": "named as counted in held-patches/k98-refusal-texts | K134: expect 2 set from the counted result in evidence/sitting (k118-notes.md, notes/k133-results.md)."
+   },
+   {
+    "id": "goldfish-budgets-omit-the-closing-ceremony",
+@@ -725,9 +731,11 @@
+     "--test",
+     "plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs"
+    ],
+-   "expect": null,
++   "expect": {
++    "minPass": 34
++   },
+    "heavy": false,
+-   "why": "named as counted in held-patches/k104-fanout-guard-enforce"
++   "why": "named as counted in held-patches/k104-fanout-guard-enforce | K134: expect 34 set from the counted result on the sitting tree (notes/k133-results.md); 29 of 29 on the pre-sitting tree, so a thin green (RED) there by design."
+   },
+   {
+    "id": "guard-lifecycle-ready",
+@@ -1259,9 +1267,11 @@
+     "--test",
+     "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
+    ],
+-   "expect": null,
++   "expect": {
++    "minPass": 31
++   },
+    "heavy": false,
+-   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
++   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there. | K134: expect 31 set from the counted result on the sitting tree (decision-round pin); 25 of 25 on the pre-sitting tree, so a thin green (RED) there by design."
+   },
+   {
+    "id": "run-parallel",
+@@ -1382,6 +1392,110 @@
+    "why": "[agent] Update the stale V-10 header text in the pin (still says open, owner Coordinator).",
+    "knownSeconds": 85
+   },
++  {
++   "id": "governed-check-child-ignores-inherited-node-test-context",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs"
++   ],
++   "expect": {
++    "minPass": 2
++   },
++   "heavy": false,
++   "why": "K134, decision-round pin of K120 (evidence/sitting/k120-notes.md): a governed delivery check verdict ignores an inherited NODE_TEST_CONTEXT; expect 2 of 2. The pin file and the one-line product fix land with the sitting, so this entry is RED (file missing, or 0 pass / 2 fail without the fix) on a tree before the sitting: list only, run it after the sitting."
++  },
++  {
++   "id": "project-calibration-retains-new-project-placeholder",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs"
++   ],
++   "expect": {
++    "minPass": 43
++   },
++   "heavy": false,
++   "why": "K134, project-calibration pin (AC-232, cases S1 to S8, evidence/sitting/notes/k133-results.md): 43 of 43 on the sitting tree; 28 of 28 on the pre-sitting tree, so a thin green (RED) there by design. Count it after the sitting."
++  },
++  {
++   "id": "design-approval-route.e2e",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs"
++   ],
++   "expect": {
++    "minPass": 14
++   },
++   "heavy": false,
++   "why": "K134, decision-round suite: end-to-end design approval route; 14 of 14 measured on the pre-sitting tree (a floor: the sitting tree may hold more)."
++  },
++  {
++   "id": "check-observation-governance",
++   "items": [],
++   "command": [
++    "--test",
++    "harness/scripts/check-observation-governance.test.mjs"
++   ],
++   "expect": {
++    "minPass": 7
++   },
++   "heavy": false,
++   "why": "K134, decision-round suite: the observation governance checker; expect 7 of 7."
++  },
++  {
++   "id": "dispatch-scope-overlap",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs"
++   ],
++   "expect": {
++    "minPass": 12
++   },
++   "heavy": false,
++   "why": "K134, one of the seven test files registered by K118 (evidence/sitting/k118-notes.md), 12 of 12 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
++  },
++  {
++   "id": "commit-message-policy-administrative-refusal",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs"
++   ],
++   "expect": {
++    "minPass": 1
++   },
++   "heavy": false,
++   "why": "K134, K118 registration (evidence/sitting/k118-notes.md), 1 of 1 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
++  },
++  {
++   "id": "onboarding-init-machine-plane-reason",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs"
++   ],
++   "expect": {
++    "minPass": 1
++   },
++   "heavy": false,
++   "why": "K134, K118 registration (evidence/sitting/k118-notes.md), 1 of 1 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
++  },
++  {
++   "id": "pipeline-state-approve-push-chat-catalogue-repair",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs"
++   ],
++   "expect": {
++    "minPass": 1
++   },
++   "heavy": false,
++   "why": "K134, K118 registration (evidence/sitting/k118-notes.md), 1 of 1 there. The file exists only on the sitting tree: list only, RED (file missing) before it."
++  },
+   {
+    "id": "onboarding-init",
+    "items": [
+@@ -1437,6 +1551,20 @@
+    "heavy": true,
+    "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host. // [verify-wsl] Run the complete original onboarding controller (184 cases, four shards) and the Source corpus serially on Linux/WSL with a private TMPDIR and reconcile any remaining failures. // [verify-wsl] Complete the full onboarding suite (216 cases, eight workers) serially on Linux/WSL with a private TMPDIR and capture consistent PASS and END counts, all child completions and exit 0. // [verify-wsl] Run the complete original onboarding controller and the preserved unsafe-layout callback serially on Linux/WSL with a raised timeout and a private TMPDIR. | HEAVY: original onboarding controller: 184 cases in four shards, 216 cases with eight workers; about 15 to 30 minutes; run `node <file>` (not `--test`), own summary line; run alone with a raised cap"
+   },
++  {
++   "id": "native-goldfish-host-state",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs"
++   ],
++   "expect": {
++    "minPass": 38
++   },
++   "heavy": true,
++   "timeoutMs": 3600000,
++   "why": "K134, HEAVY: the whole native Goldfish host-state file, about 15 minutes alone, 38 of 38 expected (K120 notes: run the whole file once, alone, NGHS09 included). NGHS09 is RED without the K120 product fix, so the whole file is only green after the sitting. Run alone, last, with a raised cap."
++  },
+   {
+    "id": "forensics-and-audit-evidence-not-reconstructable",
+    "items": [
+diff --git a/specs/sprint-alfred-epic/plans/count-pass-suites.md b/specs/sprint-alfred-epic/plans/count-pass-suites.md
+index b5b30f2df..15af498d7 100644
+--- a/specs/sprint-alfred-epic/plans/count-pass-suites.md
++++ b/specs/sprint-alfred-epic/plans/count-pass-suites.md
+@@ -2,7 +2,7 @@
+ 
+ `count-pass-suites.json` is the input of `scripts/sitting-count-pass.mjs` (see `docs/operating-tools.md`, "Serial count pass"). It covers the 55 rows of `evidence/delivery-remeasure-2026-10-23/snapshot.json` that carry an open entry owned by `agent` or `verify-wsl`, plus the suites that the notes in `evidence/held-patches/` name as counted.
+ 
+-120 entries: 69 serve at least one of the 55 rows (`items`), 47 are held-patch suites only (empty `items`, `why` names the notes), 4 are unresolved (`command: null`, never run). Entries are de-duplicated by suite file; the id is the file name without `.test.mjs`. Order: cheap suites first (by the seconds of an earlier counted run where one is on record, otherwise by name), the four heavy suites last, the unresolved entries at the end.
++129 entries: 69 serve at least one of the 55 rows (`items`), 56 are held-patch or decision-round suites only (empty `items`, `why` names the notes; 9 of them added by K134), 4 are unresolved (`command: null`, never run). Entries are de-duplicated by suite file; the id is the file name without `.test.mjs`. Order: cheap suites first (by the seconds of an earlier counted run where one is on record, otherwise by name), the five heavy suites last, the unresolved entries at the end.
+ 
+ Resolution rule for a row: its own pin `plugins/pipeline-core/lib/pins/<slug>.test.mjs` (all pins named by a row exist under the full slug), plus the suites its `open.what` or backlog text names. `why` carries the open sentence(s) verbatim, tagged `[agent]` or `[verify-wsl]`. Read `why` before trusting a green: for rows whose open clause asks to build, restate or document something, a counted pin run is the evidence gap only if that work is committed first.
+ 
+@@ -14,9 +14,25 @@ Resolution rule for a row: its own pin `plugins/pipeline-core/lib/pins/<slug>.te
+ | `onboarding-init` (`scripts/onboarding-init.test.mjs`) | 368.5 s (item text, 2026-09-29) | unsplit greenfield matrix, the baseline of `onboarding-init-greenfield-matrix-is-serial-and-slow` |
+ | `onboarding-init-greenfield-matrix-is-serial-and-slow` (pin) | unknown | split cases; compare the wall time with the 368.5 s baseline |
+ | `project-onboarding-v3` | 15 to 30 min | the original onboarding controller (184 cases in four shards, 216 cases with eight workers); run as `node <file>` (not `--test`), `expect.minPass` 216; serves `nongit-retirement-reader-calls-inaccessible-controller-helper`, `retirement-reader-masks-typed-unsafe-layout-inspection`, `onboarding-test-runner-reports-async-pass-before-settlement` and `git-hook-runtime-snapshot-omits-protected-baseline-catalog`; give it `--timeout-ms 3600000` |
++| `native-goldfish-host-state` (K134) | about 15 min | the whole `native-goldfish-host-state.test.mjs`, `expect.minPass` 38, `timeoutMs` 3600000; its NGHS09 case is red without the K120 fix, so the file is green only after the sitting; listed after the four above, run alone, last |
+ 
+ Other suites may be slow without a recorded runtime (guard-lifecycle-ready, guard-dispatch, antigravity-pretool-guard, slice-queue); the runner's per-suite cap and `--resume` cover that.
+ 
++## Suites that are red before the sitting by design (K134)
++
++K134 added the suites that the decision rounds created or grew. Run the list on the sitting tree, after the protected steps. On a tree before the sitting the following entries are RED and that is expected, not a defect (the runner has no field for it; this table is the record):
++
++| Id | Why red before the sitting | Expected after |
++|---|---|---|
++| `governed-check-child-ignores-inherited-node-test-context` | the K120 pin file and its product fix are sitting steps (the file is missing, or 0 pass / 2 fail without the fix) | 2 |
++| `native-goldfish-host-state` (heavy) | NGHS09 needs the K120 fix | 38 |
++| `dispatch-scope-overlap`, `commit-message-policy-administrative-refusal`, `onboarding-init-machine-plane-reason`, `pipeline-state-approve-push-chat-catalogue-repair` | the four files of the K118 registration that exist only on the sitting tree (the other three of its seven, `clone-hook-readiness.refresh`, `commit-pipeline-owned` and `gitleaks-scratch-clones-exclusion`, were already listed and are green today at 4, 2 and 2) | 12, 1, 1, 1 |
++| `project-calibration-retains-new-project-placeholder` | thin green: 28 pass today | 43 |
++| `guard-dispatch-fanout` | thin green: 29 pass today | 34 |
++| `role-route-preflight-with-self-dispatch-fallback` | thin green: 25 pass today | 31 |
++
++Green today and kept as they are: `design-approval-route.e2e` (14, a floor) and `check-observation-governance` (7). These eight were run once through the runner on 2026-10-23 with `--only` (the other entries were not run).
++
+ ## Unresolved (command null)
+ 
+ | Id | Row | Reason |
+@@ -34,4 +50,6 @@ Several rows ask for work, not a count: `bounded-reader-terminal-binding` (the 2
+ 
+ `expect.minPass` is set only where an open entry states the count: `goldfish-budgets-omit-the-closing-ceremony` 7, `feature-branch-push-admitted-without-signature-approval` 16, `dispatch-record-log-stays-empty-despite-mandatory-phase-entries` 31, `hgo-patch-preflight-before-signature` 12 (13 cases, 1 todo), `project-onboarding-v3` 216. Everything else is `null`.
+ 
+-The list was not run; the runner was smoke-run on its fixture suites and on one cheap real suite (`node-v24-on-windows-creates-a-real-nul-file`, 14 of 14).
++K134 also set `expect.minPass` on `guard-dispatch-fanout` 34, `role-route-preflight-with-self-dispatch-fallback` 31, `clone-hook-readiness.refresh` 4, `commit-pipeline-owned` 2 and `gitleaks-scratch-clones-exclusion` 2, and on its own additions (table above).
++
++The list was not run as a whole; the runner was smoke-run on its fixture suites and on one cheap real suite (`node-v24-on-windows-creates-a-real-nul-file`, 14 of 14).

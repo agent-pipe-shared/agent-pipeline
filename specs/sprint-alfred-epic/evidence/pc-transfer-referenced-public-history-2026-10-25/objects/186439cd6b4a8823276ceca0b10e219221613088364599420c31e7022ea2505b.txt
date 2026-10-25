@@ -1,0 +1,30 @@
+# Exact aggregate Advisor namespace composition
+
+Aggregate tested: 563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e, source commit e585f61a43944a7958069db9d69c0d909bf7acbf. This is Scratch-only component composition evidence, not actual Advisor/model execution or productive source activation.
+
+## Bound graph
+
+The preparation script verifies the current aggregate patch digest and metadata surface hashes, then copies the exact current host/journal/supervisor/launcher/worker/ownership source bytes with import-coordinate changes only. bindings.json lists every source and runtime hash and every changed import coordinate. Canonical strict JSON parser, schema-lite and canonical hashing dependencies are separately bound. Source logic, process-root registration and shutdown/ownership checks are unchanged. Existing host-input fixtures, tests, evidence and runtime copies were preserved.
+
+The runner binds aggregate patch, metadata, all six original virtual postimages, all six runtime copies, canonical dependencies and the targeted test file before and after execution. sourceAndRuntimeStable is true. No aggregate was assembled, patch applied or canonical source written.
+
+## Two actual controlled process cases
+
+Command: node --test scratch/codex-advisor-host-namespace-composition.test.mjs. Two tests passed, zero failed, exit 0, 4627.880408ms. The cases use exactly two real managed Linux Node subprocesses, each running a controlled local app-server protocol fixture. No Codex binary, provider, credential read or model turn occurred.
+
+Each fixture creates a private synthetic Git-common directory and calls registerCodexHostProcessRoot({gitCommonDir,repoFingerprint,purpose:'advisor'}). The returned root is exactly <gitCommonDir>/agent-pipeline/advisor-codex/<repoFingerprint>/processes. The actual aggregate host/supervisor use this registered Advisor root, rather than the old Readiness namespace.
+
+- Approved: beforeTurnInput is called once after actual MCP protocol readback, receives frozen metadata/digests only, then exactly one turn/start reaches the fixture. Its received request hash equals the host's bound request hash; input disposition is acknowledged. Terminal exit is 0, ownership independently verifies closed, and no live owned session remains.
+- Refused: the callback occurs after MCP readback; zero turn/start reaches the fixture. thread/unsubscribe is observed, the real managed process closes with exit 0, ownership independently verifies closed and no live owned session remains. This is an executed pre-content refusal, not a zero-launch/no-child claim.
+
+Independent verifyRegisteredCodexOwnership receives the expected host receipt ID, repository fingerprint, dispatch, candidate, bound request digest and the independently read Node executable digest. Its result matches the host ownership projection. Two metadata-only actual event transcripts record these observations, input disposition, terminal and journal hashes; no prompt or answer content is persisted.
+
+## Purpose/authority boundary
+
+Registration's purpose:'advisor' is controller-local state. The namespace and registered root gate enforce the selected Advisor process location at creation, and the generic journal binds receipt ID, repository fingerprint, dispatch, candidate and request. Purpose is not a durable field of intent, and verifyRegisteredCodexOwnership has no expected-purpose field. The transcripts record purposePersistedInIntent:false explicitly. Root registration must be reconstructed by a trusted controller on re-entry; a receipt or namespace spelling alone cannot attest the original registered purpose or export decision.
+
+The synthetic Git-common coordinate is an explicitly supplied fixture directory, not repository discovery or live Git authority. The callback approved/refused values are controlled protocol-test decisions, not an observed real host export capability. Session/model/configuration responses are produced by the Node fixture. This proves actual process namespace admission plus generic input ordering/shutdown/ownership composition; it does not qualify an ordinary Advisor recipe, actual model identity, Advisor host record/store transaction or native Codex run. Raw output custody and explicit StdioStatus remain outside the tested contract.
+
+No additional Readiness-positive case was required: this task changes no graph source logic and uses only the newly registered Advisor root; existing explicit Readiness behavior and the unchanged compatibility branch remain bound to their separate evidence. No broader suite or formal Critic/Reader stamp is claimed.
+
+Artifacts: codex-advisor-host-namespace-composition-bindings.json; codex-advisor-host-namespace-composition-evidence.json; codex-advisor-host-namespace-composition-transcripts.jsonl; codex-advisor-host-namespace-composition-test.stdout.txt; codex-advisor-host-namespace-composition-test.stderr.txt. All new files are under this owned prefix.

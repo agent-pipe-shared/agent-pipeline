@@ -1,0 +1,2484 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 9ad0b3d06..8f1092a69 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -852,6 +852,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-announce-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-argv-closure-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-chat-catalogue-repair-tests",
++        "verify-phase:harness/scripts/verify.mjs:pipeline-state-calibration-recovery-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-close-audit-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-discard-feature-tests",
+@@ -1102,6 +1103,7 @@
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
++        "verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-native-type-cache-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-private-state-observation-memo-tests",
+         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 2f2e22283..d0552f738 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -1332,6 +1332,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "pipeline-state-calibration-recovery-tests",
++      "path": "plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "pipeline-state-close-audit-tests",
+       "path": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+@@ -1973,6 +1978,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "windows-authority-readiness-tests",
++      "path": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "windows-private-state-tests",
+       "path": "plugins/pipeline-core/lib/windows-private-state.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 6e9546c28..03e2c04de 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3934,6 +3934,50 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "pipeline-state-calibration-recovery-tests",
++      "file": "plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs",
++      "invariantPinned": "Calibration phase and Verify command transitions preserve exact Source and State recovery, refuse forged or concurrent writes, and report partial repair without false readiness.",
++      "nonOverlapNote": "Unique K156 calibration recovery course; the existing calibration transition and pipeline-state suites retain their own established cases.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "KCR001",
++          "KCR002",
++          "KCR003",
++          "KCR004",
++          "KCR005",
++          "KCR006",
++          "KCR007",
++          "KCR008",
++          "KCR009",
++          "KCR010",
++          "KCR011"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "windows-authority-readiness-tests",
++      "file": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
++      "invariantPinned": "Windows authority readiness aggregates closed project, plugin and private path observations, refuses inherited mutation and unknown native causes, and remains read-only.",
++      "nonOverlapNote": "Unique G19 readiness decision suite; native preflight integration and Windows ACL pins retain their own contracts.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "WAR001",
++          "WAR002",
++          "WAR003",
++          "WAR004",
++          "WAR005",
++          "WAR006",
++          "WAR007",
++          "WAR008",
++          "WAR009"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+index fc7b72d58..9288dd2ba 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+@@ -10,7 +10,8 @@ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+-import { observeCurrentPlanApprovalForCalibration, classifyVerifyCommand } from "../scripts/pipeline-state.mjs";
++import { observeCurrentPlanApprovalForCalibration, classifyVerifyCommand, inspectValidatedCalibrationSourceWitness, retireDeadCalibrationContinuityLock } from "../scripts/pipeline-state.mjs";
++import { isActiveSourceOwnedSessionAuthorityBoundary } from "./session-authority-registry.mjs";
+ import { ensureHardenedPrivateDirectory } from "./hardened-private-directory.mjs";
+ import { assertPrivateRegularFile, writePrivateFileNoReplaceAtomic } from "./private-boundary.mjs";
+ import { parseStrictJson } from "./governance-event.mjs";
+@@ -24,7 +25,8 @@ const HELD = new WeakMap();
+ const HEX = /^[a-f0-9]{64}$/u;
+ const CODE = /^[A-Z][A-Z0-9-]{1,63}$/u;
+ const OID =/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
+-const fail = (code) => { const error = new Error(code); error.code = code; throw error; };
++const fail = (code, windowsAuthorityCause = null) => { const error = new Error(code); error.code = code;
++  if (windowsAuthorityCause) error.windowsAuthorityCause = windowsAuthorityCause; throw error; };
+ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ const canonical = (value) => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
+   ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+@@ -92,9 +94,10 @@ function repository(rootDir) {
+   return { root, common, head, tree, git, directory: join(common, "agent-pipeline", "calibration-verify-commit") };
+ }
+ 
+-function approval(repo) {
+-  const value = observeCurrentPlanApprovalForCalibration({ rootDir: repo.root });
+-  if (value && value.status === "unavailable" && typeof value.code === "string" && CODE.test(value.code)) fail(value.code);
++function approval(repo, phaseEntry = false) {
++  const value = observeCurrentPlanApprovalForCalibration({ rootDir: repo.root, phaseEntry });
++  if (value && value.status === "unavailable" && typeof value.code === "string" && CODE.test(value.code))
++    fail(value.code, /^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.windowsAuthorityCause ?? "") ? value.windowsAuthorityCause : null);
+   const keys = ["status", "rootDir", "statePath", "stateSha256", "stateRevision", "candidate", "submissionSha256", "approvalSha256", "authoritySha256", "approvalBasis", "sourceRefs"];
+   if (!exactKeys(value, keys) || value.status !== "eligible" || value.rootDir !== repo.root
+     || !HEX.test(value.stateSha256) || !HEX.test(value.submissionSha256) || !HEX.test(value.approvalSha256) || !HEX.test(value.authoritySha256)
+@@ -116,8 +119,8 @@ function twinAt(repo, path, revision) {
+   return { path, bytes, value, sha256: sha(bytes), gitMode: match[1], blob: match[2] };
+ }
+ 
+-// Select only actual committed and physically present tiers. An omitted legacy
+-// peer must be absent in HEAD, index and the physical layout on every recheck.
++// Select only actual committed and physically present tiers. An omitted peer
++// must be absent in HEAD, index and the physical layout on every recheck.
+ function committedCalibrationPaths(repo) {
+   const paths = [];
+   for (const path of PATHS) {
+@@ -141,7 +144,7 @@ function committedCalibrationPaths(repo) {
+     if (tracked !== present || (!tracked && repo.git(["ls-files", "--stage", "-z", "--", path]).length !== 0)) fail("CVCT-CALIBRATION");
+     if (tracked) paths.push(path);
+   }
+-  if (paths[0] !== PATHS[0]) fail("CVCT-CALIBRATION");
++  if (paths.length === 0) fail("CVCT-CALIBRATION");
+   return paths;
+ }
+ 
+@@ -162,7 +165,35 @@ export function inspectCommittedCalibrationVerifyLayout({ rootDir } = {}) {
+   } catch (error) { return { status: "unavailable", code: unavailable(error).code }; }
+ }
+ 
+-function transition(repo, currentApproval, command) {
++/** A fresh command may normalize only exact committed-baseline or its own
++ * computed verify-field delta. This observation never reads a journal. */
++export function inspectReplayableCalibrationVerifyLayout({ rootDir, verifyCommand, phaseEntry = false } = {}) {
++  try {
++    const repo = repository(rootDir);
++    const committed = committedCalibrationPaths(repo).map(path => twinAt(repo,path,"HEAD"));
++    if (committed.length === 2 && !same(committed[0].value,committed[1].value)) fail("CVCT-TWIN-CAS");
++    if (classifyVerifyCommand(committed[0].value.verify) === "configured") {
++      if (committed[0].value.verify !== verifyCommand) fail("CVCT-COMMAND");
++      currentFiles(repo,{entries:committed.map(entry=>({...entry,beforeSha256:entry.sha256}))},false);
++      return {status:"committed-configured",paths:committed.map(entry=>entry.path)};
++    }
++    const facts = transition(repo,approval(repo,phaseEntry),verifyCommand);
++    let currentCount=0;
++    for (const entry of facts.entries) {
++      const file=readBounded(repo.root,join(repo.root,entry.path));
++      if ((file.mode & 0o111 ? "100755" : "100644") !== entry.gitMode
++        || ![entry.beforeSha256,entry.afterSha256].includes(file.sha256)) fail("CVCT-TWIN-CAS");
++      if (file.sha256===entry.afterSha256) currentCount++;
++    }
++    const finalRepo=repository(repo.root);
++    if (finalRepo.head!==repo.head || finalRepo.tree!==repo.tree
++      || !same(approval(finalRepo,phaseEntry),facts.approval)) fail("CVCT-CAS");
++    return {status:currentCount===0?"baseline-only":currentCount===facts.entries.length?"configured-current":"partial-current",
++      paths:facts.entries.map(entry=>entry.path)};
++  } catch(error) { return {status:"unavailable",code:unavailable(error).code}; }
++}
++
++function transition(repo, currentApproval, command, statePostSha256 = null) {
+   if (classifyVerifyCommand(command) !== "configured" || typeof command !== "string" || Buffer.byteLength(command) > 32_768 || /[\r\n\0]/u.test(command)) fail("CVCT-COMMAND");
+   const before = committedCalibrationPaths(repo).map((path) => twinAt(repo, path, "HEAD"));
+   if ((before.length === 2 && !same(before[0].value, before[1].value)) || before.some((entry) => classifyVerifyCommand(entry.value.verify) !== "baseline-only")) fail("CVCT-BASELINE");
+@@ -170,7 +201,11 @@ function transition(repo, currentApproval, command) {
+     const after = Buffer.from(`${JSON.stringify({ ...entry.value, verify: command }, null, 2)}\n`, "utf8");
+     return { path: entry.path, beforeSha256: entry.sha256, beforeBlob: entry.blob, gitMode: entry.gitMode, afterSha256: sha(after), afterSize: after.length };
+   });
+-  const facts = { rootDir: repo.root, commonDir: repo.common, head: repo.head, tree: repo.tree, approval: currentApproval, verifyCommand: command, entries };
++  if (statePostSha256 !== null && !HEX.test(statePostSha256)) fail("CVCT-STATE-POSTIMAGE");
++  // The original non-phase record never carried this field. Its canonical ID
++  // remains byte-for-byte compatible with records already published by hooks.
++  const facts = { rootDir: repo.root, commonDir: repo.common, head: repo.head, tree: repo.tree, approval: currentApproval, verifyCommand: command,
++    ...(statePostSha256 === null ? {} : { statePostSha256 }), entries };
+   return { ...facts, id: sha(canonical(facts)) };
+ }
+ 
+@@ -182,6 +217,26 @@ function currentFiles(repo, facts, after) {
+       || (file.mode & 0o111 ? "100755" : "100644") !== entry.gitMode) fail("CVCT-TWIN-CAS");
+   }
+ }
++function replayableFiles(repo,facts) {
++  for(const entry of facts.entries) {
++    const file=readBounded(repo.root,join(repo.root,entry.path));
++    if ((file.mode & 0o111 ? "100755" : "100644") !== entry.gitMode
++      || ![entry.beforeSha256,entry.afterSha256].includes(file.sha256)) fail("CVCT-TWIN-CAS");
++  }
++}
++function retireDeadTransitionLock(repo,sourceBoundary) {
++  if (!isActiveSourceOwnedSessionAuthorityBoundary({boundary:sourceBoundary,rootDir:repo.root})) fail("CVCT-SOURCE-WRITER");
++  const path=join(repo.directory,"transition.lock");
++  if (!existsSync(path)) return;
++  const before=lstatSync(path),file=readBounded(repo.common,path,true);
++  const match=/^([a-f0-9]{64})\n([1-9][0-9]*)\n$/u.exec(file.bytes.toString("ascii"));
++  if (!match || !Number.isSafeInteger(Number(match[2]))) fail("CVCT-LOCK");
++  try { process.kill(Number(match[2]),0); fail("CVCT-LIVE-OWNER"); }
++  catch(error) { if(error.code!=="ESRCH") throw error; }
++  if(!same(identity(before),identity(lstatSync(path)))
++    || readBounded(repo.common,path,true).sha256!==file.sha256) fail("CVCT-LOCK");
++  unlinkSync(path);
++}
+ function readRecord(repo, path) {
+   const raw = readBounded(repo.common, path, true).bytes;
+   const value = parseStrictJson(raw);
+@@ -194,29 +249,51 @@ function publish(repo, facts, phase) {
+   const bytes = Buffer.from(`${JSON.stringify({ schema: SCHEMA, phase, facts }, null, 2)}\n`);
+   if (bytes.length > MAX_BYTES) fail("CVCT-RECORD-BOUNDS");
+   const published = writePrivateFileNoReplaceAtomic(path, bytes);
+-  if (!published.created || !same(readRecord(repo, path), { schema: SCHEMA, phase, facts })) fail("CVCT-RECORD-CONFLICT");
++  if (!same(readRecord(repo, path), { schema: SCHEMA, phase, facts })) fail("CVCT-RECORD-CONFLICT");
+ }
+-const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && CODE.test(error.code) ? error.code : "CVCT-UNAVAILABLE" });
++const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && CODE.test(error.code) ? error.code : "CVCT-UNAVAILABLE",
++  ...(/^WIN-AUTH-[A-Z-]{1,64}$/u.test(error?.windowsAuthorityCause ?? "") ? {windowsAuthorityCause:error.windowsAuthorityCause} : {}) });
+ 
+-export function prepareCalibrationVerifyCommitTransition({ rootDir, verifyCommand } = {}) {
++function sameApprovalAcrossPhase(before, after) {
++  if (before.statePath !== after.statePath || before.stateSha256 === after.stateSha256
++    || !same(before.candidate, after.candidate)
++    || before.submissionSha256 !== after.submissionSha256
++    || before.approvalSha256 !== after.approvalSha256
++    || before.authoritySha256 !== after.authoritySha256
++    || before.approvalBasis !== after.approvalBasis
++    || before.stateRevision !== after.stateRevision) return false;
++  const withoutState = value => value.sourceRefs.filter(ref => ref.path !== value.statePath);
++  return same(withoutState(before), withoutState(after));
++}
++
++export function prepareCalibrationVerifyCommitTransition({ rootDir, verifyCommand, phaseEntry = false, sourceWitness = null, sourceBoundary = null } = {}) {
+   let held = null;
+   try {
+     const repo = repository(rootDir);
+-    const facts = transition(repo, approval(repo), verifyCommand);
+-    currentFiles(repo, facts, false);
++    if (typeof phaseEntry !== "boolean") fail("CVCT-PHASE-ENTRY");
++    const source = phaseEntry ? inspectValidatedCalibrationSourceWitness(sourceWitness) : null;
++    if (phaseEntry ? !source || source.rootDir !== repo.root || !HEX.test(source.statePostSha256)
++      || !HEX.test(source.statePreSha256) : sourceWitness !== null) fail("CVCT-SOURCE-WRITER");
++    const currentApproval = approval(repo, phaseEntry);
++    if (source && source.statePreSha256 !== currentApproval.stateSha256) fail("CVCT-SOURCE-WRITER");
++    const facts = transition(repo, currentApproval, verifyCommand, source?.statePostSha256 ?? null);
++    replayableFiles(repo, facts);
+     ensureHardenedPrivateDirectory(repo.common, repo.directory);
++    const boundary=source?.sourceBoundary ?? sourceBoundary;
++    retireDeadTransitionLock(repo,boundary);
+     const lockPath = join(repo.directory, "transition.lock");
+     const fd = openSync(lockPath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
+-    held = { repo, facts, fd, lockPath, lockIdentity: null };
+-    writeFileSync(fd, `${facts.id}\n`); fsyncSync(fd);
++    held = { repo, facts, phaseEntry, fd, lockPath, lockIdentity: null };
++    writeFileSync(fd, `${facts.id}\n${process.pid}\n`); fsyncSync(fd);
+     held.lockIdentity = identity(assertPrivateRegularFile(lockPath));
+     if (!same(identity(fstatSync(fd)), held.lockIdentity)) fail("CVCT-LOCK");
+-    if (!same(approval(repository(rootDir)), facts.approval)) fail("CVCT-APPROVAL-CAS");
+-    currentFiles(repo, facts, false);
++    if (!same(approval(repository(rootDir), phaseEntry), facts.approval)) fail("CVCT-APPROVAL-CAS");
++    replayableFiles(repo, facts);
+     publish(repo, facts, "prepared");
+     const preparedHandle = Object.freeze({});
+     HELD.set(preparedHandle, held);
+-    return { ok: true, preparedHandle, paths: facts.entries.map((entry) => entry.path) };
++    return { ok: true, preparedHandle, paths: facts.entries.map((entry) => entry.path),
++      entries:facts.entries.map(entry=>({path:entry.path,beforeSha256:entry.beforeSha256,afterSha256:entry.afterSha256})) };
+   } catch (error) {
+     // Preserve any exclusive lock/journal after interruption. Never reclaim a
+     // stale preparation automatically or pretend it has no effects.
+@@ -231,10 +308,15 @@ export function completeCalibrationVerifyCommitTransition({ preparedHandle } = {
+   HELD.delete(preparedHandle);
+   try {
+     const repo = repository(held.repo.root);
+-    const facts = transition(repo, approval(repo), held.facts.verifyCommand);
+-    if (!same(facts, held.facts) || !same(identity(fstatSync(held.fd)), held.lockIdentity)
++    const facts = transition(repo, approval(repo), held.facts.verifyCommand, held.facts.statePostSha256);
++    const continuous = held.phaseEntry
++      ? sameApprovalAcrossPhase(held.facts.approval, facts.approval)
++        && same({ ...held.facts, id: null, approval: null }, { ...facts, id: null, approval: null })
++      : same(facts, held.facts);
++    if (!continuous || (held.phaseEntry && facts.approval.stateSha256 !== held.facts.statePostSha256)
++      || !same(identity(fstatSync(held.fd)), held.lockIdentity)
+       || !same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)) fail("CVCT-CAS");
+-    if (!same(readRecord(repo, recordPath(repo, facts.id, "prepared")), { schema: SCHEMA, phase: "prepared", facts })) fail("CVCT-RECORD");
++    if (!same(readRecord(repo, recordPath(repo, held.facts.id, "prepared")), { schema: SCHEMA, phase: "prepared", facts: held.facts })) fail("CVCT-RECORD");
+     currentFiles(repo, facts, true);
+     publish(repo, facts, "ready");
+     if (!same(approval(repository(repo.root)), facts.approval)) fail("CVCT-APPROVAL-CAS");
+@@ -249,6 +331,51 @@ export function completeCalibrationVerifyCommitTransition({ preparedHandle } = {
+   }
+ }
+ 
++/** Release only this process's exact preparation after a refused companion write.
++ * The prepared journal stays as an audit preimage. An exact later preparation
++ * may reuse it, but only after the committed calibration preimage is restored. */
++export function abandonCalibrationVerifyCommitTransition({ preparedHandle } = {}) {
++  const held = preparedHandle && HELD.get(preparedHandle);
++  if (!held) return { ok: false, code: "CVCT-HANDLE" };
++  HELD.delete(preparedHandle);
++  try {
++    const repo = repository(held.repo.root);
++    if (repo.head !== held.repo.head || repo.tree !== held.repo.tree
++      || !same(identity(fstatSync(held.fd)), held.lockIdentity)
++      || !same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)
++      || !same(readRecord(repo, recordPath(repo, held.facts.id, "prepared")), { schema: SCHEMA, phase: "prepared", facts: held.facts })
++      || !same(approval(repo, held.phaseEntry), held.facts.approval)) fail("CVCT-CAS");
++    closeSync(held.fd); held.fd = null;
++    if (!same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)) fail("CVCT-LOCK");
++    unlinkSync(held.lockPath);
++    return { ok: true, code: "CVCT-ABANDONED" };
++  } catch (error) {
++    if (held.fd !== null) { try { closeSync(held.fd); } catch { /* retain the typed failure */ } }
++    return unavailable(error);
++  }
++}
++
++/** The State writer proved its replacement did not commit. Undo only the exact
++ * configured companion image held by this same process. */
++export function rollbackCalibrationVerifyCommitTransition({ preparedHandle } = {}) {
++  const held = preparedHandle && HELD.get(preparedHandle);
++  if (!held) return { ok: false, code: "CVCT-HANDLE" };
++  try {
++    const repo = repository(held.repo.root);
++    if (!same(approval(repo, held.phaseEntry), held.facts.approval)
++      || !same(identity(fstatSync(held.fd)), held.lockIdentity)
++      || !same(identity(assertPrivateRegularFile(held.lockPath)), held.lockIdentity)) fail("CVCT-CAS");
++    currentFiles(repo, held.facts, true);
++    for (const entry of held.facts.entries) {
++      const original = twinAt(repo, entry.path, "HEAD");
++      if (original.sha256 !== entry.beforeSha256) fail("CVCT-CAS");
++      writeFileSync(join(repo.root, entry.path), original.bytes);
++    }
++    currentFiles(repo, held.facts, false);
++    return abandonCalibrationVerifyCommitTransition({ preparedHandle });
++  } catch (error) { return unavailable(error); }
++}
++
+ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths } = {}) {
+   try {
+     const repo = repository(rootDir);
+@@ -258,7 +385,13 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths
+       || !same([...stagedPaths].sort(), [...actual].sort())) fail("CVCT-STAGED-SET");
+     const after = paths.map((path) => twinAt(repo, path, ""));
+     if (after.length === 2 && !same(after[0].value, after[1].value)) fail("CVCT-TWIN-CAS");
+-    const facts = transition(repo, approval(repo), after[0].value.verify);
++    const approved = approval(repo);
++    const candidates = [
++      transition(repo, approved, after[0].value.verify),
++      transition(repo, approved, after[0].value.verify, approved.stateSha256),
++    ];
++    const facts = candidates.find(value => existsSync(recordPath(repo, value.id, "ready")));
++    if (!facts) fail("CVCT-RECORD");
+     for (const entry of facts.entries) {
+       const staged = after.find((value) => value.path === entry.path);
+       if (staged.sha256 !== entry.afterSha256 || staged.gitMode !== entry.gitMode) fail("CVCT-STAGED-CAS");
+@@ -268,7 +401,7 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths
+     if (!same(readRecord(repo, recordPath(repo, facts.id, "ready")), { schema: SCHEMA, phase: "ready", facts })) fail("CVCT-RECORD");
+     currentFiles(repo, facts, true);
+     const finalRepo = repository(repo.root);
+-    if (!same(transition(finalRepo, approval(finalRepo), facts.verifyCommand), facts)
++    if (!same(transition(finalRepo, approval(finalRepo), facts.verifyCommand, facts.statePostSha256), facts)
+       || !same(finalRepo.git(["diff", "--cached", "--name-only", "-z", "HEAD"]).toString("utf8").split("\0").filter(Boolean), actual)) fail("CVCT-CAS");
+     for (const entry of facts.entries) {
+       const staged = twinAt(finalRepo, entry.path, "");
+@@ -278,6 +411,22 @@ export function inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths
+   } catch (error) { return unavailable(error); }
+ }
+ 
++/** Existing ready records remain valid after restart; this reads their exact
++ * current approval and calibration bytes without granting journal authority. */
++export function inspectCurrentCalibrationVerifyReady({rootDir,verifyCommand}={}) {
++  try {
++    const repo=repository(rootDir),currentApproval=approval(repo);
++    const candidates=[transition(repo,currentApproval,verifyCommand),
++      transition(repo,currentApproval,verifyCommand,currentApproval.stateSha256)];
++    const facts=candidates.find(value=>existsSync(recordPath(repo,value.id,"ready")));
++    if(!facts || existsSync(join(repo.directory,"transition.lock"))) fail("CVCT-RECORD");
++    if(!same(readRecord(repo,recordPath(repo,facts.id,"ready")),{schema:SCHEMA,phase:"ready",facts})) fail("CVCT-RECORD");
++    currentFiles(repo,facts,true);
++    if(!same(approval(repository(repo.root)),currentApproval)) fail("CVCT-APPROVAL-CAS");
++    return {ok:true,code:"CVCT-COMMIT-READY",paths:facts.entries.map(entry=>entry.path)};
++  } catch(error) {return unavailable(error);}
++}
++
+ /** One-line repair per unmet configure-verify condition (AC-140, never-fully-blocking). */
+ export function configureVerifyRepair(code) {
+   if (code === "CVCT-AUTHORITY-STALE") return "restore the approved PRD/Spec bytes, or run reopen-design and approve the plan again";
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+index 2204e99e6..561725634 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.test.mjs
+@@ -28,7 +28,7 @@ const BASELINE = "node -e \"console.error('pipeline: the verify contract of this
+ let counter = 0;
+ 
+ // A contained real-git repository: its own `git init`, every git call ceilinged at the fixture parent.
+-function repository({ verify, legacyPeer = true }) {
++function repository({ verify, neutralPeer = true, legacyPeer = true }) {
+   const parent = join(WORK, `fx-${counter += 1}`);
+   const root = join(parent, "repo");
+   mkdirSync(root, { recursive: true });
+@@ -40,7 +40,7 @@ function repository({ verify, legacyPeer = true }) {
+   git("config", "user.name", "Goldfish");
+   assert.equal(realpathSync(root), root);
+   const bytes = `${JSON.stringify({ project: "cvct-unit", verify, handover: "docs/state.md" }, null, 2)}\n`;
+-  const twins = ["project/pipeline.json", ...(legacyPeer ? [".claude/pipeline.json"] : [])];
++  const twins = [...(neutralPeer ? ["project/pipeline.json"] : []), ...(legacyPeer ? [".claude/pipeline.json"] : [])];
+   mkdirSync(join(root, "project"), { recursive: true });
+   if (legacyPeer) mkdirSync(join(root, ".claude"), { recursive: true });
+   for (const twin of twins) writeFileSync(join(root, twin), bytes);
+@@ -72,6 +72,11 @@ test("an absent legacy peer leaves exactly the neutral tier", () => {
+   assert.deepEqual(inspectCommittedCalibrationVerifyLayout({ rootDir: root }), { status: "baseline-only", paths: ["project/pipeline.json"] });
+ });
+ 
++test("an absent neutral peer leaves exactly the original legacy tier", () => {
++  const { root } = repository({ verify: BASELINE, neutralPeer: false });
++  assert.deepEqual(inspectCommittedCalibrationVerifyLayout({ rootDir: root }), { status: "baseline-only", paths: [".claude/pipeline.json"] });
++});
++
+ test("a non-repository root stays unavailable and is never read through the common-dir normalization", () => {
+   const bare = join(WORK, "not-a-repo");
+   mkdirSync(bare, { recursive: true });
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 1816538fb..039b484da 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -245,6 +245,10 @@ export function releaseSessionAuthorityLock({repository:input,reason,judge=judge
+ 
+ export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
+ function boundary(token){const found=boundaryBrands.get(token);if(!found||boundaryContext.getStore()?.token!==token)fail('SDC-AUTHORITY-UNAVAILABLE','expired-boundary');repository(found.repository);return found.repository;}
++export function isActiveSourceOwnedSessionAuthorityBoundary({boundary:token,rootDir}={}) {
++  const found=boundaryBrands.get(token);
++  return !!found&&boundaryContext.getStore()?.token===token&&found.repository.primaryRoot===rootDir;
++}
+ 
+ function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));const s=lstatSync(abs);if(!s.isFile()||s.isSymbolicLink())fail('SDC-AUTHORITY-UNAVAILABLE',`${producerId}:source-file`);return {path,sha256:hash(process.platform==='win32'?nativeSourceRead(abs,SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes).bytes:readFileSync(abs))};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
+ function portsFor(repo,ports){if(!Array.isArray(ports)||ports.length!==12)fail('SDC-AUTHORITY-UNAVAILABLE','complete-twelve-ports-required');return definitions.map((def,index)=>{const row=ports[index];exact(row,['producerId','port'],'participant-port');if(row.producerId!==def[0])fail('SDC-AUTHORITY-UNAVAILABLE','participant-order');const predicate=def[1][`isOwned${def[2]}AuthorityProducerPort`];if(typeof predicate!=='function'||predicate(row.port,{repository:repo})!==true)fail('SDC-AUTHORITY-UNAVAILABLE',`${def[0]}:unowned-port`);for(const method of ['readBaseline','observeOperation','observeTerminal','reconcile','readAssurance'])if(typeof row.port[method]!=='function')fail('SDC-AUTHORITY-UNAVAILABLE',`${def[0]}:missing-method`);return {port:row.port,participant:participant(def)};});}
+@@ -561,7 +565,7 @@ export function executeSourceOwnedSessionAuthorityPlanning(input) {
+ 
+ // Shared-State publication is a source-owned transaction, never a caller rebase.
+ const stateWriteRefreshTickets = new WeakMap();
+-const stateWriteEntries = new Set(['state.set-feature','state.cancel-submitted-plan','state.cancel-mixed-plan-state','state.reopen-design','state.seal-plan-approval','state.set-gate-estimate','state.revoke-plan','state.set-phase-no-calibration']);
++const stateWriteEntries = new Set(['state.set-feature','state.cancel-submitted-plan','state.cancel-mixed-plan-state','state.reopen-design','state.seal-plan-approval','state.set-gate-estimate','state.revoke-plan','state.set-phase-no-calibration','state.set-phase-with-calibration']);
+ const stateIncidenceNamespaces = {'onboarding-continuity':'selected-state','state-push-challenge':'selected-state-push-challenge'};
+ 
+ /** Native return linkage reads the original reservation while its actual
+diff --git a/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs b/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs
+index c7e0e7722..239a78e2a 100644
+--- a/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs
++++ b/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs
+@@ -61,14 +61,16 @@ export function prepareSessionAuthorityRegistryFixture({root=null,prefix='sessio
+  assert.equal(initialized.status,'initialized',JSON.stringify(initialized));
+  return {repoDir,repository,root:authorityRoot};
+ }
+-export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null}={}) {
++export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null,initialPlanSurfacePath=null}={}) {
++if(initialPlanSurfacePath!==null && (typeof initialPlanSurfacePath!=='string' || !/^src\/[A-Za-z0-9._/-]+$/u.test(initialPlanSurfacePath)
++  || initialPlanSurfacePath.split('/').some(part=>part==='.'||part==='..')))throw Error('fixture initial plan surface path');
+ const write=(path,bytes)=>{const target=join(root,path);mkdirSync(join(target,'..'),{recursive:true});writeFileSync(target,bytes);};
+ const git=(...args)=>{const r=spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false',...args],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr);return r.stdout.trim();};
+ git('init','-q');
+ const source=pipelineUserSource??'schema: pipeline.user.v3\ngates:\n  human_approval: chat\nlanguage:\n  human_facing: en\n  agent_facing: en\n';
+ const manifest='schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n';
+ const spec='# Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | The dependency returns expected bytes. | unit.test.cjs |\n'+additionalCriteria.map(row=>{if(!/^AC-[2-9][0-9]*$/.test(row.id)||typeof row.text!=='string'||/[|\n\r]/.test(row.text))throw Error('fixture criterion shape');return `| ${row.id} | ${row.text} | targeted source check |\n`;}).join('');
+-const preprd=`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${nativeManagedDigest(spec)} -->\n# PRD\n\nProvide the expected dependency behavior.\n`;
++const preprd=`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${nativeManagedDigest(spec)} -->\n# PRD\n\nProvide the expected dependency behavior.\n${initialPlanSurfacePath===null?'':`\nImplement ${initialPlanSurfacePath}.\n`}`;
+ // AC-264 (ALF-B10): '/evidence/' mirrors the onboarding seed (PROJECT_IGNORE_SEED in lib/project-onboarding-v3.mjs, PF-26D fix 2), so the dispatch guard's evidence/dispatch-route-<slice>.json, written after the baseline capture, is not a new unowned untracked path.
+ write('pipeline.user.yaml',source);write('.claude/pipeline.yaml',manifest);write('.gitignore','.claude/pipeline-state.json\nscratch/\n/evidence/\n');write('specs/unit/spec.md',spec);write('specs/unit/prd_unit.md',preprd+'\n\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n');
+ write('.claude/pipeline.json',JSON.stringify({project:'fixture',verify:'node --test unit.test.cjs',autonomy:'bounded',branchModel:'local',worktree:'supported',stakes:'medium',constraints:[]}));
+diff --git a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+index e15f6cd90..0b39b20af 100644
+--- a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
++++ b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+@@ -219,7 +219,10 @@ test("the marker stays atomic with a real design -> implementation transition",
+     const approved = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, planPath));
+     assert.equal(approved, 0);
+ 
+-    const setPhase = run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], { dir, now: FIXED_NOW, architectureEntryReadiness: () => ({ status: "ready" }) });
++    // QG-04: this marker examiner starts with a configured verify command.
++    // The separate calibration recovery examiner covers the commit-bound
++    // --verify-command route; do not request an uncommitted rewrite here.
++    const setPhase = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW, architectureEntryReadiness: () => ({ status: "ready" }) });
+     assert.equal(setPhase, 0);
+     assert.equal(JSON.parse(readFileSync(join(dir, "project/pipeline.json"), "utf8")).verify, verifyCommand);
+     const afterSetPhase = checkStatePhaseConsistency({ rootDir: dir });
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.mjs b/plugins/pipeline-core/scripts/close-coordinator.mjs
+index 6ed6aea21..f85bbc3f5 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.mjs
+@@ -20,6 +20,7 @@ import { requiresPublicationReview } from "../lib/publication-review-requirement
+ import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+ import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+ import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
++import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ import {
+   assertPrivateRegularFile,
+   ensurePrivateDirectory,
+@@ -492,6 +493,26 @@ async function transitionPlan(values) {
+     const observed = authorityFromState(root, snapshot, { requireResult: true });
+     const closeRequest = continuityCloseRequest(root, snapshot, values.continuityCloseRequest);
+     if (canonical(observed.feature) !== canonical(stored.coordinator.activeFeature)) fail("CLOSE-FEATURE", "feature-close identity drifted");
++    const registeredManifest = `${dirname(observed.feature.planPath).split(sep).join("/")}/lifecycle.json`;
++    let hasRegisteredManifest = false;
++    try { lstatSync(join(root, registeredManifest)); hasRegisteredManifest = true; }
++    catch (error) { if (error?.code !== "ENOENT") fail("CLOSE-PACKAGE", "registered feature package path is unreadable"); }
++    if (hasRegisteredManifest) {
++      const checked = validateFeaturePackage(root, registeredManifest);
++      if (!checked.ok) fail("CLOSE-PACKAGE", `registered feature package is inconsistent: ${checked.findings.join("; ")}`);
++      const packageValue = readJsonFile(root, registeredManifest, "feature package").value;
++      for (const [kind, path, digest] of [
++        ["prd", observed.feature.planPath, observed.authority.prdSha256],
++        ["spec", snapshot.state.planApproval?.poGateAuthority?.specPath, observed.authority.specSha256],
++        ["result", snapshot.state.continuity?.authority?.result?.path, observed.authority.implementationResultSha256],
++      ]) {
++        // Result is a required package artifact even when its metadata marks it
++        // non-authoritative; Continuity State still binds its exact current bytes.
++        const entries = packageValue.artifacts?.filter((item) => item?.class === kind
++          && (kind === "result" || item.authority === true)) ?? [];
++        if (entries.length !== 1 || entries[0].path !== path || entries[0].sha256 !== digest) fail("CLOSE-PACKAGE-AUTHORITY", `registered package ${kind} does not bind current State authority`);
++      }
++    }
+     courseAuthorship = assertCourseCriticEvidence(root, observed.feature, { audited: values.auditRequest !== undefined });
+     // A missing slice queue says nothing about whether the whole candidate
+     // received independent review. Resolve the State and package contracts.
+diff --git a/plugins/pipeline-core/scripts/close-coordinator.test.mjs b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+index ca72b2f10..2a58df3ec 100644
+--- a/plugins/pipeline-core/scripts/close-coordinator.test.mjs
++++ b/plugins/pipeline-core/scripts/close-coordinator.test.mjs
+@@ -26,6 +26,7 @@ import {
+   syncPublicationCloseDirectory,
+ } from "./publication-close-journal.mjs";
+ import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
++import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+ 
+ const h = (c, n = 64) => c.repeat(n);
+ const CLI = fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url));
+@@ -273,7 +274,7 @@ function writeJson(path, value) {
+   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+ }
+ 
+-function processFixture(name) {
++function processFixture(name, options = {}) {
+   const root = mkdtempSync(join(tmpdir(), `h5-${name}-`));
+   mkdirSync(join(root, ".claude"), { recursive: true });
+   mkdirSync(join(root, "specs", "feature"), { recursive: true });
+@@ -297,12 +298,26 @@ function processFixture(name) {
+   const resultSha256 = digest(readFileSync(join(root, paths.result)));
+   const closeEvidenceSha256 = digest(readFileSync(join(root, paths.closeEvidence)));
+   const activeFeature = { id: "feature", planPath: paths.prd, phase: "implementation" };
++  // These process cases exercise close mechanics for a current mini course.
++  // Registered rigor-1 packages still require the real Critic/Verify audit.
++  const profileSha256 = h("a");
++  const planSubmission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: activeFeature.id,
++    planPath: paths.prd, planSha256: prdSha256, specPath: paths.spec, specSha256,
++    profile: "mini", profileSha256, submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z" };
+   const state = {
+     schema: "pipeline.state.v0",
+     activeFeature,
+     planApproved: true,
++    planSubmission,
+     planApproval: {
++      schema: CURRENT_APPROVAL_SCHEMA,
++      approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z",
++      submissionSha256: sha256CanonicalJson(planSubmission), profileSha256,
++      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null,
+       poGateAuthority: {
++        schema: "pipeline.po-gate-authority.v2", humanFacing: "en",
++        sourceSha256: h("b"), runtimeSha256: h("c"), receiptSha256: h("d"), repositoryFingerprint: h("e"),
++        planPath: paths.prd,
+         planSha256: prdSha256,
+         specPath: paths.spec,
+         specSha256,
+@@ -362,6 +377,16 @@ function processFixture(name) {
+     result: state.continuity.authority.result,
+     closeEvidence: { path: paths.closeEvidence, sha256: closeEvidenceSha256 },
+   });
++  if (options.beforePrepared) options.beforePrepared({ root, paths, state, lifecycle });
++  if (options.expectPreparedRefusal) {
++    const refused = invoke([
++      "plan-transition", "--root", root, "--lifecycle", lifecycle, "--actor", "PO",
++      "--phase", "feature-close-prepared", "--architecture-impact", "architecture-conforms",
++      "--continuity-close-request", paths.closeRequest,
++    ], 2);
++    assert.equal(refused.code, options.expectPreparedRefusal);
++    return { root, lifecycle, refused };
++  }
+   const prepared = transition("feature-close-prepared", [
+     "--continuity-close-request", paths.closeRequest,
+   ]);
+@@ -432,6 +457,26 @@ function processFixture(name) {
+   };
+ }
+ 
++test("process: registered package digest drift blocks close preparation before any transition", () => {
++  const f = processFixture("package-drift", {
++    beforePrepared({ root, paths }) {
++      for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(root, "specs/feature", name), `${name}\n`);
++      const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: digest(readFileSync(join(root, path))), authority, mutability, retention: "active" });
++      writeJson(join(root, "specs/feature/lifecycle.json"), {
++        schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++        artifacts: [
++          artifact("prd", paths.prd, true, "mutable"), artifact("spec", paths.spec, true, "immutable"),
++          artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++          { ...artifact("result", paths.result, true, "append-only"), sha256: h("f") },
++          artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++        ], candidate: null, supersedes: null,
++      });
++    },
++    expectPreparedRefusal: "CLOSE-PACKAGE",
++  });
++  assert.equal(f.refused.code, "CLOSE-PACKAGE");
++});
++
+ test("process: local close is read-only planned, replay-safe, candidate-bound and never pushes", () => {
+   const fixture = processFixture("local");
+   const originalTracked = readFileSync(fixture.trackedPath);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index a248ba31b..7eccd514d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -3,12 +3,18 @@
+ 
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+-import { createHash } from "node:crypto";
++import { createHash, createHmac } from "node:crypto";
+ import { afterEach, test } from "node:test";
+-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { run } from "./pipeline-state.mjs";
++import { planFeaturePackageReconcile, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
++import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
++import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
++import { observeSessionCleanupState } from "../lib/onboarding-continuity.mjs";
++import { initializeSessionAuthorityRegistry, reserveSessionAuthorityMember, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
+ 
+ const roots = [];
+ const NOW = "2026-07-31T12:00:00.000Z";
+@@ -40,8 +46,8 @@ function initRepo(dir) {
+   git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+ }
+ 
+-function fixture(name = "case") {
+-  const root = mkdtempSync(join(tmpdir(), `pipeline-result-bootstrap-${name}-`)); roots.push(root); initRepo(root);
++function fixture(name = "case", parent = tmpdir()) {
++  const root = mkdtempSync(join(parent, `pipeline-result-bootstrap-${name}-`)); roots.push(root); initRepo(root);
+   mkdirSync(join(root, ".claude")); mkdirSync(join(root, "specs", "feature"), { recursive: true });
+   writeFileSync(join(root, "specs/feature/prd_feature.md"), "prd\n"); writeFileSync(join(root, "specs/feature/spec.md"), "spec\n");
+   const historical = Buffer.from("# Feature result\n\nExisting canonical Markdown must survive intact.\n", "utf8");
+@@ -70,6 +76,188 @@ function plan(f) {
+   assert.equal(value.status, 0, value.err); assert.deepEqual(readFileSync(f.statePath), before); return JSON.parse(value.out);
+ }
+ 
++function registerPackage(f) {
++  for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(f.root, "specs/feature", name), `${name}\n`);
++  const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: hash(readFileSync(join(f.root, path))), authority, mutability, retention: "active" });
++  const manifest = {
++    schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++    artifacts: [
++      artifact("prd", "specs/feature/prd_feature.md", true, "mutable"),
++      artifact("spec", "specs/feature/spec.md", true, "immutable"),
++      artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++      artifact("result", "specs/feature/result.md", true, "append-only"),
++      artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++    ], candidate: null, supersedes: null,
++  };
++  const manifestPath = "specs/feature/lifecycle.json";
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  return { manifestPath, manifest };
++}
++
++function legacyJournalFixture(name, stage = "post-state") {
++  const f = fixture(name);
++  const { manifestPath } = registerPackage(f);
++  const oldSuffix = Buffer.from('```pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n```\n');
++  const oldBytes = Buffer.concat([f.historical, oldSuffix]);
++  const preState = readFileSync(f.statePath);
++  const postState = structuredClone(f.value);
++  postState.continuity.revision = 8;
++  postState.continuity.resume.sourceRevision = 8;
++  postState.continuity.authority.result = { path: "specs/feature/result.md", sha256: hash(oldBytes) };
++  postState.updatedAt = NOW;
++  const postStateBytes = Buffer.from(JSON.stringify(postState, null, 2) + "\n");
++  writeFileSync(f.resultPath, oldBytes);
++  if (stage === "post-state") writeFileSync(f.statePath, postStateBytes);
++  const key = Buffer.alloc(32, 11);
++  mkdirSync(join(f.commonDir, "agent-pipeline", "result-bootstrap"), { recursive: true, mode: 0o700 });
++  writeFileSync(join(f.commonDir, "agent-pipeline", "result-bootstrap", "key"), key, { mode: 0o600 });
++  const core = { schema: "pipeline.continuity-result-bootstrap-journal.v1", planSha256: h("a"),
++    stateSha256: hash(preState), postStateSha256: hash(postStateBytes),
++    result: { path: "specs/feature/result.md", sha256: hash(oldBytes) } };
++  const mac = createHmac("sha256", key).update(JSON.stringify(core)).digest("hex");
++  writeFileSync(f.journalPath, JSON.stringify({ ...core, mac }) + "\n", { mode: 0o600 });
++  const action = ["continuity-result-bootstrap-apply", "--feature-id", "feature", "--expected-revision", "7",
++    "--expected-state-sha256", core.stateSha256, "--expected-post-state-sha256", core.postStateSha256,
++    "--updated-at", NOW, "--plan-sha256", core.planSha256, "--activate"];
++  return { ...f, manifestPath, oldBytes, oldSuffix, action };
++}
++
++test("legacy MAC journal recovers the exact pre-fence postimage and yields the signed package preview", () => {
++  const f = legacyJournalFixture("legacy-post");
++  const manifestBefore = readFileSync(join(f.root, f.manifestPath));
++  const result = invoke(f.root, f.action);
++  assert.equal(result.status, 0, result.err);
++  const receipt = JSON.parse(result.out);
++  assert.equal(receipt.status, "recovered-legacy");
++  assert.equal(receipt.completion.state, "reconciliation-pending");
++  assert.equal(receipt.completion.preview.status, "reconcile-preview");
++  assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore);
++  assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
++  assert.equal(readFileSync(f.resultPath).includes(Buffer.from("pipeline.result-reconciliation-fence.v1")), true);
++  assert.equal(JSON.parse(readFileSync(f.statePath)).continuity.authority.result.sha256, hash(readFileSync(f.resultPath)));
++  assert.equal(existsSync(f.journalPath), false);
++});
++
++test("legacy journal repairs Result-before-State and replays each interrupted repair phase", () => {
++  for (const [name, stage, seam] of [
++    ["prestate", "pre-state", "afterLegacyResultRepairJournal"],
++    ["after-result", "post-state", "afterLegacyResultRepairResult"],
++    ["after-state", "post-state", "afterLegacyResultRepairState"],
++  ]) {
++    const f = legacyJournalFixture(name, stage);
++    const stopped = invoke(f.root, f.action, { [seam]: () => false });
++    assert.equal(stopped.status, 2, name);
++    assert.equal(existsSync(f.journalPath), true, name);
++    const resumed = invoke(f.root, f.action);
++    assert.equal(resumed.status, 0, `${name}: ${resumed.err}`);
++    assert.equal(JSON.parse(resumed.out).completion.preview.status, "reconcile-preview", name);
++    assert.equal(existsSync(f.journalPath), false, name);
++  }
++});
++
++test("legacy journal refuses forged proof, altered historical prefix and PRD drift without writing", () => {
++  for (const kind of ["forged-mac", "prefix", "prd"]) {
++    const f = legacyJournalFixture(`legacy-${kind}`);
++    if (kind === "forged-mac") {
++      const value = JSON.parse(readFileSync(f.journalPath)); value.mac = h("f");
++      writeFileSync(f.journalPath, JSON.stringify(value) + "\n", { mode: 0o600 });
++    }
++    if (kind === "prefix") writeFileSync(f.resultPath, Buffer.concat([Buffer.from("tampered\n"), f.oldBytes]));
++    if (kind === "prd") writeFileSync(join(f.root, "specs/feature/prd_feature.md"), "drift\n");
++    const stateBefore = readFileSync(f.statePath);
++    const resultBefore = readFileSync(f.resultPath);
++    const manifestBefore = readFileSync(join(f.root, f.manifestPath));
++    const refused = invoke(f.root, f.action);
++    assert.equal(refused.status, 2, kind);
++    assert.deepEqual(readFileSync(f.statePath), stateBefore, kind);
++    assert.deepEqual(readFileSync(f.resultPath), resultBefore, kind);
++    assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore, kind);
++  }
++});
++
++test("retired legacy journal exposes one exact signed repair preview and then the existing package reconcile", () => {
++  const f = legacyJournalFixture("legacy-retired");
++  rmSync(f.journalPath);
++  const manifestBefore = readFileSync(join(f.root, f.manifestPath));
++  const previewRun = invoke(f.root, ["continuity-result-bootstrap-plan"]);
++  assert.equal(previewRun.status, 0, previewRun.err);
++  const preview = JSON.parse(previewRun.out);
++  assert.equal(preview.status, "legacy-repair-preview");
++  assert.equal(preview.preview.result.from, hash(f.oldBytes));
++  assert.equal(preview.applyAction.approvalKind, "feature-package-reconcile");
++  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath, "--plan-sha256", preview.planSha256];
++  const stateBefore = readFileSync(f.statePath); const resultBefore = readFileSync(f.resultPath);
++  const defaultAbsent = invoke(f.root, args, { gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(defaultAbsent.status, 2); assert.deepEqual(readFileSync(f.statePath), stateBefore);
++  assert.deepEqual(readFileSync(f.resultPath), resultBefore);
++  const absent = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: false }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(absent.status, 2); assert.deepEqual(readFileSync(f.statePath), stateBefore);
++  assert.deepEqual(readFileSync(f.resultPath), resultBefore);
++  const repaired = invoke(f.root, args, { now: undefined, featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(repaired.status, 0, repaired.err);
++  const receipt = JSON.parse(repaired.out);
++  assert.equal(receipt.status, "legacy-repaired");
++  assert.equal(receipt.completion.preview.status, "reconcile-preview");
++  assert.deepEqual(readFileSync(join(f.root, f.manifestPath)), manifestBefore);
++  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath,
++    "--plan-sha256", receipt.completion.planSha256], {
++    featurePackageReconcileApproval: () => ({ ok: true }), gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }),
++  });
++  assert.equal(reconciled.status, 0, reconciled.err);
++  assert.equal(validateFeaturePackage(f.root, f.manifestPath).ok, true);
++});
++
++test("signed legacy repair replays after interruption without consuming another approval", () => {
++  const f = legacyJournalFixture("legacy-signed-replay"); rmSync(f.journalPath);
++  const preview = JSON.parse(invoke(f.root, ["continuity-result-bootstrap-plan"]).out);
++  const args = ["feature-package-reconcile", "--root", f.root, "--manifest", f.manifestPath, "--plan-sha256", preview.planSha256];
++  const stopped = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }), afterLegacyResultRepairResult: () => false });
++  assert.equal(stopped.status, 2);
++  const resumed = invoke(f.root, args, { featurePackageReconcileApproval: () => ({ ok: false }) });
++  assert.equal(resumed.status, 0, resumed.err);
++  assert.equal(JSON.parse(resumed.out).completion.preview.status, "reconcile-preview");
++});
++
++test("signed legacy preview refuses source drift and forged repair replay without new writes", () => {
++  const drift = legacyJournalFixture("legacy-signed-drift"); rmSync(drift.journalPath);
++  const preview = JSON.parse(invoke(drift.root, ["continuity-result-bootstrap-plan"]).out);
++  writeFileSync(join(drift.root, "specs/feature/spec.md"), "drift\n");
++  const args = ["feature-package-reconcile", "--root", drift.root, "--manifest", drift.manifestPath, "--plan-sha256", preview.planSha256];
++  const stateBefore = readFileSync(drift.statePath); const resultBefore = readFileSync(drift.resultPath);
++  const refused = invoke(drift.root, args, { featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(refused.status, 2);
++  assert.deepEqual(readFileSync(drift.statePath), stateBefore);
++  assert.deepEqual(readFileSync(drift.resultPath), resultBefore);
++
++  const keyless = legacyJournalFixture("legacy-signed-keyless"); rmSync(keyless.journalPath);
++  const keylessPlan = JSON.parse(invoke(keyless.root, ["continuity-result-bootstrap-plan"]).out);
++  rmSync(join(keyless.commonDir, "agent-pipeline", "result-bootstrap", "key"));
++  let approvals = 0;
++  const keylessResult = invoke(keyless.root, ["feature-package-reconcile", "--root", keyless.root, "--manifest", keyless.manifestPath,
++    "--plan-sha256", keylessPlan.planSha256], { featurePackageReconcileApproval: () => { approvals++; return { ok: true }; },
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }) });
++  assert.equal(keylessResult.status, 2); assert.equal(approvals, 0);
++  assert.deepEqual(readFileSync(keyless.resultPath), keyless.oldBytes);
++
++  const forged = legacyJournalFixture("legacy-signed-forged"); rmSync(forged.journalPath);
++  const signedPlan = JSON.parse(invoke(forged.root, ["continuity-result-bootstrap-plan"]).out);
++  const signedArgs = ["feature-package-reconcile", "--root", forged.root, "--manifest", forged.manifestPath, "--plan-sha256", signedPlan.planSha256];
++  const stopped = invoke(forged.root, signedArgs, { featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }), afterLegacyResultRepairJournal: () => false });
++  assert.equal(stopped.status, 2);
++  const repairPath = join(forged.commonDir, "agent-pipeline", "result-bootstrap", "legacy-repair-journal");
++  const record = JSON.parse(readFileSync(repairPath)); record.mac = h("f");
++  writeFileSync(repairPath, JSON.stringify(record) + "\n", { mode: 0o600 });
++  const oldState = readFileSync(forged.statePath); const oldResult = readFileSync(forged.resultPath);
++  const replay = invoke(forged.root, signedArgs, { featurePackageReconcileApproval: () => ({ ok: true }) });
++  assert.equal(replay.status, 2);
++  assert.deepEqual(readFileSync(forged.statePath), oldState);
++  assert.deepEqual(readFileSync(forged.resultPath), oldResult);
++});
++
+ // Windows: Node synthesizes `.mode` on native Windows from the read-only
+ // attribute alone, so the bare `(info.mode & 0o077)` comparison in
+ // ensureBootstrapPrivateDirectory/readPrivateBootstrap failed closed
+@@ -99,7 +287,7 @@ test("win32: an insecure DACL assessment on the private result-bootstrap directo
+ 
+ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence", () => {
+   const f = fixture("success"); const p = plan(f);
+-  const fence = Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
++  const fence = Buffer.from("\n<!-- pipeline.result-reconciliation-fence.v1 -->\n```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
+   assert.equal(p.schema, "pipeline.continuity-result-bootstrap-plan.v1"); assert.equal(p.preimage.result.path, "specs/feature/result.md"); assert.equal(p.preimage.result.sha256, hash(f.historical));
+   assert.deepEqual(Buffer.from(p.preimage.historicalMarkdown.bytesBase64, "base64"), f.historical); assert.deepEqual(Buffer.from(p.append.bytesBase64, "base64"), fence);
+   assert.deepEqual(Buffer.from(p.result.bytesBase64, "base64"), Buffer.concat([f.historical, fence])); assert.equal(existsSync(f.journalPath), false);
+@@ -115,6 +303,62 @@ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result p
+   assert.equal(existsSync(join(f.root, ".claude", ".pipeline-result-bootstrap-private")), false); assert.equal(existsSync(f.journalPath), false);
+ });
+ 
++test("registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview", () => {
++  const f = fixture("registered"); const { manifestPath } = registerPackage(f);
++  const manifestBytes = readFileSync(join(f.root, manifestPath));
++  const p = plan(f);
++  assert.equal(p.preimage.package.path, manifestPath);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  assert.equal(completion.state, "reconciliation-pending");
++  assert.equal(completion.preview.status, "reconcile-preview");
++  assert.equal(completion.preview.changes.length, 1);
++  assert.equal(completion.preview.changes[0].class, "result");
++  assert.equal(completion.preview.changes[0].from, hash(f.historical));
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, false);
++  assert.equal(planFeaturePackageReconcile(f.root, manifestPath, JSON.parse(readFileSync(f.statePath)).continuity.authority.result).status, "reconcile-preview");
++  const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
++  assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
++  const reconciled = invoke(f.root, ["feature-package-reconcile", "--root", f.root, "--manifest", manifestPath, "--plan-sha256", completion.planSha256], {
++    featurePackageReconcileApproval: () => ({ ok: true }),
++    gitCandidate: () => ({ ok: true, commit: h("a"), tree: h("b") }),
++  });
++  assert.equal(reconciled.status, 0, reconciled.err);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  const afterReconcileReplay = invoke(f.root, p.applyAction.argv.slice(1));
++  assert.equal(afterReconcileReplay.status, 0, afterReconcileReplay.err);
++  assert.equal(JSON.parse(afterReconcileReplay.out).completion.queueAction, "review");
++});
++
++test("registered bootstrap interruption and replay retain a single provable reconciliation plan", () => {
++  for (const [name, seam] of [["result", "afterResultBootstrapResult"], ["state", "afterResultBootstrapState"]]) {
++    const f = fixture(`registered-${name}`); const { manifestPath } = registerPackage(f); const p = plan(f);
++    const manifestBytes = readFileSync(join(f.root, manifestPath));
++    assert.equal(invoke(f.root, p.applyAction.argv.slice(1), { [seam]: () => false }).status, 2);
++    assert.equal(existsSync(f.journalPath), true);
++    assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
++    const resumed = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(resumed.status, 0, resumed.err);
++    const receipt = JSON.parse(resumed.out);
++    assert.equal(receipt.completion.preview.status, "reconcile-preview");
++    assert.equal(receipt.completion.preview.changes.length, 1);
++    assert.equal(existsSync(f.journalPath), false);
++    const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
++    assert.equal(JSON.parse(replay.out).completion.planSha256, receipt.completion.planSha256);
++  }
++});
++
++test("registered package authority drift refuses bootstrap before Result, State or manifest mutation", () => {
++  const f = fixture("package-drift"); const { manifestPath, manifest } = registerPackage(f);
++  manifest.artifacts.find((entry) => entry.class === "result").sha256 = h("f");
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  const stateBytes = readFileSync(f.statePath); const resultBytes = readFileSync(f.resultPath); const manifestBytes = readFileSync(join(f.root, manifestPath));
++  const refused = invoke(f.root, ["continuity-result-bootstrap-plan"]);
++  assert.equal(refused.status, 2); assert.match(refused.err, /PS-RESULT-BOOTSTRAP-PACKAGE/);
++  assert.deepEqual(readFileSync(f.statePath), stateBytes); assert.deepEqual(readFileSync(f.resultPath), resultBytes);
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes); assert.equal(existsSync(f.journalPath), false);
++});
++
+ test("AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation", () => {
+   const beforeResult = fixture("journal-before-result"); const beforeResultPlan = plan(beforeResult);
+   const stoppedBeforeResult = invoke(beforeResult.root, beforeResultPlan.applyAction.argv.slice(1), { afterResultBootstrapJournal: () => false });
+@@ -173,3 +417,92 @@ test("AC-047-149: bootstrap requires a current implementing Plan lifecycle befor
+     assert.equal(existsSync(f.journalPath), false, kind);
+   }
+ });
++
++test("controlled METHOD: catalogue-present Source companion closes exact Result bootstrap effects", async () => {
++  const parent = join(process.cwd(), "scratch", "test-tmp");
++  mkdirSync(parent, { recursive: true });
++  const f = fixture("source-catalogue", parent);
++  mkdirSync(join(f.root, "project"), { mode: 0o700 });
++  const neutralStatePath = join(f.root, "project", "pipeline-state.json");
++  writeFileSync(neutralStatePath, readFileSync(f.statePath), { mode: 0o600 });
++  rmSync(f.statePath);
++  f.statePath = neutralStatePath;
++  chmodSync(f.statePath, 0o600);
++  registerPackage(f);
++  const repository = inspectSignedDescriptorCustodyRepository(f.root);
++  const runtime = createControlledMethodRuntimeFixture({ repository,
++    fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", "result-bootstrap"),
++    sessionId: "result-bootstrap" });
++  const ports = createSessionAuthorityParticipantPorts({ repository });
++  assert.equal(initializeSessionAuthorityRegistry({ repository }, ports).status, "initialized");
++  const port = ports.find(row => row.producerId === "onboarding-continuity").port;
++  let operationHandle, executionHandle, memberHandle, memberPath;
++  const member = () => {
++    const bytes = readFileSync(join(repository.commonDir, memberPath.slice(5)));
++    return { path: memberPath, sha256: hash(bytes), size: bytes.length };
++  };
++  await runtime.run(async () => {
++    const state = observeSessionCleanupState(f.root);
++    const prepared = port.prepareOperation({ requesterHandle: runtime.requesterHandle, entry: "bind",
++      input: { expectedStateSha256: state.stateSha256, expectedRevision: state.revision } });
++    assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
++    operationHandle = prepared.operationHandle;
++    const observed = port.observeOperation(operationHandle);
++    const reserved = withSessionAuthorityBoundary({ repository }, boundary =>
++      reserveSessionAuthorityMember({ boundary, producerPort: port, association: observed.association, operationHandle }));
++    memberHandle = reserved.memberHandle; memberPath = reserved.memberRef.path;
++    const executed = await port.executeOperation({ operationHandle, memberHandle, expectedMemberRef: reserved.memberRef });
++    assert.equal(executed.status, "executed", JSON.stringify(executed));
++    executionHandle = executed.executionHandle;
++  });
++  const sourceCall = async (argv, overrides = {}) => {
++    const out = []; const log = console.log;
++    console.log = (...parts) => out.push(parts.join(" "));
++    try {
++      const result = await runtime.run(() => port.executeCompanionOperation({ operationHandle, executionHandle,
++        expectedMemberRef: member(), expectedStateSha256: hash(readFileSync(f.statePath)), entry: argv[0], argv, ...overrides }));
++      return { result, out: out.join("\n") };
++    } finally { console.log = log; }
++  };
++  const beforeState = readFileSync(f.statePath), beforeResult = readFileSync(f.resultPath);
++  const missingErrors = [], originalError = console.error;
++  console.error = (...parts) => missingErrors.push(parts.join(" "));
++  let missingContext;
++  try { missingContext = run(["continuity-result-bootstrap-plan"], { dir: f.root }); }
++  finally { console.error = originalError; }
++  assert.equal(missingContext, 2);
++  assert.match(missingErrors.join("\n"), /companion-owning-lifecycle-context-required/);
++  assert.deepEqual(readFileSync(f.statePath), beforeState);
++  assert.deepEqual(readFileSync(f.resultPath), beforeResult);
++  const forged = await sourceCall(["continuity-result-bootstrap-plan"], { expectedStateSha256: h("f") });
++  assert.equal(forged.result.status, "unavailable");
++  assert.equal(forged.result.attempted, false);
++  assert.deepEqual(readFileSync(f.statePath), beforeState);
++  assert.deepEqual(readFileSync(f.resultPath), beforeResult);
++  const planned = await sourceCall(["continuity-result-bootstrap-plan"]);
++  assert.equal(planned.result.status, "completed", JSON.stringify(planned.result));
++  assert.equal(planned.result.exitCode, 0);
++  const plan = JSON.parse(planned.out);
++  const prdPath = join(f.root, "specs/feature/prd_feature.md");
++  const prdBytes = readFileSync(prdPath);
++  writeFileSync(prdPath, "drift\n");
++  const drifted = await sourceCall(plan.applyAction.argv.slice(1));
++  assert.notEqual(drifted.result.exitCode, 0);
++  assert.deepEqual(readFileSync(f.statePath), beforeState);
++  assert.deepEqual(readFileSync(f.resultPath), beforeResult);
++  writeFileSync(prdPath, prdBytes);
++  // Restored bytes have a new physical identity, so the old plan stays stale.
++  const refreshed = await sourceCall(["continuity-result-bootstrap-plan"]);
++  assert.equal(refreshed.result.exitCode, 0);
++  const applied = await sourceCall(JSON.parse(refreshed.out).applyAction.argv.slice(1));
++  assert.equal(applied.result.status, "completed", JSON.stringify(applied.result));
++  assert.equal(applied.result.exitCode, 0);
++  assert.equal(applied.result.assurance, "controlled-unit-method");
++  const receipt = JSON.parse(applied.out);
++  assert.equal(receipt.status, "applied");
++  assert.equal(receipt.completion.preview.status, "reconcile-preview");
++  assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
++  assert.equal(existsSync(join(repository.commonDir, "agent-pipeline", "result-bootstrap", "journal")), false);
++  assert.equal(validateFeaturePackage(f.root, "specs/feature/lifecycle.json").ok, false);
++  await runtime.dispose();
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 54b3d799b..e8a7b1067 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -15,17 +15,13 @@
+  *   as `.claude/guard-override.log.jsonl`).
+  *
+  * TWO NAMED VERIFY-RECOVERY ROUTES (NVA-CF-VERIFYDEADLOCK): `set-phase --phase implementation`
+- * additionally writes the calibration's `verify` field (`project/pipeline.json`,
+- * plus its legacy `.claude/pipeline.json` twin when present) when `--verify-command`
+- * is supplied, or refuses the transition outright if the calibration still carries
+- * the seeded UNCONFIGURED_VERIFY placeholder and no command was supplied. This is
+- * the one sanctioned moment that write is allowed to happen. A project which
+- * deliberately entered implementation on that baseline may later use the
+- * separately typed `configure-verify --verify-command <command>` route. That
+- * route is closed to every lifecycle except established implementation and
+- * accepts only two intact, identical baseline calibration twins. Both routes
+- * mirror the trust-anchor "same transaction" fix pattern -- see the comment on
+- * `readCalibrationVerifyStatus()` below for the full rationale.
++ * may accept `--verify-command` with a committed baseline calibration. Its
++ * lock-held writer prepares the guarded calibration transition before either
++ * calibration or State is committed; a companion failure leaves State intact.
++ * After State commits, the same held transition publishes commit readiness.
++ * A project may also enter implementation with baseline-only verification and
++ * invoke `configure-verify` later. Neither route accepts a changed or divergent
++ * committed calibration layout. See `readCalibrationVerifyStatus()` below.
+  *
+  * SCHEMA (`pipeline.state.v0`) -- the file this CLI reads/writes:
+  *   {
+@@ -472,6 +468,7 @@ import {
+   validPlanSubmission,
+ } from "../lib/plan-spec-state-v2.mjs";
+ import {
++  RESULT_RECONCILIATION_FENCE,
+   inventoryFeaturePackages,
+   planFeaturePackageBootstrap,
+   planFeaturePackageReconcile,
+@@ -495,7 +492,7 @@ import { collectRigorJournalEntry, rigorVerifyRows } from "../lib/rigor-lifecycl
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
+ import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+-import { withSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
++import { withSessionAuthorityBoundary, isActiveSourceOwnedSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
+ import { readSourceOwnedAuthorityContext, inspectSourceOwnedCurrentAuthorityContext, createSignedCleanupRequesterObserver } from "../lib/session-requester-bridge.mjs";
+ import {
+   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
+@@ -558,10 +555,12 @@ import {
+   syncStateMdNextAction,
+ } from "../lib/onboarding-continuity.mjs";
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
++import { inspectWindowsOwnedAuthorityPath } from "../lib/windows-owned-authority-backend.mjs";
++import { windowsAuthorityCause } from "../lib/windows-authority-readiness.mjs";
+ import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+ import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
+ 
+-import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
++import { prepareCalibrationVerifyCommitTransition, completeCalibrationVerifyCommitTransition, abandonCalibrationVerifyCommitTransition, rollbackCalibrationVerifyCommitTransition, inspectCommittedCalibrationVerifyLayout, inspectReplayableCalibrationVerifyLayout, inspectCurrentCalibrationVerifyReady, configureVerifyRepair } from "../lib/calibration-verify-commit-transition.mjs";
+ 
+ export const SCHEMA_ID = "pipeline.state.v0";
+ export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
+@@ -913,9 +912,11 @@ function writeState(dir, state, expectedState, options = {}) {
+       finally { frame.validatingCompanion=false;frame.boundary=previousBoundary; }
+     });
+   }
+-  if (frame?.cataloguePresent && !frame.executingWrite && !frame.executingCompanion && !frame.validatingCompanion) {
+-    const entry = frame.push ? `state.approve-push.${frame.push.effect}` : STATE_AUTHORITY_ENTRIES.get(frame.sub);
+-    if (!entry || !frame.sourceDefaults || options.reuseLock || options.afterValidation || options.afterCommit) {
++  if ((frame?.cataloguePresent || frame?.entry === "state.set-phase-with-calibration")
++    && !frame.executingWrite && !frame.executingCompanion && !frame.validatingCompanion) {
++    const entry = frame.push ? `state.approve-push.${frame.push.effect}` : frame.entry;
++    if (!entry || !frame.sourceDefaults || options.reuseLock
++      || (options.afterValidation && entry !== "state.set-phase-with-calibration") || options.afterCommit) {
+       return {ok:false,committed:false,code:"SDC-AUTHORITY-UNAVAILABLE"};
+     }
+     const publish = boundary => {
+@@ -933,7 +934,8 @@ function writeState(dir, state, expectedState, options = {}) {
+   // instead of acquiring a second lock avoids a self-collision on the same lock path; this
+   // call then does not own the lock's lifecycle and must not release it.
+   const reusedLock = options.reuseLock;
+-  const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
++  const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN,
++    frame?.entry === "state.set-phase-with-calibration" ? {ownerPid:process.pid} : {});
+   if (!lock.ok) return { ok: false, committed: false, code: lock.code };
+   let stateLockWitness = null;
+   let externalMutation = false;
+@@ -994,12 +996,21 @@ function writeState(dir, state, expectedState, options = {}) {
+       // replacement, so a State I/O failure can still leave that companion write
+       // durable; callers must report that disposition truthfully.
+       if (options.afterValidation) {
++        const sourceWitness = Object.freeze({});
++        const sourceWrite = stateAuthorityInvocation?.executingWrite;
++        if (sourceWrite?.entry === "state.set-phase-with-calibration") {
++          const postState = options.preserveGateEstimate === true ? nextState : clearGateEstimateForMutation(nextState);
++          validatedCalibrationSourceWitnesses.set(sourceWitness, {
++            sourceWrite, rootDir:dir, statePreSha256:sha256Bytes(sourceWrite.preBytes),
++            statePostSha256:sha256Bytes(Buffer.from(`${JSON.stringify(postState, null, 2)}\n`)),
++          });
++        }
+         let gate;
+         try {
+-          gate = options.afterValidation();
++          gate = options.afterValidation({ state: clearGateEstimateForMutation(nextState), sourceWitness });
+         } catch {
+           return { ok: false, committed: false, code: "PS-AFTER-VALIDATION" };
+-        }
++        } finally { validatedCalibrationSourceWitnesses.delete(sourceWitness); }
+         if (!gate?.ok) return {
+           ok: false,
+           committed: false,
+@@ -1238,12 +1249,12 @@ function parseLockRecord(raw) {
+   }
+   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+   const keys = Object.keys(value);
+-  if (keys.length !== 4 || !keys.every((key) => ["schema", "token", "ownerNonce", "acquiredAtMs"].includes(key))) return null;
++  if (![4,5].includes(keys.length) || !keys.every((key) => ["schema", "token", "ownerNonce", "acquiredAtMs", "ownerPid"].includes(key))) return null;
+   if (value.schema !== CONTINUITY_LOCK_SCHEMA_ID
+     || !LOCK_TOKEN_RE.test(value.token)
+     || !LOCK_TOKEN_RE.test(value.ownerNonce)
+     || !Number.isSafeInteger(value.acquiredAtMs)
+-    || value.acquiredAtMs < 0) return null;
++    || value.acquiredAtMs < 0 || (keys.length === 5 && (!Number.isSafeInteger(value.ownerPid) || value.ownerPid < 1))) return null;
+   return value;
+ }
+ 
+@@ -1351,7 +1362,8 @@ export function acquireContinuityLock(dir, token, deps = {}) {
+   const ownerNonce = deps.ownerNonce?.() ?? randomUUID();
+   if (!LOCK_TOKEN_RE.test(ownerNonce)) return { ok: false, code: "PS-CONTINUITY-LOCK-NONCE" };
+   const acquiredAtMs = nowMs();
+-  const record = { schema: CONTINUITY_LOCK_SCHEMA_ID, token, ownerNonce, acquiredAtMs };
++  const record = { schema: CONTINUITY_LOCK_SCHEMA_ID, token, ownerNonce, acquiredAtMs,
++    ...(deps.ownerPid === undefined ? {} : {ownerPid:deps.ownerPid}) };
+ 
+   if (existsSync(lockRecoveryPath(dir))) return { ok: false, code: "PS-CONTINUITY-RECOVERY-IN-PROGRESS" };
+   const published = publishExclusiveRecord(path, record, authorityDir);
+@@ -1367,9 +1379,15 @@ export function acquireContinuityLock(dir, token, deps = {}) {
+     return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+   }
+   const ageMs = observed ? acquiredAtMs - observed.acquiredAtMs : -1;
+-  if (!observed || observed.token !== token || ageMs < staleMs) {
++  if (!observed || observed.token !== token
++    || (deps.ownerPid === undefined && ageMs < staleMs)
++    || (deps.ownerPid !== undefined && (!Number.isSafeInteger(observed.ownerPid) || observed.ownerPid < 1))) {
+     return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+   }
++  if (deps.ownerPid !== undefined) {
++    try { process.kill(observed.ownerPid,0); return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
++    catch(error) { if(error?.code!=="ESRCH") return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
++  }
+ 
+   const recoveryGuard = acquireRecoveryGuard(dir, record);
+   if (!recoveryGuard.ok) return recoveryGuard;
+@@ -1381,7 +1399,12 @@ export function acquireContinuityLock(dir, token, deps = {}) {
+     if (!current
+       || current.token !== token
+       || current.ownerNonce !== observed.ownerNonce
+-      || currentAgeMs < staleMs) return { ok: false, code: "PS-CONTINUITY-LOCKED" };
++      || (deps.ownerPid === undefined && currentAgeMs < staleMs)
++      || (deps.ownerPid !== undefined && current.ownerPid !== observed.ownerPid)) return { ok: false, code: "PS-CONTINUITY-LOCKED" };
++    if (deps.ownerPid !== undefined) {
++      try { process.kill(current.ownerPid,0); return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
++      catch(error) { if(error?.code!=="ESRCH") return {ok:false,code:"PS-CONTINUITY-LOCKED"}; }
++    }
+     unlinkSync(path);
+     const recovered = publishExclusiveRecord(path, record, authorityDir);
+     if (!recovered.ok) return recovered;
+@@ -1442,6 +1465,33 @@ export function releaseContinuityLock(lock) {
+   }
+ }
+ 
++/** Retire only this dead calibration writer's exact adjacent State lock while
++ * the existing Source registry boundary serializes recovery and new writers. */
++export function retireDeadCalibrationContinuityLock({dir,ownerPid,sourceBoundary} = {}) {
++  if (!isActiveSourceOwnedSessionAuthorityBoundary({boundary:sourceBoundary,rootDir:dir})) return false;
++  const path = continuityLockPath(dir);
++  let before;
++  try { before = lstatSync(path); }
++  catch (error) { return error?.code === "ENOENT"; }
++  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size > 4096) return false;
++  let raw;
++  try { raw = readFileSync(path,"utf8"); } catch { return false; }
++  const record = parseLockRecord(raw);
++  if (!record || record.token !== LEGACY_WRITER_LOCK_TOKEN
++    || !Number.isSafeInteger(record.ownerPid) || record.ownerPid < 1
++    || (ownerPid !== undefined && record.ownerPid !== ownerPid)) return false;
++  try { process.kill(record.ownerPid,0); return false; }
++  catch (error) { if (error?.code !== "ESRCH") return false; }
++  try {
++    const after = lstatSync(path);
++    if (after.dev !== before.dev || after.ino !== before.ino || after.mode !== before.mode
++      || after.nlink !== before.nlink || after.size !== before.size
++      || readFileSync(path,"utf8") !== raw) return false;
++    unlinkSync(path);
++    return true;
++  } catch { return false; }
++}
++
+ function assertContinuityLockOwned(lock) {
+   const current = parseLockRecord(readFileSync(lock.path, "utf8"));
+   return current !== null && current.token === lock.token && current.ownerNonce === lock.ownerNonce;
+@@ -3650,14 +3700,17 @@ export function buildLateVerifyRecoveryAction(dir, state = null) {
+  * present malformed or non-object peer is refused. Returns the repository-relative
+  * paths actually written.
+  */
+-function writeCalibrationVerifyCommand(dir, command) {
+-  const prepared = prepareCalibrationVerifyWrite(dir);
++function writeCalibrationVerifyCommand(dir, command, sourceEntries) {
++  const prepared = prepareCalibrationVerifyWrite(dir, sourceEntries);
+   if (!prepared.ok) return prepared;
+   const written = [];
+-  for (const { relPath, value } of prepared.entries) {
++  const mutated = [];
++  for (const { relPath, value, alreadyCurrent } of prepared.entries) {
++    written.push(relPath);
++    if (alreadyCurrent) continue;
+     try {
+       writeFileSync(join(dir, relPath), `${JSON.stringify({ ...value, verify: command }, null, 2)}\n`);
+-      written.push(relPath);
++      mutated.push(relPath);
+     } catch {
+       // A throwing write can have changed its target before reporting an I/O
+       // failure (for example, truncation followed by ENOSPC). A completed
+@@ -3666,7 +3719,7 @@ function writeCalibrationVerifyCommand(dir, command) {
+       return { ok: false, code: "PS-CALIBRATION-WRITE", written, externalMutation: true };
+     }
+   }
+-  return { ok: true, written, externalMutation: written.length > 0 };
++  return { ok: true, written, mutated, externalMutation: mutated.length > 0 };
+ }
+ 
+ /**
+@@ -3674,22 +3727,30 @@ function writeCalibrationVerifyCommand(dir, command) {
+  * may have one tier or matching twins; a missing, malformed, non-object, or
+  * divergent present peer is never silently skipped or reconciled here.
+  */
+-function prepareCalibrationVerifyWrite(dir) {
++function prepareCalibrationVerifyWrite(dir, sourceEntries) {
++  if (!Array.isArray(sourceEntries) || sourceEntries.length < 1 || sourceEntries.length > 2) return {ok:false,code:"PS-CALIBRATION-SOURCE"};
++  const planned = new Map(sourceEntries.map(entry=>[entry.path,entry]));
++  if (planned.size !== sourceEntries.length) return {ok:false,code:"PS-CALIBRATION-SOURCE"};
+   const entries = [];
+   for (const relPath of [AUTHORITY_ARTIFACTS.calibration.neutral, AUTHORITY_ARTIFACTS.calibration.legacy]) {
+     const path = join(dir, relPath);
+     if (!existsSync(path)) continue;
+     let value;
++    let currentSha256;
+     try {
+-      value = JSON.parse(readFileSync(path, "utf8"));
++      const observed = calibrationApprovalFile(dir,relPath);
++      currentSha256 = observed.ref.sha256;
++      value = JSON.parse(observed.bytes.toString("utf8"));
+     } catch {
+       return { ok: false, code: "PS-CALIBRATION-MALFORMED" };
+     }
+     if (value === null || typeof value !== "object" || Array.isArray(value)) return { ok: false, code: "PS-CALIBRATION-MALFORMED" };
+-    entries.push({ relPath, value });
++    const plan=planned.get(relPath);
++    if (!plan || ![plan.beforeSha256,plan.afterSha256].includes(currentSha256)) return {ok:false,code:"PS-CALIBRATION-DRIFTED"};
++    entries.push({ relPath, value, alreadyCurrent:currentSha256===plan.afterSha256 });
+   }
+   if (entries.length === 0) return { ok: false, code: "PS-CALIBRATION-MISSING" };
+-  if (entries.length === 2 && !sameJson(entries[0].value, entries[1].value)) return { ok: false, code: "PS-CALIBRATION-DRIFTED" };
++  if (entries.length !== planned.size) return {ok:false,code:"PS-CALIBRATION-DRIFTED"};
+   return { ok: true, entries };
+ }
+ 
+@@ -5793,7 +5854,36 @@ function resultBootstrapPath(dir, prdPath) {
+ }
+ 
+ function canonicalResultBootstrapBytes() {
+-  return Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n", "utf8");
++  return Buffer.from(`${RESULT_RECONCILIATION_FENCE}\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`, "utf8");
++}
++
++// The exact postimage emitted before the reconciliation fence was introduced.
++// It is useful only with an authenticated bootstrap journal and a registered
++// package whose stale Result digest binds the bytes preceding this suffix.
++const LEGACY_RESULT_BOOTSTRAP_BYTES = Buffer.from('```pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n```\n', "utf8");
++const LEGACY_RESULT_REPAIR_SCHEMA = "pipeline.continuity-result-legacy-repair-journal.v1";
++
++function legacyResultPackage(dir, state, prd, spec, observed) {
++  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
++  const manifest = physicalRebindFile(dir, path);
++  if (manifest === null) return null;
++  let value;
++  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return null; }
++  if (value?.feature?.id !== state.activeFeature?.id || !Array.isArray(value.artifacts)) return null;
++  const bindings = {};
++  for (const kind of ["prd", "spec", "result"]) {
++    const entries = value.artifacts.filter((entry) => entry?.class === kind && entry.authority === true);
++    if (entries.length !== 1) return null;
++    bindings[kind] = entries[0];
++  }
++  if (bindings.prd.path !== prd.path || bindings.prd.sha256 !== prd.sha256
++    || bindings.spec.path !== spec.path || bindings.spec.sha256 !== spec.sha256
++    || bindings.result.path !== observed.path) return null;
++  const checked = validateFeaturePackage(dir, path);
++  const resultIndex = value.artifacts.indexOf(bindings.result);
++  if (checked.receipt?.manifestSha256 !== manifest.sha256 || checked.findings.length !== 1
++    || checked.findings[0] !== `FTP-ARTIFACT-${resultIndex}: digest does not bind file bytes`) return null;
++  return { path, sha256: manifest.sha256, historicalSha256: bindings.result.sha256 };
+ }
+ 
+ function observeCanonicalResultBootstrap(dir, relativePath) {
+@@ -5836,6 +5926,29 @@ function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
+   finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
+ }
+ 
++function atomicRepairLegacyResult(result, oldBytes, newBytes, lock, deps = {}) {
++  const tmp = `${result.absolute}.tmp.${lock.ownerNonce}`;
++  let fd;
++  try {
++    const before = physicalRebindFile(result.root, result.path);
++    if (before === null || !before.bytes.equals(oldBytes) || !sameJson(before.identity, result.identity))
++      return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-RACE" };
++    fd = openSync(tmp, "wx", 0o600);
++    (deps.replaceResultFdContents ?? replaceFdContents)(fd, newBytes);
++    fsyncSync(fd); closeSync(fd); fd = undefined;
++    const rechecked = physicalRebindFile(result.root, result.path);
++    if (rechecked === null || !rechecked.bytes.equals(oldBytes) || !sameJson(rechecked.identity, result.identity))
++      return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-RACE" };
++    sealStateCompanion("repository", result.path, newBytes);
++    (deps.renameResultSync ?? renameSync)(tmp, result.absolute);
++    const synced = deps.syncResultDirectory?.(result.parent) ?? syncDirectory(result.parent);
++    const observed = physicalRebindFile(result.root, result.path);
++    return synced.ok && observed !== null && observed.bytes.equals(newBytes)
++      ? { ok: true } : { ok: false, code: "PS-RESULT-LEGACY-REPAIR-READBACK" };
++  } catch { return { ok: false, code: "PS-RESULT-LEGACY-REPAIR-IO" }; }
++  finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
++}
++
+ function resultBootstrapEligible(state, prd, spec) {
+   const continuity = state?.continuity;
+   const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
+@@ -5859,7 +5972,86 @@ function resultBootstrapNextState(state, result, updatedAt) {
+   return next;
+ }
+ 
+-function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt) {
++function resultBootstrapPackage(dir, state, prd, spec, resultPath) {
++  const path = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
++  const manifest = physicalRebindFile(dir, path);
++  if (manifest === null) {
++    // A missing manifest is the legacy unregistered course. An unsafe present
++    // manifest must never be mistaken for that course.
++    try { lstatSync(resolve(dir, path)); return { ok: false }; }
++    catch (error) { return error?.code === "ENOENT" ? { ok: true, package: null } : { ok: false }; }
++  }
++  const checked = validateFeaturePackage(dir, path);
++  if (!checked.ok || checked.receipt?.featureId !== state.activeFeature.id) return { ok: false };
++  let value;
++  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return { ok: false }; }
++  for (const [kind, observed] of [["prd", prd], ["spec", spec], ["result", resultPath]]) {
++    const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
++    if (entries.length !== 1 || entries[0].path !== observed.path || entries[0].sha256 !== observed.sha256) return { ok: false };
++  }
++  return { ok: true, package: { path, sha256: manifest.sha256, resultSha256: resultPath.sha256 } };
++}
++
++function planLegacyResultRepair(dir, state, manifestPath) {
++  const authority = state?.continuity?.authority;
++  const prd = physicalRebindFile(dir, authority?.prd?.path);
++  const spec = physicalRebindFile(dir, authority?.spec?.path);
++  const result = physicalRebindFile(dir, authority?.result?.path);
++  if (prd === null || spec === null || result === null
++    || prd.sha256 !== authority.prd.sha256 || spec.sha256 !== authority.spec.sha256
++    || result.sha256 !== authority.result.sha256 || result.path !== resultBootstrapPath(dir, prd.path)
++    || state.activeFeature?.planPath !== prd.path
++    || !validateContinuityState(state.continuity, state.activeFeature.id).ok
++    || derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 }).status !== "implementing") return null;
++  const registration = legacyResultPackage(dir, state, prd, spec, result);
++  const bytes = registration === null ? null : legacyResultRepairObservation(result, registration.historicalSha256);
++  if (bytes === null || !bytes.isOld || registration.path !== manifestPath) return null;
++  return {
++    schema: "pipeline.result-legacy-repair-preview.v1", status: "legacy-repair-preview",
++    featureId: state.activeFeature.id, manifest: registration.path, manifestSha256: registration.sha256,
++    historicalPrefixSha256: registration.historicalSha256,
++    prd: { path: prd.path, sha256: prd.sha256 }, spec: { path: spec.path, sha256: spec.sha256 },
++    result: { path: result.path, from: bytes.oldSha256, to: bytes.newSha256 },
++    continuityRevision: state.continuity.revision, requiredAuthority: "po",
++    approvalKind: "feature-package-reconcile",
++  };
++}
++
++function resultBootstrapCompletion(dir, state, packageBinding) {
++  const path = `${dirname(state.continuity.authority.prd.path).split(sep).join("/")}/lifecycle.json`;
++  if (packageBinding === null) {
++    try { lstatSync(resolve(dir, path)); }
++    catch (error) { if (error?.code === "ENOENT") return featureClosureProgress("review"); }
++  }
++  const manifest = packageBinding?.path ?? path;
++  if (validateFeaturePackage(dir, manifest).ok) {
++    try {
++      const value = JSON.parse(readFileSync(resolve(dir, manifest), "utf8"));
++      const bindings = [["prd", state.continuity.authority.prd], ["spec", state.continuity.authority.spec], ["result", state.continuity.authority.result]];
++      if (bindings.every(([kind, authority]) => {
++        const entries = value.artifacts.filter((entry) => entry.class === kind && entry.authority === true);
++        return entries.length === 1 && entries[0].path === authority.path && entries[0].sha256 === authority.sha256;
++      })) return featureClosureProgress("review");
++    } catch { /* A registered package with unreadable authority needs recovery. */ }
++  }
++  const ordinary = planFeaturePackageReconcile(dir, manifest, state.continuity.authority.result);
++  const preview = ordinary.status === "rejected" && ordinary.reason === "reconcile-result-metadata-only"
++    ? planLegacyResultRepair(dir, state, manifest) ?? ordinary : ordinary;
++  const pending = preview.status === "reconcile-preview" || preview.status === "legacy-repair-preview";
++  return {
++    scope: "feature-closure", state: pending ? "reconciliation-pending" : "authenticated-recovery-required", workflowTerminal: false,
++    manifest, preview,
++    planSha256: pending ? sha256CanonicalJson(preview) : null,
++    nextAction: preview.status === "legacy-repair-preview"
++      ? "obtain the PO-bound feature-package-reconcile approval for this exact legacy repair plan and candidate, then run feature-package-reconcile with this manifest and plan digest; a second preview will reconcile the package after Result and State repair"
++      : preview.status === "reconcile-preview" ? "obtain the PO-bound feature-package-reconcile approval for this exact plan and candidate, then apply it" : "resolve package drift through authenticated recovery",
++    ...(preview.status === "legacy-repair-preview" ? { repairAction: { executable: process.execPath,
++      argv: [fileURLToPath(import.meta.url), "feature-package-reconcile", "--root", realpathSync(resolve(dir)), "--manifest", manifest, "--plan-sha256", sha256CanonicalJson(preview)],
++      requiredInputs: ["by", "proof-request", "proof-authority", "proof"], approvalKind: "feature-package-reconcile", executionBoundary: "host-authorized-wsl" } } : {}),
++  };
++}
++
++function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt, packageBinding) {
+   const appendedFence = canonicalResultBootstrapBytes();
+   return {
+     schema: RESULT_BOOTSTRAP_PLAN_SCHEMA,
+@@ -5873,6 +6065,7 @@ function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, re
+       spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity },
+       result: { path: resultPath.path, sha256: resultPath.sha256, identity: resultPath.identity },
+       historicalMarkdown: { sha256: sha256Bytes(resultPath.historicalBytes), bytesBase64: resultPath.historicalBytes.toString("base64") },
++      package: packageBinding,
+     },
+     append: { sha256: sha256Bytes(appendedFence), bytesBase64: appendedFence.toString("base64") },
+     result: { path: resultPath.path, sha256: sha256Bytes(resultBytes), bytesBase64: resultBytes.toString("base64") },
+@@ -5891,12 +6084,14 @@ function buildResultBootstrapPlan(dir, existing, updatedAt) {
+   if (state.activeFeature.planPath !== prd.path) return { ok: false, code: "PS-RESULT-BOOTSTRAP-FEATURE" };
+   const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
+   if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
++  const registration = resultBootstrapPackage(dir, state, prd, spec, resultPath);
++  if (!registration.ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-PACKAGE" };
+   const resultBytes = Buffer.concat([resultPath.historicalBytes, canonicalResultBootstrapBytes()]);
+   if (resultBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-SIZE" };
+   const result = { path: resultPath.path, sha256: sha256Bytes(resultBytes) };
+   const nextState = resultBootstrapNextState(state, result, updatedAt);
+   if (!validateContinuityState(nextState.continuity, nextState.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-POSTIMAGE" };
+-  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt);
++  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt, registration.package);
+   return { ok: true, payload, planSha256: sha256Bytes(JSON.stringify(payload)), resultPath, resultBytes, nextState };
+ }
+ 
+@@ -5908,7 +6103,7 @@ function resultBootstrapPrivatePaths(dir, deps = {}) {
+     if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+     const namespace = join(root, "agent-pipeline");
+     const base = join(namespace, "result-bootstrap");
+-    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
++    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal"), repairJournal: join(base, "legacy-repair-journal") };
+   } catch { return null; }
+ }
+ 
+@@ -6006,6 +6201,33 @@ function retireBootstrapJournal(paths, deps = {}) {
+   try { return ensureBootstrapPrivateDirectory(paths, deps) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+ }
+ 
++function loadLegacyResultRepairJournal(paths, key, deps = {}) {
++  const raw = readPrivateBootstrap(paths.repairJournal, deps);
++  if (raw === null) {
++    try { lstatSync(paths.repairJournal); return { ok: false }; }
++    catch (error) { return error?.code === "ENOENT" ? { ok: true, record: null } : { ok: false }; }
++  }
++  if (key === null || key.byteLength !== 32) return { ok: false };
++  try {
++    const value = JSON.parse(raw.toString("utf8"));
++    if (!exactObjectKeys(value, ["schema", "planSha256", "oldStateSha256", "newStateSha256", "oldResultSha256", "newResultSha256", "manifestSha256", "updatedAt", "mac"])
++      || value.schema !== LEGACY_RESULT_REPAIR_SCHEMA
++      || ![value.planSha256, value.oldStateSha256, value.newStateSha256, value.oldResultSha256, value.newResultSha256, value.manifestSha256, value.mac].every((v) => SHA256_RE.test(v))
++      || !canonicalIso(value.updatedAt)) return { ok: false };
++    const { mac, ...core } = value;
++    return bootstrapJournalMac(key, core) === mac ? { ok: true, record: value } : { ok: false };
++  } catch { return { ok: false }; }
++}
++
++function publishLegacyResultRepairJournal(paths, key, core) {
++  return writePrivateBootstrap(paths.repairJournal, Buffer.from(JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) }) + "\n", "utf8"));
++}
++
++function retireLegacyResultRepairJournal(paths) {
++  sealSourceBootstrapRepairJournalRetirement(paths);
++  try { unlinkSync(paths.repairJournal); return syncDirectory(paths.base).ok; } catch { return false; }
++}
++
+ function parseResultBootstrapApply(argv) {
+   if (argv.length !== 13 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--expected-revision" || !parseExpectedRevision(argv[3]).ok
+     || argv[4] !== "--expected-state-sha256" || !SHA256_RE.test(argv[5]) || argv[6] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[7])
+@@ -6013,6 +6235,120 @@ function parseResultBootstrapApply(argv) {
+   return { featureId: argv[1], expectedRevision: parseExpectedRevision(argv[3]).value, expectedStateSha256: argv[5], expectedPostStateSha256: argv[7], updatedAt: argv[9], planSha256: argv[11] };
+ }
+ 
++function legacyResultRepairObservation(observed, historicalSha256) {
++  if (observed === null) return null;
++  const old = LEGACY_RESULT_BOOTSTRAP_BYTES;
++  const fenced = canonicalResultBootstrapBytes();
++  const current = observed.bytes;
++  const isNew = current.subarray(-fenced.length).equals(fenced);
++  const isOld = !isNew && current.subarray(-old.length).equals(old);
++  if (!isOld && !isNew) return null;
++  const prefix = current.subarray(0, current.length - (isOld ? old.length : fenced.length));
++  if (sha256Bytes(prefix) !== historicalSha256) return null;
++  let historicalText;
++  try { historicalText = new TextDecoder("utf-8", { fatal: true }).decode(prefix); } catch { return null; }
++  if (!Buffer.from(historicalText, "utf8").equals(prefix) || historicalText.startsWith("\uFEFF")
++    || historicalText.includes("\r") || !historicalText.endsWith("\n")
++    || /^```pipeline-result(?:\n|$)/mu.test(historicalText)
++    || historicalText.includes(RESULT_RECONCILIATION_FENCE)) return null;
++  const oldBytes = Buffer.concat([prefix, old]);
++  const newBytes = Buffer.concat([prefix, fenced]);
++  if (newBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return null;
++  return { oldBytes, newBytes, oldSha256: sha256Bytes(oldBytes), newSha256: sha256Bytes(newBytes), isOld };
++}
++
++// Returns null when this is not an old journal. An applicable but unprovable
++// recovery is always handled as a refusal, so the ordinary writer never
++// interprets its pre-fence postimage as a fresh bootstrap.
++function recoverJournaledLegacyResultBootstrap(dir, current, apply, journal, lock, deps) {
++  const pending = journal.journal;
++  const repairLoaded = loadLegacyResultRepairJournal(journal.paths, journal.key, deps);
++  if (!repairLoaded.ok) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-JOURNAL" };
++  const repairing = repairLoaded.record;
++  if (pending === null && repairing === null) return null;
++  if (pending !== null && (pending.planSha256 !== apply.planSha256
++    || pending.stateSha256 !== apply.expectedStateSha256
++    || pending.postStateSha256 !== apply.expectedPostStateSha256)) return { status: 2, error: "PS-RESULT-LEGACY-JOURNAL-BINDING" };
++  if (repairing !== null && repairing.planSha256 !== apply.planSha256) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-BINDING" };
++  const state = current.state;
++  const prd = physicalRebindFile(dir, state?.continuity?.authority?.prd?.path);
++  const spec = physicalRebindFile(dir, state?.continuity?.authority?.spec?.path);
++  const resultPath = prd === null ? null : resultBootstrapPath(dir, prd.path);
++  const observed = resultPath === null ? null : physicalRebindFile(dir, resultPath);
++  if (prd === null || spec === null || observed === null
++    || prd.sha256 !== state.continuity.authority.prd.sha256
++    || spec.sha256 !== state.continuity.authority.spec.sha256
++    || state.activeFeature?.id !== apply.featureId || state.activeFeature.planPath !== prd.path)
++    return { status: 2, error: "PS-RESULT-LEGACY-AUTHORITY" };
++  const registration = legacyResultPackage(dir, state, prd, spec, observed);
++  const bytes = registration === null ? null : legacyResultRepairObservation(observed, registration.historicalSha256);
++  if (bytes === null) return { status: 2, error: "PS-RESULT-LEGACY-PREFIX" };
++  if (pending !== null && (pending.result.path !== observed.path || pending.result.sha256 !== bytes.oldSha256))
++    return { status: 2, error: "PS-RESULT-LEGACY-JOURNAL-RESULT" };
++  if (repairing === null && pending === null) return null;
++  const stateSha256 = sha256Bytes(current.raw);
++  let nextState = null;
++  let oldStateSha256;
++  let updatedAt;
++  if (repairing !== null) {
++    oldStateSha256 = repairing.oldStateSha256;
++    updatedAt = repairing.updatedAt;
++    if (repairing.oldResultSha256 !== bytes.oldSha256 || repairing.newResultSha256 !== bytes.newSha256
++      || repairing.manifestSha256 !== registration.sha256) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-DRIFT" };
++  } else {
++    oldStateSha256 = stateSha256;
++    updatedAt = stateSha256 === pending.stateSha256 ? apply.updatedAt : deps.now();
++  }
++  if (stateSha256 === oldStateSha256) {
++    if (state.continuity.authority.result === null) {
++      if (pending === null || stateSha256 !== pending.stateSha256 || !resultBootstrapEligible(state, prd, spec))
++        return { status: 2, error: "PS-RESULT-LEGACY-PRESTATE" };
++      const oldPost = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.oldSha256 }, apply.updatedAt);
++      if (sha256Bytes(Buffer.from(JSON.stringify(oldPost, null, 2) + "\n", "utf8")) !== pending.postStateSha256)
++        return { status: 2, error: "PS-RESULT-LEGACY-POSTSTATE-PROOF" };
++    } else if (stateSha256 !== pending?.postStateSha256 || state.continuity.authority.result.path !== observed.path
++      || state.continuity.authority.result.sha256 !== bytes.oldSha256)
++      return { status: 2, error: "PS-RESULT-LEGACY-STATE-BINDING" };
++    nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
++    if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok)
++      return { status: 2, error: "PS-RESULT-LEGACY-POSTSTATE" };
++  } else if (repairing === null || stateSha256 !== repairing.newStateSha256
++    || state.continuity.authority.result?.path !== observed.path
++    || state.continuity.authority.result?.sha256 !== bytes.newSha256)
++    return { status: 2, error: "PS-RESULT-LEGACY-STATE-DRIFT" };
++  const newStateSha256 = nextState === null ? repairing.newStateSha256
++    : sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8"));
++  if (repairing !== null && newStateSha256 !== repairing.newStateSha256)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-POSTSTATE" };
++  if (repairing === null) {
++    const core = { schema: LEGACY_RESULT_REPAIR_SCHEMA, planSha256: apply.planSha256,
++      oldStateSha256, newStateSha256, oldResultSha256: bytes.oldSha256,
++      newResultSha256: bytes.newSha256, manifestSha256: registration.sha256, updatedAt };
++    if (!publishLegacyResultRepairJournal(journal.paths, journal.key, core))
++      return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-PREPARE" };
++  }
++  if (deps.afterLegacyResultRepairJournal?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-JOURNAL" };
++  if (bytes.isOld && !atomicRepairLegacyResult({ ...observed, root: realpathSync(resolve(dir)), parent: dirname(observed.absolute) }, bytes.oldBytes, bytes.newBytes, lock, deps).ok)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RESULT-WRITE" };
++  const resultReadback = physicalRebindFile(dir, observed.path);
++  if (resultReadback === null || !resultReadback.bytes.equals(bytes.newBytes))
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RESULT-READBACK" };
++  if (deps.afterLegacyResultRepairResult?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-RESULT" };
++  if (nextState !== null && !atomicWriteContinuityState(dir, nextState, lock, deps).ok)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-STATE-WRITE" };
++  const persisted = readStateRaw(dir);
++  if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== newStateSha256
++    || persisted.state.continuity.authority.result?.sha256 !== bytes.newSha256)
++    return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-STATE-READBACK" };
++  if (deps.afterLegacyResultRepairState?.() === false) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-INTERRUPTED-STATE" };
++  if (pending !== null && !retireBootstrapJournal(journal.paths, deps)) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RETIRE-BOOTSTRAP" };
++  if (!retireLegacyResultRepairJournal(journal.paths)) return { status: 2, error: "PS-RESULT-LEGACY-REPAIR-RETIRE" };
++  return { status: 0, receipt: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "recovered-legacy", featureId: apply.featureId,
++    revision: persisted.state.continuity.revision, stateSha256: newStateSha256,
++    result: persisted.state.continuity.authority.result, mutated: nextState !== null,
++    completion: resultBootstrapCompletion(dir, persisted.state, registration) } };
++}
++
+ // NVA-R34-BLINDPUSHPATH: `queueAction` (not `nextAction`) -- this is the bare
+ // "review"/"close" queue-state label the item's own "Three separate
+ // defects" section named as one of the two non-protocol meanings the field
+@@ -6033,7 +6369,23 @@ function runResultBootstrapCommand(sub, rest, deps) {
+   if (sub === "continuity-result-bootstrap-plan") {
+     if (rest.length !== 0) { console.error("Error: Result bootstrap plan accepts no caller bindings."); return 2; }
+     const planned = buildResultBootstrapPlan(deps.dir, readStateRaw(deps.dir), deps.now());
+-    if (!planned.ok) { console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2; }
++    if (!planned.ok) {
++      const current = readStateRaw(deps.dir);
++      if (current.status === "ok" && current.state.continuity?.authority?.result !== null) {
++        const completion = resultBootstrapCompletion(deps.dir, current.state, null);
++        if (completion.preview?.status === "legacy-repair-preview") {
++          const journal = loadBootstrapJournal(deps.dir, deps);
++          if (!journal.ok || journal.journal !== null) {
++            console.error("Error: Result bootstrap legacy journal is pending or unreadable; replay the original bootstrap action before signed repair."); return 2;
++          }
++          console.log(JSON.stringify({ schema: "pipeline.continuity-result-legacy-repair-plan.v1", status: "legacy-repair-preview",
++            preview: completion.preview, planSha256: completion.planSha256, applyAction: completion.repairAction,
++            nextAction: completion.nextAction }, null, 2));
++          return 0;
++        }
++      }
++      console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2;
++    }
+     const writer = fileURLToPath(import.meta.url);
+     console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-bootstrap-apply", "--feature-id", planned.payload.featureId, "--expected-revision", String(planned.payload.expectedRevision), "--expected-state-sha256", planned.payload.preimage.stateSha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
+     return 0;
+@@ -6052,13 +6404,25 @@ function runResultBootstrapCommand(sub, rest, deps) {
+     const resultObserved = resultPath ? physicalRebindFile(deps.dir, resultPath) : null;
+     const prd = physicalRebindFile(deps.dir, current.state.continuity?.authority?.prd?.path);
+     const spec = physicalRebindFile(deps.dir, current.state.continuity?.authority?.spec?.path);
++    if (journal.paths && ((journal.journal !== null && resultObserved?.bytes.subarray(-LEGACY_RESULT_BOOTSTRAP_BYTES.length).equals(LEGACY_RESULT_BOOTSTRAP_BYTES)
++      && !resultObserved.bytes.includes(Buffer.from(RESULT_RECONCILIATION_FENCE)))
++      || existsSync(journal.paths.repairJournal))) {
++      const recovered = recoverJournaledLegacyResultBootstrap(deps.dir, current, apply, journal, lock, deps);
++      if (recovered !== null) {
++        if (recovered.status !== 0) console.error(`Error: Result bootstrap legacy recovery refused (${recovered.error}); recovery journal retained.`);
++        else console.log(JSON.stringify(recovered.receipt));
++        return recovered.status;
++      }
++    }
+     if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
+       if (prd === null || spec === null
+         || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
+         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
+         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
++      const completion = resultBootstrapCompletion(deps.dir, current.state, null);
++      if (completion.state === "authenticated-recovery-required") { console.error(`Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: ${completion.preview.reason}; journal retained if present.`); return 2; }
+       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths, deps))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
+-      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion: featureClosureProgress("review") })); return 0;
++      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion })); return 0;
+     }
+     // A durable Result may legitimately exist while State is still at the exact
+     // preimage.  The authenticated journal is the only authority that may resume
+@@ -6079,6 +6443,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+       }
+     }
+     if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.payload.featureId !== apply.featureId || planned.planSha256 !== apply.planSha256 || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result bootstrap apply inputs are stale or conflicting; zero mutation."); return 2; }
++    if (planned.resultPath === null && resultBootstrapCompletion(deps.dir, planned.nextState, null).state === "authenticated-recovery-required") { console.error("Error: PS-RESULT-BOOTSTRAP-AUTHENTICATED-RECOVERY: historical journal cannot prove the required reconciliation fence; journal retained."); return 2; }
+     if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || journal.journal.stateSha256 !== apply.expectedStateSha256 || journal.journal.postStateSha256 !== apply.expectedPostStateSha256)) { console.error("Error: Result bootstrap journal conflicts; zero mutation."); return 2; }
+     if (journal.journal === null && !publishBootstrapJournal(deps.dir, planned, deps)) { console.error("Error: Result bootstrap journal prepare failed; zero mutation."); return 2; }
+     if (deps.afterResultBootstrapJournal?.() === false) { console.error("Error: Result bootstrap interrupted after journal preparation; recovery journal retained."); return 2; }
+@@ -6098,7 +6463,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
+     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
+     const recovered = loadBootstrapJournal(deps.dir, deps);
+     if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths, deps)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
+-    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: featureClosureProgress("review") })); return 0;
++    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: resultBootstrapCompletion(deps.dir, persisted.state, planned.payload.preimage?.package ?? null) })); return 0;
+   } finally { releaseContinuityLock(lock); }
+ }
+ 
+@@ -8516,6 +8881,76 @@ function computeFeaturePackageReconcilePostimage(root, manifest, planSha256, res
+   return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode, changes: rebuilt.changes };
+ }
+ 
++function runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps) {
++  const privateState = loadBootstrapJournal(root, deps);
++  if (!privateState.ok || privateState.journal !== null) return { ok: false, code: "FTP-LEGACY-BOOTSTRAP-JOURNAL-PENDING" };
++  const loaded = loadLegacyResultRepairJournal(privateState.paths, privateState.key, deps);
++  if (!loaded.ok) return { ok: false, code: "FTP-LEGACY-REPAIR-JOURNAL" };
++  const repairing = loaded.record;
++  if (repairing !== null && repairing.planSha256 !== planSha256) return { ok: false, code: "FTP-LEGACY-REPAIR-PLAN-DRIFT" };
++  const current = readStateRaw(root);
++  if (current.status !== "ok") return { ok: false, code: "FTP-LEGACY-STATE" };
++  const state = current.state;
++  const prd = physicalRebindFile(root, state?.continuity?.authority?.prd?.path);
++  const spec = physicalRebindFile(root, state?.continuity?.authority?.spec?.path);
++  const observed = physicalRebindFile(root, state?.continuity?.authority?.result?.path);
++  if (prd === null || spec === null || observed === null || prd.sha256 !== state.continuity.authority.prd.sha256
++    || spec.sha256 !== state.continuity.authority.spec.sha256 || observed.path !== resultBootstrapPath(root, prd.path))
++    return { ok: false, code: "FTP-LEGACY-AUTHORITY" };
++  const registration = legacyResultPackage(root, state, prd, spec, observed);
++  const bytes = registration === null ? null : legacyResultRepairObservation(observed, registration.historicalSha256);
++  if (bytes === null || registration.path !== manifest) return { ok: false, code: "FTP-LEGACY-PREFIX" };
++  let oldStateSha256, newStateSha256, updatedAt, nextState = null;
++  const currentSha = sha256Bytes(current.raw);
++  if (repairing === null) {
++    const preview = planLegacyResultRepair(root, state, manifest);
++    if (preview === null || sha256CanonicalJson(preview) !== planSha256 || !bytes.isOld)
++      return { ok: false, code: "FTP-LEGACY-PLAN-DRIFT" };
++    oldStateSha256 = currentSha;
++    updatedAt = deps.now();
++    nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
++    if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok)
++      return { ok: false, code: "FTP-LEGACY-POSTSTATE" };
++    newStateSha256 = sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8"));
++    const core = { schema: LEGACY_RESULT_REPAIR_SCHEMA, planSha256, oldStateSha256, newStateSha256,
++      oldResultSha256: bytes.oldSha256, newResultSha256: bytes.newSha256,
++      manifestSha256: registration.sha256, updatedAt };
++    if (privateState.key === null || privateState.key.byteLength !== 32
++      || !publishLegacyResultRepairJournal(privateState.paths, privateState.key, core))
++      return { ok: false, code: "FTP-LEGACY-REPAIR-PREPARE" };
++  } else {
++    ({ oldStateSha256, newStateSha256, updatedAt } = repairing);
++    if (repairing.oldResultSha256 !== bytes.oldSha256 || repairing.newResultSha256 !== bytes.newSha256
++      || repairing.manifestSha256 !== registration.sha256) return { ok: false, code: "FTP-LEGACY-REPAIR-DRIFT" };
++    if (currentSha === oldStateSha256) {
++      if (state.continuity.authority.result?.path !== observed.path || state.continuity.authority.result.sha256 !== bytes.oldSha256)
++        return { ok: false, code: "FTP-LEGACY-STATE-BINDING" };
++      nextState = resultBootstrapNextState(state, { path: observed.path, sha256: bytes.newSha256 }, updatedAt);
++      if (sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")) !== newStateSha256)
++        return { ok: false, code: "FTP-LEGACY-REPAIR-POSTSTATE" };
++    } else if (currentSha !== newStateSha256 || state.continuity.authority.result?.path !== observed.path
++      || state.continuity.authority.result.sha256 !== bytes.newSha256)
++      return { ok: false, code: "FTP-LEGACY-STATE-DRIFT" };
++  }
++  if (deps.afterLegacyResultRepairJournal?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-JOURNAL" };
++  if (bytes.isOld && !atomicRepairLegacyResult({ ...observed, root: realpathSync(resolve(root)), parent: dirname(observed.absolute) }, bytes.oldBytes, bytes.newBytes, lock, deps).ok)
++    return { ok: false, code: "FTP-LEGACY-RESULT-WRITE" };
++  const resultReadback = physicalRebindFile(root, observed.path);
++  if (resultReadback === null || !resultReadback.bytes.equals(bytes.newBytes)) return { ok: false, code: "FTP-LEGACY-RESULT-READBACK" };
++  if (deps.afterLegacyResultRepairResult?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-RESULT" };
++  if (nextState !== null && !atomicWriteContinuityState(root, nextState, lock, deps).ok)
++    return { ok: false, code: "FTP-LEGACY-STATE-WRITE" };
++  const persisted = readStateRaw(root);
++  if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== newStateSha256
++    || persisted.state.continuity.authority.result?.sha256 !== bytes.newSha256)
++    return { ok: false, code: "FTP-LEGACY-STATE-READBACK" };
++  if (deps.afterLegacyResultRepairState?.() === false) return { ok: false, code: "FTP-LEGACY-INTERRUPTED-STATE" };
++  if (!retireLegacyResultRepairJournal(privateState.paths)) return { ok: false, code: "FTP-LEGACY-REPAIR-RETIRE" };
++  return { ok: true, receipt: { schema: FEATURE_PACKAGE_RECONCILE_SCHEMA, status: "legacy-repaired", manifest,
++    planSha256, result: persisted.state.continuity.authority.result,
++    completion: resultBootstrapCompletion(root, persisted.state, registration) } };
++}
++
+ /**
+  * `feature-package-reconcile` -- the third plan kind's transactional half (PHX-WP-GATE,
+  * P-AC-08). Consumes `planFeaturePackageReconcile` under the identical `--plan-sha256`
+@@ -8552,8 +8987,26 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+   try {
+     const stateNow = (deps.readStateRaw ?? readStateRaw)(root);
+     const resultAuthority = stateNow.status === "ok" ? (stateNow.state?.continuity?.authority?.result ?? null) : null;
+-    const plan = planFeaturePackageReconcile(root, manifest, resultAuthority);
+-    if (plan.status !== "reconcile-preview" || sha256CanonicalJson(plan) !== planSha256) {
++    const ordinaryPlan = planFeaturePackageReconcile(root, manifest, resultAuthority);
++    const bootstrapPaths = resultBootstrapPrivatePaths(root, deps);
++    const repairPending = bootstrapPaths !== null && existsSync(bootstrapPaths.repairJournal);
++    const needsLegacy = repairPending || ordinaryPlan.status === "rejected" && ordinaryPlan.reason === "reconcile-result-metadata-only";
++    const bootstrap = needsLegacy ? loadBootstrapJournal(root, deps) : { ok: true, journal: null };
++    const repairing = needsLegacy && bootstrap.ok ? loadLegacyResultRepairJournal(bootstrap.paths, bootstrap.key, deps) : { ok: true, record: null };
++    if (!bootstrap.ok || !repairing.ok) return refuseFeaturePackageRead(sub, "legacy Result repair journal is unreadable or tampered; zero mutation");
++    if (repairing.record !== null) {
++      if (repairing.record.planSha256 !== planSha256) return refuseFeaturePackageRead(sub, "legacy Result repair plan digest conflicts with pending journal; zero mutation");
++      const resumed = runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps);
++      if (!resumed.ok) return refuseFeaturePackageRead(sub, `legacy Result repair recovery refused (${resumed.code}); journal retained`);
++      console.log(JSON.stringify(resumed.receipt, null, 2)); return 0;
++    }
++    const legacyPlan = ordinaryPlan.status === "rejected" && ordinaryPlan.reason === "reconcile-result-metadata-only" && stateNow.status === "ok"
++      ? planLegacyResultRepair(root, stateNow.state, manifest) : null;
++    const plan = legacyPlan ?? ordinaryPlan;
++    if (bootstrap.journal !== null && legacyPlan !== null) return refuseFeaturePackageRead(sub, "legacy bootstrap journal is pending; replay its original bootstrap action before signed repair");
++    if (legacyPlan !== null && (bootstrap.key === null || bootstrap.key.byteLength !== 32))
++      return refuseFeaturePackageRead(sub, "legacy bootstrap journal key is unavailable or unsafe; zero approval consumption and zero artifact mutation");
++    if (!(plan.status === "reconcile-preview" || plan.status === "legacy-repair-preview") || sha256CanonicalJson(plan) !== planSha256) {
+       return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
+     }
+ 
+@@ -8592,6 +9045,12 @@ function runFeaturePackageReconcileCommand(argv, deps) {
+       return refuseFeaturePackageRead(sub, message);
+     }
+ 
++    if (legacyPlan !== null) {
++      const repaired = runSignedLegacyResultRepair(root, manifest, planSha256, lock, deps);
++      if (!repaired.ok) return refuseFeaturePackageRead(sub, `legacy Result repair refused (${repaired.code}); journal retained if prepared`);
++      console.log(JSON.stringify(repaired.receipt, null, 2)); return 0;
++    }
++
+     const pending = loadFeaturePackageApplyJournal(root, deps);
+     if (!pending.ok) return refuseFeaturePackageRead(sub, `a prior recovery journal is unreadable or tampered (${pending.code}); run feature-package-recover`);
+     if (pending.journal !== null) {
+@@ -10401,7 +10860,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+   // Routed ahead of readState() too: this transaction's authority is the --root
+   // repository's own topology and its own private journal, never the operator's
+   // local state file (PHX-0A-WRITE, P-AC-08).
+-  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, deps);
++  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, { ...deps, dir, now });
+ 
+   const existing = readState(dir);
+   if (existing.status === "malformed") {
+@@ -10583,6 +11042,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.log('Phase already "design"; zero-write replay accepted.');
+         return 0;
+       }
++      if (lifecycle.status === "implementing" && flags["verify-command"] !== undefined) {
++        // A stopped phase writer may have committed State already. Re-enter the
++        // current configured-command Source route; no old journal supplies State.
++        return runStateSource(["configure-verify","--verify-command",flags["verify-command"]],
++          {...deps,sourceBoundary:stateAuthorityInvocation?.boundary});
++      }
+       const architecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+         rootDir: dir,
+         taskScope: base.activeFeature?.planPath ?? null,
+@@ -10598,18 +11063,25 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.log(JSON.stringify({ schema: architecture.schema, code: architecture.code, nextAction: architecture.nextAction }));
+         return 2;
+       }
+-      // NVA-CF-VERIFYDEADLOCK: the design->implementation transition is the one
+-      // sanctioned moment that may write project/pipeline.json's `verify` field --
+-      // see the UNCONFIGURED_VERIFY_MARKER comment above for why. `--verify-command`
+-      // is optional once a real command is already configured (idempotent replay),
+-      // but this refuses to LEAVE the placeholder in place by entering implementation
+-      // silently: that refusal, not a GS-10 override, is the sanctioned way through.
++      // NVA-CF-VERIFYDEADLOCK: a requested command uses the guarded calibration
++      // transition under the State writer's validated, lock-held companion step.
++      // Without a command, an already configured or baseline-only contract can
++      // enter implementation; release readiness still checks the latter.
+       const requestedVerifyCommand = flags["verify-command"];
++      let calibrationNeeded = false;
+       if (requestedVerifyCommand !== undefined) {
+         if (classifyVerifyCommand(requestedVerifyCommand) !== "configured") {
+           console.error('Error: --verify-command must be a real, non-blank verification command -- not the plugin\'s UNCONFIGURED_VERIFY placeholder text.');
+           return 2;
+         }
++        // Early read-only diagnosis. The writer rechecks all of this under its
++        // lock before either companion or State mutation.
++        const committed = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:requestedVerifyCommand,phaseEntry:true});
++        if (!["baseline-only","partial-current","configured-current","committed-configured"].includes(committed.status)) {
++          console.error(`Error: set-phase implementation refused calibration commit preflight (${committed.code ?? committed.status}); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.`);
++          return 2;
++        }
++        calibrationNeeded = committed.status !== "committed-configured";
+       } else {
+         const verifyStatus = readCalibrationVerifyStatus(dir);
+         if (!new Set(["configured", "baseline-only"]).has(verifyStatus.status)) {
+@@ -10617,6 +11089,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           return 2;
+         }
+       }
++      let preparedCalibration = null;
+       const written = writeState(dir, undefined, base, {
+         transition: (observed) => {
+           const transition = enterPlanImplementation({
+@@ -10628,19 +11101,41 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+             ? { ...transition, state: { ...transition.state, updatedAt: now() } }
+             : transition;
+         },
+-        afterValidation: requestedVerifyCommand === undefined ? undefined : () => writeCalibrationVerifyCommand(dir, requestedVerifyCommand),
++        afterValidation: !calibrationNeeded ? undefined : ({ sourceWitness }) => {
++          const prepared = prepareCalibrationVerifyCommitTransition({ rootDir: dir, verifyCommand: requestedVerifyCommand, phaseEntry: true, sourceWitness });
++          if (!prepared?.ok || !prepared.preparedHandle) return { ok: false, code: prepared?.code ?? "CVCT-PREPARE-UNAVAILABLE" };
++          const result = writeCalibrationVerifyCommand(dir, requestedVerifyCommand, prepared.entries);
++          if (result.ok) preparedCalibration = prepared.preparedHandle;
++          else {
++            const abandoned = abandonCalibrationVerifyCommitTransition({ preparedHandle: prepared.preparedHandle });
++            if (!abandoned.ok) console.error(`Error: calibration preparation remains held (${abandoned.code}); inspect private transition before retrying.`);
++          }
++          return result;
++        },
+       });
+       if (!stateWriteSucceeded(written)) {
++        if (preparedCalibration && written.committed === false) {
++          const rollback = rollbackCalibrationVerifyCommitTransition({ preparedHandle: preparedCalibration });
++          if (!rollback.ok) console.error(`Error: calibration rollback remains incomplete (${rollback.code}); retry the same set-phase command after this process exits.`);
++        }
+         if (written.externalMutation === true) {
+-          console.error(`Error: set-phase implementation failed after calibration mutation (${written.code}); inspect calibration and State before retrying.`);
++          console.error(`Error: set-phase implementation failed after possible calibration mutation (${written.code}); State was not reported committed. Inspect both tiers before recovery. No configured commit is claimed.`);
+           return 2;
+-        } else if (written.code?.startsWith("PS-CALIBRATION-")) {
++        }
++        if (written.code?.startsWith("PS-CALIBRATION-")) {
+           console.error(`Error: set-phase implementation refused invalid calibration (${written.code}); zero mutation.`);
+           return 2;
+         }
+         console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
+         return 2;
+       }
++      if (calibrationNeeded) {
++        const ready = completeCalibrationVerifyCommitTransition({ preparedHandle: preparedCalibration });
++        if (!ready?.ok || ready.code !== "CVCT-COMMIT-READY") {
++          console.error(`Error: implementation State and calibration were written, but the commit-ready transition failed (${ready?.code ?? "CVCT-COMPLETE-UNAVAILABLE"}); inspect State and both calibration tiers. No configured commit is claimed.`);
++          return 2;
++        }
++      }
+       syncNextActionDocs(dir, written.transition.state);
+       console.log('Phase set: "implementation"; lifecycle="implementing".');
+       const decisionSummary = summarizePlanningDecisionApplicability(architecture.artifacts?.decisionApplicability);
+@@ -10648,6 +11143,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       return 0;
+     }
+ 
++    case "recover-verify-transition": {
++      console.error("Error: the unshipped journal recovery route is unavailable; retry the original set-phase or configure-verify command with its exact verify command.");
++      return 2;
++    }
++
+     // NVA-GF-LATEVERIFY-1: an intentionally baseline-only project can enter
+     // implementation before its real test command is known. This is the one
+     // later, typed recovery -- deliberately separate from set-phase so it
+@@ -10665,30 +11165,50 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error(`Error: configure-verify requires an established implementing lifecycle (${lifecycle.code ?? "PS-LIFECYCLE-NOT-IMPLEMENTING"}); zero calibration write.`);
+         return 2;
+       }
+-      const twins = readIdenticalCalibrationVerifyTwins(dir);
+       const command = parsed.value["verify-command"];
+-      if (twins.status === "configured" && twins.command === command) {
++      // A different command cannot replay an already committed configured
++      // contract. Classify it from the validated, clean committed layout so
++      // callers receive the established configured-tier refusal without
++      // preparing a transition or writing either calibration tier.
++      const committedLayout = inspectCommittedCalibrationVerifyLayout({rootDir:dir});
++      if (committedLayout.status === "configured" && committedLayout.command !== command) {
++        console.error("Error: configure-verify refused calibration tiers (configured); zero calibration write.");
++        return 2;
++      }
++      const twins = inspectReplayableCalibrationVerifyLayout({rootDir:dir,verifyCommand:command});
++      if (["baseline-only","partial-current","configured-current"].includes(twins.status)
++        && !retireDeadCalibrationContinuityLock({dir,sourceBoundary:deps.sourceBoundary})) {
++        console.error("Error: a live or unknown State writer lock remains; no calibration success is claimed.");
++        return 2;
++      }
++      if (twins.status === "committed-configured"
++        || (twins.status === "configured-current"
++          && inspectCurrentCalibrationVerifyReady({rootDir:dir,verifyCommand:command}).ok)) {
+         console.log("Verify command already configured; exact zero-write replay accepted.");
+         return 0;
+       }
+-      if (twins.status !== "baseline-only") {
+-        console.error(`Error: configure-verify requires intact, identical committed baseline-only calibration tiers (${twins.status}); zero calibration write.`);
++      if (!["baseline-only","partial-current","configured-current"].includes(twins.status)) {
++        if (twins.status === "unavailable" && committedLayout.status === "unavailable") {
++          console.error("Error: configure-verify refused calibration tiers (unavailable); zero calibration write.");
++        } else {
++          console.error(`Error: configure-verify requires exact committed baseline or this command's verify-field delta (${twins.code??twins.status}); zero calibration write.`);
++        }
+         return 2;
+       }
+-      const commitTransition = prepareCalibrationVerifyCommitTransition({rootDir: dir, verifyCommand: command});
++      const commitTransition = prepareCalibrationVerifyCommitTransition({rootDir: dir, verifyCommand: command, sourceBoundary:deps.sourceBoundary});
+       if (!commitTransition?.ok || !commitTransition.preparedHandle
+         || !sameJson(commitTransition.paths, twins.paths)) {
+         console.error(`Error: configure-verify commit route unavailable (${commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE"}); zero calibration write; repair: ${configureVerifyRepair(commitTransition?.code ?? "CVCT-PREPARE-UNAVAILABLE")}`);
+         return 2;
+       }
+-      const written = writeCalibrationVerifyCommand(dir, command);
++      const written = writeCalibrationVerifyCommand(dir, command, commitTransition.entries);
+       if (!written.ok
+         || !sameJson(written.written, commitTransition.paths)) {
+         // The full write set was validated immediately above. This defensive
+         // failure is retained for an unexpected filesystem race; callers must
+         // inspect the durable files rather than treating an incomplete result
+         // as a successful recovery.
+-        console.error("Error: configure-verify could not write the exact committed calibration tiers; inspect calibration before retrying.");
++        console.error("Error: configure-verify could not write the exact committed calibration tiers; calibration mutation is possible. Inspect both tiers before retrying.");
+         return 2;
+       }
+       const commitReady = completeCalibrationVerifyCommitTransition({preparedHandle: commitTransition.preparedHandle});
+@@ -12762,7 +13282,16 @@ const STATE_AUTHORITY_ENTRIES = new Map([
+   ["set-phase", "state.set-phase-no-calibration"],
+ ]);
+ const stateAuthorityWriteBrands = new WeakMap();
++const validatedCalibrationSourceWitnesses = new WeakMap();
+ let stateAuthorityInvocation = null;
++export function inspectValidatedCalibrationSourceWitness(witness) {
++  const fact = validatedCalibrationSourceWitnesses.get(witness);
++  if (!fact || fact.sourceWrite !== stateAuthorityInvocation?.executingWrite
++    || fact.sourceWrite.entry !== "state.set-phase-with-calibration"
++    || !fact.sourceWrite.frame?.boundary) return null;
++  return Object.freeze({rootDir:fact.rootDir,statePreSha256:fact.statePreSha256,
++    statePostSha256:fact.statePostSha256,sourceBoundary:fact.sourceWrite.frame.boundary});
++}
+ const stateOwnedCompanionFailureFrames = new WeakSet();
+ function stateAuthorityFailure(code, reason) {
+   const error = new Error(reason);
+@@ -12820,10 +13349,11 @@ function stateAuthorityImage(repository) {
+   };
+ }
+ function prepareStateAuthorityWrite(frame, entry, dir, state, expectedState, options) {
+-  if (frame !== stateAuthorityInvocation || !frame.boundary || !frame.cataloguePresent
++  if (frame !== stateAuthorityInvocation || !frame.boundary
++    || (!frame.cataloguePresent && entry !== "state.set-phase-with-calibration")
+     || !frame.sourceDefaults || resolve(dir) !== frame.repository.primaryRoot
+     || (frame.push ? frame.sub !== "approve-push" || entry !== `state.approve-push.${frame.push.effect}`
+-      : !STATE_AUTHORITY_ENTRIES.has(frame.sub) || entry !== STATE_AUTHORITY_ENTRIES.get(frame.sub))) {
++      : !STATE_AUTHORITY_ENTRIES.has(frame.sub) || entry !== frame.entry)) {
+     stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-source-entry-unavailable");
+   }
+   const before = stateAuthorityImage(frame.repository);
+@@ -12871,7 +13401,7 @@ export function executeStateAuthorityWrite(handle) {
+   let result;
+   try { result = writeState(data.dir,data.state,data.expectedState,data.options); }
+   finally { data.frame.executingWrite = null; }
+-  if (!data.sealedBytes && result?.ok === false && result.committed === false && result.externalMutation !== true) {
++  if (result?.ok === false && result.committed === false) {
+     data.sealedBytes = data.preBytes;
+   }
+   if (!data.sealedBytes) stateAuthorityFailure("SDC-AUTHORITY-HELD", "state-write-no-valid-terminal");
+@@ -12906,12 +13436,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+     } catch { return 2; }
+   }
+   // Read-only and the State-read-only P16 twin writer retain their exact routes.
+-  if (["inspect","help","-h","--help","configure-verify"].includes(sub)) return runStateSource(argv,deps);
++  if (["inspect","help","-h","--help"].includes(sub)) return runStateSource(argv,deps);
+   const dir = deps.dir ?? projectDir();
+   const previous = stateAuthorityInvocation;
+   let owningFailureFrame = null;
+   try {
+     const repository = inspectSignedDescriptorCustodyRepository(dir);
++    if (sub === "configure-verify") return withSessionAuthorityBoundary({repository}, boundary =>
++      runStateSource(argv,{...deps,sourceBoundary:boundary}));
+     if(sub === "approve-push") {
+       const present=withSessionAuthorityBoundary({repository},()=>stateCataloguePresent(repository));
+       if(!present) return runStateSource(argv,deps);
+@@ -12964,7 +13496,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+         return result;
+       });
+     }
+-    if (!STATE_AUTHORITY_ENTRIES.has(sub) || (sub === "set-phase" && argv.includes("--verify-command"))) {
++    if (!STATE_AUTHORITY_ENTRIES.has(sub)) {
+       // The original legacy route may contain an attended prompt. Inspect the
+       // catalogue under common lock, then release it BEFORE that original route.
+       // PF-54 (D51 (1)): a route the State companion has not adopted writes the State outside the
+@@ -12990,11 +13522,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+     }
+     return withSessionAuthorityBoundary({repository}, boundary => {
+       const cataloguePresent = stateCataloguePresent(repository);
+-      if (cataloguePresent && (!STATE_AUTHORITY_ENTRIES.has(sub)
+-        || (sub === "set-phase" && argv.includes("--verify-command")))) {
++      if (cataloguePresent && !STATE_AUTHORITY_ENTRIES.has(sub)) {
+         stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", "state-outer-companion-route-not-adopted");
+       }
+       const frame = {repository,boundary,cataloguePresent,sub,
++        entry:sub === "set-phase" && argv.includes("--verify-command")
++          ? "state.set-phase-with-calibration" : STATE_AUTHORITY_ENTRIES.get(sub),
+         sourceDefaults:Object.keys(deps).every(key => key === "dir" || key === "now"),executingWrite:null};
+       stateAuthorityInvocation = frame;
+       return runStateSource(argv,deps);
+@@ -13522,7 +14055,8 @@ function prepareStateCompanion(frame, argv) {
+     }
+     sourceEffects=[sourceEffects[0],{scope:"repository",path:resultPath},
+       {scope:"common",path:"agent-pipeline/result-bootstrap/key"},
+-      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"}];
++      {scope:"common",path:"agent-pipeline/result-bootstrap/journal"},
++      {scope:"common",path:"agent-pipeline/result-bootstrap/legacy-repair-journal"}];
+   }
+   if(frame.sub === "present-plan") {
+     const source=readState(frame.repository.primaryRoot);
+@@ -13588,7 +14122,7 @@ function sealSourceBootstrapPrivatePublication(path,bytes,replace) {
+   if(data.entry !== "continuity-result-bootstrap-apply" || replace)
+     stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-entry");
+   const relativePath=relative(data.repository.commonDir,path).split(sep).join("/");
+-  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal"].includes(relativePath)
++  if(!["agent-pipeline/result-bootstrap/key","agent-pipeline/result-bootstrap/journal","agent-pipeline/result-bootstrap/legacy-repair-journal"].includes(relativePath)
+     || resolve(data.repository.commonDir,relativePath)!==path)
+     stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-private-source-path");
+   sealStateCompanion("common",relativePath,bytes);
+@@ -13606,17 +14140,38 @@ function sealSourceBootstrapJournalRetirement(paths,deps) {
+   const key="common/agent-pipeline/result-bootstrap/journal",published=data.seals.get(key);
+   const state=readStateRaw(data.repository.primaryRoot);
+   const result=authenticated.journal && physicalRebindFile(data.repository.primaryRoot,authenticated.journal.result.path);
++  const repair=loadLegacyResultRepairJournal(paths,authenticated.key);
++  const repaired=repair.ok && repair.record
++    && repair.record.planSha256===apply?.planSha256
++    && repair.record.oldResultSha256===authenticated.journal?.result.sha256
++    && state.status==="ok" && sha256Bytes(state.raw)===repair.record.newStateSha256
++    && result?.sha256===repair.record.newResultSha256;
+   if(!apply || !authenticated.ok || !authenticated.journal || !physical.bytes
+     || authenticated.journal.planSha256!==apply.planSha256
+     || authenticated.journal.stateSha256!==apply.expectedStateSha256
+     || authenticated.journal.postStateSha256!==apply.expectedPostStateSha256
+-    || state.status!=="ok" || sha256Bytes(state.raw)!==apply.expectedPostStateSha256
+-    || !result || result.sha256!==authenticated.journal.result.sha256
++    || !(repaired || (state.status==="ok" && sha256Bytes(state.raw)===apply.expectedPostStateSha256
++      && result?.sha256===authenticated.journal.result.sha256))
+     || (published ? !physical.bytes.equals(published) : !statePushEqual(physical.image,effect.preimage)))
+     stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-authenticated-retirement-unavailable");
+   if(data.bootstrapJournalRetired)stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repeated-retirement");
+   data.bootstrapJournalRetired=true;
+ }
++function sealSourceBootstrapRepairJournalRetirement(paths) {
++  const data=stateAuthorityInvocation?.executingCompanion;
++  if(!data)return;
++  if(data.entry!=="continuity-result-bootstrap-apply" || paths.root!==data.repository.commonDir
++    || paths.repairJournal!==join(data.repository.commonDir,"agent-pipeline","result-bootstrap","legacy-repair-journal"))
++    stateAuthorityFailure("SDC-AUTHORITY-CAS","companion-bootstrap-repair-retirement-path");
++  const key=readPrivateBootstrap(paths.key),repair=loadLegacyResultRepairJournal(paths,key);
++  const state=readStateRaw(data.repository.primaryRoot);
++  const result=state.status==="ok"?physicalRebindFile(data.repository.primaryRoot,state.state.continuity?.authority?.result?.path):null;
++  if(!repair.ok || !repair.record || state.status!=="ok"
++    || sha256Bytes(state.raw)!==repair.record.newStateSha256
++    || result?.sha256!==repair.record.newResultSha256)
++    stateAuthorityFailure("SDC-AUTHORITY-HELD","companion-bootstrap-repair-retirement-proof");
++  data.bootstrapRepairJournalRetired=true;
++}
+ export function executeStateAuthorityCompanionWrite(handle) {
+   const data = ownedStateCompanion(handle);
+   if (data.attempted || data.frame.executingCompanion) stateAuthorityFailure("SDC-AUTHORITY-CAS", "companion-already-attempted");
+@@ -13639,8 +14194,9 @@ export function executeStateAuthorityCompanionWrite(handle) {
+   const effects = data.effects.map((effect,index) => {
+     const actual=readbacks[index], seal=data.seals.get(effect.scope+"/"+effect.path);
+     const authenticatedRetirement=data.entry === "continuity-result-bootstrap-apply"
+-      && data.bootstrapJournalRetired === true && effect.scope === "common"
+-      && effect.path === "agent-pipeline/result-bootstrap/journal";
++      && effect.scope === "common" && (
++        data.bootstrapJournalRetired === true && effect.path === "agent-pipeline/result-bootstrap/journal"
++        || data.bootstrapRepairJournalRetired === true && effect.path === "agent-pipeline/result-bootstrap/legacy-repair-journal");
+     if (!unchanged && (authenticatedRetirement ? actual.image !== null
+       : seal ? !actual.bytes?.equals(seal) : !statePushEqual(actual.image,effect.preimage))) {
+       stateAuthorityFailure("SDC-AUTHORITY-HELD", "companion-partial-or-unsealed-postimage");
+@@ -13753,7 +14309,12 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
+   if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > 1048576
+     || (typeof process.getuid === "function" && before.uid !== process.getuid())
+     || (privateState && process.platform !== "win32" && (before.mode & 0o077) !== 0)) throw Error("CVCT-FILE");
+-  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") throw Error("CVCT-FILE");
++  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") {
++    const error = Error("CVCT-FILE");
++    try { inspectWindowsOwnedAuthorityPath({ path: target, directory: false }); }
++    catch (nativeError) { error.windowsAuthorityCause = windowsAuthorityCause(nativeError); }
++    throw error;
++  }
+   const same = info => info.isFile() && info.dev === before.dev && info.ino === before.ino
+     && info.mode === before.mode && info.nlink === 1 && info.size === before.size;
+   const fd = openSync(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+@@ -13768,8 +14329,9 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
+   return {bytes,ref:Object.freeze({path,sha256:sha256Bytes(bytes),size:bytes.length})};
+ }
+ 
+-export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+-  const unavailable = code => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable."});
++export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = false} = {}) {
++  const unavailable = (code, windowsAuthorityCause = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
++    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {})});
+   try {
+     const root = resolve(rootDir);
+     if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return unavailable("CVCT-ROOT");
+@@ -13779,7 +14341,10 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+     const physical = calibrationApprovalFile(root, selected, {privateState:true});
+     const state = JSON.parse(physical.bytes.toString("utf8"));
+     const lifecycle = derivePlanLifecycle(state);
+-    if (!isLateVerifyRecoveryLifecycle(lifecycle) || !validCurrentPlanApproval(state.planApproval)
++    const eligibleLifecycle = phaseEntry === true
++      ? lifecycle.ok && lifecycle.status === "approved" && state.activeFeature?.phase === "design"
++      : isLateVerifyRecoveryLifecycle(lifecycle);
++    if (!eligibleLifecycle || !validCurrentPlanApproval(state.planApproval)
+       || !validPlanSubmission(state.planSubmission)) return unavailable("CVCT-APPROVAL-UNAVAILABLE");
+     const authority = checkPoGateAuthority({repoRoot:root});
+     if (!authority?.ok || authority.divergences?.length !== 0
+@@ -13846,5 +14411,5 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+       submissionSha256:sha256CanonicalJson(state.planSubmission),approvalSha256:sha256CanonicalJson(state.planApproval),
+       authoritySha256:sha256CanonicalJson(authority.value),approvalBasis,
+       sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
+-  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE"); } // AC-140: keep the typed source failure
++  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE", error?.windowsAuthorityCause); } // AC-140: keep the typed source failure
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2649dc88c..18df3dd79 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -40,6 +40,24 @@ import { designReadinessReportSha256 } from "../lib/design-readiness-host-eviden
+ import { createAdvisoryAttemptTrail } from "../lib/advisory-attempt-trail.mjs";
+ import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
+ import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
++import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
++import { applyAdoptionDecision } from "./architecture-adoption.mjs";
++
++function prepareCalibrationArchitectureFixture(root) {
++  const source = fileURLToPath(new URL("../../..", import.meta.url));
++  cpSync(join(source, "architecture"), join(root, "architecture"), { recursive: true });
++  cpSync(join(source, "AGENTS.md"), join(root, "AGENTS.md"));
++  const adoption = { rootDir: root, decision: "deferred", scope: ["specs/", "architecture/map/"],
++    rationale: "Contained fixture physical architecture deferral", decidedAt: "2026-10-24T12:00:00.000Z",
++    reviewDate: "2099-01-01", decisionRef: "TEST-K156" };
++  const request = prepareAdoptionAuthority(adoption);
++  applyAdoptionDecision({ ...adoption, approvalRequest: request, chatApproval: {
++    mode: "chat-attributed-unattested", by: "Synthetic fixture PO", decisionRef: "TEST-K156", intentSha256: request.intent.sha256,
++  } });
++  const readiness = inspectArchitectureEntryReadiness({ rootDir: root, taskScope: "specs/unit/prd_unit.md" });
++  assert.equal(readiness.status, "ready", readiness.code);
++}
+ 
+ const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+ const planSha256 = createHash("sha256").update("plan").digest("hex");
+@@ -1940,7 +1958,7 @@ function awaitingApprovalFixture() {
+ // must still support each healthy layout that project authority admits.
+ {
+   const verifyCommand = `${process.execPath} -e "process.exit(0)"`;
+-  const baseline = { project: "calibration-preflight", verify: "node -e \"process.exit(1)\"", handover: "docs/state.md" };
++  const baseline = { project: "calibration-preflight", verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"", handover: "docs/state.md" };
+   const approvedState = {
+     schema: "pipeline.state.v0",
+     activeFeature: { id: "calibration-preflight", planPath: "specs/calibration-preflight/prd.md", phase: "design" },
+@@ -1982,68 +2000,91 @@ function awaitingApprovalFixture() {
+   refused({ neutral: baseline, legacy: { ...baseline, handover: "docs/other-state.md" } }, "unequal valid calibration twins must reject before any write");
+ 
+   for (const [label, options, expectedPaths] of [
+-    ["neutral-only", { legacy: undefined }, ["project/pipeline.json"]],
+-    ["legacy-only", { neutral: undefined }, [".claude/pipeline.json"]],
+-    ["matching-dual", {}, ["project/pipeline.json", ".claude/pipeline.json"]],
++    ["neutral-only", { neutral: baseline, legacy: undefined }, ["project/pipeline.json"]],
++    ["legacy-only", { neutral: undefined, legacy: baseline }, [".claude/pipeline.json"]],
++    ["matching-dual", { neutral: baseline, legacy: baseline }, ["project/pipeline.json", ".claude/pipeline.json"]],
+   ]) {
+-    const root = fixture(options);
++    // QG-04: the old positive fixture hand-seeded an uncommitted approval and
++    // calibration. The commit transition correctly refuses both. Keep the
++    // same layout and successful mutation assertions with a production writer
++    // approval and committed baseline; the refusal cases above retain their
++    // original zero-write assertions and setup.
++    const root = mkdtempSync(join(nativeContractFixtureParent(), `phase-calibration-${label}-`));
++    prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
++    prepareCalibrationArchitectureFixture(root);
++    const stateFile = statePath(root);
++    const state = JSON.parse(readFileSync(stateFile, "utf8"));
++    writeFileSync(stateFile, `${JSON.stringify({ ...state, activeFeature: { ...state.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });
++    if (options.legacy === undefined) rmSync(join(root, ".claude/pipeline.json"));
++    if (options.neutral !== undefined) {
++      mkdirSync(join(root, "project"), { recursive: true });
++      writeFileSync(join(root, "project/pipeline.json"), `${JSON.stringify(baseline, null, 2)}\n`);
++    }
++    if (options.legacy !== undefined) writeFileSync(join(root, ".claude/pipeline.json"), `${JSON.stringify(baseline, null, 2)}\n`);
++    const fixtureGit = (...args) => assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).status, 0);
++    fixtureGit("add", "--", ...expectedPaths);
++    if (options.legacy === undefined) fixtureGit("add", "-u", "--", ".claude/pipeline.json");
++    fixtureGit("commit", "-q", "--no-verify", "-m", "committed calibration fixture");
+     const lines = [];
+     const originalLog = console.log;
+     console.log = (...parts) => { lines.push(parts.join(" ")); };
+     try {
+       assert.equal(run(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand], {
+-        dir: root, now: () => now,
+-        architectureEntryReadiness: () => ({ status: "ready", artifacts: { decisionApplicability: {
+-          status: "advisory", areas: [{ area: "pipeline-core", status: "advisory",
+-            decisions: [{ id: "ADR-0076", digest: "a".repeat(64), path: "docs/adr/0076.md" }], findings: [] }],
+-          unresolvedPaths: [],
+-        } } }),
++        dir: root,
+       }), 0, `${label} layout must remain supported`);
+     } finally { console.log = originalLog; }
+     const decisionLine = lines.find((line) => line.startsWith("Architecture decisions: "));
+     assert.ok(decisionLine, `${label} must display task-scoped architecture decisions`);
+-    assert.equal(JSON.parse(decisionLine.slice("Architecture decisions: ".length)).areas[0].decisions[0].id, "ADR-0076");
++    const decisionSummary = JSON.parse(decisionLine.slice("Architecture decisions: ".length));
++    assert.equal(decisionSummary.schema, "pipeline.architecture-planning-decisions.v1");
++    assert.deepEqual(decisionSummary.areas, [], `${label} must not invent an effective decision for the unowned planned path`);
++    assert.deepEqual(decisionSummary.unresolvedPaths, ["src/change.mjs"], `${label} must display the actual task-scoped planning path`);
+     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
+   }
+ 
+   refused({ neutral: undefined, legacy: undefined }, "missing all calibrations with a requested command must not report implementation success");
+ }
+ 
++// QG-04: the original CLI fixture supplied this projection through a caller
++// readiness function. Current Source forbids that caller input from granting a
++// State witness. Keep the original ADR identity/summary obligation as a bounded
++// formatting unit check; it cannot authenticate an effective decision or enter
++// the calibration writer. The three layout cases above inspect real Source
++// readback and retain their original calibration-write assertions.
++{
++  const projection = { status: "advisory", areas: [{ area: "pipeline-core", status: "advisory",
++    decisions: [{ id: "ADR-0076", digest: "a".repeat(64), path: "docs/adr/0076.md" }], findings: [] }],
++    unresolvedPaths: [] };
++  const summary = summarizePlanningDecisionApplicability(projection);
++  assert.equal(summary.areas[0].decisions[0].id, "ADR-0076");
++  assert.equal(summary.areas[0].decisions[0].decisionSha256, "a".repeat(64));
++}
++
+ // NVA-B-CALIBRATION-PARTIAL-IO: an attempted first calibration write can truncate
+ // its target and then throw. The CLI must retain that possible companion mutation
+ // when State itself never commits; counting only completed writes falsely reports
+ // this observable partial write as zero mutation.
+ {
+-  const root = mktempProjectDir();
+-  const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
+-  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
+-    cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
+-  }
+-  writeFileSync(join(root, "AGENTS.md"), "Architecture: [map](architecture/map/index.md).\n", "utf8");
+-  mkdirSync(join(root, "specs/partial-calibration-io"), { recursive: true });
+-  writeFileSync(join(root, "specs/partial-calibration-io/prd.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
+-
+-  const calibration = { project: "partial-calibration-io", verify: "node --test old.mjs", handover: "docs/state.md" };
++  // QG-04: keep the injected partial-write examiner, but enter it through
++  // current approval and a committed baseline. The old hand-seeded approval
++  // and uncommitted calibration now correctly fail before the writer.
++  const root = mkdtempSync(join(nativeContractFixtureParent(), "partial-calibration-io-"));
++  prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
++  prepareCalibrationArchitectureFixture(root);
++  const calibration = { project: "partial-calibration-io", verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"", handover: "docs/state.md" };
+   const calibrationPath = join(root, "project", "pipeline.json");
+   const legacyPath = join(root, ".claude", "pipeline.json");
+-  const stateFile = join(root, "project", "pipeline-state.json");
++  const stateFile = statePath(root);
+   mkdirSync(join(root, "project"), { recursive: true });
+   mkdirSync(join(root, ".claude"), { recursive: true });
+   writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+   writeFileSync(legacyPath, `${JSON.stringify(calibration, null, 2)}\n`);
+-  writeFileSync(stateFile, JSON.stringify({
+-    schema: "pipeline.state.v0",
+-    activeFeature: { id: "partial-calibration-io", planPath: "specs/partial-calibration-io/prd.md", phase: "design" },
+-    planApproved: true,
+-    planApproval: { approvedBy: "PO", approvedAt: now },
+-  }, null, 2));
+-
+-  fixtureAdoption({
+-    rootDir: root,
+-    decision: "approved-scoped",
+-    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml", "specs/partial-calibration-io/"],
+-    rationale: "partial calibration test fixture",
+-  });
++  const committedBaseline = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "add", "--", "project/pipeline.json", ".claude/pipeline.json"], { encoding: "utf8" });
++  assert.equal(committedBaseline.status, 0, committedBaseline.stderr);
++  const baselineCommit = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "baseline calibration fixture"], { encoding: "utf8" });
++  assert.equal(baselineCommit.status, 0, baselineCommit.stderr);
++  const approved = JSON.parse(readFileSync(stateFile, "utf8"));
++  writeFileSync(stateFile, `${JSON.stringify({ ...approved, activeFeature: { ...approved.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });
+   const before = [readFileSync(calibrationPath, "utf8"), readFileSync(legacyPath, "utf8"), readFileSync(stateFile, "utf8")];
+   const originalWriteFileSync = fs.writeFileSync;
+   let injected = false;
+@@ -2058,11 +2099,7 @@ function awaitingApprovalFixture() {
+   syncBuiltinESMExports();
+   let captured;
+   try {
+-    captured = capturedStderr(() => run(["set-phase", "--phase", "implementation", "--verify-command", "node --test"], {
+-      dir: root,
+-      now: () => now,
+-      architectureEntryReadiness: () => ({ status: "ready" }),
+-    }));
++    captured = capturedStderr(() => run(["set-phase", "--phase", "implementation", "--verify-command", "node --test"], { dir: root }));
+   } finally {
+     fs.writeFileSync = originalWriteFileSync;
+     syncBuiltinESMExports();
+@@ -2085,47 +2122,35 @@ function awaitingApprovalFixture() {
+ // never a GS-10 override, never a `git commit --no-verify` bypass (neither guard
+ // nor git are invoked by this test at all: `run()` is called in-process).
+ {
+-  const root = mktempProjectDir();
+-  const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
+-  for (const directory of ["architecture", "backlog", "harness", "plugins/pipeline-core", "schemas"]) {
+-    cpSync(join(repositoryRoot, directory), join(root, directory), { recursive: true });
+-  }
+-  mkdirSync(join(root, "plugins/pipeline-core"), { recursive: true });
+-  writeFileSync(join(root, "plugins/pipeline-core/architecture-entry-plan.md"), "Implement plugins/pipeline-core/scripts/pipeline-state.mjs\n", "utf8");
++  // QG-04: retain the original phase and twin assertions against a genuine
++  // approved State and committed baseline; the old hand-seeded fixture could
++  // not satisfy the sanctioned calibration commit transition.
++  const root = mkdtempSync(join(nativeContractFixtureParent(), "phase-verify-deadlock-"));
++  prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
++  prepareCalibrationArchitectureFixture(root);
+   const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
+   mkdirSync(join(root, "project"), { recursive: true });
+-  mkdirSync(join(root, ".claude"), { recursive: true });
+   const calibration = { project: "new-project", verify: seededVerify, handover: "docs/state.md" };
+   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+-    schema: "pipeline.state.v0",
+-    activeFeature: { id: "verify-deadlock-repro", planPath: "plugins/pipeline-core/architecture-entry-plan.md", phase: "design" },
+-    planApproved: true,
+-    planApproval: { approvedBy: "PO", approvedAt: now },
+-  }, null, 2));
+-  fixtureAdoption({
+-    rootDir: root,
+-    decision: "approved-scoped",
+-    scope: ["plugins/pipeline-core/", "architecture/map/", "project/pipeline.json", "pipeline.user.yaml"],
+-    rationale: "verify deadlock architecture-ready fixture",
+-  });
+-  // This scenario isolates the verify-command deadlock. Architecture-entry
+-  // readiness has its own real-map/authority suite; inject that gate as ready
+-  // here so changing calibration does not turn the test into a profile-drift
+-  // test as well.
+-  const deps = { dir: root, now: () => now, architectureEntryReadiness: () => ({ status: "ready" }) };
++  const committedBaseline = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "add", "--", "project/pipeline.json", ".claude/pipeline.json"], { encoding: "utf8" });
++  assert.equal(committedBaseline.status, 0, committedBaseline.stderr);
++  const baselineCommit = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "baseline calibration fixture"], { encoding: "utf8" });
++  assert.equal(baselineCommit.status, 0, baselineCommit.stderr);
++  const approved = JSON.parse(readFileSync(statePath(root), "utf8"));
++  writeFileSync(statePath(root), `${JSON.stringify({ ...approved, activeFeature: { ...approved.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });
++  const deps = { dir: root };
+ 
+   // 1. A product-specific command is not a PO gate. The legacy placeholder is
+   // interpreted as baseline-only and implementation can start without another
+   // human turn. Release remains independently blocked by the producer.
+   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
+     "baseline-only verification must allow the approved plan to enter implementation");
+-  const baselineState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
++  const baselineState = JSON.parse(readFileSync(statePath(root), "utf8"));
+   assert.equal(baselineState.activeFeature.phase, "implementation");
+   assert.equal(JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8")).verify, seededVerify,
+     "the transition must not relabel the legacy placeholder as a full command");
+-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({ ...baselineState, activeFeature: { ...baselineState.activeFeature, phase: "design" } }, null, 2));
++  writeFileSync(statePath(root), JSON.stringify({ ...baselineState, activeFeature: { ...baselineState.activeFeature, phase: "design" } }, null, 2));
+ 
+   // 2. --verify-command carrying the placeholder text itself (or blank) is
+   // refused -- the deadlock's fix must never let the placeholder re-enter through
+@@ -2142,7 +2167,7 @@ function awaitingApprovalFixture() {
+   const realVerify = `${process.execPath} -e "process.exit(0)"`;
+   const applied = run(["set-phase", "--phase", "implementation", "--verify-command", realVerify], deps);
+   assert.equal(applied, 0, "set-phase --verify-command must succeed with a real command");
+-  const afterState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
++  const afterState = JSON.parse(readFileSync(statePath(root), "utf8"));
+   assert.equal(afterState.activeFeature.phase, "implementation", "phase must now be implementation");
+   const neutralCalibration = JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8"));
+   const legacyCalibration = JSON.parse(readFileSync(join(root, ".claude", "pipeline.json"), "utf8"));
+@@ -2162,7 +2187,7 @@ function awaitingApprovalFixture() {
+   // 5. Idempotent replay: once configured, re-entering implementation (e.g. after
+   // reopen-design) without --verify-command is no longer refused.
+   const revertedToDesign = { ...afterState, activeFeature: { ...afterState.activeFeature, phase: "design" } };
+-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify(revertedToDesign, null, 2));
++  writeFileSync(statePath(root), JSON.stringify(revertedToDesign, null, 2));
+   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,
+     "once the calibration already carries a real verify command, --verify-command is optional on replay");
+ }
+@@ -2195,7 +2220,7 @@ function awaitingApprovalFixture() {
+   const gitIn = (...args) => assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" }).status, 0, `git ${args.join(" ")}`);
+   gitIn("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+   gitIn("commit", "-q", "--no-verify", "-m", "seed unconfigured verify");
+-  const deps = { dir: root, architectureEntryReadiness: () => ({ status: "ready" }) };
++  const deps = { dir: root };
+ 
+   assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).activeFeature.phase, "implementation",
+     "the approved baseline must already have entered implementation through the sanctioned writer");
+@@ -2257,7 +2282,7 @@ function awaitingApprovalFixture() {
+   gitInMalformed("add", "--", "project/pipeline.json", ".claude/pipeline.json");
+   gitInMalformed("commit", "-q", "--no-verify", "-m", "seed malformed legacy twin");
+   const malformedNeutralBefore = readFileSync(join(malformedRoot, "project", "pipeline.json"), "utf8");
+-  const malformedAttempt = capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot, architectureEntryReadiness: () => ({ status: "ready" }) }));
++  const malformedAttempt = capturedStderr(() => run(["configure-verify", "--verify-command", realVerify], { dir: malformedRoot }));
+   assert.equal(malformedAttempt.result, 2);
+   assert.ok(malformedAttempt.lines.some((line) => line.includes("calibration tiers (unavailable)")),
+     `the malformed twin itself must be the refusal reason: ${malformedAttempt.lines.join(" ")}`);

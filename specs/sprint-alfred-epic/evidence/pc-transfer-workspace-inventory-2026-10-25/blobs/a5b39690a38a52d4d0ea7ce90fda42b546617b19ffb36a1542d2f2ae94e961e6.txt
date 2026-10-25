@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { lstatSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve, win32 } from "node:path";
+import test from "node:test";
+import { auditPackRequestPath, isSanctionedLifecycleCommand, resolveBoundArtifactPublicationInvocation } from "./command-catalogue.mjs";
+import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+import { AUDIT_PACK_SCRIPT } from "./constants.mjs";
+import { devPlanShellRefusalHit } from "./devplan-shell-lane.mjs";
+import { isNeverLiftableKernelPath } from "../guard-maintenance-window.mjs";
+
+const root = process.cwd();
+const script = "plugins/pipeline-core/scripts/audit-pack.mjs";
+const base = join(root, "scratch", "audit-pack-guard-fixtures");
+
+test("the admitted read-only audit CLI source is never liftable in project and installed roots", () => {
+  assert.equal(AUDIT_PACK_SCRIPT, join(root, script));
+  const installedPluginRoot = join(root, "scratch", "installed-pipeline-core");
+  for (const source of [script, "plugins/pipeline-core/scripts/publication-gate-evidence.mjs"]) {
+    assert.equal(isNeverLiftableKernelPath(join(root, source), { rootDir: root }), true, source);
+    assert.equal(isNeverLiftableKernelPath(join(installedPluginRoot, source.slice("plugins/pipeline-core/".length)),
+      { rootDir: root, livePluginRoot: installedPluginRoot }), true, source);
+  }
+});
+
+test("native Windows request separators normalize within the exact scratch boundary", () => {
+  const windowsRoot = "C:\\project";
+  const request = "C:\\project\\scratch\\request.json";
+  assert.equal(auditPackRequestPath(windowsRoot, request, win32), "scratch/request.json");
+  assert.equal(auditPackRequestPath(windowsRoot, "scratch\\request.json", win32), "scratch/request.json");
+  assert.equal(auditPackRequestPath(windowsRoot, "C:\\other\\scratch\\request.json", win32), null);
+  assert.equal(auditPackRequestPath(windowsRoot, "D:\\project\\scratch\\request.json", win32), null);
+  assert.equal(auditPackRequestPath(windowsRoot, "C:\\project\\scratch\\..\\scratch\\request.json", win32), null);
+  assert.equal(auditPackRequestPath(windowsRoot, "scratch\\.\\request.json", win32), null);
+  assert.equal(auditPackRequestPath(root, "scratch\\request.json"), null);
+});
+
+test("audit-pack exact read and publication verbs retain separate guard routes", () => {
+  mkdirSync(base, { recursive: true });
+  const fixture = mkdtempSync(join(base, "admission-"));
+  try {
+    const path = join(fixture, "request.json");
+    const relative = path.slice(root.length + 1).split("\\").join("/");
+    const command = (verb, requestPath = relative) => `node ${script} ${verb} --request ${requestPath}`;
+    const write = value => writeFileSync(path, `${JSON.stringify(value)}\n`);
+    write({ repositoryRoot: root, manifestPath: "specs/fixture/lifecycle.json", packId: "test-pack",
+      outputPath: "scratch/audit-packs/test-pack", criticPacketIds: [], approvalPairs: [], verifyEvidencePath: null });
+    assert.equal(resolveSanctionedScriptInvocation(command("plan"), root)?.script, AUDIT_PACK_SCRIPT);
+    assert.deepEqual(resolveSanctionedScriptInvocation(command("plan"), root)?.args, ["plan", "--request", relative]);
+    assert.equal(realpathSync(root), root);
+    assert.equal(realpathSync(path), path);
+    assert.equal(lstatSync(path).nlink, 1);
+    assert.equal(isSanctionedLifecycleCommand(command("plan"), root), true);
+    assert.equal(isNeverLiftableKernelPath(AUDIT_PACK_SCRIPT, { rootDir: root }), true);
+    assert.equal(isSanctionedLifecycleCommand(command("plan", path), root), true);
+    assert.equal(resolveBoundArtifactPublicationInvocation(command("plan"), root), null);
+    write({ repositoryRoot: root, packPath: "specs/fixture/evidence/audit-packs/test-pack" });
+    assert.equal(isSanctionedLifecycleCommand(command("verify"), root), true);
+    write({ repositoryRoot: root, plan: { pack: { featureId: "fixture", packId: "test-pack", outputPath: "scratch/audit-packs/test-pack" } } });
+    assert.equal(isSanctionedLifecycleCommand(command("build"), root), false);
+    assert.deepEqual(resolveBoundArtifactPublicationInvocation(command("build"), root),
+      { kind: "audit-pack-build", outputPath: "scratch/audit-packs/test-pack" });
+    write({ repositoryRoot: root, plan: { pack: { featureId: "fixture", packId: "test-pack", outputPath: "scratch/audit-packs/test-pack" } },
+      outputPath: "specs/fixture/evidence/audit-packs/test-pack" });
+    assert.equal(isSanctionedLifecycleCommand(command("publish"), root), false);
+    assert.deepEqual(resolveBoundArtifactPublicationInvocation(command("publish", path), root),
+      { kind: "audit-pack-publish", outputPath: "specs/fixture/evidence/audit-packs/test-pack" });
+    const observed = [];
+    const denied = devPlanShellRefusalHit(command("publish"), root, {
+      extractShellWriteTargetsFn: () => [],
+      devPlanGateVerdictFn: ({ filePath }) => { observed.push(filePath); return { verdict: "block", reason: "fixture-policy" }; },
+    });
+    assert.deepEqual(observed, ["specs/fixture/evidence/audit-packs/test-pack"]);
+    assert.equal(denied?.candidate, "specs/fixture/evidence/audit-packs/test-pack");
+    assert.equal(resolveBoundArtifactPublicationInvocation(`node ${script} publish --request ${resolve(root, "../foreign.json")}`, root), null);
+    assert.equal(resolveBoundArtifactPublicationInvocation(`node scratch/foreign-audit-pack.mjs publish --request ${relative}`, root), null);
+    assert.equal(resolveBoundArtifactPublicationInvocation(`${command("publish")} --extra`, root), null);
+    write({ repositoryRoot: root, plan: { pack: { featureId: "fixture", packId: "test-pack", outputPath: "scratch/audit-packs/test-pack" } },
+      outputPath: "specs/other/evidence/audit-packs/test-pack" });
+    assert.equal(resolveBoundArtifactPublicationInvocation(command("publish"), root), null);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});

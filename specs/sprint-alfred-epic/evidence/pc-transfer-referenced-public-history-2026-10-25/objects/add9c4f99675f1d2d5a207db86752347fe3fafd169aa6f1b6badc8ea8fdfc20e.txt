@@ -1,0 +1,66 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+
+const root = process.cwd();
+const packagePath = 'specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25';
+const packageRoot = path.join(root, packagePath);
+const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const failures = [];
+const checks = [];
+const record = (id, ok, detail) => {
+  checks.push({ id, status: ok ? 'pass' : 'fail', detail });
+  if (!ok) failures.push(id);
+};
+
+const index = JSON.parse(await fs.readFile(path.join(packageRoot, 'evidence-index.json'), 'utf8'));
+record('index-schema', index.schema === 'pipeline.portable-candidate-evidence-index.v1', index.schema);
+record('source-binding', index.candidate.source.commit === '821cd35c103e30a027ff5ea8f0a30f0362f40b8d' && index.candidate.source.tree === '375d3dfc3f9e9abb477ce8756fd749a7d77e76b8' && index.candidate.source.sourcePathCount === 36, 'Source commit/tree/path count');
+record('matrix-binding', index.candidate.matrix.commit === '61589901f9318ef0cf5c9eb8b45bc51830208bd1' && index.candidate.matrix.tree === '062a95fdf0b7c9f8680be0760e058f0e0876870d', 'matrix commit/tree');
+record('agy-attribution', index.userAttributedAGYDecision.nativeExecutionEvidence === false && index.userAttributedAGYDecision.concreteModelObserved === false && index.userAttributedAGYDecision.effortObserved === false, 'user attribution and unobserved runtime fields');
+record('pending-gates', index.evidenceLimits.integratedVerifyAndSecurity === 'pending parent' && index.evidenceLimits.independentBatchReview === 'pending parent' && index.evidenceLimits.poAcceptance === 'open', 'Verify, independent review, PO acceptance');
+
+for (const entry of index.reports) {
+  let original;
+  let derivative;
+  try {
+    original = await fs.readFile(path.join(root, entry.sourcePath));
+    derivative = await fs.readFile(path.join(packageRoot, entry.derivativePath));
+  } catch (error) {
+    record(`resolve:${entry.derivativePath}`, false, error.code ?? error.message);
+    continue;
+  }
+  record(`original-hash:${entry.derivativePath}`, sha256(original) === entry.sourceSha256 && original.length === entry.sourceBytes, entry.sourcePath);
+  record(`derivative-hash:${entry.derivativePath}`, sha256(derivative) === entry.derivativeSha256 && derivative.length === entry.derivativeBytes && entry.derivativeIsOriginalBytes === false, entry.derivativePath);
+  const body = derivative.toString('utf8');
+  record(`redaction:${entry.derivativePath}`, !/(?:\/home\/|\/Users\/|[A-Za-z]:\\Users\\)/.test(body) && !/(?:session|conversation|account|user)[-_ ]?(?:id|uuid)\s*[:=]\s*(?!\[redacted\])[^\s,;]+/i.test(body), 'no common absolute home path or labeled correlation ID');
+}
+
+for (const name of ['README.md', 'user-agy-decision.md']) {
+  const text = await fs.readFile(path.join(packageRoot, name), 'utf8');
+  const links = [...text.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]).filter((href) => !/^[a-z]+:\/\//i.test(href));
+  for (const href of links) {
+    try {
+      await fs.access(path.resolve(packageRoot, href));
+      record(`link:${name}:${href}`, true, 'resolves within package');
+    } catch {
+      record(`link:${name}:${href}`, false, 'target missing');
+    }
+  }
+  record(`no-machine-path:${name}`, !/(?:\/home\/|\/Users\/|[A-Za-z]:\\Users\\)/.test(text), 'no common absolute home path');
+}
+
+const output = {
+  schema: 'pipeline.portable-candidate-evidence-verification.v1',
+  command: 'node scratch/agent-out/portable-candidate-evidence/verify.mjs',
+  scope: packagePath,
+  owner: 'portable-candidate-evidence task worker',
+  exitCode: failures.length === 0 ? 0 : 1,
+  checkCount: checks.length,
+  passCount: checks.filter((item) => item.status === 'pass').length,
+  failCount: failures.length,
+  checks,
+};
+await fs.writeFile(path.join(packageRoot, 'verification.json'), `${JSON.stringify(output, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ artifact: `${packagePath}/verification.json`, exitCode: output.exitCode, checkCount: output.checkCount, passCount: output.passCount, failCount: output.failCount })}\n`);
+if (failures.length) process.exitCode = 1;

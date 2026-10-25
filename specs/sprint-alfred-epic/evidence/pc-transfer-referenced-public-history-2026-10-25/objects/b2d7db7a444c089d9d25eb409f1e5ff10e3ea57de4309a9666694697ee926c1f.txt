@@ -1,0 +1,16 @@
+// K132 measure: mirror vs source equality, manifest/pin self-consistency, installedInputs() result. Read-only. usage: node scratch/k132-measure.mjs <cloneDir>
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+const clone = resolve(process.argv[2]);
+const sha = (p) => createHash("sha256").update(readFileSync(`${clone}/${p}`)).digest("hex");
+const pairs = [
+  ["docs/product-capability-inventory.json", "plugins/pipeline-core/reader-inputs/product-capability-inventory.json"],
+  ["governance/observation-doc-governance.json", "plugins/pipeline-core/reader-inputs/observation-doc-governance.json"],
+  ["harness/reader-review-protocol.md", "plugins/pipeline-core/reader-inputs/reader-review-protocol.md"],
+];
+for (const [s, m] of pairs) console.log(m.split("/").at(-1), "mirror==source:", sha(s) === sha(m));
+console.log("manifest sha", sha("plugins/pipeline-core/reader-inputs/manifest.json"));
+const mod = await import(pathToFileURL(`${clone}/plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs`).href);
+try { console.log("installedInputs() ok", JSON.stringify(mod.installedInputs())); } catch (e) { console.log("installedInputs() FAILS:", e.message); }

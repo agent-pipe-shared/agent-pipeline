@@ -1,0 +1,13 @@
+// K141 helper: find which commit changed (not appended) an existing registry row after the recovery record; print removed lines.
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
+const root = resolve("scratch/clones/k141");
+const g = (...a) => execFileSync("git", ["-C", root, ...a], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+const commits = g("rev-list", "--first-parent", "--reverse", "b7c660282e168051455fab83c37c7261a83cc71d..HEAD", "--", "harness/verify-suites.json").trim().split("\n").filter(Boolean);
+console.log("registry-touching commits since b7c66:", commits.length);
+for (const c of commits) {
+  const d = g("show", "--format=%h %ad %s", "--date=short", "-U0", c, "--", "harness/verify-suites.json");
+  const lines = d.split("\n");
+  const removed = lines.filter((l) => l.startsWith("-") && !l.startsWith("---"));
+  if (removed.length > 0) console.log(lines[0], "REMOVED-LINES", removed.length, JSON.stringify(removed.slice(0, 3)).slice(0, 400));
+}

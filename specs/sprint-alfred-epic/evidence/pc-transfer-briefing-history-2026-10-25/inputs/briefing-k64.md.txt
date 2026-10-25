@@ -1,0 +1,29 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k64/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; replace `<name>` with `k64`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, `--glob`, multi-path rg, other pipelines and composed commands are refused. A `git commit` needs a clone identity: read `git config user.name` and `git config user.email` in the MAIN checkout and set them once with `git -C scratch/clones/k64 config user.name ...` and `... user.email ...` (use the values exactly as read, no hyphen substitution).
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K64-SMALL-FIXES/2026-10-23 · Role Goldfish`
+
+## Briefing K64-SMALL-FIXES: three small, independent corrections found by the 2026-10-23 reader and closure rounds
+
+### 1. Goal
+Readers and closure readers are fallible: verify each claim yourself before editing.
+
+A. AC-152, item `design-generator-repeats-large-source-material`: `intakeStagingGeneratedBanner` in `plugins/pipeline-core/lib/onboarding-continuity.mjs` (around lines 6960-6969; locate with `rg -n "intakeStagingGeneratedBanner" <that file>`) tells the reader of a generated PRD/Spec staging draft "do not hand-edit", which contradicts the design flow (the draft is elaborated before it is bound as authority; a similar sentence exists in `plugins/pipeline-core/lib/plan-authority-staging-guard.mjs` near line 60: read both, and the item's text `backlog/items/*-design-generator-repeats-large-source-material.md` section "Reconciled 2026-10-23" and its Acceptance). Reword the banner so it does not forbid the elaboration the flow requires, without weakening the real constraint (the staging file is not yet bound as project authority). Add ONE asserting case for the banner wording to `plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs` (RED first against the old wording, then GREEN). Check first with `rg -n "onboarding-continuity" plugins/pipeline-core/protected-baseline.json` and the kernel list in `plugins/pipeline-core/lib/guard-maintenance-window.mjs` (`NEVER_LIFTABLE_KERNEL_PATHS`) whether the file is protected: if it is, deliver a protected diff per the common briefing instead of committing.
+
+B. AC-201, pin `plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs`: two test titles still carry stale tags 'needs protected patch P21-07C' (around line 42) and 'P21-07D' (around line 229), although the stored-patch preflight is built (`lib/human-guard-override.mjs`, commit 724e9db87). Verify that the cases they title now run and pass without a patch (run the pin alone before and after), then remove ONLY the stale tag text from the titles (keep the case ids and every assertion; a test-title change is not an assertion change, but say so in the commit message with QG-04 noted).
+
+C. K6 digest pins: `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json` holds digest pins that a closure reader found stale. Find what reads it (`rg -l "codex-isolated-critic-protected-preimage" plugins/pipeline-core/scripts` and `.../lib`, one directory each) and which test checks the pins, run that test alone to see the exact mismatch, then regenerate the pins with the script or function that owns them if there is one (never hand-compute digests if a generator exists); if the pins protect a protected file's preimage and the file legitimately changed, update them only through the owner. Report before/after for the test. If this file or its owner is protected, deliver a protected diff instead.
+
+### 2. Context files
+The files named above; `backlog/items/*-design-generator-repeats-large-source-material.md`; `guardrails/quality-gates.md` (QG-04).
+
+### 3. DoD checks
+For each part the test(s) it touches before/after with counts (A: pin file +1 case; B: identical counts; C: the pin test from red to green or the exact reason it cannot). `node --test scratch/clones/k64/harness/scripts/check-consumer-safe-paths.test.mjs` passes. Heavy suites strictly one at a time, in the foreground. One commit per lettered part by explicit pathspec; message files under the clone's `scratch/commit-msg/`; Conventional Commits; trailers exactly `AI-Assisted: true` and `Dispatch: K64-SMALL-FIXES (goldfish)`.
+
+### 4. Forbidden
+Anything beyond the three parts; `CLAUDE.md`, `.claude/**`, `docs/state.md`, `specs/**`, `backlog/**` edits; touching the MAIN checkout other than writing `scratch/agent-out/*`; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths or secrets in any file; Advisor; weakening any existing assertion.
+
+### 5. Stop conditions
+A part whose premise is false (report, skip it); the fix needing a protected edit (deliver the diff, do not commit); more than 2 failed attempts at one problem; tool budget at 80 percent (commit what is green, report the rest).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k64`. Tool budget: base cap 70, closing allowance +5. TASK_ID: K64-SMALL-FIXES. Status wording per the common briefing (never "done").

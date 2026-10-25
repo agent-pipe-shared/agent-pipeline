@@ -1,0 +1,29 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 32d911ffc..b9afef2e8 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1083,6 +1083,7 @@
+         "verify-phase:harness/scripts/verify.mjs:verify-selection-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-append-history-check",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-append-history-tests",
++        "verify-phase:harness/scripts/verify.mjs:required-evidence-not-ignored-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-append-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
+         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 8724cf75a..2d202ba43 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3652,6 +3652,12 @@
+       "file": "plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs",
+       "invariantPinned": "A recorded dispatch-budget grant is announced to the agent with its state and continuation, from the counter state the hook holds (D75 B)",
+       "nonOverlapNote": "Unique test suite for the grant notice path of hooks/guard-dispatch-budget.mjs"
++    },
++    {
++      "name": "required-evidence-not-ignored-tests",
++      "file": "harness/scripts/check-required-evidence-not-ignored.test.mjs",
++      "invariantPinned": "Evidence that a tracked index, manifest or check needs is never ignored, untracked or inside the git directory; each violation carries a typed REQ-EVIDENCE code (D101)",
++      "nonOverlapNote": "Unique test suite for harness/scripts/check-required-evidence-not-ignored.mjs"
+     }
+   ]
+ }

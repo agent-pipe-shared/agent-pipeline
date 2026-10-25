@@ -1,0 +1,159 @@
+{
+  "taskId": "rename-content-marker-preservation-20260929",
+  "rulesetSha": "f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6",
+  "dispatcher": "Root",
+  "actualModel": "gpt-6-sol/medium",
+  "readySessionContinuation": true,
+  "rows": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
+      "preimageSha256": "b53435d83e0621f49951c8360fd5b522a333fd944505075b24832e72caa248cb",
+      "postimageSha256": "d215709b2c5186b5b5f958a68d23d1627e395e89dfe775f7e939f2bea85d090b",
+      "actualSourceSha256": "d215709b2c5186b5b5f958a68d23d1627e395e89dfe775f7e939f2bea85d090b",
+      "postimage": "scratch/0.7-rename-content-marker-preservation-20260929/postimages/0.txt",
+      "patch": "scratch/0.7-rename-content-marker-preservation-20260929/source-0.patch",
+      "patchSha256": "7e7132c1cc3651503fa07f8ef456afde1f1bff1a713f843348a42a1cfda2e362",
+      "delivered": true
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+      "preimageSha256": "b8d383bc6ef3664f1aca02af218436936fe7f1d74164a06c0f27cc9fe1688843",
+      "postimageSha256": "fcfaf46aeecbc1131df4fa810bd99baac1692093c83546975951d6b03f11bd4c",
+      "actualSourceSha256": "fcfaf46aeecbc1131df4fa810bd99baac1692093c83546975951d6b03f11bd4c",
+      "postimage": "scratch/0.7-rename-content-marker-preservation-20260929/postimages/1.txt",
+      "patch": "scratch/0.7-rename-content-marker-preservation-20260929/source-1.patch",
+      "patchSha256": "249947635827e4e7409d26cc8a1438356f9ffe29cb44f460d666f0677810e1de",
+      "delivered": true
+    }
+  ],
+  "inverse": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
+      "equal": true,
+      "sha256": "b53435d83e0621f49951c8360fd5b522a333fd944505075b24832e72caa248cb",
+      "expected": "b53435d83e0621f49951c8360fd5b522a333fd944505075b24832e72caa248cb"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs",
+      "equal": true,
+      "sha256": "b8d383bc6ef3664f1aca02af218436936fe7f1d74164a06c0f27cc9fe1688843",
+      "expected": "b8d383bc6ef3664f1aca02af218436936fe7f1d74164a06c0f27cc9fe1688843"
+    }
+  ],
+  "syntax": [
+    {
+      "command": [
+        "<home>/.local/lib/node-v24.15.0/bin/node",
+        "--check",
+        "plugins/pipeline-core/hooks/guard-apply-patch.mjs"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    },
+    {
+      "command": [
+        "<home>/.local/lib/node-v24.15.0/bin/node",
+        "--check",
+        "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs"
+      ],
+      "exitCode": 0,
+      "stderr": ""
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "sha256": "e5629b80a205ff3b02818855eb7c9a145ff9e8f7ba1071e953225308c59af9e8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-staging-authoring.mjs",
+      "sha256": "bca262a31d1888b8edfc4207c43bdeb69abde69664bae957cbdf8447c38cef8c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "8dc05229943d816b03463649143eddfd51cae74bd1be40a796ffd28032d60554"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+      "sha256": "44cf3f6d9ed811afd53b93483d4550fe264d75ed2e1f2cf92da6ec52108c3fe5"
+    }
+  ],
+  "directed": {
+    "command": [
+      "bwrap",
+      "--unshare-net",
+      "--ro-bind",
+      "/",
+      "/",
+      "--dev",
+      "/dev",
+      "--proc",
+      "/proc",
+      "--tmpfs",
+      "/tmp",
+      "--setenv",
+      "HOME",
+      "/tmp/rename-test-home",
+      "--setenv",
+      "USERPROFILE",
+      "/tmp/rename-test-home",
+      "--setenv",
+      "PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE",
+      "/tmp/rename-test-home",
+      "--setenv",
+      "TMPDIR",
+      "/tmp",
+      "--chdir",
+      "<repo-root>",
+      "<home>/.local/lib/node-v24.15.0/bin/node",
+      "scratch/0.7-rename-content-marker-preservation-20260929/directed.mjs"
+    ],
+    "exitCode": 0,
+    "signal": null,
+    "error": null,
+    "Source": "read-only",
+    "network": "unshared",
+    "operatorHome": "private /tmp",
+    "providerCalls": 0,
+    "result": {
+      "qualification": "exact Source changed callbacks plus unchanged inactive control; actual parser/translation and actual lifecycle predicate; no readiness bypass",
+      "passed": 5,
+      "total": 5,
+      "cases": [
+        {
+          "name": "EOF07 inactive governance remains an unconditional hook no-op",
+          "pass": true
+        },
+        {
+          "name": "RCM01 renamed acknowledgement content reaches the writer-only denial with and without EOF",
+          "pass": true
+        },
+        {
+          "name": "RCM02 innocuous renamed content never claims an acknowledgement fact",
+          "pass": true
+        },
+        {
+          "name": "RCM03 a fact observed before Move to also protects its destination",
+          "pass": true
+        },
+        {
+          "name": "RCM04 rename facts stay within their own file operation",
+          "pass": true
+        }
+      ]
+    }
+  },
+  "previous": {
+    "manifest": "scratch/0.7-native-eof-marker-support-20260929/manifest.json",
+    "sha256": "22c339d4599563880ef0e57ba640da90246c18f877b4eb8dfd8051f04c409744",
+    "fullSuite": {
+      "passed": 18,
+      "failed": 5,
+      "exitCode": 1,
+      "receipt": "scratch/0.7-native-eof-marker-support-20260929/full.receipt.json",
+      "qualification": "prior actual Source receipt preserved; no full rerun"
+    }
+  },
+  "scope": "content scan only; existing path/parser/lifecycle rules and all prior callbacks unchanged",
+  "qualification": "changed directed controls5/5; no whole-candidate PASS, installation or native authorship claim"
+}

@@ -1,0 +1,18 @@
+command: node --test plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs
+label: g20-publication-guard-final
+exitCode: 0
+head: 7dddb672cc829341911a076e18570b5a26091802
+tree: 39c661c79cbeb3431415f83dabb79c2c1192b5d8
+dirty: true
+--- stdout ---
+✔ guard uses the proposed push commit for review, despite HEAD and dirty package changes (7929.515886ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8583.024762
+
+--- stderr ---

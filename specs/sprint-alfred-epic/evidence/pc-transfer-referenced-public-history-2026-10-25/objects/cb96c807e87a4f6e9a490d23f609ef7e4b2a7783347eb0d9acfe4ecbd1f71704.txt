@@ -1,0 +1,1329 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+  IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS,
+  VENDORED_LINK_EXCLUSIONS,
+  checkRepository,
+  checkConsumerRepositoryExamples,
+  checkMaintainerAudienceBoundaries,
+  checkStatefulDesignContracts,
+  collectAnchors,
+  extractMarkdownLinks,
+  isExcludedRepoPath,
+  stripFencedCode,
+  stripHtmlComments,
+  stripInlineCode,
+} from "./check-doc-contracts.mjs";
+import {
+  MANIFEST_PATHS,
+  checkEnforcementDocument,
+  compareEnforcementRegistrations,
+  collectEnforcementRegistrations,
+  escapeMarkdownCell,
+  parseEnforcementCliArgs,
+  renderEnforcementDocument,
+} from "./generate-enforcement-doc.mjs";
+import {
+  READER_REVIEW_PATHS,
+  checkReaderBinding,
+  snapshotReaderDocumentation,
+} from "./check-doc-reader-binding.mjs";
+
+const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.url));
+const ENFORCEMENT_SCRIPT = fileURLToPath(new URL("./generate-enforcement-doc.mjs", import.meta.url));
+const READER_BINDING_SCRIPT = fileURLToPath(new URL("./check-doc-reader-binding.mjs", import.meta.url));
+const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+const roots = [];
+const EXPECTED_READER_REVIEW_PATHS = [
+  "GEMINI.md",
+  "PIPELINE_FLOW.de.md",
+  "PIPELINE_FLOW.md",
+  "README.md",
+  "SETUP.md",
+  "docs/README.md",
+  "docs/audit-and-evidence.md",
+  "docs/audit-bundles.md",
+  "docs/cost-and-measurement.md",
+  "docs/enforcement.md",
+  "docs/overview.md",
+  "docs/parallel-work.md",
+  "docs/security-controls.md",
+  "docs/sprint-alfred-completion-report.md",
+  "docs/usage.md",
+  "docs/v3-consumer-onboarding.md",
+];
+const READER_RECORD_PATH = "specs/reader-binding/evidence/reader-review/record.json";
+const READER_DISPOSITION_PATH = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
+
+test("consumer operation documents reject source-checkout plugin commands", () => {
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/usage.md": "node <plugin-root>/scripts/verify-evidence-producer.mjs --root <project-root>",
+    "docs/push-release-flow.md": "node \"${PIPELINE_PLUGIN_ROOT}/scripts/push-init.mjs\" --root <repo>",
+  }), []);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/usage.md": "node plugins/pipeline-core/scripts/verify-evidence-producer.mjs --root <project-root>",
+  }), [
+    "consumer-command: docs/usage.md: use <plugin-root> or PIPELINE_PLUGIN_ROOT, never plugins/pipeline-core from a source checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/usage.md": "Run this repository's Verify command before release.",
+  }), [
+    "consumer-perspective: docs/usage.md: address the consuming project, not this source repository or checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "GEMINI.md": "Read AGENTS.md before working in this repository.",
+  }), [
+    "consumer-perspective: GEMINI.md: address the consuming project, not this source repository or checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "docs/v3-consumer-onboarding.md": "claude plugin install pipeline-core@agent-pipeline-local --scope project",
+  }), [
+    "consumer-marketplace: docs/v3-consumer-onboarding.md: consumer instructions must use the released GitHub marketplace selector, never agent-pipeline-local",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "SETUP.md": [
+      "node <plugin-root>/scripts/toolchain-preflight.mjs --root <project-root>",
+      "## B. Maintain a shared pipeline source (occasional)",
+      "node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root \"$PWD\"",
+    ].join("\n"),
+  }), []);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "SETUP.md": "node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root <project-root>",
+  }), [
+    "consumer-command: SETUP.md: use <plugin-root> or PIPELINE_PLUGIN_ROOT, never plugins/pipeline-core from a source checkout",
+  ]);
+  assert.deepEqual(checkConsumerRepositoryExamples({
+    "SETUP.md": [
+      "Prepare this checkout before installation.",
+      "## B. Maintain a shared pipeline source (occasional)",
+      "This repository is the source-maintenance checkout.",
+    ].join("\n"),
+  }), [
+    "consumer-perspective: SETUP.md: address the consuming project, not this source repository or checkout",
+  ]);
+});
+
+test("local marketplace development guides retain an explicit maintainer boundary", () => {
+  assert.deepEqual(checkMaintainerAudienceBoundaries({
+    "docs/claude-local-plugin-development.md": "> Maintainer-only guide. Consumer repositories use the released plugin.",
+    "docs/codex-local-plugin-development.md": "> Maintainer-only guide. Consumer repositories use the released plugin.",
+  }), []);
+  assert.deepEqual(checkMaintainerAudienceBoundaries({
+    "docs/claude-local-plugin-development.md": "# Claude local plugin development\n\nUse a local marketplace.",
+  }), [
+    "maintainer-audience: docs/claude-local-plugin-development.md: local-development instructions must begin with the Maintainer-only guide marker",
+  ]);
+});
+
+function linkFixtureDirectory(target, path) {
+  symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+}
+
+function linkFixtureFileOrClassifyUnavailable(t, target, path) {
+  try {
+    symlinkSync(target, path, "file");
+    return true;
+  } catch (error) {
+    if (process.platform === "win32" && error?.code === "EPERM") {
+      t.skip("native Windows standard account cannot create file-symlink security fixtures without Developer Mode");
+      return false;
+    }
+    throw error;
+  }
+}
+
+const STATEFUL_DESIGN_CONTRACTS = [
+  {
+    id: "authority-issuer-replay",
+    template: "Authority issuer and replay rule.",
+    elephant: "authority issuer and replay rule",
+  },
+  {
+    id: "durable-storage-atomicity",
+    template: "Durable storage and atomicity boundary.",
+    elephant: "durable storage and atomicity",
+  },
+  {
+    id: "crash-state-matrix",
+    template: "Complete resource/phase crash-state matrix.",
+    elephant: "complete resource/phase crash-state matrix",
+  },
+  {
+    id: "mutation-enforcement",
+    template: "Exact mutation point and kernel/controller enforcement point.",
+    elephant: "exact mutation plus kernel/controller enforcement points",
+  },
+  {
+    id: "bootstrap-self-update",
+    template: "Bootstrap and self-update transition.",
+    elephant: "bootstrap/self-update transition",
+  },
+  {
+    id: "candidate-evidence-binding",
+    template: "Binary candidate/evidence binding.",
+    elephant: "binary candidate/evidence binding",
+  },
+  {
+    id: "pre-post-bytes",
+    template: "Exact pre- and post-mutation bytes.",
+    elephant: "exact pre/post bytes",
+  },
+  {
+    id: "sole-recovery-authority",
+    template: "Sole recovery authority.",
+    elephant: "sole recovery authority",
+  },
+  {
+    id: "self-reference-audit",
+    template: "Self-reference audit (what mutable material cannot authenticate itself).",
+    elephant: "self-reference audit",
+  },
+];
+
+function write(root, path, content) {
+  const file = join(root, path);
+  mkdirSync(resolve(file, ".."), { recursive: true });
+  writeFileSync(file, content);
+}
+
+function fixture(overrides = {}) {
+  const root = mkdtempSync(join(tmpdir(), "doc-contracts-"));
+  roots.push(root);
+  const files = {
+    ".claude/pipeline.json": '{"handover":"docs/state.md"}\n',
+    "CLAUDE.md": "# Rules\n\n[State](docs/state.md)\n",
+    "docs/state.md": "# State\n\n[Calibration](../.claude/pipeline.json)\n",
+    "README.md": "# Home\n\n[State](docs/state.md#state)\n",
+    ...overrides,
+  };
+  for (const [path, content] of Object.entries(files)) {
+    if (content !== null) write(root, path, content);
+  }
+  return { root, files };
+}
+
+function runFixture(root, extra = {}) {
+  const trackedPaths = extra.trackedPaths ?? [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"];
+  const markdownPaths = extra.markdownPaths ?? trackedPaths.filter((path) => path.endsWith(".md"));
+  return checkRepository(root, { trackedPaths, markdownPaths, readText: extra.readText });
+}
+
+function enforcementFixture() {
+  const { root } = fixture();
+  for (const path of Object.values(MANIFEST_PATHS)) write(root, path, readFileSync(join(REPO, path), "utf8"));
+  write(root, "docs/enforcement.md", renderEnforcementDocument({ rootDir: root }));
+  return {
+    root,
+    trackedPaths: [
+      ".claude/pipeline.json",
+      "CLAUDE.md",
+      "docs/state.md",
+      "README.md",
+      "docs/enforcement.md",
+      ...Object.values(MANIFEST_PATHS),
+    ],
+  };
+}
+
+function runEnforcementCli(root, args) {
+  return spawnSync(process.execPath, [ENFORCEMENT_SCRIPT, ...args, "--root", root], { encoding: "utf8" });
+}
+
+function sha256Bytes(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function gitFixture(root, args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function commitFixture(root, paths, message) {
+  gitFixture(root, ["add", "--", ...paths]);
+  gitFixture(root, ["commit", "-q", "-m", message]);
+  return gitFixture(root, ["rev-parse", "HEAD"]);
+}
+
+function readerBindingFixture({ malformedRecord = false, invalidUtf8Record = false, missingRecord = false, resolvedFindings = false } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "reader-binding-"));
+  roots.push(root);
+  for (const path of READER_REVIEW_PATHS) write(root, path, `# ${path}\n\nReader fixture.\n`);
+  write(root, "docs/product-capability-inventory.json", "{}\n");
+  write(root, "governance/observation-doc-governance.json", "{}\n");
+  write(root, "harness/reader-review-protocol.md", "# Reader protocol\n");
+  gitFixture(root, ["init", "-q"]);
+  gitFixture(root, ["config", "user.email", "fixture@example.test"]);
+  gitFixture(root, ["config", "user.name", "Fixture"]);
+  let reviewedCommit = commitFixture(root, ["."], "reviewed state");
+  let resolutionCommit = null;
+  if (resolvedFindings) {
+    write(root, "README.md", "# README.md\n\nResolved reader finding.\n");
+    resolutionCommit = commitFixture(root, ["README.md"], "resolve reader finding");
+    reviewedCommit = resolutionCommit;
+  }
+  if (missingRecord) return { root, reviewedCommit, candidateCommit: reviewedCommit };
+  if (malformedRecord || invalidUtf8Record) {
+    write(root, "specs/reader-binding/evidence/reader-review/record.json", invalidUtf8Record ? Buffer.from([0xff]) : "{not json}\n");
+    const candidateCommit = commitFixture(root, ["specs/reader-binding/evidence/reader-review/record.json"], "malformed record");
+    return { root, reviewedCommit, candidateCommit };
+  }
+  const snapshot = snapshotReaderDocumentation({ root, candidate: reviewedCommit, featureId: "reader-binding" });
+  const phaseOnePath = "specs/reader-binding/evidence/reader-review/phase-one/round-1.md";
+  const phaseTwoPath = "specs/reader-binding/evidence/reader-review/phase-two/round-1.md";
+  const dispositionPath = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
+  write(root, phaseOnePath, "# Phase one\n\nNo findings.\n");
+  write(root, phaseTwoPath, "# Phase two\n\nNo findings.\n");
+  const findings = resolvedFindings
+    ? [
+      { id: "cut-1", class: "cut", status: "resolved", resolutionCommit },
+      { id: "reordering-1", class: "reordering", status: "no-change", resolutionCommit: null },
+    ]
+    : [];
+  write(root, dispositionPath, `${JSON.stringify({ schema: "pipeline.doc-reader-disposition.v1", round: "round-1", status: resolvedFindings ? "resolved" : "no-findings", findings })}\n`);
+  const record = {
+    schema: "pipeline.doc-reader-binding-record.v1",
+    reviewedCommit,
+    reviewedTree: gitFixture(root, ["rev-parse", `${reviewedCommit}^{tree}`]),
+    docsetSha256: snapshot.docsetSha256,
+    coverage: snapshot.coverage,
+    inputs: snapshot.inputs,
+    phaseOne: { path: phaseOnePath, sha256: sha256Bytes(join(root, phaseOnePath)) },
+    phaseTwo: { path: phaseTwoPath, sha256: sha256Bytes(join(root, phaseTwoPath)) },
+    disposition: { path: dispositionPath, sha256: sha256Bytes(join(root, dispositionPath)) },
+  };
+  write(root, READER_RECORD_PATH, `${JSON.stringify(record)}\n`);
+  const candidateCommit = commitFixture(root, ["specs/reader-binding/evidence/reader-review"], "reader closure");
+  return { root, reviewedCommit, candidateCommit };
+}
+
+function readReaderRecord(root) { return JSON.parse(readFileSync(join(root, READER_RECORD_PATH), "utf8")); }
+function writeReaderRecord(root, record) { write(root, READER_RECORD_PATH, `${JSON.stringify(record)}\n`); }
+function readReaderDisposition(root) { return JSON.parse(readFileSync(join(root, READER_DISPOSITION_PATH), "utf8")); }
+function writeReaderDisposition(root, disposition) { write(root, READER_DISPOSITION_PATH, `${JSON.stringify(disposition)}\n`); }
+
+test.after(() => {
+  for (const root of roots) {
+    chmodSync(root, 0o700);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fenced code is removed without losing line structure", () => {
+  const value = "ok\n```md\n[bad](missing.md)\n```\nend";
+  assert.equal(stripFencedCode(value), "ok\n\n\n\nend");
+});
+
+test("HTML comments are removed to a fixed point without preserving nested delimiters", () => {
+  assert.equal(stripHtmlComments("before<!-- hidden -->after"), "beforeafter");
+  assert.equal(stripHtmlComments("before<!-- outer <!-- inner -->after"), "beforeafter");
+  assert.equal(stripHtmlComments("before<!-- unterminated"), "before");
+});
+
+test("anchors implement unicode, explicit ids, setext, and duplicate suffixes", () => {
+  const anchors = collectAnchors("# Über & under\n# Repeat\n# Repeat-1\n# Repeat\nSetext\n---\n<a id=\"Exact-ID\"></a>\n");
+  for (const anchor of ["über--under", "repeat", "repeat-1", "repeat-2", "setext", "Exact-ID", "exact-id"]) assert(anchors.has(anchor));
+  const independent = collectAnchors('<a id="foo"></a>\n# Foo\n# Foo\n');
+  assert(independent.has("foo"));
+  assert(independent.has("foo-1"));
+  assert(!independent.has("foo-2"));
+});
+
+test("collectAnchors scopes to the half above a DE-REFERENCE-BELOW marker", () => {
+  const bilingual =
+    "# English Heading\n\n<a id=\"planted-alias\"></a>\n\n<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a German reader copy. -->\n\n# Deutsche Überschrift\n\n<a id=\"other-alias\"></a>\n";
+  const anchors = collectAnchors(bilingual);
+  assert(anchors.has("english-heading"));
+  assert(anchors.has("planted-alias"));
+  assert(!anchors.has("deutsche-überschrift"));
+  assert(!anchors.has("other-alias"));
+  const monolingual = collectAnchors("# English Heading\n\n# Deutsche Überschrift\n");
+  assert(monolingual.has("english-heading"));
+  assert(monolingual.has("deutsche-überschrift"));
+});
+
+test("a link into the German half of a bilingual doc fails the anchor check", () => {
+  const { root } = fixture({
+    "docs/state.md":
+      "# State\n\n[Calibration](../.claude/pipeline.json)\n\n<a id=\"english-alias\"></a>\n\n<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a German reader copy. -->\n\n<a id=\"german-alias\"></a>\n",
+    "README.md": "# Home\n\n[Reachable](docs/state.md#english-alias) [Unreachable](docs/state.md#german-alias)\n",
+  });
+  const reasons = runFixture(root).findings.join("\n");
+  assert.match(reasons, /README\.md:3 -> docs\/state\.md#german-alias: anchor not found/);
+  assert.doesNotMatch(reasons, /english-alias/);
+});
+
+test("inline and reference links are extracted while fenced fakes are ignored", () => {
+  const links = extractMarkdownLinks(
+    '[ref]: docs/state.md#state\n[A](README.md)\n[B][ref]\n[C](missing_(v1).md)\n[D](missing.md "Title")\n[E](<angle.md> \'Title\')\n```\n[X](missing.md)\n```\n',
+  );
+  assert.deepEqual(links.map((entry) => entry.destination), [
+    "docs/state.md#state",
+    "README.md",
+    "docs/state.md#state",
+    "missing_(v1).md",
+    "missing.md",
+    "angle.md",
+  ]);
+});
+
+test("inline code spans are blanked without losing line structure", () => {
+  const spanA = "`[a-z][a-z0-9-]{0,63}`";
+  const spanB = "``two``";
+  const value = `before ${spanA} middle ${spanB} end`;
+  const expected = value.replace(spanA, " ".repeat(spanA.length)).replace(spanB, " ".repeat(spanB.length));
+  assert.equal(stripInlineCode(value), expected);
+  assert.equal(stripInlineCode(value).length, value.length);
+});
+
+test("a regex character class in a single-backtick code span is not read as a reference-style link", () => {
+  const links = extractMarkdownLinks(
+    "the pattern `[a-z][a-z0-9-]{0,63}` matches bounded ID slugs.\n",
+  );
+  assert.deepEqual(
+    links.filter((link) => link.kind === "missing-reference"),
+    [],
+  );
+  assert.deepEqual(links, []);
+});
+
+test("a genuine broken reference-style link outside any code span is still reported missing-reference", () => {
+  const links = extractMarkdownLinks("see [Missing][undefined-ref] for details.\n");
+  assert.deepEqual(links, [{ destination: null, referenceId: "undefined-ref", line: 1, kind: "missing-reference" }]);
+});
+
+test("a code-span look-alike does not suppress a genuine broken reference-style link on the same line", () => {
+  const links = extractMarkdownLinks(
+    "the pattern `[a-z][a-z0-9-]{0,63}` is unrelated to [Missing][undefined-ref] here.\n",
+  );
+  assert.deepEqual(links, [{ destination: null, referenceId: "undefined-ref", line: 1, kind: "missing-reference" }]);
+});
+
+test("minimal repository passes", () => {
+  const { root } = fixture();
+  const result = runFixture(root);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.statefulDesignContracts, "not-applicable");
+});
+
+test("missing file and missing anchor fail", () => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Missing](no.md) [Anchor](docs/state.md#absent)\n" });
+  const reasons = runFixture(root).findings.join("\n");
+  assert.match(reasons, /target is not tracked/);
+  assert.match(reasons, /anchor not found/);
+});
+
+test("same-document fragments resolve against the source file", () => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Local](#home)\n" });
+  assert.deepEqual(runFixture(root).findings, []);
+});
+
+test("external URLs are never fetched and directory links are accepted", () => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Web](https://invalid.example/x) [Docs](docs/)\n" });
+  assert.deepEqual(runFixture(root).findings, []);
+});
+
+test("absolute and escaping paths fail closed", () => {
+  const { root } = fixture({ "README.md": '# Home\n\n[A](/etc/passwd) [B](../outside.md "Title") [C](<../angle.md> \'Title\')\n' });
+  const reasons = runFixture(root).findings.join("\n");
+  assert.match(reasons, /absolute internal path/);
+  assert.equal((reasons.match(/escapes repository root/g) ?? []).length, 2);
+});
+
+test("untracked Markdown sources are outside the exact-tree scan", () => {
+  const { root } = fixture({ "scratch.md": Buffer.from([0xff, 0xfe]) });
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["add", "--", ".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"], { cwd: root });
+  const result = checkRepository(root);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.markdownFiles, 3);
+});
+
+test("excluded instruction path is filtered before every source and target read", () => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Excluded](AGENTS.md)\n", "AGENTS.md": Buffer.from([0xff, 0xfe]) });
+  const reads = [];
+  const readText = (file) => {
+    const rel = relative(root, file).split("\\").join("/");
+    reads.push(rel);
+    if (isExcludedRepoPath(rel)) throw new Error("forbidden read");
+    return execFileSync(process.execPath, ["-e", "process.stdout.write(require('fs').readFileSync(process.argv[1]))", file], { encoding: "utf8" });
+  };
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "AGENTS.md"],
+    markdownPaths: ["AGENTS.md", "CLAUDE.md", "docs/state.md", "README.md"],
+    readText,
+  });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.excludedLinks, 1);
+  assert(!reads.includes("AGENTS.md"));
+});
+
+test("internal symlink aliases cannot bypass the excluded instruction path", () => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Excluded](alias/AGENTS.md)\n", "AGENTS.md": Buffer.from([0xff, 0xfe]) });
+  linkFixtureDirectory(root, join(root, "alias"));
+  const reads = [];
+  const readText = (file) => {
+    const rel = relative(root, file).split("\\").join("/");
+    reads.push(rel);
+    if (rel.endsWith("AGENTS.md")) throw new Error("forbidden read");
+    return execFileSync(process.execPath, ["-e", "process.stdout.write(require('fs').readFileSync(process.argv[1]))", file], { encoding: "utf8" });
+  };
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "alias/AGENTS.md"],
+    readText,
+  });
+  assert.deepEqual(result.findings, []);
+  assert(!reads.includes("alias/AGENTS.md"));
+});
+
+test("isExcludedRepoPath: archived and immutable reader evidence are directory-prefix exclusions, AGENTS.md stays exact-match only", () => {
+  assert.equal(isExcludedRepoPath("docs/state-archive"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive/anything.md"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive/nested/deep.md"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive-not-really/foo.md"), false);
+  assert.equal(isExcludedRepoPath("specs/sprint-nova-epic/evidence/reader-review/phase-one/r5.md"), true);
+  assert.equal(isExcludedRepoPath("specs/sprint-nova-epic/evidence/reader-review-notes/r5.md"), false);
+  assert.equal(isExcludedRepoPath("specs/sprint-alfred-epic/evidence/reader-review/phase-one/r5.md"), true);
+  assert.equal(isExcludedRepoPath("specs/sprint-alfred-epic/evidence/reader-review-notes/r5.md"), false);
+  assert.equal(isExcludedRepoPath("AGENTS.md"), true);
+  assert.equal(isExcludedRepoPath("AGENTS.mdx"), false);
+});
+
+test("a Markdown source under docs/state-archive/ is never scanned, even when its internal links would otherwise fail", () => {
+  const { root } = fixture({
+    "docs/state-archive/2026-08-19--rotation.md": "# Archived\n\n[Stale](../../old/path/that/no/longer/exists.md)\n",
+  });
+  const reads = [];
+  const readText = (file) => {
+    const rel = relative(root, file).split("\\").join("/");
+    reads.push(rel);
+    return execFileSync(process.execPath, ["-e", "process.stdout.write(require('fs').readFileSync(process.argv[1]))", file], { encoding: "utf8" });
+  };
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "docs/state-archive/2026-08-19--rotation.md"],
+    markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", "docs/state-archive/2026-08-19--rotation.md"],
+    readText,
+  });
+  assert.deepEqual(result.findings, []);
+  assert(!reads.includes("docs/state-archive/2026-08-19--rotation.md"));
+});
+
+test("an immutable reader-review report is never scanned as public documentation", () => {
+  for (const featureId of ["sprint-nova-epic", "sprint-alfred-epic"]) {
+    const report = `specs/${featureId}/evidence/reader-review/phase-one/r5.md`;
+    const { root } = fixture({ [report]: "# Report\n\n[Local](/private/reader/path.md)\n" });
+    const result = runFixture(root, {
+      trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", report],
+      markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", report],
+    });
+    assert.deepEqual(result.findings, []);
+  }
+});
+
+test("a link into a specific docs/state-archive/ file resolves via the exclusion, not the pre-existing trackedDescendant fallback", () => {
+  const { root } = fixture({
+    "README.md": "# Home\n\n[Archived](docs/state-archive/2026-08-19--rotation.md)\n",
+  });
+  // Deliberately absent from trackedPaths (and no descendant entry with this
+  // exact prefix + "/" exists either), so the pre-existing trackedDescendant
+  // fallback at the target check cannot be what makes this pass — only the
+  // isExcludedRepoPath directory-prefix exclusion can.
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"],
+  });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.excludedLinks, 1);
+});
+
+test("untracked targets fail even when present in the worktree", () => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Ghost](ghost.md)\n", "ghost.md": "# Ghost\n" });
+  assert.match(runFixture(root).findings.join("\n"), /target is not tracked/);
+});
+
+test("generated enforcement document derives the three runner schemas without classifying guards", () => {
+  const registration = collectEnforcementRegistrations();
+  assert.deepEqual(
+    registration.sources.map(({ runner, path }) => ({ runner, path })),
+    [
+      { runner: "Claude Code", path: MANIFEST_PATHS["Claude Code"] },
+      { runner: "Codex", path: MANIFEST_PATHS.Codex },
+      { runner: "Antigravity", path: MANIFEST_PATHS.Antigravity },
+    ],
+  );
+  assert(registration.rows.some((row) => row.runner === "Codex" && row.event === "SubagentStart" && row.matcher === "(all)"
+    && row.command.endsWith('codex-slicing-hint.mjs" SubagentStart')));
+  assert(registration.rows.some((row) => row.runner === "Antigravity" && row.event === "PreInvocation"
+    && row.command === "node hooks/antigravity-slicing-hint.mjs deliver"));
+  assert(registration.rows.some((row) => row.runner === "Claude Code" && row.event === "PreToolUse"
+    && row.command.includes("guard-slicing.mjs")));
+
+  const document = renderEnforcementDocument();
+  assert.match(document, /## Maintained explanation and limits/u);
+  assert.match(document, /expressly advisory/u);
+  assert.match(document, /does not say that the command blocks/u);
+  assert.doesNotMatch(document, /every registered command blocks/u);
+  assert.doesNotMatch(document, /Claude Code row is coverage for Codex/u);
+});
+
+test("generated enforcement registration order uses UTF-8 bytes, not the host locale", () => {
+  const rows = ["z", "~", "é", "😀", "!"].map((command) => ({
+    runner: "same",
+    event: "same",
+    matcher: "same",
+    command,
+    commandWindows: null,
+  }));
+  assert.deepEqual(
+    rows.sort(compareEnforcementRegistrations).map((row) => row.command),
+    ["!", "z", "~", "é", "😀"],
+  );
+});
+
+test("generated enforcement document changes with a manifest and rejects malformed registrations", () => {
+  const { root } = enforcementFixture();
+  const baseline = renderEnforcementDocument({ rootDir: root });
+  const codexPath = join(root, MANIFEST_PATHS.Codex);
+  const codex = JSON.parse(readFileSync(codexPath, "utf8"));
+  codex.hooks.PreToolUse[0].matcher = "changed|native-matcher";
+  writeFileSync(codexPath, JSON.stringify(codex, null, 2) + "\n");
+  assert.notEqual(renderEnforcementDocument({ rootDir: root }), baseline, "a changed registration must change the generated bytes");
+
+  codex.hooks.PreToolUse[0].hooks[0].command = "";
+  writeFileSync(codexPath, JSON.stringify(codex, null, 2) + "\n");
+  assert.throws(
+    () => renderEnforcementDocument({ rootDir: root }),
+    /codex-hooks\.json\.hooks\.PreToolUse\[0\]\.hooks\[0\]\.command: expected a non-empty string/u,
+  );
+});
+
+test("manifest table cells encode pipes, backticks, newlines, and HTML-looking input", () => {
+  const special = "node a|b" + String.fromCharCode(96) + "c\n<script>&";
+  assert.equal(
+    escapeMarkdownCell(special),
+    "node a&#124;b&#96;c&#10;&lt;script&gt;&amp;",
+  );
+  const { root } = enforcementFixture();
+  const codexPath = join(root, MANIFEST_PATHS.Codex);
+  const codex = JSON.parse(readFileSync(codexPath, "utf8"));
+  codex.hooks.PreToolUse[0].hooks[0].command = special;
+  writeFileSync(codexPath, JSON.stringify(codex, null, 2) + "\n");
+  const rendered = renderEnforcementDocument({ rootDir: root });
+  assert.match(rendered, /node a&#124;b&#96;c&#10;&lt;script&gt;&amp;/u);
+  assert.doesNotMatch(rendered, /<script>/u);
+});
+
+test("a stale tracked enforcement page fails the existing documentation contract", () => {
+  const { root, trackedPaths } = enforcementFixture();
+  assert.equal(checkEnforcementDocument({ rootDir: root }).ok, true);
+  write(root, "docs/enforcement.md", "# stale\n");
+  const result = checkRepository(root, {
+    trackedPaths,
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+  });
+  assert.equal(result.stats.enforcementDocument, "checked");
+  assert(
+    result.findings.some((finding) => finding.startsWith("generated-enforcement: docs/enforcement.md: document bytes differ")),
+    "expected generated-document drift finding; got: " + result.findings.join(" | "),
+  );
+});
+
+test("source manifest identity keeps a deleted enforcement page fail-closed", () => {
+  const { root, trackedPaths } = enforcementFixture();
+  const withoutPage = trackedPaths.filter((path) => path !== "docs/enforcement.md");
+  const result = checkRepository(root, {
+    trackedPaths: withoutPage,
+    markdownPaths: withoutPage.filter((path) => path.endsWith(".md")),
+  });
+  assert.equal(result.stats.enforcementDocument, "checked");
+  assert(
+    result.findings.includes(
+      "generated-enforcement: docs/enforcement.md: required generated page is not tracked -- run: node harness/scripts/generate-enforcement-doc.mjs --write and add the page",
+    ),
+  );
+});
+
+test("a tracked enforcement page stays checked when one source manifest is removed", () => {
+  const { root, trackedPaths } = enforcementFixture();
+  const removedManifest = MANIFEST_PATHS.Codex;
+  rmSync(join(root, removedManifest));
+  const result = checkRepository(root, {
+    trackedPaths: trackedPaths.filter((path) => path !== removedManifest),
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+  });
+  assert.equal(result.stats.enforcementDocument, "checked");
+  assert(
+    result.findings.some((finding) => finding.startsWith("generated-enforcement: docs/enforcement.md: generation failed: plugins/pipeline-core/hooks/codex-hooks.json: cannot read manifest")),
+    "expected missing-manifest contract finding; got: " + result.findings.join(" | "),
+  );
+});
+
+test("enforcement contract reports malformed source manifests", () => {
+  const { root, trackedPaths } = enforcementFixture();
+  const codexPath = join(root, MANIFEST_PATHS.Codex);
+  writeFileSync(codexPath, "{ malformed\n");
+  const result = checkRepository(root, {
+    trackedPaths,
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+  });
+  assert(
+    result.findings.some((finding) => finding.startsWith("generated-enforcement: docs/enforcement.md: generation failed: plugins/pipeline-core/hooks/codex-hooks.json: invalid JSON")),
+    "expected malformed-manifest contract finding; got: " + result.findings.join(" | "),
+  );
+});
+
+test("enforcement generator CLI rejects unknown, duplicate, and contradictory flags without writing", () => {
+  assert.throws(() => parseEnforcementCliArgs([]), /exactly one/u);
+  assert.throws(() => parseEnforcementCliArgs(["--write", "--check"]), /exactly one/u);
+  assert.throws(() => parseEnforcementCliArgs(["--stdout", "--unknown"]), /unknown argument/u);
+  assert.throws(() => parseEnforcementCliArgs(["--stdout", "--root", "--check"]), /--root requires/u);
+  assert.throws(() => parseEnforcementCliArgs(["--stdout", "--root", "one", "--root", "two"]), /--root requires/u);
+
+  const { root } = fixture();
+  for (const path of Object.values(MANIFEST_PATHS)) write(root, path, readFileSync(join(REPO, path), "utf8"));
+  const output = join(root, "docs", "enforcement.md");
+  const result = runEnforcementCli(root, ["--stdout", "--check"]);
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /exactly one/u);
+  assert.equal(existsSync(output), false, "invalid CLI input must not create the generated document");
+});
+
+test("invalid UTF-8 and injected reads fail closed", () => {
+  const invalid = fixture({ "README.md": Buffer.from([0xff, 0xfe]) });
+  const invalidResult = checkRepository(invalid.root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"],
+    markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md"],
+  });
+  assert.match(invalidResult.findings.join("\n"), /source read failed/);
+  const injected = fixture();
+  const injectedResult = runFixture(injected.root, {
+    readText(file) {
+      if (file.endsWith("README.md")) throw new Error("simulated read failure");
+      return execFileSync(process.execPath, ["-e", "process.stdout.write(require('fs').readFileSync(process.argv[1]))", file], { encoding: "utf8" });
+    },
+  });
+  assert.match(injectedResult.findings.join("\n"), /simulated read failure/);
+});
+
+test("symlink targets escaping the repository fail closed", (t) => {
+  const { root } = fixture({ "README.md": "# Home\n\n[Outside](outside.md)\n" });
+  const external = mkdtempSync(join(tmpdir(), "doc-contracts-outside-"));
+  roots.push(external);
+  writeFileSync(join(external, "target.md"), "# Outside\n");
+  if (!linkFixtureFileOrClassifyUnavailable(t, join(external, "target.md"), join(root, "outside.md"))) return;
+  assert.match(
+    runFixture(root, { trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "outside.md"] }).findings.join("\n"),
+    /symlink target escapes repository root/,
+  );
+});
+
+test("malformed, duplicate, and invalid handover calibration fail", () => {
+  for (const calibration of [
+    "{bad",
+    '{"handover":"docs/state.md","nested":{"handover":"docs/state.md"}}',
+    '{"handover":""}',
+    '{"handover":"/docs/state.md"}',
+    '{"handover":"../state.md"}',
+    '{"handover":"docs\\\\state.md"}',
+  ]) {
+    const { root } = fixture({ ".claude/pipeline.json": `${calibration}\n` });
+    assert.match(runFixture(root).findings.join("\n"), /authority:/);
+  }
+});
+
+test("handover must be tracked regular Markdown and not a symlink", (t) => {
+  const first = fixture();
+  assert.match(runFixture(first.root, { trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "README.md"] }).findings.join("\n"), /not tracked/);
+  const second = fixture({ "docs/state.md": null, "docs/real.md": "# State\n" });
+  if (!linkFixtureFileOrClassifyUnavailable(t, "real.md", join(second.root, "docs/state.md"))) return;
+  assert.match(runFixture(second.root).findings.join("\n"), /symlink is not allowed/);
+});
+
+test("CLAUDE requires the calibrated state only and handover requires backlink", () => {
+  const missing = fixture({ "CLAUDE.md": "# Rules\n" });
+  assert.match(runFixture(missing.root).findings.join("\n"), /does not link/);
+  const competing = fixture({ "CLAUDE.md": "# Rules\n[State](docs/state.md) [Other](other/state.md)\n", "other/state.md": "# Other\n" });
+  assert.match(
+    runFixture(competing.root, { trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "other/state.md"] }).findings.join("\n"),
+    /competing state/,
+  );
+  const noBacklink = fixture({ "docs/state.md": "# State\n" });
+  assert.match(runFixture(noBacklink.root).findings.join("\n"), /does not link back/);
+});
+
+test("CLI fails closed when Git enumeration is unavailable", () => {
+  const root = mkdtempSync(join(tmpdir(), "doc-contracts-no-git-"));
+  roots.push(root);
+  const result = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /git ls-files failed/);
+});
+
+function liveStatefulDesignSurfaces() {
+  return Object.fromEntries(["templates/spec.md", "roles/elephant.md"]
+    .map((surface) => [surface, readFileSync(join(REPO, surface), "utf8")]));
+}
+
+test("stateful design checklist is complete on both required documentation surfaces", () => {
+  const baseline = checkRepository(REPO);
+  assert.deepEqual(baseline.findings, []);
+  assert.equal(
+    baseline.stats.statefulDesignContracts,
+    "checked",
+    "the repository result must attest that both stateful-design documentation surfaces were checked",
+  );
+
+  const surfaces = liveStatefulDesignSurfaces();
+  for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+    for (const [surface, phrase] of [
+      ["templates/spec.md", requirement.template],
+      ["roles/elephant.md", requirement.elephant],
+    ]) {
+      const text = surfaces[surface];
+      assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
+      const findings = checkStatefulDesignContracts({ ...surfaces,
+        [surface]: text.replace(phrase, `[intentionally omitted: ${requirement.id}]`) });
+      assert(
+        findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`),
+        `${surface} must reject an omitted ${requirement.id} checklist concept; got: ${findings.join(" | ")}`,
+      );
+    }
+  }
+});
+
+test("repository documentation gate still enforces a missing operative stateful-design phrase", () => {
+  const requirement = STATEFUL_DESIGN_CONTRACTS[0];
+  const surface = "templates/spec.md";
+  const result = checkRepository(REPO, { readText(file) {
+    const text = readFileSync(file, "utf8");
+    if (relative(REPO, file).split("\\").join("/") !== surface) return text;
+    assert(text.includes(requirement.template));
+    return text.replace(requirement.template, `[intentionally omitted: ${requirement.id}]`);
+  } });
+  assert(result.findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`));
+});
+
+const statefulDesignBaseTrackedPaths = [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"];
+
+test("pipeline-shaped repositories require both stateful-design surfaces even when neither is tracked", () => {
+  const { root } = fixture({ ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\n" });
+  const result = runFixture(root, { trackedPaths: [...statefulDesignBaseTrackedPaths, ".claude/pipeline.yaml"] });
+  assert.deepEqual(
+    result.findings.filter((finding) => finding.endsWith(": required-surface-missing")),
+    [
+      "stateful-design-contract: roles/elephant.md: required-surface-missing",
+      "stateful-design-contract: templates/spec.md: required-surface-missing",
+    ],
+  );
+  assert.equal(result.stats.statefulDesignContracts, "checked");
+});
+
+for (const [presentSurface, phraseKey] of [
+  ["templates/spec.md", "template"],
+  ["roles/elephant.md", "elephant"],
+]) {
+  test(`a generic repository ignores a lone canonical-named ${presentSurface} surface`, () => {
+    const { root } = fixture({
+      [presentSurface]: `${STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[phraseKey]).join("\n")}\n`,
+    });
+    const result = runFixture(root, { trackedPaths: [...statefulDesignBaseTrackedPaths, presentSurface] });
+    assert.equal(
+      result.stats.statefulDesignContracts,
+      "not-applicable",
+      "a canonical filename alone must not classify a generic repository as pipeline-shaped",
+    );
+    assert(
+      !result.findings.some((finding) => finding.startsWith("stateful-design-contract:")),
+      `generic repositories must not emit stateful-design findings; got: ${result.findings.join(" | ")}`,
+    );
+  });
+}
+
+for (const [presentSurface, missingSurface, phraseKey] of [
+  ["templates/spec.md", "roles/elephant.md", "template"],
+  ["roles/elephant.md", "templates/spec.md", "elephant"],
+]) {
+  test(`a lone ${presentSurface} stateful-design surface fails closed`, () => {
+    const { root } = fixture({
+      ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\n",
+      [presentSurface]: `${STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[phraseKey]).join("\n")}\n`,
+    });
+    const result = runFixture(root, {
+      trackedPaths: [...statefulDesignBaseTrackedPaths, ".claude/pipeline.yaml", presentSurface],
+    });
+    assert.notEqual(
+      result.stats.statefulDesignContracts,
+      "not-applicable",
+      `${missingSurface} must not silently disable the stateful-design contract`,
+    );
+    assert(
+      result.findings.some((finding) => finding.startsWith(`stateful-design-contract: ${missingSurface}:`)),
+      `${missingSurface} must have a surface-specific stateful-design finding; got: ${result.findings.join(" | ")}`,
+    );
+  });
+}
+
+for (const [context, conceal] of [
+  ["fenced code", (phrase) => `\n\`\`\`text\n${phrase}\n\`\`\`\n`],
+  ["HTML comment", (phrase) => `<!-- ${phrase} -->`],
+]) {
+  for (const [surface, phraseKey] of [
+    ["templates/spec.md", "template"],
+    ["roles/elephant.md", "elephant"],
+  ]) {
+    test(`stateful-design phrases hidden only in ${context} fail on ${surface}`, () => {
+      const surfaces = liveStatefulDesignSurfaces();
+      let text = surfaces[surface];
+      for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+        const phrase = requirement[phraseKey];
+        assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
+        text = text.replaceAll(phrase, conceal(phrase));
+      }
+      const findings = checkStatefulDesignContracts({ ...surfaces, [surface]: text });
+      for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+        assert(
+          findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`),
+          `${surface} must reject ${requirement.id} hidden only in ${context}; got: ${findings.join(" | ")}`,
+        );
+      }
+    });
+  }
+}
+
+const statefulDesignOperativeSections = [
+  {
+    surface: "templates/spec.md",
+    phraseKey: "template",
+    start: "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
+    end: "### 3. Alternatives (mandatory from level 1)",
+    rejectedExample: "### Rejected example (non-operative stateful checklist)",
+  },
+  {
+    surface: "roles/elephant.md",
+    phraseKey: "elephant",
+    start: "### EL-07 (MUST) — Spec-readiness check before implementation",
+    end: "### EL-19 (MUST) — PO gate (PRD) before implementation",
+    rejectedExample: "## Rejected example (non-operative stateful checklist)",
+  },
+];
+
+function moveStatefulPhrasesToRejectedExample(text, section) {
+  const start = text.indexOf(section.start);
+  const end = text.indexOf(section.end, start);
+  assert(start >= 0, `${section.surface} fixture must contain its operative section start`);
+  assert(end > start, `${section.surface} fixture must contain its operative section end`);
+
+  let operative = text.slice(start, end);
+  const phrases = STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[section.phraseKey]);
+  for (const phrase of phrases) {
+    assert(operative.includes(phrase), `${section.surface} operative section must contain ${phrase}`);
+    operative = operative.replaceAll(phrase, `[moved to rejected example]`);
+  }
+
+  const rejectedExample = `\n${section.rejectedExample}\n\nThis visible prose is a rejected example, not an operative requirement.\n\n${phrases.map((phrase) => `- ${phrase}`).join("\n")}\n`;
+  return {
+    text: `${text.slice(0, start)}${operative}${text.slice(end)}${rejectedExample}`,
+    rejectedExample,
+  };
+}
+
+for (const section of statefulDesignOperativeSections) {
+  test(`stateful-design phrases moved from the operative section fail on ${section.surface}`, () => {
+    const surfaces = liveStatefulDesignSurfaces();
+    const moved = moveStatefulPhrasesToRejectedExample(surfaces[section.surface], section);
+    const rejectedExample = moved.rejectedExample;
+    const findings = checkStatefulDesignContracts({ ...surfaces, [section.surface]: moved.text });
+
+    for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+      const phrase = requirement[section.phraseKey];
+      assert(rejectedExample.includes(phrase), `${section.surface} must leave ${requirement.id} visible outside its operative section`);
+      assert(!rejectedExample.includes("<!--") && !rejectedExample.includes("```"), "the rejected example must remain ordinary Markdown");
+      assert(
+        findings.includes(`stateful-design-contract: ${section.surface}: ${requirement.id}`),
+        `${section.surface} must reject ${requirement.id} when it appears only in a non-operative rejected example; got: ${findings.join(" | ")}`,
+      );
+    }
+  });
+}
+
+test("current repository integration passes and excludes the instruction path", () => {
+  const result = checkRepository(REPO);
+  assert.deepEqual(result.findings, []);
+  assert(result.stats.markdownFiles > 100);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 9);
+  assert.equal(result.stats.observationGovernance, "checked");
+});
+
+test("reader binding scope is the approved lexical set of active public documents", () => {
+  assert.deepEqual(READER_REVIEW_PATHS, EXPECTED_READER_REVIEW_PATHS);
+  assert.equal(new Set(READER_REVIEW_PATHS).size, EXPECTED_READER_REVIEW_PATHS.length);
+});
+
+test("reader binding accepts a record-only candidate and ignores worktree edits", () => {
+  const { root, reviewedCommit, candidateCommit } = readerBindingFixture();
+  const result = checkReaderBinding({ root, candidate: candidateCommit, featureId: "reader-binding" });
+  assert.equal(result.status, "passed");
+  assert.equal(result.candidateCommit, candidateCommit);
+  assert.equal(result.reviewedCommit, reviewedCommit);
+  assert.equal(result.findings.length, 0);
+  write(root, "README.md", "uncommitted worktree change\n");
+  assert.equal(checkReaderBinding({ root, candidate: candidateCommit, featureId: "reader-binding" }).status, "passed");
+  const resolved = readerBindingFixture({ resolvedFindings: true });
+  assert.equal(checkReaderBinding({ root: resolved.root, candidate: resolved.candidateCommit, featureId: "reader-binding" }).status, "passed", "a real ancestor resolution commit and no-change/null finding close a nonempty disposition");
+});
+
+test("reader binding fails malformed records and stale covered documentation", () => {
+  const malformed = readerBindingFixture({ malformedRecord: true });
+  const malformedResult = checkReaderBinding({ root: malformed.root, candidate: malformed.candidateCommit, featureId: "reader-binding" });
+  assert.equal(malformedResult.status, "failed");
+  assert.match(malformedResult.findings.join("\n"), /not valid JSON/);
+  const invalidUtf8 = readerBindingFixture({ invalidUtf8Record: true });
+  const invalidUtf8Result = checkReaderBinding({ root: invalidUtf8.root, candidate: invalidUtf8.candidateCommit, featureId: "reader-binding" });
+  assert.equal(invalidUtf8Result.status, "failed");
+  assert.match(invalidUtf8Result.findings.join("\n"), /not valid UTF-8/);
+
+  const stale = readerBindingFixture();
+  write(stale.root, "README.md", "# README.md\n\nChanged after review.\n");
+  const staleCandidate = commitFixture(stale.root, ["README.md"], "stale public document");
+  const staleResult = checkReaderBinding({ root: stale.root, candidate: staleCandidate, featureId: "reader-binding" });
+  assert.equal(staleResult.status, "failed");
+  assert.match(staleResult.findings.join("\n"), /does not bind identical reviewed and candidate documentation inputs/);
+});
+
+test("reader binding fails each covered-input drift and a deleted covered document", () => {
+  for (const path of ["docs/product-capability-inventory.json", "governance/observation-doc-governance.json", "harness/reader-review-protocol.md"]) {
+    const fixture = readerBindingFixture();
+    write(fixture.root, path, `changed ${path}\n`);
+    const candidate = commitFixture(fixture.root, [path], `drift ${path}`);
+    assert.match(checkReaderBinding({ root: fixture.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /does not bind identical reviewed and candidate documentation inputs/);
+  }
+  const deleted = readerBindingFixture();
+  gitFixture(deleted.root, ["rm", "-q", "--", "README.md"]);
+  gitFixture(deleted.root, ["commit", "-q", "-m", "delete covered document"]);
+  const candidate = gitFixture(deleted.root, ["rev-parse", "HEAD"]);
+  assert.match(checkReaderBinding({ root: deleted.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /README\.md is missing/);
+});
+
+test("reader binding fails missing or tampered reports and disposition", () => {
+  const missing = readerBindingFixture();
+  gitFixture(missing.root, ["rm", "-q", "--", "specs/reader-binding/evidence/reader-review/phase-one/round-1.md"]);
+  gitFixture(missing.root, ["commit", "-q", "-m", "remove phase one"]);
+  const missingCandidate = gitFixture(missing.root, ["rev-parse", "HEAD"]);
+  assert.match(checkReaderBinding({ root: missing.root, candidate: missingCandidate, featureId: "reader-binding" }).findings.join("\n"), /phase-one\/round-1\.md is missing/);
+
+  const report = readerBindingFixture();
+  const phaseTwoPath = "specs/reader-binding/evidence/reader-review/phase-two/round-1.md";
+  write(report.root, phaseTwoPath, "# Tampered phase two\n");
+  const reportCandidate = commitFixture(report.root, [phaseTwoPath], "tamper phase two");
+  assert.match(checkReaderBinding({ root: report.root, candidate: reportCandidate, featureId: "reader-binding" }).findings.join("\n"), /phase report digest mismatch/);
+
+  const disposition = readerBindingFixture();
+  write(disposition.root, READER_DISPOSITION_PATH, `${JSON.stringify(readReaderDisposition(disposition.root))}\n\n`);
+  const dispositionCandidate = commitFixture(disposition.root, [READER_DISPOSITION_PATH], "tamper disposition bytes");
+  assert.match(checkReaderBinding({ root: disposition.root, candidate: dispositionCandidate, featureId: "reader-binding" }).findings.join("\n"), /disposition digest mismatch/);
+
+  const missingDisposition = readerBindingFixture();
+  gitFixture(missingDisposition.root, ["rm", "-q", "--", READER_DISPOSITION_PATH]);
+  gitFixture(missingDisposition.root, ["commit", "-q", "-m", "remove disposition"]);
+  const missingDispositionCandidate = gitFixture(missingDisposition.root, ["rev-parse", "HEAD"]);
+  assert.match(checkReaderBinding({ root: missingDisposition.root, candidate: missingDispositionCandidate, featureId: "reader-binding" }).findings.join("\n"), /disposition\/round-1\.json is missing/);
+});
+
+test("reader binding rejects corrupt record identity, coverage, and evidence paths", () => {
+  const wrongTree = readerBindingFixture();
+  const wrongTreeRecord = readReaderRecord(wrongTree.root);
+  wrongTreeRecord.reviewedTree = "f".repeat(40);
+  writeReaderRecord(wrongTree.root, wrongTreeRecord);
+  const wrongTreeCandidate = commitFixture(wrongTree.root, [READER_RECORD_PATH], "wrong reviewed tree");
+  assert.match(checkReaderBinding({ root: wrongTree.root, candidate: wrongTreeCandidate, featureId: "reader-binding" }).findings.join("\n"), /reviewedTree does not match/);
+
+  for (const mutate of [
+    (record) => record.coverage.pop(),
+    (record) => { record.coverage[1] = { ...record.coverage[0] }; },
+  ]) {
+    const fixture = readerBindingFixture();
+    const record = readReaderRecord(fixture.root);
+    mutate(record);
+    writeReaderRecord(fixture.root, record);
+    const candidate = commitFixture(fixture.root, [READER_RECORD_PATH], "corrupt coverage");
+    assert.match(checkReaderBinding({ root: fixture.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /record\.coverage/);
+  }
+
+  const unsafePath = readerBindingFixture();
+  const unsafeRecord = readReaderRecord(unsafePath.root);
+  unsafeRecord.phaseOne.path = "specs/reader-binding/evidence/reader-review/phase-one/../outside.md";
+  writeReaderRecord(unsafePath.root, unsafeRecord);
+  const unsafeCandidate = commitFixture(unsafePath.root, [READER_RECORD_PATH], "unsafe report path");
+  assert.match(checkReaderBinding({ root: unsafePath.root, candidate: unsafeCandidate, featureId: "reader-binding" }).findings.join("\n"), /unsafe round identifier/);
+});
+
+test("reader binding rejects a reviewed commit outside candidate ancestry", () => {
+  const fixture = readerBindingFixture();
+  const branch = gitFixture(fixture.root, ["branch", "--show-current"]);
+  gitFixture(fixture.root, ["checkout", "-q", "--orphan", "unrelated"]);
+  gitFixture(fixture.root, ["rm", "-rf", "--", "."]);
+  write(fixture.root, "unrelated.md", "# unrelated\n");
+  const unrelatedCommit = commitFixture(fixture.root, ["unrelated.md"], "unrelated history");
+  gitFixture(fixture.root, ["checkout", "-q", branch]);
+  const record = readReaderRecord(fixture.root);
+  record.reviewedCommit = unrelatedCommit;
+  writeReaderRecord(fixture.root, record);
+  const candidate = commitFixture(fixture.root, [READER_RECORD_PATH], "nonancestor reviewed commit");
+  assert.match(checkReaderBinding({ root: fixture.root, candidate, featureId: "reader-binding" }).findings.join("\n"), /not an ancestor/);
+});
+
+test("reader binding requires explicit empty findings and reachable resolution commits", () => {
+  const empty = readerBindingFixture();
+  const dispositionPath = "specs/reader-binding/evidence/reader-review/disposition/round-1.json";
+  const recordPath = "specs/reader-binding/evidence/reader-review/record.json";
+  const emptyDisposition = JSON.parse(readFileSync(join(empty.root, dispositionPath), "utf8"));
+  emptyDisposition.status = "resolved";
+  write(empty.root, dispositionPath, `${JSON.stringify(emptyDisposition)}\n`);
+  const emptyRecord = JSON.parse(readFileSync(join(empty.root, recordPath), "utf8"));
+  emptyRecord.disposition.sha256 = sha256Bytes(join(empty.root, dispositionPath));
+  write(empty.root, recordPath, `${JSON.stringify(emptyRecord)}\n`);
+  const emptyCandidate = commitFixture(empty.root, [dispositionPath, recordPath], "invalid empty disposition");
+  assert.match(checkReaderBinding({ root: empty.root, candidate: emptyCandidate, featureId: "reader-binding" }).findings.join("\n"), /empty findings require explicit no-findings/);
+
+  const unresolved = readerBindingFixture();
+  const unresolvedDisposition = JSON.parse(readFileSync(join(unresolved.root, dispositionPath), "utf8"));
+  unresolvedDisposition.status = "resolved";
+  unresolvedDisposition.findings = [{ id: "cut-1", class: "cut", status: "resolved", resolutionCommit: "f".repeat(40) }];
+  write(unresolved.root, dispositionPath, `${JSON.stringify(unresolvedDisposition)}\n`);
+  const unresolvedRecord = JSON.parse(readFileSync(join(unresolved.root, recordPath), "utf8"));
+  unresolvedRecord.disposition.sha256 = sha256Bytes(join(unresolved.root, dispositionPath));
+  write(unresolved.root, recordPath, `${JSON.stringify(unresolvedRecord)}\n`);
+  const unresolvedCandidate = commitFixture(unresolved.root, [dispositionPath, recordPath], "unresolved disposition");
+  assert.match(checkReaderBinding({ root: unresolved.root, candidate: unresolvedCandidate, featureId: "reader-binding" }).findings.join("\n"), /does not resolve to a real commit/);
+
+  const open = readerBindingFixture();
+  const openDisposition = readReaderDisposition(open.root);
+  openDisposition.status = "open";
+  writeReaderDisposition(open.root, openDisposition);
+  const openRecord = readReaderRecord(open.root);
+  openRecord.disposition.sha256 = sha256Bytes(join(open.root, dispositionPath));
+  writeReaderRecord(open.root, openRecord);
+  const openCandidate = commitFixture(open.root, [dispositionPath, recordPath], "open disposition status");
+  assert.match(checkReaderBinding({ root: open.root, candidate: openCandidate, featureId: "reader-binding" }).findings.join("\n"), /invalid schema, round, status, or findings array/);
+});
+
+test("reader binding refuses non-regular covered blobs and malformed CLI arguments", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "reader-binding-symlink-"));
+  roots.push(root);
+  for (const path of READER_REVIEW_PATHS) write(root, path, "# fixture\n");
+  rmSync(join(root, "README.md"));
+  if (!linkFixtureFileOrClassifyUnavailable(t, "PIPELINE_FLOW.md", join(root, "README.md"))) return;
+  write(root, "docs/product-capability-inventory.json", "{}\n");
+  write(root, "governance/observation-doc-governance.json", "{}\n");
+  write(root, "harness/reader-review-protocol.md", "# protocol\n");
+  gitFixture(root, ["init", "-q"]);
+  gitFixture(root, ["config", "user.email", "fixture@example.test"]);
+  gitFixture(root, ["config", "user.name", "Fixture"]);
+  const candidate = commitFixture(root, ["."], "symlink coverage");
+  assert.throws(() => snapshotReaderDocumentation({ root, candidate, featureId: "reader-binding" }), /mode 100644/);
+  const badCli = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidate, "--candidate", candidate, "--feature-id", "reader-binding"], { encoding: "utf8" });
+  assert.equal(badCli.status, 2);
+  assert.equal(badCli.stdout, "");
+  const malformedCandidate = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", "not-a-commit", "--feature-id", "reader-binding"], { encoding: "utf8" });
+  assert.equal(malformedCandidate.status, 2);
+  const malformedFeature = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidate, "--feature-id", "../reader-binding"], { encoding: "utf8" });
+  assert.equal(malformedFeature.status, 2);
+});
+
+test("reader snapshot rejects covered blobs above the fixed byte cap", () => {
+  const root = mkdtempSync(join(tmpdir(), "reader-binding-oversize-"));
+  roots.push(root);
+  for (const path of READER_REVIEW_PATHS) write(root, path, "# fixture\n");
+  write(root, "README.md", Buffer.alloc((512 * 1024) + 1, 0x61));
+  write(root, "docs/product-capability-inventory.json", "{}\n");
+  write(root, "governance/observation-doc-governance.json", "{}\n");
+  write(root, "harness/reader-review-protocol.md", "# protocol\n");
+  gitFixture(root, ["init", "-q"]);
+  gitFixture(root, ["config", "user.email", "fixture@example.test"]);
+  gitFixture(root, ["config", "user.name", "Fixture"]);
+  const candidate = commitFixture(root, ["."], "oversize coverage");
+  assert.throws(() => snapshotReaderDocumentation({ root, candidate, featureId: "reader-binding" }), /byte limit/);
+});
+
+test("reader binding CLI emits one snapshot or check JSON object and fails an isolated missing-record fixture", () => {
+  const { root, candidateCommit } = readerBindingFixture();
+  const snapshot = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidateCommit, "--feature-id", "reader-binding", "--snapshot"], { encoding: "utf8" });
+  assert.equal(snapshot.status, 0);
+  assert.equal(snapshot.stdout.trim().split("\n").length, 1);
+  assert.equal(JSON.parse(snapshot.stdout).schema, "pipeline.doc-reader-docset-snapshot.v1");
+  const checked = spawnSync(process.execPath, [READER_BINDING_SCRIPT, "--root", root, "--candidate", candidateCommit, "--feature-id", "reader-binding"], { encoding: "utf8" });
+  assert.equal(checked.status, 0);
+  assert.equal(JSON.parse(checked.stdout).status, "passed");
+  const missing = readerBindingFixture({ missingRecord: true });
+  const missingResult = checkReaderBinding({ root: missing.root, candidate: missing.candidateCommit, featureId: "reader-binding" });
+  assert.equal(missingResult.status, "failed");
+  assert.match(missingResult.findings.join("\n"), /reader-review\/record\.json/);
+});
+
+function missingReferenceAtLine(line, referenceId) {
+  return `${"\n".repeat(line - 1)}[Historical issue][${referenceId}]\n`;
+}
+
+function runImmutableSnapshotFixture(root, files, immutableSnapshotMissingReferenceExclusions) {
+  const trackedPaths = [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", ...files];
+  return checkRepository(root, {
+    trackedPaths,
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+    immutableSnapshotMissingReferenceExclusions,
+  });
+}
+
+test("each immutable snapshot exclusion suppresses its own exact normalized missing-reference occurrence", () => {
+  for (const entry of IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS) {
+    const { root } = fixture({ [entry.source]: missingReferenceAtLine(entry.line, entry.referenceId.toUpperCase()) });
+    const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+    assert.deepEqual(result.findings, [], `${entry.source}:${entry.line} -> ${entry.referenceId}`);
+    assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 1);
+  }
+});
+
+test("an immutable snapshot exclusion does not suppress the same reference id at another line", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Known][plain tag]\n[New][plain tag]\n" });
+  const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+  assert.deepEqual(result.findings, [`${entry.source}:4 -> plain tag: missing reference definition`]);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 1);
+});
+
+test("an immutable snapshot exclusion does not suppress the same line and id in another source", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const otherSource = "specs/other-snapshot.md";
+  const { root } = fixture({ [otherSource]: "# Other\n\n[Unexpected][plain tag]\n" });
+  const result = runImmutableSnapshotFixture(root, [otherSource], [entry]);
+  assert.deepEqual(result.findings, [`${otherSource}:3 -> plain tag: missing reference definition`]);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 0);
+});
+
+test("an immutable snapshot exclusion suppresses only one same-line occurrence", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag", occurrence: 0 };
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Known][plain tag] [New][plain tag]\n" });
+  const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+  assert.deepEqual(result.findings, [`${entry.source}:3 -> plain tag: missing reference definition`]);
+  assert.equal(result.stats.immutableSnapshotExcludedMissingReferences, 1);
+});
+
+test("a stale immutable snapshot exclusion is reported deterministically", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const { root } = fixture({ [entry.source]: "# Snapshot\n\n[Defined][plain tag]\n\n[plain tag]: ../docs/state.md\n" });
+  const result = runImmutableSnapshotFixture(root, [entry.source], [entry]);
+  assert.deepEqual(result.findings, [
+    `immutable-snapshot-missing-reference-exclusion: ${entry.source}:3 -> plain tag: exclusion no longer suppresses a "missing reference definition" finding -- remove it`,
+  ]);
+});
+
+test("ordinary broken reference-style links still fail with immutable snapshot exclusions configured", () => {
+  const entry = { source: "specs/immutable-snapshot.md", line: 3, referenceId: "plain tag" };
+  const { root } = fixture({ "README.md": "# Home\n\n[Broken][ordinary missing reference]\n" });
+  const result = runImmutableSnapshotFixture(root, [], [entry]);
+  assert.deepEqual(result.findings, ["README.md:3 -> ordinary missing reference: missing reference definition"]);
+});
+
+test("successful CLI output exposes the immutable snapshot exclusion count", () => {
+  const result = spawnSync(process.execPath, [SCRIPT, "--root", REPO], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /9 immutable snapshot missing-reference exclusion\(s\) accepted/);
+});
+
+const VENDORING_BACKLOG_ITEM = "backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md";
+const vendoredFixtureSource = "plugins/pipeline-core/docs/adr/0005-quality-gates-dod.md";
+const vendoredFixtureExclusions = [
+  {
+    source: vendoredFixtureSource,
+    origin: "docs/adr/0005-quality-gates-dod.md",
+    destinations: ["../operating-model.md"],
+    reason: `fixture entry; see ${VENDORING_BACKLOG_ITEM}`,
+  },
+];
+
+function runVendoredFixture(root, files) {
+  const trackedPaths = [...statefulDesignBaseTrackedPaths, ...files];
+  return checkRepository(root, {
+    trackedPaths,
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+    vendoredLinkExclusions: vendoredFixtureExclusions,
+  });
+}
+
+test("a vendored link exclusion suppresses only its own listed destination", () => {
+  const { root } = fixture({
+    [vendoredFixtureSource]: [
+      "# Vendored copy",
+      "",
+      "[Inherited and listed](../operating-model.md)",
+      "[Inherited, not listed](0001-distribution-plugin-marketplace.md)",
+      "[Genuinely new breakage](../../nowhere.md)",
+      "",
+    ].join("\n"),
+  });
+  const result = runVendoredFixture(root, [vendoredFixtureSource]);
+
+  assert.deepEqual(result.findings, [
+    `${vendoredFixtureSource}:4 -> 0001-distribution-plugin-marketplace.md: target is not tracked`,
+    `${vendoredFixtureSource}:5 -> ../../nowhere.md: target is not tracked`,
+  ]);
+  assert.equal(result.stats.vendoredExcludedLinks, 1);
+  assert.equal(result.stats.excludedLinks, 0, "the vendoring exemption must not be counted as an instruction-path exclusion");
+});
+
+test("a vendored link exclusion is bound to its own source file", () => {
+  const otherSource = "plugins/pipeline-core/docs/adr/0010-session-bootstrap.md";
+  const { root } = fixture({ [otherSource]: "# Other vendored copy\n\n[Inherited](../operating-model.md)\n" });
+  const result = runVendoredFixture(root, [otherSource]);
+
+  assert.deepEqual(result.findings, [`${otherSource}:3 -> ../operating-model.md: target is not tracked`]);
+  assert.equal(result.stats.vendoredExcludedLinks, 0);
+});
+
+test("a vendored link exclusion that stops matching is reported, and stays inert where its file is absent", () => {
+  const repaired = fixture({
+    [vendoredFixtureSource]: "# Vendored copy\n\n[Repaired](../../../../docs/state.md)\n",
+  });
+  assert.deepEqual(runVendoredFixture(repaired.root, [vendoredFixtureSource]).findings, [
+    `vendored-link-exclusion: ${vendoredFixtureSource} -> ../operating-model.md: exclusion no longer suppresses a "target is not tracked" finding -- remove it`,
+  ]);
+
+  const absent = fixture();
+  assert.deepEqual(
+    runVendoredFixture(absent.root, []).findings,
+    [],
+    "a repository that carries none of the vendored copies must see the entries as not applicable, not stale",
+  );
+});
+
+test("every shipped vendored link exclusion is justified by a byte-identical origin whose links resolve", () => {
+  const tracked = new Set(execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8" }).split("\0").filter(Boolean));
+  assert(VENDORED_LINK_EXCLUSIONS.length > 0, "the exclusion list must not be silently emptied");
+
+  for (const entry of VENDORED_LINK_EXCLUSIONS) {
+    assert.equal(entry.source, `plugins/pipeline-core/${entry.origin}`, "an exclusion may only cover a vendored copy of a repo-root source");
+    assert(tracked.has(entry.source), `${entry.source} must be tracked`);
+    assert(tracked.has(entry.origin), `${entry.origin} must be tracked`);
+    assert(
+      readFileSync(join(REPO, entry.source)).equals(readFileSync(join(REPO, entry.origin))),
+      `${entry.source} must stay byte-identical to ${entry.origin}; once it diverges the vendoring rationale no longer holds`,
+    );
+    assert(entry.destinations.length > 0, `${entry.source} must list the destinations it exempts`);
+
+    for (const destination of entry.destinations) {
+      const target = relative(REPO, resolve(REPO, dirname(entry.origin), destination.split("#")[0])).split("\\").join("/");
+      assert(
+        tracked.has(target),
+        `${entry.origin} -> ${destination} must resolve to a tracked target from its origin directory (an inherited link, not a dead one); got ${target}`,
+      );
+    }
+
+    assert(entry.reason.includes(entry.source), "the reason must name the file it exempts");
+    assert(entry.reason.includes("vendored copy"), "the reason must state the vendoring cause");
+    assert(entry.reason.includes(VENDORING_BACKLOG_ITEM), "the reason must cite the tracked follow-up backlog item by path");
+  }
+});

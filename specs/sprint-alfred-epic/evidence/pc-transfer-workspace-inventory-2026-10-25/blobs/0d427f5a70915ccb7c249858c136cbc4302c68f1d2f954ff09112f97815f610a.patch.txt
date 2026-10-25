@@ -1,0 +1,375 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 49676d14e..8b732ee9f 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -288,7 +288,7 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+     // (a system message, a path, a stack fragment) never reaches it.
+     const code = architectureDesignFailureCode(error);
+     return { ok: false, status: "design-required", code,
+-      ...(code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
++      ...(prdPath ? { prdPath } : {}),
+       ...(error?.field && code === error.message ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
+   }
+ }
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 131264944..acf2f618b 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -87,7 +87,7 @@ function proposalAction(root, inspectedDesign = null, deps = {}) {
+     mutation: true, requiresConfirmation: false,
+     expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+   };
+-  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && typeof design.prdPath === "string") return {
++  if (!design.ok && design.status === "design-required" && typeof design.prdPath === "string") return {
+     kind: "architecture-design-required",
+     prdPath: design.prdPath,
+     guidance: "Complete the architecture design block in this exact PO-bound PRD, then present and approve a new final design-workflow package before materialization.",
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index 8a3d7e437..f7e6282a3 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -92,6 +92,20 @@ test("missing design block preserves its exact PRD action before scaffold-map va
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test("incomplete greenfield design points to its PRD without asking for estate adoption", () => {
++  const root = fixture();
++  const prdPath = "specs/feature/prd.md";
++  try {
++    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
++      inspectArchitectureDesign: () => ({ ok: false, status: "design-required",
++        code: "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE", prdPath }),
++    } });
++    assert.equal(result.code, "ARCHITECTURE-MAP-MISSING");
++    assert.equal(result.nextAction.kind, "architecture-design-required");
++    assert.equal(result.nextAction.prdPath, prdPath);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
+   const root = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/critic-accepted-contract.mjs b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+index a0288a028..5a4f21b53 100644
+--- a/plugins/pipeline-core/lib/critic-accepted-contract.mjs
++++ b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+@@ -334,7 +334,7 @@ export function inspectSpecCriterionRows(source) {
+   const why = {id: `not a criterion id (${CRITERION_ID_RULE}; a leading zero is not allowed)`, shape: 'row shape the parser does not locate', duplicate: 'stated more than once'};
+   const named = unsupported.slice(0, 8).map(entry => `${entry.id}${entry.line ? ` (line ${entry.line}` : ' ('}${entry.line ? ', ' : ''}${why[entry.reason]})`).join('; ');
+   return {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located, unsupported,
+-    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
++    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. Example: | # | Criterion | Evidence | with | AC-1 | WHEN an event occurs, the system SHALL respond. | tests/example.test.mjs |. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
+ }
+ 
+ /** Pure original-byte interpretation only. Locators and parser success confer no authority. */
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index c937507c6..5aa507146 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -5673,6 +5673,14 @@ function buildCoordinatorSourcedPromotionPlan({
+   const checkMarkers = !allowAppliedReplay;
+   const checkAcknowledgement = !new Set(["epic", "feature"]).has(input.profile);
+   const authority = promotionArtifacts(observed.root, input, { checkMarkers, checkAcknowledgement });
++  if (checkMarkers) {
++    const prdDraft = observeOptionalProjectFile(observed.root, input.prdPath, "promotion PRD");
++    const specDraft = observeOptionalProjectFile(observed.root, input.specPath, "promotion specification");
++    if (prdDraft.raw?.toString("utf8").includes("<!-- DRAFT TEMPLATE: replace every REPLACE value")
++      || specDraft.raw?.toString("utf8").includes("<!-- DRAFT TEMPLATE: replace every REPLACE value")) {
++      fail("BOOTSTRAP-BIND-DRAFT-INCOMPLETE", "author the generated PRD and Spec before bootstrap binding freezes their exact bytes");
++    }
++  }
+   const featureId = input.featureId;
+   // NVA-R1-LANGWIRE: a coordinator-sourced binding has no kickoff predecessor to
+   // inherit an operator-facing default from (plan.kickoff === null; unlike the
+@@ -7107,10 +7115,9 @@ function buildIntakePrdContent(checkpoint, featureId, designInputSha256, specSha
+     "## Notes",
+     "",
+     "This is a deterministic staging draft: product framing (What/Why/Scope/",
+-    "Non-goals/Risks/Alternatives/DoD) has not been synthesized. Binding",
+-    "(bootstrap-bind-apply, step 5) does not require this framing to exist",
+-    "yet -- it must be authored and reviewed before the plan is submitted for",
+-    "PO approval (pipeline-state submit-plan).",
++    "Non-goals/Risks/Alternatives/DoD) has not been synthesized. Author and",
++    "review this framing before bootstrap-bind-apply freezes the document",
++    "and before pipeline-state submit-plan requests final PO approval.",
+     "",
+     renderArchitectureDesignSkeleton().trimEnd(),
+     "",
+@@ -7130,9 +7137,9 @@ function buildIntakeSpecContent(checkpoint, featureId, designInputSha256) {
+     "",
+     "This is a deterministic staging draft: acceptance criteria (EARS),",
+     "detailed implementation, and alternatives have not been synthesized.",
+-    "Binding (bootstrap-bind-apply, step 5) does not require this to exist",
+-    "yet -- it must be authored and reviewed before the plan is submitted for",
+-    "PO approval (pipeline-state submit-plan).",
++    "Author and review the criteria and implementation detail before",
++    "bootstrap-bind-apply freezes the document and before pipeline-state",
++    "submit-plan requests final PO approval.",
+     "",
+     renderDesignTraceabilitySkeleton().trimEnd(),
+     "",
+@@ -7707,8 +7714,11 @@ export function observeBootstrapBindAcknowledgement({
+     fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing staging specification");
+   }
+   const acknowledged = [...prd.raw.toString("utf8").matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length === 1;
++  const draftIncomplete = prd.raw.toString("utf8").includes("<!-- DRAFT TEMPLATE: replace every REPLACE value")
++    || spec.raw.toString("utf8").includes("<!-- DRAFT TEMPLATE: replace every REPLACE value");
+   return {
+     acknowledged,
++    draftIncomplete,
+     // Kept as an explicit false for old callers that read the field.  A
+     // generated draft is no longer exempt: the acknowledgement binds the
+     // exact design artefacts that may enter implementation.
+diff --git a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+index 3283400b7..26a4bce5a 100644
+--- a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+@@ -140,25 +140,34 @@ function presentPlan(spec, options) {
+   try { return capture(() => run(["present-plan", "--by", "Fixture", "--review-receipt", "evidence/review-1.json"], f.deps)); }
+   finally { f.cleanup(); }
+ }
++// QG-04: preserve D64's same parser and bad-row evidence at the earlier
++// submission boundary. The original present-plan examiner remains below for
++// supported rows; this helper observes refusal before any presentation exists.
++function submissionAttempt(spec, options) {
++  try { const fixture = submittedRoot(spec, options); fixture.cleanup(); return { code: 0, stderr: "" }; }
++  catch (error) { return { code: 2, stderr: String(error.message) }; }
++}
+ const SUPPORTED_SHAPE_NAMES = [/\| # \| Criterion \| Evidence \|/u, /AC-<n>/u, /leading zero/u];
+ 
+-test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", () => {
++test("D64 submit-plan: an unsupported criterion shape or id is refused before mutation with the supported shapes named", () => {
+   for (const [label, spec, id] of [["four-column table", FOUR_COLUMN, "AC-1"], ["leading-zero id", LEADING_ZERO, "AC-01"]]) {
+-    const refused = presentPlan(spec, { governed: false });
++    const refused = submissionAttempt(spec, { governed: false });
+     assert.equal(refused.code, 2, label);
+-    assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, `${label}: ${refused.stderr}`);
++    assert.match(refused.stderr, /submit-plan blocked by CAC-CRITERION-UNSUPPORTED/u, `${label}: ${refused.stderr}`);
+     assert.ok(refused.stderr.includes(id), `${label}: names the offending id`);
+     for (const shape of SUPPORTED_SHAPE_NAMES) assert.match(refused.stderr, shape, `${label}: names the supported shapes`);
+   }
+ });
+ 
+-test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and a Spec with no criterion rows are not refused by it", () => {
+-  for (const [label, spec] of [["supported three-column", THREE_COLUMN], ["supported two-column", TWO_COLUMN], ["no criterion rows at all", "# Technical Spec\nGuard admission regression.\n"]]) {
++test("D64 present-plan (RED mirror): supported criterion shapes still reach the later receipt check", () => {
++  for (const [label, spec] of [["supported three-column", THREE_COLUMN], ["supported two-column", TWO_COLUMN]]) {
+     const result = presentPlan(spec, { governed: false });
+     assert.equal(result.code, 2, `${label}: the later receipt check still stops the bare fixture`);
+     assert.doesNotMatch(result.stderr, /CAC-CRITERION-UNSUPPORTED/u, `${label}: ${result.stderr}`);
+     assert.match(result.stderr, /present-plan refused \(DRR-/u, `${label}: ${result.stderr}`);
+   }
++  assert.match(submissionAttempt("# Technical Spec\nGuard admission regression.\n", { governed: false }).stderr,
++    /PLAN-SUBMIT-NO-CRITERION/u);
+ });
+ 
+ // AC-264 / D85 (PO decision 2026-10-22): a GOVERNED project's submit-plan also checks the delivery hand-off, so a Spec with no admitted row never reaches
+@@ -167,10 +176,11 @@ test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and
+ test("D64 present-plan with the delivery hand-off wired: governed root, one admitted row beside an unsupported one is still refused by D64; a Spec with no admitted row is refused at submit-plan", () => {
+   const mixed = `${LEADING_ZERO}\n| # | Criterion |\n| --- | --- |\n| 1 | A supported row beside the unsupported AC-01 |\n`;
+   assert.deepEqual(scanAcceptedCriterionRows(mixed).map((row) => row.id), ["AC-1"], "control: exactly one row is admitted, AC-01 is not");
+-  const refused = presentPlan(mixed);
++  const refused = submissionAttempt(mixed);
+   assert.equal(refused.code, 2);
+-  assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, refused.stderr);
+-  assert.throws(() => presentPlan(FOUR_COLUMN), /PLR-HANDOFF-NO-CRITERION/u, "submit-plan stops a governed Spec with no admitted row, before present-plan");
++  assert.match(refused.stderr, /submit-plan blocked by CAC-CRITERION-UNSUPPORTED/u, refused.stderr);
++  assert.match(submissionAttempt(FOUR_COLUMN).stderr, /CAC-CRITERION-UNSUPPORTED/u,
++    "submit-plan stops a governed Spec with no admitted row, before present-plan");
+ });
+ 
+ test("D64 criterion inspection: the located and the unsupported rows come from the parser's own scan", () => {
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 745baa214..f64075048 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -3685,6 +3685,14 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
+       // final package proof is verified by pipeline-state.mjs.
+       const checkpointProfile = checkpoint.value?.values?.profile ?? null;
+       const finalPackageProfile = new Set(["epic", "feature"]).has(checkpointProfile);
++      if (acknowledgement === null) {
++        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
++          repository, runtime, continuity, appServer, nextAction: null,
++          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_observation_unavailable",
++            "the generated design could not be inspected before binding",
++            "repair the generated PRD and Spec observation, then inspect again")],
++        });
++      }
+       const needsAcknowledgement = !finalPackageProfile && acknowledgement !== null
+         && acknowledgement.acknowledged === false;
+       // The generated Spec marker is a technical hash binding, not a PO
+@@ -3743,6 +3751,18 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
+           });
+         }
+       }
++      if (acknowledgement.draftIncomplete === true) {
++        return lifecycleResult({
++          status: "bootstrap-binding-required", root, runner, intent,
++          repository, runtime, continuity, appServer,
++          nextAction: { kind: "design-authoring-required", prdPath: acknowledgement.prd.path,
++            specPath: acknowledgement.spec.path,
++            guidance: "Author and review the generated PRD and Spec, then inspect again. Bootstrap binding freezes their exact bytes before plan submission." },
++          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_authoring_required",
++            "the generated PRD and Spec still contain draft framing",
++            "author both documents before bootstrap-bind-plan")],
++        });
++      }
+       let signatureObservation = null;
+       let signatureMode = false;
+       if (needsAcknowledgement) {
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 71c784666..ba8ed4b6f 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -9322,8 +9322,9 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     assert.equal(corrected.code, 0, stderr);
+     assert.equal(readOnboardingIntakeCheckpoint({ rootDir: path, spawn: fakeGit }).value.designQuestions[0].answer, "Ship safely and accessibly.");
+ 
+-    // Staging generated: bootstrap-binding-required, nextAction is the real
+-    // bootstrap-bind-plan command. Called directly (not through onboardingCli):
++    // Staging generated: bootstrap-binding-required, with a design authoring
++    // action before the bind command can freeze the generated draft.
++    // Called directly (not through onboardingCli):
+     // planOnboardingIntakeGenerate/applyOnboardingIntakeGenerate take `spawn`
+     // as their own top-level parameter, never nested under `deps` -- the CLI
+     // wrapper's `{ rootDir, deps }` call shape never actually threads a test's
+@@ -9347,8 +9348,9 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     const afterGenerate = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+     assert.equal(afterGenerate.status, "bootstrap-binding-required");
+     assert.equal(afterGenerate.continuity.status, "absent-pristine");
+-    assert.equal(afterGenerate.nextAction.kind, "command");
+-    assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
++    assert.equal(afterGenerate.nextAction.kind, "design-authoring-required");
++    assert.equal(afterGenerate.nextAction.prdPath, genApplied.targets.prd.path);
++    assert.equal(afterGenerate.nextAction.specPath, genApplied.targets.spec.path);
+ 
+     // Final-package profiles skip the early PO acknowledgement, but the
+     // generated PRD's technical Spec digest still has to be repaired before
+@@ -9375,8 +9377,7 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     assert.equal(markerRepair.code, 0, stderr);
+     assert.equal(markerRepair.result.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
+     const afterMarkerRepair = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+-    assert.equal(afterMarkerRepair.nextAction.kind, "command");
+-    assert.equal(afterMarkerRepair.nextAction.argv[1], "bootstrap-bind-plan");
++    assert.equal(afterMarkerRepair.nextAction.kind, "design-authoring-required");
+   } finally { dispose(path); }
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 54b3d799b..0af84dba2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -10766,7 +10766,32 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           return 2;
+         }
+       }
++      // A submission is the design freeze boundary. Validate the same physical
++      // Spec rows that presentation and dispatch consume before State changes.
++      const submissionSpec = physicalRebindFile(dir, authority.value.specPath);
++      let submissionSpecText = null;
++      try { submissionSpecText = submissionSpec ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(submissionSpec.bytes) : null; }
++      catch { submissionSpecText = null; }
++      if (submissionSpecText === null || submissionSpec.sha256 !== authority.value.specSha256) {
++        console.error("Error: submit-plan blocked by PLAN-SUBMIT-SPEC-UNAVAILABLE; the exact source Spec must be readable before submission.");
++        return 2;
++      }
++      const submissionCriteria = inspectSpecCriterionRows(submissionSpecText);
++      if (!submissionCriteria.ok) {
++        console.error(`Error: submit-plan blocked by ${submissionCriteria.code}; ${submissionCriteria.message}`);
++        return 2;
++      }
++      if (submissionCriteria.located.length === 0) {
++        console.error("Error: submit-plan blocked by PLAN-SUBMIT-NO-CRITERION; author a supported normative acceptance criterion before submission.");
++        return 2;
++      }
+       const submitHandoff = planHandoffRefusal("submit-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 })); if (submitHandoff) { console.error(submitHandoff); return 2; } // AC-264/D30/D85: refused before any write
++      const submitCandidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
++      if (!submitCandidate?.ok || !/^[a-f0-9]{40,64}$/u.test(submitCandidate.commit ?? "")
++        || !/^[a-f0-9]{40,64}$/u.test(submitCandidate.tree ?? "")) {
++        console.error("Error: submit-plan blocked by PLAN-SUBMIT-HEAD-UNAVAILABLE; resolve the current Git HEAD before submission.");
++        return 2;
++      }
+       const profileSha256 = sha256CanonicalJson(profile.value);
+       const expectedPlanSha256 = authority.value.planSha256;
+       const expectedSpecSha256 = authority.value.specSha256;
+@@ -10814,6 +10839,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+             planApprovalBriefing: submittedBriefing, rigorHistory: [...(observed.rigorHistory ?? []), submittedRigor] } };
+         },
+         beforeCommit: () => {
++          const currentCandidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
++          if (!currentCandidate?.ok || currentCandidate.commit !== submitCandidate.commit
++            || currentCandidate.tree !== submitCandidate.tree) return { ok: false, code: "PLAN-SUBMIT-HEAD-STALE" };
+           const currentSelection = inspectSelectedPlanProfile(dir, base);
+           if (!currentSelection.ok) return currentSelection;
+           if (currentSelection.profile !== null && currentSelection.profile !== profileName) {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2649dc88c..e74191a65 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1046,7 +1046,7 @@ function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailabl
+   mkdirSync(join(root, "project"), { recursive: true });
+   mkdirSync(join(root, planPath, ".."), { recursive: true });
+   mkdirSync(join(root, specPath, ".."), { recursive: true });
+-  const specBytes = Buffer.from("# Technical Spec\nOrdinary fixture authority.\n", "utf8");
++  const specBytes = Buffer.from("# Technical Spec\nOrdinary fixture authority.\n\n## Acceptance criteria\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | WHEN the plan is submitted, the system SHALL retain its sources. | test.mjs |\n", "utf8");
+   const specSha256 = sha256Hex(specBytes);
+   const planBytes = Buffer.from(`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${specSha256} -->\n# PRD\n${featureId}\n`, "utf8");
+   const planSha256 = sha256Hex(planBytes);
+@@ -1179,6 +1179,32 @@ function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailabl
+   return { root, deps, planPath, specPath, planSha256, specSha256 };
+ }
+ 
++// G25: submission must fail before the State writer observes either invalid
++// candidate identity or a criterion that the dispatch parser cannot locate.
++{
++  const fixture = planAuthorityFixture({ featureId: "g25-no-head", planPath: "specs/g25-no-head/prd_g25-no-head.md", specPath: "specs/g25-no-head/spec.md" });
++  const before = readFileSync(statePath(fixture.root), "utf8");
++  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "mini"], {
++    ...fixture.deps, gitCandidate: () => ({ ok: false, error: "HEAD unavailable" }),
++  }));
++  assert.equal(attempt.result, 2);
++  assert.ok(attempt.lines.some(line => line.includes("HEAD")), attempt.lines.join(" "));
++  assert.equal(readFileSync(statePath(fixture.root), "utf8"), before);
++}
++{
++  const fixture = planAuthorityFixture({ featureId: "g25-bad-criterion", planPath: "specs/g25-bad-criterion/prd_g25-bad-criterion.md", specPath: "specs/g25-bad-criterion/spec.md" });
++  const malformed = "# Technical Spec\n\n## Acceptance criteria\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-01 | WHEN submitted, the system SHALL retain sources. | test.mjs |\n";
++  writeFileSync(join(fixture.root, fixture.specPath), malformed);
++  const authority = fixture.deps.poGateAuthority().value;
++  const before = readFileSync(statePath(fixture.root), "utf8");
++  const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "mini"], {
++    ...fixture.deps, poGateAuthority: () => ({ ok: true, value: { ...authority, specSha256: sha256Hex(Buffer.from(malformed)) } }),
++  }));
++  assert.equal(attempt.result, 2);
++  assert.ok(attempt.lines.some(line => line.includes("CAC-CRITERION-UNSUPPORTED")), attempt.lines.join(" "));
++  assert.equal(readFileSync(statePath(fixture.root), "utf8"), before);
++}
++
+ function presentFeaturePlanArgs(deps, by = "coordinator") {
+   return ["present-plan", "--by", by, "--design-workflow-package", deps.designWorkflowPackagePath];
+ }
+@@ -1536,7 +1562,7 @@ function attendedFeaturePlanDeps(root, deps) {
+     "",
+     "Notes: reviewed and ready.",
+   ].join("\n"));
+-  writeFileSync(join(root, specPath), "# spec\n");
++  writeFileSync(join(root, specPath), "# spec\n\n## Acceptance criteria\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | WHEN the plan is submitted, the system SHALL preserve its source. | test.mjs |\n");
+   // This test authors a new draft after constructing its isolated authority
+   // fixture. Bind that fixture to the actual revised bytes before submission;
+   // a stale digest must remain refused by the production draft validator.
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 0da485542..efa7590a2 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -112,6 +112,11 @@ afterwards.
+ - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
+   acceptance criteria and implementation detail authored before binding.
+ 
++For a criterion table the delivery parser accepts, use `| # | Criterion |
++Evidence |` and a row such as `| AC-1 | WHEN the project is submitted, the
++system SHALL retain its reviewed sources. | tests/submission.test.mjs |`.
++`AC-01` has a leading zero and is not a supported criterion ID.
++
+ **These are drafts, not the finished design.** They are provenance plus
+ scaffolding, not the captured material — the agent is expected to author them
+ into a real PRD and Spec against the quality bar in `kickoff-design.md`

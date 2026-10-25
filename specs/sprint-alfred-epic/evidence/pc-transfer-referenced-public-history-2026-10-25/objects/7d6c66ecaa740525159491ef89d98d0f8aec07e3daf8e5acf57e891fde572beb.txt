@@ -1,0 +1,63 @@
+command: node --test scratch/clones/k150b-g31/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+label: k150b-g31-red-v2
+exitCode: 1
+head: b062173423dd17ce1a8d56ee4bbb3e86e4569e42
+tree: d8c0f5032b41a6b60af08ed6d5e96dae20a4991b
+dirty: true
+--- stdout ---
+✖ K150B: a long material path retains its full identity and digest in the disclosure (10.154973ms)
+✖ K150B: multi-kilobyte nested path still gives a bounded exact locator (1.751016ms)
+✔ K150B: malformed digest and control-bearing material paths refuse (1.312494ms)
+✔ G31: human-facing critical authorization names the external proof (1.583669ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 673.920876
+
+✖ failing tests:
+
+test at scratch/clones/k150b-g31/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:9:1
+✖ K150B: a long material path retains its full identity and digest in the disclosure (10.154973ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(lines.some(line => line.includes("full path") && line.includes("record")))
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/k150b-g31/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:15:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scratch/clones/k150b-g31/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:20:1
+✖ K150B: multi-kilobyte nested path still gives a bounded exact locator (1.751016ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(lines.every(line => line.length <= 300))
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/k150b-g31/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:25:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

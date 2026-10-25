@@ -1,0 +1,77 @@
+# C7 bundled protected ceremony - hunks by section
+
+## D30 - plan-readiness hand-off call sites (AC-264, ALF-B27-D30B)
+
+Target: plugins/pipeline-core/scripts/pipeline-state.mjs (protected, PB-SANCTIONED-WRITER) - one import and two call sites; no helper is added
+(the two blocks are four lines each and share no state). approve-plan is NOT a call site: a refusal there burns the PO's signature.
+The unprotected half (lib/plan-handoff-readiness.mjs, the scanAcceptedCriterionRows export, regression cases R1-R6) is already in the tree.
+Full result: scratch/c7/pipeline-state.patched.mjs (copy of the real file with exactly these three hunks; `diff` against the real file is the authoritative hunk list).
+The three regions are non-adjacent: one ceremony per region, or one Edit whose old_string spans them (CLAUDE.md, ceremony paragraph).
+
+### D30-1 - import block, directly after the architecture-design import (original line 440)
+
+Anchor / before (must match exactly once):
+```js
+import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+```
+
+After:
+```js
+import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";
+import { inspectPlanDeliveryHandoff } from "../lib/plan-handoff-readiness.mjs";
+```
+
+### D30-2 - case "submit-plan": after the inspectArchitectureDesignDraft block (closing brace at original line 10765), before `const profileSha256`
+
+Anchor / before (must match exactly once):
+```js
+          console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+          return 2;
+        }
+      }
+      const profileSha256 = sha256CanonicalJson(profile.value);
+```
+
+After:
+```js
+          console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+          return 2;
+        }
+      }
+      // AC-264 / D30: a governed Spec that could not be handed off to a delivery briefing is refused here, before anything is recorded.
+      const planHandoff = inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 });
+      if (!planHandoff.ok) {
+        console.error(`Error: submit-plan blocked by ${planHandoff.code}${planHandoff.path ? ` (${planHandoff.path})` : ""}: ${planHandoff.message}. No submission or signature request was recorded.`);
+        return 2;
+      }
+      const profileSha256 = sha256CanonicalJson(profile.value);
+```
+
+### D30-3 - case "present-plan": after the lifecycle check (closing brace at original line 10972), before the approval request is written (original line 10986)
+
+Anchor / before (must match exactly once):
+```js
+      const submitted = base.planSubmission;
+      const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+```
+
+After:
+```js
+      const submitted = base.planSubmission;
+      // AC-264 / D30: re-check the exact submitted Spec before the signature request is written; approve-plan is deliberately not a call site (a refusal there burns the signature).
+      const planHandoff = inspectPlanDeliveryHandoff({ rootDir: dir, specPath: submitted?.specPath, expectedSpecSha256: submitted?.specSha256 });
+      if (!planHandoff.ok) {
+        console.error(`Error: present-plan blocked by ${planHandoff.code}${planHandoff.path ? ` (${planHandoff.path})` : ""}: ${planHandoff.message}. No presentation or approval request was recorded.`);
+        return 2;
+      }
+      const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+```
+
+### Proof (the way C4 was proven: scratch copies, real layout mirrored by symlinks, no text rewritten)
+
+Run once unpatched (baseline) and once patched, each as `node <mirror>/plugins/pipeline-core/scripts/pipeline-state.test.mjs` with a private TMPDIR outside the checkout, cwd = repository root.
+- baseline: exit 1, PASS lines 0, FAIL lines 0, last line: "Node.js v24.22.0"
+- patched: exit 1, PASS lines 0, FAIL lines 0, last line: "Node.js v24.22.0"
+- PASS-line sequences identical between baseline and patched: true
+- reference: the real (non-mirrored) GREEN run, scratch/evidence-d30b-green.txt, has 18 PASS lines
+- the ungoverned fixtures of the existing suite skip the new check (PLR-NO-GOVERNANCE before the Spec is read), so equal counts are the expected result; a difference would be a finding.

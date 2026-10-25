@@ -1,0 +1,205 @@
+diff --git a/docs/audit-and-evidence.md b/docs/audit-and-evidence.md
+index de3381755..0618e73b4 100644
+--- a/docs/audit-and-evidence.md
++++ b/docs/audit-and-evidence.md
+@@ -1,11 +1,11 @@
+ # Audit and evidence
+ 
+-Agent Pipeline helps a team retain reviewable delivery evidence. It does not certify compliance, grant an approval, or replace an auditor's assessment. Evidence is useful when it stays bound to the exact candidate and when its limits remain visible.
++Agent-Pipeline helps a team retain reviewable delivery evidence. It does not certify compliance, grant an approval, or replace an auditor's assessment. Evidence is useful when it stays bound to the exact candidate and when its limits remain visible.
+ 
+ ## What an audit package can contain
+ 
+ - A Verify receipt records the command, candidate commit and tree, individual suite results, and the resulting status. It is evidence of that run, not a statement that every control or legal obligation is satisfied.
+-- An [Audit Bundle](audit-bundles.md) is a create-only, offline-verifiable copy of a validated Feature Package. Its manifest binds the candidate, policy digest, copied artifacts, and their digests. Signing is a separate operation; what a signature does not establish is stated in [what a successful check means](audit-bundles.md#what-a-successful-check-means).
++- An [Audit Bundle](audit-bundles.md) is a create-only, offline-verifiable copy of a validated Feature Package (see the [Terms](README.md#terms-used-across-these-documents)). Its manifest binds the candidate, policy digest, copied artifacts, and their digests. Signing is a separate operation; what a signature does not establish is stated in [what a successful check means](audit-bundles.md#what-a-successful-check-means).
+ - The [Evidence Viewer](evidence-viewer.md) makes a static offline projection for review. A broken package is labelled invalid, and a view cannot change governance authority. Use its redacted sharing mode when source paths or other private details should not travel with the report.
+ - [Governance replay](governance-replay.md) reconstructs a lifecycle timeline from retained, verified events. An incomplete, stale, prefix-valid, or invalid stream is unavailable; the viewer does not turn partial history into an authoritative narrative.
+ 
+@@ -14,9 +14,11 @@ The optional audit and evidence CLIs are explicit local entry points. They do no
+ ## A safe review path
+ 
+ First complete the planned delivery flow and prepare the Feature Package in
+-`specs/<feature-id>/`. The bundle `plan` command takes the package's lifecycle
+-manifest (`specs/<feature>/lifecycle.json`) and refuses an invalid package or a
+-missing candidate binding; the full layout is defined in the
++`specs/<feature-id>/` (the feature's folder name under `specs/`). The bundle
++`plan` command takes the package's lifecycle manifest
++(`specs/<feature-id>/lifecycle.json`) and refuses an invalid package or a
++missing candidate binding; it also needs an approved organization policy pack
++(see [Audit bundles](audit-bundles.md)). The full layout is defined in the
+ [canonical artifact topology](artifact-topology.md) (maintainer reference).
+ Then start with that
+ package and its candidate-bound Verify receipt. Validate the package before
+diff --git a/docs/audit-bundles.md b/docs/audit-bundles.md
+index faa0c4a51..738197951 100644
+--- a/docs/audit-bundles.md
++++ b/docs/audit-bundles.md
+@@ -1,7 +1,8 @@
+ # Audit bundles
+ 
+ An Audit Bundle is a create-only, offline-verifiable copy of the validated
+-artifacts of one completed Feature Package. Its manifest binds the exact
++artifacts of one completed Feature Package (see the
++[Terms](README.md#terms-used-across-these-documents)). Its manifest binds the exact
+ candidate commit/tree, every copied byte digest, and the resolved organization
+ policy digest. It is evidence, not governance authority and not a release or
+ compliance claim.
+@@ -12,11 +13,13 @@ JSON and confirm its compatibility with the selected Core version using the
+ an explicit governance input, not a file the Audit Bundle command creates or
+ an authority substitute. If there is no approved pack, stop rather than
+ inventing one. Then use the local CLI to emit a reviewable plan, build from
+-that plan, and verify an existing bundle:
++that plan, and verify an existing bundle. `<plugin-root>` is the installed
++plugin directory (the command convention in the [documentation map](README.md));
++`<feature-id>` is the Feature Package's folder name under `specs/`:
+ 
+ ```bash
+ node <plugin-root>/scripts/audit-bundle.mjs plan \
+-  --repo "$PWD" --manifest specs/<feature>/lifecycle.json \
++  --repo "$PWD" --manifest specs/<feature-id>/lifecycle.json \
+   --bundle-id <bundle-id> --core-version <core-version> \
+   --pack-file <policy-pack.json>
+ ```
+diff --git a/docs/cost-and-measurement.md b/docs/cost-and-measurement.md
+index 410c00812..79079455e 100644
+--- a/docs/cost-and-measurement.md
++++ b/docs/cost-and-measurement.md
+@@ -1,4 +1,4 @@
+-# What real trial data says about effort
++# Cost and measurement: what real trial data says about effort
+ 
+ Agent-Pipeline adds planning, review, verification and controlled delivery to
+ an agent-led software workflow. That creates real coordination and waiting
+@@ -8,7 +8,8 @@ runners.
+ 
+ ## Observations from small greenfield runs
+ 
+-Three 0.6.2 sessions exercised meaningful lifecycle work in Claude Code,
++Three 0.6.2 sessions (Greenfield runs, see the
++[Terms](README.md#terms-used-across-these-documents)) exercised meaningful lifecycle work in Claude Code,
+ Codex and Antigravity. The scopes, environments and measurement methods were
+ not identical, so the figures must not be ranked as a runner benchmark.
+ 
+@@ -18,10 +19,13 @@ not identical, so the figures must not be ranked as a runner benchmark.
+ | Claude Code | About 89 minutes machine-observed; the report attributes about 31 minutes to dispatched product/quality work and estimates administration at roughly 55% of its session time. | A Critic found a missing restart-test assertion; the signed push and audit path completed. Time categories and administration share are the runner's estimates. |
+ | Codex | Recovery, verification and worker-dispatch paths were exercised; an under-delivering worker was replaced by a fresh dispatch. | The summary does not provide directly comparable wall-time or token figures. Do not infer a cost number from this run. |
+ 
+-The detailed [three-runner findings](../backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md)
+-retain the evidence boundaries and specific follow-ups.
++The detailed three-runner findings (maintainer reference, not part of a
++consuming project: `backlog/evidence/2026-09-11-greenfield-062-three-runner-findings.md`
++in the plugin's own repository) retain the evidence boundaries and specific
++follow-ups.
+ 
+-One separate Claude happy-path transcript covered a tiny minigame from kickoff
++A different Claude session, not the Claude Code run in the table, was one
++separate happy-path transcript. It covered a tiny minigame from kickoff
+ through attempted push. It spans 1 hour 37 minutes 53 seconds; the forensic
+ accounting attributes 77 minutes 34 seconds to Pipeline-operation phases and
+ 17 minutes 15 seconds to waiting for a human response. **The push was
+@@ -44,6 +48,12 @@ quality and recovery as well as speed. Subscription allowance and model access
+ vary by provider, plan and task, so these repository observations cannot
+ predict your bill or plan usage.
+ 
++## What is not measured yet
++
++The Greenfield runs are too heterogeneous to establish a cross-runner cost
++ranking or a representative consumer-overhead estimate. Comparable
++multi-runner task telemetry is still needed before making those claims.
++
+ ## Proposed item and waiting measurements
+ 
+ For item-owned delivery (one Goldfish per complete outcome, see
+@@ -54,7 +64,7 @@ identity, correction rounds, targeted-check executions and requalification
+ reasons with the actual candidate. These are proposed measurements, not
+ collected results. Compare identical original criteria and outcomes before
+ claiming fewer handoffs, shorter item closure or less waiting. No performance
+-guarantee follows from the new policy.
++guarantee follows from item-owned delivery.
+ 
+ ## Maintainer reference: 0.7 verification measurements
+ 
+@@ -72,9 +82,3 @@ do not authorize changing pool width, moving a suite out of a serial lane, or
+ reusing a receipt; those choices still require evidence about isolation and
+ candidate-bound inputs and outputs. They also do not measure the cost of a
+ consuming project's full agent workflow.
+-
+-## What is not measured yet
+-
+-The Greenfield runs are too heterogeneous to establish a cross-runner cost
+-ranking or a representative consumer-overhead estimate. Comparable
+-multi-runner task telemetry is still needed before making those claims.
+diff --git a/docs/parallel-work.md b/docs/parallel-work.md
+index 93341e755..d5774e15e 100644
+--- a/docs/parallel-work.md
++++ b/docs/parallel-work.md
+@@ -45,7 +45,8 @@ estimate is currently available.
+ 
+ Parallelism is scheduled across complete, independently verifiable outcomes,
+ not across analysis, test authorship and code for the same item. The
+-Coordinator declares file owners before dispatch; an item that collides with an
++Coordinator (see the [Terms](README.md#terms-used-across-these-documents))
++declares file owners before dispatch; an item that collides with an
+ active owner waits. The per-item steps and their trade-off are in the
+ [delivery step table](../PIPELINE_FLOW.md#3-deliver-in-independently-checkable-packages).
+ 
+@@ -59,12 +60,10 @@ The review budget and the rules for retaining evidence are stated once in
+ 
+ ## After a cancelled slice
+ 
+-After a slice was cancelled with the class `wrong-premise`, the briefing
+-generator refuses to brief a new dispatch for the same item
+-(`DBG-RECON-REQUIRED`) until a recon note is referenced: the `reconNote` field
+-of the briefing package, or `--recon-note` on the binding route, naming a
+-non-empty file under `scratch/` or `specs/`. The duty ends once a slice of that
+-item has been delivered (integrated into the candidate).
++If a slice was cancelled as `wrong-premise`, the briefing generator refuses a
++new dispatch for the same item (`DBG-RECON-REQUIRED`). Repair: write a
++non-empty recon note under `scratch/` or `specs/` and reference it as the
++briefing's `reconNote` (`--recon-note` on the binding route).
+ 
+ ## Runner boundary
+ 
+diff --git a/docs/security-controls.md b/docs/security-controls.md
+index 04ce33fa0..020ac5548 100644
+--- a/docs/security-controls.md
++++ b/docs/security-controls.md
+@@ -1,12 +1,12 @@
+ # Security controls
+ 
+-Agent Pipeline provides security-oriented checks and evidence contracts for a delivery candidate. They reduce specific risks; they are not a warranty that a repository, deployment, or organization is secure or compliant.
++Agent-Pipeline provides security-oriented checks and evidence contracts for a delivery candidate. They reduce specific risks; they are not a warranty that a repository, deployment, or organization is secure or compliant.
+ 
+ ## What is checked
+ 
+-The [security control catalog](../governance/security-controls/catalog.json) defines applicable controls, their evidence binding, and waiver expiry. Its NIST SSDF and OWASP ASVS mappings help teams connect a local control to a framework, but the catalog is not an automatically active scanner or runner control. A caller must resolve and evaluate it.
++The security control catalog (`governance/security-controls/catalog.json`, a maintainer source reference in the plugin's own repository, not a file your project has) defines applicable controls, their evidence binding, and waiver expiry. Its NIST SSDF and OWASP ASVS mappings help teams connect a local control to a framework, but the catalog is not an automatically active scanner or runner control. A caller must resolve and evaluate it.
+ 
+-The Verify security scan combines configured adapters for secret detection, dependency vulnerability scanning, static analysis, and license checks. The scanners behind the first three categories are named in [SETUP](../SETUP.md); no license-check tool is named in the public documentation. A skipped adapter is not a pass, and an adapter error fails closed in the completeness result. Scanner findings still have the limits of their rules, available inputs, and execution environment. They do not prove the absence of all vulnerabilities, insecure configuration, or operational exposure.
++The Verify security scan combines configured adapters for secret detection, dependency vulnerability scanning, static analysis, and license checks. The scanners behind the first three categories are named in [SETUP](../SETUP.md); the license check is a built-in control, not a third-party tool. A skipped adapter is not a pass, and an adapter error fails closed in the completeness result. Scanner findings still have the limits of their rules, available inputs, and execution environment. They do not prove the absence of all vulnerabilities, insecure configuration, or operational exposure.
+ 
+ ## Guard enforcement
+ 
+diff --git a/docs/sprint-alfred-completion-report.md b/docs/sprint-alfred-completion-report.md
+index c870ac92b..d4d8fdca2 100644
+--- a/docs/sprint-alfred-completion-report.md
++++ b/docs/sprint-alfred-completion-report.md
+@@ -11,7 +11,7 @@
+ 
+ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint Alfred** erbrachten technischen Leistungen, architektonischen Entscheidungen, Schemata, Guardrail-Verschärfungen, Modul-Karten und geschlossenen Backlog-Items gemäß dem **Operating Model §3.3** und der **Sprint Alfred Spezifikation** (`specs/sprint-alfred-epic/spec.md`).
+ 
+-**Audit-Grenzen (14. September 2026):** Dieser Nachtrag wertet vorhandene Code- und Evidenzartefakte sowie einen begrenzten Audit-Lauf aus. Er ist weder ein Full-Workspace- noch ein Release-Verify und ersetzt weder Push- noch PO-Abnahme. Der Audit-Lauf im Work-Modus wählte und bestand 88 Journal-Schritte; diese Zahl ist keine Aussage darüber, dass sämtliche im Repository registrierten Suiten ausgeführt wurden. Die Suite-Registrierungsprüfung erfasste separat 529 Testdateien gegenüber 564 Registrierungs- beziehungsweise Opt-out-Einträgen; sie prüft Zuordnung, nicht den Erfolg jeder Suite.
++**Audit-Grenzen (14. September 2026):** Dieser Nachtrag wertet vorhandene Code- und Evidenzartefakte sowie einen begrenzten Audit-Lauf aus. Er ist weder ein Full-Workspace- noch ein Release-Verify und ersetzt weder Push- noch PO-Abnahme. Der Audit-Lauf im Work-Modus wählte und bestand 88 Journal-Schritte; diese Zahl ist keine Aussage darüber, dass sämtliche im Repository registrierten Suiten ausgeführt wurden. Die Suite-Registrierungsprüfung erfasste separat 529 Testdateien gegenüber 564 Registrierungs- beziehungsweise Opt-out-Einträgen; sie prüft Zuordnung, nicht den Erfolg jeder Suite. Die beiden Zahlen zählen Verschiedenes: Die 564 sind Einträge aus drei Registrierungslisten (`TEST_SUITES`, `SCOPED_VERIFY_SUITES`, `WINDOWS_ASSURANCE_VERIFY_SUITES`) plus Opt-outs, nicht Dateien.
+ 
+ ---
+ 
+@@ -21,7 +21,7 @@ Dieser Bericht dokumentiert lückenlos und kritisch alle im Rahmen des **Sprint
+ - **Ergebnis:** 
+   - **Alle 25 Sprint-Alfred Backlog-Items** sind als geschlossen dokumentiert, mit vollständiger 4-Feld-Closure (`closedAt`, `closureRepository: "self"`, `closureCommit`, `closureEvidence`) und im Transitions-Ledger nach dem strengen **GG-22-Protokoll** abgeglichen (`check-backlog-state.mjs` gültig mit den bekannten, akzeptierten historischen Diagnosen). Das ist eine Aussage über die Backlog-Closure, nicht über die vollständige Erfüllung der Epic-Anforderungen: Track D ist nur teilweise implementiert (siehe unten).
+   - **Suite-Registrierung und Audit-Lauf:** Zahlen und Grenzen (Zuordnungscheck, begrenzter Work-Modus-Lauf, kein Full-Workspace- oder Release-Verify) stehen einmal im Absatz „Audit-Grenzen“ oben.
+-  - **Critic-Skip-Coverage:** Die Zählung von 15 evidenced, 9 skipped und 17 legacy ist der historische Closure-Baseline-Stand. Der aktuelle Backlog-Checker ist mit den bekannten, akzeptierten historischen Diagnosen gültig; daraus folgt keine gegenwartsbezogene „0 Findings“-Garantie.
++  - **Critic-Skip-Coverage:** Die Zählung von 15 evidenced, 9 skipped und 17 legacy ist der historische Closure-Baseline-Stand. Diese 41 sind nicht die 25 Sprint-Alfred-Items von oben: Die Summe übersteigt 25, die Zählung betrifft also eine andere, größere Menge; welche, belegt dieser Bericht nicht. Der aktuelle Backlog-Checker ist mit den bekannten, akzeptierten historischen Diagnosen gültig; daraus folgt keine gegenwartsbezogene „0 Findings“-Garantie.
+   - **Track D (Agent-First Architecture Standard):** Teilweise implementiert. ADR-Kontinuität, Modul-Inventory, Concept Map Bundle und der Fitness-Evaluator sind vorhanden. Die produktive Push-Anbindung und die dauerhafte Checkpoint-Schuld für AC-18 fehlen noch; die Repository-Adoption ist aufgeschoben.
+   - **Mechanische Governance & Schutzlinien (Tracks A & B):** Plan-Authority-Sealing, dynamischer Schutz geschlossener Evidenzen, attendiertes PO-Acknowledge-Routing, deklarative Testsuite-Registrierung (`harness/verify-suites.json`), sanktionierte Design-Trailer (`Dispatch: design (elephant)`).
+   - **3-Runner-Verdrahtung:** Code- und Hook-Verdrahtung sowie fokussierte Contract-Suites sind vorhanden. Native Claude- und Antigravity-Hooks wurden in diesem Audit nicht live ausgeführt; daraus folgt keine Zertifizierung nativer Live-Durchsetzung. Als begrenzte lokale Beobachtung liegt allein ein erfolgreicher Codex-Bootstrap vor.

@@ -1,0 +1,8 @@
+import {readFileSync, statSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const root='scratch/agent-out/retired-course-content-adjudication/';
+const pointer=JSON.parse(readFileSync('specs/sprint-alfred-epic/evidence/delivery-status-current.json'));
+const files=[root+'report.md',root+'bootstrap.md',root+'routes.md',root+'generator.md',root+'resource-observations.json',pointer.snapshot,'docs/adr/0085-one-review-one-signature-design-approval.md','specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md','specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md','specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md','specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md',...['codex-bootstrap-in-the-typed-next-action','design-course-run-v2-refuses-its-own-documented-routes','design-generator-repeats-large-source-material'].map(n=>'plugins/pipeline-core/lib/pins/'+n+'.test.mjs')];
+const artifacts=files.map(path=>({path,bytes:statSync(path).size,sha256:createHash('sha256').update(readFileSync(path)).digest('hex')}));
+if(artifacts.find(a=>a.path===pointer.snapshot).sha256!==pointer.sha256)throw Error('snapshot pointer mismatch');
+console.log(JSON.stringify({scope:'read-only artifact existence and snapshot hash; no behavior execution',owner:'RETIRED-COURSE-CONTENT-ADJUDICATION',artifacts,pointerIntegrity:'pass'},null,2));

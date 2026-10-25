@@ -1,0 +1,1005 @@
+diff --git a/plugins/pipeline-core/lib/authority-restore.test.mjs b/plugins/pipeline-core/lib/authority-restore.test.mjs
+new file mode 100644
+index 000000000..8f6e16c95
+--- /dev/null
++++ b/plugins/pipeline-core/lib/authority-restore.test.mjs
+@@ -0,0 +1,207 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * authority-restore.test.mjs -- D31 / AC-115 (PO decisions D31, D137): an approved Spec that is
++ * edited gets (1) a pre-edit warning naming the consequence and the runnable alternatives and
++ * (2) a typed, digest-checked self-revert that restores the exact approved bytes.
++ */
++import test from "node:test";
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
++import { createGovernanceScopeController } from "./governance-scope.mjs";
++import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
++import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
++import { isSanctionedLifecycleCommand } from "./guard/command-catalogue.mjs";
++import { applyAuthorityRestore, main, planAuthorityRestore } from "../scripts/authority-restore.mjs";
++
++const SCRIPT = fileURLToPath(new URL("../scripts/authority-restore.mjs", import.meta.url));
++const sha = (text) => createHash("sha256").update(text).digest("hex");
++const PRD = "# PRD\nApproved requirements.\n";
++const SPEC = "# Spec\nApproved design.\n";
++const EDITED = "# Spec\nEdited design.\n";
++const readyStub = () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" });
++
++function git(root, ...args) {
++  const r = spawnSync("git", ["-C", root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", ...args], { encoding: "utf8" });
++  assert.equal(r.status, 0, r.stderr);
++  return r.stdout.trim();
++}
++
++function fixture() {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "k42-restore-")));
++  git(root, "init", "-q");
++  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
++  const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-guard-fixture" });
++  assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).requiresEnforcement, true);
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  mkdirSync(join(root, "specs", "feat"), { recursive: true });
++  writeFileSync(join(root, "pipeline.user.yaml"), "marker\n");
++  writeFileSync(join(root, "specs/feat/prd.md"), PRD);
++  writeFileSync(join(root, "specs/feat/spec.md"), SPEC);
++  writeFileSync(join(root, "notes.md"), "free notes\n");
++  const state = {
++    schema: "pipeline.state.v0",
++    activeFeature: { id: "feat", planPath: "specs/feat/prd.md", phase: "implementation" },
++    planApproved: true,
++    planSubmission: { submittedAt: "2026-08-28T11:00:00.000Z" },
++    planApproval: { approvedAt: "2026-08-28T12:00:00.000Z" },
++    continuity: {
++      schema: "pipeline.continuity.v0", featureId: "feat", revision: 1,
++      authority: {
++        prd: { path: "specs/feat/prd.md", sha256: sha(PRD) },
++        spec: { path: "specs/feat/spec.md", sha256: sha(SPEC) },
++      },
++    },
++  };
++  writeFileSync(join(root, ".claude/pipeline-state.json"), JSON.stringify(state));
++  git(root, "add", "specs", "notes.md");
++  git(root, "commit", "-q", "-m", "approved documents");
++  return { root, statePath: join(root, ".claude/pipeline-state.json"), specPath: join(root, "specs/feat/spec.md") };
++}
++
++const editCall = (file) => ({ tool_name: "Edit", tool_input: { file_path: file, old_string: "Approved", new_string: "Changed" } });
++const guard = (root, call) => evaluateLifecycleReadyGuard(call, { projectDir: root, requireProjectOnboardingReadyFn: readyStub });
++
++function quietly(fn) {
++  const err = console.error;
++  const log = console.log;
++  const lines = [];
++  console.error = (...a) => { lines.push(a.join(" ")); };
++  console.log = (...a) => { lines.push(a.join(" ")); };
++  try { return { result: fn(), lines }; } finally { console.error = err; console.log = log; }
++}
++
++test("an Edit of the bound approved Spec is refused with the consequence and the runnable alternatives", () => {
++  const { root, specPath } = fixture();
++  try {
++    const verdict = guard(root, editCall(specPath));
++    assert.equal(verdict.exitCode, 2);
++    assert.match(verdict.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/);
++    assert.match(verdict.stderr, /approval is invalidated/u, "names the consequence of an edit that gets through");
++    assert.match(verdict.stderr, /design lock/u);
++    assert.match(verdict.stderr, /reopen-design --by/u, "names the design route");
++    assert.ok(verdict.stderr.includes(`${SCRIPT} restore --root ${root}`), "names the exact runnable self-revert command");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("an Edit of an unbound file carries no authority warning", () => {
++  const { root } = fixture();
++  try {
++    const verdict = guard(root, editCall(join(root, "notes.md")));
++    assert.equal(verdict.exitCode, 0);
++    assert.doesNotMatch(verdict.stderr ?? "", /approval is invalidated|authority-restore/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("restore writes the exact approved bytes back and leaves Pipeline State untouched", () => {
++  const { root, statePath, specPath } = fixture();
++  try {
++    writeFileSync(specPath, EDITED);
++    const stateBefore = readFileSync(statePath);
++    const planned = planAuthorityRestore(root);
++    assert.equal(planned.status, "restorable");
++    const applied = applyAuthorityRestore(root);
++    assert.equal(applied.status, "restored");
++    assert.deepEqual(applied.written, ["specs/feat/spec.md"]);
++    assert.equal(sha(readFileSync(specPath, "utf8")), sha(SPEC), "approved bytes are back");
++    assert.deepEqual(readFileSync(statePath), stateBefore, "State is not written by a restore");
++    const again = planAuthorityRestore(root);
++    assert.equal(again.code, "AUTHORITY-RESTORE-NOTHING-EDITED", "the approval is valid again: working digest equals the approved one");
++    assert.equal(guard(root, editCall(specPath)).exitCode, 2, "the lock still protects the restored document");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("restore refuses when the source bytes are not the approved ones: one repair, nothing written", () => {
++  const { root, statePath, specPath } = fixture();
++  try {
++    writeFileSync(specPath, EDITED);
++    git(root, "add", "specs");
++    git(root, "commit", "-q", "-m", "edited spec was committed");
++    writeFileSync(specPath, "# Spec\nFurther local edit.\n");
++    const stateBefore = readFileSync(statePath);
++    const working = readFileSync(specPath);
++    const refused = applyAuthorityRestore(root);
++    assert.equal(refused.ok, false);
++    assert.equal(refused.code, "AUTHORITY-RESTORE-SOURCE-MISMATCH");
++    assert.match(refused.repair, /--commit <full sha>/u);
++    assert.match(refused.repair, /reopen-design/u);
++    assert.deepEqual(refused.written, []);
++    assert.deepEqual(readFileSync(specPath), working, "working file untouched");
++    assert.deepEqual(readFileSync(statePath), stateBefore, "State untouched");
++    // The documented repair works: the older commit holds the approved bytes.
++    const old = git(root, "rev-list", "--max-parents=0", "HEAD");
++    assert.equal(applyAuthorityRestore(root, { commit: old }).status, "restored");
++    assert.equal(readFileSync(specPath, "utf8"), SPEC);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("restore is refused when nothing was edited, and when the binding is released", () => {
++  const { root, statePath } = fixture();
++  try {
++    const nothing = applyAuthorityRestore(root);
++    assert.equal(nothing.code, "AUTHORITY-RESTORE-NOTHING-EDITED");
++    assert.deepEqual(nothing.written, []);
++    const state = JSON.parse(readFileSync(statePath, "utf8"));
++    state.planInvalidation = { schema: "pipeline.plan-invalidation.v1", invalidatedAt: "2026-08-28T13:00:00.000Z" };
++    writeFileSync(statePath, JSON.stringify(state));
++    assert.equal(applyAuthorityRestore(root).code, "AUTHORITY-RESTORE-NOT-BOUND");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("restore refuses a State whose approval binding disagrees with the continuity digest", () => {
++  const { root, statePath, specPath } = fixture();
++  try {
++    const state = JSON.parse(readFileSync(statePath, "utf8"));
++    state.planApproval.poGateAuthority = { planSha256: sha(PRD), specSha256: sha("other") };
++    writeFileSync(statePath, JSON.stringify(state));
++    writeFileSync(specPath, EDITED);
++    assert.equal(applyAuthorityRestore(root).code, "AUTHORITY-RESTORE-STATE-INCONSISTENT");
++    assert.equal(readFileSync(specPath, "utf8"), EDITED);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("the CLI parser is closed: wrong root, unknown flag, duplicate flag and short commit are exit 2", () => {
++  const { root, specPath } = fixture();
++  try {
++    writeFileSync(specPath, EDITED);
++    for (const argv of [
++      ["restore"], ["restore", "--root", join(root, "..")], ["restore", "--root", root, "--force", "1"],
++      ["restore", "--root", root, "--root", root], ["restore", "--root", root, "--commit", "abc123"], ["bogus", "--root", root],
++    ]) assert.equal(quietly(() => main(argv, root)).result, 2, JSON.stringify(argv));
++    assert.equal(readFileSync(specPath, "utf8"), EDITED, "no refusal wrote anything");
++    assert.equal(quietly(() => main(["restore", "--root", root], root)).result, 0);
++    assert.equal(readFileSync(specPath, "utf8"), SPEC);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("a session in partial readiness can still run the restore (and not an arbitrary node script)", () => {
++  const { root } = fixture();
++  try {
++    const partial = () => { throw new ProjectOnboardingReadyError("PORG-NOT-READY", "partial", { intent: "session", lifecycleStatus: "partial" }); };
++    const bash = (command) => evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } },
++      { projectDir: root, requireProjectOnboardingReadyFn: partial });
++    assert.equal(bash("git restore specs/feat/spec.md").exitCode, 2, "the generic route stays refused");
++    const typed = bash(`node ${SCRIPT} restore --root ${root}`);
++    assert.equal(typed.exitCode, 0, `the typed route is admitted: ${typed.stderr}`);
++    assert.equal(bash(`node ${join(root, "evil.mjs")} restore --root ${root}`).exitCode, 2);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("the guard admits exactly the restore and inspect argv shapes", () => {
++  const { root } = fixture();
++  try {
++    const ok = (tail) => isSanctionedLifecycleCommand(`node ${SCRIPT} ${tail}`, root);
++    assert.equal(ok(`restore --root ${root}`), true);
++    assert.equal(ok(`inspect --root ${root}`), true);
++    assert.equal(ok(`restore --root ${root} --commit ${"a".repeat(40)}`), true);
++    assert.equal(ok(`restore --root ${root} --commit abc123`), false);
++    assert.equal(ok(`restore --root ${join(root, "x")}`), false);
++    assert.equal(ok(`restore --root ${root} --force 1`), false);
++    assert.equal(ok(`apply --root ${root}`), false);
++    assert.equal(ok("restore"), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index c9cd0906e..cc342fd04 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { ARCHITECTURE_BASELINE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+@@ -210,6 +210,25 @@ function sanctionedArchitectureBaselineArgs(args, root) {
+   return !(has("--diff") && (has("--from") || has("--through"))) && has("--from") === has("--through");
+ }
+ 
++// AC-245 (D139): scripts/dispatch-recovery.mjs keeps ONE bounded recovery state file per dispatch under
++// <root>/evidence (it validates its own inputs and refuses with a repair). Admitted as exactly three argv shapes,
++// all bound to this root; the packet and result are repository-relative regular .json paths without a dot segment.
++const RECOVERY_DISPATCH_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
++const RECOVERY_INPUT = /^(?:scratch|evidence)\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}\.json$/u;
++function sanctionedDispatchRecoveryArgs(args, root) {
++  if (!exactRoot(args, root, 1)) return false;
++  const rest = args.slice(3);
++  if (args[0] === "inspect") return rest.length === 2 && rest[0] === "--dispatch-id" && RECOVERY_DISPATCH_ID.test(rest[1]);
++  if (args[0] === "clear") {
++    return rest[0] === "--dispatch-id" && RECOVERY_DISPATCH_ID.test(rest[1] ?? "")
++      && (rest.length === 2 || (rest.length === 3 && rest[2] === "--discard-corrupt"));
++  }
++  if (args[0] !== "record") return false;
++  const input = (value) => RECOVERY_INPUT.test(value ?? "") && !value.split("/").some((part) => part === "." || part === "..");
++  return rest[0] === "--packet" && input(rest[1]) && rest[2] === "--result" && input(rest[3])
++    && (rest.length === 4 || (rest.length === 6 && rest[4] === "--expected-attempts" && /^(?:0|[1-9][0-9]{0,2})$/u.test(rest[5])));
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+   if (script === DESIGN_COURSE_SCRIPT) return sanctionedDesignCourseArgs(args, root);
+@@ -269,6 +288,13 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   // `eligibility()` (pure) and reaches `recordHumanGuardDenial()` only on the branch that
+   // returns before `storage()` -- its own AC-5 test pins that it writes nothing.
+   if (script === REPAIR_MAP_SCRIPT) return args.length === 0;
++  if (script === DISPATCH_RECOVERY_SCRIPT) return sanctionedDispatchRecoveryArgs(args, root);
++  // D31 / AC-115: the typed self-revert of an edited bound PRD/Spec. One closed shape per verb: `--root <this root>` and an
++  // optional full-length `--commit` revision; the script itself refuses (no state written) unless the restored bytes hash to the approved digest.
++  if (script === AUTHORITY_RESTORE_SCRIPT) {
++    return ["inspect", "restore"].includes(args[0]) && exactRoot(args, root, 1)
++      && (args.length === 3 || (args[3] === "--commit" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(args[4] ?? "") && args.length === 5));
++  }
+   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
+   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
+   if (script === SESSION_CRITIC_FINALIZER_SCRIPT) return sanctionedSessionCriticFinalizerArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index fe73aaf9a..cbc0b06e1 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -167,6 +167,11 @@ export const OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("..
+ export const TRANSCRIPT_RECOVERY_SCRIPT = fileURLToPath(new URL("../../scripts/runner-transcript-recovery.mjs", import.meta.url));
+ 
+ export const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../../scripts/repair-map.mjs", import.meta.url));
++// AC-245 (D139): the dispatch recovery verb, admitted as three exact argv shapes (sanctionedDispatchRecoveryArgs).
++export const DISPATCH_RECOVERY_SCRIPT = fileURLToPath(new URL("../../scripts/dispatch-recovery.mjs", import.meta.url));
++
++// D31 / AC-115: the typed self-revert of an edited, bound authority document (digest-checked restore of the approved bytes).
++export const AUTHORITY_RESTORE_SCRIPT = fileURLToPath(new URL("../../scripts/authority-restore.mjs", import.meta.url));
+ 
+ export const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../../scripts/codex-host-repository-init.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/guard/denial-route.mjs b/plugins/pipeline-core/lib/guard/denial-route.mjs
+index 41f5ed809..74b1b9f54 100644
+--- a/plugins/pipeline-core/lib/guard/denial-route.mjs
++++ b/plugins/pipeline-core/lib/guard/denial-route.mjs
+@@ -7,7 +7,7 @@ import { isSessionCapabilityFailurePhase } from "../codex-onboarding-capabilitie
+ import { placeholder, renderHumanCopySafeCommand } from "../copy-safe-command.mjs";
+ import { consumeHumanGuardOverride, humanGuardRouteUnavailableReason, recordHumanGuardDenial } from "../human-guard-override.mjs";
+ import { readHumanApprovalMode } from "../critical-human-proof-policy.mjs";
+-import { CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
++import { AUTHORITY_RESTORE_SCRIPT, CONTROLLING_NON_READY_STATUSES, INTAKE_LIFECYCLE_STATUSES, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH, PARTIAL_LIFECYCLE_SCRATCH_DIR, PLUGIN_ROOT } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, GRAMMAR_DENIAL_REMEDY, GRAMMAR_DENIAL_REMEDY_SHORT, READ_COMMAND_UNSUPPORTED_CODE, READ_COMMAND_UNSUPPORTED_GUIDANCE, READ_COMMAND_UNSUPPORTED_NOTE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE, READ_SCOPE_DENIAL_REMEDY } from "./grammar-denials.mjs";
+ import { verdict } from "./verdict.mjs";
+ 
+@@ -255,7 +255,9 @@ export function protectedStateWriterOnly() {
+ // prevents the drift, it does not offer any new way to lift the class once reached.
+ const AUTHORITY_DOCUMENT_BOUND_CODE = "GUARD-LIFECYCLE-AUTHORITY-BOUND";
+ 
+-export function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
++export function protectedAuthorityDocumentWriteOnly(matchedRelativePath, root) {
++  // D31 / AC-115: the pre-edit warning. Named before the edit, not discovered after it.
++  const restoreCommand = `node ${AUTHORITY_RESTORE_SCRIPT} restore --root ${typeof root === "string" ? root : "<project root>"}`;
+   return verdict(
+     2,
+     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+@@ -272,7 +274,12 @@ export function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
+       + "If the only problem is a missing/incorrect PO plan acknowledgement marker on an "
+       + "otherwise-correct bound PRD, the narrower `po-authority-acknowledge-plan` / "
+       + "`po-authority-acknowledge-apply` route (NVA-W4-2B) records the acknowledgement "
+-      + "without reopening design or editing the file directly.\n",
++      + "without reopening design or editing the file directly.\n"
++      + "If an edit gets through anyway (any route that bypasses this refusal), the approval is invalidated: the file no "
++      + "longer matches its approved digest and the design lock engages (readiness drops to partial).\n"
++      + "Undo an edit that already happened, with no PO round trip and no new design review: "
++      + `\`${restoreCommand}\` restores the exact approved bytes from git (add \`--commit <full sha>\` to name another source) `
++      + "and refuses, writing nothing, when those bytes are not the approved ones.\n",
+   );
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index b12543747..4be0e1bbf 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -303,7 +303,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       }
+       const boundAuthority = boundAuthorityDocumentPath(root, requested);
+       if (boundAuthority !== null) {
+-        return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority));
++        return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority, root));
+       }
+       const hooksDisableFinding = hooksDisableSettingsWriteFinding({
+         filePath: requested,
+diff --git a/plugins/pipeline-core/scripts/authority-restore.mjs b/plugins/pipeline-core/scripts/authority-restore.mjs
+new file mode 100644
+index 000000000..d4090b0bb
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/authority-restore.mjs
+@@ -0,0 +1,187 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * authority-restore.mjs -- the typed self-revert for an edited, bound authority document
++ * (PO decision D31 under AC-115, confirmed D137; backlog
++ * 2026-10-21-a-stale-plan-invalidation-reopens-the-authority-edit-lock.md).
++ *
++ * An approved PRD/Spec is bound by digest in Pipeline State (`continuity.authority.prd|spec.sha256`).
++ * An edit that reaches the working tree anyway drifts the file out from under that binding and the
++ * session drops out of readiness. This script restores the exact approved bytes, so the approval is
++ * valid again without a new design review. It never writes Pipeline State and never touches
++ * anything but the edited bound documents.
++ *
++ *   inspect --root <root> [--commit <rev>]   read-only: per bound document, approved/working/source digests
++ *   restore --root <root> [--commit <rev>]   restore every edited bound document, all or none
++ *
++ * The bytes come from git (`HEAD` by default, or the commit named by --commit) and are written only
++ * when their sha256 equals the approved digest. Any refusal carries one repair and writes nothing.
++ */
++import { createHash } from "node:crypto";
++import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, join, relative, resolve } from "node:path";
++import { spawnSync } from "node:child_process";
++import { pathToFileURL } from "node:url";
++import { boundAuthorityDocumentPath } from "../lib/guard/denial-route.mjs";
++
++export const AUTHORITY_RESTORE_SCHEMA = "pipeline.authority-restore.v1";
++const SHA256_RE = /^[a-f0-9]{64}$/u;
++const REV_RE = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
++const STATE_PATHS = [join(".claude", "pipeline-state.json"), join("project", "pipeline-state.json")];
++
++const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
++
++function refusal(code, message, repair) {
++  return { ok: false, schema: AUTHORITY_RESTORE_SCHEMA, status: "refused", code, message, repair, written: [] };
++}
++
++function readState(root) {
++  for (const rel of STATE_PATHS) {
++    let raw;
++    try { raw = readFileSync(join(root, rel), "utf8"); } catch { continue; }
++    try {
++      const state = JSON.parse(raw);
++      return state !== null && typeof state === "object" && !Array.isArray(state) ? state : null;
++    } catch { return null; }
++  }
++  return null;
++}
++
++function safeRelativePath(root, value) {
++  if (typeof value !== "string" || value === "" || isAbsolute(value) || /[\x00-\x1f\x7f\\]/u.test(value)) return null;
++  const absolute = resolve(root, value);
++  const rel = relative(root, absolute);
++  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
++  return { rel: rel.split(/[\\/]/u).join("/"), absolute };
++}
++
++function workingBytes(absolute) {
++  try {
++    if (lstatSync(absolute).isSymbolicLink()) return { symlink: true };
++    return { bytes: readFileSync(absolute) };
++  } catch { return { missing: true }; }
++}
++
++function committedBytes(root, rev, rel) {
++  const result = spawnSync("git", ["-C", root, "cat-file", "blob", `${rev}:${rel}`], { maxBuffer: 64 * 1024 * 1024 });
++  return result.status === 0 ? result.stdout : null;
++}
++
++/** Read-only plan: what is bound, what is edited, and whether the approved bytes can be restored. */
++export function planAuthorityRestore(root, { commit = "HEAD" } = {}) {
++  const state = readState(root);
++  const authority = state?.continuity?.authority;
++  const entries = [["prd", authority?.prd], ["spec", authority?.spec]];
++  if (state === null || entries.some(([, e]) => typeof e?.path !== "string" || !SHA256_RE.test(e?.sha256 ?? ""))) {
++    return refusal("AUTHORITY-RESTORE-NOT-BOUND",
++      "Pipeline State records no approved PRD/Spec digest pair, so there are no approved bytes to restore.",
++      "Nothing to restore here. If the documents are being designed, edit them normally; otherwise run `inspect` of pipeline-state.mjs.");
++  }
++  const documents = [];
++  for (const [kind, entry] of entries) {
++    const target = safeRelativePath(root, entry.path);
++    if (target === null || boundAuthorityDocumentPath(root, target.absolute) === null) {
++      return refusal("AUTHORITY-RESTORE-NOT-BOUND",
++        `The ${kind} (${entry.path}) is not a currently bound, approved authority document (design is open or an invalidation is newer than the approval).`,
++        "The document is editable through the design route; restore applies only while the approval is current.");
++    }
++    const approved = entry.sha256;
++    // A recorded approval binding must agree with the continuity digest; a disagreement means State itself is the problem.
++    const gate = state.planApproval?.poGateAuthority;
++    const gateDigest = kind === "prd" ? gate?.planSha256 : gate?.specSha256;
++    if (typeof gateDigest === "string" && gateDigest !== approved) {
++      return refusal("AUTHORITY-RESTORE-STATE-INCONSISTENT",
++        `The approval binding (${gateDigest}) and the continuity digest (${approved}) of the ${kind} disagree.`,
++        "Run `inspect` of pipeline-state.mjs and follow its named PO-authority route; restoring bytes cannot repair a disagreeing binding.");
++    }
++    const working = workingBytes(target.absolute);
++    if (working.symlink) {
++      return refusal("AUTHORITY-RESTORE-UNSAFE-TARGET", `${target.rel} is a symbolic link.`,
++        "Replace the link with a regular file by hand, then run inspect again.");
++    }
++    const workingDigest = working.bytes === undefined ? null : sha256(working.bytes);
++    const edited = workingDigest !== approved;
++    const source = edited ? committedBytes(root, commit, target.rel) : null;
++    documents.push({
++      kind, path: target.rel, absolute: target.absolute, approvedSha256: approved, workingSha256: workingDigest, edited,
++      sourceRev: commit, sourceSha256: source === null ? null : sha256(source), sourceBytes: source,
++    });
++  }
++  const edited = documents.filter((d) => d.edited);
++  if (edited.length === 0) {
++    return refusal("AUTHORITY-RESTORE-NOTHING-EDITED",
++      "Every bound document already matches its approved digest; there is nothing to restore.",
++      "No action needed. To change an approved document, use the design route (`reopen-design`).");
++  }
++  const bad = edited.find((d) => d.sourceSha256 !== d.approvedSha256);
++  if (bad !== undefined) {
++    return refusal("AUTHORITY-RESTORE-SOURCE-MISMATCH",
++      `The bytes of ${bad.path} at ${commit} ${bad.sourceSha256 === null ? "cannot be read" : `hash to ${bad.sourceSha256}`}, not the approved ${bad.approvedSha256}.`,
++      `Name a commit that holds the approved bytes with --commit <full sha> (find it with: git log --format=%H -- ${bad.path}), or accept the edit through the design route (reopen-design, then submit-plan and approve-plan).`);
++  }
++  return { ok: true, schema: AUTHORITY_RESTORE_SCHEMA, status: "restorable", documents };
++}
++
++const publicDocument = ({ absolute, sourceBytes, ...rest }) => rest;
++
++export function applyAuthorityRestore(root, options = {}) {
++  const plan = planAuthorityRestore(root, options);
++  if (!plan.ok) return plan;
++  const written = [];
++  const temps = [];
++  try {
++    for (const doc of plan.documents.filter((d) => d.edited)) {
++      const temp = join(dirname(doc.absolute), `.authority-restore-${process.pid}-${doc.kind}.tmp`);
++      temps.push(temp);
++      writeFileSync(temp, doc.sourceBytes, { flag: "wx" });
++      if (sha256(readFileSync(temp)) !== doc.approvedSha256) throw new Error("staged bytes do not match the approved digest");
++    }
++    for (const doc of plan.documents.filter((d) => d.edited)) {
++      renameSync(join(dirname(doc.absolute), `.authority-restore-${process.pid}-${doc.kind}.tmp`), doc.absolute);
++      written.push(doc.path);
++    }
++  } catch (error) {
++    for (const temp of temps) rmSync(temp, { force: true });
++    return { ...refusal("AUTHORITY-RESTORE-WRITE-FAILED", `The restore could not be completed: ${error.message}`,
++      "Check the file permissions of the named documents and run `inspect` again."), written };
++  }
++  return { ok: true, schema: AUTHORITY_RESTORE_SCHEMA, status: "restored", written,
++    documents: plan.documents.map((d) => publicDocument({ ...d, workingSha256: d.approvedSha256 })) };
++}
++
++function parseArgs(argv, root) {
++  const [verb, ...rest] = argv;
++  if (!["inspect", "restore"].includes(verb)) return null;
++  const flags = {};
++  for (let i = 0; i < rest.length; i += 2) {
++    const name = rest[i];
++    if (!["--root", "--commit"].includes(name) || Object.hasOwn(flags, name) || rest[i + 1] === undefined) return null;
++    flags[name] = rest[i + 1];
++  }
++  if (flags["--root"] === undefined || resolve(flags["--root"]) !== resolve(root)) return null;
++  if (flags["--commit"] !== undefined && !REV_RE.test(flags["--commit"])) return null;
++  return { verb, commit: flags["--commit"] };
++}
++
++export function main(argv = process.argv.slice(2), root = process.cwd()) {
++  const parsed = parseArgs(argv, root);
++  if (parsed === null) {
++    console.error("Usage: authority-restore.mjs <inspect|restore> --root <project root, the current directory> [--commit <full sha>]");
++    return 2;
++  }
++  let result;
++  if (parsed.verb === "inspect") {
++    const plan = planAuthorityRestore(root, { commit: parsed.commit });
++    result = plan.ok ? { ...plan, documents: plan.documents.map(publicDocument) } : plan;
++  } else {
++    result = applyAuthorityRestore(root, { commit: parsed.commit });
++  }
++  if (!result.ok) {
++    console.error(`${result.code}: ${result.message}\nRepair: ${result.repair}\nNo state was written.`);
++    return 2;
++  }
++  console.log(JSON.stringify(result, null, 2));
++  return 0;
++}
++
++if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) process.exitCode = main();
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs b/plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs
+new file mode 100644
+index 000000000..5386dab12
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs
+@@ -0,0 +1,44 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Guard admission of the dispatch recovery verb (AC-245, D139). Green only with the protected admission applied
++ * (lib/guard/constants.mjs DISPATCH_RECOVERY_SCRIPT + lib/guard/command-catalogue.mjs sanctionedDispatchRecoveryArgs);
++ * the file documents the contract. Suite name for registration (an operator step): dispatch-recovery-admission.
++ */
++import assert from "node:assert/strict";
++import { realpathSync } from "node:fs";
++import { dirname, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++import { isSanctionedLifecycleCommand } from "../lib/guard/command-catalogue.mjs";
++
++const root = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."));
++const script = resolve(root, "plugins/pipeline-core/scripts/dispatch-recovery.mjs");
++const run = (args) => isSanctionedLifecycleCommand(`node '${script}' ${args}`, root);
++const base = (verb) => `${verb} --root '${root}'`;
++
++test("the three exact argv shapes are admitted", () => {
++  assert.equal(run(`${base("inspect")} --dispatch-id task-1`), true);
++  assert.equal(run(`${base("clear")} --dispatch-id task-1`), true);
++  assert.equal(run(`${base("clear")} --dispatch-id task-1 --discard-corrupt`), true);
++  assert.equal(run(`${base("record")} --packet scratch/p.json --result scratch/r.json`), true);
++  assert.equal(run(`${base("record")} --packet scratch/p.json --result evidence/r.json --expected-attempts 2`), true);
++});
++
++test("every other shape stays refused", () => {
++  const refused = [
++    "",
++    `inspect --root '${root}/x' --dispatch-id task-1`,
++    `${base("inspect")}`,
++    `${base("inspect")} --dispatch-id ../x`,
++    `${base("inspect")} --dispatch-id task-1 --extra`,
++    `${base("clear")} --dispatch-id task-1 --force`,
++    `${base("record")} --packet /etc/passwd --result scratch/r.json`,
++    `${base("record")} --packet scratch/../p.json --result scratch/r.json`,
++    `${base("record")} --packet scratch/p.json --result scratch/r.json --expected-attempts -1`,
++    `${base("record")} --result scratch/r.json --packet scratch/p.json`,
++    `${base("frobnicate")} --dispatch-id task-1`,
++  ];
++  for (const args of refused) assert.equal(run(args), false, args);
++  assert.equal(isSanctionedLifecycleCommand(`node '${script}'`, root), false);
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery.mjs b/plugins/pipeline-core/scripts/dispatch-recovery.mjs
+new file mode 100644
+index 000000000..5e1b4792b
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-recovery.mjs
+@@ -0,0 +1,208 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Dispatch recovery verb (AC-245, greenfield finding P1-1 bullet 3, PO decision D139): the first caller of
++ * lib/dispatch-recovery-state.mjs. A dispatcher or Goldfish records, reads and clears the ONE recovery state of a
++ * failed or refused role dispatch, so the course keeps the same task identity and attempt history; neither a chat
++ * message nor a renamed task can stand in for it (the state is bound to {dispatchId, role, candidate}).
++ *
++ * Closed grammar (any other argv is refused before anything is read or written):
++ *   record  --root <abs-dir> --packet <file> --result <file> [--expected-attempts <n>]
++ *   inspect --root <abs-dir> --dispatch-id <id>
++ *   clear   --root <abs-dir> --dispatch-id <id> [--discard-corrupt]
++ *
++ * Every outcome is one JSON line on stdout. Exit 0 = ok, 1 = refusal (never any state written), 2 = usage.
++ * Single-writer discipline of the module applies: the attempt-count compare-and-swap detects a lost update, it is
++ * not a lock.
++ */
++import { lstatSync, readFileSync, realpathSync, rmSync } from "node:fs";
++import { isAbsolute, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import {
++  openDispatchRecovery,
++  readDispatchRecovery,
++  recordRecoveryAttempt,
++  taskIdentityOf,
++} from "../lib/dispatch-recovery-state.mjs";
++
++export const DISPATCH_RECOVERY_CLI_SCHEMA = "pipeline.dispatch-recovery-cli.v1";
++export const MAX_INPUT_BYTES = 65536;
++
++const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
++const USAGE = "record --root <abs-dir> --packet <file> --result <file> [--expected-attempts <n>] | inspect --root <abs-dir> --dispatch-id <id> | clear --root <abs-dir> --dispatch-id <id> [--discard-corrupt]";
++const GRAMMAR = {
++  record: { value: ["--root", "--packet", "--result", "--expected-attempts"], flag: [], required: ["--root", "--packet", "--result"] },
++  inspect: { value: ["--root", "--dispatch-id"], flag: [], required: ["--root", "--dispatch-id"] },
++  clear: { value: ["--root", "--dispatch-id"], flag: ["--discard-corrupt"], required: ["--root", "--dispatch-id"] },
++};
++
++const fail = (code, message, repair, extra = {}) => ({ schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: false, code, message, repair, ...extra });
++
++/** Closed argv parse: unknown verb, unknown/duplicate/valueless flag or missing required flag is a usage refusal. */
++export function parseArgv(argv) {
++  const [verb, ...rest] = argv;
++  const spec = GRAMMAR[verb];
++  if (spec === undefined) return fail("DRC-USAGE", `Unknown or missing verb ${JSON.stringify(verb ?? null)}.`, `Run one of: ${USAGE}`);
++  const options = {};
++  for (let index = 0; index < rest.length; index += 1) {
++    const name = rest[index];
++    if (spec.flag.includes(name)) {
++      if (name in options) return fail("DRC-USAGE", `Duplicate ${name}.`, `Pass ${name} at most once: ${USAGE}`);
++      options[name] = true;
++    } else if (spec.value.includes(name)) {
++      const value = rest[index + 1];
++      if (name in options) return fail("DRC-USAGE", `Duplicate ${name}.`, `Pass ${name} at most once: ${USAGE}`);
++      if (value === undefined || value.startsWith("--")) return fail("DRC-USAGE", `${name} needs a value.`, `Pass ${name} <value>: ${USAGE}`);
++      options[name] = value;
++      index += 1;
++    } else {
++      return fail("DRC-USAGE", `Argument ${JSON.stringify(name)} is not part of the ${verb} grammar.`, `Run exactly: ${USAGE}`);
++    }
++  }
++  const missing = spec.required.find((name) => !(name in options));
++  if (missing !== undefined) return fail("DRC-USAGE", `${missing} is required for ${verb}.`, `Add ${missing}: ${USAGE}`);
++  return { ok: true, verb, options };
++}
++
++/** The exact-root argument: an absolute, normalized, symlink-free existing directory. */
++function checkRoot(root) {
++  const repair = "Pass --root as the absolute, normalized path of an existing directory (no symlink, no '..').";
++  try {
++    if (!isAbsolute(root) || resolve(root) !== root || realpathSync(root) !== root || !lstatSync(root).isDirectory()) {
++      return fail("DRC-ROOT", "The root is not an exact absolute directory path.", repair);
++    }
++  } catch {
++    return fail("DRC-ROOT", "The root does not exist or cannot be read.", repair);
++  }
++  return null;
++}
++
++function readJsonInput(path, flag) {
++  const repair = `Pass ${flag} as a regular file (no symlink) of at most ${MAX_INPUT_BYTES} bytes holding one JSON object.`;
++  let text;
++  try {
++    const stat = lstatSync(path);
++    if (!stat.isFile() || stat.size > MAX_INPUT_BYTES) return fail("DRC-INPUT-FILE", `${flag} is not a regular file within ${MAX_INPUT_BYTES} bytes.`, repair);
++    text = readFileSync(path, "utf8");
++  } catch {
++    return fail("DRC-INPUT-FILE", `${flag} cannot be read.`, repair);
++  }
++  try {
++    const value = JSON.parse(text);
++    if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("not an object");
++    return { ok: true, value };
++  } catch {
++    return fail("DRC-INPUT-FILE", `${flag} does not hold one JSON object.`, repair);
++  }
++}
++
++/** Maps a module refusal to a self-describing refusal that names one runnable repair. */
++function describeRefusal(refused, { dispatchId } = {}) {
++  const code = refused.code;
++  const id = dispatchId ?? "<id>";
++  const table = {
++    "DRS-INPUT": ["The root or dispatch id is not valid for the recovery state.", `Use a dispatch id matching ${ID} and the exact absolute --root.`],
++    "DRS-ATTEMPT-INVALID": ["The result is not a pipeline.canonical-role-fallback.v1 result of this very task.", "Pass --result as the unmodified JSON that runCanonicalRoleFallback returned for the same packet."],
++    "DRS-EXISTS": ["A recovery state already exists for this task.", `Run: inspect --root <root> --dispatch-id ${id}, then record with --expected-attempts <attempts>.`],
++    "DRS-NO-RECOVERY": ["No recovery state exists for this task.", "Run record with the first failed fallback result to open one."],
++    "DRS-CORRUPT": ["The recovery state file is unreadable or fails verification.", `Run: clear --root <root> --dispatch-id ${id} --discard-corrupt, then record the first failed result again.`],
++    "DRS-IDENTITY-MISMATCH": ["The packet's role or candidate differs from the recorded task; a renamed or re-bound task cannot continue it.", "Use the original packet of this task."],
++    "DRS-TERMINAL": ["The recovery state is already resolved by a returned attempt.", `Run: clear --root <root> --dispatch-id ${id} if a fresh recovery is needed.`],
++    "DRS-STALE": ["The expected attempt count is missing or does not match the state.", `Run record again with --expected-attempts ${refused.attempts ?? "<attempts>"}.`],
++    "DRS-ATTEMPT-LIMIT": ["The bounded attempt history is full.", "Stop retrying this task and hand it to the Elephant; the recorded history is kept."],
++    "DRS-WRITE-FAILED": ["The state could not be written atomically; nothing was changed.", "Check that <root>/evidence is writable and retry the same command."],
++  };
++  const [message, repair] = table[code] ?? ["The recovery module refused.", `Run: ${USAGE}`];
++  return fail(code, message, repair, refused.attempts === undefined ? {} : { attempts: refused.attempts });
++}
++
++async function record(options) {
++  const packetRead = readJsonInput(options["--packet"], "--packet");
++  if (!packetRead.ok) return packetRead;
++  const resultRead = readJsonInput(options["--result"], "--result");
++  if (!resultRead.ok) return resultRead;
++  const identity = taskIdentityOf(packetRead.value);
++  if (identity === null) {
++    return fail("DRC-PACKET", "The packet carries no valid task identity (dispatchId, role, candidate.commit, candidate.tree).", "Pass --packet as the role-dispatch packet of the failed task.");
++  }
++  const expectedText = options["--expected-attempts"];
++  let expectedAttempts;
++  if (expectedText !== undefined) {
++    if (!/^(?:0|[1-9][0-9]{0,2})$/u.test(expectedText)) return fail("DRC-USAGE", "--expected-attempts is not a small non-negative integer.", "Pass the attempt count printed by inspect.");
++    expectedAttempts = Number(expectedText);
++  }
++  const root = options["--root"];
++  const existing = readDispatchRecovery({ root, dispatchId: identity.dispatchId });
++  const common = { root, packet: packetRead.value, result: resultRead.value };
++  let outcome;
++  if (!existing.ok && existing.code === "DRS-NO-RECOVERY") {
++    if (expectedAttempts !== undefined && expectedAttempts !== 0) {
++      return fail("DRC-EXPECTED", "No state exists yet, but a nonzero --expected-attempts was passed.", "Omit --expected-attempts (or pass 0) to open the state.", { dispatchId: identity.dispatchId });
++    }
++    outcome = await openDispatchRecovery(common);
++  } else if (!existing.ok) {
++    return describeRefusal(existing, identity);
++  } else {
++    outcome = await recordRecoveryAttempt({ ...common, expectedAttempts });
++  }
++  return outcome.ok ? { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "record", state: outcome.state } : describeRefusal(outcome, identity);
++}
++
++function inspect(options) {
++  const dispatchId = options["--dispatch-id"];
++  const read = readDispatchRecovery({ root: options["--root"], dispatchId });
++  return read.ok ? { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "inspect", state: read.state } : describeRefusal(read, { dispatchId });
++}
++
++function clear(options) {
++  const dispatchId = options["--dispatch-id"];
++  const root = options["--root"];
++  const read = readDispatchRecovery({ root, dispatchId });
++  if (!read.ok && read.code === "DRS-CORRUPT" && options["--discard-corrupt"] === true) {
++    // Only the verified path of this exact task is removed, and only when it is a plain file or a link (never a directory).
++    const path = join(root, "evidence", `dispatch-recovery-${dispatchId}.json`);
++    try {
++      if (lstatSync(path).isDirectory()) return fail("DRC-CLEAR", "The corrupt state path is a directory; nothing was removed.", "Remove that directory by hand, then run record.", { dispatchId });
++      rmSync(path);
++    } catch {
++      return fail("DRC-CLEAR", "The corrupt state could not be removed; nothing was changed.", "Check that <root>/evidence is writable and retry the same command.", { dispatchId });
++    }
++    return { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "clear", dispatchId, discarded: "corrupt" };
++  }
++  if (!read.ok) return describeRefusal(read, { dispatchId });
++  if (options["--discard-corrupt"] === true) {
++    return fail("DRC-NOT-CORRUPT", "--discard-corrupt applies only to a state that fails verification; this one is valid.", `Run clear without --discard-corrupt (allowed once the state is resolved).`, { dispatchId });
++  }
++  if (read.state.status !== "resolved") {
++    return fail("DRC-OPEN-STATE", "The recovery is still open; clearing it would drop the attempt history.", `Record the returned attempt (record --expected-attempts ${read.state.attempts.length}) or hand the task to the Elephant; an open state is never cleared.`, { dispatchId, attempts: read.state.attempts.length });
++  }
++  try { rmSync(join(root, "evidence", `dispatch-recovery-${dispatchId}.json`)); } catch {
++    return fail("DRC-CLEAR", "The resolved state could not be removed; nothing was changed.", "Check that <root>/evidence is writable and retry the same command.", { dispatchId });
++  }
++  return { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "clear", dispatchId, discarded: "resolved" };
++}
++
++/** Runs one verb; returns the result object (never throws, never writes on a refusal). */
++export async function runDispatchRecovery(argv) {
++  const parsed = parseArgv(argv);
++  if (!parsed.ok) return parsed;
++  const rootRefusal = checkRoot(parsed.options["--root"]);
++  if (rootRefusal !== null) return rootRefusal;
++  const dispatchId = parsed.options["--dispatch-id"];
++  if (dispatchId !== undefined && !ID.test(dispatchId)) {
++    return fail("DRS-INPUT", "The dispatch id is not valid.", `Use a dispatch id matching ${ID}.`);
++  }
++  try {
++    if (parsed.verb === "record") return await record(parsed.options);
++    return parsed.verb === "inspect" ? inspect(parsed.options) : clear(parsed.options);
++  } catch {
++    return fail("DRC-INTERNAL", "The recovery verb failed unexpectedly; no state change is guaranteed.", "Run inspect to read the current state, then retry the same command.");
++  }
++}
++
++if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  const result = await runDispatchRecovery(process.argv.slice(2));
++  process.stdout.write(`${JSON.stringify(result)}\n`);
++  process.exitCode = result.ok ? 0 : (result.code === "DRC-USAGE" ? 2 : 1);
++}
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery.test.mjs b/plugins/pipeline-core/scripts/dispatch-recovery.test.mjs
+new file mode 100644
+index 000000000..642a557f2
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-recovery.test.mjs
+@@ -0,0 +1,209 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * dispatch-recovery verb (AC-245, P1-1 bullet 3, D139): every case drives the real CLI as a child process against
++ * a private temp root. Suite name for registration (an operator step): dispatch-recovery, file
++ * plugins/pipeline-core/scripts/dispatch-recovery.test.mjs.
++ */
++import assert from "node:assert/strict";
++import { execFile } from "node:child_process";
++import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++const script = resolve(dirname(fileURLToPath(import.meta.url)), "dispatch-recovery.mjs");
++const OID = (char) => char.repeat(40);
++
++const run = (args) => new Promise((done) => {
++  execFile(process.execPath, [script, ...args], { encoding: "utf8" }, (error, stdout, stderr) => {
++    done({ status: error ? (typeof error.code === "number" ? error.code : 1) : 0, stdout, stderr, json: stdout.trim() === "" ? null : JSON.parse(stdout) });
++  });
++});
++
++const packetOf = (dispatchId, role = "critic") => ({ dispatchId, role, candidate: { commit: OID("a"), tree: OID("b") } });
++const failedResult = (dispatchId, role = "critic", stderr = "boom", exitCode = 3) => ({
++  schema: "pipeline.canonical-role-fallback.v1", status: "failed", code: "RDF-PRODUCER-FAILED", route: "fallback-self-dispatch",
++  reasonCode: "RRP-NO-HOST-OBSERVATION", preparation: { packet: { dispatchId, role } }, output: { exitCode, stdout: "", stderr },
++});
++const returnedResult = (dispatchId, role = "critic") => ({ ...failedResult(dispatchId, role), status: "returned", code: "RDF-RETURNED", output: { exitCode: 0, stdout: "ok", stderr: "" } });
++
++function sandbox() {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "dispatch-recovery-cli-")));
++  const put = (name, value) => { const path = join(root, name); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); return path; };
++  return { root, put, cleanup: () => rmSync(root, { recursive: true, force: true }), files: () => readdirSync(root, { recursive: true }).sort() };
++}
++const recordArgs = (box, id, result, extra = []) => ["record", "--root", box.root, "--packet", box.put(`packet-${id}.json`, packetOf(id)), "--result", box.put(`result-${id}-${extra.length}-${Math.random()}.json`, result), ...extra];
++const stateName = (id) => `evidence/dispatch-recovery-${id}.json`;
++
++test("record opens the state from the first failed result and inspect reads it back", async () => {
++  const box = sandbox();
++  try {
++    const opened = await run(recordArgs(box, "task-1", failedResult("task-1")));
++    assert.equal(opened.status, 0, opened.stdout);
++    assert.equal(opened.json.ok, true);
++    assert.equal(opened.json.state.status, "open");
++    assert.equal(opened.json.state.attempts.length, 1);
++    assert.equal(opened.json.state.attempts[0].code, "RDF-PRODUCER-FAILED");
++    const read = await run(["inspect", "--root", box.root, "--dispatch-id", "task-1"]);
++    assert.equal(read.status, 0);
++    assert.deepEqual(read.json.state, opened.json.state);
++  } finally { box.cleanup(); }
++});
++
++test("record appends with the expected count and resolves on a returned attempt; clear removes only a resolved state", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-2", failedResult("task-2")));
++    const second = await run(recordArgs(box, "task-2", failedResult("task-2", "critic", "again", 4), ["--expected-attempts", "1"]));
++    assert.equal(second.json.state.attempts.length, 2);
++    assert.deepEqual(second.json.state.attempts[0].stderr, "boom");
++    const early = await run(["clear", "--root", box.root, "--dispatch-id", "task-2"]);
++    assert.equal(early.status, 1);
++    assert.equal(early.json.code, "DRC-OPEN-STATE");
++    assert.match(early.json.repair, /--expected-attempts 2/u);
++    const before = readFileSync(join(box.root, stateName("task-2")), "utf8");
++    const done = await run(recordArgs(box, "task-2", returnedResult("task-2"), ["--expected-attempts", "2"]));
++    assert.equal(done.json.state.status, "resolved");
++    assert.notEqual(readFileSync(join(box.root, stateName("task-2")), "utf8"), before);
++    const cleared = await run(["clear", "--root", box.root, "--dispatch-id", "task-2"]);
++    assert.equal(cleared.status, 0, cleared.stdout);
++    assert.equal(cleared.json.discarded, "resolved");
++    assert.equal((await run(["inspect", "--root", box.root, "--dispatch-id", "task-2"])).json.code, "DRS-NO-RECOVERY");
++  } finally { box.cleanup(); }
++});
++
++test("refusals name one runnable repair and write nothing", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-3", failedResult("task-3")));
++    const snapshot = box.files();
++    const bytes = readFileSync(join(box.root, stateName("task-3")), "utf8");
++    const cases = [
++      [recordArgs(box, "task-3", failedResult("task-3")), "DRS-STALE", /--expected-attempts 1|expected attempt/u],
++      [recordArgs(box, "task-3", failedResult("task-3"), ["--expected-attempts", "5"]), "DRS-STALE", /--expected-attempts 1/u],
++      [recordArgs(box, "task-3", failedResult("other-task"), ["--expected-attempts", "1"]), "DRS-ATTEMPT-INVALID", /unmodified JSON/u],
++      [recordArgs(box, "task-3", { schema: "x" }, ["--expected-attempts", "1"]), "DRS-ATTEMPT-INVALID", /unmodified JSON/u],
++      [["inspect", "--root", box.root, "--dispatch-id", "no-such-task"], "DRS-NO-RECOVERY", /record/u],
++      [["inspect", "--root", box.root, "--dispatch-id", "../escape"], "DRS-INPUT", /dispatch id/u],
++    ];
++    for (const [args, code, repair] of cases) {
++      const refused = await run(args);
++      assert.equal(refused.status, 1, JSON.stringify(refused.json));
++      assert.equal(refused.json.ok, false);
++      assert.equal(refused.json.code, code);
++      assert.match(refused.json.repair, repair);
++      assert.equal(typeof refused.json.message, "string");
++    }
++    const renamedPacket = { ...packetOf("task-3"), role: "advisor" };
++    const mismatch = await run(["record", "--root", box.root, "--packet", box.put("renamed.json", renamedPacket), "--result", box.put("r.json", failedResult("task-3", "advisor")), "--expected-attempts", "1"]);
++    assert.equal(mismatch.json.code, "DRS-IDENTITY-MISMATCH");
++    const renamed = await run(["record", "--root", box.root, "--packet", box.put("renamed2.json", packetOf("renamed-3")), "--result", box.put("r2.json", failedResult("renamed-3")), "--expected-attempts", "1"]);
++    assert.equal(renamed.json.code, "DRC-EXPECTED", "a renamed task has no state of its own and cannot take over another's");
++    assert.deepEqual(readdirSync(join(box.root, "evidence")), ["dispatch-recovery-task-3.json"]);
++    assert.equal(readFileSync(join(box.root, stateName("task-3")), "utf8"), bytes);
++    assert.deepEqual(box.files().filter((name) => name.startsWith("evidence")), snapshot.filter((name) => name.startsWith("evidence")));
++  } finally { box.cleanup(); }
++});
++
++test("closed grammar: unknown verb, unknown or duplicate flag, missing value, relative or symlinked root are refused with nothing written", async () => {
++  const box = sandbox();
++  try {
++    const link = join(tmpdir(), `dispatch-recovery-link-${process.pid}`);
++    symlinkSync(box.root, link);
++    const packet = box.put("p.json", packetOf("task-4"));
++    const result = box.put("r.json", failedResult("task-4"));
++    try {
++      const bad = [
++        [[], "DRC-USAGE"], [["frobnicate"], "DRC-USAGE"],
++        [["inspect", "--root", box.root], "DRC-USAGE"],
++        [["inspect", "--root", box.root, "--dispatch-id", "x", "--extra", "1"], "DRC-USAGE"],
++        [["inspect", "--root", box.root, "--root", box.root, "--dispatch-id", "x"], "DRC-USAGE"],
++        [["inspect", "--root", box.root, "--dispatch-id"], "DRC-USAGE"],
++        [["record", "--root", box.root, "--packet", packet, "--result", result, "--discard-corrupt"], "DRC-USAGE"],
++        [["record", "--root", "relative/dir", "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", `${box.root}/../${box.root.split("/").at(-1)}`, "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", link, "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", join(box.root, "missing"), "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", box.root, "--packet", join(box.root, "missing.json"), "--result", result], "DRC-INPUT-FILE"],
++        [["record", "--root", box.root, "--packet", packet, "--result", box.put("big.json", JSON.stringify({ pad: "x".repeat(70000) }))], "DRC-INPUT-FILE"],
++        [["record", "--root", box.root, "--packet", box.put("arr.json", "[]"), "--result", result], "DRC-INPUT-FILE"],
++        [["record", "--root", box.root, "--packet", box.put("nopacket.json", { dispatchId: "x" }), "--result", result], "DRC-PACKET"],
++        [["record", "--root", box.root, "--packet", packet, "--result", result, "--expected-attempts", "-1"], "DRC-USAGE"],
++      ];
++      for (const [args, code] of bad) {
++        const refused = await run(args);
++        assert.equal(refused.json.code, code, JSON.stringify(args.slice(0, 3)));
++        assert.equal(refused.status, code === "DRC-USAGE" ? 2 : 1);
++        assert.match(refused.json.repair, /\S/u);
++      }
++    } finally { rmSync(link, { force: true }); }
++    assert.equal(box.files().some((name) => name.startsWith("evidence")), false, "no evidence directory or state was created");
++  } finally { box.cleanup(); }
++});
++
++test("corrupt and oversize state is refused with the discard repair; clear --discard-corrupt removes only that task's file", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-5", failedResult("task-5")));
++    await run(recordArgs(box, "task-6", failedResult("task-6")));
++    const path = join(box.root, stateName("task-5"));
++    for (const corrupt of ["{not json", JSON.stringify({ schema: "pipeline.dispatch-recovery-state.v1" }), "x".repeat(200000)]) {
++      writeFileSync(path, corrupt);
++      const read = await run(["inspect", "--root", box.root, "--dispatch-id", "task-5"]);
++      assert.equal(read.json.code, "DRS-CORRUPT");
++      assert.match(read.json.repair, /clear .*--discard-corrupt/u);
++      const rec = await run(recordArgs(box, "task-5", failedResult("task-5"), ["--expected-attempts", "1"]));
++      assert.equal(rec.json.code, "DRS-CORRUPT");
++      assert.equal(readFileSync(path, "utf8"), corrupt, "a refused record leaves the corrupt file untouched");
++    }
++    const wrongFlag = await run(["clear", "--root", box.root, "--dispatch-id", "task-6", "--discard-corrupt"]);
++    assert.equal(wrongFlag.json.code, "DRC-NOT-CORRUPT");
++    assert.equal((await run(["inspect", "--root", box.root, "--dispatch-id", "task-6"])).json.ok, true);
++    const discarded = await run(["clear", "--root", box.root, "--dispatch-id", "task-5", "--discard-corrupt"]);
++    assert.equal(discarded.json.discarded, "corrupt");
++    assert.deepEqual(readdirSync(join(box.root, "evidence")), ["dispatch-recovery-task-6.json"]);
++    assert.equal((await run(recordArgs(box, "task-5", failedResult("task-5")))).json.ok, true, "the repair path reopens the state");
++  } finally { box.cleanup(); }
++});
++
++test("the attempt history is bounded: the ninth attempt is refused and the history is kept", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-7", failedResult("task-7")));
++    for (let count = 1; count < 8; count += 1) {
++      const next = await run(recordArgs(box, "task-7", failedResult("task-7"), ["--expected-attempts", String(count)]));
++      assert.equal(next.json.ok, true, JSON.stringify(next.json));
++    }
++    const bytes = readFileSync(join(box.root, stateName("task-7")), "utf8");
++    const over = await run(recordArgs(box, "task-7", failedResult("task-7"), ["--expected-attempts", "8"]));
++    assert.equal(over.json.code, "DRS-ATTEMPT-LIMIT");
++    assert.match(over.json.repair, /Elephant/u);
++    assert.equal(readFileSync(join(box.root, stateName("task-7")), "utf8"), bytes);
++  } finally { box.cleanup(); }
++});
++
++test("concurrent writers never tear the state: it stays verifiable, gapless and leaves no temporary file", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-8", failedResult("task-8")));
++    const attempts = await Promise.all(Array.from({ length: 6 }, (_, index) => run(recordArgs(box, "task-8", failedResult("task-8", "critic", `w${index}`), ["--expected-attempts", "1"]))));
++    for (const attempt of attempts) assert.ok(attempt.json.ok === true || ["DRS-STALE", "DRS-WRITE-FAILED"].includes(attempt.json.code), JSON.stringify(attempt.json));
++    assert.ok(attempts.some((attempt) => attempt.json.ok === true), "at least one writer won");
++    const read = await run(["inspect", "--root", box.root, "--dispatch-id", "task-8"]);
++    assert.equal(read.json.ok, true, JSON.stringify(read.json));
++    assert.deepEqual(read.json.state.attempts.map((row) => row.attempt), read.json.state.attempts.map((_, index) => index + 1));
++    assert.equal(read.json.state.attempts[0].stderr, "boom", "attempt 1 is never rewritten");
++    assert.deepEqual(readdirSync(join(box.root, "evidence")), ["dispatch-recovery-task-8.json"]);
++  } finally { box.cleanup(); }
++});
++
++test("two dispatches in one root keep independent states", async () => {
++  const box = sandbox();
++  try {
++    mkdirSync(join(box.root, "evidence"));
++    await run(recordArgs(box, "task-9", failedResult("task-9")));
++    await run(recordArgs(box, "task-10", failedResult("task-10")));
++    assert.deepEqual(readdirSync(join(box.root, "evidence")).sort(), ["dispatch-recovery-task-10.json", "dispatch-recovery-task-9.json"]);
++  } finally { box.cleanup(); }
++});

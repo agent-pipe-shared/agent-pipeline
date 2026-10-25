@@ -1,0 +1,44 @@
+{
+  "schema": "pipeline.public-source-scanner-disposition.v1",
+  "scanner": "gitleaks dir, default rules, empty ignore file, full log/report redaction",
+  "actualExitCode": 1,
+  "findings": [
+    {
+      "rule": "private-key",
+      "file": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/scripts/po-human-approval.mjs.txt",
+      "startLine": 1717,
+      "endLine": 1718,
+      "startColumn": 22,
+      "endColumn": 58,
+      "fingerprint": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/scripts/po-human-approval.mjs.txt:private-key:1717",
+      "reviewedSpanSha256": "f2c7d91a98d043785795cc9c52eecc96f167b1a35dd2fffcfb4bedaac11b0923",
+      "classification": "public-PEM-header-classifier-literal-no-key-body",
+      "disposition": "retained-byte-exact; false-positive confirmed from exact public Source context; no suppression added"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/dependencies/frozen-g8-postimages/plugins/pipeline-core/lib/model-family-host-store.test.mjs.txt",
+      "startLine": 49,
+      "endLine": 49,
+      "startColumn": 26,
+      "endColumn": 61,
+      "fingerprint": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/dependencies/frozen-g8-postimages/plugins/pipeline-core/lib/model-family-host-store.test.mjs.txt:generic-api-key:49",
+      "reviewedSpanSha256": "e24a6439dbb85709c0f6453d68da2f721d4e783cee8fe8557a376c24f4399ac4",
+      "classification": "synthetic-public-keyReference-label",
+      "disposition": "retained-byte-exact; false-positive confirmed from exact public Source context; no suppression added"
+    },
+    {
+      "rule": "generic-api-key",
+      "file": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/lib/model-family-host-store.test.mjs.txt",
+      "startLine": 49,
+      "endLine": 49,
+      "startColumn": 26,
+      "endColumn": 61,
+      "fingerprint": "specs/sprint-alfred-epic/evidence/pc-runner-transfer-2026-10-25/g8/postimages/plugins/pipeline-core/lib/model-family-host-store.test.mjs.txt:generic-api-key:49",
+      "reviewedSpanSha256": "e24a6439dbb85709c0f6453d68da2f721d4e783cee8fe8557a376c24f4399ac4",
+      "classification": "synthetic-public-keyReference-label",
+      "disposition": "retained-byte-exact; false-positive confirmed from exact public Source context; no suppression added"
+    }
+  ],
+  "claim": "Three reproduced public Source false positives, not a green scanner exit or a secret/profile read."
+}

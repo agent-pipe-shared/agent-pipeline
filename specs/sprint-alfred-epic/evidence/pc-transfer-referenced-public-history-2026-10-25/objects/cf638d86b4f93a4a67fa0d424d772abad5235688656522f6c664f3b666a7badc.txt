@@ -1,0 +1,116 @@
+# Alfred Reader history: finding reconciliation
+
+Prepared 2026-09-28 by read-only Git/report inspection, split across three
+historical evidence tasks. No Reader was dispatched, no owner acceptance was
+inferred, and this document is not a passing release binding.
+
+## Reviewed states and correction intervals
+
+| Round | Reviewed commit | Covered-input correction commits | Next state |
+|---|---|---|---|
+| 20260923a | `9e1851d41e50888ba7b3d76c080ab78da39f23af` | `18bdaf9c6c1e557ab5290b9a6c6953c67e6cb761`, `e11caafa749725b98a7830c81a6ce2b49d415fa9` | e11caafa |
+| 20260924a | e11caafa | `e2713f8c7c0001adb046e718f2f7e5b38b0ccc5d`, `b10a5b7c3a124e109f585560f81cae8ba7c47535`, `ef471b03f5115e9cf6317bce3e3f0fd73534402c`, `01602d9e4f1287d62508ec6ef669210721e77a70`, `f6ee2e97c7207ccb11feeafbb6ad8d0d0937fd3e`, `15c963efe044ac98be96b67c756f538acdb043d7` | `1f1b5ed603e1046de602479cb0066a0548b271ed` |
+| 20260927a | 1f1b5ed | `d2df7b61ddb287b392fcddfe90a5db2b0d4334c9` | `c3ff4084872ff5351b37e0438a932573479fb3c3` |
+| 20260927b | c3ff4084 | `641b6d17dc00ee0d657febef435a072595c888e8` | Terminal editorial correction |
+
+Report ordinals below refer to the original phase-one bullet order. A new
+phase-two finding is named separately. Repeated phase-two findings count once.
+Source reports are the eight committed Markdown files under
+`specs/sprint-alfred-epic/evidence/reader-review/{phase-one,phase-two}/`.
+Exact scope, report publication hashes and ancestry are separately recorded in
+`scratch/alfred-reader-historical-audit.json`.
+
+## Round 1 — 20260923a
+
+| Finding | Evidence | Disposition |
+|---|---|---|
+| 1 GEMINI start before optional autonomous setting | 18bdaf9c inserts pipeline-start as step 3 before optional policy | Corrected |
+| 2 README architecture/release material before basic flow | 18bdaf9c moves block after lifecycle diagram | Corrected to phase-two narrowed placement concern |
+| 3 README English/German order differs | 18bdaf9c moves German diagram below optional design pre-stage | Corrected |
+| 4 Full German flow embedded in English guide | 18bdaf9c creates PIPELINE_FLOW.de.md and adds English scope/support context | Corrected; stale expandable-version cue becomes round-two finding 1 |
+| 5 SETUP two entrances | Phase two expressly says summary and detailed procedure are not competing paths | Reviewer-adjudicated no-change; not owner acceptance |
+| 6 Usage architecture assessment placement | Phase two expressly says existing-project scope appropriately precedes dependent work | Reviewer-adjudicated no-change |
+| 7 Move Codex host contract behind general/legacy paths | Phase two carries this P1 finding; 18bdaf9c inserts installation but does not move contract, e11caafa changes early Agy installation only | Unproven in this correction interval |
+| 8 Stale 0.4.5 lifecycle assertion | 18bdaf9c replaces assertion with version-neutral release boundary | Corrected |
+| 9 Runner installation follows recovery | 18bdaf9c moves separate runner installation to entrance; e11caafa expands Agy acquisition/readback | Corrected |
+| 10 Enforcement inventory/hash table weight | Phase two expressly challenges necessity of cut for secondary reference | Reviewer-adjudicated no-change |
+| 11 Audit bundle threat detail | Phase two expressly challenges necessity of cut for secondary reference | Reviewer-adjudicated no-change; independently raised and corrected in round 2 |
+| 12 Historical cost timings | Phase two expressly challenges cut of labelled secondary-reference material | Reviewer-adjudicated no-change |
+| 13 Overview scope matrix | Phase two expressly challenges move because map defines product/current-stream reference | Reviewer-adjudicated no-change |
+| 14 Sprint completion report | Phase two expressly challenges archive because opening excludes consumer use and map excludes newcomer route | Reviewer-adjudicated no-change |
+| New phase-two German README Go/NoGo ownership | 18bdaf9c changes Elephant decision to PO recommendation, including diagram edges | Corrected |
+
+The round-one host-contract relocation cannot honestly be encoded as a
+resolution in that round's batch. Round two later cuts implementation detail
+from the guide, but that does not supply a missing round-one relocation commit.
+
+## Round 2 — 20260924a
+
+All five cited passages are corrected in e2713f8c and survive to 1f1b5ed.
+The other five covered-input commits are part of the interval, not invented
+finding-resolution commits.
+
+| Finding | Evidence | Disposition |
+|---|---|---|
+| 1 English flow promises inline expandable German version | Replaces cue with separate German guide link | Corrected |
+| 2 SETUP portable seed appears to complete initialization | Adds classification-only boundary, runner-specific next stages and fresh ready readback | Corrected |
+| 3 Audit consumer page has implementation threat detail | Moves detail to new docs/audit-bundles-technical.md and replaces consumer section with observable assurance limits | Corrected by actual relocation |
+| 4 Consumer prerequisite guidance inside source-maintainer section | Moves to labelled consumer-project section before optional advanced setup | Corrected |
+| New phase-two host transaction/future-test detail interrupts consumer route | Replaces 71 lines with 27 actionable lines, preserves exact action/restart/readback boundary and links threat model | Consumer correction proven; relocation of all removed material unproven |
+
+The linked Codex threat model has no diff in this interval and already held
+transaction controls. The future-test requirements and Issue #25 note were
+deleted from the consumer guide; do not claim they were relocated there.
+
+## Round 3 — 20260927a
+
+All five corrections are in d2df7b61. The later d2df7b61..c3ff4084 interval
+changes only backlog ledger files, so these document corrections survive.
+
+| Finding | Evidence | Disposition |
+|---|---|---|
+| 1 Final Verify missing from both flow guides | Adds Critic → final Full Verify → acceptance/close and mandatory final Verify rows | Corrected |
+| 2 English skill inventory precedes user journey | Moves complete inventory block below primary journey | Corrected |
+| 3 English README licensing outlook interrupts introduction | Moves unchanged outlook under Learn more | Corrected |
+| 4 Sprint report Track D precedes C | Moves D after C and before E | Corrected |
+| New phase-two Nova B future/implemented discrepancy | Both guides say implementation present, final candidate acceptance outstanding | Corrected |
+
+Round four does not provide explicit finding-by-finding verification of round
+three; absence of repeated findings is not a passing binding.
+
+## Round 4 — 20260927b
+
+Phase two confirms all five findings and reports no additional reader-facing
+finding. Terminal correction 641b6d17 is coordinator editorial resolution,
+without a fresh Reader verdict.
+
+| Finding | Evidence in 641b6d17 | Disposition |
+|---|---|---|
+| 1 Long Agy branch before common SETUP classification | Leaves short step-0 choice/restart and moves full installation behind common sequence | Corrected |
+| 2 F0/F0A and V4 status vocabularies disconnected | Adds classification-to-runtime-status bridge before detailed table | Corrected |
+| 3 Security/Verify order differs in Usage and flow | Usage targeted deterministic/security checks precede Critic; final Verify includes exact-candidate security outcome | Corrected |
+| 4 Repeated release/Nova status detail | Condenses both flow guides and Usage to availability warnings plus overview links; README unchanged | Partially evidenced; retained README passage not freshly adjudicated |
+| 5 German flow misses route/evidence/skill context | Adds discoverability versus approval, runner/evidence/unavailability context and English detail link | Corrected |
+
+The fourth finding explicitly permits retaining availability boundaries where
+a reader could act on an unreleased command. The retained README warning may
+meet that allowance, but Git history alone does not establish its adjudication.
+
+## Binding consequence
+
+Across 30 distinct findings: 21 concrete corrections, 7 explicit phase-two
+challenges, 1 carried finding without its requested correction in the bounded
+interval, and 1 partially evidenced terminal finding. The round-two detail cut
+is counted as a consumer correction, without inventing complete relocation.
+
+The proposed terminal schema currently permits only correction commits in the
+same round or explicit owner acceptance. It cannot encode the seven genuine
+phase-two no-change adjudications, and it cannot close the other two limits
+without further supported disposition. Therefore `actualAlfredCourseBound`
+remains false. Do not manufacture an owner acceptance, reset the course, run a
+fifth Reader, or issue a stamp from this historical audit.
+
+Next autonomous preparation: define a narrowly report-bound phase-two
+adjudication representation and its negative fixtures, while preserving open
+or partial findings as non-passing. Productive integration and release
+qualification still require the sanctioned route.

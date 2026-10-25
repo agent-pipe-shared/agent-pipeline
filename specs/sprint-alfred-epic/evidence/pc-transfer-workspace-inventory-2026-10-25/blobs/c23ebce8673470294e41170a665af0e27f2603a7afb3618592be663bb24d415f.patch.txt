@@ -1,0 +1,152 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+index df901a1f3..ab345df5d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+@@ -46,7 +46,7 @@ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ // (missing success marker) rather than silently vanish the whole file's coverage.
+ const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
+ const ADVISOR_GUARD = fileURLToPath(new URL("./guard-advisor-prohibition.mjs", import.meta.url));
+-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
++const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."); mkdirSync(join(repoRoot, "scratch"), { recursive: true }); // a fresh checkout has no scratch/
+ const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-binding-"));
+ execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
+ mkdirSync(join(bindingRepo, ".claude"), { recursive: true });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index b53303ace..f078e27d3 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -84,7 +84,8 @@ import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../
+ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+-import { enterClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
++import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
++import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+@@ -662,6 +663,9 @@ if (isDirectInvocation(import.meta.url)) {
+   // T6-A: a Claude Task/Agent call binds this hook process to its own hook-observed session owner.
+   if (["Task", "Agent"].includes(input?.tool_name)) {
+     enterClaudeHookSessionOwner({ root: input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), input });
++  } else if (input?.tool_name === "spawn_agent") {
++    // GDW01: a Codex governed item dispatch binds its hook-observed owner the same way (runner-neutral).
++    enterCodexHookSessionOwner({ root: input.cwd ?? process.cwd(), input });
+   }
+ 
+   // The subagent tool is `Task` in Claude Code and `Agent` in some runners; both are accepted
+@@ -671,6 +675,17 @@ if (isDirectInvocation(import.meta.url)) {
+   const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? toolInput.agent_type ?? (codexDispatch ? "default" : "");
+   const prompt = toolInput.prompt ?? toolInput.message ?? "";
+ 
++  // D84: the model of a Claude subagent dispatch comes from the configured routing, never from inheritance.
++  if (["Task", "Agent"].includes(input?.tool_name)) {
++    const modelCheck = evaluateDispatchModel({ runner: "claude", subagentType: typeof subagentType === "string" ? subagentType : "", model: toolInput.model });
++    const modelWarnings = dispatchModelWarningText(modelCheck);
++    if (modelWarnings !== "") process.stderr.write(modelWarnings);
++    if (!modelCheck.ok) {
++      process.stderr.write(dispatchModelRefusalText(modelCheck));
++      process.exit(2);
++    }
++  }
++
+   let dispatches;
+   if (Array.isArray(toolInput.Subagents)) {
+     // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 82ba4b117..89f477ce3 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -48,7 +48,7 @@ import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "../
+ // (missing success marker) rather than silently vanish the whole file's coverage.
+ const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
+ const ADVISOR_GUARD = fileURLToPath(new URL("./guard-advisor-prohibition.mjs", import.meta.url));
+-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
++const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."); mkdirSync(join(repoRoot, "scratch"), { recursive: true }); // a fresh checkout has no scratch/
+ const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-binding-"));
+ execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
+ mkdirSync(join(bindingRepo, ".claude"), { recursive: true });
+diff --git a/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs b/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
+index ce7b02ceb..c8c0e1dcf 100644
+--- a/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
++++ b/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
+@@ -162,7 +162,9 @@ try {
+     // Stops the class returning one guard at a time: a bare file_path read is blind to
+     // NotebookEdit, and blindness here means fail-open.
+     for (const name of ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-lifecycle-ready.mjs"]) {
+-      const source = code(readFileSync(join(HOOKS, name), "utf8"));
++      const GUARD_LIB = join(HOOKS, "..", "lib", "guard");
++      const source = code(readFileSync(join(HOOKS, name), "utf8")
++        + (name === "guard-lifecycle-ready.mjs" ? readdirSync(GUARD_LIB).filter((f) => f.endsWith(".mjs") && !f.endsWith(".test.mjs")).map((f) => readFileSync(join(GUARD_LIB, f), "utf8")).join("\n") : ""));
+       assert.ok(source.includes("writeTargetPath"), `${name} does not use the shared write-target reader`);
+       assert.doesNotMatch(source, /tool_input\?\.file_path|tool_input\.file_path/u,
+         `${name} still reads tool_input.file_path directly`);
+diff --git a/plugins/pipeline-core/lib/claude-hook-session-owner.mjs b/plugins/pipeline-core/lib/claude-hook-session-owner.mjs
+index 9ca116b86..d3d1502a9 100644
+--- a/plugins/pipeline-core/lib/claude-hook-session-owner.mjs
++++ b/plugins/pipeline-core/lib/claude-hook-session-owner.mjs
+@@ -28,6 +28,8 @@ import { loadSessionDescriptor, startSessionDescriptor } from "./worktree-lifecy
+ // ('physical-readback' | 'controlled-unit-method'); the descriptor is a physical readback, so the
+ // owner reports 'physical-readback' and carries this label separately as `ownerSource`.
+ export const CLAUDE_HOOK_SESSION_OWNER_SOURCE = "claude-hook-session-descriptor";
++// GDW01 (PO 2026-10-21): the same fallback for a Codex `spawn_agent` hook input, labelled as its own source.
++export const CODEX_HOOK_SESSION_OWNER_SOURCE = "codex-hook-session-descriptor";
+ const CLAUDE_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{7,71}$/u;
+ 
+ let entered = null;
+@@ -39,10 +41,20 @@ export function claudeHookDescriptorSessionId(sessionId) {
+ 
+ /** Enter the scope from a parsed Claude hook input. Returns whether a usable id was bound. */
+ export function enterClaudeHookSessionOwner({ root, input } = {}) {
++  return enterHookSessionOwner(root, claudeHookDescriptorSessionId(input?.session_id), CLAUDE_HOOK_SESSION_OWNER_SOURCE);
++}
++
++/** Enter the scope from a parsed Codex hook input (`spawn_agent`). Returns whether a usable id was bound. */
++export function enterCodexHookSessionOwner({ root, input } = {}) {
++  const sessionId = input?.session_id;
++  const descriptorSessionId = typeof sessionId === "string" && CLAUDE_SESSION_ID.test(sessionId) ? `codex-${sessionId}` : null;
++  return enterHookSessionOwner(root, descriptorSessionId, CODEX_HOOK_SESSION_OWNER_SOURCE);
++}
++
++function enterHookSessionOwner(root, descriptorSessionId, ownerSource) {
+   entered = null;
+-  const descriptorSessionId = claudeHookDescriptorSessionId(input?.session_id);
+   if (!descriptorSessionId || typeof root !== "string" || root === "") return false;
+-  try { entered = { primaryRoot: realpathSync(resolve(root)), descriptorSessionId }; } catch { entered = null; }
++  try { entered = { primaryRoot: realpathSync(resolve(root)), descriptorSessionId, ownerSource }; } catch { entered = null; }
+   return entered !== null;
+ }
+ 
+@@ -70,7 +82,7 @@ export function readClaudeHookSessionOwner({ repository } = {}) {
+   }
+   if (loaded.repo?.commonDir !== repository.commonDir) return null;
+   return Object.freeze({ sessionId: loaded.sessionId, descriptorSha256: loaded.descriptorSha256,
+-    ownerNonceSha256: ownerNonceDigest(loaded.ownerNonce), ownerSource: CLAUDE_HOOK_SESSION_OWNER_SOURCE });
++    ownerNonceSha256: ownerNonceDigest(loaded.ownerNonce), ownerSource: entered.ownerSource });
+ }
+ 
+ function ownerNonceDigest(nonce) { return createHash("sha256").update(Buffer.from(nonce)).digest("hex"); }
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 4ecff7ef9..bfa4f9756 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -788,6 +788,19 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/owned-continuity-verification.mjs",
+   "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+   "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
++  // Closure additions 2026-10-21 (GMWKC01): first-party imports of kernel paths that were never listed.
++  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit
++  // writers; orphan-member-step <- onboarding-continuity; budget-notice <- hooks/guard-dispatch-budget;
++  // answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight.
++  "plugins/pipeline-core/lib/advisory-answered-receipt.mjs",
++  "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
++  "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
++  "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
++  "plugins/pipeline-core/lib/node-sandbox-probe.mjs",
++  "plugins/pipeline-core/lib/pipeline-owned-files.mjs",
++  "plugins/pipeline-core/lib/session-authority-observers.mjs",
++  "plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs",
++  "plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs",
+   "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+   "plugins/pipeline-core/lib/session-authority-registry.mjs",
+   "plugins/pipeline-core/lib/session-power-owned-lifecycle.mjs",

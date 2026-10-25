@@ -1,0 +1,531 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+new file mode 100644
+index 000000000..19aba4dd2
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+@@ -0,0 +1,120 @@
++// SPDX-License-Identifier: SUL-1.0
++//
++// ALF-K13 / PO decision D110 (backlog item parallel-work-in-one-checkout-is-unsafe, "Observed again 2026-10-05"): the LIVENESS READBACK of an
++// open dispatch record's owner. There is NO second liveness mechanism and NO new persisted field: the signal is the session-owner runtime
++// judgement the pipeline already makes (PID plus process start identity, `inspectSessionOwnerRuntime`), reached through what a record
++// already carries:
++//
++//   open record (evidence/dispatch-record-<id>.json, outcome non-terminal or the interim `committed-pending-report`)
++//     -> its v2 landed owner claim (sessionId + ownerNonceSha256, under <git-common-dir>/agent-pipeline/dispatch-record-owner/)
++//     -> the session descriptor named by that sessionId (ownerRuntime {pid, processStartId})
++//     -> inspectSessionOwnerRuntime: live -> alive; not-live, reused -> gone; unavailable, unobserved -> unjudgeable.
++//
++// "Dead only on proof", like the registry lock: a record with only a v1 claim (it carries no PID), a Claude hook identity descriptor
++// (ownerRuntime is null by design), a missing descriptor, a session whose nonce is not the claim's, an unreadable claim or an unobservable
++// process is `unjudgeable`, never `gone`.
++//
++// READ-ONLY by construction: it opens files for reading only, takes no lock, retires and heals nothing, and creates no registry state.
++// No kernel-list path imports this module (it imports kernel modules, not the other way round).
++import { createHash } from "node:crypto";
++import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
++import { join } from "node:path";
++
++import { isSafeTaskId, isTerminalOutcome } from "./dispatch-record.mjs";
++import { DISPATCH_RECORD_INTERIM_OUTCOME, DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
++import { inspectSessionOwnerRuntime, inspectSignedDescriptorCustodyRepository, loadSessionDescriptor } from "./worktree-lifecycle.mjs";
++
++export const DISPATCH_RECORD_LIVENESS_SCHEMA = "pipeline.dispatch-record-liveness.v1";
++export const DISPATCH_RECORD_LIVENESS_VERDICTS = Object.freeze(["alive", "gone", "unjudgeable"]);
++
++const RECORD_FILE = /^dispatch-record-([A-Za-z0-9._-]+)\.json$/u;
++const READ_LIMIT = 1048576;
++const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
++const SHA256 = /^[a-f0-9]{64}$/u;
++
++// inspectSessionOwnerRuntime status -> verdict and reason. Every status the inspector can return is listed; anything else is unjudgeable.
++const OWNER_STATUS = Object.freeze({
++  live: ["alive", "owner-process-live"],
++  "not-live": ["gone", "owner-process-gone"],
++  reused: ["gone", "owner-pid-reused"],
++  unavailable: ["unjudgeable", "owner-runtime-unavailable"],
++  unobserved: ["unjudgeable", "owner-unobserved"],
++});
++
++function readSmallFile(path) {
++  const stat = lstatSync(path);
++  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > READ_LIMIT) throw new Error("not a small regular file");
++  return readFileSync(path, "utf8");
++}
++
++/** The claim as the guard wrote it, judged leniently: this is a diagnostic, and anything it cannot trust is `invalid`, never `gone`. */
++function readClaim(commonDir, taskId) {
++  const path = join(commonDir, "agent-pipeline", "dispatch-record-owner", `${taskId}.json`);
++  let text;
++  try { text = readSmallFile(path); } catch (error) { return error?.code === "ENOENT" ? { kind: "none" } : { kind: "invalid" }; }
++  let claim;
++  try { claim = JSON.parse(text); } catch { return { kind: "invalid" }; }
++  if (claim === null || typeof claim !== "object" || Array.isArray(claim) || claim.taskId !== taskId) return { kind: "invalid" };
++  if (claim.schema === LANDED_DISPATCH_RECORD_OWNER_SCHEMA) {
++    if (typeof claim.sessionId !== "string" || !SESSION_ID.test(claim.sessionId) || !SHA256.test(String(claim.ownerNonceSha256))) return { kind: "invalid" };
++    return { kind: "landed-v2", sessionId: claim.sessionId, ownerNonceSha256: claim.ownerNonceSha256 };
++  }
++  if (claim.schema === DISPATCH_RECORD_OWNER_SCHEMA) return { kind: "attempted-v1" };
++  return { kind: "invalid" };
++}
++
++function judgeOwner(root, claim, options) {
++  const inspect = options.inspectOwnerFn ?? inspectSessionOwnerRuntime;
++  const inspectOptions = options.platform === undefined ? {} : { platform: options.platform };
++  let loaded;
++  try { loaded = (options.loadSessionDescriptorFn ?? loadSessionDescriptor)(root, claim.sessionId, inspectOptions); }
++  catch (error) { return ["unjudgeable", error?.code === "WT-SESSION-MISSING" ? "descriptor-missing" : "descriptor-unreadable"]; }
++  // A session id is only a name: the claim binds the INCARNATION by the nonce digest, so a reused name is not this owner.
++  if (createHash("sha256").update(Buffer.from(String(loaded.ownerNonce))).digest("hex") !== claim.ownerNonceSha256) return ["unjudgeable", "session-nonce-mismatch"];
++  let owner;
++  try { owner = inspect(root, claim.sessionId, { ...inspectOptions, expectedDescriptorSha256: loaded.descriptorSha256 }); }
++  catch { return ["unjudgeable", "owner-inspection-failed"]; }
++  return OWNER_STATUS[owner?.status] ?? ["unjudgeable", "owner-status-unknown"];
++}
++
++function openRecordOutcome(path) {
++  let record;
++  try { record = JSON.parse(readSmallFile(path)); } catch { return { readable: false }; }
++  if (record === null || typeof record !== "object") return { readable: false };
++  const outcome = typeof record.outcome === "string" ? record.outcome : null;
++  const open = !isTerminalOutcome(outcome) || String(outcome).trim().toLowerCase() === DISPATCH_RECORD_INTERIM_OUTCOME;
++  return { readable: true, open, outcome };
++}
++
++/**
++ * One typed entry per OPEN dispatch record of the checkout at `root`. `options.task` narrows to one task id. `options.platform`,
++ * `options.inspectOwnerFn` and `options.loadSessionDescriptorFn` are test seams of the existing inspector, not new mechanisms.
++ */
++export function readDispatchRecordLiveness(root, options = {}) {
++  const primary = realpathSync(root);
++  const { commonDir } = inspectSignedDescriptorCustodyRepository(primary);
++  const evidence = join(primary, "evidence");
++  let names = [];
++  try { if (statSync(evidence).isDirectory()) names = readdirSync(evidence).sort(); } catch { names = []; }
++  const records = [];
++  for (const name of names) {
++    const match = RECORD_FILE.exec(name);
++    if (!match || !isSafeTaskId(match[1]) || (options.task !== undefined && options.task !== match[1])) continue;
++    const taskId = match[1];
++    const read = openRecordOutcome(join(evidence, name));
++    const base = { taskId, record: `evidence/${name}` };
++    if (!read.readable) { records.push({ ...base, outcome: null, claimKind: "unknown", verdict: "unjudgeable", reason: "record-unreadable" }); continue; }
++    if (!read.open) continue;
++    const claim = readClaim(commonDir, taskId);
++    const entry = { ...base, outcome: read.outcome, claimKind: claim.kind };
++    if (claim.kind === "landed-v2") {
++      const [verdict, reason] = judgeOwner(primary, claim, options);
++      records.push({ ...entry, sessionId: claim.sessionId, verdict, reason });
++    } else if (claim.kind === "attempted-v1") records.push({ ...entry, verdict: "unjudgeable", reason: "claim-v1-has-no-owner-process" });
++    else if (claim.kind === "none") records.push({ ...entry, verdict: "unjudgeable", reason: "no-owner-claim" });
++    else records.push({ ...entry, verdict: "unjudgeable", reason: "claim-invalid" });
++  }
++  const counts = { alive: 0, gone: 0, unjudgeable: 0 };
++  for (const entry of records) counts[entry.verdict] += 1;
++  return { schema: DISPATCH_RECORD_LIVENESS_SCHEMA, status: "inspected", readOnly: true, records, counts };
++}
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
+new file mode 100644
+index 000000000..e251b044d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
+@@ -0,0 +1,234 @@
++// SPDX-License-Identifier: SUL-1.0
++//
++// ALF-K13 / PO decision D110: the liveness READBACK of an open dispatch record's owner. The signal is the existing session-owner runtime
++// judgement (PID plus process start identity, inspectSessionOwnerRuntime) reached through the record's v2 landed owner claim:
++// open record -> v2 claim (sessionId + ownerNonceSha256) -> session descriptor ownerRuntime -> alive | gone | unjudgeable.
++// "Dead only on proof": a v1 claim, a descriptor without an owner process (a Claude hook identity), an unobservable process and a
++// missing descriptor are all `unjudgeable`. The readback mutates nothing and takes no lock.
++
++import assert from "node:assert/strict";
++import { spawn, spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { once } from "node:events";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
++import { discoverRepository, startSessionDescriptor } from "./worktree-lifecycle.mjs";
++import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness } from "./dispatch-record-liveness.mjs";
++import { DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
++
++const SKIP = process.platform === "linux" ? false : "linux-only: the process start identity is read from /proc/<pid>/stat; run under WSL";
++const SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url));
++const sha = (text) => createHash("sha256").update(text).digest("hex");
++const roots = [];
++const children = [];
++
++test.after(() => {
++  for (const child of children) { try { child.kill("SIGKILL"); } catch { /* already gone */ } }
++  for (const root of roots) rmSync(root, { recursive: true, force: true });
++});
++
++function git(cwd, args) {
++  const result = spawnSync("git", args, { cwd, encoding: "utf8", shell: false,
++    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, LC_ALL: "C" } });
++  if (result.error || result.status !== 0) throw result.error || new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
++}
++
++function fixture() {
++  const holder = mkdtempSync(join(tmpdir(), "dispatch-liveness-"));
++  chmodSync(holder, 0o700);
++  roots.push(holder);
++  const primary = join(holder, "repo");
++  mkdirSync(primary);
++  git(primary, ["init", "--initial-branch=main"]);
++  writeFileSync(join(primary, "README.md"), "fixture\n");
++  git(primary, ["add", "README.md"]);
++  git(primary, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture"]);
++  mkdirSync(join(primary, "evidence"));
++  const commonDir = discoverRepository(primary).commonDir;
++  return { primary, commonDir };
++}
++
++function writeRecord(fx, taskId, outcome) {
++  writeFileSync(join(fx.primary, "evidence", `dispatch-record-${taskId}.json`),
++    `${JSON.stringify({ schema: "pipeline.dispatch-record.v4", taskId, outcome })}\n`, { mode: 0o600 });
++}
++
++function claimDirectory(fx) {
++  const dir = join(fx.commonDir, "agent-pipeline", "dispatch-record-owner");
++  mkdirSync(dir, { recursive: true, mode: 0o700 });
++  return dir;
++}
++
++function writeV2Claim(fx, taskId, sessionId, ownerNonce) {
++  const claim = { schema: LANDED_DISPATCH_RECORD_OWNER_SCHEMA, taskId, sessionId, ownerNonceSha256: sha(ownerNonce),
++    creationDescriptorSha256: sha("descriptor"), creationInvocationBindingSha256: sha("binding"), recordSha256: sha("record"),
++    recordIdentity: { dev: 1, ino: 2 }, createdAt: "2026-10-22T00:00:00.000Z", assurance: "physical-readback" };
++  writeFileSync(join(claimDirectory(fx), `${taskId}.json`), `${JSON.stringify(claim, null, 2)}\n`, { mode: 0o600 });
++}
++
++function writeV1Claim(fx, taskId) {
++  const claim = { schema: DISPATCH_RECORD_OWNER_SCHEMA, bindingKind: "attempted-native-write", taskId, agentId: "agent-1", agentType: "goldfish", claimedAt: "2026-10-22T00:00:00.000Z" };
++  writeFileSync(join(claimDirectory(fx), `${taskId}.json`), `${JSON.stringify(claim, null, 2)}\n`, { mode: 0o600 });
++}
++
++/** A session descriptor plus the open record and v2 claim that name it. */
++function openRecordOwnedBySession(fx, taskId, descriptorOptions) {
++  const nonce = `owner-nonce-${taskId}-0000000001`;
++  const started = startSessionDescriptor(fx.primary, { sessionId: `session-${taskId}`, ownerNonce: nonce, ...descriptorOptions });
++  writeRecord(fx, taskId, "in-progress");
++  writeV2Claim(fx, taskId, started.sessionId, nonce);
++  return started;
++}
++
++const entryOf = (result, taskId) => result.records.find((entry) => entry.taskId === taskId);
++
++function treeBytes(root) {
++  const found = {};
++  const walk = (path, rel) => {
++    for (const name of readdirSync(path).sort()) {
++      const abs = join(path, name), relative = rel === "" ? name : `${rel}/${name}`, stat = statSync(abs);
++      if (stat.isDirectory()) { found[`${relative}/`] = "dir"; walk(abs, relative); }
++      else found[relative] = `${sha(readFileSync(abs))}:${stat.mode}:${stat.mtimeMs}`;
++    }
++  };
++  walk(root, "");
++  return found;
++}
++
++test("DRL-1 alive: the owner session's own live process (pid and start identity both match) is `alive`", { skip: SKIP }, () => {
++  const fx = fixture();
++  openRecordOwnedBySession(fx, "ALIVE-1");
++  const result = readDispatchRecordLiveness(fx.primary);
++  assert.equal(result.schema, DISPATCH_RECORD_LIVENESS_SCHEMA);
++  const entry = entryOf(result, "ALIVE-1");
++  assert.equal(entry.verdict, "alive");
++  assert.equal(entry.claimKind, "landed-v2");
++  assert.equal(entry.reason, "owner-process-live");
++  assert.equal(entry.sessionId, "session-ALIVE-1");
++});
++
++test("DRL-2 gone: the owner process has exited (no such pid) -> `gone`", { skip: SKIP }, async () => {
++  const fx = fixture();
++  const child = spawn("sleep", ["60"], { stdio: "ignore" });
++  children.push(child);
++  openRecordOwnedBySession(fx, "GONE-1", { ownerPid: child.pid });
++  assert.equal(entryOf(readDispatchRecordLiveness(fx.primary), "GONE-1").verdict, "alive", "fixture precondition: the recorded process is alive while it runs");
++  child.kill("SIGKILL");
++  await once(child, "exit");
++  const entry = entryOf(readDispatchRecordLiveness(fx.primary), "GONE-1");
++  assert.equal(entry.verdict, "gone");
++  assert.equal(entry.reason, "owner-process-gone");
++});
++
++test("DRL-3 gone: the recorded pid is alive but with a DIFFERENT start identity (pid reuse) -> `gone`", { skip: SKIP }, () => {
++  const fx = fixture();
++  const started = openRecordOwnedBySession(fx, "REUSED-1");
++  const descriptor = JSON.parse(readFileSync(started.path, "utf8"));
++  descriptor.ownerRuntime.processStartId = String(BigInt(descriptor.ownerRuntime.processStartId) + 1n);
++  writeFileSync(started.path, `${JSON.stringify(descriptor)}\n`);
++  const entry = entryOf(readDispatchRecordLiveness(fx.primary), "REUSED-1");
++  assert.equal(entry.verdict, "gone");
++  assert.equal(entry.reason, "owner-pid-reused");
++});
++
++test("DRL-4 unjudgeable: a v1 (attempted native write) claim carries no owner process -> `unjudgeable`, never `gone`", { skip: SKIP }, () => {
++  const fx = fixture();
++  writeRecord(fx, "V1-1", "in-progress");
++  writeV1Claim(fx, "V1-1");
++  const entry = entryOf(readDispatchRecordLiveness(fx.primary), "V1-1");
++  assert.equal(entry.verdict, "unjudgeable");
++  assert.equal(entry.claimKind, "attempted-v1");
++  assert.equal(entry.reason, "claim-v1-has-no-owner-process");
++});
++
++test("DRL-5 unjudgeable: a Claude hook identity descriptor (ownerRuntime null by design) -> `unjudgeable`", { skip: SKIP }, () => {
++  const fx = fixture();
++  openRecordOwnedBySession(fx, "HOOK-1", { ownerRuntime: null });
++  const entry = entryOf(readDispatchRecordLiveness(fx.primary), "HOOK-1");
++  assert.equal(entry.verdict, "unjudgeable");
++  assert.equal(entry.reason, "owner-runtime-unavailable");
++});
++
++test("DRL-6 unjudgeable: the process start identity cannot be observed on this platform (unavailable observation) -> `unjudgeable`", { skip: SKIP }, () => {
++  const fx = fixture();
++  openRecordOwnedBySession(fx, "UNAVAIL-1");
++  const entry = entryOf(readDispatchRecordLiveness(fx.primary, { platform: "darwin" }), "UNAVAIL-1");
++  assert.equal(entry.verdict, "unjudgeable");
++  assert.equal(entry.reason, "owner-runtime-unavailable");
++});
++
++test("DRL-7 every owner status maps exactly: live -> alive; not-live, reused -> gone; unavailable, unobserved -> unjudgeable", { skip: SKIP }, () => {
++  const fx = fixture();
++  openRecordOwnedBySession(fx, "MAP-1");
++  const expected = { live: "alive", "not-live": "gone", reused: "gone", unavailable: "unjudgeable", unobserved: "unjudgeable" };
++  for (const [status, verdict] of Object.entries(expected)) {
++    const result = readDispatchRecordLiveness(fx.primary, { inspectOwnerFn: () => ({ status }) });
++    assert.equal(entryOf(result, "MAP-1").verdict, verdict, `owner status ${status}`);
++  }
++});
++
++test("DRL-8 unjudgeable: a missing descriptor, a session whose nonce differs from the claim, no claim and an invalid claim are never `gone`", { skip: SKIP }, () => {
++  const fx = fixture();
++  writeRecord(fx, "NODESC-1", "in-progress");
++  writeV2Claim(fx, "NODESC-1", "session-nowhere", "owner-nonce-nowhere-00000001");
++  openRecordOwnedBySession(fx, "NONCE-1");
++  writeV2Claim(fx, "NONCE-1", "session-NONCE-1", "a-different-nonce-0000000002");
++  writeRecord(fx, "NOCLAIM-1", "in-progress");
++  writeRecord(fx, "BADCLAIM-1", "in-progress");
++  writeFileSync(join(claimDirectory(fx), "BADCLAIM-1.json"), "not json\n", { mode: 0o600 });
++  const result = readDispatchRecordLiveness(fx.primary);
++  assert.deepEqual([entryOf(result, "NODESC-1").verdict, entryOf(result, "NODESC-1").reason], ["unjudgeable", "descriptor-missing"]);
++  assert.deepEqual([entryOf(result, "NONCE-1").verdict, entryOf(result, "NONCE-1").reason], ["unjudgeable", "session-nonce-mismatch"]);
++  assert.deepEqual([entryOf(result, "NOCLAIM-1").verdict, entryOf(result, "NOCLAIM-1").claimKind, entryOf(result, "NOCLAIM-1").reason], ["unjudgeable", "none", "no-owner-claim"]);
++  assert.deepEqual([entryOf(result, "BADCLAIM-1").verdict, entryOf(result, "BADCLAIM-1").claimKind, entryOf(result, "BADCLAIM-1").reason], ["unjudgeable", "invalid", "claim-invalid"]);
++});
++
++test("DRL-9 only OPEN records are read back: in-progress and the interim `committed-pending-report` are; a final outcome is not", { skip: SKIP }, () => {
++  const fx = fixture();
++  writeRecord(fx, "OPEN-1", "in-progress");
++  writeRecord(fx, "OPEN-2", "committed-pending-report");
++  writeRecord(fx, "FINAL-1", "completed");
++  const result = readDispatchRecordLiveness(fx.primary);
++  assert.deepEqual(result.records.map((entry) => entry.taskId).sort(), ["OPEN-1", "OPEN-2"]);
++  assert.deepEqual(result.counts, { alive: 0, gone: 0, unjudgeable: 2 });
++});
++
++test("DRL-10 the readback mutates nothing: every byte under the git common dir and the evidence directory is unchanged and no registry lock appears", { skip: SKIP }, () => {
++  const fx = fixture();
++  openRecordOwnedBySession(fx, "RO-1");
++  openRecordOwnedBySession(fx, "RO-2", { ownerRuntime: null });
++  writeRecord(fx, "RO-3", "in-progress");
++  writeV1Claim(fx, "RO-3");
++  const before = { common: treeBytes(join(fx.commonDir, "agent-pipeline")), evidence: treeBytes(join(fx.primary, "evidence")) };
++  const result = readDispatchRecordLiveness(fx.primary);
++  assert.equal(result.records.length, 3);
++  assert.equal(result.readOnly, true);
++  assert.deepEqual({ common: treeBytes(join(fx.commonDir, "agent-pipeline")), evidence: treeBytes(join(fx.primary, "evidence")) }, before);
++  assert.equal(existsSync(join(fx.commonDir, "agent-pipeline", "session-authority")), false, "no session-authority registry was created");
++});
++
++test("DRL-11 the CLI prints the same typed result as one JSON document, exits 0, and refuses unknown arguments with exit 2", { skip: SKIP }, () => {
++  const fx = fixture();
++  openRecordOwnedBySession(fx, "CLI-1");
++  const run = (args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
++  const ok = run(["--root", fx.primary]);
++  assert.equal(ok.status, 0, ok.stderr);
++  const printed = JSON.parse(ok.stdout);
++  assert.deepEqual(printed, JSON.parse(JSON.stringify(readDispatchRecordLiveness(fx.primary))));
++  assert.equal(entryOf(printed, "CLI-1").verdict, "alive");
++  const only = JSON.parse(run(["--root", fx.primary, "--task", "NO-SUCH"]).stdout);
++  assert.deepEqual(only.records, []);
++  const bad = run(["--root", fx.primary, "--wat"]);
++  assert.equal(bad.status, 2);
++  assert.equal(JSON.parse(bad.stdout).code, "DRL-ARGS");
++  const outside = mkdtempSync(join(tmpdir(), "dispatch-liveness-norepo-"));
++  roots.push(outside);
++  const notRepo = run(["--root", outside]);
++  assert.equal(notRepo.status, 2);
++  assert.equal(JSON.parse(notRepo.stdout).code, "DRL-ROOT");
++});
+diff --git a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+index 4abdb2819..f509ce9d1 100644
+--- a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
++++ b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+@@ -593,9 +593,103 @@ test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older comm
+   assert.equal(existsSync(join(root, ".git", "agent-pipeline", "session-authority", "registry.lock")), false, "the producer leaves no session-authority registry lock");
+ });
+ 
+-// NOT PINNED HERE (reported to the Elephant, see the item's 2026-10-20 section): the session-authority registry staying readable with
+-// no orphaned lock after a Critic and a Goldfish dispatch RAN IN PARALLEL needs a live two-session run (or a harness that drives two
+-// real hook sessions against one registry); M4a only shows the producer itself never takes the registry lock.
+-// DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch
+-// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here. Its guard-side check belongs to the
+-// protected guard-dispatch hook and needs a decision on the liveness signal first (pid, heartbeat or runner task state).
++// ===================================================================================================================
++// MODE 5 -- the session-authority registry stays clean after a Critic-side producer ran beside a registry-writing dispatch (ALF-K13)
++// ===================================================================================================================
++// The harness needs no live two-session run: the "Goldfish" is a real child process that takes the registry boundary (the exclusive
++// registry lock, exactly what a governed dispatch holds while it writes) and holds it on a file handshake; the "Critic" is the real
++// producer CLI plus the read-only repair `inspect`, run while the lock is held. Both handshakes are files, so the interleaving is
++// deterministic and there is no sleep-based race.
++import { inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead } from "../session-authority-registry.mjs";
++import { inspectSessionOwnerRuntime, inspectSignedDescriptorCustodyRepository, loadSessionDescriptor, startSessionDescriptor } from "../worktree-lifecycle.mjs";
++
++function pause5(milliseconds) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds); }
++function waitFor5(path, label) {
++  for (let attempt = 0; attempt < 1500; attempt += 1) { if (existsSync(path)) return; pause5(20); }
++  assert.fail(`timed out waiting for ${label}`);
++}
++
++test("PARWORK-M5a: the real producer CLI and the repair inspect run while another process holds the registry boundary; afterwards no lock, no retired-lock directory remain, the registry reads and the session descriptors are unchanged", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, ALF-K13)" : false, timeout: 300000 }, async () => {
++  const root = join(FIXTURE, "m5-root");
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m5", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
++  writeFileSync(join(root, "README.md"), "# Fixture\n");
++  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
++  prepareConsumerVerify({ rootDir: root });
++  git4(root, ["init", "-q"]);
++  const first = commit4(root, ["."], "initial");
++  mkdirSync(join(root, "specs"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++  writeFileSync(join(root, "specs", "spec.md"), "# Older candidate\n");
++  const older = commit4(root, [".claude/pipeline.yaml", "specs/spec.md"], "older candidate");
++  writeFileSync(join(root, "README.md"), "# Fixture moved on\n");
++  commit4(root, ["README.md"], "head moved on");
++
++  // The session whose descriptor must stay consistent through the whole run.
++  const session = startSessionDescriptor(root, { sessionId: "session-parwork-m5", ownerNonce: "owner-nonce-parwork-m5-0001" });
++  const repository = inspectSignedDescriptorCustodyRepository(root);
++  const descriptorsDir = dirname(session.path);
++  const descriptorState = () => ({ names: readdirSync(descriptorsDir).sort(),
++    loaded: loadSessionDescriptor(root, session.sessionId).descriptorSha256, owner: inspectSessionOwnerRuntime(root, session.sessionId).status });
++  const descriptorsBefore = descriptorState();
++  assert.deepEqual(descriptorsBefore, { names: ["session-parwork-m5.json"], loaded: session.descriptorSha256, owner: "live" });
++  const lockPath = join(repository.commonDir, "agent-pipeline", "session-authority", "registry.lock");
++  const abandoned = join(repository.commonDir, "agent-pipeline", "session-authority-abandoned");
++  assert.equal(existsSync(lockPath), false, "fixture precondition: no registry lock before the run");
++  const registryBefore = inspectSessionAuthorityRegistryRead({ repository });
++
++  // The registry-writing "Goldfish": a real process that holds the registry boundary until told to leave.
++  const holder = join(FIXTURE, "m5-holder.mjs");
++  const ready = join(FIXTURE, "m5-ready"), go = join(FIXTURE, "m5-go");
++  writeFileSync(holder, [
++    `import { existsSync, writeFileSync } from "node:fs";`,
++    `import { withSessionAuthorityBoundary } from ${JSON.stringify(new URL("../session-authority-registry.mjs", import.meta.url).href)};`,
++    `import { inspectSignedDescriptorCustodyRepository } from ${JSON.stringify(new URL("../worktree-lifecycle.mjs", import.meta.url).href)};`,
++    `const [root, ready, go] = process.argv.slice(2);`,
++    `withSessionAuthorityBoundary({ repository: inspectSignedDescriptorCustodyRepository(root) }, () => {`,
++    `  writeFileSync(ready, "held");`,
++    `  for (let waited = 0; !existsSync(go) && waited < 60000; waited += 20) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);`,
++    `});`,
++  ].join("\n"));
++  const child = spawn(process.execPath, [holder, root, ready, go], { stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE } });
++  let holderStderr = "";
++  child.stderr.on("data", (chunk) => { holderStderr += chunk; });
++  const holderExit = new Promise((resolve) => child.on("exit", (code, signal) => resolve({ code, signal })));
++  try {
++    waitFor5(ready, "the registry-writing dispatch to hold the boundary");
++    const held = inspectSessionAuthorityLock({ repository });
++    assert.equal(held.status, "held", "the lock is observably held while the dispatch writes");
++    assert.equal(held.pid, child.pid);
++    assert.equal(held.owner, "live");
++
++    // The "Critic" side, beside it: the producer never takes the lock, and the read-only repair inspect only reports it.
++    const producer = fileURLToPath(new URL("../../scripts/verify-evidence-producer.mjs", import.meta.url));
++    const produced = spawnSync(process.execPath, [producer, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/critic-m5.json"],
++      { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE }, timeout: 240000 });
++    assert.equal(produced.status, 0, `${produced.stdout}\n${produced.stderr}`);
++    assert.equal(JSON.parse(readFileSync(join(root, "evidence", "critic-m5.json"), "utf8")).commit, older);
++    const repair = spawnSync(process.execPath, [fileURLToPath(new URL("../../scripts/session-authority-repair.mjs", import.meta.url)), "inspect", "--root", root],
++      { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE }, timeout: 120000 });
++    assert.equal(repair.status, 0, `${repair.stdout}\n${repair.stderr}`);
++    assert.equal(JSON.parse(repair.stdout).status, "inspected");
++    assert.equal(existsSync(lockPath), true, "neither Critic-side call released or removed the dispatch's lock");
++    assert.equal(inspectSessionAuthorityLock({ repository }).pid, child.pid, "the lock is still the dispatch's own");
++  } finally {
++    writeFileSync(go, "go");
++  }
++  const exit = await holderExit;
++  assert.deepEqual(exit, { code: 0, signal: null }, holderStderr);
++
++  assert.equal(existsSync(lockPath), false, "the registry lock is released when the dispatch's boundary closes");
++  assert.equal(inspectSessionAuthorityLock({ repository }).status, "absent");
++  assert.equal(existsSync(abandoned), false, "no retired-lock (session-authority-abandoned) directory was left behind");
++  // The fixture never initialized a catalogue, so the registry reads as `absent` before and after; the point is that it is never `refused`.
++  assert.deepEqual(inspectSessionAuthorityRegistryRead({ repository }), registryBefore, "the registry read is the same as before the run and is not refused");
++  assert.notEqual(registryBefore.status, "refused");
++  assert.deepEqual(descriptorState(), descriptorsBefore, "the session descriptor is byte-identical and its owner still judged live");
++});
++
++// DEFERRED, out of scope of this item's functional delivery: the GUARD-SIDE check that refuses a second writer while an open record's
++// owner is alive ("Observed again 2026-10-05 (round 3b)"). It belongs to the protected guard-dispatch hook. The liveness READBACK it
++// would consult is delivered and pinned in lib/dispatch-record-liveness.test.mjs (PO decision D110: PID plus process start identity,
++// alive | gone | unjudgeable, read-only).
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs b/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+new file mode 100644
+index 000000000..e4a88e563
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+@@ -0,0 +1,45 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++//
++// dispatch-record-liveness.mjs [--root <root>] [--task <task id>]
++//
++// PO decision D110: a READ-ONLY readback of whether the owner of each OPEN dispatch record is still running, from the existing session
++// owner runtime judgement (PID plus process start identity) reached through the record's v2 owner claim. Prints one JSON document
++// (pipeline.dispatch-record-liveness.v1): per open record its task id, claim kind, verdict (alive | gone | unjudgeable) and a reason
++// code. `unjudgeable` is deliberate: a v1 claim or a Claude hook identity carries no owner process, and nothing is called gone without
++// proof. It mutates nothing, takes no lock and never retires or heals. Exit 0: inspected. Exit 2: refused (DRL-ARGS | DRL-ROOT).
++import { realpathSync, statSync } from "node:fs";
++import { resolve } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
++
++const short = (error) => String(error?.message ?? error).replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 240);
++
++function parse(argv) {
++  const flags = {};
++  for (let index = 0; index < argv.length; index += 1) {
++    const name = argv[index]?.startsWith("--") ? argv[index].slice(2) : null;
++    if (name !== "root" && name !== "task") return { error: `unknown argument ${String(argv[index]).slice(0, 40)}` };
++    const value = argv[index + 1];
++    if (typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) return { error: `--${name} needs one value` };
++    flags[name] = value; index += 1;
++  }
++  if (flags.task !== undefined && !/^[A-Za-z0-9._-]+$/u.test(flags.task)) return { error: "--task is not a safe task id" };
++  return { flags };
++}
++
++export function runDispatchRecordLiveness(argv, out = (text) => process.stdout.write(text), { cwd = process.cwd() } = {}) {
++  const emit = (value, code) => { out(`${JSON.stringify(value)}\n`); return code; };
++  const refuse = (code, reason) => emit({ schema: DISPATCH_RECORD_LIVENESS_SCHEMA, status: "refused", code, reason }, 2);
++  const parsed = parse(argv);
++  if (parsed.error) return refuse("DRL-ARGS", `${parsed.error}; usage: dispatch-record-liveness.mjs [--root <root>] [--task <task id>]`);
++  let result;
++  try {
++    const root = realpathSync(resolve(cwd, parsed.flags.root ?? "."));
++    if (!statSync(root).isDirectory()) throw new Error("not a directory");
++    result = readDispatchRecordLiveness(root, parsed.flags.task === undefined ? {} : { task: parsed.flags.task });
++  } catch (error) { return refuse("DRL-ROOT", `--root is not a readable Pipeline repository: ${short(error)}`); }
++  return emit(result, 0);
++}
++
++if (isDirectInvocation(import.meta.url)) process.exitCode = runDispatchRecordLiveness(process.argv.slice(2));

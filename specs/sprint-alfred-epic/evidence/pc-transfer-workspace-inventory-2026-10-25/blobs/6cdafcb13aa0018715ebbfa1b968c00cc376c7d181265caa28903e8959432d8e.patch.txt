@@ -1,0 +1,479 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs b/plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs
+new file mode 100644
+index 000000000..5386dab12
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs
+@@ -0,0 +1,44 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Guard admission of the dispatch recovery verb (AC-245, D139). Green only with the protected admission applied
++ * (lib/guard/constants.mjs DISPATCH_RECOVERY_SCRIPT + lib/guard/command-catalogue.mjs sanctionedDispatchRecoveryArgs);
++ * the file documents the contract. Suite name for registration (an operator step): dispatch-recovery-admission.
++ */
++import assert from "node:assert/strict";
++import { realpathSync } from "node:fs";
++import { dirname, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++import { isSanctionedLifecycleCommand } from "../lib/guard/command-catalogue.mjs";
++
++const root = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."));
++const script = resolve(root, "plugins/pipeline-core/scripts/dispatch-recovery.mjs");
++const run = (args) => isSanctionedLifecycleCommand(`node '${script}' ${args}`, root);
++const base = (verb) => `${verb} --root '${root}'`;
++
++test("the three exact argv shapes are admitted", () => {
++  assert.equal(run(`${base("inspect")} --dispatch-id task-1`), true);
++  assert.equal(run(`${base("clear")} --dispatch-id task-1`), true);
++  assert.equal(run(`${base("clear")} --dispatch-id task-1 --discard-corrupt`), true);
++  assert.equal(run(`${base("record")} --packet scratch/p.json --result scratch/r.json`), true);
++  assert.equal(run(`${base("record")} --packet scratch/p.json --result evidence/r.json --expected-attempts 2`), true);
++});
++
++test("every other shape stays refused", () => {
++  const refused = [
++    "",
++    `inspect --root '${root}/x' --dispatch-id task-1`,
++    `${base("inspect")}`,
++    `${base("inspect")} --dispatch-id ../x`,
++    `${base("inspect")} --dispatch-id task-1 --extra`,
++    `${base("clear")} --dispatch-id task-1 --force`,
++    `${base("record")} --packet /etc/passwd --result scratch/r.json`,
++    `${base("record")} --packet scratch/../p.json --result scratch/r.json`,
++    `${base("record")} --packet scratch/p.json --result scratch/r.json --expected-attempts -1`,
++    `${base("record")} --result scratch/r.json --packet scratch/p.json`,
++    `${base("frobnicate")} --dispatch-id task-1`,
++  ];
++  for (const args of refused) assert.equal(run(args), false, args);
++  assert.equal(isSanctionedLifecycleCommand(`node '${script}'`, root), false);
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery.mjs b/plugins/pipeline-core/scripts/dispatch-recovery.mjs
+new file mode 100644
+index 000000000..5e1b4792b
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-recovery.mjs
+@@ -0,0 +1,208 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Dispatch recovery verb (AC-245, greenfield finding P1-1 bullet 3, PO decision D139): the first caller of
++ * lib/dispatch-recovery-state.mjs. A dispatcher or Goldfish records, reads and clears the ONE recovery state of a
++ * failed or refused role dispatch, so the course keeps the same task identity and attempt history; neither a chat
++ * message nor a renamed task can stand in for it (the state is bound to {dispatchId, role, candidate}).
++ *
++ * Closed grammar (any other argv is refused before anything is read or written):
++ *   record  --root <abs-dir> --packet <file> --result <file> [--expected-attempts <n>]
++ *   inspect --root <abs-dir> --dispatch-id <id>
++ *   clear   --root <abs-dir> --dispatch-id <id> [--discard-corrupt]
++ *
++ * Every outcome is one JSON line on stdout. Exit 0 = ok, 1 = refusal (never any state written), 2 = usage.
++ * Single-writer discipline of the module applies: the attempt-count compare-and-swap detects a lost update, it is
++ * not a lock.
++ */
++import { lstatSync, readFileSync, realpathSync, rmSync } from "node:fs";
++import { isAbsolute, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import {
++  openDispatchRecovery,
++  readDispatchRecovery,
++  recordRecoveryAttempt,
++  taskIdentityOf,
++} from "../lib/dispatch-recovery-state.mjs";
++
++export const DISPATCH_RECOVERY_CLI_SCHEMA = "pipeline.dispatch-recovery-cli.v1";
++export const MAX_INPUT_BYTES = 65536;
++
++const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/u;
++const USAGE = "record --root <abs-dir> --packet <file> --result <file> [--expected-attempts <n>] | inspect --root <abs-dir> --dispatch-id <id> | clear --root <abs-dir> --dispatch-id <id> [--discard-corrupt]";
++const GRAMMAR = {
++  record: { value: ["--root", "--packet", "--result", "--expected-attempts"], flag: [], required: ["--root", "--packet", "--result"] },
++  inspect: { value: ["--root", "--dispatch-id"], flag: [], required: ["--root", "--dispatch-id"] },
++  clear: { value: ["--root", "--dispatch-id"], flag: ["--discard-corrupt"], required: ["--root", "--dispatch-id"] },
++};
++
++const fail = (code, message, repair, extra = {}) => ({ schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: false, code, message, repair, ...extra });
++
++/** Closed argv parse: unknown verb, unknown/duplicate/valueless flag or missing required flag is a usage refusal. */
++export function parseArgv(argv) {
++  const [verb, ...rest] = argv;
++  const spec = GRAMMAR[verb];
++  if (spec === undefined) return fail("DRC-USAGE", `Unknown or missing verb ${JSON.stringify(verb ?? null)}.`, `Run one of: ${USAGE}`);
++  const options = {};
++  for (let index = 0; index < rest.length; index += 1) {
++    const name = rest[index];
++    if (spec.flag.includes(name)) {
++      if (name in options) return fail("DRC-USAGE", `Duplicate ${name}.`, `Pass ${name} at most once: ${USAGE}`);
++      options[name] = true;
++    } else if (spec.value.includes(name)) {
++      const value = rest[index + 1];
++      if (name in options) return fail("DRC-USAGE", `Duplicate ${name}.`, `Pass ${name} at most once: ${USAGE}`);
++      if (value === undefined || value.startsWith("--")) return fail("DRC-USAGE", `${name} needs a value.`, `Pass ${name} <value>: ${USAGE}`);
++      options[name] = value;
++      index += 1;
++    } else {
++      return fail("DRC-USAGE", `Argument ${JSON.stringify(name)} is not part of the ${verb} grammar.`, `Run exactly: ${USAGE}`);
++    }
++  }
++  const missing = spec.required.find((name) => !(name in options));
++  if (missing !== undefined) return fail("DRC-USAGE", `${missing} is required for ${verb}.`, `Add ${missing}: ${USAGE}`);
++  return { ok: true, verb, options };
++}
++
++/** The exact-root argument: an absolute, normalized, symlink-free existing directory. */
++function checkRoot(root) {
++  const repair = "Pass --root as the absolute, normalized path of an existing directory (no symlink, no '..').";
++  try {
++    if (!isAbsolute(root) || resolve(root) !== root || realpathSync(root) !== root || !lstatSync(root).isDirectory()) {
++      return fail("DRC-ROOT", "The root is not an exact absolute directory path.", repair);
++    }
++  } catch {
++    return fail("DRC-ROOT", "The root does not exist or cannot be read.", repair);
++  }
++  return null;
++}
++
++function readJsonInput(path, flag) {
++  const repair = `Pass ${flag} as a regular file (no symlink) of at most ${MAX_INPUT_BYTES} bytes holding one JSON object.`;
++  let text;
++  try {
++    const stat = lstatSync(path);
++    if (!stat.isFile() || stat.size > MAX_INPUT_BYTES) return fail("DRC-INPUT-FILE", `${flag} is not a regular file within ${MAX_INPUT_BYTES} bytes.`, repair);
++    text = readFileSync(path, "utf8");
++  } catch {
++    return fail("DRC-INPUT-FILE", `${flag} cannot be read.`, repair);
++  }
++  try {
++    const value = JSON.parse(text);
++    if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("not an object");
++    return { ok: true, value };
++  } catch {
++    return fail("DRC-INPUT-FILE", `${flag} does not hold one JSON object.`, repair);
++  }
++}
++
++/** Maps a module refusal to a self-describing refusal that names one runnable repair. */
++function describeRefusal(refused, { dispatchId } = {}) {
++  const code = refused.code;
++  const id = dispatchId ?? "<id>";
++  const table = {
++    "DRS-INPUT": ["The root or dispatch id is not valid for the recovery state.", `Use a dispatch id matching ${ID} and the exact absolute --root.`],
++    "DRS-ATTEMPT-INVALID": ["The result is not a pipeline.canonical-role-fallback.v1 result of this very task.", "Pass --result as the unmodified JSON that runCanonicalRoleFallback returned for the same packet."],
++    "DRS-EXISTS": ["A recovery state already exists for this task.", `Run: inspect --root <root> --dispatch-id ${id}, then record with --expected-attempts <attempts>.`],
++    "DRS-NO-RECOVERY": ["No recovery state exists for this task.", "Run record with the first failed fallback result to open one."],
++    "DRS-CORRUPT": ["The recovery state file is unreadable or fails verification.", `Run: clear --root <root> --dispatch-id ${id} --discard-corrupt, then record the first failed result again.`],
++    "DRS-IDENTITY-MISMATCH": ["The packet's role or candidate differs from the recorded task; a renamed or re-bound task cannot continue it.", "Use the original packet of this task."],
++    "DRS-TERMINAL": ["The recovery state is already resolved by a returned attempt.", `Run: clear --root <root> --dispatch-id ${id} if a fresh recovery is needed.`],
++    "DRS-STALE": ["The expected attempt count is missing or does not match the state.", `Run record again with --expected-attempts ${refused.attempts ?? "<attempts>"}.`],
++    "DRS-ATTEMPT-LIMIT": ["The bounded attempt history is full.", "Stop retrying this task and hand it to the Elephant; the recorded history is kept."],
++    "DRS-WRITE-FAILED": ["The state could not be written atomically; nothing was changed.", "Check that <root>/evidence is writable and retry the same command."],
++  };
++  const [message, repair] = table[code] ?? ["The recovery module refused.", `Run: ${USAGE}`];
++  return fail(code, message, repair, refused.attempts === undefined ? {} : { attempts: refused.attempts });
++}
++
++async function record(options) {
++  const packetRead = readJsonInput(options["--packet"], "--packet");
++  if (!packetRead.ok) return packetRead;
++  const resultRead = readJsonInput(options["--result"], "--result");
++  if (!resultRead.ok) return resultRead;
++  const identity = taskIdentityOf(packetRead.value);
++  if (identity === null) {
++    return fail("DRC-PACKET", "The packet carries no valid task identity (dispatchId, role, candidate.commit, candidate.tree).", "Pass --packet as the role-dispatch packet of the failed task.");
++  }
++  const expectedText = options["--expected-attempts"];
++  let expectedAttempts;
++  if (expectedText !== undefined) {
++    if (!/^(?:0|[1-9][0-9]{0,2})$/u.test(expectedText)) return fail("DRC-USAGE", "--expected-attempts is not a small non-negative integer.", "Pass the attempt count printed by inspect.");
++    expectedAttempts = Number(expectedText);
++  }
++  const root = options["--root"];
++  const existing = readDispatchRecovery({ root, dispatchId: identity.dispatchId });
++  const common = { root, packet: packetRead.value, result: resultRead.value };
++  let outcome;
++  if (!existing.ok && existing.code === "DRS-NO-RECOVERY") {
++    if (expectedAttempts !== undefined && expectedAttempts !== 0) {
++      return fail("DRC-EXPECTED", "No state exists yet, but a nonzero --expected-attempts was passed.", "Omit --expected-attempts (or pass 0) to open the state.", { dispatchId: identity.dispatchId });
++    }
++    outcome = await openDispatchRecovery(common);
++  } else if (!existing.ok) {
++    return describeRefusal(existing, identity);
++  } else {
++    outcome = await recordRecoveryAttempt({ ...common, expectedAttempts });
++  }
++  return outcome.ok ? { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "record", state: outcome.state } : describeRefusal(outcome, identity);
++}
++
++function inspect(options) {
++  const dispatchId = options["--dispatch-id"];
++  const read = readDispatchRecovery({ root: options["--root"], dispatchId });
++  return read.ok ? { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "inspect", state: read.state } : describeRefusal(read, { dispatchId });
++}
++
++function clear(options) {
++  const dispatchId = options["--dispatch-id"];
++  const root = options["--root"];
++  const read = readDispatchRecovery({ root, dispatchId });
++  if (!read.ok && read.code === "DRS-CORRUPT" && options["--discard-corrupt"] === true) {
++    // Only the verified path of this exact task is removed, and only when it is a plain file or a link (never a directory).
++    const path = join(root, "evidence", `dispatch-recovery-${dispatchId}.json`);
++    try {
++      if (lstatSync(path).isDirectory()) return fail("DRC-CLEAR", "The corrupt state path is a directory; nothing was removed.", "Remove that directory by hand, then run record.", { dispatchId });
++      rmSync(path);
++    } catch {
++      return fail("DRC-CLEAR", "The corrupt state could not be removed; nothing was changed.", "Check that <root>/evidence is writable and retry the same command.", { dispatchId });
++    }
++    return { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "clear", dispatchId, discarded: "corrupt" };
++  }
++  if (!read.ok) return describeRefusal(read, { dispatchId });
++  if (options["--discard-corrupt"] === true) {
++    return fail("DRC-NOT-CORRUPT", "--discard-corrupt applies only to a state that fails verification; this one is valid.", `Run clear without --discard-corrupt (allowed once the state is resolved).`, { dispatchId });
++  }
++  if (read.state.status !== "resolved") {
++    return fail("DRC-OPEN-STATE", "The recovery is still open; clearing it would drop the attempt history.", `Record the returned attempt (record --expected-attempts ${read.state.attempts.length}) or hand the task to the Elephant; an open state is never cleared.`, { dispatchId, attempts: read.state.attempts.length });
++  }
++  try { rmSync(join(root, "evidence", `dispatch-recovery-${dispatchId}.json`)); } catch {
++    return fail("DRC-CLEAR", "The resolved state could not be removed; nothing was changed.", "Check that <root>/evidence is writable and retry the same command.", { dispatchId });
++  }
++  return { schema: DISPATCH_RECOVERY_CLI_SCHEMA, ok: true, verb: "clear", dispatchId, discarded: "resolved" };
++}
++
++/** Runs one verb; returns the result object (never throws, never writes on a refusal). */
++export async function runDispatchRecovery(argv) {
++  const parsed = parseArgv(argv);
++  if (!parsed.ok) return parsed;
++  const rootRefusal = checkRoot(parsed.options["--root"]);
++  if (rootRefusal !== null) return rootRefusal;
++  const dispatchId = parsed.options["--dispatch-id"];
++  if (dispatchId !== undefined && !ID.test(dispatchId)) {
++    return fail("DRS-INPUT", "The dispatch id is not valid.", `Use a dispatch id matching ${ID}.`);
++  }
++  try {
++    if (parsed.verb === "record") return await record(parsed.options);
++    return parsed.verb === "inspect" ? inspect(parsed.options) : clear(parsed.options);
++  } catch {
++    return fail("DRC-INTERNAL", "The recovery verb failed unexpectedly; no state change is guaranteed.", "Run inspect to read the current state, then retry the same command.");
++  }
++}
++
++if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  const result = await runDispatchRecovery(process.argv.slice(2));
++  process.stdout.write(`${JSON.stringify(result)}\n`);
++  process.exitCode = result.ok ? 0 : (result.code === "DRC-USAGE" ? 2 : 1);
++}
+diff --git a/plugins/pipeline-core/scripts/dispatch-recovery.test.mjs b/plugins/pipeline-core/scripts/dispatch-recovery.test.mjs
+new file mode 100644
+index 000000000..642a557f2
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/dispatch-recovery.test.mjs
+@@ -0,0 +1,209 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * dispatch-recovery verb (AC-245, P1-1 bullet 3, D139): every case drives the real CLI as a child process against
++ * a private temp root. Suite name for registration (an operator step): dispatch-recovery, file
++ * plugins/pipeline-core/scripts/dispatch-recovery.test.mjs.
++ */
++import assert from "node:assert/strict";
++import { execFile } from "node:child_process";
++import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++
++const script = resolve(dirname(fileURLToPath(import.meta.url)), "dispatch-recovery.mjs");
++const OID = (char) => char.repeat(40);
++
++const run = (args) => new Promise((done) => {
++  execFile(process.execPath, [script, ...args], { encoding: "utf8" }, (error, stdout, stderr) => {
++    done({ status: error ? (typeof error.code === "number" ? error.code : 1) : 0, stdout, stderr, json: stdout.trim() === "" ? null : JSON.parse(stdout) });
++  });
++});
++
++const packetOf = (dispatchId, role = "critic") => ({ dispatchId, role, candidate: { commit: OID("a"), tree: OID("b") } });
++const failedResult = (dispatchId, role = "critic", stderr = "boom", exitCode = 3) => ({
++  schema: "pipeline.canonical-role-fallback.v1", status: "failed", code: "RDF-PRODUCER-FAILED", route: "fallback-self-dispatch",
++  reasonCode: "RRP-NO-HOST-OBSERVATION", preparation: { packet: { dispatchId, role } }, output: { exitCode, stdout: "", stderr },
++});
++const returnedResult = (dispatchId, role = "critic") => ({ ...failedResult(dispatchId, role), status: "returned", code: "RDF-RETURNED", output: { exitCode: 0, stdout: "ok", stderr: "" } });
++
++function sandbox() {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "dispatch-recovery-cli-")));
++  const put = (name, value) => { const path = join(root, name); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); return path; };
++  return { root, put, cleanup: () => rmSync(root, { recursive: true, force: true }), files: () => readdirSync(root, { recursive: true }).sort() };
++}
++const recordArgs = (box, id, result, extra = []) => ["record", "--root", box.root, "--packet", box.put(`packet-${id}.json`, packetOf(id)), "--result", box.put(`result-${id}-${extra.length}-${Math.random()}.json`, result), ...extra];
++const stateName = (id) => `evidence/dispatch-recovery-${id}.json`;
++
++test("record opens the state from the first failed result and inspect reads it back", async () => {
++  const box = sandbox();
++  try {
++    const opened = await run(recordArgs(box, "task-1", failedResult("task-1")));
++    assert.equal(opened.status, 0, opened.stdout);
++    assert.equal(opened.json.ok, true);
++    assert.equal(opened.json.state.status, "open");
++    assert.equal(opened.json.state.attempts.length, 1);
++    assert.equal(opened.json.state.attempts[0].code, "RDF-PRODUCER-FAILED");
++    const read = await run(["inspect", "--root", box.root, "--dispatch-id", "task-1"]);
++    assert.equal(read.status, 0);
++    assert.deepEqual(read.json.state, opened.json.state);
++  } finally { box.cleanup(); }
++});
++
++test("record appends with the expected count and resolves on a returned attempt; clear removes only a resolved state", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-2", failedResult("task-2")));
++    const second = await run(recordArgs(box, "task-2", failedResult("task-2", "critic", "again", 4), ["--expected-attempts", "1"]));
++    assert.equal(second.json.state.attempts.length, 2);
++    assert.deepEqual(second.json.state.attempts[0].stderr, "boom");
++    const early = await run(["clear", "--root", box.root, "--dispatch-id", "task-2"]);
++    assert.equal(early.status, 1);
++    assert.equal(early.json.code, "DRC-OPEN-STATE");
++    assert.match(early.json.repair, /--expected-attempts 2/u);
++    const before = readFileSync(join(box.root, stateName("task-2")), "utf8");
++    const done = await run(recordArgs(box, "task-2", returnedResult("task-2"), ["--expected-attempts", "2"]));
++    assert.equal(done.json.state.status, "resolved");
++    assert.notEqual(readFileSync(join(box.root, stateName("task-2")), "utf8"), before);
++    const cleared = await run(["clear", "--root", box.root, "--dispatch-id", "task-2"]);
++    assert.equal(cleared.status, 0, cleared.stdout);
++    assert.equal(cleared.json.discarded, "resolved");
++    assert.equal((await run(["inspect", "--root", box.root, "--dispatch-id", "task-2"])).json.code, "DRS-NO-RECOVERY");
++  } finally { box.cleanup(); }
++});
++
++test("refusals name one runnable repair and write nothing", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-3", failedResult("task-3")));
++    const snapshot = box.files();
++    const bytes = readFileSync(join(box.root, stateName("task-3")), "utf8");
++    const cases = [
++      [recordArgs(box, "task-3", failedResult("task-3")), "DRS-STALE", /--expected-attempts 1|expected attempt/u],
++      [recordArgs(box, "task-3", failedResult("task-3"), ["--expected-attempts", "5"]), "DRS-STALE", /--expected-attempts 1/u],
++      [recordArgs(box, "task-3", failedResult("other-task"), ["--expected-attempts", "1"]), "DRS-ATTEMPT-INVALID", /unmodified JSON/u],
++      [recordArgs(box, "task-3", { schema: "x" }, ["--expected-attempts", "1"]), "DRS-ATTEMPT-INVALID", /unmodified JSON/u],
++      [["inspect", "--root", box.root, "--dispatch-id", "no-such-task"], "DRS-NO-RECOVERY", /record/u],
++      [["inspect", "--root", box.root, "--dispatch-id", "../escape"], "DRS-INPUT", /dispatch id/u],
++    ];
++    for (const [args, code, repair] of cases) {
++      const refused = await run(args);
++      assert.equal(refused.status, 1, JSON.stringify(refused.json));
++      assert.equal(refused.json.ok, false);
++      assert.equal(refused.json.code, code);
++      assert.match(refused.json.repair, repair);
++      assert.equal(typeof refused.json.message, "string");
++    }
++    const renamedPacket = { ...packetOf("task-3"), role: "advisor" };
++    const mismatch = await run(["record", "--root", box.root, "--packet", box.put("renamed.json", renamedPacket), "--result", box.put("r.json", failedResult("task-3", "advisor")), "--expected-attempts", "1"]);
++    assert.equal(mismatch.json.code, "DRS-IDENTITY-MISMATCH");
++    const renamed = await run(["record", "--root", box.root, "--packet", box.put("renamed2.json", packetOf("renamed-3")), "--result", box.put("r2.json", failedResult("renamed-3")), "--expected-attempts", "1"]);
++    assert.equal(renamed.json.code, "DRC-EXPECTED", "a renamed task has no state of its own and cannot take over another's");
++    assert.deepEqual(readdirSync(join(box.root, "evidence")), ["dispatch-recovery-task-3.json"]);
++    assert.equal(readFileSync(join(box.root, stateName("task-3")), "utf8"), bytes);
++    assert.deepEqual(box.files().filter((name) => name.startsWith("evidence")), snapshot.filter((name) => name.startsWith("evidence")));
++  } finally { box.cleanup(); }
++});
++
++test("closed grammar: unknown verb, unknown or duplicate flag, missing value, relative or symlinked root are refused with nothing written", async () => {
++  const box = sandbox();
++  try {
++    const link = join(tmpdir(), `dispatch-recovery-link-${process.pid}`);
++    symlinkSync(box.root, link);
++    const packet = box.put("p.json", packetOf("task-4"));
++    const result = box.put("r.json", failedResult("task-4"));
++    try {
++      const bad = [
++        [[], "DRC-USAGE"], [["frobnicate"], "DRC-USAGE"],
++        [["inspect", "--root", box.root], "DRC-USAGE"],
++        [["inspect", "--root", box.root, "--dispatch-id", "x", "--extra", "1"], "DRC-USAGE"],
++        [["inspect", "--root", box.root, "--root", box.root, "--dispatch-id", "x"], "DRC-USAGE"],
++        [["inspect", "--root", box.root, "--dispatch-id"], "DRC-USAGE"],
++        [["record", "--root", box.root, "--packet", packet, "--result", result, "--discard-corrupt"], "DRC-USAGE"],
++        [["record", "--root", "relative/dir", "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", `${box.root}/../${box.root.split("/").at(-1)}`, "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", link, "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", join(box.root, "missing"), "--packet", packet, "--result", result], "DRC-ROOT"],
++        [["record", "--root", box.root, "--packet", join(box.root, "missing.json"), "--result", result], "DRC-INPUT-FILE"],
++        [["record", "--root", box.root, "--packet", packet, "--result", box.put("big.json", JSON.stringify({ pad: "x".repeat(70000) }))], "DRC-INPUT-FILE"],
++        [["record", "--root", box.root, "--packet", box.put("arr.json", "[]"), "--result", result], "DRC-INPUT-FILE"],
++        [["record", "--root", box.root, "--packet", box.put("nopacket.json", { dispatchId: "x" }), "--result", result], "DRC-PACKET"],
++        [["record", "--root", box.root, "--packet", packet, "--result", result, "--expected-attempts", "-1"], "DRC-USAGE"],
++      ];
++      for (const [args, code] of bad) {
++        const refused = await run(args);
++        assert.equal(refused.json.code, code, JSON.stringify(args.slice(0, 3)));
++        assert.equal(refused.status, code === "DRC-USAGE" ? 2 : 1);
++        assert.match(refused.json.repair, /\S/u);
++      }
++    } finally { rmSync(link, { force: true }); }
++    assert.equal(box.files().some((name) => name.startsWith("evidence")), false, "no evidence directory or state was created");
++  } finally { box.cleanup(); }
++});
++
++test("corrupt and oversize state is refused with the discard repair; clear --discard-corrupt removes only that task's file", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-5", failedResult("task-5")));
++    await run(recordArgs(box, "task-6", failedResult("task-6")));
++    const path = join(box.root, stateName("task-5"));
++    for (const corrupt of ["{not json", JSON.stringify({ schema: "pipeline.dispatch-recovery-state.v1" }), "x".repeat(200000)]) {
++      writeFileSync(path, corrupt);
++      const read = await run(["inspect", "--root", box.root, "--dispatch-id", "task-5"]);
++      assert.equal(read.json.code, "DRS-CORRUPT");
++      assert.match(read.json.repair, /clear .*--discard-corrupt/u);
++      const rec = await run(recordArgs(box, "task-5", failedResult("task-5"), ["--expected-attempts", "1"]));
++      assert.equal(rec.json.code, "DRS-CORRUPT");
++      assert.equal(readFileSync(path, "utf8"), corrupt, "a refused record leaves the corrupt file untouched");
++    }
++    const wrongFlag = await run(["clear", "--root", box.root, "--dispatch-id", "task-6", "--discard-corrupt"]);
++    assert.equal(wrongFlag.json.code, "DRC-NOT-CORRUPT");
++    assert.equal((await run(["inspect", "--root", box.root, "--dispatch-id", "task-6"])).json.ok, true);
++    const discarded = await run(["clear", "--root", box.root, "--dispatch-id", "task-5", "--discard-corrupt"]);
++    assert.equal(discarded.json.discarded, "corrupt");
++    assert.deepEqual(readdirSync(join(box.root, "evidence")), ["dispatch-recovery-task-6.json"]);
++    assert.equal((await run(recordArgs(box, "task-5", failedResult("task-5")))).json.ok, true, "the repair path reopens the state");
++  } finally { box.cleanup(); }
++});
++
++test("the attempt history is bounded: the ninth attempt is refused and the history is kept", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-7", failedResult("task-7")));
++    for (let count = 1; count < 8; count += 1) {
++      const next = await run(recordArgs(box, "task-7", failedResult("task-7"), ["--expected-attempts", String(count)]));
++      assert.equal(next.json.ok, true, JSON.stringify(next.json));
++    }
++    const bytes = readFileSync(join(box.root, stateName("task-7")), "utf8");
++    const over = await run(recordArgs(box, "task-7", failedResult("task-7"), ["--expected-attempts", "8"]));
++    assert.equal(over.json.code, "DRS-ATTEMPT-LIMIT");
++    assert.match(over.json.repair, /Elephant/u);
++    assert.equal(readFileSync(join(box.root, stateName("task-7")), "utf8"), bytes);
++  } finally { box.cleanup(); }
++});
++
++test("concurrent writers never tear the state: it stays verifiable, gapless and leaves no temporary file", async () => {
++  const box = sandbox();
++  try {
++    await run(recordArgs(box, "task-8", failedResult("task-8")));
++    const attempts = await Promise.all(Array.from({ length: 6 }, (_, index) => run(recordArgs(box, "task-8", failedResult("task-8", "critic", `w${index}`), ["--expected-attempts", "1"]))));
++    for (const attempt of attempts) assert.ok(attempt.json.ok === true || ["DRS-STALE", "DRS-WRITE-FAILED"].includes(attempt.json.code), JSON.stringify(attempt.json));
++    assert.ok(attempts.some((attempt) => attempt.json.ok === true), "at least one writer won");
++    const read = await run(["inspect", "--root", box.root, "--dispatch-id", "task-8"]);
++    assert.equal(read.json.ok, true, JSON.stringify(read.json));
++    assert.deepEqual(read.json.state.attempts.map((row) => row.attempt), read.json.state.attempts.map((_, index) => index + 1));
++    assert.equal(read.json.state.attempts[0].stderr, "boom", "attempt 1 is never rewritten");
++    assert.deepEqual(readdirSync(join(box.root, "evidence")), ["dispatch-recovery-task-8.json"]);
++  } finally { box.cleanup(); }
++});
++
++test("two dispatches in one root keep independent states", async () => {
++  const box = sandbox();
++  try {
++    mkdirSync(join(box.root, "evidence"));
++    await run(recordArgs(box, "task-9", failedResult("task-9")));
++    await run(recordArgs(box, "task-10", failedResult("task-10")));
++    assert.deepEqual(readdirSync(join(box.root, "evidence")).sort(), ["dispatch-recovery-task-10.json", "dispatch-recovery-task-9.json"]);
++  } finally { box.cleanup(); }
++});

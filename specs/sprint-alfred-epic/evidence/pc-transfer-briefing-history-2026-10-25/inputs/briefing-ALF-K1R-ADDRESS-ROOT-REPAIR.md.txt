@@ -1,0 +1,87 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K1R-ADDRESS-ROOT-REPAIR","candidateCommit":"1bea48f3e3367cc4facb3699c0db0d5534bb32bf","candidateTree":"e0518e161313212645163f823eb3c061b7f84ada","runner":"claude","role":"pipeline-core:goldfish-deep","agentType":"goldfish-deep","model":"claude-sonnet-5-5","effort":"xhigh","rulesetSha":"27d995c2edcce14d7e170379575005d23619983ac4ad73437bb2054763932e24","allowedPaths":["plugins/pipeline-core/lib/session-power-address-repair.mjs","plugins/pipeline-core/lib/session-power-address-repair.test.mjs","plugins/pipeline-core/lib/session-power.mjs","plugins/pipeline-core/scripts/session-power-address-repair.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K1R-ADDRESS-ROOT-REPAIR","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k1r-address-root-repair-check","path":"plugins/pipeline-core/lib/session-power-address-repair.test.mjs","dependencies":["plugins/pipeline-core/lib/session-power-address-repair.mjs","plugins/pipeline-core/lib/session-power-address-repair.test.mjs","plugins/pipeline-core/lib/session-power.mjs","plugins/pipeline-core/scripts/session-power-address-repair.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K1R-ADDRESS-ROOT-REPAIR","candidateCommit":"1bea48f3e3367cc4facb3699c0db0d5534bb32bf","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K1R-ADDRESS-ROOT-REPAIR: a typed repair verb moves session-power address slots of absent repositories aside through a plan and readback, and the 4096 refusal names it (K1, D71/D72)
+
+### 1. Goal
+
+End state: (1) A new library module `lib/session-power-address-repair.mjs` exports `planAddressRootRepair({home})` and `applyAddressRootRepair({home, expectedPlanSha256})`. The address root is `<home>/.apsp` with one 16-hex-character slot directory per repository fingerprint, each holding `anchor.json` (`{schema, repositoryFingerprint, primaryRoot, commonDir}`, see `lib/session-power.mjs` 331-379). The plan is read-only: it validates the root chain the way `strictAddressChain` does (owner, no group/world write, no symlink), classifies every entry as `kept` (anchor readable and its `primaryRoot` exists), `absent-repository` (anchor readable, valid schema, `primaryRoot` does not exist) or `foreign` (name not 16 hex, anchor missing/unreadable/invalid), and returns a canonical JSON plan with the root identity (dev, ino), the per-entry class, each moved candidate's anchor digest, the counts, the 4096 bound and `planSha256`; `planSha256` is bound only to the root identity and the sorted candidate set (each `absent-repository` slot's name and anchor digest), not to the `kept` or `foreign` entries, so a new slot created by another live session between plan and apply does not make apply refuse. A missing `<home>/.apsp` is a plan with nothing to do, not a refusal. Only `absent-repository` slots are moved; `foreign` entries are reported, never moved. Apply recomputes the plan, refuses with a typed code unless its digest equals `expectedPlanSha256` (nothing moved then), creates `<home>/.apsp-aside/<UTC timestamp>-<8 hex>/` with mode 0700 (never inside `.apsp`), moves each candidate with `renameSync` after re-checking that its anchor bytes still match the planned digest and `primaryRoot` is still absent, deletes nothing, and returns a readback: every moved slot present in the aside directory and absent from the root, counts before and after, and the aside path. A crash mid-apply leaves only whole slots on either side; rerunning plan then apply converges. (2) A CLI `scripts/session-power-address-repair.mjs` with verbs `plan` and `apply --plan-sha256 <digest>` prints the JSON result; it always uses the OS home `userInfo().homedir` and has no option, environment variable or argument that redirects the home (D72: no redirectable authority path); exit 0 on success, 2 on a typed refusal. (3) The `SP-ADDRESS` refusal at `lib/session-power.mjs` line 366 ('unknown fixed address namespace') is split: more than 4096 entries fails with a message that names the exact repair commands `node <plugin-root>/scripts/session-power-address-repair.mjs plan` then `apply --plan-sha256 <digest>` (resolve the plugin root from `import.meta.url`, as other refusals in this plugin do); a non-hex name keeps a foreign-namespace message that also names `plan` (which lists it). Build both messages in one small exported function of `session-power.mjs` (for example `addressNamespaceRefusalMessage({count, foreign})`) so the test checks the message without reaching `prepareAddressRoot`, which is bound to the real OS home. Zero line growth in `session-power.mjs` (edit in place on the existing lines). (4) The library also exports `repairAddressRootQuietly({home})`: plan, then apply with that plan's digest only when the plan has at least one `absent-repository` slot; it never throws and returns `{status: 'repaired'|'nothing-to-do'|'failed', code, moved}`; on a platform other than linux it returns `nothing-to-do` without reading anything (`session-power.mjs` line 593 prepares the address root only on linux). Verify runs it once before and once after its whole suite run. `harness/scripts/verify.mjs` is protected (TP-3) and `scripts/verify-journal.mjs` is held by another slice: do NOT edit either. Instead write the complete post-image of `harness/scripts/verify.mjs` to `scratch/c15/verify.mjs`: HEAD bytes plus only this change, `repairAddressRootQuietly({home: userInfo().homedir})` called directly before and directly after its `runVerifyJournal(` call, each result added to the Verify output as a diagnostic, never failing or skipping the run; report the drop-in's SHA-256; it joins ceremony C15. Not after every single suite inside Verify: suites run concurrently and `prepareAddressRoot` compares two directory listings (line 369), so a move during a running suite would make that suite fail spuriously; the serial scratch runners do the per-suite run (Elephant work, not yours). Tests use a private temporary home passed to the library functions, never the real home.
+
+### 2. Context files
+
+- `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` — rows D71 and D72 only (lines 98-99).
+- `plugins/pipeline-core/lib/session-power.mjs` — lines 315-380 (`strictAddressChain`, `addressRootRecord`, `addressDirectory`, `addressRead`, `prepareAddressRoot`); read nothing else of it unless an import is needed.
+- `scratch/apsp-move-stale.mjs` — the one-off script the PO's D71 cleanup ran (move aside, never delete); your module is its typed, plan-bound successor.
+- `harness/scripts/verify.mjs` — read only (protected TP-3): find its `runVerifyJournal(` call; you copy the file to `scratch/c15/verify.mjs` and add the two calls around it there.
+- `architecture/boundary-policy.json` — read only; new files must stay under 1000 lines.
+
+### 3. DoD checks
+
+- Acceptance criteria: AC-203 area (no dead end in the session-authority domain), owning item of correction cluster K1; PO decisions D71 and D72 ('D71 test isolation') in `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` rows D71 and D72; the never-fully-blocking rule: every refusal names a repair the agent or the PO can run from a plain terminal.
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node scratch/run-quiet.mjs k1r-new plugins/pipeline-core/lib/session-power-address-repair.test.mjs` (new, all green; cases: plan classifies kept/absent-repository/foreign; apply moves only absent-repository slots and deletes nothing; apply refuses a stale digest with nothing moved; a slot whose repository reappears between plan and apply is not moved; a crash between two renames converges on rerun; root with group-write or a symlinked root is refused; the exported refusal message for more than 4096 entries names the plan and apply commands; a private root with 4097 slots, most of absent repositories, is brought under the bound by plan plus apply; `repairAddressRootQuietly` returns `failed` instead of throwing on a refused root)
+  - `node scratch/run-quiet.mjs k1r-power plugins/pipeline-core/scripts/session-cleanup-power.test.mjs` (stays 2/2)
+  - `node --check scratch/c15/verify.mjs` and `git diff --no-index --stat harness/scripts/verify.mjs scratch/c15/verify.mjs` (the drop-in parses and differs from HEAD only by the import and the two calls)
+  - `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` (no new violation; only the known guard-git.test and git-cmd.test entries)
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`); show the RED first: run the new test file once before the `session-power.mjs` edit and record that the bound-message case is red.
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/lib/session-power-address-repair.mjs`, `plugins/pipeline-core/lib/session-power-address-repair.test.mjs`, `plugins/pipeline-core/lib/session-power.mjs`, `plugins/pipeline-core/scripts/session-power-address-repair.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- The one file outside the write scope you must write is the scratch drop-in `scratch/c15/verify.mjs` (git-ignored scratch, not committed by the host, not listed in `changedPaths`); write nothing else outside the scope.
+- Never touch the real `~/.apsp` or the real home in a test or a probe; every test passes a private temporary home to the library. Do not run the CLI's `apply` against the real home.
+- No deletion anywhere: no `rmSync`, `unlinkSync` or `rmdirSync` on address-root entries; moving aside is the only mutation.
+- No home redirect: the CLI and `session-power.mjs` keep `userInfo().homedir`; do not add an environment variable or option for it.
+- Zero line growth in `lib/session-power.mjs`; never raise an accepted count in `architecture/boundary-policy.json`.
+- Do not edit `harness/scripts/verify.mjs`, `harness/verify-suites.json` (protected) or `plugins/pipeline-core/scripts/verify-journal.mjs` (held by another slice); name the new test file as needing registration in `harness/verify-suites.json` (C16).
+- Never leave a test run in the background when you end your turn; run full files only in the foreground through `scratch/run-quiet.mjs`, one at a time, with the Bash tool timeout set to 600000 ms.
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+- The zero-line-growth rule cannot be met in `session-power.mjs`: stop and name the exact lines needed.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020195107.231d1a0` · content identity `27d995c2edcce14d7e170379575005d23619983ac4ad73437bb2054763932e24`.
+- Model/effort: `claude-sonnet-5-5` / xhigh (goldfish-deep; agent definition alias `sonnet`).
+- Tier: goldfish-deep. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K1R-ADDRESS-ROOT-REPAIR
+- Write scope: plugins/pipeline-core/lib/session-power-address-repair.mjs, plugins/pipeline-core/lib/session-power-address-repair.test.mjs, plugins/pipeline-core/lib/session-power.mjs, plugins/pipeline-core/scripts/session-power-address-repair.mjs
+- **Tool budget (TB-09, hard cap):** ≤45 tool uses (min(tier cap 45, maxTurns 80 - 15)). 80 % checkpoint at about call 36: stop editing and end the turn with an interim report naming what remains.
+- Model justification: authority code that moves entries of a per-user private namespace (D71 names it for the D65 security read); goldfish-deep is the role for guardrail/authority code with design latitude in the plan and readback shape.
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

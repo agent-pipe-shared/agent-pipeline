@@ -1,0 +1,17 @@
+# Codex ready fixture authoring package
+
+- Clone: `scratch/clones/codex-ready-fixture-authoring`; HEAD `32b398bf7c5bd03ba9184bea09305893ea4fbd61`.
+- Source scope: only `plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs`.
+- Patch: `scratch/agent-out/codex-ready-fixture-authoring.patch`; SHA256 `f6109d771c65c750fd632ac2b3b108f1e54edec473407178e0c8dc22dd9364ba`.
+- Source SHA256: `d0d8bdbf3cec6266fccce9b3ae67c5660a621bd30980c8fa2209f4c8a3dbf3e3`.
+- Git blob source preimage: `bd9759febd7dae5c7d20322fbdc0231d3b6eddab`; postimage: `32e196ffccc62038741da60b0c80125147b4018f`.
+
+## Focused verification
+
+Command: `node scratch/agent-out/codex-ready-fixture-test-runner.mjs` from the clone root, with `sandbox_permissions=require_escalated`. The scratch runner configured synthetic HOME/USERPROFILE, `PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE`, and `os.userInfo()` before child execution/imports; the runner set a one-case filter for `Bash, apply_patch, Edit and Write each reach their intended guard family` and `capture-evidence` wrote the JSON result. Exit code 0; TAP output was `ok 1 - Bash, apply_patch, Edit and Write each reach their intended guard family` and `1..1`.
+
+The candidate asserts the public authoring transition and exact generated PRD/Spec paths; authors completed synthetic PRD/Spec documents; follows returned `intake-spec-marker-apply`; retains the original `architecture-design-required` / `ARCHITECTURE-DESIGN-PACKAGE-REQUIRED` negative assertion; then writes the existing architecture package and follows the existing public acknowledgement and bind actions.
+
+The focused GREEN result is preserved at `scratch/agent-out/codex-ready-fixture-authoring-green.json`; SHA256 `91ca673a0a2ebf690ce3d7ee48e137ca533568958b69dbc551b2a8e6ffc81a9b`. Its original output name was `codex-ready-fixture-authoring-red.json`, which had held the focused RED result before the successful run overwrote it. That original RED JSON was not retained separately and has not been reconstructed. Parent had read the RED before overwrite.
+
+The successful focused test source bytes match the reported current source SHA256. The scratch runner was subsequently changed to remove the focused filter and prepare a bounded full39 capture; that full run was not started. Thus no full39 result is claimed. No live test handles remain. Main, cache, state, PRD/Spec, gates, and old G35 clone were not modified; no commits or native calls were made.

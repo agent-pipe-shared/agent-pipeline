@@ -1,0 +1,13 @@
+import { fork } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const shard = process.env.G7_SHARD ?? "1";
+const chunk = process.env.G7_CHUNK ?? "0";
+const child = fork("plugins/pipeline-core/lib/project-onboarding-v3.test.mjs", [`--pipeline-internal-shard=${shard}/6`, `--pipeline-internal-chunk=${chunk}/2`], { silent: true });
+let out = "";
+child.stdout.on("data", (d) => { out += d; });
+child.stderr.on("data", (d) => { out += d; });
+child.on("message", (m) => { out += `\nIPC ${JSON.stringify(m).slice(0, 3000)}\n`; });
+child.on("close", (code, signal) => {
+  writeFileSync(process.env.G7_LOG ?? "zz-shard-log.txt", `exit ${code} ${signal}\n${out}`);
+  process.exit(0);
+});

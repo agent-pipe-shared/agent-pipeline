@@ -1,0 +1,16 @@
+// K132 helper: apply (or --check) saved diffs inside a clone via git apply. usage: node scratch/k132-apply.mjs <cloneDir> [--check] <diff>...
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
+const [clone, ...rest] = process.argv.slice(2);
+const check = rest.includes("--check");
+for (const d of rest.filter((x) => x !== "--check")) {
+  const args = ["-C", clone, "apply", ...(check ? ["--check"] : []), resolve(d)];
+  try {
+    execFileSync("git", args, { stdio: "pipe" });
+    console.log(check ? "check ok" : "applied", d);
+  } catch (e) {
+    console.log("FAILED", d, String(e.stderr ?? e.message).trim());
+    process.exitCode = 1;
+    break;
+  }
+}

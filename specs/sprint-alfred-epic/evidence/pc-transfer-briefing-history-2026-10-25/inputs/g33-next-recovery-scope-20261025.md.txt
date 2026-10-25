@@ -1,0 +1,48 @@
+# G33 recovery investigation for the next isolated slice
+
+Frozen installation candidate:32b398bf7c5bd03ba9184bea09305893ea4fbd61.
+Do not change that checkout while installation and native tests start.
+
+Existing prevention is committed; recovery of an already damaged inactive
+State remains unimplemented. Matrix stage50 is accurate. This note is a
+bounded implementation lead, not an accepted design or a passing test.
+
+Relevant current Source:
+- lib/onboarding-continuity.mjs427: strict closed transition validator.
+- lib/onboarding-continuity.mjs469: strict discarded transition validator.
+- lib/onboarding-continuity.mjs492: inactiveLifecycleTransitionTimestamp,
+  used by the preventive writer fix; returns null for damaged State.
+- lib/onboarding-continuity.mjs1627: repair planner requires damaged State,
+  present handover, valid repair records and an existing admitted diagnosis.
+- lib/onboarding-continuity.mjs1740: apply path binds the entire plan and
+  rechecks CAS twice under the existing State writer lock before replacement.
+- scripts/pipeline-state.mjs12276: preventive preservation of validated
+  inactive timestamps; approval records have their own approvedAt.
+- scripts/pipeline-state.mjs13132: deploy approval still updates updatedAt;
+  assess the same inactive writer family without broad unrelated edits.
+
+The repair must establish an independent preimage for the lifecycle state.
+An approval-shaped object and timestamp equality alone cannot prove that
+the rest of the State was produced by a legitimate closure. Investigate
+whether an existing committed State preimage, closure/history binding and
+the sanctioned proof/public authority readers supply enough evidence.
+Restore only the previously proven lifecycle timestamp; retain approval and
+proof-consumption audit. Do not manufacture closed/discarded history, weaken
+the general validators, or turn signature verification into structural JSON
+checks. Fail explicitly when the required preimage is unavailable.
+
+The existing repair planner/apply route should retain its digest, root,
+calibration, handover, history and State CAS binding. Any new repair reason
+must use a genuine producer and remain compatible with the strict State
+repair-record schema; do not append an invented receipt to pass validation.
+
+Required isolated checks: actual damaged writer/observer reproduction;
+closed/discarded and mixed history; correct preimage recovery; malformed or
+forged approval refusal; missing/stale preimage refusal; stale plan and CAS
+mutation refusal; unchanged closure/history bytes and retained consumption;
+normal active-State timestamps; existing controlled repair routes. Follow
+synthetic identity/private-root safety before imports and through children.
+
+No production patch or qualification is supplied by this note. A scoped
+worker must receive the canonical briefing before implementation. PRD/Spec,
+general chat policy, new keys/ledgers and installed caches remain untouched.

@@ -1,0 +1,67 @@
+# Host output custody proposal
+
+Scratch-only source preparation against aggregate 563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e. Existing input admission, frozen request/binding snapshots, request parity, registered Advisor namespace and managed shutdown custody are preserved. No canonical source or aggregate was written, no real Codex/model/provider/authentication call occurred.
+
+## Source patch
+
+codex-host-output-custody.patch adds lib/codex-host-output-custody.mjs and patches lib/codex-isolated-structured-host.mjs. Both sections have assembler-compatible diff --git headers. Host preimage is 6b00ee8c5c631fb5f52571b060b7ad9f1f943dea6b3b8705966de77e4a9da4f8. Host postimage is d282b305f12859d14ac62e64359e21b03c11a0c3e7884d58347884c703f96861. New helper source postimage is b8ec08ff9b4cdb564dade0e6a95da4d640808f9e1007f96093d3a5fbae2460da. Patch SHA256 is e4974bc348e97a21ae7c309685052d725710a33468dc6d9365980119a45130df.
+
+The helper's canonical source and owned runtime differ only in canonical import coordinates. The exact aggregate host/journal/supervisor/launcher/worker/ownership graph is copied into new owned runtime files; only the host has this logical patch, and other modules differ solely in import coordinates. bindings.json lists all hashes/import changes. record-evidence.mjs compares prepared source/runtime hashes against post-test bytes, without launching another suite or model.
+
+## Versioned exported observation
+
+Executed host results add observed.outputCustody with the closed metadata projection:
+
+```text
+schema: pipeline.codex-host-output-custody.v1
+stdioStatus: complete | failed
+stdin: {finished, closed, errored}
+stdout: {bytes, retainedBytes, sha256, ended, closed, errored,
+         utf8Verified, bounded, frameCount, framingComplete, parserVerified}
+stderr: {bytes, retainedBytes, sha256, ended, closed, errored,
+         utf8Verified, bounded}
+finalMessageFrameSha256: sha256 | null
+reportRawJsonSha256: sha256 | null
+reportRawJsonBytes: integer | null
+reportCanonicalSha256: sha256 | null
+```
+
+No Buffer, raw frame, report text, stdout/stderr text or exception detail is included in this observation. The parsed report is still the existing transient result, returned only for successful execution. Missing/no-child process admission returns no output custody claim.
+
+## Digest meanings and collection
+
+- stdout/stderr.sha256 hash exact bytes actually observed at their pipe data events, including framing LF and diagnostics. Failed/overflow custody hashes are observed-prefix digests, never complete-stream assertions.
+- Each channel has a fixed bounded 8MiB transient Buffer (16MiB combined retained capacity), original byte count and incremental digest. No unbounded transcript arrays are retained. On overflow retain only remaining capacity, hash the actual received chunk, mark failed, pause output consumption and stop the registered owned session. No unbound PID is signaled.
+- Fatal streaming UTF8 decoding handles code points split across chunks and flushes at genuine end. Both stdout and stderr are checked. Arbitrary binary stderr is deliberately rejected as failed custody; this conservative behavior is a compatibility boundary, not proof that all diagnostic producers always emit UTF8.
+- stdout frames require LF termination. Empty LF is ignored as no JSON frame; CR before LF remains part of the original frame. Every nonempty outer frame passes canonical parseStrictJson, including duplicate-key, Unicode and object-type checks. Unterminated residual bytes, even a syntactically valid JSON value without LF, fail at EOF.
+- finalMessageFrameSha256 hashes the exact final outer agentMessage JSON frame bytes **excluding framing LF**. reportRawJsonSha256 hashes the exact decoded item.text UTF8 bytes: the model's original serialized report JSON with its key order, spaces and CRLF preserved. These are separate from reportCanonicalSha256 over canonicalJson(parsedReport), which remains the existing parsed-response digest semantics.
+- The helper retains raw bytes only transiently. Durable evidence contains metadata and hashes only; no real Q&A or output transcript is persisted.
+
+## Complete stdio and error handling
+
+Complete requires actual observed stdout/stderr end and close, stdin finish and close, bounded/fatal-UTF8-verified channels, complete stdout frames and no parser/stream/report validation failure. stdin.end(), byte counts, child exit or a valid parsed report alone are insufficient. Pipe flags are never inferred from child terminal state.
+
+The host records stream error events and turns output faults into static typed failure. Broken parsing rejects pending RPC/turn waiters; cleanup then ends input and follows existing owned terminal/stop/recovery custody. It does not wait for cleanup RPC responses through an already failed parser. Parser failure cannot be cleared by later frames. Late trailing bytes are checked during stream end and can invalidate an earlier valid answer before return. Failed host results expose no report.
+
+Stdio completeness and execution success remain separate. A real managed fixture exits 3 after complete valid pipes: stdioStatus is truthfully complete while host result is unsuccessful and successful ownership is null. No process success or provider/OS attestation is inferred from custody. Purpose registration remains a separate controller boundary, not a raw-output authority claim.
+
+## Targeted verification
+
+Final node --test scratch/codex-host-output-custody.test.mjs: 12 passed, zero failed, exit 0, 15995.528666ms. Nine cases use actual registered managed Linux Node protocol fixtures under the Advisor process root:
+
+- Valid original report serialization: exact raw report/frame/stdout/stderr digests match independently computed producer hashes; canonical report hash differs from its original serialization hash.
+- Valid split UTF8 across separate writes.
+- Invalid stdout UTF8; duplicate outer JSON keys.
+- Actual EOF trailing partial frame and valid JSON without framing LF.
+- Invalid duplicate-key inner report JSON; invalid stderr UTF8.
+- Nonzero process terminal with complete valid pipe custody.
+
+Three focused collector/event cases test overflow byte retention/hash, a real controlled PassThrough error event, and close without genuine end/finish. The stream-error case does not pretend to induce an OS error on a managed subprocess pipe. All managed cases check producer/controller byte/hash equality, actual pipe events and no remaining live owned session. Failed zero-exit protocol cases retain truthful closed process ownership while remaining unusable as reports.
+
+The first run had 10 passes/2 fixture expectation failures: tails were written before the later cleanup RPC newline, so strict JSON rejection was correct and framingComplete could truthfully be true. The fixtures now append tails after the final cleanup response to test real EOF residuals. No gate or failure expectation was weakened.
+
+Metadata-only transcripts cover the nine completed managed cases. Their hashes and prepared-vs-post-test stability are in evidence.json. Tests contain only controlled synthetic document text and scripts. Runtime/helper syntax was exercised by imports and successful tests; git apply --numstat accepts both patch sections. No broad Readiness suite, live Advisor replay or formal review stamp is claimed.
+
+## Future record/store mapping
+
+Keep existing responseSha256 mapped to reportCanonicalSha256. Add distinct reportRawJsonSha256, finalMessageFrameSha256 and byte/channel/stdin custody fields in a closed versioned private record; never rename canonical responseSha256 as raw-output custody. An answered record must require the exact actual host observation, complete custody and non-null raw/canonical final-report digests, plus the existing independent physical source/executable/ownership verification. Failed/null observations cannot produce answered authority. This patch does not itself activate that record/store or public transaction contract.

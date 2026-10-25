@@ -1,0 +1,159 @@
+// SPDX-License-Identifier: SUL-1.0
+// Bounded fixture qualification, not native runner/platform attestation.
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import test from 'node:test';
+
+const self = fileURLToPath(import.meta.url);
+const hooks = resolve(dirname(self), '../../hooks');
+const worker = process.argv[2] === '--fixture-worker';
+
+// Import production only in a process whose home and cwd are synthetic. In
+// particular, policy auxiliary lookups never inspect the operator's machine plane.
+if (worker) {
+  const request = JSON.parse(process.argv[3]);
+  const { createGovernanceScopeController } = await import('../governance-scope.mjs');
+  const controller = createGovernanceScopeController();
+  if (request.enroll) {
+    const plan = controller.planDecision({ rootDir: request.root, decision: 'enroll', by: 'synthetic-fixture-owner' });
+    const admission = controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
+    assert.equal(admission.state, 'active');
+  }
+  const scope = controller.observe({ rootDir: request.root });
+  assert.equal(scope.state, 'active', JSON.stringify(scope));
+  assert.equal(scope.provenance.kind, 'explicit-local-decision');
+  if (!request.input) {
+    process.stdout.write(JSON.stringify({ state: scope.state, provenance: scope.provenance.kind }));
+  } else {
+    const { evaluateLifecycleReadyGuard } = await import('../../hooks/guard-lifecycle-ready.mjs');
+    process.stdout.write(JSON.stringify(evaluateLifecycleReadyGuard(request.input, { projectDir: request.root })));
+  }
+} else {
+  const base = resolve('scratch/agent-out/g23-cross-runner-passive-matrix');
+  mkdirSync(base, { recursive: true });
+  const area = realpathSync(mkdtempSync(join(base, 'fixture-')));
+  const root = join(area, 'repo');
+  const home = join(area, 'home');
+  const outside = join(area, 'external');
+  for (const directory of [root, home, outside, join(root, 'docs'), join(root, 'scratch'), join(root, 'vault')]) mkdirSync(directory, { recursive: true });
+  const marker = 'G23 synthetic passive content\n';
+  for (const path of [join(root, 'docs/note.md'), join(root, 'scratch/note.md'), join(outside, 'admitted.md')]) writeFileSync(path, marker);
+  // Names alone exercise credential classification. No credential file exists.
+  const credential = join(root, 'vault/id_rsa');
+  const external = join(outside, 'admitted.md');
+  const cleanEnv = { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, HOME: home, USERPROFILE: home,
+    XDG_CONFIG_HOME: join(home, 'config'), XDG_STATE_HOME: join(home, 'state'),
+    CLAUDE_PROJECT_DIR: root, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, 'gitconfig'), RIPGREP_CONFIG_PATH: '' };
+  function launch(script, args = [], input) {
+    const child = spawnSync(process.execPath, [script, ...args], { cwd: root, env: cleanEnv,
+      input: input === undefined ? undefined : JSON.stringify(input), encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024 });
+    assert.equal(child.error, undefined, child.error?.message);
+    assert.equal(child.signal, null);
+    if (script === join(hooks, 'antigravity-pretool-guard.mjs')) assert.ok([0, 2].includes(child.status), child.stderr);
+    else assert.equal(child.status, 0, child.stderr);
+    // Codex's documented success transport is exit 0 with no output. Pin its
+    // active governance separately and cross-check the evaluator below.
+    if (script === join(hooks, 'codex-pretool-guard.mjs') && child.stdout.trim() === '') return null;
+    assert.notEqual(child.stdout.trim(), '', 'a silent hook is not positive admission');
+    return JSON.parse(child.stdout.trim().split('\n')[0]);
+  }
+  function inspect(input, enroll = false) { return launch(self, ['--fixture-worker', JSON.stringify({ root, enroll, input })]); }
+  function decide(route, target, family = 'cat') {
+    const command = family === 'head' ? `head -n 1 '${target}'` : family === 'rg' ? `rg -n synthetic '${target}'` : `cat '${target}'`;
+    if (route === 'claude-shell') {
+      const result = inspect({ tool_name: 'Bash', tool_input: { command } });
+      return { allowed: result.exitCode === 0, text: result.stderr ?? '' };
+    }
+    if (route === 'codex-shell') {
+      const result = launch(join(hooks, 'codex-pretool-guard.mjs'), [], { cwd: root, session_id: 'g23-fixture', tool_name: 'Bash', tool_input: { command } });
+      if (result === null) {
+        const evaluated = inspect({ tool_name: 'Bash', tool_input: { command } });
+        assert.equal(evaluated.exitCode, 0, evaluated.stderr);
+        return { allowed: true, text: '' };
+      }
+      const output = result.hookSpecificOutput;
+      assert.ok(['allow', 'deny'].includes(output?.permissionDecision), JSON.stringify(result));
+      return { allowed: output.permissionDecision === 'allow', text: output.permissionDecisionReason ?? '' };
+    }
+    const [name, args] = route === 'antigravity-url'
+      ? ['read_url_content', { Url: pathToFileURL(resolve(root, target)).href }]
+      : ['view_file', { AbsolutePath: target }];
+    const result = launch(join(hooks, 'antigravity-pretool-guard.mjs'), [], { cwd: root, toolCall: { name, args } });
+    assert.ok(['allow', 'deny'].includes(result.decision), JSON.stringify(result));
+    return { allowed: result.decision === 'allow', text: result.reason ?? '' };
+  }
+  const routes = ['claude-shell', 'codex-shell', 'antigravity-native', 'antigravity-url'];
+  function allow(route, target) { const result = decide(route, target); assert.equal(result.allowed, true, `${route}: ${target}\n${result.text}`); }
+  function deny(route, target, code) {
+    const result = decide(route, target);
+    assert.equal(result.allowed, false, `${route}: ${target}`);
+    assert.match(result.text, new RegExp(`\\b${code}\\b`, 'u'), `${route}: ${result.text}`);
+    assert.match(result.text, /BLOCKED \(guard-/u);
+    if (code !== 'GUARD-READ-TARGET-MISSING') assert.doesNotMatch(result.text, /not found|not present|no such file|does not exist|nothing to read/iu);
+  }
+  try {
+    const init = spawnSync('git', ['init', '-q', root], { cwd: root, env: cleanEnv, encoding: 'utf8' });
+    assert.equal(init.status, 0, init.stderr);
+    assert.equal(inspect(undefined, true).state, 'active');
+    await test('G23PM01 supported fixture enrollment survives fresh-process readback', () => {
+      assert.deepEqual(inspect(), { state: 'active', provenance: 'explicit-local-decision' });
+    });
+    await test('G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes', () => {
+      for (const route of routes) for (const path of ['docs/note.md', join(root, 'docs/note.md'), 'scratch/note.md']) allow(route, path);
+      for (const route of ['claude-shell', 'codex-shell']) for (const family of ['head', 'rg']) {
+        const decision = decide(route, join(root, 'docs/note.md'), family);
+        assert.equal(decision.allowed, true, decision.text);
+      }
+      // Execute only the admitted, owned synthetic file, never a refusal target.
+      const consumed = spawnSync('cat', [join(root, 'docs/note.md')], { cwd: root, env: cleanEnv, encoding: 'utf8' });
+      assert.equal(consumed.status, 0, consumed.stderr);
+      assert.equal(consumed.stdout, marker);
+    });
+    await test('G23PM03 genuinely missing in-root exact file stays denied as missing on every route', () => {
+      for (const route of routes) for (const path of ['docs/absent.md', join(root, 'docs/absent.md')]) deny(route, path, 'GUARD-READ-TARGET-MISSING');
+    });
+    await test('G23PM04 nonexistent credential names stay denied for credentials, never absence', () => {
+      for (const route of routes) for (const path of ['vault/id_rsa', credential]) deny(route, path, 'GUARD-READ-CREDENTIAL-TARGET');
+    });
+    await test('G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart', () => {
+      // D96 supplies ordinary exact-path admission; there is no synthetic JSON
+      // allowlist. Every call starts a new consumer process and rechecks policy.
+      for (let restart = 0; restart < 2; restart++) {
+        assert.equal(inspect().state, 'active');
+        for (const route of routes) allow(route, external);
+      }
+    });
+    await test('G23PM06 symlink physical credential boundary and safe local alias', { skip: process.platform === 'win32' ? 'G23-PM-SYMLINK: native Windows link privilege qualification remains pending' : false }, () => {
+      symlinkSync(join(root, 'docs/note.md'), join(root, 'docs/local-link.md'));
+      // Empty inert fixture makes realpath meaningful; contains no key bytes.
+      writeFileSync(credential, '');
+      symlinkSync(credential, join(root, 'docs/credential-link.md'));
+      for (const route of routes) {
+        allow(route, 'docs/local-link.md');
+        deny(route, 'docs/credential-link.md', 'GUARD-READ-CREDENTIAL-TARGET');
+      }
+      rmSync(join(root, 'docs/local-link.md'));
+      rmSync(join(root, 'docs/credential-link.md'));
+    });
+    await test('G23PM07 native exact Grep and bounded listing controls retain SEC-11', () => {
+      for (const tool_input of [{ pattern: 'synthetic', path: 'docs/note.md' }, { pattern: 'synthetic', path: join(root, 'docs/note.md'), glob: '*.md' }, { pattern: 'synthetic', path: 'docs/note.md', type: 'md' }]) {
+        const verdict = inspect({ tool_name: 'Grep', tool_input });
+        assert.equal(verdict.exitCode, 0, verdict.stderr);
+      }
+      for (const path of ['docs', join(root, 'docs')]) {
+        const verdict = inspect({ tool_name: 'Grep', tool_input: { pattern: 'synthetic', path } });
+        assert.equal(verdict.exitCode, 2);
+        assert.match(verdict.stderr, /GUARD-READ-TARGET:/u);
+      }
+      for (const path of ['docs', join(root, 'docs')]) {
+        const verdict = inspect({ tool_name: 'Glob', tool_input: { path, pattern: '*.md' } });
+        assert.equal(verdict.exitCode, 0, verdict.stderr);
+      }
+      const read = inspect({ tool_name: 'Read', tool_input: { file_path: external } });
+      assert.equal(read.exitCode, 0, read.stderr);
+    });
+  } finally { rmSync(area, { recursive: true, force: true }); }
+}

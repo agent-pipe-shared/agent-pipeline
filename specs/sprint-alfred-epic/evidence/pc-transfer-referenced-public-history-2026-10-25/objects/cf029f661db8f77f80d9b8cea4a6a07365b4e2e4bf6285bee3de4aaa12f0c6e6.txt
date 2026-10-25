@@ -1,0 +1,39 @@
+command: node scratch/agent-out/g20-qualification/run-close-pin.mjs --original
+label: g20-close-original-red
+exitCode: 1
+head: 1d721e5d9e534618c123481fb5eaa6561fcb310c
+tree: 10978bb1bd41e57abf0af8e4d4fab1a8c51f281f
+dirty: false
+--- stdout ---
+✖ rigor one close without a delivery course still needs the independent Critic/Verify audit (3369.256739ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4027.327253
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs:203:1
+✖ rigor one close without a delivery course still needs the independent Critic/Verify audit (3369.256739ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.close-coordinator.transition-plan.v1","root":"<repo-root>/scratch/clones/g20-qualification/scratch/alf-w3b-rigor-one-no-course-HfvtH9","lifecycleId":"close-rigor-one-no-course","actor":"PO","expectedRevision":1,"expectedStateSha256":"3647630a59f5513636265e3c7a9b2cc078ae72de2da942235eb4a54c0984228e","expectedRawSha256":"8732fe8f571e6a10d8d456a892085b3657f2f3e4be4a1ffca1598a5e80e84162","phase":"feature-close-prepared","architectureImpact":"architecture-conforms","evidenceSha256":null,"audit":null,"advance":{"expectedRevision":1,"expectedStateSha256":"3647630a59f5513636265e3c7a9b2cc078ae72de2da942235eb4a54c0984228e","phase":"feature-close-prepared","inputDigest":"0853be132ef38fb5e2279a3a5f9b5c10bd1074a92a92a9226d1163c0a985e550","observedDigest":"a3615aa68fc4e712ec1cac1a84098a477bbea87e141e53daa7ec8466191ab075","featureCloseAudit":null,"authority":{"implementationResultSha256":"a3615aa68fc4e712ec1cac1a84098a477bbea87e141e53daa7ec8466191ab075","pipelineStateSha256":"294a23da5b2240052ad4cd51def6db2971aaa46277bb8c1751f6a71151c8c693","planSha256":"939f54666f4869a7e1701b92eb14af3f8fad15c083e40bfd75de01996b30bdca","prdSha256":"939f54666f4869a7e1701b92eb14af3f8fad15c083e40bfd75de01996b30bdca","specSha256":"603c828a03383f98b82bf9c6787deeb5c40c02871a1b8d6ba14b0d538020a02b"},"architectureImpact":"architecture-conforms"},"planSha256":"94f36c60b5ddd71b393cd31122c035ff8ae77525b0b570778bcb6849260e05eb","nextAction":{"executable":"<home>/.local/lib/node-v24.15.0/bin/node","argv":["<repo-root>/plugins/pipeline-core/scripts/close-coordinator.mjs","apply-transition","--root","<repo-root>/scratch/clones/g20-qualification/scratch/alf-w3b-rigor-one-no-course-HfvtH9","--lifecycle","close-rigor-one-no-course","--actor","PO","--phase","feature-close-prepared","--architecture-impact","architecture-conforms","--continuity-close-request","evidence/close-request.json","--plan-sha256","94f36c60b5ddd71b393cd31122c035ff8ae77525b0b570778bcb6849260e05eb","--activate"],"mutation":true,"requiresConfirmation":true,"expected":{"schema":"pipeline.close-coordinator.apply.v1","statuses":["applied","replayed"]}}}
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g20-qualification/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs:214:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

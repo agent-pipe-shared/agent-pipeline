@@ -1,0 +1,11 @@
+command: node scripts/run-in.mjs scratch/clones/k150 k150-cpg plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+label: k150-cpg-final
+exitCode: 0
+head: 54bde561371592529494601badeb1b50697be742
+tree: 05ba2f35a2adba5582e0a8f5dbf52a5aabc86bfe
+dirty: false
+--- stdout ---
+GREEN exit 0 tests ? pass ? fail ? skip ? todo ?  plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+   (no summary) tail: ok 36 - NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged | ok 37 - lifecycle-not-ready denial does not advertise a human override ceremony | 1..37
+
+--- stderr ---

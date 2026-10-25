@@ -1,0 +1,113 @@
+# Sealed ordinary Codex Advisor execution composition
+
+Status: read-only implementation design against actual canonical modules and the exact scratch proposals below. No execution adapter, model turn, source integration, host export capability or authority has been activated. No executable prototype was added: wrapping the present APIs would conceal the missing pre-input admission hook, incompatible registered process root and missing output custody rather than test a real composition.
+
+## Source bindings and current baseline
+
+The canonical design coordinator reads physical repository consent and stops the Codex no-child path before question/evidence prompt construction. The canonical bridge stops it before dispatch.prepare. A callback returning available still deliberately yields ordinary-consult-host-callback-unavailable. These existing export/order fixes are preserved; old integration-review findings about their earlier ordering are not current defects.
+
+Prepared input modules inspected:
+
+| Surface | Inspected SHA256 |
+| --- | --- |
+| scratch/codex-advisor-admission-proposal.mjs | 3bdb2c2e172ce2d1f7dfafcea2d3fefbbd51b1977b7e738ed942bd433796f135 |
+| scratch/codex-advisor-request-proposal.mjs | 573710a95b9bad0f52e913956362a884857669879932d7c095965bdc272ddc15 |
+| scratch/codex-advisor-host-record-proposal.mjs | d0804a55b6ed60483a7329af873eee9f06f2812cf595830f2ddaebb15feef684 |
+| scratch/codex-advisor-private-store-proposal.mjs | 10efb9af59dc66eec20bbe5f453ab2d61985c26cac919ae7bba28f0ef10f3324 |
+| scratch/codex-advisor-binding-proposal.mjs | 7508bd642825cc2792cef636b23cfef8fceac5a7ff439353ad2a663509713631 |
+| Proposed codex-isolated-structured-host.mjs, scratch/0.7-virtual-revision-29.txt | 5936e9d2afc8234db12246e4c62769b3b8471264c2fedeb423b4dde4381ee039 |
+| Proposed codex-host-process-supervisor.mjs, revision-26.txt | 8023c0405eb2dbd42ae80cd6a5d47c9c6c42122afadd4f5888c0ad5dde54a9ee |
+| Proposed codex-readiness-ownership-verifier.mjs, revision-27.txt | 4624d591383a8435621d69adafa96be97a436cca513bb4ac94ebdb6db29d1b00 |
+| Canonical lib/critic-route-v3.mjs | cf73338a71b8a142b250483d102461b65118a3d9a88044e9801309c953b44b5c |
+| Canonical lib/trusted-tool-resolution.mjs | 38fdb5b479db758360674a5cd418d59d59fe4af516d0f028cf0a5b949d2a8463 |
+
+The proposed process journal is revision-23.txt; launcher and exec worker are revisions 24/25. Their schemas are pipeline.*. Scratch Node fixtures use separate scratch.* journal schemas. Their real process ownership evidence does not make those fixtures interchangeable with the production-proposed host.
+
+## Sealed entry and exact call sequence
+
+Proposed entry name: runCodexOrdinaryAdvisorHost. This name is a design target, not an existing callable export. Its host-owned closure derives all source, topology, authority and executable coordinates; it never accepts provider/store/capability overrides from bridge stdin or model JSON.
+
+1. **Observe a concrete governed demand.** Read physical package and Git HEAD/tree using bounded readers. Derive design package binding with canonical designAdvisoryReceiptBinding, or the applicable ordinary feature package authority. Reuse validateAdvisoryDemand and advisoryConsultationDisposition: a valid reuse-no-repeat result launches nothing and does not generate a replacement answer. Explicit reason and epic/feature are required; bootstrap, resume and consent alone never create this demand.
+
+2. **Resolve metadata without content export.** Derive repoFingerprint from canonical physical repository topology, dispatch, profile/reason and package/question/evidence digests. Digests must originate from the governed reader, not a returned expected object. Physical source reads to compute digests are permitted; prompt assembly, copying content into execution inputs and provider/launcher calls remain deferred.
+
+3. **Resolve the registered Advisor route.** Call resolveV3DutyRoute({rootDir,dutyId:'advisory',runner:'codex',candidateCommit}). It validates complete V3 candidate-committed pipeline.user.yaml and returns dutyId, runner, model, effort, state, sourceSha256, candidateCommit; require duty advisory, runner codex and state default. Reuse the semantics of canonical bridge's private resolvedAdvisoryRoute: selectModelRoleForTask({rootDir,runner:'codex',taskRoute:'duty.advisory',env:trustedHostEnvironment}) may replace model only after valid ready host readback with the same effort; fold v3SourceSha256/taskRoute/modelId/effort/readbackSha256/receiptSha256 into the canonical source digest. If optional role selection is unavailable, preserve the valid registered V3 floor. This does not change provider or bypass export denial. The private resolver needs a shared exported seam when implemented, not a second independent policy. Map to the closed request route {model,effort,sourceSha256,candidateCommit}. Default registry is gpt-6-sol/max; never hardcode it in execution. The current generic resolver accepts 40-character commits only, while scratch contracts admit 40/64: unsupported 64-character candidate resolution must return unavailable, not truncate.
+
+4. **Select the executable independently.** Use an adopted host policy such as canonical resolveTrustedSystemExecutable('codex') and its physical result, or the existing verified onboarding executable descriptor when that is the adopted authority. Do not mix policies silently. resolveTrustedSystemExecutable uses fixed system/home paths rather than PATH; it can report missing even if an untrusted/custom PATH has a binary. Reject wrappers/unavailable paths and require the final file to satisfy the binding check's single-link physical constraint. journalExecutable supplies physical path/digest plus owner/executable checks. Compare this independent selection to journal intent; the journal never chooses the expected executable for the verifier. No executable/model catalogue probe is needed before export admission.
+
+5. **Prepare only after model-free admission.** Call prepareCodexAdvisorAdmission with sealed requireReady, observeCurrentMetadata, observeRegisteredRoute, admitHostExport and a lazy factory. The factory independently rereads the physical package/evidence, builds and validates canonical createAdvisoryDemand, then calls buildPreparedCodexAdvisorRequest and buildCodexAdvisorAnswerExpected. It returns transient request bytes plus bound metadata. Check factory question/evidence/package/demand/route digests exactly against the admitted metadata. Repository decline, host denial, unavailable host capability and drift return finite governed no-child; there is no provider fallback or alternate export route.
+
+6. **Reobserve export admission before launch.** The actual host adapter must inspect the host's real export decision for the exact metadata, candidate, route and newly built recipe/request digests. The scratch callback's approved JSON is not this authority. If the actual observation is absent or denied, discard the transient prompt and launch nothing. The prelaunch check authorizes host initialization; no private authority receipt is published here. Only after this check create a physically private empty input directory and an Advisor-specific store/journal root. Do not copy credentials or transcripts into that directory. Authentication remains owned by the host; no private credential material is inspected in this design.
+
+7. **Run the managed structured host.** Existing signature is runIsolatedStructuredHost({codexPath,cwd,model,effort,prompt,outputSchema,startupTimeoutMs,turnTimeoutMs,managedProcess:{journalParent,receiptId,binding:{repoFingerprint,dispatchId,candidateCommit}}}). The host computes requestSha256 itself and adds it to spawnManagedCodexHost's binding. Its default startup/turn timeouts are 45s/180s. ReceiptId is a random drh_<32hex> host ID, distinct from the public advisoryReceiptId. The prefix is a lexical journal contract, not Readiness assurance.
+
+8. **Reobserve immediately before evidence enters stdin.** A mandatory Advisor execution hook is missing in the existing host. Add a sealed beforeTurnInput seam after config/thread/MCP verification and before the actual turn/start send. It must recheck physical consent, current metadata/candidate, selected route/executable and the actual host export decision against exact recipe/request digests with a bounded deadline/AbortSignal. It receives metadata/digests only. It must not itself reconstruct/copy the raw prompt. Rejection closes the already launched managed host, sends no question/evidence and never changes provider. An outer recheck before calling runIsolatedStructuredHost cannot substitute: initialization, thread and MCP observations occur inside that call before turn/start. The initialize/config/thread RPCs already write metadata to stdin, so steps 6 and 8 are separate prelaunch and pre-content boundaries. Exact field/decision schema must be adopted by the real host integration, not fabricated by this seam.
+
+9. **Observe the actual turn and keep terminal custody.** The existing host starts a fresh ephemeral thread, disables inherited instructions/history/environment context, tools/apps/plugins/hooks/MCP capabilities, requests exact model/provider/effort with no provider fallback, and checks the returned active profile/model/provider. It accepts only one non-commentary final agentMessage for the requested thread/turn. Server requests and other effect items fail the execution. The final answer is parsed by canonical parseStrictJson and schema-lite. Always additionally call validatePreparedCodexAdvisorAnswer: local schema-lite ignores length/count keywords, and exact citation pairs/ordering/byte bounds are semantic checks.
+
+10. **Recheck sources after completion and verify closure.** Reread candidate, physical evidence, question/package/demand, current registered route and independent executable. Require exact before/after digests; draft bytes remain bound physical bytes, not substituted Git blobs. Require observed request digest, exact receipt ID, model/provider, requested effort, config/profile/MCP controls, zero effects, completed turn, clean terminal and independently verified ownership. A completed model answer with unclosed process ownership is executed-error/unavailable, never success.
+
+11. **Construct host-owned receipts and persist only verified evidence.** Build sanitized pipeline.advisory-receipt.v1 with adapter consult and an identity derived from host observations, then validateAdvisoryReceipt. Compute exact receipt-file bytes/digest separately from canonical parsed receipt digest. Construct the metadata-only Advisor host record, validatePreparedCodexAdvisorHostRecord, then store.write(record,expected). Perform verifyPreparedCodexAdvisorBinding using independently reread physical sources, registered route, independently selected hostExecutablePath, exact receiptBytes and transient response. Its two store.readForBinding calls reconstruct registered ownership and compare the executable again. Do not export an answer/public transaction before all checks pass. The current writeDesignAdvisoryTransaction/readDesignAdvisoryTransaction do not yet bind Codex host execution; their private contract needs explicit extension before an answered Codex transaction can be authoritative.
+
+## Observed field mappings
+
+| Advisor field | Actual source / restriction |
+| --- | --- |
+| hostReceiptId | execution.observed.receiptId, exact requested managed host ID |
+| advisoryReceiptId | governed public receipt/package binding, not host ID |
+| dispatch/candidate/profile/reason/package/demand/evidence | independent physical governed caller reconstruction |
+| recipeSha256/requestSha256 | buildPreparedCodexAdvisorRequest; compare observed.requestSha256 |
+| responseSha256 | canonical parsed report digest; currently **not raw wire JSON digest** |
+| answerSha256 | exact decoded report.answer UTF8 bytes |
+| dutyReceiptSha256 | canonical parsed sanitized advisory receipt; binding.receiptFileSha256 separately hashes actual serialized receiptBytes |
+| session.threadId/turnId/modelObserved/providerObserved | execution.observed threadId/turnId/model/provider after host checks |
+| freshThreadStarted/ephemeralRequested | successful observed thread/start plus actual request flags; not model-owned assertions |
+| controls.configurationVerified/profileVerified/mcpVerified/profileIntentSha256 | actual generic host observed fields |
+| controls.unexpectedToolItems/serverRequests | events.other / events.serverRequest must both be zero; events.other is broader than tools |
+| controls.evidenceReadbackSha256/evidenceSecondReadbackSha256 | independently reconstructed public {path,sha256} list before/after; not invented from model JSON |
+| terminal.exitCode/signal/spawnError/turnStatus | observed.terminal.code/signal/spawnError and observed.turnStatus |
+| terminal.stdioStatus | **missing explicit custody field**; stdoutBytes/stderrBytes are insufficient to declare complete |
+| executableSha256 | independently selected physical binary compared to private intent and final current-file read |
+| ownership | verifyRegisteredCodexOwnership over intent/launcher/admission/child-intent/worker/child/exec-admission/execution/terminal; recovery invalidates success |
+| isolation | host-observed-tool-free; nativeSubagent/OS/provider attestation all false |
+
+Requested effort is observed as a host request parameter; the generic host does not independently receive a provider attestation of internal reasoning effort. Preserve that assurance limit.
+
+## Raw output custody: available and absent
+
+Actual pipe custody exists within runIsolatedStructuredHost: the registered launcher/worker pass standard descriptors to the selected executable, and the owning host attaches child.stdout/child.stderr listeners. However, its exported result retains only parsed report, counts and event/terminal observations. The final raw answer string is a private local variable and is discarded. Raw stdout/stderr chunks, original final JSON serialization and their digests are not returned or journaled. The process journal binds process identity/argv/request, not output bytes. No later callback/store can recover those bytes from the returned report.
+
+The current stdout parser converts each chunk with chunk.toString(), concatenates text and parses protocol lines with JSON.parse. This does not provide fatal streaming UTF8 validation or duplicate-key rejection for the outer protocol, and a trailing unterminated buffer is not explicitly rejected at shutdown. Strict parsing of the final answer happens later and cannot reconstruct original wire bytes already decoded/lost. stderr is counted and discarded. Therefore canonical responseSha256 proves parsed structured response binding only; it cannot be renamed raw-output custody.
+
+If raw-result custody is required, implement it inside the host at collection time: bounded Buffer/streaming-fatal UTF8 handling, complete line/frame accounting, strict final-message extraction, transient original answer serialization and host-computed raw frame/answer digests, and an explicit complete/failed stdio terminal observation. Raw prompt/Q&A must remain transient; durable records may retain hashes only. Adding rawResponseSha256/stdio fields requires a closed versioned host-record contract and verifier mapping. It cannot be fabricated by the composition from JSON.stringify(parsedReport). Full stdout includes reasoning/commentary; never persist it as a transcript. No source changes implementing this were made.
+
+## Actual attempts and outcome classes
+
+| Outcome | Actual facts and publication |
+| --- | --- |
+| no-child | Admission/capability/consent/prelaunch refusal, zero actual launcher/selected child/content input; no consult attempt and no answered receipt. Existing unavailable exception remains governed separately. |
+| executed-error before content | Registered host child began, then configuration/MCP/beforeTurnInput/terminal failed. Preserve host execution failure and ownership/recovery evidence. Do not call this no-child or assert zero launcher calls. No actual model turn is inferred from child startup. |
+| executed-error after content | Host observed the turn/start input submission; record one actual consult attempt ending failed/timed-out/permission-denied/unavailable, according to observed facts. No raw answer exported and no success record. Model/provider request acknowledgement is distinct from submitting a host input. |
+| verified answered | One actual submitted/acknowledged consult, valid semantic answer, physical readbacks, exact executable/request/receipt and independently closed ownership. Emit consult answered plus sanitized public projection and private host binding after verification. |
+
+Track actual launch registration and input submission separately. createAdvisoryAttemptTrail receives the host-owned actual call ledger after completion and exact serialized receiptBytes; row must be {adapter:'consult',kind:'consult',runner:'codex',status}, not host-consult. A callback returning admitted, a prepared request, or an intent journal alone is not an actual consult attempt. Existing generic host exposes no exact input-submitted event/time; the same execution extension must report that boundary and distinguish an unacknowledged submitted request from a completed model turn. Do not infer it from threadId or a failed host result. Admission before launch yields attempts empty, not a fake zero-attempt trail; current trail validation requires at least one real attempt. Executed pre-content errors therefore need a typed host-execution failure projection separate from the consultation trail; existing no-child dispatch output cannot truthfully represent them.
+
+## Shutdown and process-store integration gaps
+
+The proposed supervisor journals intent before launch, admits launcher/worker/exec in separate registered steps, and matches PID/start/group/session/UID/boot/executable/argv. stop checks a live owned anchor before TERM/KILL; finish requires stable journal readbacks, exit 0 and no live session members. Recovery never promotes interrupted work to success.
+
+The structured host interrupts/unsubscribes with bounded 5s calls, ends stdin, schedules managed stop after 5s, and bounds terminal observation to 12s. If terminal observation times out it returns unavailable and retains journal recovery; it does not invent closed ownership. Outer cancellation must not abandon this custody or delete the input directory while a registered session may remain live. Remove transient input only after independently verified closure. Deadlines cannot forcibly interrupt synchronous controller I/O or a noncooperative injected function; no such functions may perform model launch outside managed custody.
+
+Concrete journal-root blocker: proposed createHostJournal in revision-23.txt accepts only /agent-pipeline/design-readiness-codex/<repoFingerprint>/processes. The scratch Advisor private store uses <fixtureRoot>/processes, and its fixtures use scratch.* process modules. Passing that store directly to proposed runIsolatedStructuredHost fails host-process-root-unregistered. Before live composition, explicitly register an Advisor-specific private Git-common namespace and maintain physical UID/mode/link checks; do not weaken the journal to arbitrary paths or mislabel Advisor as Readiness. createPreparedCodexAdvisorPrivateStore is deliberately restricted to scratch and is not a production store constructor.
+
+Current ordinary route/agent documentation still names selected-sandbox-network-open-read-only and its selected-sandbox status receipt. An adopted tool-free host-observed contract and Advisor-specific production store/binding are required before activation. This design requests no signatures or new human approvals. WSL selected-sandbox suspension is not a reason to try another export route; Linux managed host capability is separately observed, and native Windows execution remains unqualified.
+
+## Minimal implementation slices and acceptance evidence
+
+1. Shared registered Advisor route/executable observer plus sealed real host export observation. Preserve exact selected role binding and current no-child exits.
+2. Generic host pre-content admission/input-submission and bounded output-custody contract; no arbitrary stdin callback/authority. Test denial after thread initialization sends no evidence and still closes actual owned process; late callback resolution never sends input.
+3. Explicit Advisor process namespace and production private store/verifier, preserving Readiness validators unchanged. Test unregistered root refusal and independent executable/journal/output/source drift.
+4. Execution composition using the real APIs and independent readback; tests must use a genuinely registered closed subprocess when verifying ownership and distinguish synthetic protocol observations from an actual authenticated model turn.
+5. Bridge/coordinator/transaction answered wiring and registered architecture/instruction contract. Actual admitted Codex replay and formal gates occur only afterward on a frozen candidate.
+
+This document creates no executable/protocol fixture and adds no tests that merely mirror a hypothetical callback. The previously recorded component evidence remains limited to those components. No model, Advisor, provider or managed host process was launched for this design; no existing module, patch, Loader or Assembler was changed.

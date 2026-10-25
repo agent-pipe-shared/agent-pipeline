@@ -1,0 +1,328 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 3e9212e81..0f32d55e0 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -331,6 +331,87 @@ function decision(result) {
+   }
+ }
+ 
++// Controlled lifecycle/readback/chat inputs qualify Source composition only.
++// No nested guard result is mocked and no native or human authority is claimed.
++if (process.argv.includes("--g6-aggregate")) {
++  let root;
++  try {
++    root = readyLifecycleFixture();
++    const stateFile = pipelineStatePath(root);
++    const originalState = readFileSync(stateFile, "utf8");
++    const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
++    put(join(root, "specs", "g6", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
++    put(join(root, ".claude", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
++    const manifestPath = join(root, ".claude", "pipeline.yaml");
++    const manifest = readFileSync(manifestPath, "utf8");
++    for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
++      for (const boundary of ["role", "plan", "test"]) {
++        const state = JSON.parse(originalState);
++        state.planApproved = boundary !== "plan";
++        state.activeFeature = { id: "g6", phase: boundary === "plan" ? "draft" : "implementation", planPath: "specs/g6/prd.md" };
++        delete state.continuity;
++        put(stateFile, state);
++        // Role is high-risk; plan/test need no role denial to establish their result.
++        put(join(root, "specs", "g6", "spec.md"), `| Risk class | ${boundary === "role" ? "high" : "low"} |\n| Rigor level | 2 |\n`);
++        put(manifestPath, manifest + "\ngates:\n  dev-plan:\n    mode: blocking\n");
++        const relativePath = boundary === "test" ? "protected.test.mjs" : "src/g6.mjs";
++        const path = absolute ? join(root, relativePath) : relativePath;
++        const result = decision(run({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } }, root, { timeoutMs: 60000 }));
++        assert.equal(result.decision, "deny", `${tool}/${absolute}/${boundary}`);
++        assert.match(result.reason, boundary === "role" ? /guard-el01-tripwire/ : boundary === "plan" ? /guard-devplan/ : /TP-G6/);
++        assert.doesNotMatch(result.reason, /requires-bootstrap|BOOTSTRAP-REQUIRED/);
++        console.log(`G6 aggregate ${tool} ${absolute ? "absolute" : "relative"} ${boundary}: intended denial`);
++      }
++    }
++  } catch (error) { console.error(error.stack); process.exitCode = 1; }
++  finally { if (root) rmSync(root, { recursive: true, force: true }); }
++  process.exit(process.exitCode ?? 0);
++}
++
++// Bounded G6 qualification avoids the lifecycle/native-dispatch fixture graph.
++if (process.argv.includes("--g6-bounded")) {
++  const scratch = join(process.cwd(), "scratch"); mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-native-boundaries-"));
++  const home = join(root, "fixture-home"); mkdirSync(home);
++  const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: root };
++  const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
++  const guard = (name, input) => spawnSync(process.execPath, [join(hookDir, name)], { cwd: root, env, encoding: "utf8", input: JSON.stringify(input), timeout: 10000 });
++  try {
++    put(join(root, ".agent-pipeline", "onboarding-consent.json"), { schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z" });
++    put(join(root, ".claude", "pipeline.json"), { project: "test", verify: "node verify.mjs" });
++    put(join(root, ".claude", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
++    put(join(root, ".claude", "pipeline.yaml"), "gates:\n  dev-plan:\n    mode: blocking\n");
++    put(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
++    for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
++      const path = absolute ? join(root, "src", "code.mjs") : "src/code.mjs";
++      const normalized = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } });
++      assert.equal(normalized.toolName, tool === "write_file" ? "Write" : "Edit");
++      assert.equal(normalized.toolInput.file_path, path);
++      const input = { tool_name: normalized.toolName, tool_input: normalized.toolInput, cwd: root };
++      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" } });
++      const role = guard("guard-el01-tripwire.mjs", input); assert.equal(role.status, 2, JSON.stringify(role)); assert.match(role.stderr, /guard-el01-tripwire/);
++      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: false, activeFeature: { id: "feat-1", phase: "draft", planPath: "specs/feat-1/prd.md" } });
++      const plan = guard("guard-devplan.mjs", input); assert.equal(plan.status, 2, JSON.stringify(plan)); assert.match(plan.stderr, /guard-devplan/);
++      const protectedPath = absolute ? join(root, "protected.test.mjs") : "protected.test.mjs";
++      const testInput = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: protectedPath, Content: "x", Target: "a", Replacement: "b" } } });
++      const test = guard("guard-testpath.mjs", { tool_name: testInput.toolName, tool_input: testInput.toolInput, cwd: root });
++      assert.equal(test.status, 2, JSON.stringify(test)); assert.match(test.stderr, /TP-G6/);
++    }
++    put(join(root, "README.md"), "readme\n"); put(join(root, "vault", "id_rsa"), "inert credential fixture\n");
++    for (const target of ["README.md", join(root, "README.md"), "vault/id_rsa", join(root, "vault", "id_rsa"), "missing.md", join(root, "missing.md")]) {
++      const read = guard("antigravity-pretool-guard.mjs", { workspacePaths: [root], toolCall: { name: "read_file", args: { Path: target } } });
++      const expected = target.endsWith("README.md") ? "allow" : "deny";
++      const result = read.status === 2 ? { decision: "deny", reason: read.stderr } : JSON.parse(read.stdout);
++      assert.equal(result.decision, expected, target);
++      if (target.endsWith("id_rsa")) assert.match(result.reason, /GUARD-READ-CREDENTIAL-TARGET/);
++      if (target.endsWith("missing.md")) assert.match(result.reason, /GUARD-READ-TARGET-MISSING/);
++    }
++    console.log("G6 bounded native normalization -> actual role/plan/test guards: 12 refusals; native read adapter: 6 decisions passed.");
++  } catch (error) { console.error(error.stack); process.exitCode = 1; }
++  finally { rmSync(root, { recursive: true, force: true }); }
++  process.exit(process.exitCode ?? 0);
++}
++
+ // 1. Normalization tests
+ check("normalizeAntigravityToolInput: translates run_command", () => {
+   const res = normalizeAntigravityToolInput({
+diff --git a/plugins/pipeline-core/install-agy.test.mjs b/plugins/pipeline-core/install-agy.test.mjs
+index bb0fbd661..cf292c8ee 100644
+--- a/plugins/pipeline-core/install-agy.test.mjs
++++ b/plugins/pipeline-core/install-agy.test.mjs
+@@ -11,6 +11,118 @@ import * as installerModule from "./install-agy.mjs";
+ import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plugin-attestation-host.mjs";
+ import { observePipelineStartPreflight } from "./scripts/pipeline-start-preflight.mjs";
+ import { createGovernanceScopeController } from "./lib/governance-scope.mjs";
++import { createAntigravityRefreshHost } from "./lib/antigravity-topology-refresh-host.mjs";
++
++test("G6: installer refresh expands an owned user-level matcher to native file tools", (t) => {
++  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-matcher-"));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const configRoot = join(root, "home", ".gemini");
++  const workspaceRoot = join(root, "workspace");
++  const source = join(workspaceRoot, "plugins", "pipeline-core");
++  mkdirSync(join(configRoot, "config"), { recursive: true });
++  mkdirSync(join(source, "hooks"), { recursive: true });
++  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++  // Use the shipped plugin matcher and scripts as the source of the installer wiring.
++  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
++  writeFileSync(join(source, "hooks.json"), JSON.stringify(manifest));
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) {
++    writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert fixture: never executed\n");
++  }
++  const target = join(configRoot, "config", "hooks.json");
++  const foreign = { matcher: "foreign_tool", hooks: [{ type: "command", command: "foreign-command" }] };
++  writeFileSync(target, JSON.stringify({ PreToolUse: [foreign, {
++    matcher: "run_command",
++    hooks: [{ type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` }],
++  }] }));
++  const calls = [];
++  const result = refreshAntigravityInstallation({ configRoot, workspaceRoot, approvedSourceRoot: source,
++    scope: "workspace", globalChangeApproved: true }, {
++    runCli: (argv) => { calls.push([...argv]); assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; },
++    writeInstalledReceipt: () => { assert.fail("a direct workspace fixture must not create any receipt"); },
++  });
++  assert.equal(result.status, "refreshed", JSON.stringify(result));
++  assert.ok(calls.length > 0);
++  const output = JSON.parse(readFileSync(target, "utf8"));
++  assert.deepEqual(output.PreToolUse[0], foreign);
++  const matcher = output.PreToolUse[1].matcher;
++  const misses = ["run_command", "write_to_file", "replace_file_content", "invoke_subagent", "write_file", "edit_file", "read_file"]
++    .filter((name) => !new RegExp(`^(?:${matcher})$`, "u").test(name));
++  assert.deepEqual(misses, [], "installer must refresh the owned user-level matcher as well as the command path");
++});
++
++test("G6: host matcher ownership, approval, manifest and preimage controls", (t) => {
++  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-controls-"));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const configRoot = join(root, "home", ".gemini"), workspaceRoot = join(root, "workspace");
++  const source = join(workspaceRoot, "plugins", "pipeline-core");
++  mkdirSync(join(configRoot, "config"), { recursive: true });
++  mkdirSync(join(source, "hooks"), { recursive: true });
++  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++  const manifestPath = join(source, "hooks.json");
++  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
++  writeFileSync(manifestPath, JSON.stringify(manifest));
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert\n");
++  const target = join(configRoot, "config", "hooks.json");
++  const owned = { type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` };
++  const foreignBytes = '{ "matcher":"foreign_tool", "hooks":[{"command":"foreign-command"}], "keep":"\\u00df" }';
++  const put = (hooks = [owned], matcher = "run_command") => writeFileSync(target, '{ "PreToolUse":[' + foreignBytes + ',' + JSON.stringify({ matcher, hooks }) + '] }\n');
++  const dependencies = { runCli: argv => { assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; }, writeInstalledReceipt: () => assert.fail("no receipt") };
++  const options = { configRoot, workspaceRoot, approvedSourceRoot: source, scope: "workspace", globalChangeApproved: true };
++  put(); const before = readFileSync(target);
++  assert.equal(refreshAntigravityInstallation({ ...options, globalChangeApproved: false }, dependencies).reason, "ATR-GLOBAL-SCOPE");
++  assert.deepEqual(readFileSync(target), before);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).status, "refreshed");
++  assert.ok(readFileSync(target, "utf8").includes(foreignBytes));
++  assert.equal(JSON.parse(readFileSync(target)).PreToolUse[1].matcher, manifest["pipeline-core"].PreToolUse[0].matcher);
++  const current = readFileSync(target);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).changed, false);
++  assert.deepEqual(readFileSync(target), current);
++  put([owned, { command: "foreign-command" }]); const mixed = readFileSync(target);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-WIRING-MIXED-OWNERSHIP");
++  assert.deepEqual(readFileSync(target), mixed);
++  put([{ command: "node /deleted/pipeline-core/hooks/antigravity-pretool-guard.mjs" }]);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-WIRING-OWNERSHIP-UNVERIFIABLE");
++  put();
++  const host = createAntigravityRefreshHost({ ...options, ...dependencies });
++  for (const surface of [target, manifestPath]) {
++    const plan = host.prepare(); assert.equal(plan.status, "prepared");
++    const bytes = readFileSync(surface); writeFileSync(surface, Buffer.concat([bytes, Buffer.from(" \n")]));
++    assert.equal(host.apply(plan).reason, "ATR-TOPOLOGY-DRIFT");
++    assert.equal(host.apply(plan).reason, "ATR-UNOWNED-PLAN");
++    writeFileSync(surface, bytes);
++  }
++  const group = manifest["pipeline-core"].PreToolUse[0];
++  manifest["pipeline-core"].PreToolUse.push({ ...group, matcher: "different" });
++  writeFileSync(manifestPath, JSON.stringify(manifest));
++  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-HOOK-MATCHER");
++});
++
++test("G6: missing and aliased Source scripts refuse before any wiring mutation", (t) => {
++  for (const kind of ["missing", "alias"]) {
++    const root = mkdtempSync(join(tmpdir(), "g6-source-script-"));
++    t.after(() => rmSync(root, { recursive: true, force: true }));
++    const configRoot = join(root, "config"), workspaceRoot = join(root, "workspace"), source = join(workspaceRoot, "source");
++    mkdirSync(join(configRoot, "config"), { recursive: true });
++    mkdirSync(join(source, "hooks"), { recursive: true });
++    writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++    writeFileSync(join(source, "hooks.json"), JSON.stringify({ "pipeline-core": { PreToolUse: [{ matcher: "write_file", hooks: [{ command: "node hooks/antigravity-pretool-guard.mjs" }] }] } }));
++    const script = join(source, "hooks", "antigravity-pretool-guard.mjs");
++    if (kind === "alias") { const other = join(root, "foreign.mjs"); writeFileSync(other, "// inert foreign\n"); symlinkSync(other, script); }
++    const target = join(configRoot, "config", "hooks.json");
++    const bytes = JSON.stringify({ PreToolUse: [{ matcher: "run_command", hooks: [{ command: `node "${script}"` }] }] });
++    writeFileSync(target, bytes);
++    const calls = [];
++    const result = createAntigravityRefreshHost({ configRoot, workspaceRoot, approvedSourceRoot: source, scope: "workspace", globalChangeApproved: true,
++      runCli: argv => { calls.push(argv); return { status: "ok", version: "1.2.12" }; }, writeInstalledReceipt: () => assert.fail("no receipt") }).refresh();
++    assert.equal(result.status, "refused", kind);
++    assert.match(result.reason, /^(ATR-UNAVAILABLE|ATR-HOOK-SCRIPT|ATR-TOPOLOGY-UNVERIFIABLE)$/u, kind);
++    assert.deepEqual(calls, [["--version"]]); assert.equal(readFileSync(target, "utf8"), bytes);
++  }
++});
+ 
+ test("Agy release-tag checkout creates a named branch without changing the tag commit", (t) => {
+   const root = mkdtempSync(join(tmpdir(), "agy-release-tag-checkout-"));
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+index a83b66e0f..8c812bcfd 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+@@ -27,10 +27,13 @@ function command(value){
+  if(!m)return null;return {path:m[1]??m[2]??m[3],arg:m[4]??null};
+ }
+ function templates(root){
+- const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();
+- function visit(v){if(v&&typeof v==='object'){if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
+-    const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');set.add(c.path+'\0'+(c.arg??''));}
+-    for(const value of Object.values(v))visit(value);}}
++ const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();
++ function visit(v,location=[],group=null){if(v&&typeof v==='object'){
++   if(Object.hasOwn(v,'matcher')){if(typeof v.matcher!=='string'||!v.matcher.length||!Array.isArray(v.hooks))throw Error('ATR-HOOK-MATCHER');group={event:location.filter(k=>typeof k==='string').at(-1),matcher:v.matcher};}
++   if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
++    const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');const key=c.path+'\0'+(c.arg??'');set.add(key);
++    if(group){const binding=group.event+'\0'+key;if(set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}}
++    for(const [key,value] of Object.entries(v))visit(value,[...location,Array.isArray(v)?Number(key):key],group);}}
+  visit(f.value);return set;
+ }
+ // Separator-aware containment: the relative path (always '/'-separated) when `path` lies strictly inside `root`, else null.
+@@ -44,10 +47,23 @@ function wiring(observation,configRoot,workspaceRoot){
+  for(const [scope,path] of [['global',join(configRoot,'config','hooks.json')],['global',join(configRoot,'config','external-hooks.json')],['workspace',join(workspaceRoot,'.agents','hooks.json')],['workspace',join(workspaceRoot,'.agents','external-hooks.json')]]){
+   const f=read(path);if(f.status==='absent'){result.push({scope,path,sha256:null,nextBytes:null,changes:0});continue;}
+   let changes=0,visits=0;const replacements=[],deletions=[];
++  function ownedKey(value){const c=command(value?.command);if(!c||!isAbsolute(c.path))return null;
++   for(const [root,set] of sets){const rel=within(root,c.path);if(rel!==null&&set.has(rel+'\0'+(c.arg??'')))return rel+'\0'+(c.arg??'');}
++   if(managedGone){const rel=within(managedRoot,c.path);if(rel!==null)return rel+'\0'+(c.arg??'');}return null;
++  }
+   function transform(value,location=[],parentArray=false){
+    if(++visits>4096)throw Error('ATR-WIRING-BOUND');
+    if(Array.isArray(value)){value.forEach((v,i)=>transform(v,[...location,i],true));return;}
+    if(value===null||typeof value!=='object')return value;
++   if(Array.isArray(value.hooks)){
++    const keys=value.hooks.map(ownedKey),owned=keys.filter(key=>key!==null&&desired.has(key));
++    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),matchers=owned.map(key=>desired.matchers.get(event+'\0'+key));
++     if(!Object.hasOwn(value,'matcher')&&matchers.every(m=>m===undefined)){for(const [key,v] of Object.entries(value))transform(v,[...location,key]);return;}
++     if(!Object.hasOwn(value,'matcher'))throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
++     if(matchers.some(m=>typeof m!=='string')||new Set(matchers).size!==1)throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
++     if(value.matcher!==matchers[0]){if(keys.some(key=>key===null))throw Error('ATR-WIRING-MIXED-OWNERSHIP');changes++;replacements.push({path:[...location,'matcher'],value:matchers[0]});}
++    }
++   }
+    if(Object.hasOwn(value,'command')){
+     const c=command(value.command);let owner=null,key=null;
+     if(c&&isAbsolute(c.path)){
+@@ -112,10 +128,11 @@ export function removeAntigravityWorkspaceRegistration({workspaceRoot,expectedSh
+   const after=observeAntigravityWorkspaceBindings({workspaceRoot});if(after.status!=='observed'||after.ownedIndexes.length)throw Error('ATR-REGISTRY-READBACK');return {status:'removed'};
+  }catch{return {status:'refused',reason:'ATR-WORKSPACE-REGISTRY-UNVERIFIABLE'};}
+ }
+-export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedSourceRoot,scope,globalChangeApproved=false,cliPath=null,runCli,writeInstalledReceipt}={}){
++export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedSourceRoot,scope,globalChangeApproved=false,cliPath=null,runCli,writeInstalledReceipt,beforeFinalReadback}={}){
+  directory(configRoot);directory(workspaceRoot);directory(approvedSourceRoot);
+  if(!['global','workspace'].includes(scope))throw Error('ATR-SCOPE');
+  if(runCli!==undefined&&typeof runCli!=='function')throw Error('ATR-SEALED-CLI');
++ if(beforeFinalReadback!==undefined&&typeof beforeFinalReadback!=='function')throw Error('ATR-SEALED-OBSERVER');
+  // injected function is a sealed host dependency, never read from stdin/JSON.
+  const invoke=runCli??((argv)=>{if(configRoot!==join(homedir(),'.gemini'))return {status:'unavailable'};const path=physicalCli(cliPath);const r=spawnSync(path,argv,{encoding:'utf8',timeout:20000,maxBuffer:65536});return r.error||r.signal||r.status!==0?{status:'failed'}:{status:'ok',version:argv[0]==='--version'?r.stdout.trim():null};});
+  const args={configRoot,workspaceRoot,approvedSourceRoot},plans=new WeakMap();let active=false;
+@@ -190,6 +207,9 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
+      const appends=change.append!==null?[{path:['entries'],values:[{path:change.append}]}]:[];
+      const next=rewriteAntigravityJsonBytes(original,{deletions:change.removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
+    }
++   // Optional in-process host observer: no live ownership objects or verdict input.
++   // Its return value is ignored; every real final check still follows it.
++   if(beforeFinalReadback!==undefined)beforeFinalReadback();
+    const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||!registryBound(final,scope,scope,source))throw Error('ATR-FINAL-READBACK');
+    if(registryPlans.some(({selected})=>!registryBound(final,selected,scope,source)))throw Error('ATR-FINAL-READBACK');
+    if(wiring(final,configRoot,workspaceRoot).some(p=>p.changes>0))throw Error('ATR-FINAL-WIRING-READBACK');
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+index d5ed096b4..6e76ea5df 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+@@ -8,6 +8,7 @@ function test(name, run) {
+   completionCases.push({ id: "RC05C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+ }
+ import assert from 'node:assert/strict';
++import focusedTest from 'node:test';
+ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,cpSync,existsSync,symlinkSync} from 'node:fs';
+ import {tmpdir, devNull} from 'node:os';
+ import {join} from 'node:path';
+@@ -180,6 +181,31 @@ test('prepared source, actual hook bytes and registry preimages are bound before
+  }
+ });
+ 
++focusedTest('G6: final matcher drift is refused after the real wiring write and before receipt',t=>{
++ const f=fixture(t),wire=join(f.configRoot,'config','hooks.json');
++ const matcher='run_command|write_file|edit_file|read_file';
++ f.put(join(f.approvedSourceRoot,'hooks.json'),{'pipeline-core':{PreToolUse:[{matcher,hooks:[{command:'node hooks/antigravity-start-hint.mjs'}]}]}});
++ f.put(wire,{PreToolUse:[{matcher:'run_command',hooks:[{command:'node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"'}]}]});
++ let observed=0,receipts=0;
++ const result=createAntigravityRefreshHost({...f.args,writeInstalledReceipt:()=>{receipts++;return {status:'written'};},beforeFinalReadback:(...args)=>{
++  assert.deepEqual(args,[]);observed++;
++  const written=JSON.parse(readFileSync(wire));
++  assert.equal(written.PreToolUse[0].matcher,matcher,'actual reconciliation completed');
++  assert.equal(written.PreToolUse[0].hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-start-hint.mjs')+'"');
++  written.PreToolUse[0].matcher='run_command';f.put(wire,written);
++  return {status:'refreshed'};
++ }}).refresh();
++ assert.equal(observed,1);assert.equal(receipts,0);
++ assert.equal(result.status,'partial');assert.equal(result.reason,'ATR-FINAL-WIRING-READBACK');
++ assert.ok(result.completed.includes('wiring-rebind'));
++});
++focusedTest('G6: final observer accepts only a function and cannot replace authorization',t=>{
++ const f=fixture(t);assert.throws(()=>createAntigravityRefreshHost({...f.args,beforeFinalReadback:{approved:true}}),/ATR-SEALED-OBSERVER/);
++ let observed=0;const before=readFileSync(f.imports);
++ const result=createAntigravityRefreshHost({...f.args,globalChangeApproved:false,beforeFinalReadback:()=>{observed++;}}).refresh();
++ assert.equal(result.reason,'ATR-GLOBAL-SCOPE');assert.equal(observed,0);assert.deepEqual(readFileSync(f.imports),before);
++});
++
+ // Each original sibling callback is registered individually; no envelope case.
+ if (completionCases.length !== 15) throw new Error("Required completion declared case count drift");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

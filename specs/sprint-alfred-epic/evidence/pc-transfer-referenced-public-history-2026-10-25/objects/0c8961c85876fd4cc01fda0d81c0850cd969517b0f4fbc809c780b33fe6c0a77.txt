@@ -1,0 +1,51 @@
+// K125 helper: declare the architecture-adoption-and-fitness capability in a checkout's inventory.
+// Usage: node scratch/k125-apply-inventory.mjs <root>
+import { readFileSync, writeFileSync } from "node:fs";
+const root = process.argv[2];
+const path = `${root}/docs/product-capability-inventory.json`;
+const raw = readFileSync(path, "utf8");
+const inv = JSON.parse(raw);
+if (JSON.stringify(inv, null, 2) + "\n" !== raw) throw new Error("inventory is not in canonical 2-space form");
+if (inv.capabilities.some((c) => c.id === "architecture-adoption-and-fitness")) throw new Error("already declared");
+const owner = inv.capabilities.find((c) => c.id === "deterministic-verification");
+const PREFIX = "verify-phase:harness/scripts/verify.mjs:architecture-";
+const moved = owner.surfaceIds.filter((s) => s.startsWith(PREFIX));
+if (moved.length !== 18) throw new Error(`expected 18 architecture-* verify phases, found ${moved.length}`);
+owner.surfaceIds = owner.surfaceIds.filter((s) => !s.startsWith(PREFIX));
+const base = "plugins/pipeline-core/scripts/";
+inv.capabilities.push({
+  id: "architecture-adoption-and-fitness",
+  publicName: "Architecture adoption and fitness",
+  problem: "An existing repository needs a bounded, owner-decided way to assess and adopt architecture maps, baselines, and fitness checks without a rewrite.",
+  benefit: "Read-only status and proposal commands, a request-bound adoption decision, and baseline and fitness checks that fail closed when the decision is absent, expired, malformed, or out of scope.",
+  status: "optional",
+  surfaceIds: moved,
+  runners: ["runner-neutral"],
+  platforms: ["all"],
+  operatingShapes: ["multi-team", "small-team", "solo"],
+  runnerDispositions: {
+    claude: { status: "host-dependent", reasonCode: "runner-evidence-pending" },
+    codex: { status: "host-dependent", reasonCode: "runner-evidence-pending" },
+    antigravity: { status: "host-dependent", reasonCode: "runner-evidence-pending" },
+  },
+  prerequisites: ["explicit adopter decision", "pipeline-core plugin"],
+  productionEvidence: [
+    "architecture-adoption.mjs", "architecture-baseline.mjs", "architecture-boundary-check.mjs",
+    "architecture-effective-decisions.mjs", "architecture-fitness.mjs", "architecture-inherited-sources.mjs",
+    "architecture-remedy.mjs",
+  ].map((n) => base + n),
+  testEvidence: [
+    "architecture-adoption.test.mjs", "architecture-baseline.test.mjs", "architecture-boundary-check.test.mjs",
+    "architecture-fitness.test.mjs", "architecture-inherited-sources.test.mjs", "architecture-remedy.test.mjs",
+  ].map((n) => base + n),
+  targets: [{ document: "README", anchorId: "capability-architecture-adoption-and-fitness", status: "pending" }],
+  configurationPath: "none",
+  specializedOnlyReason: null,
+});
+// Key order of the neighbours: id, publicName, problem, benefit, status, surfaceIds, runners, runnerDispositions, platforms, ...
+const last = inv.capabilities[inv.capabilities.length - 1];
+const order = ["id", "publicName", "problem", "benefit", "status", "surfaceIds", "runners", "runnerDispositions", "platforms",
+  "operatingShapes", "prerequisites", "productionEvidence", "testEvidence", "targets", "configurationPath", "specializedOnlyReason"];
+inv.capabilities[inv.capabilities.length - 1] = Object.fromEntries(order.map((k) => [k, last[k]]));
+writeFileSync(path, JSON.stringify(inv, null, 2) + "\n");
+console.log(`moved ${moved.length} surfaces; capabilities now ${inv.capabilities.length}`);

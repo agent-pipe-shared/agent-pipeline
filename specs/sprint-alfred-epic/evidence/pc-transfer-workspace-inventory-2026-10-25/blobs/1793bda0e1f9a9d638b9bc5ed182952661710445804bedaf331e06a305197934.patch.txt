@@ -1,0 +1,1122 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 8f1092a69..1eaf8e61e 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -238,6 +238,7 @@
+         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-refresh-host-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-close-disposition-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+@@ -445,7 +446,9 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
++        "verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+@@ -929,6 +932,7 @@
+         "verify-phase:harness/scripts/verify.mjs:public-baseline-diagnose-tests",
+         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+         "verify-phase:harness/scripts/verify.mjs:public-core-origin-allowlist-tests",
++        "verify-phase:harness/scripts/verify.mjs:public-handover-duty-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-bundle-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-bundle-v2-tests",
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 0824981d1..559b576f2 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1131,7 +1131,8 @@
+         "caseIds": [
+           "DAU001",
+           "DAU002",
+-          "DAU003"
++          "DAU003",
++          "DAU004"
+         ],
+         "maxBytes": 65536
+       }
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index d0552f738..d7db3c8a4 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -62,6 +62,11 @@
+       "path": "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "architecture-close-disposition-tests",
++      "path": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "architecture-decision-waiver-store-tests",
+       "path": "plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs",
+@@ -678,11 +683,21 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "g23-quoted-pipeline-reads-tests",
++      "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "g23-read-help-tests",
+       "path": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "g29-public-handover-admission-tests",
++      "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "gate-estimate-tests",
+       "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
+@@ -1519,6 +1534,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "public-handover-duty-tests",
++      "path": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "publication-authority-tests",
+       "path": "plugins/pipeline-core/lib/publication-authority.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 03e2c04de..cb812df88 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3978,6 +3978,70 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "g23-quoted-pipeline-reads-tests",
++      "file": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
++      "invariantPinned": "Quoted test-module narrowing passes the real parser and guard while malicious filters, credentials and aliases remain refused.",
++      "nonOverlapNote": "Dedicated G23 quoted pipeline witness, distinct from the original read-option and parser suites.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G23Q001",
++          "G23Q002",
++          "G23Q003",
++          "G23Q004",
++          "G23Q005"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "architecture-close-disposition-tests",
++      "file": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
++      "invariantPinned": "Close retains source-bound architecture findings and unavailable properties through the actual State writer.",
++      "nonOverlapNote": "Dedicated G26 close disposition producer and consumer witness; existing fitness suites retain their original duties.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "ACD001",
++          "ACD002",
++          "ACD003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "public-handover-duty-tests",
++      "file": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
++      "invariantPinned": "Explicit public handover updates preserve other prose and State while refusing physical aliases.",
++      "nonOverlapNote": "Dedicated public handover producer and State consumer witness, separate from lifecycle command admission.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PHD001",
++          "PHD002",
++          "PHD003",
++          "PHD004",
++          "PHD005",
++          "PHD006"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "g29-public-handover-admission-tests",
++      "file": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
++      "invariantPinned": "Only the exact explicit public handover command clears the real lifecycle guard in relative and absolute forms.",
++      "nonOverlapNote": "Dedicated G29 catalogue and actual guard witness, distinct from handover document behavior.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G29P001",
++          "G29P002"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index bde7a88af..09a424612 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -42,7 +42,11 @@ const NUMERIC_VALUE = new Set([
+ const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
+ 
+ function isBoundedFilenameFilter(value) {
+-  return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
++  // Test-module suffixes are filename data too: the observed `*.test.mjs`
++  // read has the same traversal boundary as `*.mjs`. Keep the extension
++  // bound and optional literal test marker, rather than admitting arbitrary
++  // dotted/glob/path expressions (including the existing *.tar.gz negative).
++  return typeof value === "string" && /^\*\.(?:test\.)?[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
+ }
+ 
+ function denied(code = "GUARD-PARSE-UNSUPPORTED") {
+diff --git a/plugins/pipeline-core/lib/architecture-design.mjs b/plugins/pipeline-core/lib/architecture-design.mjs
+index 49676d14e..8b732ee9f 100644
+--- a/plugins/pipeline-core/lib/architecture-design.mjs
++++ b/plugins/pipeline-core/lib/architecture-design.mjs
+@@ -288,7 +288,7 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {})
+     // (a system message, a path, a stack fragment) never reaches it.
+     const code = architectureDesignFailureCode(error);
+     return { ok: false, status: "design-required", code,
+-      ...(code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
++      ...(prdPath ? { prdPath } : {}),
+       ...(error?.field && code === error.message ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
+   }
+ }
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index 131264944..acf2f618b 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -87,7 +87,7 @@ function proposalAction(root, inspectedDesign = null, deps = {}) {
+     mutation: true, requiresConfirmation: false,
+     expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
+   };
+-  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && typeof design.prdPath === "string") return {
++  if (!design.ok && design.status === "design-required" && typeof design.prdPath === "string") return {
+     kind: "architecture-design-required",
+     prdPath: design.prdPath,
+     guidance: "Complete the architecture design block in this exact PO-bound PRD, then present and approve a new final design-workflow package before materialization.",
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index 8a3d7e437..ee12dab47 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -92,6 +92,19 @@ test("missing design block preserves its exact PRD action before scaffold-map va
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test("incomplete greenfield design keeps the PRD authoring action instead of estate adoption", () => {
++  const root = fixture();
++  const prdPath = "specs/feature/prd.md";
++  try {
++    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
++      inspectArchitectureDesign: () => ({ ok: false, status: "design-required",
++        code: "ARCHITECTURE-DESIGN-SCOPE-MISMATCH", prdPath }),
++    } });
++    assert.equal(result.nextAction.kind, "architecture-design-required");
++    assert.equal(result.nextAction.prdPath, prdPath);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
+   const root = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/critic-accepted-contract.mjs b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+index a0288a028..5a4f21b53 100644
+--- a/plugins/pipeline-core/lib/critic-accepted-contract.mjs
++++ b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+@@ -334,7 +334,7 @@ export function inspectSpecCriterionRows(source) {
+   const why = {id: `not a criterion id (${CRITERION_ID_RULE}; a leading zero is not allowed)`, shape: 'row shape the parser does not locate', duplicate: 'stated more than once'};
+   const named = unsupported.slice(0, 8).map(entry => `${entry.id}${entry.line ? ` (line ${entry.line}` : ' ('}${entry.line ? ', ' : ''}${why[entry.reason]})`).join('; ');
+   return {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located, unsupported,
+-    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
++    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. Example: | # | Criterion | Evidence | with | AC-1 | WHEN an event occurs, the system SHALL respond. | tests/example.test.mjs |. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
+ }
+ 
+ /** Pure original-byte interpretation only. Locators and parser success confer no authority. */
+diff --git a/plugins/pipeline-core/lib/design-authoring.mjs b/plugins/pipeline-core/lib/design-authoring.mjs
+index 73459cf9f..0fd4d6666 100644
+--- a/plugins/pipeline-core/lib/design-authoring.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.mjs
+@@ -36,6 +36,17 @@ export function hasGeneratedCriterionPlaceholder(text) {
+   return matches(text.replace(legacy, `- **AC-1:** ${placeholder}`));
+ }
+ 
++/** Read-only draft signal for the coordinator; binding still validates the exact source bytes. */
++export function stagingDesignNeedsAuthoring(prdText, specText) {
++  const unfinished = text => typeof text === "string" && (
++    text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
++    || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
++    || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
++    || hasGeneratedCriterionPlaceholder(text)
++  );
++  return unfinished(prdText) || unfinished(specText);
++}
++
+ /** Keep full evidence on disk; avoid repeating document payloads in the action readback. */
+ export function compactActionReadback(result) {
+   if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+diff --git a/plugins/pipeline-core/lib/design-authoring.test.mjs b/plugins/pipeline-core/lib/design-authoring.test.mjs
+index 5a98b94ea..1ac7ea77c 100644
+--- a/plugins/pipeline-core/lib/design-authoring.test.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.test.mjs
+@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { openSync as openCompletionDescriptor } from "node:fs";
+ import { parseArchitectureDesign } from "./architecture-design.mjs";
+-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, compactActionReadback } from "./design-authoring.mjs";
++import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, stagingDesignNeedsAuthoring, compactActionReadback } from "./design-authoring.mjs";
+ import { createHash } from "node:crypto";
+ import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
+ import { devNull } from "node:os";
+@@ -67,6 +67,7 @@ test("generated criterion uses the accepted parser shape while draft and legacy
+   assert.equal(rows[0].text, "WHEN <trigger>, the system SHALL <observable result>.");
+   const malformed = draft.replace("| AC-1 |", "| AC-01 |");
+   assert.equal(inspectSpecCriterionRows(malformed).code, "CAC-CRITERION-UNSUPPORTED");
++  assert.match(inspectSpecCriterionRows(malformed).message, /\| # \| Criterion \| Evidence \|.*\| AC-1 \| WHEN/u);
+   const badHeader = draft.replace("| # | Criterion | Evidence |", "| ID | Criterion | Evidence |");
+   assert.equal(inspectSpecCriterionRows(badHeader).code, "CAC-CRITERION-UNSUPPORTED");
+ 
+@@ -87,7 +88,12 @@ test("generated criterion uses the accepted parser shape while draft and legacy
+   assert.equal(result.status, "explicit-actual-independent-pass");
+ });
+ 
+-if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
++test("staging authoring distinguishes generated placeholders from reviewed source", () => {
++  assert.equal(stagingDesignNeedsAuthoring(renderArchitectureDesignSkeleton(), renderDesignTraceabilitySkeleton()), true);
++  assert.equal(stagingDesignNeedsAuthoring("# Product brief\nReviewed goals.\n", "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n"), false);
++});
++
++if (completionCases.length !== 4) throw new Error("case completion count drift: expected 4, got " + completionCases.length);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 1aa996c57..c7c6a8e6b 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -380,6 +380,9 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
+   if (script === SESSION_CRITIC_FINALIZER_SCRIPT) return sanctionedSessionCriticFinalizerArgs(args, root);
+   if (script === PIPELINE_STATE_SCRIPT) {
++    // Explicit public prose publication; exact no-argument form only. This
++    // remains subject to READY and all outer command/write policies.
++    if (args[0] === "update-public-handover") return args.length === 1;
+     return sanctionedPipelineStateArgs(args, root);
+   }
+   if (script === PO_PROFILE_REPAIR_SCRIPT) return sanctionedPoProfileRepairArgs(args, root);
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index bb81e2b1b..0c02f9f34 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -20,6 +20,7 @@ import {
+ } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+ import { isSuccessfulSpawn } from "./successful-spawn.mjs";
++import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
+ import {inspectSourceOwnedControlledMethodDispatchHandle} from "./controlled-continuity-method-dispatch.mjs";
+ import {executeSourceOwnedAfkHostTransaction,readSourceOwnedAfkProjectionSettlementSelector,readSourceOwnedAfkProjectionSettlement,isCurrentSourceOwnedAfkProjectionAttempt} from "./afk-transaction-host.mjs";
+ import {parseAfkLedgerGeneration,createAfkLedgerAuthorityProducerPort} from "./afk-ledger.mjs";
+@@ -580,6 +581,7 @@ function closedEntryStaticShape(entry) {
+   if (entry?.planCancellation !== undefined) expectedKeys.add("planCancellation");
+   if (entry?.planMixedStateRecovery !== undefined) expectedKeys.add("planMixedStateRecovery");
+   if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
++  if (entry?.architectureFitness !== undefined) expectedKeys.add("architectureFitness");
+   if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
+   if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
+   if (entry?.auditReference !== undefined) expectedKeys.add("auditReference");
+@@ -600,6 +602,26 @@ function closedEntryStaticShape(entry) {
+     || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
+     || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
+   if (!validClosedEntryRigorFields(entry)) return false;
++  if (entry.architectureFitness !== undefined) {
++    const fitness = entry.architectureFitness;
++    if (!exactKeys(fitness, new Set(["schema", "status", "rigorObservationSha256", "fitnessProjectionSha256", "candidate", "dispositions"]))
++      || fitness.schema !== "pipeline.close-architecture-fitness.v1"
++      || !["unavailable", "observed-open", "observed-pass", "source-drift"].includes(fitness.status)
++      || fitness.rigorObservationSha256 !== entry.rigorObservationSha256
++      || !(fitness.fitnessProjectionSha256 === null || SHA256_RE.test(fitness.fitnessProjectionSha256 ?? ""))
++      || !Array.isArray(fitness.dispositions)
++      || (fitness.status === "unavailable" && (fitness.fitnessProjectionSha256 !== null || fitness.dispositions.length !== 10))
++      || (fitness.status === "observed-open" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length === 0))
++      || (fitness.status === "observed-pass" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length !== 0))
++      || (fitness.status === "source-drift" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length !== 10))
++      || !(fitness.candidate === null || validRigorCandidate(fitness.candidate))) return false;
++    for (const row of fitness.dispositions) if (!exactKeys(row, new Set(["classId", "propertyId", "observedOutcome", "disposition", "reason"]))
++      || !Number.isSafeInteger(row.classId) || row.classId < 1
++      || typeof row.propertyId !== "string" || row.propertyId.length === 0
++      || !["pass", "finding", "unavailable", "unsupported", "unknown"].includes(row.observedOutcome)
++      || (row.observedOutcome === "pass" && fitness.status !== "source-drift")
++      || row.disposition !== "open" || typeof row.reason !== "string" || row.reason.length < 1 || row.reason.length > 1024) return false;
++  }
+   try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
+   if (entry.continuityClose !== undefined) {
+     const close = entry.continuityClose;
+@@ -4608,7 +4630,7 @@ export function replaceNextActionSection(markdown, sectionText) {
+  * than throwing, since this sync is advisory and must never gate the
+  * caller's already-committed State write.
+  */
+-export function syncStateMdNextAction(dir, state) {
++export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
+   let handoverPath = "docs/state.md";
+   try {
+     const root = physicalRoot(dir);
+@@ -4641,9 +4663,18 @@ export function syncStateMdNextAction(dir, state) {
+   const path = join(dir, handoverPath);
+   let markdown;
+   try {
++    // Public publication must never follow a configured private path or a
++    // physical alias, even when the caller invokes the helper explicitly.
++    if (handoverPath.split("/").some(part => [".git", ".claude", ".codex", ".agents", ".agent-pipeline", ".pipeline", ".ssh", ".aws"].includes(part))) {
++      return { ok: false, reason: "public handover path is private", handoverPath };
++    }
++    const root = physicalRoot(dir);
++    assertPhysicalChain(root, path, { leafMayBeAbsent: false });
++    const info = lstatSync(path);
++    if (!info.isFile() || info.nlink !== 1 || info.size > 4 * 1024 * 1024) return { ok: false, reason: "public handover is not a bounded regular file", handoverPath };
+     markdown = readFileSync(path, "utf8");
+   } catch {
+-    return { ok: false, reason: "docs/state.md is absent or unreadable" };
++    return { ok: false, reason: "public handover is absent, unsafe or unreadable", handoverPath };
+   }
+   let sectionText;
+   try {
+@@ -4656,14 +4687,87 @@ export function syncStateMdNextAction(dir, state) {
+     return { ok: false, reason: 'no recognizable "## Next action" heading' };
+   }
+   if (updated === markdown) {
+-    return { ok: true, changed: false };
++    return { ok: true, changed: false, handoverPath };
+   }
++  if (!apply) return { ok: true, changed: true, handoverPath };
+   try {
+     writeFileSync(path, updated, "utf8");
+   } catch (error) {
+     return { ok: false, reason: `write failed: ${error?.message ?? error}` };
+   }
+-  return { ok: true, changed: true };
++  return { ok: true, changed: true, handoverPath };
++}
++
++/** Inspect the public projection without publishing private runtime data. */
++export function inspectPublicHandoverDuty(dir, state) {
++  const preview = syncStateMdNextAction(dir, state, { apply: false });
++  const path = preview.handoverPath ?? "docs/state.md";
++  if (!preview.ok) return { schema: "pipeline.public-handover-duty.v1", status: "unavailable", path,
++    reason: preview.reason, nextAction: { kind: "agent-public-handover-update", path,
++      instruction: "Repair the public handover layout while preserving unrelated prose, then retry the explicit update." } };
++  const feature = state?.activeFeature;
++  const marker = feature && typeof feature.id === "string" && typeof feature.phase === "string"
++    ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\``
++    : "**Lifecycle phase:** no active feature";
++  let markdown;
++  try { markdown = readFileSync(join(dir, path), "utf8"); }
++  catch { markdown = null; }
++  const lines = markdown === null ? [] : markdown.split("\n");
++  const bounds = publicNextActionBounds(lines);
++  const markers = bounds === null ? [] : lines.slice(bounds.start + 1, bounds.end)
++    .filter(line => line.startsWith("**Lifecycle phase:**"));
++  const markerCurrent = markers.length === 1 && markers[0] === marker;
++  const withoutMarker = markdown === null ? null : stripPublicPhaseMarkers(markdown);
++  const sectionCurrent = withoutMarker !== null && replaceNextActionSection(withoutMarker, nextActionSection(state)) === withoutMarker;
++  const status = !preview.ok ? "unavailable" : sectionCurrent && markerCurrent ? "current" : "stale";
++  return { schema: "pipeline.public-handover-duty.v1", status, path,
++    reason: preview.ok ? (markerCurrent ? null : "structured lifecycle phase is absent or stale") : preview.reason,
++    nextAction: status === "current" ? null : {
++      kind: "agent-public-handover-update", path,
++      instruction: "Inspect current lifecycle State and update the tracked handover through an explicit agent action; preserve unrelated prose." } };
++}
++
++function publicNextActionBounds(lines) {
++  const start = lines.findIndex(line => line.trim() === "## Next action");
++  if (start < 0) return null;
++  const next = lines.findIndex((line, index) => index > start && line.startsWith("## "));
++  return { start, end: next < 0 ? lines.length : next };
++}
++
++function stripPublicPhaseMarkers(markdown) {
++  const lines = markdown.split("\n");
++  const bounds = publicNextActionBounds(lines);
++  if (bounds === null) return markdown;
++  for (let index = bounds.end - 1; index > bounds.start; index -= 1) {
++    if (!lines[index].startsWith("**Lifecycle phase:**")) continue;
++    lines.splice(index, index + 1 < bounds.end && lines[index + 1] === "" ? 2 : 1);
++  }
++  return lines.join("\n");
++}
++
++/** Explicit agent action. The runtime's private projection never calls this. */
++export function updatePublicHandoverDuty(dir, state) {
++  const before = inspectPublicHandoverDuty(dir, state);
++  if (before.status === "unavailable") return before;
++  if (before.status === "current") return before;
++  const sync = syncStateMdNextAction(dir, state, { apply: true });
++  if (!sync.ok) return inspectPublicHandoverDuty(dir, state);
++  const path = join(dir, before.path);
++  let markdown;
++  try { markdown = readFileSync(path, "utf8"); }
++  catch { return inspectPublicHandoverDuty(dir, state); }
++  const feature = state?.activeFeature;
++  const marker = feature && typeof feature.id === "string" && typeof feature.phase === "string"
++    ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\``
++    : "**Lifecycle phase:** no active feature";
++  const lines = stripPublicPhaseMarkers(markdown).split("\n");
++  const heading = lines.findIndex(line => line.trim() === "## Next action");
++  if (heading < 0) return inspectPublicHandoverDuty(dir, state);
++  const insertion = lines[heading + 1] === "" ? heading + 2 : heading + 1;
++  lines.splice(insertion, 0, marker, "");
++  try { writeFileSync(path, lines.join("\n"), "utf8"); }
++  catch { return inspectPublicHandoverDuty(dir, state); }
++  return inspectPublicHandoverDuty(dir, state);
+ }
+ 
+ /**
+@@ -5673,6 +5777,13 @@ function buildCoordinatorSourcedPromotionPlan({
+   const checkMarkers = !allowAppliedReplay;
+   const checkAcknowledgement = !new Set(["epic", "feature"]).has(input.profile);
+   const authority = promotionArtifacts(observed.root, input, { checkMarkers, checkAcknowledgement });
++  // Generated scaffold bytes remain editable until the actual design is authored.
++  // This also runs during apply's fresh plan reconstruction before any write.
++  if (stagingDesignNeedsAuthoring(
++    readFileSync(join(observed.root, authority.prd.path), "utf8"),
++    readFileSync(join(observed.root, authority.spec.path), "utf8"))) {
++    fail("BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED", "author the generated PRD and Spec before binding their bytes");
++  }
+   const featureId = input.featureId;
+   // NVA-R1-LANGWIRE: a coordinator-sourced binding has no kickoff predecessor to
+   // inherit an operator-facing default from (plan.kickoff === null; unlike the
+diff --git a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+index 3283400b7..4fef45531 100644
+--- a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+@@ -100,7 +100,7 @@ function capture(fn) {
+   finally { console.log = beforeLog; console.error = beforeError; }
+ }
+ /** A submitted feature-profile root whose Spec is `spec`; the PRD carries the matching marker. */
+-function submittedRoot(spec, { governed = true } = {}) {
++function submittedRoot(spec, { governed = true, legacySubmission = false, expectSubmissionRefusal = false } = {}) {
+   const scratch = resolve(pluginRoot, "../../scratch");
+   mkdirSync(scratch, { recursive: true });
+   const root = mkdtempSync(join(scratch, "alf-k11-d64-"));
+@@ -129,11 +129,23 @@ function submittedRoot(spec, { governed = true } = {}) {
+     gitUserName: () => "Fixture", poGateProfile: () => ({ ok: true, value: evidence }),
+     poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: sha(plan), specPath, specSha256: sha(spec) } }),
+     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex" };
+-  const submitted = capture(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+-  assert.equal(submitted.code, 0, submitted.stderr);
++  const beforeSubmission = readFileSync(statePath(root), "utf8");
++  let submitted;
++  if (legacySubmission) {
++    // Historical State may predate submit-plan's source validation. Keep the
++    // independent present-plan defense reachable without weakening submission.
++    const state = JSON.parse(beforeSubmission);
++    state.planSubmission = { schema: "pipeline.plan-submission.v1", featureId: FEATURE,
++      planPath, planSha256: sha(plan), specPath, specSha256: sha(spec), profile: "feature",
++      profileSha256: sha("profile"), submittedBy: "coordinator", submittedAt: now };
++    writeFileSync(statePath(root), JSON.stringify(state));
++  } else {
++    submitted = capture(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
++    if (!expectSubmissionRefusal) assert.equal(submitted.code, 0, submitted.stderr);
++  }
+   mkdirSync(join(root, "evidence"), { recursive: true });
+   writeFileSync(join(root, "evidence/review-1.json"), "{}\n");
+-  return { root, deps, cleanup: () => rmSync(root, { recursive: true, force: true }) };
++  return { root, deps, submitted, beforeSubmission, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+ }
+ function presentPlan(spec, options) {
+   const f = submittedRoot(spec, options);
+@@ -142,9 +154,17 @@ function presentPlan(spec, options) {
+ }
+ const SUPPORTED_SHAPE_NAMES = [/\| # \| Criterion \| Evidence \|/u, /AC-<n>/u, /leading zero/u];
+ 
+-test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", () => {
++test("D64 submit-plan: unsupported criteria refuse before State mutation; legacy present-plan retains the same defense", () => {
+   for (const [label, spec, id] of [["four-column table", FOUR_COLUMN, "AC-1"], ["leading-zero id", LEADING_ZERO, "AC-01"]]) {
+-    const refused = presentPlan(spec, { governed: false });
++    const f = submittedRoot(spec, { governed: false, expectSubmissionRefusal: true });
++    try {
++      assert.equal(f.submitted.code, 2, label);
++      assert.match(f.submitted.stderr, /submit-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u);
++      assert.equal(readFileSync(statePath(f.root), "utf8"), f.beforeSubmission, "refusal preserves exact State bytes");
++      assert.ok(f.submitted.stderr.includes(id), label);
++      for (const shape of SUPPORTED_SHAPE_NAMES) assert.match(f.submitted.stderr, shape);
++    } finally { f.cleanup(); }
++    const refused = presentPlan(spec, { governed: false, legacySubmission: true });
+     assert.equal(refused.code, 2, label);
+     assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, `${label}: ${refused.stderr}`);
+     assert.ok(refused.stderr.includes(id), `${label}: names the offending id`);
+@@ -161,16 +181,22 @@ test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and
+   }
+ });
+ 
+-// AC-264 / D85 (PO decision 2026-10-22): a GOVERNED project's submit-plan also checks the delivery hand-off, so a Spec with no admitted row never reaches
+-// present-plan there (the cases above run an ungoverned root, with the Spec bytes and assertions unchanged). D64 stays reachable in a governed root when
+-// the Spec has at least one admitted row beside the unsupported one, and an unready hand-off is refused at submit-plan with its typed code.
+-test("D64 present-plan with the delivery hand-off wired: governed root, one admitted row beside an unsupported one is still refused by D64; a Spec with no admitted row is refused at submit-plan", () => {
++// AC-264 / D85 still refuses no-row governed Specs first. Mixed rows now fail
++// submit-plan's stronger source check; historical submissions retain D64's defense.
++test("D64 governed submission: mixed unsupported rows refuse without mutation and legacy present-plan still defends them", () => {
+   const mixed = `${LEADING_ZERO}\n| # | Criterion |\n| --- | --- |\n| 1 | A supported row beside the unsupported AC-01 |\n`;
+   assert.deepEqual(scanAcceptedCriterionRows(mixed).map((row) => row.id), ["AC-1"], "control: exactly one row is admitted, AC-01 is not");
+-  const refused = presentPlan(mixed);
++  for (const [spec, code] of [[mixed, "CAC-CRITERION-UNSUPPORTED"], [FOUR_COLUMN, "PLR-HANDOFF-NO-CRITERION"]]) {
++    const f = submittedRoot(spec, { expectSubmissionRefusal: true });
++    try {
++      assert.equal(f.submitted.code, 2);
++      assert.ok(f.submitted.stderr.includes(code), f.submitted.stderr);
++      assert.equal(readFileSync(statePath(f.root), "utf8"), f.beforeSubmission);
++    } finally { f.cleanup(); }
++  }
++  const refused = presentPlan(mixed, { legacySubmission: true });
+   assert.equal(refused.code, 2);
+   assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, refused.stderr);
+-  assert.throws(() => presentPlan(FOUR_COLUMN), /PLR-HANDOFF-NO-CRITERION/u, "submit-plan stops a governed Spec with no admitted row, before present-plan");
+ });
+ 
+ test("D64 criterion inspection: the located and the unsupported rows come from the parser's own scan", () => {
+diff --git a/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs b/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
+index 24569f6c4..fffce4bba 100644
+--- a/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
++++ b/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
+@@ -163,3 +163,54 @@ test("AC-231 host-limitation: POSIX branch does not consult the seams (chmod 070
+   assert.equal(report.seen.length, 0, "seams are not consulted off win32");
+   assert.equal(report.first.code, null);
+ });
++
++// Additional Linux-reachable logical witnesses; original native cases above
++// retain their skips. Both adapters are injected before any controlled call.
++// This process view establishes no native Windows permission assurance.
++async function controlledScenario(url) {
++  const { privateMkdtemp } = await import(MODULE_URL);
++  const fixture = privateMkdtemp(`ac231-controlled-${randomUUID()}-`);
++  const parentPlatform = process.platform;
++  try {
++    const source = [
++      `for (const key of ["TMPDIR", "TMP", "TEMP"]) process.env[key] = ${JSON.stringify(fixture)};`,
++      'Object.defineProperty(process, "platform", { value: "win32" });',
++      SCENARIO,
++    ].join("\n");
++    const report = run(url, source);
++    assert.equal(process.platform, parentPlatform, "controlled view must stay in the child");
++    for (const root of report.seen) assert.equal(dirname(root), fixture, "all roots belong to this nonce fixture");
++    return report;
++  } finally {
++    rmSync(fixture, { recursive: true, force: true });
++  }
++}
++
++function assertControlledScenario(report) {
++  assertGuardedScenario(report, "controlled child");
++  assert.equal(report.seen.length, 3, "each refusal and later success must harden a fresh root");
++  assert.equal(new Set(report.seen).size, 3, "refusals must not memoize a root");
++  assert.equal(report.third.code, null, "secure retry after refusals must succeed");
++  assert.equal(report.fourth.value, report.third.value, "success is memoized despite a later insecure seam");
++}
++
++const CONTROLLED_ONLY = process.platform !== "linux" && "controlled Linux branch witness only; native cases retained separately";
++test("AC-231 controlled production: actual refusal, cleanup and retry/memoization", { skip: CONTROLLED_ONLY }, async () => {
++  assertControlledScenario(await controlledScenario(MODULE_URL));
++});
++test("AC-231 controlled mirror: unchanged helper satisfies the same examiner", { skip: CONTROLLED_ONLY }, async () => {
++  assertControlledScenario(await controlledScenario(mirror("controlled-control", null)));
++});
++test("AC-231 controlled mutation: removing refusal is rejected by the same examiner", { skip: CONTROLLED_ONLY }, async () => {
++  const url = mirror("controlled-no-refusal", text => text.replace('if (state?.status !== "secure") {', 'if (false) {'));
++  const report = await controlledScenario(url);
++  assert.equal(report.first.code, null, "mutation must actually accept the insecure root");
++  assert.throws(() => assertControlledScenario(report), { name: "AssertionError", message: /must not return a root/ });
++});
++test("AC-231 controlled mutation: removing cleanup is rejected by the same examiner", { skip: CONTROLLED_ONLY }, async () => {
++  const url = mirror("controlled-no-cleanup", text => text.replace("    discard(root);\n    throw error;", "    throw error;"));
++  const report = await controlledScenario(url);
++  assert.equal(report.first.code, "PRIVATE_TMP_ROOT_NOT_SECURE", "refusal remains active in cleanup mutant");
++  assert.equal(report.firstRootGone, false, "mutation must leave the refused root behind");
++  assert.throws(() => assertControlledScenario(report), { name: "AssertionError", message: /rejected root must be removed/ });
++});
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 745baa214..3dfd5a995 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -12,6 +12,7 @@ import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consume
+ import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
+ import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
++import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
+ // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
+ // real function with the module's existing `fs.inspectArchitectureDesign` injection, not by reading source text.
+ export { designToImplementationHandoverAction };
+@@ -3685,6 +3686,14 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
+       // final package proof is verified by pipeline-state.mjs.
+       const checkpointProfile = checkpoint.value?.values?.profile ?? null;
+       const finalPackageProfile = new Set(["epic", "feature"]).has(checkpointProfile);
++      if (acknowledgement === null) {
++        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
++          repository, runtime, continuity, appServer, nextAction: null,
++          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_observation_unavailable",
++            "the generated design could not be inspected before binding",
++            "repair the generated PRD and Spec observation, then inspect again")],
++        });
++      }
+       const needsAcknowledgement = !finalPackageProfile && acknowledgement !== null
+         && acknowledgement.acknowledged === false;
+       // The generated Spec marker is a technical hash binding, not a PO
+@@ -3743,6 +3752,31 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
+           });
+         }
+       }
++      let draftIncomplete;
++      try {
++        draftIncomplete = stagingDesignNeedsAuthoring(
++          readFileSync(join(root, acknowledgement.prd.path), "utf8"),
++          readFileSync(join(root, acknowledgement.spec.path), "utf8"),
++        );
++      } catch {
++        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
++          repository, runtime, continuity, appServer, nextAction: null,
++          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_observation_unavailable",
++            "the generated design could not be inspected before binding",
++            "repair the generated PRD and Spec observation, then inspect again")],
++        });
++      }
++      if (draftIncomplete) {
++        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
++          repository, runtime, continuity, appServer,
++          nextAction: { kind: "design-authoring-required", mutation: false, requiresConfirmation: false,
++            prdPath: acknowledgement.prd.path, specPath: acknowledgement.spec.path,
++            guidance: "Author and review the generated PRD and Spec, then inspect again before bootstrap binding." },
++          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_authoring_required",
++            "the generated PRD and Spec still contain draft framing",
++            "author both documents before bootstrap-bind-plan")],
++        });
++      }
+       let signatureObservation = null;
+       let signatureMode = false;
+       if (needsAcknowledgement) {
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 256bd34f2..1c289ed52 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -9323,8 +9323,9 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     assert.equal(corrected.code, 0, stderr);
+     assert.equal(readOnboardingIntakeCheckpoint({ rootDir: path, spawn: fakeGit }).value.designQuestions[0].answer, "Ship safely and accessibly.");
+ 
+-    // Staging generated: bootstrap-binding-required, nextAction is the real
+-    // bootstrap-bind-plan command. Called directly (not through onboardingCli):
++    // Staging generated: bootstrap-binding-required, nextAction requests
++    // authoring before the real bootstrap-bind-plan command. Called directly
++    // (not through onboardingCli):
+     // planOnboardingIntakeGenerate/applyOnboardingIntakeGenerate take `spawn`
+     // as their own top-level parameter, never nested under `deps` -- the CLI
+     // wrapper's `{ rootDir, deps }` call shape never actually threads a test's
+@@ -9348,8 +9349,17 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     const afterGenerate = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+     assert.equal(afterGenerate.status, "bootstrap-binding-required");
+     assert.equal(afterGenerate.continuity.status, "absent-pristine");
+-    assert.equal(afterGenerate.nextAction.kind, "command");
+-    assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
++    assert.equal(afterGenerate.nextAction.kind, "design-authoring-required");
++    assert.equal(afterGenerate.nextAction.prdPath, genApplied.targets.prd.path);
++    assert.equal(afterGenerate.nextAction.specPath, genApplied.targets.spec.path);
++    const beforeBindRefusal = readOnboardingIntakeCheckpoint({ rootDir: path, spawn: fakeGit });
++    for (const bind of [
++      () => planOnboardingBootstrapBind({ rootDir: path, spawn: fakeGit }),
++      () => applyOnboardingBootstrapBind({ rootDir: path, expectedPlanSha256: "a".repeat(64), activate: true, deps: { spawn: fakeGit } }),
++    ]) assert.throws(bind, error => error?.code === "BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED");
++    assert.deepEqual(readOnboardingIntakeCheckpoint({ rootDir: path, spawn: fakeGit }), beforeBindRefusal,
++      "direct plan/apply cannot freeze generated bytes or lose retained answers");
++    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).continuity.status, "absent-pristine");
+ 
+     // Final-package profiles skip the early PO acknowledgement, but the
+     // generated PRD's technical Spec digest still has to be repaired before
+@@ -9376,8 +9386,7 @@ test("v4Inspection routes a genuinely fresh repository through the full intake c
+     assert.equal(markerRepair.code, 0, stderr);
+     assert.equal(markerRepair.result.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
+     const afterMarkerRepair = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+-    assert.equal(afterMarkerRepair.nextAction.kind, "command");
+-    assert.equal(afterMarkerRepair.nextAction.argv[1], "bootstrap-bind-plan");
++    assert.equal(afterMarkerRepair.nextAction.kind, "design-authoring-required");
+   } finally { dispose(path); }
+ });
+ 
+diff --git a/plugins/pipeline-core/lib/rigor-lifecycle.mjs b/plugins/pipeline-core/lib/rigor-lifecycle.mjs
+index dd5b29fa7..443b94822 100644
+--- a/plugins/pipeline-core/lib/rigor-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/rigor-lifecycle.mjs
+@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
+ import { deriveMinimumRigor, deriveLifecycleRigorObservation, inferInputsFromRepo, normalizeInputs } from "../scripts/rigor-floor.mjs";
+ import { resolveProtectedBaseline } from "./protected-baseline.mjs";
+ import { deriveArchitecturePlanningSurface } from "./architecture-entry-readiness.mjs";
+-import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
++import { evaluateArchitectureFitness, PROPERTY_CLASSES } from "../scripts/architecture-fitness.mjs";
+ import { generateInterruptionReport } from "../scripts/report-interruptions.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath, resolveProjectAuthorityPaths } from "./project-authority.mjs";
+ import { parseStrictJson } from "./governance-event.mjs";
+@@ -93,11 +93,66 @@ export function validateRigorHistory(history) {
+     if (normalized.fitnessOutcomes.status === "available"
+       && (!body.fitnessProjection || hash(body.fitnessProjection) !== normalized.fitnessOutcomes.value.sourceSha256
+         || canonical(body.fitnessProjection.outcomes) !== canonical(normalized.fitnessOutcomes.value.outcomes))) throw new Error("RIGOR-HISTORY-FITNESS");
++    if (body.fitnessProjection?.dispositions !== undefined) {
++      const projection = body.fitnessProjection;
++      const expected = projection.outcomes.filter(row => row.outcome !== "pass");
++      if (!Array.isArray(projection.dispositions) || projection.dispositions.length !== expected.length
++        || !expected.every((row, index) => {
++          const disposition = projection.dispositions[index];
++          return disposition?.classId === row.classId && disposition.propertyId === row.propertyId
++            && disposition.observedOutcome === row.outcome && disposition.disposition === "open"
++            && typeof disposition.reason === "string" && disposition.reason.length > 0
++            && disposition.reason.length <= 1024;
++        })) throw new Error("RIGOR-HISTORY-FITNESS-DISPOSITION");
++    }
+     floors.set(body.featureId, { featureId: body.featureId, minProfile: checked.retainedProfile, inputDigest: checked.derivation.inputDigest });
+     preceding = row.entrySha256;
+   }
+   return history;
+ }
++
++/** A report-only close account of the last owner-recorded pre-close observation. */
++export function closeArchitectureFitnessDisposition(history, featureId, { candidate: closeCandidate = null, bindings: closeBindings = null } = {}) {
++  const rows = validateRigorHistory(history);
++  const entry = rows.filter(row => row.body.featureId === featureId && row.body.boundary === "pre-close").at(-1);
++  if (!entry) throw new Error("RIGOR-CLOSE-OBSERVATION-MISSING");
++  const { body } = entry;
++  const projection = body.fitnessProjection;
++  const sourceSha256 = projection ? hash(projection) : null;
++  const candidateCurrent = closeCandidate !== null && body.candidate !== null && canonical(closeCandidate) === canonical(body.candidate);
++  const sourceCurrent = closeBindings !== null && projection !== null
++    && canonical(closeBindings) === canonical({ model: projection.model, baseline: projection.baseline, map: projection.map });
++  const status = projection === null ? "unavailable" : candidateCurrent && sourceCurrent
++    ? (projection.outcomes.every(row => row.outcome === "pass") ? "observed-pass" : "observed-open") : "source-drift";
++  const dispositions = projection === null
++    ? PROPERTY_CLASSES.map(({ classId, propertyId }) => ({ classId, propertyId, observedOutcome: "unavailable",
++      disposition: "open", reason: "Pre-close fitness evidence was unavailable; this property remains unverified." }))
++    : projection.outcomes.filter(row => status === "source-drift" || row.outcome !== "pass").map(row => {
++      const original = projection.dispositions?.find(item => item.classId === row.classId && item.propertyId === row.propertyId);
++      return { classId: row.classId, propertyId: row.propertyId, observedOutcome: row.outcome,
++        disposition: "open", reason: status === "source-drift"
++          ? "The pre-close candidate or architecture source changed; this observation requires revalidation."
++          : original?.reason ?? `Pre-close fitness reported ${row.outcome}; this property remains unresolved.` };
++    });
++  return { schema: "pipeline.close-architecture-fitness.v1", status, rigorObservationSha256: entry.entrySha256,
++    fitnessProjectionSha256: sourceSha256, candidate: body.candidate, dispositions };
++}
++
++/** Re-read exactly the source set carried by a fitness projection. */
++export function readCurrentArchitectureFitnessBindings(rootDir, deps = {}) {
++  try {
++    const root = resolve(rootDir), read = deps.physicalBytes ?? physicalBytes;
++    const model = { path: "architecture/fitness-model.json", sha256: hash(read(root, "architecture/fitness-model.json")) };
++    const baseline = { path: "architecture/baseline.json", sha256: hash(read(root, "architecture/baseline.json")) };
++    const directory = join(root, "architecture/map");
++    const info = lstatSync(directory);
++    if (!info.isDirectory() || info.isSymbolicLink()) return null;
++    const names = (deps.mapEntries ?? readdirSync)(directory).filter(name => name.endsWith(".md")).sort();
++    if (!names.includes("index.md") || names.length > 256) return null;
++    const map = names.map(name => ({ path: `architecture/map/${name}`, sha256: hash(read(root, `architecture/map/${name}`)) }));
++    return { model, baseline, map };
++  } catch { return null; }
++}
+ function observation(body, previous) {
+   if (body.candidate !== null) return deriveLifecycleRigorObservation({ boundary: body.boundary,
+     featureId: body.featureId, candidate: body.candidate, inputs: body.inputs, previous });
+@@ -212,8 +267,14 @@ export function collectRigorJournalEntry({ rootDir, state, boundary, selectedPro
+       // Existing ratchet exceptions alone do not establish owner-valid approval.
+       if (value.schema === "pipeline.fitness-evidence.v1" && Array.isArray(outcomes) && outcomes.length === 10
+         && !outcomes.some(row => row.outcome === "excepted") && inputs.actualPaths.status === "available") {
++        const dispositions = outcomes.filter(row => row.outcome !== "pass").map(row => {
++          const original = value.outcomes.find(entry => entry.classId === row.classId && entry.propertyId === row.propertyId);
++          return { classId: row.classId, propertyId: row.propertyId, observedOutcome: row.outcome,
++            disposition: "open", reason: typeof original?.details === "string" && original.details.trim()
++              ? original.details.slice(0, 1024) : `Evaluator reported ${row.outcome}; property remains unresolved.` };
++        });
+         fitnessProjection = { schema: "pipeline.rigor-fitness-projection.v1", candidate: observedCandidate,
+-          model: bindings.fitnessModel, baseline: bindings.architectureBaseline, map: bindings.architectureMap, boundary, outcomes };
++          model: bindings.fitnessModel, baseline: bindings.architectureBaseline, map: bindings.architectureMap, boundary, outcomes, dispositions };
+         inputs.fitnessOutcomes = envelope({ sourceSha256: hash(fitnessProjection), outcomes }, "available", "pipeline.rigor-fitness-projection.v1");
+       }
+     } catch { inputs.fitnessOutcomes = absent("pipeline.fitness-evidence.v1"); }
+diff --git a/plugins/pipeline-core/lib/test-private-tmp.test.mjs b/plugins/pipeline-core/lib/test-private-tmp.test.mjs
+index 2395c312d..189a312d5 100644
+--- a/plugins/pipeline-core/lib/test-private-tmp.test.mjs
++++ b/plugins/pipeline-core/lib/test-private-tmp.test.mjs
+@@ -345,3 +345,38 @@ test("B-S1-T2: PRIVATE_TMP_PREFIX_ESCAPES_ROOT refuses a prefix that resolves ou
+     for (const path of leaked()) rmSync(path, { recursive: true, force: true });
+   }
+ });
++
++// Controlled branch execution only: this does not qualify native Windows DACLs.
++test("TEMP-SEAM-CONTROLLED: child-only win32 view refuses insecure roots before cleanup and retries without memoization", { skip: process.platform !== "linux" && "controlled Linux child witness" }, async () => {
++  const sandbox = await child("temp-seam-controlled-");
++  const hostPlatform = process.platform;
++  const report = runModuleChild([
++    'import { existsSync, readdirSync } from "node:fs";',
++    'import { tmpdir } from "node:os";',
++    'Object.defineProperty(process, "platform", { value: "win32" });',
++    'const { privateTempRoot } = await import(process.argv[1]);',
++    'const hardened = [], assessed = [];',
++    'const harden = root => { hardened.push(root); };',
++    'const assess = root => { assessed.push(root); return { status: "insecure", reason: "controlled-insecure" }; };',
++    'const failures = [];',
++    'for (let i = 0; i < 2; i++) {',
++    '  try { privateTempRoot({ harden, assess }); failures.push({ code: null }); }',
++    '  catch (error) { failures.push({ code: error.code, message: error.message, entries: readdirSync(tmpdir()) }); }',
++    '}',
++    'const root = privateTempRoot({ harden, assess: path => { assessed.push(path); return { status: "secure" }; } });',
++    'const same = privateTempRoot({ harden: () => { throw Error("memoized harden called"); }, assess: () => { throw Error("memoized assess called"); } }) === root;',
++    'console.log(JSON.stringify({ failures, hardened, assessed, root, same, exists: existsSync(root) }));',
++  ].join("\n"), sandbox);
++  assert.equal(process.platform, hostPlatform, "the parent platform must remain unchanged");
++  for (const failure of report.failures) {
++    assert.equal(failure.code, "PRIVATE_TMP_ROOT_NOT_SECURE");
++    assert.match(failure.message, /status=insecure, reason=controlled-insecure/);
++    assert.deepEqual(failure.entries, [], "cleanup must precede the surfaced refusal");
++  }
++  assert.equal(report.hardened.length, 3);
++  assert.deepEqual(report.assessed, report.hardened, "both seams see the same fresh roots in order");
++  assert.equal(new Set(report.hardened).size, 3, "refusals must not memoize");
++  for (const root of report.hardened) assert.equal(isInside(sandbox, root), true);
++  assert.equal(report.exists && report.same, true, "a secure attempt succeeds and is memoized");
++  assert.deepEqual(readdirSync(sandbox), [], "exit cleanup removes the successful root too");
++});
+diff --git a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+index 0b39b20af..e92d85252 100644
+--- a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
++++ b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+@@ -32,6 +32,8 @@ const A = "a".repeat(64);
+ const B = "b".repeat(64);
+ const C = "c".repeat(64);
+ const D = "d".repeat(64);
++const ATOMIC_PLAN = "# Atomic phase projection\n\nPreserve the lifecycle marker through implementation entry.\n";
++const ATOMIC_SPEC = "# Technical Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN implementation starts, the system SHALL project the implementation phase atomically. | State marker transition |\n";
+ 
+ function freshDir() {
+   const dir = mkdtempSync(join(tmpdir(), "state-phase-consistency-"));
+@@ -50,13 +52,13 @@ function projectedNextAction(dir) {
+ }
+ 
+ // Mirrors pipeline-state-approve-announce.test.mjs's injectedPoGateAuthority:
+-// a synthetic authority derived from the plan/spec path text (not real file
+-// bytes), stable across submit-plan's initial call and approve-plan's
++// a synthetic authority bound to the authored fixture bytes, stable across
++// submit-plan's initial call and approve-plan's
+ // beforeCommit re-check.
+ function injectedPoGateAuthority(planPath) {
+-  const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
++  const planSha256 = createHash("sha256").update(ATOMIC_PLAN).digest("hex");
+   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+-  const specSha256 = createHash("sha256").update(`fixture:${specPath}`).digest("hex");
++  const specSha256 = createHash("sha256").update(ATOMIC_SPEC).digest("hex");
+   const value = {
+     schema: PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
+     humanFacing: "en",
+@@ -199,6 +201,13 @@ test("the marker stays atomic with a real design -> implementation transition",
+       verify: verifyCommand,
+       handover: "docs/state.md",
+     }, null, 2)}\n`);
++    // Submission requires a real HEAD and current authored criterion sources.
++    // Keep the phase-marker examiner on the configured verify-command route.
++    mkdirSync(join(dir, "specs/atomic-feature"), { recursive: true });
++    writeFileSync(join(dir, planPath), ATOMIC_PLAN);
++    writeFileSync(join(dir, "specs/atomic-feature/spec.md"), ATOMIC_SPEC);
++    execFileSync("git", ["add", "--", planPath, "specs/atomic-feature/spec.md", "project/pipeline.json"], { cwd: dir, windowsHide: true });
++    execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "seed atomic phase fixture"], { cwd: dir, windowsHide: true });
+     const setFeature = run(["set-feature", "--id", "atomic-feature", "--plan-path", planPath], { dir, now: FIXED_NOW });
+     assert.equal(setFeature, 0);
+     const afterSetFeature = checkStatePhaseConsistency({ rootDir: dir });
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index e8a7b1067..6cae63e52 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -488,7 +488,8 @@ import {
+   validatePortablePipelineState,
+ } from "../lib/project-authority.mjs";
+ import { observeGitSource } from "../lib/source-observation.mjs";
+-import { collectRigorJournalEntry, rigorVerifyRows } from "../lib/rigor-lifecycle.mjs";
++import { collectRigorJournalEntry, rigorVerifyRows, closeArchitectureFitnessDisposition, readCurrentArchitectureFitnessBindings } from "../lib/rigor-lifecycle.mjs";
++import { inspectPublicHandoverDuty, updatePublicHandoverDuty } from "../lib/onboarding-continuity.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
+ import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+@@ -737,7 +738,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+ // that exact command as the way out of a stuck approval.
+ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "materialize-architecture", "afk-project",
+-  "inspect", "rebind-approval",
++  "inspect", "update-public-handover", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
+@@ -9632,6 +9633,28 @@ function designWorkflowGitCandidate(dir, deps = {}) {
+   return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
+ }
+ 
++// Submission binds physical authoring sources before taking the State writer
++// lock, and repeats the same observation at its commit boundary. Review receipt
++// provenance remains the separate present-plan admission.
++function inspectSubmissionSources(dir, authority, deps) {
++  const candidate = designWorkflowGitCandidate(dir, deps);
++  if (!candidate || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit ?? "")
++    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree ?? "")) return { ok: false, code: "PLAN-SUBMIT-HEAD-UNAVAILABLE" };
++  const prd = physicalRebindFile(dir, authority.planPath);
++  const spec = physicalRebindFile(dir, authority.specPath);
++  if (!prd || !spec || prd.sha256 !== authority.planSha256 || spec.sha256 !== authority.specSha256) {
++    return { ok: false, code: "PLAN-SUBMIT-SOURCE-DRIFT" };
++  }
++  let source;
++  try {
++    new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(prd.bytes);
++    source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(spec.bytes);
++  } catch { return { ok: false, code: "PLAN-SUBMIT-SOURCE-ENCODING" }; }
++  const criteria = inspectSpecCriterionRows(source);
++  if (!criteria.ok) return criteria;
++  return { ok: true, candidate, sources: [{ path: authority.planPath, sha256: prd.sha256 }, { path: authority.specPath, sha256: spec.sha256 }] };
++}
++
+ function writeDesignWorkflowApprovalRequest(dir, request) {
+   const root = realpathSync(resolve(dir));
+   const scratch = join(root, "scratch");
+@@ -11287,6 +11310,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         }
+       }
+       const submitHandoff = planHandoffRefusal("submit-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 })); if (submitHandoff) { console.error(submitHandoff); return 2; } // AC-264/D30/D85: refused before any write
++      const submitSources = inspectSubmissionSources(dir, authority.value, deps);
++      if (!submitSources.ok) {
++        console.error(`Error: submit-plan refused (${submitSources.code}); ${submitSources.message ?? "restore and validate the authored source before submission."} Zero State mutation.`);
++        return 2;
++      }
+       const profileSha256 = sha256CanonicalJson(profile.value);
+       const expectedPlanSha256 = authority.value.planSha256;
+       const expectedSpecSha256 = authority.value.specSha256;
+@@ -11334,6 +11362,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+             planApprovalBriefing: submittedBriefing, rigorHistory: [...(observed.rigorHistory ?? []), submittedRigor] } };
+         },
+         beforeCommit: () => {
++          const sourceReadback = inspectSubmissionSources(dir, authority.value, deps);
++          if (!sourceReadback.ok) return sourceReadback;
++          if (sha256CanonicalJson(sourceReadback) !== sha256CanonicalJson(submitSources)) return { ok: false, code: "PLAN-SUBMIT-SOURCE-DRIFT" };
+           const currentSelection = inspectSelectedPlanProfile(dir, base);
+           if (!currentSelection.ok) return currentSelection;
+           if (currentSelection.profile !== null && currentSelection.profile !== profileName) {
+@@ -12791,6 +12822,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         next.rigorHistory = [...(base.rigorHistory ?? []), closedRigor];
+         closedEntry.rigorObservationSha256 = closedRigor.entrySha256;
+         closedEntry.rigorVerifyRows = rigorVerifyRows(next).filter(row => row.featureId === activeFeature.id);
++        closedEntry.architectureFitness = closeArchitectureFitnessDisposition(next.rigorHistory, activeFeature.id, {
++          candidate: designWorkflowGitCandidate(dir, deps), bindings: readCurrentArchitectureFitnessBindings(dir),
++        });
+       } catch {
+         console.error("Error: RIGOR-HISTORY-INVALID: existing floor history cannot be authenticated; zero State mutation.");
+         return 2;
+@@ -12799,7 +12833,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         beforeCommit: () => {
+           const readback = collectRigorJournalEntry({ rootDir: dir, state: base, boundary: "pre-close",
+             selectedProfile: base.selectedProfile ?? base.planSubmission?.profile, observedAt: closedAt });
+-          return readback.entrySha256 === closedRigor.entrySha256 ? { ok: true } : { ok: false, code: "RIGOR-INPUT-STALE" };
++          const disposition = closeArchitectureFitnessDisposition([...(base.rigorHistory ?? []), readback], activeFeature.id, {
++            candidate: designWorkflowGitCandidate(dir, deps), bindings: readCurrentArchitectureFitnessBindings(dir),
++          });
++          return readback.entrySha256 === closedRigor.entrySha256
++            && sha256CanonicalJson(disposition) === sha256CanonicalJson(closedEntry.architectureFitness)
++            ? { ok: true } : { ok: false, code: "RIGOR-INPUT-STALE" };
+         },
+         requirePhysicalReadback: true,
+       }))) {
+@@ -13191,8 +13230,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+     // the SAME pure renderer those mutating commands call before writing to
+     // `docs/state.md`, so the returned text is byte-identical to what a fresh
+     // read of that file's section would show, without a second read.
++    case "update-public-handover": {
++      if (rest.length !== 0) return 2;
++      const result = updatePublicHandoverDuty(dir, base);
++      console.log(JSON.stringify(result, null, 2));
++      return result.status === "current" ? 0 : 2;
++    }
+     case "inspect": {
+       const lifecycle = inspectPlanLifecycle(dir, base);
++      const publicHandoverDuty = inspectPublicHandoverDuty(dir, base);
+       const drift = base.continuity == null ? null : projectContinuityAuthorityDrift(base.continuity, (p) => physicalRebindFile(dir, p)?.sha256 ?? null);
+       const payload = {
+         schema: INSPECT_SCHEMA,
+@@ -13219,6 +13265,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           ? reopenDesignNextActionText(dir)
+           : nextActionSection(base),
+         continuityAuthorityDrift: drift,
++        publicHandoverDuty: {
++          ...publicHandoverDuty,
++          nextAction: publicHandoverDuty.status === "current" ? null : {
++            kind: "command", executable: process.execPath,
++            argv: [fileURLToPath(import.meta.url), "update-public-handover"],
++            mutation: true, requiresConfirmation: false, executionBoundary: "local-process",
++          },
++        },
+       };
+       console.log(JSON.stringify(payload, null, 2));
+       return 0;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 18df3dd79..9206872ab 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1244,6 +1244,35 @@ function attendedFeaturePlanDeps(root, deps) {
+   return { ...deps, isattyFn: () => true, readLineFn: () => confirmation };
+ }
+ 
++// G25: the real submit producer must reject before any State mutation.
++for (const scenario of ["missing-head", "malformed-criterion", "missing-source", "drifted-source", "candidate-drift-before-commit", "source-drift-before-commit", "authored"]) {
++  const fixture = planAuthorityFixture({ featureId: `g25-${scenario}`, planPath: `specs/g25-${scenario}/prd.md`, specPath: `specs/g25-${scenario}/spec.md` });
++  const { root, deps, specPath } = fixture;
++  try {
++    const originalAuthority = deps.poGateAuthority().value;
++    const spec = "# Technical Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| " + (scenario === "malformed-criterion" ? "AC-01" : "AC-1") + " | WHEN submitted, the system SHALL bind authored source. | evidence |\n";
++    writeFileSync(join(root, specPath), spec);
++    const authority = { ...originalAuthority, specSha256: sha256Hex(Buffer.from(spec)) };
++    const selectedDeps = { ...deps, poGateAuthority: () => ({ ok: true, value: authority }),
++      ...(scenario === "missing-head" ? { gitCandidate: () => ({ ok: false }) } : {}) };
++    if (scenario.endsWith("before-commit")) {
++      let observations = 0;
++      selectedDeps.gitCandidate = () => {
++        observations += 1;
++        if (observations === 2 && scenario === "source-drift-before-commit") writeFileSync(join(root, specPath), spec + "Concurrent edit.\n");
++        return { ok: true, ...candidate, ...(observations === 2 && scenario === "candidate-drift-before-commit" ? { commit: "f".repeat(40) } : {}) };
++      };
++    }
++    if (scenario === "missing-source") rmSync(join(root, specPath));
++    if (scenario === "drifted-source") writeFileSync(join(root, specPath), spec + "Unexpected edit.\n");
++    const before = readFileSync(statePath(root), "utf8");
++    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "mini"], selectedDeps));
++    assert.equal(attempt.result, scenario === "authored" ? 0 : 2, `${scenario}: ${attempt.lines.join(" ")}`);
++    if (scenario !== "authored") assert.equal(readFileSync(statePath(root), "utf8"), before, scenario);
++    else assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).planSubmission.specSha256, authority.specSha256);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
+ // Scenario 1: submit-plan is refused when the plan path resolves inside the
+ // staging directory (both plan and spec staged -- the exact live shape).
+ {
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+index 0da485542..976577e1e 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md
+@@ -112,6 +112,11 @@ afterwards.
+ - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
+   acceptance criteria and implementation detail authored before binding.
+ 
++Use the accepted criterion table header `| # | Criterion | Evidence |` and a
++row such as `| AC-1 | WHEN the project is submitted, the system SHALL retain
++its reviewed sources. | tests/submission.test.mjs |`. An `AC-01` identifier
++has a leading zero and is not accepted by the criterion parser.
++
+ **These are drafts, not the finished design.** They are provenance plus
+ scaffolding, not the captured material — the agent is expected to author them
+ into a real PRD and Spec against the quality bar in `kickoff-design.md`

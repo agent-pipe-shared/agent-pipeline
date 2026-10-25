@@ -1,0 +1,90 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K1D-E-ORPHAN-MEMBER-STEP","candidateCommit":"e179818c66160487432c6ef85a6f9b99aba9aec3","candidateTree":"f1a0ddb7066da6ceceac60f7a2a40b94c44a9310","runner":"claude","role":"pipeline-core:goldfish-deep","agentType":"goldfish-deep","model":"claude-sonnet-5-5","effort":"xhigh","rulesetSha":"751aadf19d274e266657d573960cf30555d5c3d3f6ca10c6661955adf4c7848f","allowedPaths":["plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs","plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K1D-E-ORPHAN-MEMBER-STEP","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k1d-e-orphan-member-step-check","path":"plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs","dependencies":["plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs","plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K1D-E-ORPHAN-MEMBER-STEP","candidateCommit":"e179818c66160487432c6ef85a6f9b99aba9aec3","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K1D-E-ORPHAN-MEMBER-STEP: give the ordinary orphan release the RF2A registry member step (D73 E)
+
+### 1. Goal
+
+Read section 'K1D measurement 2' of the plan first. The binding case 'ordinary orphan release archives authenticated bytes before a new session binds' is red: after `applyOrphanSessionCleanupBindingRelease` (`lib/onboarding-continuity.mjs` ~3881) the next bound start fails with `onboarding-continuity:namespace-drift`, because the apply deletes the private binding (~3988) without the registry member step. Measured cause, do not re-derive it. Step 1 (measure before any edit): the apply runs under the State lock (`stateLockHeld:true` from `scripts/pipeline-state.mjs` ~12396, or its own lock at ~4019). RF2A's `releaseBindingInBoundary` (`lib/session-cleanup-lost-binding.mjs` ~182) takes the registry boundary first and the State lock inside it (via `releaseOnboardingSessionCleanupInternal` ~4084). Read `withSessionAuthorityBoundary` and `acquireLock` and record in the report whether each one waits or refuses at once when the other side holds its lock. Step 2: create `lib/session-authority-orphan-member-step.mjs` exporting one function that performs, inside the boundary token it is given or opens, exactly RF2A's member sequence: skip on an absent registry (D44), `releaseLostSessionAuthorityMember({boundary,producerId:'onboarding-continuity',target})`, then the caller's binding-delete callback, then `healSessionAuthorityDrift` with the same strict read-back rule (`absent` accepted only when it was absent before). It must not import `lib/onboarding-continuity.mjs`. Step 3: in the apply, run the binding delete (~3983-3990) through that function, after the descriptor retirement (~3978; `releaseLostSessionAuthorityMember` refuses while the descriptor is active). Every new refusal carries a runnable repair (D74), modelled on `lib/session-cleanup-lost-binding.mjs` ~196. Keep `lib/onboarding-continuity.mjs` at or below 12295 lines by compacting lines you touch. Do not change `releaseBindingInBoundary` in this slice.
+
+### 2. Context files
+
+- `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` — section 'K1D measurement 2'.
+- `plugins/pipeline-core/lib/onboarding-continuity.mjs` — ~3881-4026 (the apply), ~4054-4130 (the internal release and its lock), the imports at the top.
+- `plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs` — ~175-223, the RF2A sequence to mirror (read only).
+- `plugins/pipeline-core/lib/session-authority-registry.mjs` — read only: `releaseLostSessionAuthorityMember` ~414, `healSessionAuthorityDrift` ~362, `withSessionAuthorityBoundary`.
+- `plugins/pipeline-core/scripts/pipeline-state.mjs` — read only, ~12354-12400 (discard-feature applies under the held State lock).
+- `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` — read only, the E case ~3079.
+
+### 3. DoD checks
+
+- Acceptance criteria: PO decision D73 E and the Elephant decision in `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` section 'K1D measurement 2'; AC-203.
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node scratch/run-quiet.mjs k1d-e-binding plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` (66/67: only the B red 'neutral coordinator-close release is private, byte-stable, and replayable' left)
+  - `node scratch/run-quiet.mjs k1d-e-lost plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs` (stays 7/7)
+  - `node scratch/run-quiet.mjs k1d-e-discard plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs` (measure its count before your edit; it must not drop)
+  - `node scratch/run-quiet.mjs k1d-e-recovery plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs` (stays 39/39)
+  - `node scratch/run-quiet.mjs k1d-e-obc plugins/pipeline-core/lib/onboarding-continuity.test.mjs` (stays 306/306)
+  - `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` (only the two known violations guard-git.test.mjs and git-cmd.test.mjs)
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`).
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/lib/onboarding-continuity.mjs`, `plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs`, `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- `lib/session-authority-registry.mjs`, `lib/session-cleanup-lost-binding.mjs` and `scripts/pipeline-state.mjs` are read only.
+- `lib/onboarding-continuity.mjs` at or below 12295 lines; never raise an accepted count in `architecture/boundary-policy.json`.
+- The new module must not import `lib/onboarding-continuity.mjs` (no import cycle).
+- Do not change any existing assertion of the binding, lost-binding, discard-feature, recovery or onboarding-continuity suites.
+- Never leave a test run in the background when you end your turn; run full files only in the foreground through `scratch/run-quiet.mjs`, one at a time, with the Bash tool timeout set to 600000 ms.
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+- Step 1 shows that either lock WAITS while the other side holds its lock, so the inverted order under discard-feature could deadlock: stop before Step 2 and report both lock behaviours with file and line.
+- `releaseLostSessionAuthorityMember` refuses at the placement in Step 3: stop and report the exact refusal code and reason.
+- The architecture check refuses the new module: stop and name the exact policy entry it needs.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020195107.231d1a0` · content identity `751aadf19d274e266657d573960cf30555d5c3d3f6ca10c6661955adf4c7848f`.
+- Model/effort: `claude-sonnet-5-5` / xhigh (goldfish-deep; agent definition alias `sonnet`).
+- Tier: goldfish-deep. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K1D-E-ORPHAN-MEMBER-STEP
+- Write scope: plugins/pipeline-core/lib/onboarding-continuity.mjs, plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs, plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs
+- **Tool budget (TB-09, hard cap):** ≤45 tool uses (min(tier cap 45, maxTurns 80 - 15)). 80 % checkpoint at about call 36: stop editing and end the turn with an interim report naming what remains.
+- Model justification: registry authority sequence on the shared orphan release under a held State lock, with a lock-order measurement before the wiring (D65 security read).
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

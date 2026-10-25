@@ -1,0 +1,29 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k66/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; replace `<name>` with `k66`). Then read `scratch/briefing-k57.md`: THIS briefing is the same task as K57 (take counted results and record them in an evidence file) with the changes below; everything not changed here (method, runners, table format, forbidden list, stop conditions, commit rules) is taken from K57 with `k57`→`k66`, `K57-COUNTED-RUNS`→`K66-COUNTED-RUNS-2`. Shell grammar and identity rules as in K57 (identity values exactly as read, no hyphen substitution).
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K66-COUNTED-RUNS-2/2026-10-23 · Role Goldfish`
+
+## Briefing K66-COUNTED-RUNS-2: counted results for ten more suites that readers found built but not counted
+
+### 1. Goal
+Run each suite below ONCE, in the foreground, one after the other (never two at the same time), on the clone's HEAD, and record verdict and counts in a new evidence file `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-b.md` (same format as K57's file `pin-counted-results-2026-10-23.md`, which another dispatch writes in parallel: do NOT touch or read it; header: counted on the clone's HEAD sha, one file after the other, private TMPDIR outside every repository). A red suite is recorded red with its first failing case name; retry it ONCE alone to rule out load, never fix it. If a path does not exist, find the real one with `find` (one directory at a time) and say so; if no such suite exists, record "no suite found".
+
+Suites (from the repository root; names are given by test title when the path is unknown):
+1. `plugins/pipeline-core/lib/pins/configure-verify-names-the-unmet-approval-condition.test.mjs` (AC-140)
+2. the PARWORK pins of item `parallel-work-in-one-checkout-is-unsafe` (`find scratch/clones/k66/plugins/pipeline-core/lib/pins -name "parallel-work*"`; cases PARWORK-M4a, M5a, M6a-f)
+3. `plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs`
+4. `plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs`
+5. `plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs`
+6. the session continuity binding suite behind cluster K1D: find it with `find scratch/clones/k66/plugins/pipeline-core/lib -name "*binding*test*"` and `-name "*session-cleanup*test*"`; run the one whose cases include 'neutral coordinator-close release is private, byte-stable, and replayable' (locate with `rg -n "byte-stable" <file>` per candidate); report that case's verdict by name, and the file's counts (the last known state was 66/67 with that case red)
+7. `plugins/pipeline-core/lib/project-uninstall.test.mjs` (cases UC02C018 to UC02C020)
+8. `plugins/pipeline-core/scripts/rebind-approval.test.mjs`, then `plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs` (the latter was seen red with SDC-AUTHORITY-UNAVAILABLE on an agent host: record the exact code if it is red again)
+9. the dispatch-authorship verify suite and the codex critic packet host suite named in cluster K6 (`find scratch/clones/k66/plugins/pipeline-core -name "*dispatch-authorship*test*"`, `-name "*codex-critic-packet*test*"`, one directory level at a time starting at `lib`, `scripts`, `hooks`)
+10. `plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs` and `plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs` (K11 S1/S3)
+
+### 2. Context files
+`scratch/briefing-k57.md`, `docs/operating-tools.md`, `scripts/run-parallel.mjs` and `scripts/run-quiet.mjs` (headers).
+
+### 3. DoD checks, forbidden, stop conditions
+As in K57. Trailers: exactly `AI-Assisted: true` and `Dispatch: K66-COUNTED-RUNS-2 (goldfish)`. Tool budget: base cap 60, closing allowance +5 (a suite that hangs past the Bash timeout is recorded TIMEOUT).
+
+### 4. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k66`. TASK_ID: K66-COUNTED-RUNS-2. Status wording per the common briefing (never "done").

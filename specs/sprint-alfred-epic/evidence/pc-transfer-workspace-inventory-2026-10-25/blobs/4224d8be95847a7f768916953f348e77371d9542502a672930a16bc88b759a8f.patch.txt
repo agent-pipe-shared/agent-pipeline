@@ -1,0 +1,137 @@
+diff --git a/plugins/pipeline-core/lib/agy-session-authority.test.mjs b/plugins/pipeline-core/lib/agy-session-authority.test.mjs
+index ae802b8fe..a70ff63ff 100644
+--- a/plugins/pipeline-core/lib/agy-session-authority.test.mjs
++++ b/plugins/pipeline-core/lib/agy-session-authority.test.mjs
+@@ -6,6 +6,12 @@ import { buildSignatureIntent, consentSubject, digest, validateConsentRecord, va
+ import { canonical, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+ import { AGY_FAMILY_SUBJECT_SCHEMA, createAgyFamilyConsentAuthority, familyConsentAssignment, validateFamilyConsentSubject } from "./agy-session-authority.mjs";
+ import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
++import { execFileSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
++import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
++import { createControlledMethodRuntimeFixture, inspectSourceOwnedRequesterInvocation } from "./session-requester-bridge.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ 
+ // Reusable by the owned CLI suite: ephemeral signatures are synthetic test data.
+ export function signedFamilyConsentFixture({ repository = { primaryRoot: "/repo", commonDir: "/repo/.git" }, session: boundSession = session, now = 1000, nativeRole = "pipeline-core:goldfish-implementor" } = {}) {
+@@ -36,24 +42,48 @@ function sealedInvocation(f, model, version, invocationId) {
+   return { invocation: i, bindings: { installationBindingSha256: "a".repeat(64), accountBindingSha256: "b".repeat(64), hostProcessBindingSha256: "c".repeat(64) }, provenanceSha256: "d".repeat(64) };
+ }
+ 
+-test("v2 actual signed family and consent allow two successors through one opaque admission", async () => {
+-  const f = signedFamilyConsentFixture(), invocations = new Map([1, 2].map(n => ["invocation-" + n, sealedInvocation(f, "synthetic-gemini-" + n, n, "invocation-" + n)]));
++// Consent admission (`admit`) is a session-authority member operation: it inspects the signed-descriptor custody of a REAL
++// repository, reads the stored consent file from the common dir, and reserves its member in the registry, all from inside a
++// Source-owned bound requester context (K1c, AC-203). The two admission cases therefore run in a real temporary checkout whose
++// session descriptor comes from the bridge's own controlled fixture, the same convention as lib/agy-session-dispatch.test.mjs
++// (stale fixture, E29 (1) / AC-212 ALF-B10-AGY; K78). ORDER MATTERS: descriptor and stored consent exist BEFORE the registry initializes.
++async function withBoundRealRepository(nativeRole, body) {
++  const root = mkdtempSync(join(nativeContractFixtureParent(), "agy-session-authority-"));
++  try {
++    for (const args of [["init", "-q"], ["config", "user.name", "Synthetic"], ["config", "user.email", "synthetic@example.invalid"], ["config", "commit.gpgsign", "false"]]) execFileSync("git", args, { cwd: root });
++    writeFileSync(join(root, "input.txt"), "input\n");
++    execFileSync("git", ["add", "input.txt"], { cwd: root }); execFileSync("git", ["commit", "-qm", "synthetic fixture"], { cwd: root });
++    const custody = inspectSignedDescriptorCustodyRepository(root);
++    mkdirSync(join(custody.commonDir, "agent-pipeline"), { mode: 0o700, recursive: true });
++    const runtime = createControlledMethodRuntimeFixture({ repository: custody, fixtureRoot: join(custody.commonDir, "agent-pipeline/controlled-method-fixtures/agy-authority-owner"), sessionId: session.id });
++    const carried = inspectSourceOwnedRequesterInvocation({ repository: custody, currentInvocationHandle: runtime.currentInvocationHandle, runtimePort: runtime.runtimePort });
++    const repository = { primaryRoot: custody.primaryRoot, commonDir: custody.commonDir };
++    const f = signedFamilyConsentFixture({ repository, session: { id: session.id, descriptorSha256: carried.currentRequester.descriptorSha256 }, nativeRole });
++    mkdirSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent"), { recursive: true, mode: 0o700 });
++    writeFileSync(join(repository.commonDir, "agent-pipeline/run/agy-session-consent", session.id + ".json"), JSON.stringify(f.record), { mode: 0o600 });
++    prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
++    return await body({ f, root, runtime });
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++test("v2 actual signed family and consent allow two successors through one opaque admission", async () => withBoundRealRepository("pipeline-core:goldfish-implementor", async ({ f, root, runtime }) => {
++  const invocations = new Map([1, 2].map(n => ["invocation-" + n, sealedInvocation(f, "synthetic-gemini-" + n, n, "invocation-" + n)]));
+   let stored = f.record, revoked = false;
+   const host = createAgyFamilyConsentAuthority({ readFamilyAuthority: () => f.familyAuthorityInputs, readInvocation: ({ invocationId }) => invocations.get(invocationId), readLive: () => ({ ok: true, session: f.session, descriptor: { repo: f.repository } }), readStored: () => ({ record: stored, revoked }), readMode: () => ({ mode: "signature" }), readPolicy: () => f.policy });
+-  const admitted = await host.admit({ root: "/repo", sessionId: f.session.id, descriptorSha256: f.session.descriptorSha256, nowEpochMs: f.now }); assert.equal(admitted.ok, true, admitted.code);
++  const admitted = await runtime.run(() => host.admit({ root, sessionId: f.session.id, descriptorSha256: f.session.descriptorSha256, nowEpochMs: f.now })); assert.equal(admitted.ok, true, admitted.code);
+   const request = n => ({ invocationId: "invocation-" + n, requestedModel: "synthetic-gemini-" + n, requestedEffort: "high", role: f.subject.roles[0], scope: f.subject.scope, requiredPaths: ["src/x.mjs"], fallbackPolicy: "none", nowEpochMs: f.now });
+   for (const n of [1, 2]) { const bound = await host.bind(admitted.handle, request(n)); assert.equal(bound.ok, true, bound.code); assert.equal(bound.projection.consentRecordSha256, admitted.consentRecordSha256); assert.equal(Object.hasOwn(bound.projection, "modelId"), false); assert.equal((await host.bind(structuredClone(admitted.handle), request(n))).ok, false); assert.equal((await host.bind(bound.projection, request(n))).ok, false); }
+   for (const change of [{ requestedModel: "wrong" }, { requestedEffort: "medium" }, { role: "frontier" }, { requiredPaths: ["secrets/key"] }, { scope: {} }, { scope: { ...f.subject.scope, dispatchId: "other" } }, { fallbackPolicy: "automatic" }, { nowEpochMs: f.subject.expiresAtMs }]) assert.equal((await host.bind(admitted.handle, { ...request(1), ...change })).ok, false, JSON.stringify(change));
+   for (const [key, value] of [["taskRoute", "duty.other"], ["familyId", "other"], ["authoritySha256", "f".repeat(64)], ["sessionId", "other-session"], ["adapterContractSha256", "f".repeat(64)]]) { const original = invocations.get("invocation-1"), changed = structuredClone(original); changed.invocation[key] = value; const { receiptSha256, ...body } = changed.invocation; changed.invocation.receiptSha256 = digest(body); invocations.set("invocation-1", changed); assert.equal((await host.bind(admitted.handle, request(1))).ok, false, key); invocations.set("invocation-1", original); }
+   stored = { ...f.record, extra: true }; assert.equal((await host.bind(admitted.handle, request(1))).ok, false); stored = f.record; revoked = true; assert.equal((await host.bind(admitted.handle, request(1))).code, "AGY-CONSENT-REVOKED-OR-MISSING");
+-});
++}));
+ 
+ test("v2 native permissions bind only their verified implementation task and functional role", async () => {
+   const nativeRoles = ["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"];
+-  for (const nativeRole of nativeRoles) {
+-    const f = signedFamilyConsentFixture({ nativeRole }), readback = sealedInvocation(f, "synthetic-gemini-1", 1, "native-invocation");
++  for (const nativeRole of nativeRoles) await withBoundRealRepository(nativeRole, async ({ f, root, runtime }) => {
++    const readback =sealedInvocation(f, "synthetic-gemini-1", 1, "native-invocation");
+     const host = createAgyFamilyConsentAuthority({ readFamilyAuthority: () => f.familyAuthorityInputs, readInvocation: () => readback, readLive: () => ({ ok: true, session: f.session, descriptor: { repo: f.repository } }), readStored: () => ({ record: f.record }), readMode: () => ({ mode: "signature" }), readPolicy: () => f.policy });
+-    const admitted = await host.admit({ root: "/repo", sessionId: f.session.id, descriptorSha256: f.session.descriptorSha256, nowEpochMs: f.now });
++    const admitted = await runtime.run(() => host.admit({ root, sessionId: f.session.id, descriptorSha256: f.session.descriptorSha256, nowEpochMs: f.now }));
+     assert.equal(admitted.ok, true, admitted.code);
+     const request = { invocationId: "native-invocation", requestedModel: "synthetic-gemini-1", requestedEffort: "high", role: nativeRole, scope: f.subject.scope, requiredPaths: ["src/x.mjs"], fallbackPolicy: "none", nowEpochMs: f.now };
+     const bound = await host.bind(admitted.handle, request);
+@@ -71,7 +101,7 @@ test("v2 native permissions bind only their verified implementation task and fun
+       assert.equal((await host.bind(admitted.handle, request)).ok, false, JSON.stringify(change));
+       readback.invocation = original;
+     }
+-  }
++  });
+ });
+ 
+ test("v2 exact schemas, assignment floor digest and duplicated fields reject tamper", () => {
+@@ -91,7 +121,9 @@ test("v2 exact schemas, assignment floor digest and duplicated fields reject tam
+ });
+ 
+ const session = { id: "session-1", descriptorSha256: "a".repeat(64) };
+-const expiry = Date.now() + 10000;
++// The module-level expiry is read by the later wall-clock cases; the admission cases above (real checkout, registry) take several
++// seconds each, so a 10 s lifetime lapsed before those cases ran (K78). The lifetime stays bounded.
++const expiry = Date.now() + 600000;
+ const subject = consentSubject({ repository: { primaryRoot: "/repo", commonDir: "/repo/.git" }, session, model: "gemini-3.8-flash-high", roles: ["pipeline-core:goldfish-implementor"], allowedPaths: ["src/x.mjs"], scope: "implementation", fallbackPolicy: "none", expiresAtMs: expiry, decisionNonce: "decision-1-nonce" });
+ const intent = buildSignatureIntent({ featureId: "alfred", planSha256: "b".repeat(64), specSha256: "c".repeat(64), candidate: { commit: "d".repeat(40), tree: "e".repeat(40) }, subjectSha256: digest(subject) });
+ 
+diff --git a/plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs b/plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs
+index 89cd14f6d..20ecdee1e 100644
+--- a/plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-antigravity-live-host.test.mjs
+@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { execFileSync } from "node:child_process";
+-import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ 
+ import { LIVE_REQUEST_SCHEMA, LIVE_REQUEST_SEAL, parseArgs, runGoldfishAntigravityLiveHost } from "./goldfish-antigravity-live-host.mjs";
+ import { verifyAgySessionResultReadback } from "../lib/agy-session-dispatch.mjs";
+-import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
++import { inspectSignedDescriptorCustodyRepository, loadSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
++import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
++import { nativeContractFixtureParent, prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { runGoldfishAntigravityLiveHost as runLiveHostUnbound } from "./goldfish-antigravity-live-host.mjs";
+ import { buildSignatureIntent, consentSubject, digest } from "../lib/agy-session-authority.mjs";
+ import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+ import { runConsentCommand } from "./agy-session-consent.mjs";
+@@ -104,11 +106,19 @@ test("completed-undelivered producer refuses a writer receipt for another path",
+ });
+ 
+ test("real temporary session admits two distinct bounded fixture tasks and reuses stored consent", async () => {
+-  const root = mkdtempSync(join(tmpdir(), "agy-live-e2e-")); writeFileSync(join(root, "input.txt"), "input\n"); execFileSync("git", ["init", "-q"], { cwd: root }); execFileSync("git", ["config", "user.email", "test@example.invalid"], { cwd: root }); execFileSync("git", ["config", "user.name", "E2E"], { cwd: root }); execFileSync("git", ["add", "input.txt"], { cwd: root }); execFileSync("git", ["commit", "-q", "-m", "one"], { cwd: root }); const first = { commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), tree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim() };
++  const root = mkdtempSync(join(nativeContractFixtureParent(), "agy-live-e2e-")); writeFileSync(join(root, "input.txt"), "input\n"); execFileSync("git", ["init", "-q"], { cwd: root }); execFileSync("git", ["config", "user.email", "test@example.invalid"], { cwd: root }); execFileSync("git", ["config", "user.name", "E2E"], { cwd: root }); execFileSync("git", ["add", "input.txt"], { cwd: root }); execFileSync("git", ["commit", "-q", "-m", "one"], { cwd: root }); const first = { commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), tree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim() };
+   writeFileSync(join(root, "second.txt"), "second\n"); execFileSync("git", ["add", "second.txt"], { cwd: root }); execFileSync("git", ["commit", "-q", "-m", "two"], { cwd: root }); const second = { commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), tree: execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim() };
+   mkdirSync(join(root, "evidence"));
+-  const started = startSessionDescriptor(root, { sessionId: "live-e2e" }); const session = { id: started.sessionId, descriptorSha256: started.descriptorSha256 }; const expiresAtMs = Date.now() + 60_000; const subject = consentSubject({ repository: { primaryRoot: started.repo.primaryRoot, commonDir: started.repo.commonDir }, session, model: "gemini-3.8-flash-high", roles: ["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"], allowedPaths: ["input.txt", "second.txt"], scope: "implementation", fallbackPolicy: "none", expiresAtMs, decisionNonce: "live-decision-nonce" }); const intent = buildSignatureIntent({ featureId: "live-e2e", planSha256: "a".repeat(64), specSha256: "b".repeat(64), candidate: first, subjectSha256: digest(subject) }); const { publicKey, privateKey } = generateKeyPairSync("ed25519"); const publicKeyText = publicKey.export({ type: "spki", format: "pem" }); const record = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: "live-decision-nonce", mode: "signature", session, provider: "google", model: "gemini-3.8-flash-high", roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: digest(subject), intent, proof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "live-key", publicKey: publicKeyText, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") }, approvedAtMs: Date.now(), expiresAtMs };
++  // The dispatch lifetime is admitted only for a Source-owned bound requester (K1c, AC-203): create the descriptor and its
++  // bound requester through the bridge's own controlled fixture and run every host call inside that requester's context.
++  const repository = inspectSignedDescriptorCustodyRepository(root);
++  const runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline", "controlled-method-fixtures", "live-e2e"), sessionId: "live-e2e" });
++  const runGoldfishAntigravityLiveHost = (...callArguments) => runtime.run(() => runLiveHostUnbound(...callArguments));
++  const started = loadSessionDescriptor(root, "live-e2e"); const session = { id: started.sessionId, descriptorSha256: started.descriptorSha256 }; const expiresAtMs = Date.now() + 600_000; const subject = consentSubject({ repository: { primaryRoot: started.repo.primaryRoot, commonDir: started.repo.commonDir }, session, model: "gemini-3.8-flash-high", roles: ["pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"], allowedPaths: ["input.txt", "second.txt"], scope: "implementation", fallbackPolicy: "none", expiresAtMs, decisionNonce: "live-decision-nonce" }); const intent = buildSignatureIntent({ featureId: "live-e2e", planSha256: "a".repeat(64), specSha256: "b".repeat(64), candidate: first, subjectSha256: digest(subject) }); const { publicKey, privateKey } = generateKeyPairSync("ed25519"); const publicKeyText = publicKey.export({ type: "spki", format: "pem" }); const record = { schema: "pipeline.agy-session-consent.v1", status: "approved", decisionId: "live-decision-nonce", mode: "signature", session, provider: "google", model: "gemini-3.8-flash-high", roles: subject.roles, allowedPaths: subject.allowedPaths, subject, subjectSha256: digest(subject), intent, proof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "live-key", publicKey: publicKeyText, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") }, approvedAtMs: Date.now(), expiresAtMs };
+   const recordFile = join(root, "record.json"); writeFileSync(recordFile, JSON.stringify(record)); const policy = { ok: true, trustAnchors: [{ keyReference: "live-key", publicKeySha256: createHash("sha256").update(publicKeyText).digest("hex") }], trustAnchor: null }; await runConsentCommand(["record", "--root", root, "--session-id", started.sessionId, "--descriptor-sha256", started.descriptorSha256, "--record", recordFile], { policy });
++  // ORDER MATTERS (as in lib/agy-session-dispatch.test.mjs): the descriptor and the stored consent exist BEFORE the registry initializes; a consent written
++  // afterwards is an unregistered authority fact (AGY-AUTHORITY-UNREGISTERED).
++  prepareSessionAuthorityRegistryFixture({ root: repository.primaryRoot, excludeFromStatus: true });
+   const agy = join(root, "agy-mock"); writeFileSync(agy, "#!/usr/bin/env node\nif (process.argv[process.argv.indexOf('--output-format') + 1] !== 'stream-json') process.exit(9); console.log(JSON.stringify({event:'init',conversation_id:'mock-conversation',init:{model:'gemini-3.8-flash-high'}})); console.log(JSON.stringify({event:'step_update',step_update:{text_delta:'private tool data'}})); console.log(JSON.stringify({event:'result',result:{conversation_id:'mock-conversation',status:'SUCCESS',response:'ok'}}));\n"); chmodSync(agy, 0o755); mkdirSync(join(root, "results")); const packet = (candidate, dispatchId, path, role = "pipeline-core:goldfish-implementor") => ({ schema: "pipeline.role-dispatch-request.v1", dispatchId, transport: "antigravity", role, prompt: "## Briefing\n### 1. Goal\nImplement bounded task.\n### 2. Context files\n- input.txt\n### 3. DoD checks\n- bounded\n### 4. Forbidden\n- unrelated\n### 5. Stop conditions\n- missing\n### 6. Dispatch-Metadata\nModel: gemini-3.8-flash-high; effort high; Ruleset-SHA: local-test.\n- **Tool budget (hard cap, first-class field):** <=40 tool uses.", candidate, requiredPaths: [path], requiredPathSha256: { [path]: createHash("sha256").update(readFileSync(join(root, path))).digest("hex") }, resultDestination: { kind: "return" } });
+   const base = { schema: LIVE_REQUEST_SCHEMA, seal: LIVE_REQUEST_SEAL, root, resultRoot: root, sessionId: started.sessionId, descriptorSha256: started.descriptorSha256, consent: "stored", requestedModel: "gemini-3.8-flash-high", effort: "high", scope: "implementation", timeoutMs: 10_000, inputSha256: createHash("sha256").update("implementation").digest("hex"), routePolicySha256: "c".repeat(64) };
+   const one = await runGoldfishAntigravityLiveHost({ ...base, resultPath: "results/one.json", packet: packet(second, "one", "input.txt") }, { agyPath: agy, policy, nowEpochMs: Date.now() });

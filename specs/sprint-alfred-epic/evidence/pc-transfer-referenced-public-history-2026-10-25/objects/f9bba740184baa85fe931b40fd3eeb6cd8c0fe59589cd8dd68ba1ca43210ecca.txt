@@ -1,0 +1,52 @@
+command: node --test plugins/pipeline-core/scripts/close-coordinator.test.mjs
+label: g21-close-package-final
+exitCode: 0
+head: a0feac3a4276f06569ec9585ac96ee58877ded2b
+tree: 087b2b96d42fc8854dc78e213397bc672a29b1db
+dirty: true
+--- stdout ---
+✔ active checkpoint preserves activeFeature (6.766174ms)
+✔ completion separates closure completion from workflow terminality (1260.637068ms)
+✔ ordered phase 0 (4.690642ms)
+✔ ordered phase 1 (1.414167ms)
+✔ ordered phase 2 (2.21103ms)
+✔ ordered phase 3 (2.19501ms)
+✔ candidate required (3.102294ms)
+✔ candidate replacement denied (1.585242ms)
+✔ publication authorization required (1.670825ms)
+✔ publication exact candidate (3.418895ms)
+✔ cleanup uncertainty recoverable (2.795301ms)
+✔ local terminal (1.70544ms)
+✔ release/promotion descendants require independent authorization (2.946368ms)
+✔ delivery requires exact publication and readback receipts (3.028854ms)
+✔ authority and active-feature identities are closed (0.876666ms)
+✔ architecture impact is required at feature-close preparation and remains durable (1.087385ms)
+✔ published close-coordinator schema tracks the executable phase contract (0.694669ms)
+✔ durable replay (8.970082ms)
+✔ publication-close directory durability is typed only for native Windows limitations (0.767098ms)
+✔ CLI rejects missing activate (47.22497ms)
+✔ CLI rejects wrong digest (53.979071ms)
+✔ CLI rejects unknown phase (49.421262ms)
+✔ replay/CAS guard 0 (0.525158ms)
+✔ replay/CAS guard 1 (0.301904ms)
+✔ replay/CAS guard 2 (0.300701ms)
+✔ replay/CAS guard 3 (0.211983ms)
+✔ replay/CAS guard 4 (0.20528ms)
+✔ replay/CAS guard 5 (0.197195ms)
+✔ replay/CAS guard 6 (0.213936ms)
+✔ replay/CAS guard 7 (0.193678ms)
+✔ replay/CAS guard 8 (0.191053ms)
+✔ replay/CAS guard 9 (0.268931ms)
+✔ process: registered package digest drift blocks close preparation before any transition (4490.256094ms)
+✔ process: local close is read-only planned, replay-safe, candidate-bound and never pushes (19366.394408ms)
+✔ process: authorization, failed publication, exact readback and cleanup stay distinct (19033.732633ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44521.52967
+
+--- stderr ---

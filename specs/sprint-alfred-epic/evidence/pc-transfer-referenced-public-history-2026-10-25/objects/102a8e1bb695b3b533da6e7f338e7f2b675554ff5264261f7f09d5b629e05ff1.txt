@@ -1,0 +1,150 @@
+✔ MFHS001 activation marker plus generation index qualify a fresh invocation; failed launch retains its watermark (38790.913439ms)
+✔ MFHS002 trusted asynchronous driver success is awaited while synchronous success remains synchronous (60196.797154ms)
+✔ MFHS003 S4 private driver context carries the original sealed invocation and admitted immutable request once (75051.666857ms)
+✔ MFHS004 S4 trusted driver can complete a correlated synthetic profile-main operation from the original handle (65683.730907ms)
+✔ MFHS005 profile-main boundary refuses duty routes and existing-main switches before configured operations (131586.67382ms)
+✔ MFHS006 main launch revalidates the sealed candidate after asynchronous config application (68072.419744ms)
+✔ MFHS007 main launch revalidates signed authority after asynchronous config application (69374.132895ms)
+✔ MFHS008 async driver rejection, malformed results, and unknown dispositions fail closed while unqualified is typed (134242.606745ms)
+✔ MFHS009 ordinary repository candidates reuse signed family authority while receipts and replays retain exact candidate bytes (81066.115884ms)
+✔ MFHS010 current-candidate callback failures and non-closed or invalid OID values refuse before receipt admission (65509.87046ms)
+✔ MFHS011 candidate drift between preparation capture and locked CAS refuses without sealing (35762.403669ms)
+✔ MFHS012 candidate drift at the final prelaunch check prevents the native driver call (50947.827186ms)
+✔ MFHS013 S2 opaque discovery handle is consumed by the host; ordinary JSON and foreign bindings are refused (81159.995329ms)
+✔ MFHS014 freshness accepts a preparation younger than sixty seconds and rejects one older than sixty (51235.078435ms)
+✔ MFHS015 writer contention performs exactly two bounded CAS retries and never launches (36194.78596ms)
+✔ MFHS016 same-key replay returns original held bytes without resolving a newer selection (50925.124285ms)
+✔ MFHS017 expired preparation and a disappeared newer head refuse without lowering the watermark (66261.994424ms)
+✔ MFHS018 policy supersession during locked CAS and source freshness cancel the unlaunched attempt (36304.785288ms)
+✔ MFHS019 pin and unpin decisions changing during CAS cancel both raced selections (51181.816139ms)
+✔ MFHS020 freshly signed authority successor CAS preserves watermarks and held receipt bytes (98043.353601ms)
+✔ MFHS021 unsigned, wrong-predecessor, raced and partial successor transitions fail closed (85122.74521ms)
+✔ MFHS022 a prepare racing transition wins one generation CAS before successor transition retries (37369.832684ms)
+⚠ MFHS023 real competing transition and prepare serialize on the stored generation (36917.759912ms) # TODO
+✔ MFHS024 missing or corrupt private current state preserves active-family refusal and never falls back (25115.620113ms)
+✔ MFHS025 symlink roots, hard-linked receipts, and malformed private JSON fail closed (37102.321455ms)
+✔ MFHS026 replaced receipt bytes are never repaired or overwritten; tampering blocks offline readback (37155.45406ms)
+✔ MFHS027 schemas are closed and bind unique invocation identity, assignment, candidate, generation and watermarks (1.889771ms)
+⚠ MFHS028 real process contention serializes same-key replay and different invocation CAS generations (29050.319977ms) # TODO
+✔ MFHS029 a native admission without an admitNativeRequest port refuses synchronously and leaves the registry usable (51738.776292ms)
+✔ MFHS030 D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable (69677.711126ms)
+✔ MFHS031 D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released (70688.839574ms)
+✔ MFHS032 D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock (36227.976823ms)
+ℹ Error: Test "MFHS023 real competing transition and prepare serialize on the stored generation" at plugins/pipeline-core/lib/test-case-completion.mjs:219:5 generated asynchronous activity after the test ended. This activity created the error "Error: successor transition process failed (1): file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21
+export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                          ^
+
+Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+    at authorityOwnerFailure (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21:59)
+    at reconcile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:198:503)
+    at Object.reconcile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:201:133)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:422:3264
+    at Array.map (<anonymous>)
+    at stateRead (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:422:160)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:445:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:444:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:445:475)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:202:479 {
+  code: 'SDC-AUTHORITY-UNAVAILABLE',
+  reason: 'model-family-host:unowned-retained-member',
+  repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/k90/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root <repo-root>/scratch/clones/k90/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-4kUXlW: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+}
+
+Node.js v24.19.0
+" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+ℹ tests 32
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 1863843.338463
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+⚠ MFHS023 real competing transition and prepare serialize on the stored generation (36917.759912ms) # TODO
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/k90/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-4kUXlW/.git/agent-pipeline/model-family-host/authority-lifetimes/fed98b72cb1dda1a888ffda032e8e3db574119057dd1460048f198f5dad95464.json'
+      at lstatSync (node:fs:1771:25)
+      at readAuthoritySourceFile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:91:18)
+      at observe (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:192:274)
+      at observed (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:227:87)
+      at Array.map (<anonymous>)
+      at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:228:170
+      at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:246:855
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+      at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:246:761
+      at withCustodyTopologyScope (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/worktree-lifecycle.mjs:2155:16) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/k90/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-4kUXlW/.git/agent-pipeline/model-family-host/authority-lifetimes/fed98b72cb1dda1a888ffda032e8e3db574119057dd1460048f198f5dad95464.json'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+⚠ MFHS028 real process contention serializes same-key replay and different invocation CAS generations (29050.319977ms) # TODO
+  Error: concurrent writer failed (1): file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21
+  export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                            ^
+  
+  Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+      at authorityOwnerFailure (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21:59)
+      at reconcile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:198:503)
+      at Object.reconcile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:201:133)
+      at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:422:3264
+      at Array.map (<anonymous>)
+      at stateRead (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:422:160)
+      at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:445:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:444:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:445:475)
+      at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:202:479 {
+    code: 'SDC-AUTHORITY-UNAVAILABLE',
+    reason: 'model-family-host:unowned-retained-member',
+    repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/k90/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root <repo-root>/scratch/clones/k90/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-nZMm1y: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+  }
+  
+  Node.js v24.19.0
+  
+      at ChildProcess.<anonymous> (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/model-family-host-store.test.mjs:1036:16)
+      at ChildProcess.emit (node:events:509:28)
+      at maybeClose (node:internal/child_process:1141:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+MFHS023 real competing transition and prepare serialize on the stored generation: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/k90/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-4kUXlW/.git/agent-pipeline/model-family-host/authority-lifetimes/fed98b72cb1dda1a888ffda032e8e3db574119057dd1460048f198f5dad95464.json'
+    at lstatSync (node:fs:1771:25)
+    at readAuthoritySourceFile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:91:18)
+    at observe (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:192:274)
+    at observed (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:227:87)
+    at Array.map (<anonymous>)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:228:170
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:246:855
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:246:761
+    at withCustodyTopologyScope (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/worktree-lifecycle.mjs:2155:16)
+MFHS028 real process contention serializes same-key replay and different invocation CAS generations: Error: concurrent writer failed (1): file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21
+export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                          ^
+
+Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+    at authorityOwnerFailure (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:21:59)
+    at reconcile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:198:503)
+    at Object.reconcile (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:201:133)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:422:3264
+    at Array.map (<anonymous>)
+    at stateRead (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:422:160)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:445:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:444:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-registry.mjs:445:475)
+    at file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:202:479 {
+  code: 'SDC-AUTHORITY-UNAVAILABLE',
+  reason: 'model-family-host:unowned-retained-member',
+  repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/k90/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root <repo-root>/scratch/clones/k90/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-nZMm1y: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+}
+
+Node.js v24.19.0
+
+    at ChildProcess.<anonymous> (file://<repo-root>/scratch/clones/k90/plugins/pipeline-core/lib/model-family-host-store.test.mjs:1036:16)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1141:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)

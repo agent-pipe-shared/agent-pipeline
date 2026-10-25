@@ -1,0 +1,13 @@
+command: node <repo-root>/scripts/run-in.mjs <repo-root>/scratch/clones/k151 k151-cch plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: k151-probe
+exitCode: 1
+head: 4a7a8d070e53586e6b7cfad508da5e2443d039f4
+tree: b1f255f7a889e611ff188bdc821bf001db20b573
+dirty: true
+--- stdout ---
+RED   exit 1 tests 137 pass 135 fail 2 skip 0 todo 0  plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+   ✖ CCH136 Codex Critic host case 136
+   ✖ CCH137 Codex Critic host case 137
+   address-root repair: repaired ARR-OK moved 11
+
+--- stderr ---

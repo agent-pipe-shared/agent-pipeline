@@ -1,0 +1,1127 @@
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.mjs b/plugins/pipeline-core/lib/model-family-host-store.mjs
+index 45d079fa6..2f161e2d5 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.mjs
+@@ -1023,7 +1023,7 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+     return fail("MODEL-FAMILY-LAUNCH-FAILED");
+   }
+ 
+-  function launchUnregistered({ invocation, packetBindingSha256, nativeRequestCapability } = {}) {
++  function launchUnregistered({ invocation, packetBindingSha256, nativeRequestCapability, beforeDriver, afterDriver } = {}) {
+     const native = nativeRequestCapability === undefined ? null : nativeCapabilities.get(nativeRequestCapability);
+     if (nativeRequestCapability !== undefined && (!native || native.invocation !== invocation
+       || native.admission.status !== "issued")) return fail("MODEL-FAMILY-NATIVE-CAPABILITY-REQUIRED");
+@@ -1057,8 +1057,24 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+         nativeRequest: native.request, revalidate, consumed: false });
+     }
+     let result;
+-    const callDriver = () => trustedSources.launchDriver({ invocation: invocation.receipt,
+-      prelaunchToken: checked.value, ...(native ? { nativeRequest: native.request, driverContext } : {}) });
++    const callDriver = () => {
++      if (beforeDriver !== undefined) {
++        if (!native || typeof beforeDriver !== "function") return fail("MODEL-FAMILY-PRECHILD-CHECK-INVALID");
++        try {
++          if (beforeDriver() !== undefined) return fail("MODEL-FAMILY-PRECHILD-CHECK-INVALID");
++        } catch { return fail("MODEL-FAMILY-PRECHILD-CHECK-FAILED"); }
++      }
++      return trustedSources.launchDriver({ invocation: invocation.receipt,
++        prelaunchToken: checked.value, ...(native ? { nativeRequest: native.request, driverContext } : {}) });
++    };
++    const checkedResult = value => {
++      if (afterDriver !== undefined) {
++        if (!native || typeof afterDriver !== 'function') return fail('MODEL-FAMILY-POSTCHILD-CHECK-INVALID');
++        try { if (afterDriver() !== undefined) return fail('MODEL-FAMILY-POSTCHILD-CHECK-INVALID'); }
++        catch { return fail('MODEL-FAMILY-POSTCHILD-CHECK-FAILED'); }
++      }
++      return launchResult(value);
++    };
+     try {
+       // K147: a native driver spawns a managed host whose journal registers its own producer member in the session-authority
+       // registry. The BEGIN ticket (D113) binds only the synchronous prefix of this effect and compares a whole-registry
+@@ -1071,10 +1087,10 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+     try {
+       if (result !== null && (typeof result === "object" || typeof result === "function")
+         && typeof result.then === "function") {
+-        return Promise.resolve(result).then(launchResult, () => fail("MODEL-FAMILY-LAUNCH-FAILED"))
++        return Promise.resolve(result).then(checkedResult, () => fail("MODEL-FAMILY-LAUNCH-FAILED"))
+           .catch(() => fail("MODEL-FAMILY-LAUNCH-FAILED"));
+       }
+-      return launchResult(result);
++      return checkedResult(result);
+     } catch { return fail("MODEL-FAMILY-LAUNCH-FAILED"); }
+   }
+ 
+diff --git a/plugins/pipeline-core/lib/model-family-invocation.mjs b/plugins/pipeline-core/lib/model-family-invocation.mjs
+index d5c487d04..b9a325b32 100644
+--- a/plugins/pipeline-core/lib/model-family-invocation.mjs
++++ b/plugins/pipeline-core/lib/model-family-invocation.mjs
+@@ -165,14 +165,15 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
+     return { ok: true, code: "MODEL-FAMILY-LAUNCH-CAPABILITY", value: binding };
+   }
+ 
+-  async function launchModelFamilyInvocation({ binding } = {}) {
++  async function launchModelFamilyInvocation({ binding, beforeDriver, afterDriver } = {}) {
+     const held = bindingHandles.get(binding);
+     if (!held) return fail("MODEL-FAMILY-LAUNCH-CAPABILITY-REQUIRED");
+     let result;
+     try { result = await runtimeHost.withFreshDiscovery(held.discoveryRequest, () =>
+       held.store.launch({ invocation: held.invocation,
+         packetBindingSha256: held.receipt.packetBindingSha256,
+-        ...(held.nativeRequestCapability ? { nativeRequestCapability: held.nativeRequestCapability } : {}) })); }
++        ...(held.nativeRequestCapability ? { nativeRequestCapability: held.nativeRequestCapability } : {}),
++        ...(beforeDriver ? { beforeDriver } : {}), ...(afterDriver ? { afterDriver } : {}) })); }
+     catch { return fail("MODEL-FAMILY-LAUNCH-FAILED"); }
+     return result?.ok ? { ok: true, code: result.code, value: result.value ?? null }
+       : fail(result?.code ?? "MODEL-FAMILY-LAUNCH-FAILED", result?.retryable === true);
+diff --git a/plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs b/plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs
+new file mode 100644
+index 000000000..8c266f438
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs
+@@ -0,0 +1,192 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from 'node:assert/strict';
++import { test } from 'node:test';
++import os from 'node:os';
++import { syncBuiltinESMExports } from 'node:module';
++import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { prospectiveSocketBytes, validatePrivateParent, validateCreatedHome } from './codex-critic-private-parent-fixture.mjs';
++
++const scratch = join(process.cwd(), 'scratch', 'g17-actual-fixtures');
++let fixture, host, launchHeldCriticFamilyRoute, prepareSelectedCriticRoleDispatch;
++
++test('private-parent preflight is length-first and uses strict production ancestry', () => {
++  assert.throws(() => prospectiveSocketBytes('relative'), /G17-PRIVATE-PARENT/);
++  assert.throws(() => validatePrivateParent('/' + 'x'.repeat(43), {
++    lstatSync: () => { throw new Error('unexpected stat'); }, realpathSync: () => { throw new Error('unexpected realpath'); }, getuid: () => 1,
++  }), /G17-SOCKET-LENGTH/);
++  const safe = '/g17';
++  const ports = {
++    lstatSync: () => ({ isDirectory: () => true, isSymbolicLink: () => false, mode: 0o40700, uid: 1, dev: 1, ino: 1, gid: 1 }),
++    realpathSync: path => path, getuid: () => 1,
++  };
++  assert.equal(validatePrivateParent(safe, ports).bytes, Buffer.byteLength('/g17/g17c-000000/.apsp/0000000000000000/000000000000000000000000.sock'));
++  assert.throws(() => validatePrivateParent(safe, { ...ports,
++    lstatSync: () => ({ ...ports.lstatSync(), mode: 0o40722 }),
++  }), /SP-ADDRESS: unsafe address ancestry/);
++});
++
++async function exercise({ duringChild, afterChildStart, afterChildEnd, beforeLaunch } = {}) {
++  const snapshots = [];
++  const root = mkdtempSync(join(scratch, 'route-'));
++  try {
++    const source = join(root, 'candidate');
++    mkdirSync(source);
++    const candidate = fixture.createCandidate(source);
++    const privateObserver = fixture.createObserver(join(root, 'private-observer'));
++    const sharedObserver = fixture.createObserver(join(root, 'shared-observer'));
++    const rulesetRoot = join(root, 'ruleset');
++    fixture.run('git', ['clone', '-q', source, rulesetRoot], root);
++    const ruleset = fixture.run('git', ['rev-parse', 'HEAD'], rulesetRoot);
++    const observers = fixture.parseObserverArgs([`private=${privateObserver}`, `shared=${sharedObserver}`]);
++    const f = await fixture.signedPreparedCriticFixture('critic_high_risk', source, root);
++    try {
++      const repo = f.root;
++      const requestPath = join(root, 'request.json');
++      fixture.writeJson(requestPath, fixture.requestFor(candidate, ruleset));
++      const preparedPath = join(root, 'prepared.json');
++      const statePath = join(root, 'state.json');
++      const output = await host.prepareNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root,
++        observers, requestPath, preparedPath, dispatchStatePath: statePath, reviewRoot: join(root, 'review') },
++      { requireProjectOnboardingReadyFn: () => ({ schema: 'pipeline.project-onboarding-ready-gate.v1', status: 'ready', intent: 'dispatch' }),
++        familyInvocationEntry: f.entry, familyExecutionPorts: f.ports, invocationId: 'actual-baseline',
++        runVerify: checkout => {
++          mkdirSync(join(checkout, 'evidence'), { recursive: true });
++          fixture.writeJson(join(checkout, 'evidence', 'verify-latest.json'), { schema: 'pipeline.verify-evidence.v0', exitCode: 0, commit: candidate.commit, tree: candidate.tree, steps:[{name:'synthetic',exitCode:0}] });
++          if (process.env.G17_CASE === 'v4') fixture.prepareV4Consent(checkout);
++          return { command: 'node verify.mjs', stdoutSha256: fixture.sha256('ok'), stderrSha256: fixture.sha256(''),
++            stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
++        } });
++      const context = host.readNativeCriticPreparedContext(output);
++      const route = host.readNativeCriticPreparedRoute(context, { repoRoot: repo, preparedSha256: output.preparedSha256 });
++      const prepared = fixture.readJsonBounded(preparedPath).value;
++      f.setReturn(fixture.successfulReturn(prepared, output.preparedSha256));
++      const selection = prepareSelectedCriticRoleDispatch({ input: { sandboxRuntime: { repoRoot: repo },
++        dispatch: { candidateCommit: candidate.commit, candidateTree: candidate.tree }, referencePaths: ['specs/review.md'] },
++        route, resultDestination: { kind: 'return' } });
++      assert.equal(selection.status, 'prepared', selection.code);
++      const nativeRequest = { model: route.model, effort: route.effort };
++      const args = { repo, root, preparedPath, candidate, context, host };
++      if (duringChild) f.setChildEffect(() => duringChild(args));
++      const snap = phase => {
++        const admin = {};
++        const walk = (directory, prefix = '') => {
++          for (const entry of readdirSync(directory, { withFileTypes: true })) {
++            const path = prefix + entry.name, absolute = join(directory, entry.name), stat = lstatSync(absolute);
++            admin[path] = { mode: stat.mode, hash: entry.isFile() ? fixture.sha256(readFileSync(absolute)) : entry.isSymbolicLink() ? fixture.sha256(readlinkSync(absolute)) : null };
++            if (entry.isDirectory()) walk(absolute, path + '/');
++          }
++        };
++        walk(join(repo, '.git'));
++        snapshots.push({ phase, detail: host.captureRepositoryFingerprint(repo).detail, admin });
++      };
++      snap('prepared');
++      let returned;
++      if (process.env.G17_CASE === 'v4') {
++        returned = await fixture.exerciseV4Consumer({ f, host, context, output, root, repo, candidate, route, prepared });
++        assert.equal(fixture.readJsonBounded(`${preparedPath}.family-execution`).value.schema, 'pipeline.critic-family-native-custody.v4');
++      } else {
++      host.consumeNativeCriticPreparedContext(context, { packet: selection.packet, nativeRequest });
++      beforeLaunch?.(args);
++      let childFailure;
++      const launched = await launchHeldCriticFamilyRoute({ route, packet: selection.packet, nativeRequest,
++        beforeReservations: () => host.checkNativeCriticPreparedState(context),
++        beforeChildStart: () => { host.captureNativeCriticChildStart(context); snap('child-start'); },
++        afterChildEnd: () => { try { host.checkNativeCriticChildEnd(context); afterChildEnd?.(args); } catch (error) { childFailure = error; throw error; } },
++        afterHostSettled: () => host.captureNativeCriticHostSettled(context) });
++      snap('launched');
++      if (childFailure) throw childFailure;
++      assert.equal(launched.ok, true, launched.code);
++      host.recordNativeCriticPreparedExecution(context, { packet: selection.packet, nativeRequest, nativeResult: launched.value });
++      returned = launched.value.hostReturn;
++      }
++      if (afterChildStart) afterChildStart(args);
++      const isolated = await import(`./codex-critic-host.mjs?actual=${Date.now()}-${Math.random()}`);
++      const restored = await isolated.createNativeCriticPreparedContextFactory({ familyInvocationEntry: f.entry,
++        familyExecutionPorts: f.ports }).reconstruct({ repoRoot: repo, preparedPath });
++      snap('reconstructed');
++      const returnPath = join(root, 'return.json');
++      fixture.writeJson(returnPath, returned);
++      return isolated.finalizeNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, observers,
++        preparedPath, dispatchStatePath: statePath, returnPath, receiptPath: join(root, 'receipt.json'), familyContext: restored });
++    } finally {
++      if (process.env.G17_PHASE_AUDIT) {
++        for (let i = 1; i < snapshots.length; i++) {
++          const before = snapshots[i-1], after = snapshots[i];
++          console.log(JSON.stringify({ phase: after.phase, changed: [...new Set([...Object.keys(before.admin), ...Object.keys(after.admin)])]
++            .filter(path => JSON.stringify(before.admin[path]) !== JSON.stringify(after.admin[path])),
++            changedParts: Object.keys(after.detail).filter(key => JSON.stringify(before.detail[key]) !== JSON.stringify(after.detail[key])) }));
++        }
++      }
++      f.cleanup();
++    }
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++test('actual prepared route accepts host reservations and finalizes a clean child',
++  { skip: !process.env.G17_PRIVATE_PARENT && 'requires explicit operator supplied private parent' }, async () => {
++    const parent = process.env.G17_PRIVATE_PARENT;
++    validatePrivateParent(parent); // strict real ancestry before the first fixture write
++    const fixtureHome = mkdtempSync(join(parent, 'g17c-'));
++    const ownedHome = lstatSync(fixtureHome);
++    const originalUserInfo = os.userInfo;
++    try {
++      validateCreatedHome(fixtureHome);
++      const actualUser = originalUserInfo();
++      os.userInfo = () => ({ ...actualUser, homedir: fixtureHome });
++      syncBuiltinESMExports();
++      mkdirSync(scratch, { recursive: true });
++      fixture = await import('./codex-critic-actual-fixture.mjs');
++      host = await import('./codex-critic-host.mjs');
++      ({ launchHeldCriticFamilyRoute } = await import('./codex-critic-session-route.mjs'));
++      ({ prepareSelectedCriticRoleDispatch } = await import('./codex-critic-selected-host.mjs'));
++      const group = process.env.G17_CASE || 'positive';
++      if (group === 'positive' || group === 'v4') {
++        const final = await exercise();
++        assert.equal(final.reviewPass, true);
++      } else if (group === 'mutations') {
++        const cases = {
++          worktree: ({repo}) => writeFileSync(join(repo, 'specs/review.md'), 'child mutation\n'),
++          index: ({repo}) => fixture.run('git', ['update-index', '--assume-unchanged', 'specs/review.md'], repo),
++          HEAD: ({repo, candidate}) => fixture.run('git', ['update-ref', 'HEAD', candidate.base], repo),
++          'admin-config': ({repo}) => fixture.run('git', ['config', 'g17.child', 'true'], repo),
++          'admin-session-authority': ({repo}) => writeFileSync(join(repo, '.git', 'agent-pipeline', 'session-authority', 'child.json'), '{}\n'),
++          'admin-empty-directory': ({repo}) => mkdirSync(join(repo, '.git', 'child-empty')),
++        };
++        for (const [name, mutate] of Object.entries(cases)) {
++          await assert.rejects(exercise({duringChild: mutate}), /repository mutation observed/, name);
++          console.log(JSON.stringify({ independentActualMutation: name, refused: true }));
++        }
++        await assert.rejects(exercise({afterChildStart: cases.worktree}), /repository mutation observed/);
++        console.log(JSON.stringify({ independentPostSettlementMutation: 'worktree', refused: true }));
++      } else if (group === 'settlement-gap') {
++        await assert.rejects(exercise({afterChildEnd: ({repo}) => queueMicrotask(() => writeFileSync(join(repo, '.git', 'child-settlement-gap'), 'unowned mutation\n'))}), /repository mutation observed|DRIFT|FAILED/);
++      } else if (group === 'custody') {
++        const changeJson = (path, mutate) => { const value = fixture.readJsonBounded(path).value; mutate(value); fixture.writeJson(path, value); };
++        const cases = {
++          missing: ({preparedPath}) => rmSync(`${preparedPath}.family-child-start`),
++          forged: ({preparedPath}) => changeJson(`${preparedPath}.family-child-start`, value => {value.protected.candidate = '0'.repeat(64);}),
++          'forged-linked': ({preparedPath}) => {
++            changeJson(`${preparedPath}.family-child-start`, value => {value.protected.candidate = '0'.repeat(64);});
++            changeJson(`${preparedPath}.family-execution`, value => {value.childStartSha256 = fixture.readJsonBounded(`${preparedPath}.family-child-start`).sha256;});
++          },
++          'old-v3': ({preparedPath}) => changeJson(`${preparedPath}.family-execution`, value => {delete value.hostSettledSha256;}),
++          'old-v4': ({preparedPath}) => changeJson(`${preparedPath}.family-execution`, value => {value.schema='pipeline.critic-family-native-custody.v4'; delete value.hostSettledSha256;}),
++          'old-receipt': ({preparedPath}) => changeJson(`${preparedPath}.family-invocation`, value => {value.receipt.receiptSha256='0'.repeat(64);}),
++        };
++        for (const [name, mutate] of Object.entries(cases)) {
++          await assert.rejects(exercise({afterChildStart: mutate}), name.startsWith('old-v') ? /CRITIC-FAMILY-REPREPARE-REQUIRED/ : /ENOENT|DRIFT/, name);
++          console.log(JSON.stringify({ independentCustody: name, refused: true }));
++        }
++        await assert.rejects(exercise({afterChildStart: ({host,context}) => host.captureNativeCriticChildStart(context)}), /BASELINE-REPLAY/);
++        console.log(JSON.stringify({ independentCustody: 'replay', refused: true }));
++      } else throw new Error('unknown G17_CASE');
++    } finally {
++      os.userInfo = originalUserInfo;
++      syncBuiltinESMExports();
++      const present = lstatSync(fixtureHome, { throwIfNoEntry: false });
++      if (present && present.dev === ownedHome.dev && present.ino === ownedHome.ino && present.isDirectory()) {
++        rmSync(fixtureHome, { recursive: true, force: true });
++      }
++    }
++  });
+diff --git a/plugins/pipeline-core/scripts/codex-critic-actual-fixture.mjs b/plugins/pipeline-core/scripts/codex-critic-actual-fixture.mjs
+new file mode 100644
+index 000000000..71370b718
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/codex-critic-actual-fixture.mjs
+@@ -0,0 +1,438 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from 'node:assert/strict';
++import { createHash, generateKeyPairSync, sign } from 'node:crypto';
++import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { dirname, join } from 'node:path';
++import { arch, release, type } from 'node:os';
++import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG, nativeCriticReducingCliArgs,
++  nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest, reduceDiscoveredNativeMcpServers } from '../lib/codex-native-critic-tools.mjs';
++import { buildNativeCriticSelection, nativeCriticArtifactRequestDigest, nativeCriticCanonicalDigest } from '../lib/codex-native-critic-policy.mjs';
++import { repositoryFingerprint } from '../lib/codex-onboarding-runtime.mjs';
++import { runCriticExportConsent } from './critic-export-consent.mjs';
++import { invokeCodexNativeCriticHost, runPreflightedFixedChild } from './codex-native-critic-host.mjs';
++import { spawnSync, execFileSync } from 'node:child_process';
++import { canonical, createPoApprovalIntent } from '../lib/po-approval-proof.mjs';
++import { createModelFamilyInvocationEntry } from '../lib/model-family-invocation.mjs';
++import { createModelFamilyRuntimeHost } from '../lib/model-family-runtime-host.mjs';
++import { prepareSessionAuthorityRegistryFixture } from '../lib/test-item-approved-course-fixture.mjs';
++import { registeredModelFamilyTaskRoutes } from '../lib/model-family-route-source.mjs';
++import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from '../lib/model-family-discovery.mjs';
++import { createCodexFamilyAdapter } from '../lib/model-family-codex-adapter.mjs';
++import { readHeldModelFamilyInvocation } from '../lib/model-family-host-store.mjs';
++import { canonicalJson, DEFAULT_PIPELINE_ROOT, parseObserverArgs, readJsonBounded, sha256 } from './codex-critic-host.mjs';
++
++const RULESET_PATHS = [
++  "roles/critic.md",
++  "templates/prompts/critic-review.md",
++  "plugins/pipeline-core/config/routing-authority.json",
++  "plugins/pipeline-core/config/runner-mappings.json",
++  "plugins/pipeline-core/config/runner-profiles-v3.json",
++  "plugins/pipeline-core/lib/routing-projection.mjs",
++  "plugins/pipeline-core/lib/critic-route-v3.mjs",
++  "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
++  "plugins/pipeline-core/lib/human-role-labels.mjs",
++  "plugins/pipeline-core/lib/review-economy.mjs",
++  "plugins/pipeline-core/lib/schema-lite.mjs",
++  "plugins/pipeline-core/lib/yaml-lite.mjs",
++  "plugins/pipeline-core/lib/manifest.mjs",
++  "plugins/pipeline-core/lib/critic-packet-governance.mjs",
++  "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
++  "plugins/pipeline-core/scripts/pipeline-user-v3.schema.json",
++  "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
++  "plugins/pipeline-core/scripts/codex-critic-host.mjs",
++  "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
++  "plugins/pipeline-core/scripts/critic-verdict.schema.json",
++];
++function run(command, args, cwd) {
++  const result = spawnSync(command, args, { cwd, encoding: "utf8", shell: false });
++  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed: ${result.stderr}`);
++  return result.stdout.trim();
++}
++
++function writeJson(path, value) {
++  writeFileSync(path, canonicalJson(value), { mode: 0o600 });
++}
++
++function createCandidate(root) {
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  mkdirSync(join(root, "specs"), { recursive: true });
++  mkdirSync(join(root, "policies"), { recursive: true });
++  writeJson(join(root, ".claude", "pipeline.json"), { project: "fixture", verify: "node verify.mjs" });
++  writeFileSync(join(root, "pipeline.user.yaml"), readFileSync(join(DEFAULT_PIPELINE_ROOT, "pipeline.user.yaml")));
++  writeFileSync(join(root, "verify.mjs"), "process.exit(0);\n");
++  writeFileSync(join(root, ".gitignore"), "evidence/\n");
++  writeFileSync(join(root, "specs", "review.md"), "# Review spec\n");
++  writeFileSync(join(root, "policies", "guard.md"), "# Guard\n");
++  for (const path of RULESET_PATHS) {
++    const target = join(root, path);
++    mkdirSync(dirname(target), { recursive: true });
++    writeFileSync(target, readFileSync(join(DEFAULT_PIPELINE_ROOT, path)));
++  }
++  run("git", ["init", "-q"], root);
++  // Pin EOL handling for this fixture repo regardless of the host's system-level
++  // core.autocrlf (Git for Windows commonly defaults it to true): otherwise a
++  // native-Windows checkout of these text files diverges from their committed
++  // bytes and later `git status`/`git clone` calls observe a false "dirty" state.
++  run("git", ["config", "core.autocrlf", "false"], root);
++  run("git", ["config", "user.name", "Fixture"], root);
++  run("git", ["config", "user.email", "fixture@example.invalid"], root);
++  run("git", ["add", ".gitignore", ".claude/pipeline.json", "pipeline.user.yaml", "verify.mjs", "specs/review.md", "policies/guard.md", ...RULESET_PATHS], root);
++  run("git", ["commit", "-qm", "base"], root);
++  const base = run("git", ["rev-parse", "HEAD"], root);
++  writeFileSync(join(root, "specs", "review.md"), "# Review spec\n\nCandidate.\n");
++  run("git", ["add", "specs/review.md"], root);
++  run("git", ["commit", "-qm", "candidate-one"], root);
++  const firstCandidate = run("git", ["rev-parse", "HEAD"], root);
++  writeFileSync(join(root, "policies", "guard.md"), "# Guard\n\nCandidate.\n");
++  run("git", ["add", "policies/guard.md"], root);
++  run("git", ["commit", "-qm", "candidate-two"], root);
++  const commit = run("git", ["rev-parse", "HEAD"], root);
++  return {
++    base,
++    commits: [firstCandidate, commit],
++    commit,
++    tree: run("git", ["rev-parse", "HEAD^{tree}"], root),
++  };
++}
++
++function createObserver(root) {
++  mkdirSync(root);
++  mkdirSync(join(root, "ignored"));
++  writeFileSync(join(root, ".gitignore"), "ignored/\n");
++  writeFileSync(join(root, "tracked.txt"), "tracked\n");
++  writeFileSync(join(root, "ignored", "state.txt"), "initial\n");
++  run("git", ["init", "-q"], root);
++  run("git", ["config", "core.autocrlf", "false"], root);
++  run("git", ["config", "user.name", "Fixture"], root);
++  run("git", ["config", "user.email", "fixture@example.invalid"], root);
++  run("git", ["add", ".gitignore", "tracked.txt"], root);
++  run("git", ["commit", "-qm", "observer"], root);
++  return root;
++}
++
++function requestFor(candidate, ruleset) {
++  return {
++    schema: "pipeline.codex-critic-request.v2",
++    task_id: "normal-critic-fixture",
++    project: "fixture",
++    ruleset_sha: ruleset,
++    calibration_path: ".claude/pipeline.json",
++    spec_path: "specs/review.md",
++    review_base: candidate.base,
++    candidate_commit: candidate.commit,
++    candidate_tree: candidate.tree,
++    guardrail_paths: ["policies/guard.md"],
++    evidence_paths: ["evidence/verify-latest.json"],
++    rigor: "2",
++    risk: "high",
++    trigger_row: "T1",
++    task_authority: {
++      manifest: { operations: ["read"], paths: [".claude/**", "docs/**", "evidence/**", "governance/**", "plugins/**", "policies/**", "roles/**", "specs/**", "templates/**"] },
++      request: { operations: ["read"], paths: [".claude/pipeline.json", "specs/review.md", "policies/guard.md", "evidence/verify-latest.json"] },
++    },
++    review_economy: {
++      round: 1,
++      correction_commits: 0,
++      requested_mode: "full",
++      changed_paths: [],
++      changed_behavior_claims: [],
++      prior_receipt: null,
++      path_invariant_map: {},
++      path_invariant_map_sha256: null,
++      coordinator_impact_confirmed: false,
++      trust_boundary_changed: false,
++      impact_ambiguous: false,
++    },
++  };
++}
++function successfulReturn(prepared, preparedSha256, overrides = {}) {
++  const verdict = {
++    findings: [],
++    deliberately_not_flagged: ["deterministic gates"],
++    trajectory_verdict: "consistent",
++    trajectory_evidence: "evidence/verify-latest.json matches the reviewed commit",
++    briefing_violations: [],
++    pass: true,
++  };
++  const criticResult = {
++    schema: "pipeline.codex-critic-host-result.v1",
++    dispatch_id: prepared.dispatchId,
++    prepared_sha256: preparedSha256,
++    nonce: prepared.nonce,
++    candidate_commit: prepared.review.commit,
++    candidate_tree: prepared.review.tree,
++    review_mode: prepared.reviewPlan.mode,
++    affected_invariant_ids: prepared.reviewPlan.affectedInvariantIds,
++    context_disclosure: ["project-instructions", "git-status"],
++    achieved_assurance: prepared.assurance,
++    verdict,
++    ...overrides.critic_result,
++  };
++  const eventTexts = [
++    ["review-started", `prepared:${preparedSha256}`],
++    ["evidence-inspected", `reference-set:${prepared.bindings.referenceSetSha256}`],
++    ["review-completed", `result:${sha256(canonicalJson(criticResult))}`],
++  ];
++  const baseProgress = { boundTreeChanges: 0, verifiedOutputBytes: 0, traceBytes: 0, completedTestSteps: 0, deliveredResultBytes: 0 };
++  const inspectedProgress = {
++    ...baseProgress,
++    boundTreeChanges: prepared.review.commits.length,
++    verifiedOutputBytes: prepared.verify.stdoutBytes + prepared.verify.stderrBytes,
++    completedTestSteps: prepared.verify.completedTestSteps,
++  };
++  const progress = [
++    baseProgress,
++    inspectedProgress,
++    { ...inspectedProgress, deliveredResultBytes: Buffer.byteLength(canonicalJson(criticResult), "utf8") },
++  ];
++  return {
++    schema: "pipeline.codex-native-host-return.v1",
++    host_execution: {
++      agent_id: "native-agent-fixture",
++      task_name: prepared.expectedTaskName,
++      dispatch_id: prepared.dispatchId,
++      requested_alias: prepared.route.alias,
++      requested_effort: prepared.route.effort,
++      resolved_model: prepared.route.model,
++      resolved_effort: prepared.route.effort,
++      route_source: "v3-candidate-duty+coordinator",
++      may_delegate: false,
++      terminal_status: "completed",
++      completed_elapsed_ms: 2_000,
++      recovery_count: 0,
++      evidence_events: eventTexts.map(([kind, evidence_text], index) => ({
++        sequence: index + 1,
++        kind,
++        elapsed_ms: 500 + index * 500,
++        evidence_text,
++        evidence_sha256: sha256(evidence_text),
++        progress: progress[index],
++      })),
++      ...overrides.host_execution,
++    },
++    critic_result: criticResult,
++  };
++}
++async function signedPreparedCriticFixture(dutyId, root, childRoot) {
++  const sha = value => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
++  const runner = "codex", taskRoute = `duty.${dutyId}`;
++  const routeSource = registeredModelFamilyTaskRoutes();
++  const route = routeSource.taskRoutes.find(value => value.runner === runner && value.taskRoute === taskRoute);
++  // AC-212: modelAuthorityOwner() caches one owner per repository for the whole process and that owner's live map keeps every op it
++  // reserved, so a fixture that reused the shared candidate repository inherited the previous fixture's ops (their lifetime files
++  // removed by cleanup -> activate() failed with domain-source-input) while a leftover lifetime blocks the registry initialization.
++  // Each fixture therefore works in its own copy of the candidate repository (same HEAD, so the commit and tree match request.json).
++  const sourceRoot = root;
++  root = mkdtempSync(join(childRoot, "codex-critic-host-family-fixture-"));
++  cpSync(sourceRoot, root, { recursive: true, verbatimSymlinks: true });
++  rmSync(join(root, ".git", "agent-pipeline"), { recursive: true, force: true });
++  const commonDir = join(root, ".git");
++  mkdirSync(join(commonDir, "agent-pipeline"), { recursive: true, mode: 0o700 });
++  // AC-212: the host's lifetimes reserve their members in the session-authority registry, so the checkout carries an initialized one.
++  // The shared candidate repository must keep a clean `git status` (prepareNativeCritic refuses an unclean candidate), so the
++  // helper's two untracked authority inputs are excluded locally instead of committed (the candidate commit and tree stay unchanged).
++  prepareSessionAuthorityRegistryFixture({ root, excludeFromStatus: true });
++  const candidateCommit = run("git", ["rev-parse", "HEAD"], root);
++  const candidateTree = run("git", ["rev-parse", "HEAD^{tree}"], root);
++  const keyFor = invocationId => ({ runner, installationBindingSha256: sha("installation"), accountBindingSha256: sha("account"), sessionId: "critic-session", invocationId });
++  async function actualS2OpaquePort({ models, key, familyId = "sol" }) {
++  const rules = {};
++  const contract = { schema: "pipeline.model-family-adapter-contract.v1", runner: "codex", familyId,
++    discoveryModes: ["complete-catalogue"], providerEvidenceSha256s: [sha("synthetic-provider-contract")] };
++  for (const name of RULE_FIELDS) {
++    const rule = { id: `s5a-${name}`, version: 1, sha256: sha(name) };
++    contract[name] = rule;
++    const run = name === "identityRule" ? ({ phase, entry }) => phase === "coverage"
++      ? pass("SYNTHETIC", { mode: "complete-catalogue", evidenceSha256: sha("coverage"), latestAliasEvidenceSha256: null })
++      : pass("SYNTHETIC", { model: entry.model })
++      : name === "releaseGroupingRule" ? ({ entry }) => pass("SYNTHETIC", { releaseId: `${familyId}-${entry.version.join("-")}`,
++        familyId, groupingEvidenceSha256: sha("group") })
++        : name === "versionRule" ? ({ entry }) => pass("SYNTHETIC", entry.version)
++          : name === "variantSelectionRule" ? ({ entry }) => pass("SYNTHETIC", { modelId: entry.model,
++            canonicalModelId: null, aliasEvidenceSha256: null })
++            : name === "selectabilityRule" ? () => pass("SYNTHETIC", { released: true, visible: true, selectable: true })
++              : name === "effortRule" ? ({ entry }) => pass("SYNTHETIC", {
++                efforts: entry.supportedReasoningEfforts.map((item) => item.reasoningEffort),
++                capabilityEvidenceSha256: sha("capability") })
++                : () => fail("SYNTHETIC_UNUSED");
++    rules[rule.id] = { version: rule.version, sha256: rule.sha256, run };
++  }
++  let latest;
++  const timestamp = "2026-10-01T12:00:00.000Z";
++  const expiresAt = "2026-10-01T12:01:00.000Z";
++  const host = createModelFamilyDiscoveryHost({ rules, clock: () => timestamp,
++    capture: async (context) => pass("SYNTHETIC_CAPTURE", { bindings: context.bindings, observedAt: context.observedAt,
++      source: "S5A-SYNTHETIC", pages: [{ request: { id: 1, method: "model/list",
++        params: { cursor: null, includeHidden: true, limit: 100 } },
++        responseBytes: JSON.stringify({ id: 1, result: { data: models.map(({ modelId, version, efforts = [route.effort] }) => ({ id: modelId,
++          model: modelId, hidden: false, version, released: true,
++          supportedReasoningEfforts: efforts.map((reasoningEffort) => ({ reasoningEffort })) })), nextCursor: null } }) }] }),
++    verifyProviderContract: ({ contractSha256, contract: value }) => pass("SYNTHETIC_CONTRACT", {
++      contractSha256, providerEvidenceSha256s: value.providerEvidenceSha256s }),
++    compatibility: ({ runner: selectedRunner, record, variant, slot }) => {
++      const value = host.readDiscovery(latest).value;
++      return pass("SYNTHETIC_COMPAT", { subjectSha256: discoveryDigest({ runner: selectedRunner,
++        releaseId: record.releaseId, modelId: variant.modelId, ...slot,
++        discoverySha256: discoveryDigest(value), adapterContractSha256: value.adapterContractSha256 }),
++        evidenceSha256: sha("compat") });
++    } });
++  const context = host.createContext({ runner, bindings: { installationBindingSha256: key.installationBindingSha256,
++    accountBindingSha256: key.accountBindingSha256, hostProcessBindingSha256: sha("process") },
++    observedAt: timestamp, expiresAt }).value;
++  const qualified = host.qualifyContract(contract);
++  const adapter = createCodexFamilyAdapter(host);
++  const raw = await adapter.captureRawDiscovery(context);
++  if (!raw.ok) return raw;
++  const coverage = adapter.verifyCoverage(raw.value, context, qualified.value);
++  if (!coverage.ok) return coverage;
++  const normalized = adapter.normalizeReleases(raw.value, qualified.value, coverage.value);
++  if (!normalized.ok) return normalized;
++  latest = normalized.value;
++  const snapshot = host.readDiscovery(latest).value;
++  const head = snapshot.records.filter((entry) => entry.familyId === familyId)
++    .sort((left, right) => (right.version[0] ?? 0) - (left.version[0] ?? 0)
++      || (right.version[1] ?? 0) - (left.version[1] ?? 0))[0];
++  const compatible = adapter.verifyCompatibility({ discovery: latest, releaseId: head.releaseId,
++    modelId: head.variants[0].modelId }, { taskRoute, role: route.role, effort: route.effort }, context, qualified.value);
++  const resolverContext = { coverage: { familyId, coverageEvidenceSha256: sha("coverage"),
++    unknownTargetFamilyEvidenceSha256s: [] }, hardEligibility: { runner, taskRoute, role: route.role,
++    effort: route.effort, evidenceSha256: sha("hard"), minimumVersion: null, deniedModelIds: [] },
++  variantRule: null, compatibility: { runner, taskRoute, role: route.role, effort: route.effort,
++    modelId: head.variants[0].modelId, evidenceSha256: sha("compat") }, latestAlias: null };
++  return compatible.ok ? { ok: true, contractSha256: discoveryDigest(contract), value: { discoveryHost: host,
++    discoveryHandle: compatible.value.discovery, context: resolverContext } } : compatible;
++}
++
++function signedS4Authority(adapterContractSha256, familyId = "sol", selectedModelId = "gpt-6-sol") {
++  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
++  const publicPem = publicKey.export({ format: "pem", type: "spki" });
++  const trustAnchors = [{ keyReference: "S5A-SYNTHETIC-TEST-KEY", publicKeySha256: sha(publicPem) }];
++  const selector = { kind: "model-id", value: selectedModelId };
++  const taskRoutes = [{ taskRoute, runner, role: route.role, effort: route.effort, state: "default", selector }];
++  const configuredRoutes = [{ runner, role: route.role, effort: route.effort, selector }];
++  const routeSource = { ok: true, taskRoutes, configuredRoutes };
++  const routeSourceSha256 = sha({ taskRoutes, configuredRoutes });
++  const assignments = [{ runner, role: route.role, effort: route.effort, taskRoutes: [taskRoute], familyId,
++    adapterContractSha256, minimumVersion: [6], update: "latest" }];
++  const subject = { revision: "model-family-v2", predecessorAuthoritySha256: null,
++    routeSourceSha256, assignments, migration: null };
++  const subjectSha256 = sha(subject);
++  const candidateAtApproval = { commit: candidateCommit, tree: candidateTree };
++  const approvalIntent = createPoApprovalIntent({ kind: "model-role-policy", featureId: "model-role-routes",
++    planSha256: routeSourceSha256, specSha256: subjectSha256, candidate: candidateAtApproval,
++    policyRevision: "model-family-v2", subjectSha256, decision: "approved" });
++  const bundle = { schema: "pipeline.model-family-approved-policy.v2", candidateAtApproval, subject,
++    approvalIntent, proof: { schema: "pipeline.po-approval-proof.v1", intentSha256: approvalIntent.sha256,
++      keyReference: trustAnchors[0].keyReference, publicKey: publicPem,
++      signatureBase64: sign(null, Buffer.from(approvalIntent.sha256), privateKey).toString("base64") } };
++  return { bundle, routeSource, trustAnchors };
++}
++
++
++  const models = [{ modelId: "gpt-6-sol", version: [6] }, { modelId: "gpt-6.1-sol", version: [6,1] }];
++  const probe = await actualS2OpaquePort({ models, key: keyFor("probe") });
++  assert.equal(probe.ok, true, probe.code);
++  const authority = signedS4Authority(probe.contractSha256);
++  const bindings = { installationBindingSha256: sha("installation"), accountBindingSha256: sha("account"), hostProcessBindingSha256: sha("process") };
++  let launches = 0, observed, admissionError, hostReturn, nativeDriver, childEffect;
++  const childPath = join(childRoot, "prepared-child.mjs");
++  writeFileSync(childPath, 'let text="";for await (const chunk of process.stdin) text+=chunk;process.stdout.write(text);');
++  const runtimeHost = createModelFamilyRuntimeHost({ cwd: root, clock: () => Date.parse("2026-10-01T12:00:30.000Z"), trustedSources: {
++    readAuthorityInputs: () => ({ ...authority, predecessor: null }), readPinInputs: () => [],
++    readCurrentCandidate: () => ({ candidateCommit, candidateTree }),
++    captureFreshDiscovery: ({ key }) => actualS2OpaquePort({ models, key }),
++    resolveInvocationContext: ({ requestedSessionId, invocationId }) => ({ ok: true, key: { ...keyFor(invocationId), sessionId: requestedSessionId },
++      assignment: { runner, taskRoute, role: route.role, effort: route.effort, familyId: "sol" }, candidateCommit, candidateTree }),
++    resolveCurrentInvocationIdentity: ({ invocationId }) => ({ ok: true, key: keyFor(invocationId),
++      assignment: { runner, taskRoute, role: route.role, effort: route.effort, familyId: "sol" }, candidateCommit, candidateTree }),
++    admitNativeRequest: ({ invocation, request }) => {
++      try {
++      assert.equal(Object.isFrozen(request), true);
++      assert.equal(request.model, undefined);
++      assert.equal(request.schema, "pipeline.critic-family-native-request.v1");
++      assert.equal(request.root, root);
++      assert.equal(request.request.model, invocation.selectedModelId);
++      assert.equal(request.request.effort, invocation.effort);
++      return { ok: true, code: "SYNTHETIC_REQUEST_ADMISSION" };
++      } catch (error) { admissionError = error; throw error; }
++    },
++    launchDriver: async ({ nativeRequest }) => {
++      launches++;
++      if (nativeDriver) { observed = await nativeDriver(nativeRequest); return {ok:true,value:observed}; }
++      const value = nativeRequest.request;
++      const selected = value.sandboxTransport;
++      const result = hostReturn ? { identity: { provider: "openai", modelId: value.model, effort: value.effort }, hostReturn } : { status: "reviewed", verdict: { verdict: "PASS", findings: [] },
++        identity: { provider: "openai", modelId: value.model, effort: value.effort },
++        rulesetBindings: Object.fromEntries(["roleContractSha256", "promptContractSha256", "verdictSchemaSha256", "childExecutableSha256", "childModuleGraphSha256"].map(name => [name, sha(name)])),
++        rulesetProvenance: { kind: "git", identity: candidateCommit },
++        sandboxExecution: { schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: selected.selectionId, selectionSha256: selected.selectionSha256, repoFingerprint: selected.repoFingerprint, duty: "critic", dispatch: selected.dispatch,
++          observed: { cliSha256: selected.toolchain.cliSha256, profileSha256: selected.profile.sha256, networkEnabled: true, scratchRootSha256: selected.profile.scratchRootSha256 },
++          terminal: { childStarted: true, exitCode: 0, stdioStatus: "complete", cleanupStatus: "complete" } } };
++      const bytes = execFileSync(process.execPath, [childPath], { input: JSON.stringify(result), encoding: "utf8", timeout: 3000 });
++      observed = JSON.parse(bytes);
++      childEffect?.();
++      return { ok: true, value: observed };
++    }
++  } });
++  let activation;
++  try { activation = runtimeHost.store().activate(); }
++  catch (error) { throw new Error(`${dutyId}: activation threw ${error.code}/${error.reason}`, { cause: error }); }
++  assert.equal(activation.ok, true, `${dutyId}: ${activation.code}`);
++  const entry = createModelFamilyInvocationEntry({ runtimeHost, routeSource });
++  const identityHost = createModelFamilyDiscoveryHost({ clock: () => "2026-10-01T12:00:30.000Z", execution: ({ rawHostResult }) =>
++    observed && discoveryDigest(rawHostResult) === discoveryDigest(observed) ? pass("ACTUAL_SYNTHETIC_CHILD_IDENTITY", {
++      actualModelIds: [observed.identity?.modelId ?? observed.result.observed.model], actualEffort: observed.identity?.effort ?? observed.result.observed.effort, rawHostResultSha256: discoveryDigest(rawHostResult), hostObservationSha256: sha("child-stdout")
++    }) : fail("NO_CHILD_OBSERVATION") });
++  const context = identityHost.createContext({ runner, bindings, observedAt: "2026-10-01T12:00:30.000Z", expiresAt: "2026-10-01T12:01:00.000Z" }).value;
++  const ports = { adapters: { codex: createCodexFamilyAdapter(identityHost) }, contextForInvocation: () => pass("SOURCE_CONTEXT", context),
++    readOriginalInvocation: ({ invocationId }) => { const r = readHeldModelFamilyInvocation({ rootDir: join(commonDir, "agent-pipeline"), key: keyFor(invocationId) }); return r.ok ? pass("ORIGINAL_S4", { invocation: r.value, bindings, provenanceSha256: discoveryDigest(r.value) }) : r; },
++    readLaunchEvidence: ({ invocation: i }) => pass("NODE_CHILD_EVIDENCE", { invocationReceiptSha256: i.receiptSha256, runner,
++      supported: { status: "supported", efforts: [i.effort], evidenceSha256: probe.contractSha256 },
++      requested: { modelId: i.selectedModelId, effort: i.effort, evidenceSha256: sha("request") },
++      configured: { modelId: i.selectedModelId, effort: i.effort, evidenceSha256: sha("configured"), assurance: "host-configured" },
++      execution: { status: "succeeded", evidenceSha256: sha("exit-zero") } }) };
++  return { root, candidateCommit, candidateTree, entry, ports, route, setChildEffect: value => { childEffect = value; }, setDriver: value => { nativeDriver = value; }, setReturn: value => { hostReturn = structuredClone(value); }, admissionError: () => admissionError, launches: () => launches, cleanup: () => rmSync(root, { recursive: true, force: true }) };
++}
++export { run, writeJson, createCandidate, createObserver, requestFor, successfulReturn, signedPreparedCriticFixture, parseObserverArgs, readJsonBounded, sha256, canonicalJson };
++
++// Reuse the existing app-server examiner verbatim without executing its 137-case
++// module. This bounded route starts only its synthetic executable.
++export function prepareV4Consent(review) {
++  const exportContext={provider:'OpenAI',service:'synthetic-native-family-fixture',hostGate:'additional-check-required',providerGate:'not-observed',observedEndpoint:null};
++  const grantPath='evidence/family-export.json';
++  writeJson(join(review,grantPath),{scope:{recipient:{provider:exportContext.provider,runner:'codex',service:exportContext.service},purpose:'critic',sourceRoots:['specs'],evidenceRoots:['evidence']}});
++  const grantArgs=['--root',review,'--request',grantPath], plan=runCriticExportConsent(['plan',...grantArgs]);
++  assert.equal(runCriticExportConsent(['record',...grantArgs,'--plan-sha256',plan.planSha256,'--decision-reference','test-fixture:family-native','--decision-sha256','e'.repeat(64)]).ok,true);
++  rmSync(join(review,grantPath));
++}
++export async function exerciseV4Consumer({ f, host, context, output, root, repo, candidate, route, prepared }) {
++  const exportContext={provider:'OpenAI',service:'synthetic-native-family-fixture',hostGate:'additional-check-required',providerGate:'not-observed',observedEndpoint:null};
++  const review=prepared.review.root;
++  const source=readFileSync(new URL('./codex-critic-host.test.mjs',import.meta.url),'utf8');
++  const start=source.indexOf('function writeFakeCriticAppServer('), end=source.indexOf('\nfunction runActualCriticChild(',start);
++  assert.ok(start>=0&&end>start);
++  const writeFake = new Function('SELECTED_CRITIC_ROUTE','NATIVE_CRITIC_PROHIBITED_FEATURES','NATIVE_CRITIC_REDUCING_CONFIG','nativeCriticReducingCliArgs','join','assert','writeFileSync', source.slice(start,end)+'\nreturn writeFakeCriticAppServer;')
++    (route,NATIVE_CRITIC_PROHIBITED_FEATURES,NATIVE_CRITIC_REDUCING_CONFIG,nativeCriticReducingCliArgs,join,assert,writeFileSync);
++  const reviewScope={kind:'current-artifacts',paths:['specs/review.md']};
++  const referenceRecords=[{path:'evidence/verify-latest.json',sha256:sha256(readFileSync(join(review,'evidence/verify-latest.json'))),candidate:{commit:candidate.commit,tree:candidate.tree}},
++    {path:'specs/review.md',blobOid:run('git',['rev-parse',`${candidate.commit}:specs/review.md`],review),sha256:sha256(readFileSync(join(review,'specs/review.md'))),mode:'100644'}];
++  const referencePaths=referenceRecords.map(r=>r.path), backendDir=join(root,'synthetic-backend');mkdirSync(backendDir);
++  const verdict=successfulReturn(prepared,output.preparedSha256).critic_result.verdict;
++  const fake=writeFake(backendDir,[{type:'agentMessage',phase:'final_answer',text:JSON.stringify(verdict)}],{requireNativeWire:true,model:route.model,effort:route.effort,threadReasoningEffort:route.effort});
++  const reduction=reduceDiscoveredNativeMcpServers([{data:[],nextCursor:null}]);
++  const features={pageCount:1,dataCount:NATIVE_CRITIC_PROHIBITED_FEATURES.length,digest:nativeCriticCanonicalDigest(Object.fromEntries(NATIVE_CRITIC_PROHIBITED_FEATURES.map(n=>[n,false])))},mcp={pageCount:1,dataCount:0,digest:nativeCriticCanonicalDigest({pageCount:1,dataCount:0,allDisabled:true,allEmpty:true,catalogFree:true})};
++  const tuple={cli:{version:'0.153.4',sha256:sha256(readFileSync(fake))},protocolSchemaSha256:'2'.repeat(64),host:{platformClass:'linux-wsl2',kernel:{sysname:type(),release:release(),machine:arch()},filesystemClass:'wsl2-native',bootIdSha256:sha256('boot')},policy:{threadSandbox:'read-only',turn:{type:'readOnly',networkAccess:false}},toolSurface:{configSha256:nativeCriticToolSurfaceConfigDigest(reduction),observationSha256:nativeCriticToolSurfaceObservationDigest(features,mcp)}};
++  const nowMs=Date.parse('2026-10-01T12:00:30.000Z'),smokeReceipt={schema:'pipeline.codex-native-critic-smoke.v1',status:'passed',tuple,observed:{initialized:true,readObserved:true,writeObserved:true,nativeWriteDenied:true,canaryUnchanged:true,hostWriteControl:true,sourceUnchanged:true,protocolError:false,guardDenial:false,sandboxLaunchDenied:false,timedOut:false,cleanupComplete:true,terminal:{exitCode:0,signal:null,spawnFailed:false}},capturedAt:'2026-10-01T12:00:00.000Z'};
++  const referenceSetSha256=nativeCriticCanonicalDigest(referenceRecords);
++  const selection=buildNativeCriticSelection({selectionId:'cncs_'+'d'.repeat(26),repoFingerprint:repositoryFingerprint(review),dispatch:{queueRevision:1,candidateCommit:candidate.commit,candidateTree:candidate.tree,referenceSetSha256,requestSha256:nativeCriticArtifactRequestDigest({candidateCommit:candidate.commit,candidateTree:candidate.tree,referenceSetSha256,reviewMode:'full',reviewScope})},route,poDecisionSha256:'4'.repeat(64),smokeReceipt,smokeReceiptSha256:nativeCriticCanonicalDigest(smokeReceipt),createdAt:'2026-10-01T12:00:20.000Z'},{validateRoute:()=>route,expectedTuple:tuple,nowMs,maxSmokeAgeMs:300000});
++  const input={exportContext,selection,expectedTuple:tuple,repository:{root:review,cliPath:fake},coordinatorScratch:{path:backendDir},referencePaths,referenceRecords,reviewScope,reviewMode:'full'};
++  f.setDriver(nativeRequest=>runPreflightedFixedChild({root:review,packet:nativeRequest.packet,evidenceRecords:referenceRecords.filter(r=>r.blobOid===undefined),request:nativeRequest.request}));
++  let custodyError;
++  const deps={familyContext:context,preparedSha256:output.preparedSha256,onCustodyError:error=>{custodyError=error;},nowMs,resolveRoute:()=>{throw new Error('must not reselect prepared family');},readFileSync:path=>path==='/proc/version'?'Linux Microsoft':path==='/proc/self/mountinfo'?`1 0 0:1 / ${review} rw - ext4 /dev/root rw\n`:'boot'};
++  const reviewed=await invokeCodexNativeCriticHost(input,deps);
++  if(custodyError)throw custodyError;
++  assert.equal(reviewed.status,'reviewed',JSON.stringify(reviewed));
++  assert.equal(f.launches(),1);
++  return host.readNativeCriticCapturedReturn(context);
++}
+diff --git a/plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs b/plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs
+new file mode 100644
+index 000000000..653adbdde
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs
+@@ -0,0 +1,47 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { test } from "node:test";
++import { execFileSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
++import { captureRepositoryFingerprint, assertNativeCriticChildStartUnchanged } from "./codex-critic-host.mjs";
++
++const git = (cwd, ...args) => execFileSync("git", args, { cwd, stdio: "pipe" });
++
++const cases = {
++  worktree: root => writeFileSync(join(root, 'tracked.txt'), 'child\n'),
++  index: root => git(root, 'update-index', '--assume-unchanged', 'tracked.txt'),
++  HEAD: root => git(root, 'symbolic-ref', 'HEAD', 'refs/heads/child'),
++  config: root => git(root, 'config', 'g17.child', 'true'),
++  refs: root => writeFileSync(join(root, '.git', 'refs', 'child'), 'child\n'),
++  objects: root => writeFileSync(join(root, '.git', 'objects', 'child'), 'child\n'),
++  hooks: root => writeFileSync(join(root, '.git', 'hooks', 'child'), 'child\n'),
++  logs: root => writeFileSync(join(root, '.git', 'logs', 'child'), 'child\n'),
++  info: root => writeFileSync(join(root, '.git', 'info', 'child'), 'child\n'),
++  'agent-pipeline': root => writeFileSync(join(root, '.git', 'agent-pipeline', 'session-authority', 'child.json'), 'child\n'),
++  'empty-directory': root => mkdirSync(join(root, '.git', 'child-empty')),
++};
++for (const [name, change] of Object.entries(cases)) test(`independent full Git inventory mutation: ${name}`, () => {
++  const scratch = join(process.cwd(), "scratch", "g17-baseline-fixtures");
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "repo-"));
++  try {
++    git(root, "init", "-q");
++    writeFileSync(join(root, "tracked.txt"), "base\n");
++    git(root, "add", "--", "tracked.txt");
++    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "base");
++    const fingerprint = () => ({ candidate: captureRepositoryFingerprint(root).sha256 });
++    const prepared = fingerprint();
++    const registry = join(root, ".git", "agent-pipeline", "session-authority");
++    mkdirSync(registry, { recursive: true });
++    writeFileSync(join(registry, "reservation.json"), "host reservation\n");
++    const childStart = fingerprint();
++    assert.notDeepEqual(childStart, prepared, "a host reservation changes the prepare fingerprint");
++    assert.doesNotThrow(() => assertNativeCriticChildStartUnchanged(childStart, fingerprint()));
++    // Every examiner starts with its own unmutated repository and baseline.
++    change(root);
++    assert.throws(() => assertNativeCriticChildStartUnchanged(childStart, fingerprint()), /repository mutation observed|failed/);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.mjs b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+index 1e8d0c3e0..e67c0e8ea 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+@@ -51,7 +51,7 @@ import { routingProvenance } from "../lib/routing-projection.mjs";
+ import { resolveCriticHighRiskRoute, resolveV3DutyRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+ import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+-import { resolveSessionCodexCriticRoute, recheckHeldCriticFamilyRoute, readHeldCriticFamilyExecution } from "./codex-critic-session-route.mjs";
++import { resolveSessionCodexCriticRoute, restoreHeldCriticFamilyRoute, sealHeldCriticFamilyCustody, checkHeldCriticFamilyCustody, recheckHeldCriticFamilyRoute, readHeldCriticFamilyExecution } from "./codex-critic-session-route.mjs";
+ import { createModelFamilyExecutionHost, validateInvocationReadback, digest as familyDigest } from "../lib/model-family-execution.mjs";
+ import { readValidatedNativeCriticReturn } from "./codex-native-critic-host.mjs";
+ import { applyCriticSessionModelRoute } from "../lib/critic-session-model-route.mjs";
+@@ -1090,6 +1090,9 @@ function protectedRootPathMap(repoRoot, pipelineRoot, observers) {
+ function assertFingerprintMapEqual(before, after, label) {
+   if (JSON.stringify(before) !== JSON.stringify(after)) fail(`${label} repository mutation observed`);
+ }
++export function assertNativeCriticChildStartUnchanged(childStart, after) {
++  assertFingerprintMapEqual(childStart, after, "normal Critic run");
++}
+ 
+ const preparedFamilyContexts = new WeakMap();
+ const preparedFamilyResults = new WeakMap();
+@@ -1106,7 +1109,8 @@ export function readNativeCriticPreparedRoute(context, { repoRoot, preparedSha25
+   return held.route;
+ }
+ function familyCustodyPaths(held) {
+-  return { invocation: `${held.preparedPath}.family-invocation`, consumed: `${held.preparedPath}.family-consumed`, execution: `${held.preparedPath}.family-execution` };
++  return { invocation: `${held.preparedPath}.family-invocation`, consumed: `${held.preparedPath}.family-consumed`,
++    baseline: `${held.preparedPath}.family-child-start`, execution: `${held.preparedPath}.family-execution` };
+ }
+ function heldPreparedFamilyContext(context) {
+   const held = preparedFamilyContexts.get(context);
+@@ -1119,16 +1123,75 @@ export function consumeNativeCriticPreparedContext(context, { packet, nativeRequ
+   atomicWriteExclusive(paths.consumed, { schema: "pipeline.critic-family-consumption.v1", preparedSha256: held.preparedSha256,
+     packetSha256: familyDigest(packet), nativeRequestSha256: familyDigest(nativeRequest) });
+ }
++export function checkNativeCriticPreparedState(context) {
++  const held = heldPreparedFamilyContext(context);
++  const prepared = readJsonBounded(held.preparedPath).value;
++  assertFingerprintMapEqual(prepared.bindings.protectedBefore,
++    protectedFingerprintMap(held.repoRoot, prepared.sources.rulesetRoot, held.observers), "prelaunch");
++  assertDisposableCheckout(prepared.review.root, prepared.review.commit,
++    [...prepared.request.evidence_paths, prepared.review.diffReferencePath]);
++  if (captureRepositoryFingerprint(prepared.review.root, prepared.references.filter(({ source }) => source === "review")).sha256
++    !== prepared.bindings.reviewFingerprintSha256) fail("prelaunch review repository mutation observed");
++}
++export function captureNativeCriticChildStart(context) {
++  // The Model BEGIN ticket can still own its registry boundary here. Read the
++  // already held host context without opening another registry transition.
++  const held = preparedFamilyContexts.get(context);
++  if (!held || readJsonBounded(held.preparedPath).sha256 !== held.preparedSha256) fail("CRITIC-FAMILY-PREPARED-CONTEXT-REQUIRED");
++  const paths = familyCustodyPaths(held);
++  if (held.childStartBaseline || !existsSync(paths.consumed)) fail("CRITIC-FAMILY-BASELINE-REPLAY");
++  const prepared = readJsonBounded(held.preparedPath).value;
++  const candidate = captureRepositoryFingerprint(held.repoRoot);
++  if (!held.preparedCandidateDetail || Object.keys(candidate.detail).some(key => key !== "administrative"
++    && JSON.stringify(candidate.detail[key]) !== JSON.stringify(held.preparedCandidateDetail[key]))) fail("CRITIC-FAMILY-PRECHILD-CANDIDATE-DRIFT");
++  const protectedNow = protectedFingerprintMap(held.repoRoot, prepared.sources.rulesetRoot, held.observers);
++  for (const name of ["ruleset", "observer.private", "observer.shared"]) {
++    if (protectedNow[name] !== prepared.bindings.protectedBefore[name]) fail("CRITIC-FAMILY-PRECHILD-PROTECTED-DRIFT");
++  }
++  const baseline = { schema: "pipeline.critic-family-child-start.v1", preparedSha256: held.preparedSha256,
++    consumptionSha256: readJsonBounded(paths.consumed).sha256,
++    protected: protectedNow };
++  const written = atomicWriteExclusive(paths.baseline, baseline);
++  held.childStartBaseline = { sha256: written.sha256, protected: baseline.protected };
++}
++export function checkNativeCriticChildEnd(context) {
++  const held = preparedFamilyContexts.get(context);
++  if (!held?.childStartBaseline || held.childEndChecked) fail('CRITIC-FAMILY-BASELINE-REPLAY');
++  const prepared = readJsonBounded(held.preparedPath).value;
++  assertNativeCriticChildStartUnchanged(held.childStartBaseline.protected,
++    protectedFingerprintMap(held.repoRoot, prepared.sources.rulesetRoot, held.observers));
++  held.childEndChecked = true;
++}
++export function captureNativeCriticHostSettled(context) {
++  const held = preparedFamilyContexts.get(context);
++  if (!held?.childEndChecked || held.hostSettled) fail('CRITIC-FAMILY-BASELINE-REPLAY');
++  const prepared = readJsonBounded(held.preparedPath).value;
++  // The full child interval was checked before the Model lifecycle settled its
++  // own lifetime. No administrative path is omitted from either comparison.
++  const value = { schema: 'pipeline.critic-family-host-settled.v1', preparedSha256: held.preparedSha256,
++    childStartSha256: held.childStartBaseline.sha256,
++    protected: protectedFingerprintMap(held.repoRoot, prepared.sources.rulesetRoot, held.observers) };
++  const written = atomicWriteExclusive(`${held.preparedPath}.family-host-settled`, value);
++  held.hostSettled = { sha256: written.sha256, protected: value.protected };
++}
+ export function recordNativeCriticPreparedExecution(context, { packet, nativeRequest, nativeResult } = {}) {
+   const held = heldPreparedFamilyContext(context), paths = familyCustodyPaths(held);
++  if (!held.hostSettled || !held.childEndChecked) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
++  const baselineRecord = readJsonBounded(paths.baseline);
++  if (!held.childStartBaseline || baselineRecord.sha256 !== held.childStartBaseline.sha256
++    || baselineRecord.value.preparedSha256 !== held.preparedSha256
++    || JSON.stringify(baselineRecord.value.protected) !== JSON.stringify(held.childStartBaseline.protected)) fail("CRITIC-FAMILY-CHILD-START-DRIFT");
+   const consumption = readJsonBounded(paths.consumed).value;
+   if (consumption.preparedSha256 !== held.preparedSha256 || consumption.packetSha256 !== familyDigest(packet)
+     || consumption.nativeRequestSha256 !== familyDigest(nativeRequest)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+   const execution = readHeldCriticFamilyExecution(held.route);
+   if (!execution.ok || execution.value.nativeResultSha256 !== familyDigest(nativeResult)
+     || execution.value.packetSha256 !== familyDigest(packet)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+-  atomicWriteExclusive(paths.execution, { schema: held.generatedHostReturn ? "pipeline.critic-family-native-custody.v2" : "pipeline.critic-family-native-custody.v1", preparedSha256: held.preparedSha256,
+-    nativeResult, packet, nativeRequest, execution: execution.value, ...(held.generatedHostReturn ? { hostReturn: held.generatedHostReturn } : {}) });
++  const custody = { schema: held.generatedHostReturn ? "pipeline.critic-family-native-custody.v4" : "pipeline.critic-family-native-custody.v3", preparedSha256: held.preparedSha256,
++    nativeResult, packet, nativeRequest, execution: execution.value, childStartSha256: baselineRecord.sha256, hostSettledSha256: held.hostSettled.sha256,
++    ...(held.generatedHostReturn ? { hostReturn: held.generatedHostReturn } : {}) };
++  atomicWriteExclusive(paths.execution, custody);
++  sealHeldCriticFamilyCustody(held.route, custody);
+   held.nativeResult = structuredClone(nativeResult);
+ }
+ export function captureNativeCriticPreparedReturn(context, validatedHandle) {
+@@ -1172,20 +1235,35 @@ export function createNativeCriticPreparedContextFactory({ familyInvocationEntry
+       || !familyExecutionPorts?.readLaunchEvidence || !familyExecutionPorts?.contextForInvocation
+       || !familyExecutionPorts?.adapters?.codex?.readActualExecutionIdentity) fail("CRITIC-FAMILY-CUSTODY-RECONSTRUCTION-UNQUALIFIED");
+     const preparedRecord = readJsonBounded(preparedPath), original = readJsonBounded(`${preparedPath}.family-invocation`).value;
+-    exactKeys(original, ["schema", "preparedSha256", "receipt"], "family invocation custody");
++    exactKeys(original, ["schema", "preparedSha256", "receipt", "protectedRoots"], "family invocation custody");
+     if (original.schema !== "pipeline.critic-family-prepared-custody.v1" || original.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+     const i = original.receipt;
+-    const route = await resolveSessionCodexCriticRoute({ rootDir: repoRoot, candidateCommit: preparedRecord.value.request.candidate_commit,
+-      dutyId: preparedRecord.value.route.duty, invocationId: i.invocationId, familyInvocationEntry, familyRuntimeHost, familyExecutionPorts });
++    const route = restoreHeldCriticFamilyRoute({ rootDir: repoRoot, receipt: i, familyInvocationEntry, familyRuntimeHost, familyExecutionPorts });
+     const checked = recheckHeldCriticFamilyRoute(route);
+     if (!checked.ok || familyDigest(checked.receipt) !== familyDigest(i)) fail("CRITIC-FAMILY-ORIGINAL-INVOCATION-DRIFT");
+-    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath, preparedSha256: preparedRecord.sha256,
++    const roots = original.protectedRoots;
++    if (JSON.stringify(Object.keys(roots).sort()) !== JSON.stringify(["candidate", "observer.private", "observer.shared", "ruleset"])
++      || roots.candidate !== realpathSync(repoRoot) || roots.ruleset !== realpathSync(preparedRecord.value.sources.rulesetRoot)) fail("CRITIC-FAMILY-PROTECTED-ROOTS-DRIFT");
++    const observers = ["private", "shared"].map(name => ({ name, root: assertGitRepository(roots[`observer.${name}`], `observer ${name}`) }));
++    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath, preparedSha256: preparedRecord.sha256, observers,
+       requestSha256: sha256(canonicalJson(preparedRecord.value.request)) };
+     if (requireExecution) {
+       const custody = readJsonBounded(`${preparedPath}.family-execution`).value;
+-      const v2 = custody.schema === "pipeline.critic-family-native-custody.v2";
+-      exactKeys(custody, ["schema", "preparedSha256", "nativeResult", "packet", "nativeRequest", "execution", ...(v2 ? ["hostReturn"] : [])], "family execution custody");
+-      if (!["pipeline.critic-family-native-custody.v1", "pipeline.critic-family-native-custody.v2"].includes(custody.schema) || custody.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
++      if (!custody.hostSettledSha256) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
++      checkHeldCriticFamilyCustody(route, custody);
++      const v2 = custody.schema === "pipeline.critic-family-native-custody.v4";
++      exactKeys(custody, ["schema", "preparedSha256", "nativeResult", "packet", "nativeRequest", "execution", "childStartSha256", "hostSettledSha256", ...(v2 ? ["hostReturn"] : [])], "family execution custody");
++      if (!["pipeline.critic-family-native-custody.v3", "pipeline.critic-family-native-custody.v4"].includes(custody.schema) || custody.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
++      const baselineRecord = readJsonBounded(`${preparedPath}.family-child-start`);
++      exactKeys(baselineRecord.value, ["schema", "preparedSha256", "consumptionSha256", "protected"], "family child-start custody");
++      if (baselineRecord.value.schema !== "pipeline.critic-family-child-start.v1" || baselineRecord.value.preparedSha256 !== preparedRecord.sha256
++        || custody.childStartSha256 !== baselineRecord.sha256 || baselineRecord.value.consumptionSha256 !== readJsonBounded(`${preparedPath}.family-consumed`).sha256) fail("CRITIC-FAMILY-CHILD-START-DRIFT");
++      held.childStartBaseline = { sha256: baselineRecord.sha256, protected: baselineRecord.value.protected };
++      const settled = readJsonBounded(`${preparedPath}.family-host-settled`);
++      exactKeys(settled.value, ['schema', 'preparedSha256', 'childStartSha256', 'protected'], 'family host-settled custody');
++      if (settled.value.schema !== 'pipeline.critic-family-host-settled.v1' || settled.value.preparedSha256 !== preparedRecord.sha256
++        || settled.value.childStartSha256 !== baselineRecord.sha256 || settled.sha256 !== custody.hostSettledSha256) fail('CRITIC-FAMILY-CHILD-START-DRIFT');
++      held.hostSettled = { sha256: settled.sha256, protected: settled.value.protected };
+       const consumption = readJsonBounded(`${preparedPath}.family-consumed`).value;
+       if (consumption.preparedSha256 !== preparedRecord.sha256 || consumption.packetSha256 !== familyDigest(custody.packet)
+         || consumption.nativeRequestSha256 !== familyDigest(custody.nativeRequest)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+@@ -1333,11 +1411,14 @@ export function prepareNativeCritic(options, deps = {}) {
+     const checked = recheckHeldCriticFamilyRoute(route);
+     if (!checked.ok) fail(checked.code);
+     const context = Object.freeze(Object.create(null));
+-    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath: options.preparedPath, requestSha256: sha256(canonicalJson(request)), preparedSha256: null };
++    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath: options.preparedPath, requestSha256: sha256(canonicalJson(request)), preparedSha256: null,
++      observers: options.observers, preparedCandidateDetail: null };
+     preparedFamilyContexts.set(context, held);
+     const result = prepareNativeCriticCore(options, deps, context);
+     held.preparedSha256 = result.preparedSha256;
+-    atomicWriteExclusive(familyCustodyPaths(held).invocation, { schema: "pipeline.critic-family-prepared-custody.v1", preparedSha256: result.preparedSha256, receipt: recheckHeldCriticFamilyRoute(route).receipt });
++    held.preparedCandidateDetail = captureRepositoryFingerprint(repoRoot).detail;
++    atomicWriteExclusive(familyCustodyPaths(held).invocation, { schema: "pipeline.critic-family-prepared-custody.v1", preparedSha256: result.preparedSha256,
++      receipt: recheckHeldCriticFamilyRoute(route).receipt, protectedRoots: protectedRootPathMap(repoRoot, options.pipelineRoot, options.observers) });
+     preparedFamilyResults.set(result, context);
+     return result;
+   })();
+@@ -1883,7 +1964,7 @@ function recoverReceiptTransaction({ controlRoot, consumePath, completePath, pen
+   return { ok: true, receiptPath, receiptSha256: marker.receiptSha256, reviewPass: recoveredReceipt.reviewPass, recovered: true, cleanupComplete };
+ }
+ 
+-function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution) {
++function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution, protectedAtChildStart) {
+   if (receipt.assurance !== prepared.assurance || JSON.stringify(receipt.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("receipt assurance boundary drift");
+   if ("normalLaneAuthorization" in receipt) fail("current receipt must not carry legacy normal lane authorization");
+   if (receipt.route.providerAttested !== false || receipt.route.coordinatorConfirmed !== true) fail("receipt route claim drift");
+@@ -1918,8 +1999,8 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution
+     || receipt.liveness.evidenceEvents.length === 0
+     || receipt.liveness.evidenceEvents.some(({ evidenceSha256 }) => !SHA256.test(evidenceSha256))
+     || JSON.stringify(receipt.liveness.evidenceEvents) !== JSON.stringify(expectedLivenessEvents)) fail("receipt liveness binding invalid");
+-  if (JSON.stringify(receipt.state.before) !== JSON.stringify(prepared.bindings.protectedBefore)
+-    || JSON.stringify(receipt.state.after) !== JSON.stringify(prepared.bindings.protectedBefore)) fail("receipt protected-state binding drift");
++  if (JSON.stringify(receipt.state.before) !== JSON.stringify(protectedAtChildStart)
++    || JSON.stringify(receipt.state.after) !== JSON.stringify(protectedAtChildStart)) fail("receipt protected-state binding drift");
+   if (sanitizedVerdict.findings.some(({ detailSha256, evidence, specRef }) => !SHA256.test(detailSha256)
+     || !Number.isInteger(evidence.startLine) || evidence.startLine < 1 || !Number.isInteger(evidence.endLine)
+     || evidence.endLine < evidence.startLine || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(specRef))) fail("receipt finding binding invalid");
+@@ -1983,9 +2064,11 @@ export function finalizeNativeCritic(options) {
+   if (sha256(canonicalJson(referenceNow)) !== prepared.bindings.referenceSetSha256) fail("reference set drift after review");
+   const reviewAfter = captureRepositoryFingerprint(prepared.review.root, referenceNow.filter(({ source }) => source === "review"));
+   const after = protectedFingerprintMap(repoRoot, pipelineRoot, observers);
++  const childStart = familyContext === null ? prepared.bindings.protectedBefore : preparedFamilyContexts.get(familyContext)?.hostSettled?.protected;
++  if (!childStart) fail("CRITIC-FAMILY-CHILD-START-REQUIRED");
+   const reviewMutation = reviewAfter.sha256 !== prepared.bindings.reviewFingerprintSha256;
+-  const protectedMutation = JSON.stringify(after) !== JSON.stringify(prepared.bindings.protectedBefore);
+-  if (reviewMutation || protectedMutation) fail("repository mutation observed during normal Critic run");
++  if (reviewMutation) fail("repository mutation observed during normal Critic run");
++  assertNativeCriticChildStartUnchanged(childStart, after);
+   const sanitizedVerdict = sanitizeVerdictForReceipt(validated.result.verdict, prepared.review.root);
+ 
+   const receipt = {
+@@ -2033,14 +2116,14 @@ export function finalizeNativeCritic(options) {
+       executionSetSha256: prepared.bindings.executionSetSha256,
+       routingProvenance: prepared.bindings.routingProvenance,
+     },
+-    state: { before: prepared.bindings.protectedBefore, after, mutationObserved: false },
++    state: { before: childStart, after, mutationObserved: false },
+     assurance: prepared.assurance,
+     residualRisks: [...RESIDUAL_RISKS],
+     verdict: sanitizedVerdict,
+     reviewPass: validated.reviewPass,
+   };
+   assertSchema(receipt, RECEIPT_SCHEMA_PATH, "receipt");
+-  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution);
++  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution, childStart);
+   const published = completeReceiptTransaction({
+     controlRoot, consumePath, completePath, pendingPath, receiptPath, receipt, prepared, dispatchState, cleanup: options.cleanup,
+   });
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+index 3b6ec28be..47596a7c7 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+@@ -14,7 +14,8 @@ import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-sourc
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "../lib/model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "../lib/model-family-codex-adapter.mjs";
+ import { readHeldModelFamilyInvocation } from "../lib/model-family-host-store.mjs";
+-import { readNativeCriticPreparedContext, readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, recordNativeCriticPreparedExecution, readNativeCriticCapturedReturn } from "./codex-critic-host.mjs";
++import { readNativeCriticPreparedContext, readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, recordNativeCriticPreparedExecution, readNativeCriticCapturedReturn,
++  checkNativeCriticPreparedState, captureNativeCriticChildStart, checkNativeCriticChildEnd, captureNativeCriticHostSettled } from "./codex-critic-host.mjs";
+ import { launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
+ import { PassThrough } from "node:stream";
+ import { pathToFileURL } from "node:url";
+@@ -3230,7 +3231,9 @@ await checkAsync("active native PREPARE retains original private signed route an
+    assert.equal(preparation.status,"prepared",preparation.code);
+    const nativeRequest = {model:route.model,effort:route.effort};
+    consumeNativeCriticPreparedContext(context,{packet:preparation.packet,nativeRequest});
+-   const launched = await launchHeldCriticFamilyRoute({route,packet:preparation.packet,nativeRequest});
++   const launched = await launchHeldCriticFamilyRoute({route,packet:preparation.packet,nativeRequest,
++    beforeReservations:()=>checkNativeCriticPreparedState(context),beforeChildStart:()=>captureNativeCriticChildStart(context),
++    afterChildEnd:()=>checkNativeCriticChildEnd(context),afterHostSettled:()=>captureNativeCriticHostSettled(context)});
+    if (!launched.ok && f.admissionError()) throw f.admissionError();
+    assert.equal(launched.ok,true,launched.code); assert.equal(f.launches(),1);
+    recordNativeCriticPreparedExecution(context,{packet:preparation.packet,nativeRequest,nativeResult:launched.value});
+@@ -3296,10 +3299,11 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
+    const protectedBeforeFinalize={candidate:captureRepositoryFingerprint(repo).sha256,ruleset:captureRepositoryFingerprint(rulesetRoot).sha256,
+     "observer.private":captureRepositoryFingerprint(observers.find(o=>o.name==="private").root).sha256,
+     "observer.shared":captureRepositoryFingerprint(observers.find(o=>o.name==="shared").root).sha256};
+-   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||JSON.stringify(protectedBeforeFinalize)!==JSON.stringify(prepared.bindings.protectedBefore)){
++   const childStart=readJsonBounded(`${output.preparedPath}.family-host-settled`).value.protected;
++   if(reviewFingerprintBeforeFinalize.sha256!==prepared.bindings.reviewFingerprintSha256||JSON.stringify(protectedBeforeFinalize)!==JSON.stringify(childStart)){
+     const changed=(before,after)=>Object.keys(before).filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key]));
+     const detailChanges=Object.fromEntries(Object.keys(reviewFingerprintAtPrepare.detail).filter(key=>JSON.stringify(reviewFingerprintAtPrepare.detail[key])!==JSON.stringify(reviewFingerprintBeforeFinalize.detail[key])).map(key=>[key,{before:reviewFingerprintAtPrepare.detail[key],after:reviewFingerprintBeforeFinalize.detail[key]}]));
+-    assert.fail(`CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=${reviewFingerprintAtPrepare.sha256===prepared.bindings.reviewFingerprintSha256}; reviewDetailsChanged=${JSON.stringify(detailChanges)}; protectedChanged=${JSON.stringify(changed(prepared.bindings.protectedBefore,protectedBeforeFinalize))}`);
++    assert.fail(`CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=${reviewFingerprintAtPrepare.sha256===prepared.bindings.reviewFingerprintSha256}; reviewDetailsChanged=${JSON.stringify(detailChanges)}; protectedChanged=${JSON.stringify(changed(childStart,protectedBeforeFinalize))}`);
+    }
+    const final=isolated.finalizeNativeCritic({repoRoot:repo,pipelineRoot:rulesetRoot,controlDir:root,observers,preparedPath:output.preparedPath,dispatchStatePath:`${prefix}-state.json`,returnPath:`${prefix}-return.json`,receiptPath:`${prefix}-receipt.json`,familyContext:restored});assert.equal(final.reviewPass,true);
+    const replay=await invokeCodexNativeCriticHost(input,deps);assert.equal(replay.status,"unavailable");assert.equal(f.launches(),1);
+diff --git a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+index 8c9011a6b..248427ba8 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+@@ -9,6 +9,17 @@ import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.m
+ import { createModelFamilyExecutionHost, validateInvocationReadback, digest } from "../lib/model-family-execution.mjs";
+ 
+ const heldFamilyRoutes = new WeakMap();
++const heldFamilyCustody = new Map();
++export function sealHeldCriticFamilyCustody(route, custody) {
++  const held = heldFamilyRoutes.get(route);
++  if (!held?.execution || heldFamilyCustody.has(held.receipt.receiptSha256)) familyFailure('CRITIC-FAMILY-CUSTODY-SEAL-REPLAY');
++  heldFamilyCustody.set(held.receipt.receiptSha256, digest(custody));
++}
++export function checkHeldCriticFamilyCustody(route, custody) {
++  const held = heldFamilyRoutes.get(route), seal = held && heldFamilyCustody.get(held.receipt.receiptSha256);
++  if (!seal) familyFailure('CRITIC-FAMILY-REPREPARE-REQUIRED');
++  if (seal !== digest(custody)) familyFailure('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
++}
+ function familyFailure(code) { const error = new Error(code); error.code = code; throw error; }
+ export function isHeldCriticFamilyRoute(route) { return heldFamilyRoutes.has(route); }
+ export function readHeldCriticFamilyExecution(route) {
+@@ -39,7 +50,7 @@ export function recheckHeldCriticFamilyRoute(route) {
+ 
+ /** Construction-owned route admission. The returned projection is diagnostic;
+  * only its original private object can bind and consume the S5 invocation. */
+-export async function launchHeldCriticFamilyRoute({ route, packet, nativeRequest } = {}) {
++export async function launchHeldCriticFamilyRoute({ route, packet, nativeRequest, beforeReservations, beforeChildStart, afterChildEnd, afterHostSettled } = {}) {
+   const held = heldFamilyRoutes.get(route), checked = recheckHeldCriticFamilyRoute(route);
+   if (!checked.ok) return checked;
+   const ports = held.executionPorts;
+@@ -49,13 +60,16 @@ export async function launchHeldCriticFamilyRoute({ route, packet, nativeRequest
+     || packet?.candidate?.tree !== held.receipt.candidateTree || nativeRequest?.model !== route.model
+     || nativeRequest?.effort !== route.effort) return { ok: false, code: "CRITIC-FAMILY-REQUEST-DRIFT" };
+   if (held.consumed) return { ok: false, code: "CRITIC-FAMILY-CONSUMED" };
++  if ([beforeReservations, beforeChildStart, afterChildEnd, afterHostSettled].some(fn => typeof fn !== 'function')) return { ok: false, code: "CRITIC-FAMILY-BASELINE-HOOK-REQUIRED" };
++  try { beforeReservations(); } catch { return { ok: false, code: "CRITIC-FAMILY-PREPARED-STATE-DRIFT" }; }
+   held.consumed = true;
+   const i = held.receipt, bindingPacket = Object.fromEntries(["runner", "sessionId", "invocationId", "candidateCommit", "candidateTree", "taskRoute", "role", "effort", "selectedModelId", "authoritySha256", "discoverySha256", "packetBindingSha256"].map(key => [key, i[key]]));
+   const bound = await held.entry.bindModelFamilyInvocation({ invocation: held.invocation, packet: bindingPacket,
+     nativeRequest: { schema: "pipeline.critic-family-native-request.v1", root: held.rootDir, packet: structuredClone(packet), request: structuredClone(nativeRequest) } });
+   if (!bound.ok) return bound;
+-  const launched = await held.entry.launchModelFamilyInvocation({ binding: bound.value });
++  const launched = await held.entry.launchModelFamilyInvocation({ binding: bound.value, beforeDriver: beforeChildStart, afterDriver: afterChildEnd });
+   if (!launched.ok) return launched;
++  afterHostSettled();
+   const execution = createModelFamilyExecutionHost({ readInvocation: async () => {
+     const read = await ports.readOriginalInvocation({ root: held.rootDir, invocationId: i.invocationId, sessionId: i.sessionId, expectedReceiptSha256: i.receiptSha256 });
+     const verified = validateInvocationReadback(read?.value);
+@@ -69,6 +83,19 @@ export async function launchHeldCriticFamilyRoute({ route, packet, nativeRequest
+   return { ok: true, code: "CRITIC-FAMILY-NATIVE-OBSERVED", value: launched.value, executionReceipt: receipt.value };
+ }
+ 
++/** Restore only the original, independently read held receipt. Reconstruction
++ * must not reserve a new prepare lifetime in the protected repository. */
++export function restoreHeldCriticFamilyRoute({ rootDir, receipt, familyInvocationEntry, familyRuntimeHost, familyExecutionPorts } = {}) {
++  const entry = familyInvocationEntry ?? createModelFamilyInvocationEntry({ runtimeHost: familyRuntimeHost ?? createModelFamilyRuntimeHost({ cwd: rootDir }) });
++  const read = entry.readHeld({ runner: receipt.runner, sessionId: receipt.sessionId, invocationId: receipt.invocationId });
++  if (!read?.ok || digest(read.value) !== digest(receipt)) familyFailure('CRITIC-FAMILY-ORIGINAL-INVOCATION-DRIFT');
++  const route = validateSessionCodexCriticRoute({ dutyId: receipt.taskRoute.slice('duty.'.length), runner: receipt.runner,
++    model: receipt.selectedModelId, effort: receipt.effort, sourceSha256: digest({ authoritySha256: receipt.authoritySha256,
++      receiptSha256: receipt.receiptSha256, taskRoute: receipt.taskRoute }), candidateCommit: receipt.candidateCommit });
++  heldFamilyRoutes.set(route, { entry, receipt, rootDir, executionPorts: familyExecutionPorts, consumed: true });
++  return route;
++}
++
+ export function resolveSessionCodexCriticRoute({ rootDir, candidateCommit, dutyId = "critic_high_risk",
+   env = process.env, resolveV3 = null,
+   select = selectModelRoleForTask, authorityDependencies = {}, familyInvocationEntry = null,
+diff --git a/plugins/pipeline-core/scripts/codex-native-critic-host.mjs b/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
+index 366f154df..6c20040bc 100644
+--- a/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
+@@ -27,7 +27,8 @@ import {
+ import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest } from "../lib/codex-native-critic-tools.mjs";
+ import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, criticFamilyExecutionPortsReady, launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
+ import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
+-import { readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, captureNativeCriticPreparedReturn } from "./codex-critic-host.mjs";
++import { readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, captureNativeCriticPreparedReturn,
++  checkNativeCriticPreparedState, captureNativeCriticChildStart, checkNativeCriticChildEnd, captureNativeCriticHostSettled } from "./codex-critic-host.mjs";
+ import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
+ import { admitNativeCriticExport } from "../lib/native-critic-export-admission.mjs";
+ import { ROLE_DISPATCH_REQUEST_SCHEMA, preflightRoleDispatch } from "../lib/role-dispatch-preflight.mjs";
+@@ -512,7 +513,11 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
+       request,
+     }, familyRoute ? { ...dependencies, runChild: async () => {
+       consumeNativeCriticPreparedContext(dependencies.familyContext, { packet: dispatchPacket, nativeRequest: request });
+-      const observed = await launchHeldCriticFamilyRoute({ route: familyRoute, packet: dispatchPacket, nativeRequest: request });
++      const observed = await launchHeldCriticFamilyRoute({ route: familyRoute, packet: dispatchPacket, nativeRequest: request,
++        beforeReservations: () => checkNativeCriticPreparedState(dependencies.familyContext),
++        beforeChildStart: () => captureNativeCriticChildStart(dependencies.familyContext),
++        afterChildEnd: () => checkNativeCriticChildEnd(dependencies.familyContext),
++        afterHostSettled: () => captureNativeCriticHostSettled(dependencies.familyContext) });
+       if (!observed.ok) { if (!observed.child) throw new Error(observed.code); familyObservationFailure = true; return observed.child; }
+       return observed.value;
+     } } : dependencies);

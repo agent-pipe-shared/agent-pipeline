@@ -1,0 +1,285 @@
+diff --git a/plugins/pipeline-core/lib/critic-accepted-contract.mjs b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+index ed312dddf..a0288a028 100644
+--- a/plugins/pipeline-core/lib/critic-accepted-contract.mjs
++++ b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+@@ -141,6 +141,10 @@ export function commitAcceptedContractCapture({capture,persistEnvelope,publishSt
+   } catch { return {...no(retained ? 'CAC-CAPTURE-PUBLICATION' : 'CAC-CAPTURE-READBACK'),committed:false,envelopeRetained:retained}; }
+ }
+ 
++// Normative and excluded heading vocabulary of the criterion scan (shared with `inspectSpecCriterionRows`).
++const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
++const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
++
+ /**
+  * The ordered criterion-row scan of the host parser, exported unchanged so other readers (plan-readiness
+  * hand-off, lib/plan-handoff-readiness.mjs) see exactly the rows `parseAcceptedCriticCriterion` selects from.
+@@ -153,9 +157,7 @@ export function scanAcceptedCriterionRows(source) {
+     for (const raw of source.split(/(?<=\n)/u)) {
+       lines.push({text:raw.replace(/\r?\n$/u,''),byteOffset}); byteOffset += Buffer.byteLength(raw);
+     }
+-    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below.
+-    const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
+-    const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
++    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below (module level).
+     // Two-column acceptance table: a number cell, then a criterion cell. Rows `n` and `R-n` map to `AC-n`.
+     const TWO_COLUMN_NUMBER = /^(?:#|nr\.?|id)$/iu;
+     const TWO_COLUMN_CRITERION = /^(?:kriterium|kriterien|abnahmekriterium|anforderung|criterion|requirement)$/iu;
+@@ -275,6 +277,66 @@ export function scanAcceptedCriterionRows(source) {
+     return rows;
+ }
+ 
++/** The criterion shapes the host parser locates, as named in a refusal (D64: the repair is stated where the refusal is). */
++export const SUPPORTED_CRITERION_SHAPES = Object.freeze([
++  'a three-column table with the header `| # | Criterion | Evidence |` and the id (AC-<n>) in the first cell',
++  'a two-column table with the header `| # | Criterion |` (or `| Nr. | Kriterium |`) whose first cell is `n`, `R-n` or `AC-n`',
++  'a heading `AC-<n>` followed by one paragraph',
++  'a bullet `- **AC-<n>:** text` or a numbered item `1. **AC-<n>:** text`',
++]);
++export const CRITERION_ID_RULE = 'an id is AC-<n> (n without a leading zero) or AC-E<epic>-<story>-<nn>';
++const CRITERION_CANDIDATE_TOKEN = 'AC-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*';
++const TABLE_CANDIDATE = new RegExp(`^\\s*\\|\\s*(?:\\*\\*|\`)?(${CRITERION_CANDIDATE_TOKEN})(?:\\*\\*|\`)?\\s*\\|`, 'u');
++const ITEM_CANDIDATE = new RegExp(`^\\s*(?:[-+*]|[0-9]+[.)])\\s+(?:\\*\\*|\`)?(${CRITERION_CANDIDATE_TOKEN})(?:\\*\\*|\`)?[:.)]?(?:\\s|$|\\*)`, 'u');
++const HEADING_CANDIDATE = new RegExp(`^ {0,3}#{1,6}\\s+(${CRITERION_CANDIDATE_TOKEN})(?:\\s+#+)?\\s*$`, 'u');
++
++/**
++ * D64 (present-plan): is every acceptance-criterion row of the Spec one the registration and dispatch parser locates?
++ * Reuses `scanAcceptedCriterionRows` for what is located; the only addition is the list of CANDIDATE rows under a
++ * normative acceptance heading (a line that starts with an `AC-` token in a table cell, list item or heading), so a
++ * row the scan silently ignores -- the four-column table, a leading-zero id -- is named instead of first failing at
++ * dispatch preparation. A Spec with no candidate row is outside this check (the delivery hand-off, which also wants
++ * a row to exist, is a separate and deferred concern, PO decision D85). `source` is the strictly decoded Spec text.
++ * @returns {{ok: true, located: string[]} | {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located: string[], unsupported: {id: string, line: number, reason: string}[], message: string}}
++ */
++export function inspectSpecCriterionRows(source) {
++  const rows = scanAcceptedCriterionRows(source);
++  const counts = new Map();
++  for (const row of rows) if (row.normative) counts.set(row.id, (counts.get(row.id) ?? 0) + 1);
++  const located = [...new Set(rows.filter(row => row.normative && row.valid !== false).map(row => row.id))];
++  const unsupported = [];
++  for (const row of rows) {
++    if (!row.normative) continue;
++    if (row.valid === false) unsupported.push({id: row.id, line: 0, reason: 'shape'});
++    else if (counts.get(row.id) > 1 && !unsupported.some(entry => entry.id === row.id && entry.reason === 'duplicate')) unsupported.push({id: row.id, line: 0, reason: 'duplicate'});
++  }
++  const headings = []; let comment = false, fence = null;
++  const lines = source.split(/\r?\n/u);
++  for (let index = 0; index < lines.length; index++) {
++    const text = lines[index];
++    if (comment || text.includes('<!--')) { if (text.includes('<!--')) comment = true; if (text.includes('-->')) comment = false; continue; }
++    const marker = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/u);
++    if (fence) { if (marker && marker[1][0] === fence.char && marker[1].length >= fence.length && marker[2].trim() === '') fence = null; continue; }
++    if (marker) { fence = {char: marker[1][0], length: marker[1].length}; continue; }
++    if (/^(?: {0,3}>| {4}|\t)/u.test(text)) continue;
++    const heading = text.match(/^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/u);
++    if (heading) {
++      while (headings.length && headings.at(-1).level >= heading[1].length) headings.pop();
++      headings.push({level: heading[1].length, text: heading[2]});
++    }
++    if (!headings.some(entry => NORMATIVE_HEADING.test(entry.text)) || headings.some(entry => EXCLUDED_HEADING.test(entry.text))) continue;
++    const token = (heading ? text.match(HEADING_CANDIDATE) : text.match(TABLE_CANDIDATE) ?? text.match(ITEM_CANDIDATE))?.[1];
++    if (!token) continue;
++    if (!isCriterionId(token)) unsupported.push({id: token, line: index + 1, reason: 'id'});
++    else if (!located.includes(token)) unsupported.push({id: token, line: index + 1, reason: 'shape'});
++  }
++  if (unsupported.length === 0) return {ok: true, located};
++  const why = {id: `not a criterion id (${CRITERION_ID_RULE}; a leading zero is not allowed)`, shape: 'row shape the parser does not locate', duplicate: 'stated more than once'};
++  const named = unsupported.slice(0, 8).map(entry => `${entry.id}${entry.line ? ` (line ${entry.line}` : ' ('}${entry.line ? ', ' : ''}${why[entry.reason]})`).join('; ');
++  return {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located, unsupported,
++    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
++}
++
+ /** Pure original-byte interpretation only. Locators and parser success confer no authority. */
+ export function parseAcceptedCriticCriterion(input) {
+   let parserVersion = 'markdown-acceptance-table.v1';
+diff --git a/plugins/pipeline-core/lib/design-consistency-check.mjs b/plugins/pipeline-core/lib/design-consistency-check.mjs
+index 26d98d6e1..7d6197945 100644
+--- a/plugins/pipeline-core/lib/design-consistency-check.mjs
++++ b/plugins/pipeline-core/lib/design-consistency-check.mjs
+@@ -228,7 +228,9 @@ function assertSummary(summary) {
+     fail("a review receipt summary kind must be initial or delta");
+   }
+   assertSourceSet(summary.sources, "a review receipt summary sources", false);
+-  if (!hasExactKeys(summary.report, ["path", "sha256"]) || typeof summary.report.path !== "string" || !isSha(summary.report.sha256)) fail("a review receipt summary report is malformed");
++  // D64: a sanitized report carries the digest of its unpublished original beside the published digest (a distinct, well-formed pair).
++  const pairedReport = hasExactKeys(summary.report, ["path", "sha256", "originalSha256"]) && isSha(summary.report.originalSha256) && summary.report.originalSha256 !== summary.report.sha256;
++  if (!(hasExactKeys(summary.report, ["path", "sha256"]) || pairedReport) || typeof summary.report.path !== "string" || !isSha(summary.report.sha256)) fail("a review receipt summary report is malformed");
+   if (summary.verdict !== "pass" && summary.verdict !== "open-findings") fail("a review receipt summary verdict is malformed");
+   const findings = summary.openFindingIds;
+   if (!Array.isArray(findings) || findings.length > FINDING_IDS_MAX || !findings.every(isRequirementId) || new Set(findings).size !== findings.length) fail("a review receipt summary openFindingIds is malformed");
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 776fc7531..60c03f03d 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -101,6 +101,11 @@ function sameSources(a, b) {
+ 
+ const isFeatureId = (value) => isString(value) && FEATURE_ID.test(value);
+ const isRef = (value) => isObject(value) && hasExactKeys(value, ["path", "sha256"]) && isString(value.path) && isSha256(value.sha256);
++/** A report reference: path and published digest, plus (D64, a sanitized report) the digest of its unpublished original. */
++const isReportShape = (value) => isObject(value) && isString(value.path) && isSha256(value.sha256)
++  && (hasExactKeys(value, ["path", "sha256"]) || hasExactKeys(value, ["originalSha256", "path", "sha256"]));
++/** The pair is well-formed when absent, or when the original digest is a digest that differs from the published one. */
++const reportPairIsValid = (report) => !Object.hasOwn(report, "originalSha256") || (isSha256(report.originalSha256) && report.originalSha256 !== report.sha256);
+ const isReviewer = (value) => isObject(value) && hasExactKeys(value, ["model", "runner"]) && isString(value.runner) && RUNNER.test(value.runner) && isString(value.model) && MODEL.test(value.model);
+ const isSourcesShape = (value) => isObject(value) && hasExactKeys(value, ["companions", "prd", "spec"]) && isRef(value.prd) && isRef(value.spec) && Array.isArray(value.companions) && allOf(value.companions, isRef);
+ const isStringList = (value) => Array.isArray(value) && allOf(value, isString);
+@@ -151,11 +156,12 @@ function receiptRefusal(receipt) {
+     && (previousReceiptSha256 === null || isSha256(previousReceiptSha256))
+     && isSourcesShape(sources)
+     && isReviewer(receipt.reviewer)
+-    && isRef(report)
++    && isReportShape(report)
+     && (receipt.verdict === "pass" || receipt.verdict === "open-findings")
+     && isStringList(receipt.openFindingIds)
+     && isReviewedAt(receipt.reviewedAt);
+   if (!shapeOk) return "DRR-SHAPE";
++  if (!reportPairIsValid(report)) return "DRR-REPORT-PAIR";
+   const companionPaths = sources.companions.map((companion) => companion.path);
+   if (!pathsAreAcceptable(report.path, sources.prd.path, sources.spec.path, companionPaths, previousReceiptPath)) return "DRR-PATH";
+   if (!sourcesAreAcceptable(sources.prd.path, sources.spec.path, companionPaths)) return "DRR-SOURCES";
+@@ -305,10 +311,11 @@ export function createDesignReviewReceipt(input) {
+     && (previous === null || isPreviousInput(previous))
+     && isSourcesShape(sources)
+     && isReviewer(reviewer)
+-    && isRef(report)
++    && isReportShape(report)
+     && isStringList(openFindingIds)
+     && isReviewedAt(reviewedAt);
+   if (!shapeOk) return refuse("DRR-SHAPE");
++  if (!reportPairIsValid(report)) return refuse("DRR-REPORT-PAIR");
+ 
+   const companions = sources.companions.map(({ path, sha256 }) => ({ path, sha256 })).sort((a, b) => compareUnits(a.path, b.path));
+   const normalized = {
+@@ -360,7 +367,7 @@ export function createDesignReviewReceipt(input) {
+     previousReceiptSha256,
+     sources: normalized,
+     reviewer: { runner: reviewer.runner, model: reviewer.model },
+-    report: { path: report.path, sha256: report.sha256 },
++    report: Object.hasOwn(report, "originalSha256") ? { path: report.path, sha256: report.sha256, originalSha256: report.originalSha256 } : { path: report.path, sha256: report.sha256 },
+     verdict: ids.length === 0 ? "pass" : "open-findings",
+     openFindingIds: ids,
+     reviewedAt,
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 6877fec27..a76f07d1f 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -176,6 +176,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
+       },
+       optionalValue: {
+         "--previous": input,
++        "--original-report": input,
+         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
+         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
+       },
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index bf7359b42..465baf7dd 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -407,6 +407,9 @@ export function sanctionedPipelineStateArgs(args, root) {
+     });
+   }
+   if (args[0] === "materialize-architecture") return args.length === 1;
++  // D64: the next action `inspect` renders once a plan is approved. The verb takes no flags and writes one governed template
++  // file (it refuses when that file exists), the same class as materialize-architecture just above.
++  if (args[0] === "materialize-push-threat-model") return args.length === 1;
+   const validBy = (value) => typeof value === "string"
+     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
+   if (args[0] === "plan-legacy-v2-revocation-recovery") {
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 930642110..12d6ca09e 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -39,7 +39,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
+ 
+ const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
+-  + "[--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
++  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
+   + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
+   + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
+ 
+@@ -51,7 +51,7 @@ const REQUESTED_ROUTE_PATTERN = /^[\x21-\x7e]{1,128}$/u;
+ const SINGLE_FLAGS = new Map([
+   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
+   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
+-  ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
++  ["original-report", "originalReportPath"], ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
+ ]);
+ const REPEATED_FLAGS = new Map([["companion", "companionPaths"], ["open-finding", "openFindingIds"]]);
+ const REQUIRED = ["repo", "feature", "report", "prd", "spec", "out"];
+@@ -136,6 +136,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const companionPaths = request.companionPaths ?? [];
+   const openFindingIds = request.openFindingIds ?? [];
+   const previousPath = request.previousPath ?? null;
++  const originalReportPath = request.originalReportPath ?? null;
+   const requestedRoute = request.requestedRoute ?? null;
+   const observedIdentity = request.observedIdentity ?? null;
+   const isStrings = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+@@ -153,6 +154,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
+   companionPaths.forEach((path) => named.push(["companion", path]));
+   if (previousPath !== null) named.push(["previous receipt", previousPath]);
++  if (originalReportPath !== null) named.push(["original report", originalReportPath]);
+   for (const [role, path] of named) {
+     if (!isSafePath(path)) return refuse("DRC-PATH-UNSAFE", `the ${role} path is not a safe repo-relative path: ${JSON.stringify(path)}`);
+   }
+@@ -184,6 +186,13 @@ export function createReceiptFromDisk(input, deps = {}) {
+   }
+   const reportRead = readBound(repoReal, request.reportPath, "report");
+   if (!reportRead.ok) return reportRead;
++  // D64: a sanitized report. The unpublished original is read only to derive its digest; the receipt binds both digests.
++  let originalSha256 = null;
++  if (originalReportPath !== null) {
++    const originalRead = readBound(repoReal, originalReportPath, "original report");
++    if (!originalRead.ok) return originalRead;
++    originalSha256 = sha256Of(originalRead.bytes);
++  }
+   let previous = null;
+   if (previousPath !== null) {
+     const previousRead = readBound(repoReal, previousPath, "previous receipt");
+@@ -203,7 +212,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+     previous,
+     sources,
+     reviewer: { runner, model },
+-    report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes) },
++    report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes), ...(originalSha256 === null ? {} : { originalSha256 }) },
+     openFindingIds,
+     reviewedAt: clock.toISOString(),
+     specBytes,
+@@ -261,7 +270,7 @@ function parseArgv(argv) {
+   }
+   const missing = REQUIRED.find((name) => !single.has(name));
+   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
+-  const request = { ...repeated, previousPath: null, requestedRoute: null, observedIdentity: null };
++  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null };
+   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
+   return { ok: true, request };
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index f62c0ca62..25f0376e0 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -378,7 +378,7 @@ import {
+   writeSync,
+ } from "node:fs";
+ import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+-import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture } from "../lib/critic-accepted-contract.mjs";
++import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture, inspectSpecCriterionRows } from "../lib/critic-accepted-contract.mjs";
+ import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
+ import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
+ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
+@@ -10975,6 +10975,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+       let approvalRequestPath = null, approvalReview = null;
+       if (requiresWorkflowPackage) {
++        // D64: every acceptance-criterion row the Spec states must be one the registration/dispatch parser locates; an unsupported
++        // shape or id is refused HERE, before the PO is asked to sign, not first at dispatch preparation. Scoped to Specs that carry
++        // such rows (a Spec with none is the deferred delivery hand-off concern, D85) and fail-open on an unreadable Spec, which the
++        // input check below refuses with its own typed code.
++        const specFile = physicalRebindFile(dir, submitted.specPath);
++        let specText = null;
++        try { specText = specFile ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(specFile.bytes) : null; } catch { specText = null; }
++        const criteria = specText === null ? { ok: true } : inspectSpecCriterionRows(specText);
++        if (!criteria.ok) { console.error(`Error: present-plan refused (${criteria.code}); ${criteria.message}`); return 2; }
+         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
+         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
+         const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});

@@ -1,0 +1,60 @@
+command: node --test plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+label: k150b-g31-red
+exitCode: 1
+head: 13ed1539bef27e3d897934ff9ce58e39c01ceb8f
+tree: b3d97247d51342b279e66586d3f830038afa7551
+dirty: true
+--- stdout ---
+✖ K150B: a long material path retains its full identity and digest in the disclosure (2.527752ms)
+✔ K150B: malformed digest and control-bearing material paths refuse (1.054534ms)
+✖ G31: human-facing critical authorization names the external proof (3.148261ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 665.818748
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:9:1
+✖ K150B: a long material path retains its full identity and digest in the disclosure (2.527752ms)
+  Error: PO-SIGN-DISCLOSURE-MATERIAL
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:781:32)
+      at compactSigningDisclosure (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs:482:203)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:11:17)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+
+test at plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:28:1
+✖ G31: human-facing critical authorization names the external proof (3.148261ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      code: 'PO-HUMAN-CRITICAL-AUTHORIZATION-READY',
+      ok: true,
+  +   proofPath: '/repo/scratch/critical-push-proof.json'
+  -   proofPath: '/keys/proof-critical-push.json'
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs:32:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { ok: true, code: 'PO-HUMAN-CRITICAL-AUTHORIZATION-READY', proofPath: '/repo/scratch/critical-push-proof.json' },
+    expected: { ok: true, code: 'PO-HUMAN-CRITICAL-AUTHORIZATION-READY', proofPath: '/keys/proof-critical-push.json' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,13 @@
+command: node scripts/run-in.mjs scratch/clones/k149 k149-cch plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: k149-base
+exitCode: 1
+head: 439f4c60d512dc351021304c2919f5dfc9ed5807
+tree: 17e76c0fe69c7bd22bdb616a561984a3be372f86
+dirty: true
+--- stdout ---
+RED   exit 1 tests 137 pass 135 fail 2 skip 0 todo 0  plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+   ✖ CCH136 Codex Critic host case 136
+   ✖ CCH137 Codex Critic host case 137
+   address-root repair: repaired ARR-OK moved 1
+
+--- stderr ---

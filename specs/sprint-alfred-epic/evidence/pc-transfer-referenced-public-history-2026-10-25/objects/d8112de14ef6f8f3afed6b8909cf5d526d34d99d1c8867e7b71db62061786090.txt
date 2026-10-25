@@ -1,0 +1,11 @@
+RED exit 1 sig null secs 75 tests 23 pass 21 fail 1 skip 1 todo 0 red plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+GREEN exit 0 sig null secs 80 tests 23 pass 22 fail 0 skip 1 todo 0 green1 plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+GREEN exit 0 sig null secs 468 tests 392 pass 389 fail 0 skip 3 todo 0 after-glr plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+GREEN exit 0 sig null secs 80 tests 23 pass 22 fail 0 skip 1 todo 0 after plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+GREEN exit 0 sig null secs 1 tests 12 pass 12 fail 0 skip 0 todo 0 after plugins/pipeline-core/lib/passive-read-policy.test.mjs
+GREEN exit 0 sig null secs 44 tests 8 pass 8 fail 0 skip 0 todo 0 after plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
+GREEN exit 0 sig null secs 1 tests 5 pass 5 fail 0 skip 0 todo 0 after plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
+GREEN exit 0 sig null secs 2 tests 74 pass 73 fail 0 skip 1 todo 0 after plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+GREEN exit 0 sig null secs 32 tests 15 pass 14 fail 0 skip 1 todo 0 after plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+GREEN exit 0 sig null secs 2 tests 9 pass 9 fail 0 skip 0 todo 0 after plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+GREEN exit 0 sig null secs 0 tests 9 pass 9 fail 0 skip 0 todo 0 after harness/scripts/check-consumer-safe-paths.test.mjs

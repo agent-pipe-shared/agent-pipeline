@@ -1,0 +1,14 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-decided.md` and the files named in them are your ONLY input. Read `scratch/clones/k126/templates/prompts/agent-obligations.md` first, then the common file. Clone name: `k126`. BASE: main (clone of the main checkout; run `git pull --ff-only` inside it first). Tool budget: base 70, closing allowance +5. Everything here is unprotected (backlog item text); commit in the clone, trailers exactly `AI-Assisted: true` and `Dispatch: K126-ITEM-RECONSTRUCTION (goldfish)`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K126-ITEM-RECONSTRUCTION/2026-10-23 · Role Goldfish`
+
+## K126-ITEM-RECONSTRUCTION: reconstruct the backlog item `implementation-without-dispatch-escapes-review-coverage` 1:1 from its pin header
+
+### 1. Goal
+PO permission of 2026-10-23 (batch 12, row 37), for EXACTLY this one file: create `backlog/items/<date>-implementation-without-dispatch-escapes-review-coverage.md` (use the naming convention of the neighbours in `backlog/items/`; the date is the pin's own date if its header carries one, else 2026-10-23) reconstructed 1:1 from the pin header of the test that pins it (find it: `rg -ln "implementation-without-dispatch-escapes-review-coverage" plugins harness specs backlog docs | head -20`; read the pin header and the matrix row in `specs/sprint-alfred-epic/` that names the item). Follow the two examples already reconstructed on 2026-10-23: `backlog/items/2026-10-23-domain-scanner-findings-need-reproduction-before-remedy.md` and `backlog/items/2026-10-23-capture-evidence-does-not-normalize-windows-npm-launch.md` (frontmatter, "reconstructed" marker and wording, acceptance section). Rules: no new facts, no invented acceptance criteria: the acceptance section lists exactly the clauses the pin cases assert, each mapped to the pin case id; mark the file as "reconstructed from the pin header, PO permission 2026-10-23". Check the backlog item checker if one exists (`find harness/scripts -name "check-backlog*"`; run it once, alone) and `node harness/scripts/check-doc-contracts.mjs`. The open entry on the delivery matrix (index plan `specs/sprint-alfred-epic/plans/index-75-plan-2026-10-23.md`) says "create it and map the pin cases": report the mapping table. Notes: `scratch/agent-out/K126-notes.md`. Never "done".
+
+### 2. DoD
+One item file committed in the clone, mapping table, checks run.
+
+### 3. Task id
+TASK_ID: K126-ITEM-RECONSTRUCTION.

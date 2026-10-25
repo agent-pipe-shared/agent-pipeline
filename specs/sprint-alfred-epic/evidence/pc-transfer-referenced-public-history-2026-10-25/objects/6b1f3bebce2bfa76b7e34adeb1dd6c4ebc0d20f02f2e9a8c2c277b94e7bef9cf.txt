@@ -1,0 +1,9 @@
+command: git diff --check
+label: g32-diff-check
+exitCode: 0
+head: eac1d2dc8a4dbbf6117f4499d8cc8a23f65ffbd3
+tree: ae59ba836876caf93aa4bed681c0bd8ff093a703
+dirty: true
+--- stdout ---
+
+--- stderr ---

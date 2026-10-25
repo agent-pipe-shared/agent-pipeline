@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: SUL-1.0
+/** Resolve the existing feature review duty from validated State and package evidence. */
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { validateRigorHistory } from "./rigor-lifecycle.mjs";
+import { validateFeaturePackage } from "./feature-package-topology.mjs";
+
+const RANK = Object.freeze({ mini: 0, feature: 1, epic: 2 });
+const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+export function resolvePublicationReviewRequirement(state, { rootDir } = {}) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return { required: true, code: "REVIEW-STATE-UNAVAILABLE" };
+  const featureId = state.activeFeature?.id ?? (Array.isArray(state.closedFeatures) ? state.closedFeatures.at(-1)?.id : null);
+  if (typeof featureId !== "string" || !ID.test(featureId)) return { required: true, code: "REVIEW-FEATURE-UNAVAILABLE" };
+  let history;
+  try { history = validateRigorHistory(state.rigorHistory); }
+  catch { return { required: true, code: "REVIEW-RIGOR-HISTORY-INVALID" }; }
+  const submitted = state.planSubmission?.profile;
+  if (submitted !== undefined && !Object.hasOwn(RANK, submitted)) return { required: true, code: "REVIEW-PROFILE-INVALID" };
+  const retained = history.filter(row => row.body.featureId === featureId).at(-1)?.body.observation.retainedProfile;
+  if (retained !== undefined && !Object.hasOwn(RANK, retained)) return { required: true, code: "REVIEW-RETAINED-PROFILE-INVALID" };
+  if (submitted === undefined && retained === undefined) return { required: true, code: "REVIEW-PROFILE-UNAVAILABLE" };
+  const profile = RANK[submitted ?? "mini"] >= RANK[retained ?? "mini"] ? submitted ?? retained : retained;
+  if (RANK[profile] >= 1) return { required: true, code: "REVIEW-PROFILE-REQUIRED" };
+  // Package rigor is separate: registration maps even mini to package rigor 1.
+  if (rootDir !== undefined) {
+    const manifestPath = `specs/${featureId}/lifecycle.json`;
+    if (existsSync(join(rootDir, manifestPath))) {
+      let checked;
+      try { checked = validateFeaturePackage(rootDir, manifestPath); }
+      catch { return { required: true, code: "REVIEW-PACKAGE-INVALID" }; }
+      if (!checked.ok) return { required: true, code: "REVIEW-PACKAGE-INVALID" };
+      return { required: true, code: "REVIEW-PACKAGE-REQUIRED" };
+    }
+  }
+  return { required: false, code: "REVIEW-LOW-RIGOR" };
+}
+
+export function requiresPublicationReview(state, options) {
+  return resolvePublicationReviewRequirement(state, options).required;
+}

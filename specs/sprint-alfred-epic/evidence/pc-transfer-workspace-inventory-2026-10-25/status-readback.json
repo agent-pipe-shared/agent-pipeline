@@ -1,0 +1,2124 @@
+{
+  "schema": "pipeline.pc-transfer-workspace-status-readback.v1",
+  "primaryExcluded": "parent is performing authorized handover integration; candidate content remains separately checked",
+  "roots": [
+    {
+      "root": "scratch/clones/expanded-po-suite-registration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g23-original-m7-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-agy-original-critic-return-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/critic-cand",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/critic-ord2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/critic-ord3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/critic-ord4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/verify-wt",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/wt-d02409a8a",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/ac168-enforcement-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/ac168-enforcement-checkpoint-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/agy-install-lifecycle-matcher",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/agy-native-tier-repair-fresh",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/candidate-final-compatibility-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/codex-push-guard-budget",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/codex-ready-fixture-authoring",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/composed-enrollment-kernel-c28",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/cp1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/cross-runner-diagnostic-toil",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/current-unsafe-options-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/d124-a3-fixture-repair",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/d124-current-carry-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress5",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress6",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress7",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress8",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/dress9",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/fix-wave-cohort-registration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/fix-wave-verify-registration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/fv1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g10",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g11",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g12",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g13-current-session-artifact-export",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g17-critic",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g17-current-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g17-enrollment-integration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g17-source-settlement-correction",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g18-agy-model-carrier-consistency",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g19-preflight-integration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g19-windows",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g20-publication-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g20-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g20-verify-registration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g21-result",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g21-result-red",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g22-worktree-test-dependencies",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g23-cross-runner-passive-matrix",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g23-current-source-qualification-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g23-passive-matrix-enrollment",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g23-quoted-pipeline-reads",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g23-reads",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g24-evidence-collision",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g24-immutable-run-completion-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g25-design-journey",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g25-g27-design-helper-completion",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g26-g29-close-honesty",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g26-g29-helper-completion",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g27-architecture-current-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g27-criterion-generator",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g28-portable-evidence",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g30-active-runner-views",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g30-midsession-hook-refresh",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g30-verify-registration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g32-security-remote",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g33-existing-state-recovery",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g5",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g6",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g6-aggregate-fixture-repair",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g6-installer-matcher-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g6-matcher-readback-finalization",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g6-source-host-wiring-correction",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g7",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g7-draft-route-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g7-required-completion-source-corrected",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g8",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g8-native-producer-contract-draft",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g8-original-custody-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g9",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/g9b-active-hook-view-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/generator-guidance-condensation",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/generator-integrated-13-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/generator-output-budget-repair",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/h1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/h2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/h3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/h4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/h5",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/h6",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/i1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/i2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/i3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/i4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/j1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/j2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/j3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/j4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/j5",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k1-trial",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k10",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k101",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k102",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k103",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k104-apply",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k107",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k108",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k11",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k110",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k111",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k112",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k113",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k114",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k115",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k116",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k117",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k118-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k119",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k12",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k120",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k120-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k121",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k122",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k123",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k124",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k125",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k125-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k126",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k127",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k127-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k128",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k128-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k129",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k13",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k130",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k131",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k132",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k132-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k132-verify",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k133",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k134",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k135",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k136",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k137",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k138",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k139",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k139-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k14",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k140",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k140-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k141",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k141-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k142",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k142-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k143",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k143-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k144",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k144-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k145",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k146-codex",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k147",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k147-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k148",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k148-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k149",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k15",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k15-stack",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k150",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k150b-g31",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k151",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k152",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k152b-model",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k152b-model-a3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k153",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k156-current-dependency-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k156-runtime-recovery",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k157",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k16",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k17",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k18",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k19",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k20",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k21",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k22",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k23",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k24",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k25",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k27",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k28",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k29",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k30",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k31",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k32",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k32-apply",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k33",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k34",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k35",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k36",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k37",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k38",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k39",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k40",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k41",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k42",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k43",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k44",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k45",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k46",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k47",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k48",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k49",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k5",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k50",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k51",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k52",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k52red",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k53",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k54",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k55",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k56",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k57",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k58",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k59",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k6",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k6-check",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k60",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k61",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k62",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k63",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k64",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k66",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k67",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k68",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k69",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k7",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k70",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k73",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k74",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k75",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k76",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k77",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k78",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k79",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k8",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k80",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k81",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k82",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k83",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k84",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k85",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k86",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k89",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k9",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k90",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k91",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k92",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k93",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k94",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k95",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k96",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k97",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k98",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/k98b",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/original-075-requalification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/original-controller-completion-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/original-controller-controlled-identity",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/original-guard-lifecycle-current-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/original-onboarding-controller-cohort",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/p1-g23-composed-registration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/p1-lifecycle-composition",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/p1-state-marker-fixture",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pinrun",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/po-discard-never-liftable-completion",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/po-only-discard-guard-repair",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/post-close-push-continuity",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/private-tmp-controlled-refusal",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-block3-dress9-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-block3-dress9-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-block3-dress9-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-f3-prompt-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-head-540e96f71-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-head-540e96f71-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-head-540e96f71-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k141-r1-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k141-r1-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k141-r1-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k141-r2-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k141-r3-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k144-base-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k40-42-dress8-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k40-42-dress8-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k40-42-dress8-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k41k42-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k41k42-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k41k42-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k48-mfhs-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k48-mfi-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k49sweep-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k49sweep-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k50-gnd-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k52-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k52-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k52b-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-k52b-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-linux-singles-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-linux-singles-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-linux-singles-2-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-linux-singles-2-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-linux-singles-2-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-mfi-a-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-mfi-b-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-onboarding-v3-head-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-validate-0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-validate-1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-validate-2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/pw-validate-3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-checkout-identity-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-critic-close-inputs-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-critic-finalizer-original-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-dispatch-help-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-ready-guard-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/r2-windows-main-entry-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rehearse",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rehearse2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rehearse3",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rehearse4",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rehearse5",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-adv",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-el01",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-el01b",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-gdl",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-ovr",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-read",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/rv-reg",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/scanner-summary-truth",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/signing-help-delegation-qualification",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/state-result-recovery-integration",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/unsafe-options-hermetic-fixture",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/v0",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/v1",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/v2",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    },
+    {
+      "root": "scratch/clones/windows-host-acl-scope-20261025",
+      "statusExit": 0,
+      "unchanged": true,
+      "headUnchanged": true
+    }
+  ]
+}

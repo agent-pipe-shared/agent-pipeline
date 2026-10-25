@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: SUL-1.0
+// Test-only authoring setup for the retained coordinator language-binding case.
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {renderArchitectureDesignSkeleton,renderDesignTraceabilitySkeleton,stagingDesignNeedsAuthoring} from './design-authoring.mjs';
+import {planOnboardingIntakeSpecMarker,applyOnboardingIntakeSpecMarker} from './onboarding-continuity.mjs';
+
+export function authorOriginalCoordinatorLanguageFixture(rootDir, generated) {
+  const prdPath=join(rootDir,generated.targets.prd.path);
+  const specPath=join(rootDir,generated.targets.spec.path);
+  const prd=readFileSync(prdPath,'utf8'),spec=readFileSync(specPath,'utf8');
+  const architecture=renderArchitectureDesignSkeleton();
+  const traceability=renderDesignTraceabilitySkeleton();
+  assert.equal(prd.split(architecture).length,2,'the original generated PRD must carry one authoring aid');
+  assert.equal(spec.split(traceability).length,2,'the original generated Spec must carry one authoring aid');
+  writeFileSync(prdPath,prd.replace(architecture,'## Design\n\nThis mini project preserves the confirmed operator language while binding its authored design.\n'));
+  writeFileSync(specPath,spec.replace(traceability,'## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN an authored design changes its operator language, the system SHALL bind a consistent authority in that language. | Retained coordinator language-binding callback |\n\n## Traceability\n\n| Design input | Requirement | Acceptance criterion | Verification entry point |\n|---|---|---|---|\n| Confirmed intake language | Preserve language consistency at bind | AC-1 | Retained coordinator language-binding callback |\n'));
+  assert.equal(stagingDesignNeedsAuthoring(readFileSync(prdPath,'utf8'),readFileSync(specPath,'utf8')),false);
+  // Repair the exact technical digest through its public transaction after authoring.
+  const plan=planOnboardingIntakeSpecMarker({rootDir,repositoryCapability:'local'});
+  const applied=applyOnboardingIntakeSpecMarker({rootDir,repositoryCapability:'local',expectedPlanSha256:plan.planSha256,activate:true});
+  assert.ok(['applied','already-current'].includes(applied.status));
+}

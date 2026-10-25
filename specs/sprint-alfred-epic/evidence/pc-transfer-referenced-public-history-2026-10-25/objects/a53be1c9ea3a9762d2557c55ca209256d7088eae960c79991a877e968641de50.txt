@@ -1,0 +1,9 @@
+fix(pipeline): bind lifecycle input and qualify controlled refusal paths
+
+Validate current authored sources before submission writes, preserve architecture dispositions, and admit explicit public handover inspection.
+
+Register focused witnesses, preserve the atomic State examiner with a committed fixture, and exercise the unchanged private-temp refusal through controlled children.
+
+AI-Assisted: true
+Dispatch: P1-LIFECYCLE-COMPOSITION (goldfish)
+Commit-Act: human-operator

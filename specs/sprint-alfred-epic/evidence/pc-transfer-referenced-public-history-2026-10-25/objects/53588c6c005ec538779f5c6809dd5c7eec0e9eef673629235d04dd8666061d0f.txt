@@ -1,0 +1,27 @@
+command: node --test scratch/clones/g20-qualification/harness/scripts/check-consumer-safe-paths.test.mjs
+label: g20-consumer-safe-clone
+exitCode: 0
+head: 1e57d58014a2a5c00b3ba5409aa6a9a01aa976d5
+tree: d2cc59df43fc810e7569c6bc7da228290c461963
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (2.245566ms)
+✔ a clean fixture passes (1.424015ms)
+✔ an allowlisted occurrence passes (0.626561ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.525368ms)
+✔ multiple prefix hits on one line each produce a finding (0.388147ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.446699ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (2.786834ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (358.473775ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (23.133779ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 529.858935
+
+--- stderr ---

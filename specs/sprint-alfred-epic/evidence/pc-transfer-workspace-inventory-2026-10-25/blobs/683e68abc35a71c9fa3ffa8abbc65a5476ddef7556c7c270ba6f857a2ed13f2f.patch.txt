@@ -1,0 +1,1264 @@
+diff --git a/harness/config/required-evidence-accepted-debt.v1.json b/harness/config/required-evidence-accepted-debt.v1.json
+new file mode 100644
+index 000000000..2d8b4d41e
+--- /dev/null
++++ b/harness/config/required-evidence-accepted-debt.v1.json
+@@ -0,0 +1,493 @@
++{
++  "schema": "pipeline.required-evidence-accepted-debt.v1",
++  "entries": [
++    {
++      "source": "evidence/alf-scanner-prep-terminal-reconciliation.json",
++      "path": "evidence/dispatch-record-ALF-SCANNER-PREP.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-INSTALLER-ATTESTATION-RUNNER-PARITY-1.json",
++      "path": "backlog/evidence/2026-09-12-installer-parity-review-bundle-tests.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-1.json",
++      "path": "evidence/NVA-B-XPORTFIX-1-check-consumer-safe-paths-test.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-1.json",
++      "path": "evidence/NVA-B-XPORTFIX-1-green-codex-critic-host-test.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-1.json",
++      "path": "evidence/NVA-B-XPORTFIX-1-red-codex-critic-host-test.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
++      "path": "evidence/NVA-B-XPORTFIX-2-cases-108-109-red-pre-70287f72.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
++      "path": "evidence/NVA-B-XPORTFIX-2-check-consumer-safe-paths-test.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
++      "path": "evidence/NVA-B-XPORTFIX-2-green-codex-critic-host-test.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-B-XPORTFIX-2.json",
++      "path": "evidence/NVA-B-XPORTFIX-2-red-codex-critic-host-test.txt",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-BL-32.json",
++      "path": "evidence/security-latest.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-BL-32.json",
++      "path": "evidence/security-latest.v2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/dispatch-record-NVA-R18-SCANBOOT.json",
++      "path": "plugins/pipeline-core/config/security/semgrep-default-rules.yml",
++      "code": "REQ-EVIDENCE-UNTRACKED",
++      "reason": "The referrer names evidence that is neither tracked nor ignored and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-01V4.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-02V4.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-03V4.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-04.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-05.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-06.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-07.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-08.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-09.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-10.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC1R3.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC3.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC4R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC5.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC6.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AUTHORITY-THREE.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-CALIBRATION-R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-MISSING-THREE-R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-R1.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-CALIBRATION-DESIGN-R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-PROMOTION-MAP.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-PROMOTION-Q0.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-evidence.json",
++      "path": "evidence/dispatch-record-NVA-B-PUSH-LIFECYCLE-DESIGN-R3.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-ALF-SCANNER-PREP.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-01V4.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-02V4.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-03V4.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-04.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-05.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-06.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-07.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-08.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-09.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-10.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC1R3.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC3.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC4R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC5.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AC6.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-AUTHORITY-THREE.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-CALIBRATION-R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-MISSING-THREE-R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-AUDIT-R1.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-CALIBRATION-DESIGN-R2.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-PROMOTION-MAP.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-PROMOTION-Q0.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    },
++    {
++      "source": "evidence/legacy-dispatch-reconcile-index.json",
++      "path": "evidence/dispatch-record-NVA-B-PUSH-LIFECYCLE-DESIGN-R3.json",
++      "code": "REQ-EVIDENCE-IGNORED",
++      "reason": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++      "owner": "Elephant",
++      "due": "2026-11-30"
++    }
++  ]
++}
+diff --git a/harness/scripts/check-required-evidence-not-ignored.mjs b/harness/scripts/check-required-evidence-not-ignored.mjs
+index 39fb49ba4..d40e9fa58 100644
+--- a/harness/scripts/check-required-evidence-not-ignored.mjs
++++ b/harness/scripts/check-required-evidence-not-ignored.mjs
+@@ -13,7 +13,12 @@
+  *                                 (advisory: it works, yet a replacement file
+  *                                 cannot be added without `git add -f`)
+  *
+- * Only the first three fail the check. Scope is declared, not discovered:
++ * Only the first three fail the check, unless a finding is a listed pair of the
++ * tracked accepted-debt baseline (PO decision D106, ACCEPTED_DEBT_PATH): a listed
++ * pair is reported as severity "accepted" until its due date; past it the pair is
++ * REQ-EVIDENCE-DEBT-EXPIRED, and a listed pair that is no longer a finding is
++ * REQ-EVIDENCE-DEBT-STALE, so the list can only shrink. A new pair is always an
++ * error. Scope is declared, not discovered:
+  * see REFERRER_PATTERNS. Code that hard-codes a machine-local path is out of
+  * reach of a data scan and stays a review concern.
+  */
+@@ -42,7 +47,9 @@ export function collectPathReferences(value, out = new Set()) {
+   return [...out];
+ }
+ 
+-export function checkRequiredEvidenceNotIgnored({ rootDir, referrerPatterns = REFERRER_PATTERNS } = {}) {
++export function checkRequiredEvidenceNotIgnored({
++  rootDir, referrerPatterns = REFERRER_PATTERNS, debtPath = ACCEPTED_DEBT_PATH, today: today_ = new Date(),
++} = {}) {
+   if (typeof rootDir !== "string") return { ok: false, code: "REQ-EVIDENCE-ROOT", findings: [] };
+   const root = resolve(rootDir);
+   const git = (args, allowFailure = false) => {
+@@ -85,18 +92,122 @@ export function checkRequiredEvidenceNotIgnored({ rootDir, referrerPatterns = RE
+         : { ...base, code: "REQ-EVIDENCE-UNTRACKED", severity: "error", exists });
+     }
+   }
+-  return { ok: !findings.some((entry) => entry.severity === "error"), code: "REQ-EVIDENCE-CHECKED", findings };
++
++  // D106: subtract the named, expiring accepted baseline. A finding that is not
++  // listed stays an error; a listed pair is advisory until its due date; a listed
++  // pair that is no longer a finding is stale. The list can therefore only shrink.
++  const today = normalizeDay(today_);
++  const debt = loadAcceptedDebt({ root, tracked, debtPath });
++  const gated = [...debt.findings];
++  const used = new Set();
++  for (const finding of findings) {
++    const key = finding.source + "\0" + finding.path;
++    const entry = finding.severity === "error" ? debt.byPair.get(key) : undefined;
++    if (!entry || entry.code !== finding.code) { gated.push(finding); continue; }
++    used.add(key);
++    if (today === null || entry.due < today) {
++      gated.push({ ...finding, code: "REQ-EVIDENCE-DEBT-EXPIRED", severity: "error", acceptedAs: finding.code, owner: entry.owner, due: entry.due });
++    } else {
++      gated.push({ ...finding, severity: "accepted", owner: entry.owner, due: entry.due, reason: entry.reason });
++    }
++  }
++  for (const [key, entry] of debt.byPair) {
++    if (!used.has(key)) {
++      gated.push({ source: entry.source, path: entry.path, code: "REQ-EVIDENCE-DEBT-STALE", severity: "error", acceptedAs: entry.code, owner: entry.owner, due: entry.due });
++    }
++  }
++  return { ok: !gated.some((entry) => entry.severity === "error"), code: "REQ-EVIDENCE-CHECKED", findings: gated };
++}
++
++export const ACCEPTED_DEBT_PATH = "harness/config/required-evidence-accepted-debt.v1.json";
++export const ACCEPTED_DEBT_SCHEMA = "pipeline.required-evidence-accepted-debt.v1";
++const DEBT_CODES = Object.freeze(["REQ-EVIDENCE-GIT-DIR", "REQ-EVIDENCE-IGNORED", "REQ-EVIDENCE-UNTRACKED"]);
++const DEBT_ENTRY_KEYS = ["code", "due", "owner", "path", "reason", "source"];
++const DAY = /^\d{4}-\d{2}-\d{2}$/u;
++const DEBT_REASON = Object.freeze({
++  "REQ-EVIDENCE-GIT-DIR": "The referrer names a machine-local path inside the git directory; accepted historical debt per D106, cleanup in 0.7.1.",
++  "REQ-EVIDENCE-IGNORED": "The referrer names evidence that an ignore rule hides and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++  "REQ-EVIDENCE-UNTRACKED": "The referrer names evidence that is neither tracked nor ignored and a clean clone does not have; accepted historical debt per D106, cleanup in 0.7.1.",
++});
++
++function validDay(value) {
++  if (typeof value !== "string" || !DAY.test(value)) return false;
++  const parsed = new Date(value + "T00:00:00Z");
++  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
++}
++
++function normalizeDay(value) {
++  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
++  return validDay(value) ? value : null;
++}
++
++/** Generate the accepted-debt document from real findings; nothing is typed by hand. */
++export function buildAcceptedDebt(findings, { due, owner = "Elephant" } = {}) {
++  const seen = new Set();
++  const entries = [];
++  for (const finding of findings) {
++    if (!(finding.severity === "error" || finding.severity === "accepted") || !DEBT_CODES.includes(finding.code)) continue;
++    const key = finding.source + "\0" + finding.path;
++    if (seen.has(key)) continue;
++    seen.add(key);
++    entries.push({ source: finding.source, path: finding.path, code: finding.code, reason: DEBT_REASON[finding.code], owner, due });
++  }
++  entries.sort((a, b) => (a.source < b.source ? -1 : a.source > b.source ? 1 : a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
++  return { schema: ACCEPTED_DEBT_SCHEMA, entries };
++}
++
++function loadAcceptedDebt({ root, tracked, debtPath }) {
++  const empty = (finding) => ({ byPair: new Map(), findings: finding ? [finding] : [] });
++  const invalid = (detail) => empty({ source: debtPath, path: debtPath, code: "REQ-EVIDENCE-DEBT-INVALID", severity: "error", detail });
++  if (!existsSync(resolve(root, debtPath))) return empty(null);
++  // The list is itself evidence the gate depends on: it must be in a clean clone.
++  if (!tracked.has(debtPath)) {
++    return empty({ source: debtPath, path: debtPath, code: "REQ-EVIDENCE-DEBT-UNTRACKED", severity: "error" });
++  }
++  let doc;
++  try { doc = JSON.parse(readFileSync(resolve(root, debtPath), "utf8")); }
++  catch { return invalid("not valid JSON"); }
++  if (doc === null || typeof doc !== "object" || Array.isArray(doc)
++    || Object.keys(doc).sort().join("\0") !== "entries\0schema"
++    || doc.schema !== ACCEPTED_DEBT_SCHEMA || !Array.isArray(doc.entries)) return invalid("shape or schema");
++  const byPair = new Map();
++  for (const [position, entry] of doc.entries.entries()) {
++    const label = `entries[${position}]`;
++    if (entry === null || typeof entry !== "object" || Array.isArray(entry)
++      || Object.keys(entry).sort().join("\0") !== DEBT_ENTRY_KEYS.join("\0")) return invalid(`${label} is not a closed entry`);
++    if (![entry.source, entry.path, entry.reason, entry.owner].every((value) => typeof value === "string" && value.trim() !== "")) {
++      return invalid(`${label} has an empty source, path, reason or owner`);
++    }
++    if (!DEBT_CODES.includes(entry.code)) return invalid(`${label}.code is not a listable failing code`);
++    if (!validDay(entry.due)) return invalid(`${label}.due is not a YYYY-MM-DD date`);
++    const key = entry.source + "\0" + entry.path;
++    if (byPair.has(key)) return invalid(`${label} repeats an earlier referrer and target pair`);
++    byPair.set(key, entry);
++  }
++  return { byPair, findings: [] };
+ }
+ 
+ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+-  const result = checkRequiredEvidenceNotIgnored({ rootDir: resolve(fileURLToPath(new URL("../..", import.meta.url))) });
+-  const counts = {};
+-  for (const entry of result.findings) {
+-    const key = `${entry.source} ${entry.code}`;
+-    counts[key] = (counts[key] ?? 0) + 1;
++  const rootDir = resolve(fileURLToPath(new URL("../..", import.meta.url)));
++  const result = checkRequiredEvidenceNotIgnored({ rootDir });
++  if (process.argv.includes("--emit-accepted-debt")) {
++    // Regenerate from the current findings (accepted baseline included), never by hand.
++    const dueArg = process.argv.find((arg) => arg.startsWith("--due="))?.slice("--due=".length);
++    if (!validDay(dueArg)) {
++      process.stderr.write("--emit-accepted-debt needs --due=YYYY-MM-DD\n");
++      process.exitCode = 2;
++    } else process.stdout.write(JSON.stringify(buildAcceptedDebt(result.findings, { due: dueArg }), null, 2) + "\n");
++  } else {
++    const counts = {};
++    const bySeverity = {};
++    for (const entry of result.findings) {
++      const key = `${entry.source} ${entry.code} ${entry.severity}`;
++      counts[key] = (counts[key] ?? 0) + 1;
++      bySeverity[entry.severity] = (bySeverity[entry.severity] ?? 0) + 1;
++    }
++    // Default output is a per-referrer summary; --list prints every finding.
++    const listed = process.argv.includes("--list") ? result.findings : undefined;
++    process.stdout.write(JSON.stringify({ ok: result.ok, code: result.code, bySeverity, counts, findings: listed }, null, 2) + "\n");
++    if (!result.ok) process.exitCode = 1;
+   }
+-  // Default output is a per-referrer summary; --list prints every finding.
+-  const listed = process.argv.includes("--list") ? result.findings : undefined;
+-  process.stdout.write(JSON.stringify({ ok: result.ok, code: result.code, counts, findings: listed }, null, 2) + "\n");
+-  if (!result.ok) process.exitCode = 1;
+ }
+diff --git a/harness/scripts/check-required-evidence-not-ignored.test.mjs b/harness/scripts/check-required-evidence-not-ignored.test.mjs
+index 7c194d143..0a7728662 100644
+--- a/harness/scripts/check-required-evidence-not-ignored.test.mjs
++++ b/harness/scripts/check-required-evidence-not-ignored.test.mjs
+@@ -6,6 +6,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import {
++  ACCEPTED_DEBT_PATH,
++  buildAcceptedDebt,
+   checkRequiredEvidenceNotIgnored,
+   collectPathReferences,
+ } from "./check-required-evidence-not-ignored.mjs";
+@@ -80,3 +82,108 @@ test("references from a non-index file are not scanned, and an untracked index i
+   assert.equal(result.ok, true);
+   assert.deepEqual(result.findings, []);
+ }));
++
++// D106: the check is a gate with a named, expiring accepted baseline.
++const GONE = "evidence/dispatch-record-GONE.json";
++const OTHER = "evidence/dispatch-record-OTHER.json";
++const debtEntry = (path, over = {}) => ({
++  source: "evidence/the-index.json", path, code: "REQ-EVIDENCE-IGNORED",
++  reason: "accepted until the 0.7.1 cleanup", owner: "Elephant", due: "2026-11-30", ...over,
++});
++const debtFile = (...entries) => ({ schema: "pipeline.required-evidence-accepted-debt.v1", entries });
++const gated = (f, { refs = [GONE], debt = null, track: trackDebt = true } = {}) => {
++  f.put("evidence/the-index.json", index(...refs));
++  track(f, "evidence/the-index.json");
++  if (debt !== null) {
++    f.put(ACCEPTED_DEBT_PATH, typeof debt === "string" ? debt : debtFile(...debt));
++    if (trackDebt) track(f, ACCEPTED_DEBT_PATH);
++  }
++};
++const run = (f, today = "2026-10-22") => checkRequiredEvidenceNotIgnored({ rootDir: f.root, today });
++
++test("an accepted pair is advisory and the check passes; the entry fields are carried into the finding", () => fixture((f) => {
++  gated(f, { debt: [debtEntry(GONE)] });
++  const result = run(f);
++  assert.equal(result.ok, true, JSON.stringify(result.findings));
++  assert.deepEqual(codes(result), [`REQ-EVIDENCE-IGNORED:${GONE}`]);
++  assert.equal(result.findings[0].severity, "accepted");
++  assert.equal(result.findings[0].owner, "Elephant");
++  assert.equal(result.findings[0].due, "2026-11-30");
++}));
++
++test("a pair that is not in the accepted list is an error, even when others are accepted", () => fixture((f) => {
++  gated(f, { refs: [GONE, OTHER], debt: [debtEntry(GONE)] });
++  const result = run(f);
++  assert.equal(result.ok, false);
++  assert.deepEqual(result.findings.filter((entry) => entry.severity === "error").map((entry) => entry.path), [OTHER]);
++  // The pair is exact: the same target from another referrer is a new reference.
++  assert.equal(run(f).findings.find((entry) => entry.path === GONE).severity, "accepted");
++}));
++
++test("the exact referrer, target and code must match: a different source or code is not accepted", () => fixture((f) => {
++  gated(f, { debt: [debtEntry(GONE, { source: "evidence/another-index.json" })] });
++  const wrongSource = run(f);
++  assert.equal(wrongSource.ok, false);
++  assert.deepEqual(codes(wrongSource), [`REQ-EVIDENCE-DEBT-STALE:${GONE}`, `REQ-EVIDENCE-IGNORED:${GONE}`].sort());
++}));
++
++test("an accepted pair whose due date has passed is an error; the due day itself is still accepted", () => fixture((f) => {
++  gated(f, { debt: [debtEntry(GONE)] });
++  assert.equal(run(f, "2026-11-30").ok, true);
++  const expired = run(f, "2026-12-01");
++  assert.equal(expired.ok, false);
++  assert.deepEqual(codes(expired), [`REQ-EVIDENCE-DEBT-EXPIRED:${GONE}`]);
++}));
++
++test("a listed pair that is no longer a finding is stale and fails, so the list can only shrink", () => fixture((f) => {
++  f.put("harness/data.json", "{}");
++  track(f, "harness/data.json");
++  gated(f, { refs: ["harness/data.json"], debt: [debtEntry(GONE)] });
++  const result = run(f);
++  assert.equal(result.ok, false);
++  assert.deepEqual(codes(result), [`REQ-EVIDENCE-DEBT-STALE:${GONE}`]);
++}));
++
++test("an invalid or untracked accepted-debt file fails closed and accepts nothing", () => fixture((f) => {
++  for (const bad of [
++    "{ not json",
++    JSON.stringify({ schema: "other", entries: [] }),
++    JSON.stringify(debtFile({ ...debtEntry(GONE), extra: 1 })),
++    JSON.stringify(debtFile(debtEntry(GONE, { owner: "" }))),
++    JSON.stringify(debtFile(debtEntry(GONE, { due: "30.11.2026" }))),
++    JSON.stringify(debtFile(debtEntry(GONE), debtEntry(GONE))),
++    JSON.stringify(debtFile(debtEntry(".git/x/y.json", { code: "REQ-EVIDENCE-TRACKED-IGNORED" }))),
++  ]) {
++    gated(f, { debt: bad });
++    const result = run(f);
++    assert.equal(result.ok, false, bad);
++    assert.ok(result.findings.some((entry) => entry.code === "REQ-EVIDENCE-DEBT-INVALID"), bad);
++    assert.ok(result.findings.some((entry) => entry.code === "REQ-EVIDENCE-IGNORED" && entry.severity === "error"), bad);
++  }
++}));
++
++test("an accepted-debt file that is not tracked is itself machine-local evidence and is refused", () => fixture((f) => {
++  gated(f, { debt: [debtEntry(GONE)], track: false });
++  const result = run(f);
++  assert.equal(result.ok, false);
++  assert.ok(result.findings.some((entry) => entry.code === "REQ-EVIDENCE-DEBT-UNTRACKED"));
++  assert.ok(result.findings.some((entry) => entry.code === "REQ-EVIDENCE-IGNORED" && entry.severity === "error"));
++}));
++
++test("buildAcceptedDebt is generated from the failing findings only, sorted, one entry per pair", () => {
++  const findings = [
++    { source: "evidence/b.json", path: "evidence/z.json", code: "REQ-EVIDENCE-IGNORED", severity: "error" },
++    { source: "evidence/a.json", path: "evidence/y.json", code: "REQ-EVIDENCE-UNTRACKED", severity: "error" },
++    { source: "evidence/a.json", path: "evidence/x.json", code: "REQ-EVIDENCE-TRACKED-IGNORED", severity: "advisory" },
++    { source: "evidence/a.json", path: "evidence/y.json", code: "REQ-EVIDENCE-UNTRACKED", severity: "error" },
++  ];
++  const built = buildAcceptedDebt(findings, { due: "2026-11-30" });
++  assert.equal(built.schema, "pipeline.required-evidence-accepted-debt.v1");
++  assert.deepEqual(built.entries.map((entry) => `${entry.source} ${entry.path} ${entry.code}`),
++    ["evidence/a.json evidence/y.json REQ-EVIDENCE-UNTRACKED", "evidence/b.json evidence/z.json REQ-EVIDENCE-IGNORED"]);
++  for (const entry of built.entries) {
++    assert.equal(entry.owner, "Elephant");
++    assert.equal(entry.due, "2026-11-30");
++    assert.ok(entry.reason.length > 20);
++  }
++});
+diff --git a/harness/scripts/check-verify-suite-append.mjs b/harness/scripts/check-verify-suite-append.mjs
+index 9d463cd4c..7204e371c 100644
+--- a/harness/scripts/check-verify-suite-append.mjs
++++ b/harness/scripts/check-verify-suite-append.mjs
+@@ -4,6 +4,7 @@
+  * repair, proven from committed history alone (integration trailer plus
+  * byte-derived restoration; no machine-local receipt). */
+ import { execFileSync } from "node:child_process";
++import { createHash } from "node:crypto";
+ import { readFileSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -62,10 +63,43 @@ function exactEntryShape(entry) {
+     && Number.isSafeInteger(entry.appendedSuiteCount) && entry.appendedSuiteCount > 0;
+ }
+ 
++// D107: one narrow, unsigned-by-design, historical exception kind next to the signed
++// b7 one: "a row with a duplicate name/file added by commit X, removed again by commit Y".
++// It names both full commit SHAs and four registry digests; nothing is derived from a
++// pattern, so no other commit pair can use it and the kind cannot be extended by data.
++const DUP_ENTRY_SCHEMA = "pipeline.verify-suite-duplicate-repair-entry.v1";
++const DUP_ENTRY_KEYS = [
++  "addCommit", "addParent", "addPostimageSha256", "addPreimageSha256", "duplicateFile",
++  "duplicateName", "duplicateRowSha256", "owner", "reason", "removeCommit", "removeParent",
++  "removePostimageSha256", "removePreimageSha256", "schema", "signed",
++].sort().join("\0");
++const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
++const fullOid = (value) => /^[a-f0-9]{40}$/u.test(value ?? "");
++
++function exactDuplicateRepairShape(entry) {
++  return entry !== null && typeof entry === "object" && !Array.isArray(entry)
++    && Object.keys(entry).sort().join("\0") === DUP_ENTRY_KEYS
++    && entry.schema === DUP_ENTRY_SCHEMA
++    && [entry.addCommit, entry.addParent, entry.removeCommit, entry.removeParent].every(fullOid)
++    && entry.addCommit !== entry.removeCommit
++    && [entry.addPreimageSha256, entry.addPostimageSha256, entry.removePreimageSha256,
++      entry.removePostimageSha256, entry.duplicateRowSha256].every((value) => SHA256.test(value ?? ""))
++    && entry.removePreimageSha256 === entry.addPostimageSha256
++    && typeof entry.duplicateName === "string" && entry.duplicateName.length > 0
++    && typeof entry.duplicateFile === "string" && entry.duplicateFile.length > 0
++    && entry.owner === "Elephant" && entry.signed === false
++    && typeof entry.reason === "string" && /unsigned/u.test(entry.reason)
++    && /historical/iu.test(entry.reason) && entry.reason.length >= 40;
++}
++
+ function exactRecoveryShape(value) {
+-  return value !== null && typeof value === "object" && !Array.isArray(value)
+-    && Object.keys(value).sort().join("\0") === "entries\0schema"
+-    && value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
++  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
++  const keys = Object.keys(value).sort().join("\0");
++  if (keys !== "entries\0schema" && keys !== "duplicateRepairs\0entries\0schema") return false;
++  if (Object.hasOwn(value, "duplicateRepairs")
++    && !(Array.isArray(value.duplicateRepairs) && value.duplicateRepairs.length === 1
++      && exactDuplicateRepairShape(value.duplicateRepairs[0]))) return false;
++  return value.schema === RECOVERY_SCHEMA && Array.isArray(value.entries)
+     && value.entries.length === 1 && exactEntryShape(value.entries[0]);
+ }
+ 
+@@ -128,13 +162,22 @@ export function evaluateSignedHistoryRestoration({
+ 
+   const restoredBytes = registryBytes([...parent.suites, ...additions]);
+   const restored = parseRegistry(restoredBytes);
+-  if (!restored || candidate.suites.slice(0, restored.suites.length)
+-    .some((row, index) => canonical(row) !== canonical(restored.suites[index]))) {
++  if (!restored || candidate.suites.length < restored.suites.length) {
+     return fail("VSA-RECOVERY-CANDIDATE-MISMATCH");
+   }
+-  if (candidate.suites.length > restored.suites.length) {
++  if (candidate.suites.length === restored.suites.length) {
++    if (candidate.suites.some((row, index) => canonical(row) !== canonical(restored.suites[index]))) {
++      return fail("VSA-RECOVERY-CANDIDATE-MISMATCH");
++    }
++  } else {
++    // D103: later registrations may be inserted at any position, so the restored
++    // registry must survive as an ordered, unchanged subsequence of the candidate
++    // (the relaxed append policy), not as its literal prefix.
+     const suffix = evaluateVerifySuiteAppend({ beforeBytes: restoredBytes, afterBytes: candidateBytes });
+-    if (!suffix.ok) return fail("VSA-RECOVERY-SUFFIX-NOT-APPEND");
++    if (!suffix.ok) {
++      return fail(suffix.code === "VSA-PRIOR-ENTRY-CHANGED"
++        ? "VSA-RECOVERY-CANDIDATE-MISMATCH" : "VSA-RECOVERY-SUFFIX-NOT-APPEND");
++    }
+   }
+   return {
+     ok: true,
+@@ -153,6 +196,73 @@ function readRecovery(root, read) {
+   } catch { return null; }
+ }
+ 
++function readDuplicateRepair(root, read) {
++  try {
++    const value = parseStrictJson(read(resolve(root, RECOVERY), "utf8"));
++    return exactRecoveryShape(value) && Object.hasOwn(value, "duplicateRepairs") ? value.duplicateRepairs[0] : null;
++  } catch { return null; }
++}
++
++/**
++ * Pure D107 witness. Everything is derived from the four registry byte strings and
++ * the entry: the add step must be an ordinary relaxed-contract insertion plus exactly
++ * one row that repeats the name and file of a retained row; the removal step must
++ * drop exactly that row and otherwise satisfy the relaxed contract.
++ */
++export function evaluateDuplicateRepair({
++  entry, addCommit, addParent, removeCommit, removeParent,
++  addBeforeBytes, addAfterBytes, removeBeforeBytes, removeAfterBytes,
++} = {}) {
++  const fail = (code) => ({ ok: false, code });
++  if (!exactDuplicateRepairShape(entry)) return fail("VSA-DUPREPAIR-SHAPE");
++  if (addCommit !== entry.addCommit || addParent !== entry.addParent
++    || removeCommit !== entry.removeCommit || removeParent !== entry.removeParent
++    || sha256Hex(addBeforeBytes) !== entry.addPreimageSha256 || sha256Hex(addAfterBytes) !== entry.addPostimageSha256
++    || sha256Hex(removeBeforeBytes) !== entry.removePreimageSha256 || sha256Hex(removeAfterBytes) !== entry.removePostimageSha256) {
++    return fail("VSA-DUPREPAIR-AUTHORIZATION");
++  }
++  const addBefore = parseRegistry(addBeforeBytes);
++  const addAfter = parseRegistry(addAfterBytes);
++  const removeBefore = parseRegistry(removeBeforeBytes);
++  const removeAfter = parseRegistry(removeAfterBytes);
++  if (!addBefore || !addAfter || !removeBefore || !removeAfter) return fail("VSA-DUPREPAIR-SHAPE");
++  const isDuplicate = (row) => row?.name === entry.duplicateName && row?.file === entry.duplicateFile
++    && sha256Hex(canonical(row)) === entry.duplicateRowSha256;
++  if (!addBefore.suites.some((row) => row?.name === entry.duplicateName && row?.file === entry.duplicateFile)) {
++    return fail("VSA-DUPREPAIR-NOT-DUPLICATE-ADD");
++  }
++  const without = (suites, index) => suites.filter((_, position) => position !== index);
++  const added = addAfter.suites.map((row, index) => (isDuplicate(row) ? index : -1)).filter((index) => index >= 0)
++    .some((index) => evaluateVerifySuiteAppend({ beforeBytes: addBeforeBytes, afterBytes: registryBytes(without(addAfter.suites, index)) }).ok);
++  if (!added) return fail("VSA-DUPREPAIR-NOT-DUPLICATE-ADD");
++  if (removeAfter.suites.some(isDuplicate)) return fail("VSA-DUPREPAIR-NOT-REMOVAL");
++  const removed = removeBefore.suites.map((row, index) => (isDuplicate(row) ? index : -1)).filter((index) => index >= 0)
++    .some((index) => evaluateVerifySuiteAppend({ beforeBytes: registryBytes(without(removeBefore.suites, index)), afterBytes: removeAfterBytes }).ok);
++  if (!removed) return fail("VSA-DUPREPAIR-NOT-REMOVAL");
++  return { ok: true, code: "VSA-DUPREPAIR-VERIFIED" };
++}
++
++function bindDuplicateRepair({ root, run, read, entry }) {
++  if (!entry) return null;
++  try {
++    // The entry must be committed and unmodified: a worktree-only edit never unlocks it.
++    if (run(["show", "HEAD:" + RECOVERY]) !== read(resolve(root, RECOVERY), "utf8")) return null;
++    const parentOf = (commit) => {
++      const line = run(["rev-list", "--parents", "-n", "1", commit]).trim().split(/\s+/u);
++      return line.length === 2 && line[0] === commit ? line[1] : null;
++    };
++    const addParent = parentOf(entry.addCommit);
++    const removeParent = parentOf(entry.removeCommit);
++    if (addParent === null || removeParent === null) return null;
++    const result = evaluateDuplicateRepair({
++      entry, addCommit: entry.addCommit, addParent, removeCommit: entry.removeCommit, removeParent,
++      addBeforeBytes: run(["show", addParent + ":" + REGISTRY]), addAfterBytes: run(["show", entry.addCommit + ":" + REGISTRY]),
++      removeBeforeBytes: run(["show", removeParent + ":" + REGISTRY]), removeAfterBytes: run(["show", entry.removeCommit + ":" + REGISTRY]),
++    });
++    return result.ok ? { entry } : null;
++  } catch { return null; }
++}
++
+ /**
+  * Tracked-evidence witness for the integration commit (PO decision D101).
+  * Everything it reads is committed history: the commit's own message trailer
+@@ -232,25 +342,38 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+       introduction + "^.." + head, "--", REGISTRY]).trim().split("\n").filter(Boolean);
+     let checked = 0;
+     let integrationWitnessSeen = false;
++    const dup = bindDuplicateRepair({ root, run, read, entry: readDuplicateRepair(root, read) });
++    let dupAddSeen = false;
++    let dupRemoveSeen = false;
+     for (const commit of commits) {
+       if (!OID.test(commit)) return fail("VSA-HISTORY-SHAPE");
+       const before = show(commit + "^", REGISTRY);
+       const after = show(commit, REGISTRY);
+       const result = evaluateVerifySuiteAppend({ beforeBytes: before, afterBytes: after });
+-      if (!result.ok) {
+-        if (recovery?.ok && commit === recovery.entry.integrationCommit
+-          && before === recovery.parentBytes && after === recovery.defectBytes) {
+-          integrationWitnessSeen = true;
+-        } else if (recovery?.ok && integrationWitnessSeen
++      // D103: the integration commit itself may now satisfy the relaxed contract (rows
++      // were inserted, not changed); the witness must be seen either way so that the
++      // one defect-to-restoration transition after it stays recognised.
++      if (recovery?.ok && commit === recovery.entry.integrationCommit
++        && before === recovery.parentBytes && after === recovery.defectBytes) {
++        integrationWitnessSeen = true;
++      } else if (!result.ok) {
++        if (recovery?.ok && integrationWitnessSeen
+           && before === recovery.defectBytes && after === recovery.restoredBytes) {
+           // This is the one exact defect-to-restoration transition. Any other
+           // historical failure remains subject to the original prefix policy.
++        } else if (dup && !dupAddSeen && commit === dup.entry.addCommit
++          && sha256Hex(before) === dup.entry.addPreimageSha256 && sha256Hex(after) === dup.entry.addPostimageSha256) {
++          dupAddSeen = true;
++        } else if (dup && dupAddSeen && !dupRemoveSeen && commit === dup.entry.removeCommit
++          && sha256Hex(before) === dup.entry.removePreimageSha256 && sha256Hex(after) === dup.entry.removePostimageSha256) {
++          dupRemoveSeen = true;
+         } else {
+           return fail(result.code, commit);
+         }
+       }
+       checked += 1;
+     }
++    if (dupAddSeen && !dupRemoveSeen) return fail("VSA-DUPREPAIR-INCOMPLETE", dup.entry.removeCommit);
+     const committed = show(head, REGISTRY);
+     if (committed !== worktree) {
+       const result = evaluateVerifySuiteAppend({ beforeBytes: committed, afterBytes: worktree });
+@@ -260,7 +383,8 @@ export function checkVerifySuiteAppend({ rootDir, git = null, read = readFileSyn
+     }
+     return {
+       ok: true,
+-      code: recovery?.ok ? "VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION" : "VSA-HISTORY-APPEND-ONLY",
++      code: recovery?.ok ? "VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION"
++        : dupRemoveSeen ? "VSA-HISTORY-APPEND-ONLY-RECORDED-DUPLICATE-REPAIR" : "VSA-HISTORY-APPEND-ONLY",
+       checked,
+     };
+   } catch (error) {
+diff --git a/harness/scripts/check-verify-suite-append.test.mjs b/harness/scripts/check-verify-suite-append.test.mjs
+index b794bc242..72740ac5d 100644
+--- a/harness/scripts/check-verify-suite-append.test.mjs
++++ b/harness/scripts/check-verify-suite-append.test.mjs
+@@ -5,7 +5,9 @@ import { execFileSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import { checkVerifySuiteAppend, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
++import { createHash } from "node:crypto";
++import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
++import { checkVerifySuiteAppend, evaluateDuplicateRepair, evaluateSignedHistoryRestoration, integrationTrailerWitness } from "./check-verify-suite-append.mjs";
+ import { evaluateVerifySuiteAppend } from "../../plugins/pipeline-core/lib/verify-suite-append-policy.mjs";
+ 
+ function fixture(run) {
+@@ -187,6 +189,146 @@ test("the same repair is refused when the integration trailer, the entry digest,
+   });
+ });
+ 
++// D103: later rows may be inserted anywhere, also while a recorded restoration is in force.
++test("a mid-file insertion commit is admitted by the relaxed contract; a change next to it is not", () => fixture((f) => {
++  f.writeConfig([f.tp13]);
++  f.writeRegistry(["a", "b"]);
++  f.commit("introduce protected registry");
++  f.writeRegistry(["a", "x", "b"]);
++  f.commit("insert in the middle");
++  f.writeRegistry(["w", "a", "x", "b", "c"]);
++  f.commit("insert in front and append");
++  assert.deepEqual(checkVerifySuiteAppend({ rootDir: f.root }),
++    { ok: true, code: "VSA-HISTORY-APPEND-ONLY", checked: 3 });
++  f.writeRegistry(["w", "a", "b", "x", "c", "d"]);
++  f.commit("reorder prior rows while appending");
++  assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).code, "VSA-PRIOR-ENTRY-CHANGED");
++}));
++
++test("the recorded restoration still holds after later rows were inserted mid-file", () => {
++  const restoredWithInsertions = registry([...prior.slice(0, 50), { name: "mid-a", file: "mid-a.test.mjs" },
++    ...prior.slice(50), ...additions.slice(0, 5), { name: "mid-b", file: "mid-b.test.mjs" }, ...additions.slice(5),
++    { name: "tail", file: "tail.test.mjs" }]);
++  const result = evaluate({ candidateBytes: restoredWithInsertions });
++  assert.equal(result.code, "VSA-RECOVERY-VERIFIED");
++  assert.equal(result.futureAppendCount, 3);
++  const lostRow = registry([...prior.slice(0, 50), ...prior.slice(51), ...additions, { name: "tail", file: "tail.test.mjs" }]);
++  assert.equal(evaluate({ candidateBytes: lostRow }).code, "VSA-RECOVERY-CANDIDATE-MISMATCH");
++  const duplicated = registry([...prior, ...additions, { name: "tail", file: additions[0].file }]);
++  assert.equal(evaluate({ candidateBytes: duplicated }).code, "VSA-RECOVERY-DUPLICATE-IDENTITY");
++});
++
++// D107: one exact, byte-bound, unsigned exception for a duplicate row added by one commit
++// and removed again by another. Narrow by construction: it names two full commit SHAs and
++// four registry digests, so a look-alike commit of the same shape stays refused.
++const sha256 = (value) => createHash("sha256").update(value).digest("hex");
++const row = (name, extra = {}) => ({ name, file: `${name}.test.mjs`, ...extra });
++const rowHash = (value) => sha256(canonical(value));
++const dupRow = row("a", { invariantPinned: "generic second entry" });
++const registryText = (rows) => JSON.stringify({ schema: "pipeline.verify-suites.v1", suites: rows }, null, 2) + "\n";
++function dupRepairHistory(f, { lookAlike = false, mutateEntry = (e) => e, commitRecovery = true } = {}) {
++  const write = (rows) => writeFileSync(join(f.root, "harness", "verify-suites.json"), registryText(rows));
++  const sha = (rev) => f.git("rev-parse", rev).trim();
++  const bytes = (rev) => f.git("show", rev + ":harness/verify-suites.json");
++  f.writeConfig([f.tp13]);
++  write([row("a"), row("b")]);
++  f.commit("introduce protected registry");
++  write([row("a"), row("b"), row("c"), dupRow]);
++  f.commit("add rows including a duplicate identity");
++  const addCommit = sha("HEAD");
++  write([row("a"), row("b"), row("c"), row("d"), row("e")]);
++  f.commit("drop the duplicate again and add rows");
++  const removeCommit = sha("HEAD");
++  const dupEntry = mutateEntry({
++    schema: "pipeline.verify-suite-duplicate-repair-entry.v1",
++    addCommit, addParent: sha(addCommit + "^"), removeCommit, removeParent: sha(removeCommit + "^"),
++    addPreimageSha256: sha256(bytes(addCommit + "^")), addPostimageSha256: sha256(bytes(addCommit)),
++    removePreimageSha256: sha256(bytes(removeCommit + "^")), removePostimageSha256: sha256(bytes(removeCommit)),
++    duplicateName: dupRow.name, duplicateFile: dupRow.file, duplicateRowSha256: rowHash(dupRow),
++    owner: "Elephant", signed: false,
++    reason: "Historical, unsigned exception recorded by the Elephant: narrow, bound to these two commits and their registry bytes, not extendable.",
++  });
++  if (lookAlike) {
++    // The very same shape again, by two other commits that the entry does not name.
++    write([row("a"), row("b"), row("c"), row("d"), row("e"), row("g", { invariantPinned: "x" }), row("g2", { name: "d", file: "d.test.mjs", invariantPinned: "generic" })]);
++    f.commit("look-alike: add a duplicate identity again");
++    write([row("a"), row("b"), row("c"), row("d"), row("e"), row("g", { invariantPinned: "x" }), row("h")]);
++    f.commit("look-alike: drop it again");
++  }
++  writeFileSync(join(f.root, "harness", "verify-suite-history-recovery.json"), JSON.stringify({
++    schema: "pipeline.verify-suite-history-recovery.v1", entries: [entry], duplicateRepairs: [dupEntry],
++  }, null, 2) + "\n");
++  if (commitRecovery) f.commit("record recovery");
++  return { dupEntry, addCommit, removeCommit };
++}
++
++test("a duplicate row added by one commit and removed by another is accepted only for the exactly named pair", () => fixture((f) => {
++  dupRepairHistory(f);
++  const result = checkVerifySuiteAppend({ rootDir: f.root });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.equal(result.code, "VSA-HISTORY-APPEND-ONLY-RECORDED-DUPLICATE-REPAIR");
++}));
++
++test("a look-alike commit pair of the same shape is refused (the exception is not extendable)", () => fixture((f) => {
++  const { addCommit } = dupRepairHistory(f, { lookAlike: true });
++  const result = checkVerifySuiteAppend({ rootDir: f.root });
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "VSA-ENTRY");
++  assert.notEqual(result.detail, addCommit);
++}));
++
++test("the exception is refused when a digest, a commit, the reason or the commit state is wrong", () => {
++  const variants = [
++    (e) => ({ ...e, addPostimageSha256: "0".repeat(64) }),
++    (e) => ({ ...e, removePreimageSha256: "0".repeat(64) }),
++    (e) => ({ ...e, addCommit: "f".repeat(40) }),
++    (e) => ({ ...e, removeCommit: e.addCommit }),
++    (e) => ({ ...e, duplicateRowSha256: "1".repeat(64) }),
++    (e) => ({ ...e, signed: true }),
++    (e) => ({ ...e, owner: "Someone" }),
++    (e) => ({ ...e, reason: "short" }),
++    (e) => ({ ...e, extra: 1 }),
++  ];
++  for (const mutateEntry of variants) fixture((f) => {
++    dupRepairHistory(f, { mutateEntry });
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).ok, false, mutateEntry.toString());
++  });
++  fixture((f) => {
++    dupRepairHistory(f, { commitRecovery: false });
++    assert.equal(checkVerifySuiteAppend({ rootDir: f.root }).ok, false);
++  });
++});
++
++test("evaluateDuplicateRepair derives the shape from the bytes: no duplicate add, no removal, or an extra change is refused", () => {
++  const base = [row("a"), row("b")];
++  const withDup = [...base, row("c"), dupRow];
++  const fixed = [...base, row("c"), row("d")];
++  const input = (over = {}) => {
++    const e = {
++      schema: "pipeline.verify-suite-duplicate-repair-entry.v1",
++      addCommit: "a".repeat(40), addParent: "b".repeat(40), removeCommit: "c".repeat(40), removeParent: "d".repeat(40),
++      addPreimageSha256: sha256(registryText(base)), addPostimageSha256: sha256(registryText(withDup)),
++      removePreimageSha256: sha256(registryText(withDup)), removePostimageSha256: sha256(registryText(fixed)),
++      duplicateName: dupRow.name, duplicateFile: dupRow.file, duplicateRowSha256: rowHash(dupRow),
++      owner: "Elephant", signed: false, reason: "Historical, unsigned exception recorded by the Elephant: narrow, not extendable.",
++    };
++    return { entry: e, addCommit: e.addCommit, addParent: e.addParent, removeCommit: e.removeCommit, removeParent: e.removeParent,
++      addBeforeBytes: registryText(base), addAfterBytes: registryText(withDup),
++      removeBeforeBytes: registryText(withDup), removeAfterBytes: registryText(fixed), ...over };
++  };
++  assert.equal(evaluateDuplicateRepair(input()).ok, true);
++  // The add step must really be a duplicate identity, not a plain append.
++  const plain = [...base, row("c"), row("z")];
++  assert.equal(evaluateDuplicateRepair(input({ addAfterBytes: registryText(plain) })).ok, false);
++  // The removal step must remove exactly that row and change no other prior row.
++  const alsoRemoved = [row("a"), row("c"), row("d")];
++  assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(alsoRemoved) })).ok, false);
++  const keptDup = [...base, row("c"), dupRow, row("d")];
++  assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(keptDup) })).ok, false);
++  const changedPrior = [row("a"), { ...row("b"), invariantPinned: "weakened" }, row("c"), row("d")];
++  assert.equal(evaluateDuplicateRepair(input({ removeAfterBytes: registryText(changedPrior) })).ok, false);
++});
++
+ test("full history traversal refuses a rewrite when recovery is missing or invalid", () => {
+   const invalidRecovery = JSON.stringify({
+     schema: "pipeline.verify-suite-history-recovery.v1",
+diff --git a/harness/verify-suite-history-recovery.json b/harness/verify-suite-history-recovery.json
+index fc99f05f1..844003d18 100644
+--- a/harness/verify-suite-history-recovery.json
++++ b/harness/verify-suite-history-recovery.json
+@@ -11,5 +11,24 @@
+       "priorSuiteCount": 87,
+       "appendedSuiteCount": 21
+     }
++  ],
++  "duplicateRepairs": [
++    {
++      "schema": "pipeline.verify-suite-duplicate-repair-entry.v1",
++      "addCommit": "5cc6b70066970d2b577a90b5c72f92d5ebf85602",
++      "addParent": "ec9ea2d4fbda5ac5a780498ca8c84184c48f6aa4",
++      "removeCommit": "6940723aea2bee0b29dd35660f609a981b9b4417",
++      "removeParent": "b1035fbe92f12b570dd138f1af45b930758184fe",
++      "addPreimageSha256": "61992ee3b781342fa0f303ed3a47505ba18ca1b31c1604c032e97d00f9231579",
++      "addPostimageSha256": "d5f5e607c099fa342ebe78a1efbd688f2e8d4c8d55594cc406d0f0baf20b9f50",
++      "removePreimageSha256": "d5f5e607c099fa342ebe78a1efbd688f2e8d4c8d55594cc406d0f0baf20b9f50",
++      "removePostimageSha256": "65ec4e28e9c7315ac7ae9a3a699fc4070b7ce2c5fd65a83ce489c971b8855ab7",
++      "duplicateName": "shell-grammar-capability-placement-tests",
++      "duplicateFile": "harness/scripts/shell-grammar-capability-placement.test.mjs",
++      "duplicateRowSha256": "d0fc96b5a6008d1e6317ac6248d05bf78123283e1fe5939967e155ff41f23c15",
++      "owner": "Elephant",
++      "signed": false,
++      "reason": "Historical, unsigned exception recorded by the Elephant (PO decision D107): the first commit added a second registry row repeating the name and file of an existing row, the second commit removed that row again. Narrow and not extendable: it is bound to these two commits and their registry bytes, so a third commit of the same shape stays refused."
++    }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs b/plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs
+index 9c67f15dc..0623e2be8 100644
+--- a/plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs
++++ b/plugins/pipeline-core/lib/verify-suite-append-policy.test.mjs
+@@ -20,11 +20,37 @@ test("B2-ii admits one append batch without rewriting previous registrations", (
+ test("B2-ii rejects deletion, reorder, changed coverage and presentation-only edits", () => {
+   assert.equal(check(prior, prior).code, "VSA-NO-APPEND");
+   assert.equal(check(next, prior).code, "VSA-NO-APPEND");
+-  assert.equal(check(prior, { ...next, suites: [next.suites[1], next.suites[0]] }).code, "VSA-PRIOR-ENTRY-CHANGED");
++  // D103: a new row in front of a retained prior row is an insertion, no longer a rewrite.
++  // Reordering rows that already existed stays refused (see the D103 test below).
++  const reordered = [...next.suites, { name: "third-tests", file: "lib/third.test.mjs" }];
++  reordered.splice(0, 2, reordered[1], reordered[0]);
++  assert.equal(check(next, { ...next, suites: reordered }).code, "VSA-PRIOR-ENTRY-CHANGED");
+   assert.equal(check(prior, { ...next, suites: [{ ...prior.suites[0], file: "lib/weakened.test.mjs" }, next.suites[1]] }).code,
+     "VSA-PRIOR-ENTRY-CHANGED");
+ });
+ 
++test("D103 admits insertion at any position while every prior row is retained unchanged", () => {
++  const a = { name: "a-tests", file: "lib/a.test.mjs", invariantPinned: "a" };
++  const b = { name: "b-tests", file: "lib/b.test.mjs" };
++  const c = { name: "c-tests", file: "lib/c.test.mjs" };
++  const x = { name: "x-tests", file: "lib/x.test.mjs" };
++  const y = { name: "y-tests", file: "lib/y.test.mjs" };
++  const before = { ...prior, suites: [a, b, c] };
++  const after = (suites) => check(before, { ...before, suites });
++  assert.deepEqual(after([x, a, b, c]), { ok: true, code: "VSA-APPEND", appended: 1 });
++  assert.deepEqual(after([a, x, b, c]), { ok: true, code: "VSA-APPEND", appended: 1 });
++  assert.deepEqual(after([a, b, x, y, c]), { ok: true, code: "VSA-APPEND", appended: 2 });
++  assert.deepEqual(after([a, x, b, c, y]), { ok: true, code: "VSA-APPEND", appended: 2 });
++  // Insertion never excuses a changed, removed, reordered or duplicate row.
++  assert.equal(after([a, x, { ...b, invariantPinned: "weakened" }, c]).code, "VSA-PRIOR-ENTRY-CHANGED");
++  assert.equal(after([a, x, y, c]).code, "VSA-PRIOR-ENTRY-CHANGED");
++  assert.equal(after([a, x, c, b]).code, "VSA-PRIOR-ENTRY-CHANGED");
++  assert.equal(after([a, b, c, x, { name: x.name, file: "lib/other.test.mjs" }]).code, "VSA-ENTRY");
++  assert.equal(after([a, b, c, x, { name: "other", file: x.file }]).code, "VSA-ENTRY");
++  assert.equal(after([a, b, c]).code, "VSA-NO-APPEND");
++  assert.equal(after([a, b]).code, "VSA-NO-APPEND");
++});
++
+ test("B2-ii rejects malformed, duplicate-key and duplicate-suite postimages", () => {
+   assert.equal(evaluateVerifySuiteAppend({ beforeBytes: JSON.stringify(prior), afterBytes: '{"schema":"pipeline.verify-suites.v1","schema":"pipeline.verify-suites.v1","suites":[]}' }).code, "VSA-SHAPE");
+   assert.equal(check(prior, { ...next, suites: [...next.suites, next.suites[1]] }).code, "VSA-ENTRY");
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index 8b7d62fba..32639ea25 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -883,6 +883,28 @@ test("actual commit paths reject false T5/T0 and allow generated lockfile T0", (
+   assert.equal(evaluate(trueT0Root, ["generated/client.mjs", "package-lock.json"]).ok, true);
+ });
+ 
++// D104: the repository no longer carries a recovery index. An absent index is the
++// normal case; it retires nothing, produces no finding of its own, and every
++// record stays subject to the ordinary per-record Critic disposition.
++test("an absent abandoned-v3 recovery index is normal and retires no record", () => {
++  const clean = fixture({ "evidence/dispatch-record-T5.json": json(v3("T5", { criticSkip: skip() })) });
++  const none = evaluate(clean, []);
++  assert.equal(none.ok, true, none.readFindings.join("\n"));
++  assert.equal(none.administrativelyRetiredRecordCount, 0);
++  assert.deepEqual(none.readFindings, []);
++
++  // The two historical task IDs get no special treatment without the index.
++  const named = fixture({
++    "evidence/dispatch-record-ALF-ADOPTION-PROOF.json": json(v3("ALF-ADOPTION-PROOF", { candidateCommit: null, criticRequired: required() })),
++    "evidence/dispatch-record-ALF-RECOVERY-PLAN.json": json(v3("ALF-RECOVERY-PLAN", { criticRequired: required() })),
++  });
++  const strict = evaluate(named, []);
++  assert.equal(strict.ok, false);
++  assert.equal(strict.administrativelyRetiredRecordCount, 0);
++  assert.equal(strict.readFindings.filter((finding) => /ALF-ADOPTION-PROOF|ALF-RECOVERY-PLAN/u.test(finding)).length, 2);
++  assert.doesNotMatch(strict.readFindings.join("\n"), /recovery index/u);
++});
++
+ test("empty commit paths preserve T5 admission and reject T0", () => {
+   const t0 = { schema: CRITIC_SKIP_SCHEMA, trigger: trigger({ diff: { mechanical: true, architecture: false, guardrails: false, security: false } }), appliedRow: "T0" };
+   const t5Root = fixture({ "evidence/dispatch-record-T5.json": json(v3("T5", { criticSkip: skip() })) });

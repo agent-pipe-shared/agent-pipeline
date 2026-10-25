@@ -1,0 +1,29 @@
+// Helper (untracked): run test files / checks one after the other in the k95 clone, each with its own private TMPDIR outside every repository.
+// usage: node scratch/K95-D75A-RECON-GATE-run.mjs <label> <file-relative-to-clone>...   (env K95_TIMEOUT_MS = per-file timeout, default 1200000)
+import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync, chmodSync, appendFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+const [label, ...files] = process.argv.slice(2);
+const timeout = Number(process.env.K95_TIMEOUT_MS ?? 1200000);
+const PREFIX = "K95-D75A-RECON-GATE";
+mkdirSync("scratch/agent-out", { recursive: true });
+files.forEach((file, i) => {
+  const tmp = join(homedir(), "pipeline-test-tmp", `k95-${label}`, String(i));
+  mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+  const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+  delete env.NODE_TEST_CONTEXT;
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, file.split(" "), { cwd: resolve("scratch/clones/k95"), encoding: "utf8", env, timeout, maxBuffer: 256 * 1024 * 1024 });
+  const out = (r.stdout ?? "") + (r.stderr ?? "");
+  const secs = Math.round((Date.now() - t0) / 1000);
+  writeFileSync(`scratch/agent-out/${PREFIX}-${label}-${file.replace(/[\\/ ]/g, "_")}.log`, out);
+  const num = (k) => (new RegExp(`^ℹ ${k} (\\d+)`, "m").exec(out) ?? [])[1] ?? "?";
+  const timedOut = r.error && r.error.code === "ETIMEDOUT";
+  const failing = [...new Set([...out.matchAll(/^\s*✖ (.+?) \(\d/gm)].map((m) => m[1]).filter((t) => t !== "failing tests:"))];
+  const line = `${label} ${timedOut ? "TIMEOUT" : r.status === 0 ? "GREEN" : "RED"} exit ${r.status} sig ${r.signal} secs ${secs} tests ${num("tests")} pass ${num("pass")} fail ${num("fail")} skip ${num("skipped")} todo ${num("todo")} ${file}`;
+  console.log(line);
+  appendFileSync(`scratch/agent-out/${PREFIX}-results.txt`, line + "\n");
+  for (const f of failing.slice(0, 8)) console.log(`   FAILING: ${f.slice(0, 200)}`);
+  if (num("tests") === "?") console.log(`   tail: ${out.trim().split("\n").slice(-6).join(" | ").slice(0, 900)}`);
+});

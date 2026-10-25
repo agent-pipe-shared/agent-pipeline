@@ -1,0 +1,31 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k46/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, protected-path delivery, quality rules, report shape; replace `<name>` with `k46`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, multi-path rg, other pipelines and composed commands are refused. A `git commit` needs a clone identity: read `git config user.name` and `git config user.email` in the MAIN checkout and set them once with `git -C scratch/clones/k46 config user.name ...` and `... user.email ...` (this is the clone's own local config, allowed for this task; the `-c` form is refused by guard-push).
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261020195107.231d1a0 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K46-AGY-FALLBACK/2026-10-22 · Role Goldfish`
+
+## Briefing K46-AGY-FALLBACK: admit the recorded self-dispatch fallback for the Antigravity Advisor and Critic (D122)
+
+### 1. Goal
+PO decision D122 (specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md, row D122; grep for it): the recorded self-dispatch fallback is admitted for the Antigravity Advisor and Critic roles with an honest assurance label; native AGY route cells wait for an authenticated per-call carrier (D63/AC-109); Verify needs only the node-sandbox probe. Observable end state: `lib/role-route-preflight.mjs` resolves the antigravity advisor and critic route cells to the recorded self-dispatch fallback (not `RRP-ROUTE-CELL-UNAVAILABLE`), with an assurance label that says the route is a self-dispatch without an authenticated per-call carrier; the Claude cells and every other antigravity cell are unchanged; and the todo case for AC-108 in `plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs` (about lines 290-300, marker "todo") becomes a real passing case with its assertions stating exactly this behaviour.
+
+### 2. Context files
+- specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md: rows D122, D63, D125 (grep)
+- plugins/pipeline-core/lib/role-route-preflight.mjs (fallback legality around lines 26 and 134-140; route cell data it reads)
+- plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs (the todo near lines 296-297 and the neighbouring passing cases)
+- plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs (the existing standalone pin of the fallback; do not weaken any case)
+- backlog item (strip first, read the STRIPPED copy only): run `node plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs --item backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md --out scratch/k46-item-stripped.md` from the MAIN checkout
+
+### 3. DoD checks
+- RED first: change the todo case into an asserting case, show it fails on the unchanged code for the intended reason (the route resolves to unavailable), then GREEN after the change. Converting a `todo` into an asserting case is the required change of an existing examiner; justify it in the commit message with D122 (QG-04), in its own commit (the pin change) separate from the library change.
+- Check `NEVER_LIFTABLE_KERNEL_PATHS` in plugins/pipeline-core/lib/guard-maintenance-window.mjs: if `role-route-preflight.mjs` is listed or imported by a kernel path, STOP and report (protected delivery would be needed).
+- Targeted checks, one at a time: `plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs`; `plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs`; every other test file that imports role-route-preflight (find them with single-file `rg -n "role-route-preflight" <dir-file>` style reads of the pin directory listing via `find`); `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (in the clone); `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs --root scratch/clones/k46` (0 new violations).
+- Quick check: none configured, unknown (no quick PASS). Final integrated Verify: Coordinator owns it.
+- Commit unprotected files in the clone as each piece is green (explicit pathspec, message files under the clone's `scratch/commit-msg/`, trailers exactly `AI-Assisted: true` and `Dispatch: K46-AGY-FALLBACK (goldfish)`).
+
+### 4. Forbidden
+Touching Spec/PRD or any AC row; weakening, skipping or deleting any existing examiner other than turning the one named todo into an asserting case; signing; override ceremonies; network; push/reset/stash/checkout/rebase; no-go paths `.claude/**`, `docs/state.md`, `specs/**`, `backlog/**`; no absolute home/repo-root paths or secrets in files or commit messages. Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant. Do not claim a native Antigravity route: the label must say self-dispatch.
+
+### 5. Stop conditions
+More than 2 failed attempts at one problem; the file is a kernel path; the assurance label needs a schema or Spec change; a suite red BEFORE your change for an unrelated reason (record, do not fix); tool budget at 80 percent.
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261020195107.231d1a0`. Model/effort: Sonnet 5.5 (general-purpose carrier; goldfish-* types are refused at the dispatch guard for lack of native item admission). Profile standard. Worktree: no, own clone `scratch/clones/k46` at the current main HEAD. Tool budget: base cap 35, closing allowance +5 on closing acts only, structured closing handover. TASK_ID: K46-AGY-FALLBACK. Status wording per the common briefing (never "done").

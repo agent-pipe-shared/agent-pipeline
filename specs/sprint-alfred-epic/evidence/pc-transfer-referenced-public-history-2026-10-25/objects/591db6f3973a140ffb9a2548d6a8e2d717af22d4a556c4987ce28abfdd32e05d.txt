@@ -1,0 +1,74 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 7a7765553..2afbdd8cd 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -937,6 +937,8 @@
+         "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
++        "verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests",
++        "verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests",
+         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-contract-tests",
+         "verify-phase:harness/scripts/verify.mjs:push-batch-execution-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index aaf752eda..8b4f830de 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -1561,6 +1561,16 @@
+       "path": "plugins/pipeline-core/scripts/publication-executor-v2.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "publication-guard-candidate-tests",
++      "path": "plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "publication-review-requirement-tests",
++      "path": "plugins/pipeline-core/lib/publication-review-requirement.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "publication-state-authority-tests",
+       "path": "harness/scripts/publication-state-authority.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index a4c0a658e..73ee6bc7b 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3891,6 +3891,35 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "publication-review-requirement-tests",
++      "file": "plugins/pipeline-core/lib/publication-review-requirement.test.mjs",
++      "invariantPinned": "Current candidate-bound Plan, Spec and package rigor decide whether independent publication review is required; stale or unavailable authority cannot waive it.",
++      "nonOverlapNote": "Unique G20 pure requirement decision witness; publication-guard-candidate-tests covers guard use of the proposed push commit.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PRR001",
++          "PRR002",
++          "PRR003",
++          "PRR004"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "publication-guard-candidate-tests",
++      "file": "plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs",
++      "invariantPinned": "The push guard decides review from the proposed commit despite different HEAD and dirty working files, and retains the distinct checkpoint, Verify and remote identity gates.",
++      "nonOverlapNote": "Unique G20 candidate-bound guard fixture witness; publication-review-requirement-tests covers the pure decision.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PGC001"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }

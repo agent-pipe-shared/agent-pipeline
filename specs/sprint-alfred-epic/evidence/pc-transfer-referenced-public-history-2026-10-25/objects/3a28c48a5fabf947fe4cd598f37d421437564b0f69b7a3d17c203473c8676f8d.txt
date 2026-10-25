@@ -1,0 +1,331 @@
+{
+  "schema": "scratch.prepared-onboarding-static-diagnosis.v1",
+  "method": "read-only static public code and frozen stdout; no imports, runtime tests or Source changes",
+  "resultManifestSha256": "899998a367bcf039ab3c75ec625d45d5be35749808a5ff4051a169b0a8df745e",
+  "baseline": {
+    "cause": "Runtime snapshot enumerates only lib/hooks/scripts/config/schemas, omitting root protected-baseline.json. Installer binds generated hook to snapshot/lib; copied loader resolves snapshot/protected-baseline.json, which cannot be present under that inventory contract.",
+    "classification": "code-supported deterministic copy-path defect; failing disposable root was disposed, so its snapshot was not physically retained",
+    "overlayLimit": "Prepared5725 changes dynamic absent closedFeatures handling only; copied shipped baseline lookup remains unchanged. PB-BASELINE-UNAVAILABLE is shipped data/schema failure, distinct from PB-DYNAMIC-UNAVAILABLE.",
+    "callChain": [
+      "project-onboarding-v3.test.mjs:4933 materializeArchitectureDesignFixture after reopen-design",
+      "architecture-design-test-fixture.mjs commitIfStaged: actual git add architecture then commit",
+      "pre-commit-hook-install.mjs:912 publishGitHookRuntimeSnapshot; snapshot/lib binding",
+      "protected-test-paths.mjs:97 baseline.status !== ready => PB-BASELINE-UNAVAILABLE",
+      "protected-baseline.mjs:16 root protected-baseline.json lookup"
+    ],
+    "rawFailure": "stdout.txt:580",
+    "sourceLoaderDelivered": false
+  },
+  "timeout": {
+    "budgetMs": 900000,
+    "elapsedMs": 900226,
+    "signal": "SIGTERM",
+    "observed": 150,
+    "pass": 149,
+    "fail": 1,
+    "unobserved": 34,
+    "controllerFooter": false,
+    "shards": [
+      {
+        "shard": 0,
+        "expected": 46,
+        "observed": 41,
+        "lastObserved": {
+          "name": "a freshly seeded project is honest about its authority tier, its verify contract and its gates",
+          "line": 8520,
+          "index": 160
+        },
+        "firstUnobserved": {
+          "name": "a confirmed first-round language is visible as a default, not forced on later intake",
+          "line": 8826,
+          "index": 164
+        },
+        "unobserved": [
+          {
+            "name": "a confirmed first-round language is visible as a default, not forced on later intake",
+            "line": 8826,
+            "index": 164
+          },
+          {
+            "name": "regression: a repository recognisedKickoff() already recognizes as mid-kickoff is completely unaffected by the intake-coordinator routing",
+            "line": 9343,
+            "index": 168
+          },
+          {
+            "name": "a source consumer never receives an automatic runner-permission repair",
+            "line": 9416,
+            "index": 172
+          },
+          {
+            "name": "F4 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused",
+            "line": 9542,
+            "index": 176
+          },
+          {
+            "name": "fresh public portable apply in empty and existing Git roots creates no retirement",
+            "line": 9823,
+            "index": 180
+          }
+        ],
+        "laterObservedAfterFirstUnobserved": 0
+      },
+      {
+        "shard": 1,
+        "expected": 46,
+        "observed": 40,
+        "lastObserved": {
+          "name": "reinstall quarantines only current V3 authority and leaves legacy calibration intact",
+          "line": 8436,
+          "index": 157
+        },
+        "firstUnobserved": {
+          "name": "an ordinary consumer project's runtime initialization never seeds the private overlay's own calibration",
+          "line": 8635,
+          "index": 161
+        },
+        "unobserved": [
+          {
+            "name": "an ordinary consumer project's runtime initialization never seeds the private overlay's own calibration",
+            "line": 8635,
+            "index": 161
+          },
+          {
+            "name": "all three runners execute the exact returned consent and design-question actions without repeating durable Git identity",
+            "line": 8865,
+            "index": 165
+          },
+          {
+            "name": "regression: a repository already at ready (kickoff-apply's provisional authority) is completely unaffected by the intake-coordinator routing",
+            "line": 9370,
+            "index": 169
+          },
+          {
+            "name": "a ready consumer with malformed permission shapes receives only the typed read-only repair plan",
+            "line": 9432,
+            "index": 173
+          },
+          {
+            "name": "F-B V3 manifest repair temporary cleanup preserves foreign content when the temporary inode number is reused",
+            "line": 9642,
+            "index": 177
+          },
+          {
+            "name": "retained non-Git public bootstrap refuses before mutation and offers explicit recovery",
+            "line": 9834,
+            "index": 181
+          }
+        ],
+        "laterObservedAfterFirstUnobserved": 0
+      },
+      {
+        "shard": 2,
+        "expected": 46,
+        "observed": 44,
+        "lastObserved": {
+          "name": "source runner permission observation preserves lifecycle actions and ready-only fields",
+          "line": 9452,
+          "index": 174
+        },
+        "firstUnobserved": {
+          "name": "NVA-B-UNLINK-1 V3 manifest repair does not claim rolled-back while a throwing temporary unlink leaves the target published",
+          "line": 9732,
+          "index": 178
+        },
+        "unobserved": [
+          {
+            "name": "NVA-B-UNLINK-1 V3 manifest repair does not claim rolled-back while a throwing temporary unlink leaves the target published",
+            "line": 9732,
+            "index": 178
+          },
+          {
+            "name": "real retired public route requires fresh consent and cannot restore old approval",
+            "line": 9842,
+            "index": 182
+          }
+        ],
+        "laterObservedAfterFirstUnobserved": 0
+      },
+      {
+        "shard": 3,
+        "expected": 46,
+        "observed": 25,
+        "lastObserved": {
+          "name": "omitting the runner on a direct kickoff promotion call is a caller error, not a silent Codex default",
+          "line": 6351,
+          "index": 99
+        },
+        "firstUnobserved": {
+          "name": "kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles",
+          "line": 6490,
+          "index": 103
+        },
+        "unobserved": [
+          {
+            "name": "kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles",
+            "line": 6490,
+            "index": 103
+          },
+          {
+            "name": "current runtime exposes closed continuity outcomes while required App Server failure keeps precedence",
+            "line": 6683,
+            "index": 107
+          },
+          {
+            "name": "portable seed is manifest-valid, then onboarding owns the runtime initialization transaction",
+            "line": 7014,
+            "index": 111
+          },
+          {
+            "name": "Git capability rejects nonzero, missing-status, and non-EPERM spawn results",
+            "line": 7302,
+            "index": 115
+          },
+          {
+            "name": "portable rollback preserves a target whose identity changed after exclusive creation",
+            "line": 7391,
+            "index": 119
+          },
+          {
+            "name": "an invalid generated manifest is never accepted as a current fresh authority",
+            "line": 7471,
+            "index": 123
+          },
+          {
+            "name": "manifest-only repair is source/preimage/plan bound, confirmed, and read back",
+            "line": 7557,
+            "index": 127
+          },
+          {
+            "name": "manifest repair stays inside its pinned parent when the pathname becomes a symlink",
+            "line": 7685,
+            "index": 131
+          },
+          {
+            "name": "manifest repair never quarantines a foreign post-publication target",
+            "line": 7810,
+            "index": 135
+          },
+          {
+            "name": "NVA-SOURCERECOVERY-1: the recoverable source-recovery paths are unchanged by the repairCommand fix",
+            "line": 7925,
+            "index": 139
+          },
+          {
+            "name": "H3 manifest repair rejects wrong digest and missing activation without writes",
+            "line": 8020,
+            "index": 143
+          },
+          {
+            "name": "H3 manifest repair fails closed on V4 readback failure and physical-root symlink",
+            "line": 8143,
+            "index": 147
+          },
+          {
+            "name": "remote adoption rejects a remote .agents and preserves the target control mount",
+            "line": 8302,
+            "index": 151
+          },
+          {
+            "name": "partial authority planner requires an explicit V3 selection and hashes preserved user projections",
+            "line": 8380,
+            "index": 155
+          },
+          {
+            "name": "observation governance applies only to the Pipeline source checkout, never a fresh consumer",
+            "line": 8503,
+            "index": 159
+          },
+          {
+            "name": "v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required)",
+            "line": 8707,
+            "index": 163
+          },
+          {
+            "name": "chat acknowledgement consumes the one in-chat PO decision without a second terminal confirmation",
+            "line": 9292,
+            "index": 167
+          },
+          {
+            "name": "fresh lifecycle keeps project settings portable and reports local runner permissions",
+            "line": 9394,
+            "index": 171
+          },
+          {
+            "name": "F4 runtime probe cleanup preserves foreign content when the probe inode number is reused",
+            "line": 9488,
+            "index": 175
+          },
+          {
+            "name": "F4 portable rollback preserves foreign content when a created target's inode number is reused",
+            "line": 9768,
+            "index": 179
+          },
+          {
+            "name": "fresh rollback restores owned empty root and preserves foreign concurrent Git bytes",
+            "line": 9877,
+            "index": 183
+          }
+        ],
+        "laterObservedAfterFirstUnobserved": 0
+      }
+    ],
+    "localization": "Every shard has a contiguous observed prefix followed by an unobserved suffix. The first unobserved callback is each shard execution frontier, not a proven stalled internal operation. No start-event timestamps, stack traces or child exit/footer evidence survive; cannot identify a particular blocking subprocess or lock.",
+    "controller": "Four children inherit stdout and execute callbacks synchronously in zero-based index modulo4 order. runShards awaits Promise.all without a per-callback/controller deadline. External wrapper sends process-group SIGTERM at900000ms. First frontier paths invoke fresh onboarding/runtime/manifest setup; they contain no explicit callback deadline."
+  },
+  "bindings": [
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/prepared-184-proposal/manifest.json",
+      "sha256": "899998a367bcf039ab3c75ec625d45d5be35749808a5ff4051a169b0a8df745e"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/prepared-184-proposal/stdout.txt",
+      "sha256": "b99c757887159ec488d5c6b51a7bab2e4a4efcbee1c2fa8b44a87d9b5743089e"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/prepared-184-proposal/receipt.json",
+      "sha256": "5d66a3737a531ca71ae954b8f612ba6ebafcdaedfaecd339775b5539e224e66e"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/prepared-184-proposal/run.mjs",
+      "sha256": "677d1eec5610672f5dc89a5de0ac69f2482011393014a4232eb18a29c75ba92d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "04de51bdf4ee33908cd46e2ebde0f57b917bb2c7c6c6ca10b9fe238a6e58a9f6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "50246313d2e0a722bf1840dd8fd2d43556c1cc279b1ac71441f5b39500d13cc0"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-test-paths.mjs",
+      "sha256": "395fdc0846d1f97dee68a71030d672b4fb482234e4fac0eb5ea80bac4c56152d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs",
+      "sha256": "2b1ab46d6942a8423aec8d02a28818644c541a8f9ca69beded8ce7bbc0994a96"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pre-commit-hook-install.mjs",
+      "sha256": "621c98bfba35acc4783bc0f7463820c5a2a45c974f4896d8e422d84987f8cf0d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-design-test-fixture.mjs",
+      "sha256": "389827d494d55cdf5b5037e08c8916c996d04ef714b0348fbb1a2df7c1a59214"
+    },
+    {
+      "path": "plugins/pipeline-core/protected-baseline.json",
+      "sha256": "761fd977ae0063a874cfa8434bcd658bc3ddb3905d1501a424d19c7a8d197cbc"
+    },
+    {
+      "path": "plugins/pipeline-core/schemas/pipeline.protected-baseline.v1.json",
+      "sha256": "ddb809b93d1809b2175c546197180ae8b84a0431bc24b2a759581bb4ef6d98cf"
+    }
+  ],
+  "claims": {
+    "actualCompleteSourcePASS": false,
+    "preparedCompletePASS": false,
+    "fullVerifyPASS": false,
+    "unobservedPassing": false
+  }
+}

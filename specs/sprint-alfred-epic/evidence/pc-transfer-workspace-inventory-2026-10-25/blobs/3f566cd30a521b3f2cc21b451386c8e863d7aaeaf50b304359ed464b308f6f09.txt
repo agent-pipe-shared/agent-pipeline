@@ -1,0 +1,5 @@
+{
+ "status": 2,
+ "stdout": "",
+ "stderr": "Error: present-plan refused (DCC-PATH-IGNORED); use present-plan --review-receipt."
+}

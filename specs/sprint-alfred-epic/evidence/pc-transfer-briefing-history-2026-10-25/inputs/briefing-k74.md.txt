@@ -1,0 +1,26 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k74/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; here the clone name is `k74`: replace `<name>` with `k74`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, `--glob`, multi-path rg, other pipelines and composed commands are refused.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K74-A2-RESIDUAL-PINS/2026-10-23 · Role Goldfish`
+
+## Briefing K74-A2-RESIDUAL-PINS: close the optional residuals of AC-181 and AC-201 as pin cases
+
+### 1. Goal
+The read-only report `scratch/agent-out/k13-ac197-read.md` (MAIN checkout, read only) names the residuals. Build them in the clone, in the existing UNPROTECTED pin files (`plugins/pipeline-core/lib/pins/` is outside the protected baseline and the kernel list; confirm for each target file with `plugins/pipeline-core/protected-baseline.json` and `NEVER_LIFTABLE_KERNEL_PATHS` in `lib/guard-maintenance-window.mjs`, and stop on a protected target):
+1. AC-181 (`lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs`): (a) the `&&` chain is only characterised partially at about line 157; add the case that a read-only `git stash list && git stash list` chain (and a chain with one mutating stash verb, which must stay classified as a write) is classified as the item's acceptance says; (b) `perl -i.bak` and `ruby -i.bak` in-place edit forms have no test: add one case each that asserts they are classified as working-tree writes, exactly like the existing `sed -i` / similar in-place forms in the classifier tests (find them with `rg -n "sed -i" <file> | head`). Read the backlog item (`rg -n "stash" backlog/items/*` is refused: use `find backlog/items -name "*stash*"` then Read) for the exact acceptance wording.
+2. AC-201 (`lib/pins/hgo-patch-preflight-before-signature.test.mjs`, acceptance points at about lines 163 to 205): the form `git apply --check --reverse` has no admit case: add one admit case (read-only check, must be admitted) and one case that plain `git apply` stays mutating. Read the item/pin header for the exact wording.
+Run each case against the CURRENT product code. If a new case is RED because the product does not behave as the acceptance says, do NOT change the product: mark the case as a documented RED only if the repository's pins already use that convention (look at the neighbouring `todo`/RED-mirror usage; AC-126 "RED mirror" is the convention name), otherwise leave it out and report the defect with the exact command and the observed classification. A case that is GREEN stays as a regression pin.
+
+### 2. Context files
+`scratch/agent-out/k13-ac197-read.md`, the two pin files, the classifier code they drive (read only), `guardrails/quality-gates.md`, neighbouring pins for the case style.
+
+### 3. DoD checks
+Each new case RED or GREEN with counts per file before and after (run each pin file once alone with `node --test`, private TMPDIR outside every repository and outside /tmp, e.g. a directory under the home directory created by the runner script `scratch/k72-run.mjs` in the MAIN checkout: read its header). `node --test scratch/clones/k74/harness/scripts/check-consumer-safe-paths.test.mjs` passes. One commit in the clone, explicit pathspec, message file under the clone's `scratch/commit-msg/`, subject `test(pins): close the optional AC-181 and AC-201 residuals`, trailers exactly `AI-Assisted: true` and `Dispatch: K74-A2-RESIDUAL-PINS (goldfish)`.
+
+### 4. Forbidden
+Any product, protected or kernel-path edit; weakening or removing an existing assertion or case; `CLAUDE.md`, `.claude/**`, `docs/state.md`, `specs/**`, `backlog/**` edits; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths, emails or secrets in any file; Advisor.
+
+### 5. Stop conditions
+A target file that is protected; a cause that needs a design decision; more than 2 failed attempts at one problem; tool budget at 80 percent (commit what is green, report the rest).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k74`. Tool budget: base cap 55, closing allowance +5. TASK_ID: K74-A2-RESIDUAL-PINS. Status wording per the common briefing (never "done"). Final report max 25 lines.

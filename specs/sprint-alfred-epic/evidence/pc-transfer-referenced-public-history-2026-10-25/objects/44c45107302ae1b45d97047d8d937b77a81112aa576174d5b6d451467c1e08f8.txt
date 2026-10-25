@@ -1,0 +1,45 @@
+FULL SAME-OWNER D149 METHOD CONTINUATION
+
+The full original briefing follows. Existing owner, clone, base, scope, all attempts and cumulative approximately50 actions remain. Maximum50 additional calls, reserve12 for complete patch/manifest/captures/handoff. No reset, native grant, new principal or authenticated runtime amendment is claimed. This PO-approved D149 method-only continuation overrides generic closing-only/native-budget restrictions only for this bounded method task.
+
+Actual own Goldfish preflight completed at host boundary before first write; optional model identity conflict remains unavailable. An earlier narrow accidental docs/state decision-ID search was disclosed, never retroactively erased or called allowed. Do not repeat bootstrap in this now-ready runtime.
+
+Current public root-bound named-commit RED PCI-ROOT-MISMATCH and focused GREEN1/1 are preserved. Continue negatives and full original affected suites. Physical reciprocal Git-worktree membership and byte-identical original calibration must remain checked; never accept a copied root hash, arbitrary same-name repo or caller boolean/token. Consumer producer/dependency interfaces and original checkout mutation boundaries remain. Source work only in the original owned clone; parent Main/metadata remain foreign.
+
+# Full method-only Goldfish briefing — R2-CHECKOUT-IDENTITY-20261025
+
+You are not alone. Preserve all other edits. D143 isolated method-only authorship applies: no Main writes, staging, commits, dispatch records, native receipts, child agents or model/provider calls. Parent integrates with active hooks. Do not manufacture runtime/model authority from this briefing. This is one bounded P0 outcome, not permission to touch other lifecycle work.
+
+## 1. Goal
+
+Repair `pipeline.greenfield.r2.branch-checkout-runtime-continuity` under existing AC174/274/264, specifically current Verify named-commit calibration identity mismatch. Preserve the correct candidate commit/tree, original delivery branch/index/runtime and physical project provenance. No product deletion is established; files remain on the delivery branch. No main switch or restart is authorized or required.
+
+## 2. Context and entry
+
+Follow AGENTS.md → architecture/map/index.md → pipeline-core.md/harness.md → applicable compiled architecture decisions → exact installed pipeline-start skill → implementation. Installed skill: `<home>/.codex/plugins/cache/agent-pipeline-local/pipeline-core/0.7.0+codex.20261025134513.977dad8/skills/pipeline-start/SKILL.md`. Actual root `<repo-root>`; inert clone has no separate bootstrap. First exact operational preflight is authorized from Main at require_escalated if actual new runtime needs it. Do not repeat entry if already ready. Optional model store unavailable is not a grant. Ruleset SHA `1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe`, project agent-pipeline, calibration project/pipeline.json.
+
+Read immutable Spec sections AC174/274/264, stripped acceptance `scratch/r2-checkout-continuity-acceptance-20261025.md`, sanitized second-run Codex P0.2 report, fix-wave D143/D148/D149/D151/D152/D153. No raw session/profile/history reads. Current Source recon facts (verify, not native attestation): verify-evidence-producer.mjs315–336 uses exact detached candidate OID, same-basename directory284–288 and existing committed-dependency preparer. commit-worktree-dependencies.mjs52–107 already pins npm/version/lock and refuses mutable reuse. project-calibration-identity.mjs30–42 hashes physical root;216–217 rejects different rootSha256. consumer-verify.mjs22–25 invokes it. Existing named-commit test873–920 omits projectIdentity at880 and misses real mismatch. Close skill contains no branch/main/restart requirement; close-coordinator187–193 uses current clean HEAD/tree. Treat these as bounded Source facts, not proof of native report causality.
+
+Create NEW inert owned clone `scratch/clones/r2-checkout-identity-20261025` from exact `73afcf74241fd38627161d5a5e9956d12b7e9341`; retain no Main working changes. Own ONLY lib/project-calibration-identity.mjs, lib/consumer-verify.mjs, scripts/verify-evidence-producer.mjs, scripts/verify-evidence-producer.test.mjs and existing directly paired calibration tests if causally required. Paths are under plugins/pipeline-core/. Read existing Git worktree/root identity helpers and close contracts as needed. Model/registry/Critic/finalizer/close-coordinator/Windows Phoenix modules are foreign READONLY. No protected baseline/Verify registration mutation.
+
+## 3. Acceptance and checks
+
+Write meaningful RED for actual public named-commit route with real root-bound calibration before production edit. Correct the smallest Source-owned route. Do not skip root identity, accept copied root hashes, trust caller environment/JSON tokens, blindly rewrite signed calibration in candidate tree, or use same-basename as authority. Prefer existing Source/Git physical lineage and exact candidate provenance; a materially new authority/principal/ledger contract requires concrete proposal, not assumed permission. Ordinary implementation within existing verified worktree/origin contract is authorized.
+
+Qualified positive must run Verify in the exact isolated candidate using legitimate original project identity and committed prerequisites. Negatives: unrelated same-basename repo, forged origin/root association, changed calibration, wrong commit/tree and unbound external path. Check original branch/HEAD/index/runtime/package bytes remain unchanged on success and failure. Temporary checkout cleanup follows actual settlement and removes no original work; failure leaves no consumable green evidence. Preserve old tests/IDs. Keep close custody and Critic/Verify requirements; do not implement no-Critic close or needless restart.
+
+All Node/Git/tests at require_escalated from first call. Synthetic userInfo/homedir/tmpdir BEFORE all test/capture imports and descendants, no real account lookup. Ordinary own0700 public /tmp test fixtures per D151; separate Source-validated own unique private homes under `/run/user/1000/ap-g17` per D148. Git synthetic identity/isolated config, no hook bypass. Cleanup only exact own device/inode after all child processes settle; preserve unknown-live fixtures.
+
+Capture commands/exit/counts via scripts/capture-evidence.mjs, full original affected suites and consumer-safe paths. Do not run Full Verify/Critic/Reader, stamp/install/push/close, paid/native calls or real product changes. Missing project-resource measurements/quick routes stay unknown. Native runner assurance is not inferred from controlled Source checks. Any new test file needing Verify enrollment must be flagged, not secretly registered.
+
+## 4. Forbidden
+
+Main/index, PRD/Spec, other workers' modules, actual profiles/keys/authority namespaces, raw session stores, arbitrary external reads/writes, no-verify/hooks override, broad identity fallback or boolean/JSON authenticity claims, main checkout, merge/reset/rebase/release. No weakened examiner or marker-only behavioral substitution.
+
+## 5. Stop and decisions
+
+After two same-cause unchanged failures preserve evidence and diagnose causally; no blind loop. Continue independently safe units. If new authority contract is unavoidable, prepare minimal concrete facts/options/recommendation and exact affected invariant for PO review. Do not stop merely because implementation is substantial while allowance remains.
+
+## 6. Delivery
+
+Initial70-call guidance, reserve14 for complete cumulative patch INCLUDING new files, manifest/postimage SHA256/capture hashes and actual RED/GREEN handoff. D149 max50 additional calls only by full same-owner replacement, cumulative attempts preserved, no fake native grant. Same ready runtime model selection; no override/attestation invented. Own scratch/agent-out/r2-checkout-identity-20261025. No commits or staging. Return passed/failed/unverifiable, original Source bindings, fixture rationale, exact limitations and pending integrated Verify/Critic/native/PO acceptance separately.

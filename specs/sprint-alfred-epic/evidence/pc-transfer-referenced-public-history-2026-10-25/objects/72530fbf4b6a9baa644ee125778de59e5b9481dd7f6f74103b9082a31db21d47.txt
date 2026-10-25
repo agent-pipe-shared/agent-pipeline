@@ -1,0 +1,246 @@
+# Greenfield-Test der Agent-Pipeline: Analyse des abgebrochenen Durchlaufs
+
+Stand: 20.10.2026. Runner: **Codex**; im früheren Rohtranskript CLI-Version **0.163.0**. Aufgelöster Pipeline-Stand: **0.7.0+codex.20261020064459.a8ddf85**, lokale Entwicklungsdistribution. Quellen: S0 Z.1 und Preflight-Ausgabe S0 Z.33; Versionsmeldung S1-T1. Die Entwicklung wurde auf ausdrückliche Anweisung beendet. Diese Analyse holt weder Implementierung noch Freigabe, Abnahme oder Abschluss nach.
+
+## Quellen, Methode und Grenzen
+
+Die Methode aus der installierten Pipeline-Referenz `skills/pipeline-start/references/transcript-forensics.md` wurde geladen: tatsächliche Aufrufe/Ergebnisse vor Selbstauskünften, Sitzungen und Subagenten getrennt, Befunde mit „bestätigt“, „teilweise bestätigt“ oder „nicht belegt“. Zusätzlich prüfte ein frischer, ausdrücklich schreibgeschützter Analyseagent die bereitgestellten Quellen unabhängig. Seine Ergebnisse bestätigten insbesondere die eingeschränkte Transkriptabdeckung und die widersprüchliche Modellprovenienz. Methodische Quelle: genannte Referenz, Abschnitte „Standard categories“ und „Report shape“.
+
+**Die verlangte vollständige Rohtranskript-Auswertung aller Sitzungen konnte nicht erreicht werden.** Der vorgeschriebene Recovery-Zugang lieferte genau eine passende frühere Sitzung vollständig, schließt aber die laufende Sitzung aus. Die höher priorisierte Zugriffsvorgabe verbietet die direkte Suche in Runner-Sitzungsverzeichnissen; die entsprechende Nutzeranforderung konnte deshalb nicht umgesetzt werden. Der zusätzliche App-Zugang lieferte für die aktuelle Sitzung ausschließlich gekürzte Assistant-Turns, keine vollständigen Tool-/PO-Ereignisse, Zeiten oder Tokenzähler. Für die Entwicklungs-Subagenten waren Berichte und Dispatches im sichtbaren Arbeitskontext, aber keine vollständigen Rohtranskripte verfügbar. Es wird keine Vollständigkeit vorgetäuscht. Beleg: Recovery-List „sessions“ mit einem Eintrag; App-Readback `truncated:true`, `scratch/forensics/session-current-app-readback.redacted.json`.
+
+Quellenschlüssel:
+
+- **S0**: vollständig gelesene vorherige Sitzung vor dem Neustart; 133 Ereignisse. Redigierte, zeilengleiche Arbeitskopie: `scratch/forensics/session-prior.redacted.jsonl`. Personen-/Accountangaben und opaker verschlüsselter Reasoning-Inhalt sind entfernt; strukturierte Aufrufe, Ergebnisse und Verbrauchsdaten bleiben erhalten. „Z.“ bezeichnet die ursprüngliche Ereigniszeile, nicht eine Zeile innerhalb eines eingebetteten Dokuments.
+- **S1-T1…T7**: sieben abgeschlossene Hauptagenten-Turns der aktuellen Entwicklung. Gekürzte App-Abfrage und daraus extrahierte finale Antworten: `scratch/forensics/current-visible-turns.md`. Tool-Zitate aus dem noch sichtbaren Arbeitskontext werden ausdrücklich als **Kontextbeleg** bezeichnet; sie ersetzen kein vollständig exportiertes Rohtranskript.
+- **F**: `specs/onboarding-9b93178fab3c/`. Kürzungen wie `F/spec.md:49` stehen für diesen relativen Repository-Pfad.
+- **P**: installiertes Plugin derselben oben genannten Version; Referenzen wie `P/docs/operating-model.md:395` sind logische Plugin-Pfade ohne private Installationskoordinaten.
+- Repository-Inventare, redigierter Status, Zeitrechnung und Prüfpaketindex: `scratch/forensics/`. Ein fehlender Nachweis wird als fehlend ausgewiesen, nicht als fehlgeschlagener oder erfolgreicher Lauf umgedeutet.
+
+Zeiten sind UTC; die Commit-Anzeige mit `+02:00` wurde entsprechend umgerechnet. Analysearbeit nach dem Entwicklungsstopp ist aus den Entwicklungszahlen ausgeschlossen. Andere ähnlich benannte App-Threads wurden mangels Repository-Identitätsnachweis nicht diesem Projekt zugerechnet. Belege: Recovery-List, S0 Z.1, `scratch/forensics/commit-index.txt`.
+
+## Stärken
+
+1. **Bestätigt: Produktanforderungen überlebten den Neustart.** Der private Intake enthält den ursprünglichen Materialblock mit 3.605 Bytes; Resume-Hint und Sprache/Profil wurden gespeichert. Die nächste Sitzung entwickelte ein dazu passendes Gestaltungskonzept. Der tatsächliche spätere Consume-Aufruf ist wegen der S1-Rohdatenlücke nicht unabhängig nachgewiesen. Belege: S0 Z.118–127; S1-T1; `project/resume-hint.json:5`; `F/design-input.md:1`.
+2. **Bestätigt: Explizite Freigaben und historische Bindungen existieren.** Der akzeptierte Vertrag, Quellen-Hashes, Registrierung und spätere Invalidierung bleiben nachvollziehbar. Die Tabellenänderung wurde nicht still unter einer alten Freigabe umgesetzt. Belege: Commit `aebe843`, `F/lifecycle.json:9`, `project/pipeline-state.json:695`, Commit `32bfb54`.
+3. **Bestätigt: Die Leserprüfung bewirkte konkrete redaktionelle Verbesserungen.** Die erste Runde führte zur Entfernung einer Wiederholung, zur Absatzaufteilung und zu einem klar markierten Architekturanhang. Die zweite Runde präzisierte reproduzierbare Screenshot-Zustände. Belege: Commit `28fe900`; `F/evidence/reader-review/disposition-1.md:5`; `F/evidence/reader-review/disposition-2.md:12` und `:24`.
+4. **Teilweise bestätigt: Schutzmechanismen verhinderten problematische Veröffentlichung.** Der Commit-Hook erkannte absolute lokale Pfadlinks im ersten Reviewbericht. Das Original wurde privat erhalten und die veröffentlichte Fassung normalisiert. Das war eine sinnvolle Datenschutzkontrolle, kein Beleg für einen vollständigen Security-Scan. Belege: Kontextbeleg S1-T4 „staged content contains private local identifiers“; `F/evidence/design-review-1.md:1`; `F/evidence/design-review-disposition.md:10`.
+5. **Bestätigt: Kein vorgetäuschtes fertiges Produkt.** Die finalen Antworten sagen wiederholt, dass die Szene nicht gebaut ist; kein Produktcode wurde vom Hauptagenten geschrieben. Das Inventar enthält keine `index.html`. Belege: S1-T3, T4 und T7; `scratch/forensics/tracked-files.txt`; Commitfolge `d781165` bis `2beee97`.
+
+Diese Stärken betreffen Anforderungen, Dokumentqualität und Prozesskontrolle. Eine dadurch verbesserte Laufzeitqualität des gewünschten Produkts ist **nicht belegt**, weil kein Produkt geliefert wurde.
+
+## Verbesserungspotenziale nach Priorität
+
+### P0: Vorgeschriebene Werkzeuge müssen vor der Freigabe tatsächlich ausführbar sein
+
+**Teilweise bestätigt aus Kontext, durch Artefakte gestützt:** Modellroutenauswahl und vorgeschriebener Receipt-Produzent wurden als undurchsichtige Implementierungsausführung abgewiesen, obwohl sie vor der Implementierung gebraucht wurden. Daraus wurden mindestens drei abgeschlossene Einmal-Ausnahmen und eine weitere ausstehende Ausnahmefrage. Belege: S1-T2, T3, T4, T7; Kontextbeleg „File: .pipeline-opaque-execution“; die vorbereiteten Pläne unter `scratch/*receipt-override-plan.json`; erzeugtes Receipt in Commit `fd26e57`.
+
+**Vorschlag:** Die festen installierten Entry-Points mit geschlossenen Argumentformen direkt im Lifecycle zulassen. Ein Integrationstest muss mit eingeschalteten echten Guards von frischem Repository bis zur ersten Implementierungsdelegation laufen, einschließlich Routenauswahl, Review-Receipt, Architekturmaterialisierung und Registrierung. Nicht bloß die einzelnen CLIs isoliert testen. Erfolgskriterium: kein HGO für vorgeschriebene interne Vorbereitung. Dies folgt dem eigenen Autonomieanspruch, `P/docs/operating-model.md:395` und `P/skills/pipeline-start/references/design-course.md:38`.
+
+### P0: Reviewprovenienz darf nicht aus einem anderen Agentenprofil stammen
+
+**Bestätigt:** Das kanonische Receipt nennt `reviewer.model = sonnet` und Runner `codex`, während die dokumentierte angeforderte Route `gpt-6-luna` mit hoher Denktiefe lautet. Das tatsächlich ausgeführte Modell bleibt ohne direkte Ausführungsbeobachtung unbekannt. Eine angeforderte Route ist kein Identitätsnachweis. Belege: `F/evidence/design-review-receipt-final.json:1`; `F/evidence/design-review-final-context.md:3`.
+
+Die Quelle erklärt den Widerspruch: Der Produzent liest standardmäßig `agents/critic.md` und übernimmt dessen `model:`-Zeile, statt die konkrete Readiness-Ausführung zu binden. Belege: `P/scripts/design-review-receipt.mjs:42`, `:144`, `:198`.
+
+**Vorschlag:** Reviewer-Rolle, angeforderte Route und beobachtete Ausführungsidentität getrennt speichern; ausschließlich den konkreten Dispatch verketten. Bei fehlender Beobachtung `unknown` ausgeben, niemals ein fremdes Modellprofil als Ausführungsfakt. Für kritische Projekte ist korrekte Provenienz wichtiger als das bloße Vorhandensein eines PASS-JSON.
+
+### P0: Parserfähigkeit ist ein deterministisches Design-Gate, kein spätes Implementierungshindernis
+
+**Bestätigt:** Die inhaltlich geprüfte und freigegebene Spec hatte eine nicht unterstützte viergliedrige Abnahmetabelle. Erst die Dispatch-Vorbereitung fand `CAC-CRITERION-UNSUPPORTED`. Die spätere Korrektur änderte keinen der zwölf Kriterien-Texte. Belege: `F/evidence/criterion-format-correction.md:3`; Commit `32bfb54`; `F/evidence/criterion-format-delta-review.md:1`.
+
+**Ursache:** Agentenfehler bei der Tabellenform, verstärkt durch fehlende frühzeitige Maschinenvalidierung. Die gelesene Implementierungsreferenz nennt bereits zulässige Kriterienformen. Der vorgeschaltete technische Review übersah die Dispatch-Verträglichkeit. Belege: `P/skills/pipeline-start/references/implementation-continuation.md`, Abschnitt Kriterienrenderings; `F/evidence/design-review-final.md:1` gegenüber `F/evidence/criterion-format-correction.md:3`.
+
+**Vorschlag:** Ein gemeinsamer Parser für Spec-Erzeugung, Readiness, Registrierung und Dispatch; vor `present-plan` jedes Kriterium probeweise lokalisieren. Fehler bei führenden Nullen und Tabellenköpfen gezielt testen. Formale Normalisierung muss über einen geregelten, semantikerhaltenden Änderungsweg laufen; sie darf keine zusätzliche inhaltliche Reviewrunde erzwingen, wenn ein bytegenauer Kriterienvergleich die Gleichheit belegt.
+
+### P1: Reviewbudget und Receipt-Kette müssen dieselbe Geschichte erzählen
+
+**Bestätigt:** Der Kontextbericht sagt „2 of 2“ technische Runden, das präsentierte Receipt dagegen `kind: initial`, `round: 1`, ohne Vorgänger. Die frühere Kette wurde wegen eines nicht veröffentlichbaren Berichts privat zurückbehalten. Damit war der dokumentierte Zwei-Runden-Kurs nicht als entsprechende kanonische Kette repräsentiert. Belege: `F/evidence/design-review-final-context.md:5`; `F/evidence/design-review-receipt-final.json:1`.
+
+**Folge:** Nach der Formatkorrektur konnte die vorgesehene Möglichkeit `unreviewedSourceDelta` nicht mit dieser Initial-Kette genutzt werden. Der Presenter verweigerte mit `DCC-REVIEW-RECEIPT-BINDING`; der PO wurde um eine zusätzliche Review-Ausnahme gebeten. Belege: Kontextbeleg S1-T6 „present-plan refused (DCC-REVIEW-RECEIPT-BINDING)“; S1-T6 und T7; `P/lib/design-approval-binding.mjs:9`; `F/evidence/criterion-format-review-exception.md:3`.
+
+**Ursache:** Agentenfehler bei Berichtssanitisierung und Kettenführung plus unzureichende Unterstützung für die sichere Publikation von Berichten. Nicht jede zusätzliche Runde war ein notwendiges Pipeline-Gate. **Vorschlag:** Berichte vor dem ersten kanonischen Receipt automatisch sanitisieren; Original- und Publikationsdigest explizit verketten; verbrauchte Runden unabhängig von Dateinamen/Kanonisierung zählen; dem Coordinator eine sichere Recovery für unpublizierbare Berichte liefern.
+
+### P1: Recovery muss einen anderen, fortschrittsfähigen Zustand erreichen
+
+**Teilweise bestätigt:** Das reine Unstaging generierter Codex-Dateien wurde als Arbeitsbaumänderung blockiert. Die zurückgegebene Audit-Verifikation lief im Host erfolgreich, aber derselbe Unstage-Aufruf blieb gesperrt. Erst ein enger Commit mit expliziten zulässigen Pfaden führte weiter. Belege: Kontext S1-T2 „HGO-NARROWER-WRITER-REQUIRED“, anschließend „status: valid“ und erneute Verweigerung; Commits `d781165` und `96f73fe`.
+
+**Vorschlag:** Indexänderungen, Arbeitsbaumänderungen und reine Beobachtungen getrennt klassifizieren. Recovery-Aktionen als Zustandsautomat testen: vorgeschlagene Aktion ausführen, Originalaktion wiederholen, Fortschritt nachweisen. Eine Endlosschleife `verify-audit → gleiche Ablehnung` ist kein nutzbarer Recovery-Vertrag.
+
+### P1: Frühere Antworten und Darstellungen konsistent halten
+
+**Teilweise bestätigt:** Git-Identität wurde im sichtbaren S1-Kontext nochmals abgefragt, obwohl sie bereits in S0 genannt war. In der späteren manuellen Intake-Erfassung fehlten die Git-Autor-Argumente; Sprache und Profil wurden dagegen erhalten. Belege: S0 Z.69, Z.73, Z.88, Z.118; Kontext S1-T2 mit der Frage nach fehlender Commit-Autorenschaft. Eine Wiederholung des gesamten Produktbriefs oder der Sprache/des Profils ist dagegen **nicht belegt**; S1-T1 übernimmt diese ausdrücklich.
+
+**Vorschlag:** Einen durchgängigen typisierten Intake-Datensatz mit Vollständigkeitsprüfung vor dem Neustart verwenden. Die Actor-Zuordnung für Einreichung/Präsentation einmal gebündelt mit den anderen nötigen Angaben abfragen, soweit die Policy dies zulässt; keine Namen aus Git still als PO-Autorität übernehmen. Quelle für die strenge Attributionsregel: `P/skills/pipeline-start/SKILL.md`, EL-36.
+
+### P1: Auditierbarkeit und Beobachtbarkeit als Produktfunktion liefern
+
+**Bestätigt:** Die aktuelle Rohsitzung und die Child-Rohtraces konnten nicht vollständig exportiert werden. Damit sind genaue Gesamtarbeitszeit, aktuelle Tokenverbräuche und erschöpfende Toolzählung nicht rekonstruierbar. Das selbst erstellte Prüfpaket muss Git, State, mehrere Berichtsarten und private Scratch-Verweise kombinieren. Belege: Quellenabgrenzung oben; `scratch/forensics/audit-index.md`.
+
+**Vorschlag:** Ein repositorygebundener, read-only Export für alle zugehörigen Root-/Child-Sitzungen mit fortlaufenden Ereignis-IDs, Anfang/Ende, Usage, Parent-Bezug und Redaktionsmodus. Bereits bekannte persönliche Metadaten nicht in öffentliche Berichte übernehmen. Der Export muss auch den aktiven Thread sicher abdecken; keine freie Suche im gesamten Runner-Archiv verlangen.
+
+## Schleifen, Fehlversuche und PO-Eingriffe
+
+Die folgende Liste umfasst die in S0 beziehungsweise im sichtbaren S1-Kontext identifizierten Fälle. Wegen der fehlenden S1-Rohdaten ist eine erschöpfende Ereigniszahl **nicht belegt**. „Pipeline-Produktdefekt“ bezeichnet die Pipeline, nicht die nie gebaute Szene.
+
+| Fall | Befund und Beleg | Ursache / vermeidbarer Anteil |
+|---|---|---|
+| Installation und gebündelte Einstellungen | S0 Z.17, Z.65, Z.69 | Erwartete Einrichtungsentscheidungen; kein Produktdefekt |
+| Sandbox-Aufruf, dann Host-Wiederholung | `spawnSync node EPERM`, S0 Z.38; eskalierter Retry Z.42 | Integrations-/Agentenfehler: deklarierte Host-Grenze unmittelbar verwenden |
+| Neustart mit externem Befehl | S0 Z.104, Z.130–133 | Erwartete Runtime-Grenze; zusätzlicher Bedienaufwand auch im Chat-Modus |
+| Ungültiger Patch mit mehrfach behandeltem Ziel | Kontext S1-T2: `invalid patch: multiple operations target` | Agentenfehler; Patch vorher strukturell prüfen |
+| Template-Kommentar blieb im ausgearbeiteten PRD | Kontext S1-T2: `ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE`; Korrektur vor Commit `57fca47` | Agentenfehler; frühe Vorlagen-/Placeholder-Prüfung |
+| Lesender Mehrdatei-Aufruf mit pipeline.json abgewiesen | Kontext S1-T2: `GUARD-GATE-STRENGTH-SHELL`; einzelne Datei später lesbar | Pipeline-Grammatik/Agentenaufruf; rein lesende Formen präzise zulassen |
+| Optionaler Modellrollen-Bootstrap blockiert | Kontext S1-T2: `GUARD-DEVPLAN-SHELL` | Wahrscheinlicher Pipeline-Integrationsdefekt; optionales Readback nicht zum PO-Task machen |
+| Help-/Diagnoseaufrufe als opaque Ausführung | Kontext S1-T2: `pipeline-state.mjs --help` verweigert | Doku-/Grammatiklücke; dokumentierte Help-Form oder sichere Ersatzaktion |
+| Externe Glob-/Pfaddiagnose abgewiesen | Kontext S1-T2: `GUARD-READ-SCOPE-OUTSIDE-ROOT` | Nicht pauschal Fehlalarm: Scope-Grenze vorhanden; Agent muss feste bekannte Quellen verwenden |
+| Codex-Gerüst im ersten Commit blockiert | Kontext S1-T2: `GUARD-DEVPLAN-LIFECYCLE`; spätere Sicherung `96f73fe` | Pipeline-Produktdefekt bei eigenen Bootstrap-Zielen plus vermeidbare Commit-Reihenfolge |
+| Unstage/Audit/Unstage-Schleife | Kontext S1-T2: `HGO-NARROWER-WRITER-REQUIRED` | Pipeline-Recovery ohne Fortschritt; Audit-Sandboxprobe zusätzlich vermeidbarer Agentenfehler |
+| Routenauswahl wird PO-Ausnahme | S1-T2, T3; `model-role-dispatch-select.mjs` | Routinevorbereitung als menschliches Gate; Pipeline-Integrationsdefekt |
+| Initialer Receipt-Produzent verweigert; Draft-Recovery hilft nicht | S1-T3, T4 | Pipeline-Produktdefekt; erneut dieselbe nicht zugelassene Entry-Point-Klasse |
+| Rohbericht blockiert Datenschutz-Hook | Kontext S1-T4: `category: home-path`; `F/evidence/design-review-1.md:1` | Korrekte Kontrolle eines Agentenfehlers; vor Receipt automatisch redigieren |
+| Quellenkorrekturen nach erster Receipt-Erzeugung | Commit `28fe900`; `F/evidence/design-review-final-context.md:5` | Sinnvolle redaktionelle Verbesserung, aber vermeidbare doppelte Kanonisierung |
+| Finaler Receipt verlangt weitere Ausnahme | S1-T4, T5 | Gleicher Pipeline-Integrationsdefekt bei anderem exakt gebundenem Aufruf |
+| Zusätzliche Fragen nach Git-Autor und --by | Kontext S1-T2; S0 Z.69 | Identitätsverlust/Agentenintake; getrennte Autoritätsrolle sachlich nötig, serielles Fragen vermeidbar |
+| Finale Entwurfsfreigabe | S1-T5; State-Historie und akzeptierter Vertrag | Erwartetes konfiguriertes Gate; nicht mit HGO-Ausnahmen verwechseln |
+| Ausgegebenes absolutes Node-Executable blockiert | Kontext S1-T6: ursprüngliches approve-plan verweigert, dokumentiertes `node` funktioniert | Pipeline-Grammatik passt nicht zum eigenen Action-Rendering |
+| Materialisierung vor Phasenwechsel nötig | Kontext S1-T6: `ARCHITECTURE-MATERIALIZATION-REQUIRED`; Commit `b8d0b75` | Erwarteter automatischer Lifecycle-Schritt; kein PO-Gate |
+| Registrierung trotzdem nach fehlgeschlagenem Phasenwechsel versucht | Kontext S1-T6: register-feature-package verweigert | Agentenfehler: abhängige Aktionen nur nach erfolgreichem Ergebnis ausführen |
+| Fehlendes leeres ADR-Verzeichnis blockiert Eintritt | Kontext S1-T6: `ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED`; `docs/adr/.gitkeep`, Commit `b8d0b75` | Pipeline-Greenfield-Defekt: „keine ADRs“ nicht mit „Quelle ausgefallen“ verwechseln |
+| Architekturdiagnose selbst vor Implementation gesperrt | Kontext S1-T6: architecture-baseline als opaque abgewiesen | Pipeline-Integrationsdefekt; sichere Diagnostik muss vor dem Eintritt möglich sein |
+| Dispatch --help nicht unterstützt | Kontext S1-T6: `DBG-SUBCOMMAND` | Doku-/CLI-Ergonomie; geringer, vermeidbarer Diagnoseaufwand |
+| AC-01 verworfen, AC-10 dann Tabellenformat verworfen | Kontext S1-T6: `DBG-CRITERION-ID`, danach `CAC-CRITERION-UNSUPPORTED`; `32bfb54` | Agentenformatfehler und zu spät konsolidierte Parserverträge |
+| Tabellenkorrektur invalidiert Freigabe und Presenter | `project/pipeline-state.json:695`; Kontext `DCC-REVIEW-RECEIPT-BINDING` | Erwartete Hashbindung, aber unnötig späte formale Prüfung und vorherige Kettenunterbrechung |
+| Zusätzliche Delta-Prüfung braucht Budgetausnahme | S1-T6, T7; `F/evidence/criterion-format-review-exception.md:3` | Kombination aus Agentenfehler und fehlender Recovery für die kanonische Kette |
+| Delta-Receipt wieder gesperrt | S1-T7; letzter vorbereiteter Plan in scratch/ | Pipeline-Produktdefekt; vierte HGO-Frage dieser Vorbereitung, beim Stopp unbeantwortet |
+
+Während der Analyse zusätzlich beobachtet, **nicht** in Entwicklungszahlen eingerechnet: Ein `rg --files` mit mehreren Excludes und ein Mehrdatei-`stat` wurden durch die geschlossene Grammatik verweigert; der erlaubte Scratch-Test scheiterte vor Ausführung mit `GUARD-DEVPLAN-SHELL`. Beleg: `scratch/forensics/seed-attempt-status.md:5` und Analyse-Kontext. Es wurden dafür keine neuen Freigaben eingeholt.
+
+## Abgleich mit Operating Model, Rollen und Guardrails
+
+| Prüffrage | Ergebnis und Einordnung | Beleg |
+|---|---|---|
+| Vollständige Implementierungsbriefings und Rollentrennung | Kein Goldfish-Implementierungsdispatch fand statt. Der generierte gebundene Auftrag scheiterte vorher. Daher weder saubere Implementierungsbriefings noch deren Ausführung qualifiziert; kein Hauptagenten-Produktcode | S1-T6/T7; Inventar; Regel `P/docs/operating-model.md:102`, `:248` |
+| Frische Reviews | Im sichtbaren Kontext sieben frische, nicht geerbte Entwicklungs-Reviewdispatches. Berichte vorhanden. Keine unabhängige Verifikation vollständiger Child-Rohtraces, Modellidentität oder OS-Isolation | F/evidence/; `design-review-final-context.md:3` |
+| Critic unabhängig von Umsetzung | Kein Implementierungs-Critic gestartet. Design-Readiness und Reader sind keine Ersatz-Critic-Reviews | `F/evidence/design-review-final.md:3`; `F/design/critic-review-unit.json`; Regel `P/docs/operating-model.md:339` |
+| Tests getrennt von Umsetzung | Keine Produkttests vorhanden. Ein allgemeines Gebot verschiedener Autoren für Test und Code steht so nicht im Operating Model: Goldfish besitzt auch Testvorbereitung; test_author ist eine eigene optionale Duty | Inventar; `P/docs/operating-model.md:87`, `:145`; `pipeline.user.yaml:272` |
+| Verify/Security vor Abschluss | Nicht erreicht und nicht nachgeholt. Verify ist null; keine kandidatgebundenen Ergebnisse. Da keine Fertigstellung erklärt wurde, ist dies kein nachgewiesener falscher Abschluss | `project/pipeline.json:8`; `F/result.md:7`; Regel `P/docs/operating-model.md:339` |
+| Audit Trail | Zehn nachvollziehbare Commits und viele gehashte Quellen; widersprüchliche Reviewer-/Rundenangaben und keine vollständig aktuelle Nachweiskette | Commit-Index; Receipt :1; final-context :5 |
+| Geregelte Änderungen | Reopen/Resubmit erfolgt, Freigabe invalidiert. Registrierte alte Vertragsstände bleiben erhalten; ein aktueller erfolgreicher Reconcile ist nicht belegt | `project/pipeline-state.json:695`; `F/lifecycle.json:12` und `:20` |
+| Bootstrap-Konformität | Preflight und Versionsauflösung vorhanden. Eine vollständig belegte, endgültige Bootstrap-Bestätigung mit allen verlangten Feldern ist im vorhandenen S1-Export nicht nachgewiesen | S1-T1; S0 Z.33; `P/skills/pipeline-start/SKILL.md`, Confirmation |
+
+## Freigaben je Modus
+
+Aktive Projektkonfiguration: **Chat-Modus** für menschliche und Push-Freigaben. Advisor-Export ist erlaubt. Belege: `pipeline.user.yaml:1`, `:39`, `:41`. Es ist keine ausgeführte Signaturzeremonie belegt. Die vorherige S0-Entscheidung für Chat steht im Originalinput, S0 Z.69.
+
+| Reihenfolge | Tatsächlich verlangte PO-Handlung | Modus / Bewertung |
+|---|---|---|
+| S0-1 | Pipeline-Installation bestätigen | Chat; erwartete Einrichtungszustimmung, S0 Z.17/21 |
+| S0-2 | Autorangaben, Sprache, Profil, Chat/Signature und Advisor-Export gebündelt beantworten | Chat-Intake, S0 Z.65/69 |
+| S0-3 | Sitzung beenden und vorgegebenen Startbefehl extern im Projekt ausführen | Runtime-Neustart, **keine Signatur**; zusätzliche Terminalarbeit trotz Chat-Modus, S0 Z.130 |
+| S1-1 | Gestaltungskonzept bestätigen | Vom Produktauftrag ausdrücklich verlangt; S0 Z.11, S1-T1 |
+| S1-2/3 | Commit-Autorenschaft erneut nennen, danach Actor für Einreichung/Präsentation bestätigen | Kontextbeleg; Datenverlust und vermeidbar serialisierte Intake-Fragen |
+| S1-4 | Einmalige Ausnahme für Prüfer-Routenauswahl bestätigen | Chat-HGO, S1-T2/T3 |
+| S1-5 | Einmalige Ausnahme für initialen Prüfnachweis bestätigen | Chat-HGO, S1-T3/T4 |
+| S1-6 | Einmalige Ausnahme für finalen Prüfnachweis bestätigen | Chat-HGO, S1-T4/T5 |
+| S1-7 | Vollständigen Entwurf zur Umsetzung freigeben | Konfiguriertes finales Chat-Plan-Gate; S1-T5; historischer Vertrag in F/evidence/ |
+| S1-8 | Zusätzliche, ausschließlich formale Delta-Prüfung über das Reviewbudget hinaus erlauben | Chat-Ausnahme; S1-T6/T7, exception.md:3 |
+| S1-9 | Ausnahme zum Schreiben des Delta-Receipts bestätigen | Nur gefragt; beim Stopp **nicht erteilt**, S1-T7 |
+
+**Signature-Modus:** Keine belastbare Aussage zur praktischen Signaturbedienung dieses Tests möglich, weil nicht benutzt. Gelegentliche Guard-Texte boten Signaturwege an, bevor die Chat-Konfiguration committed war; das ist kein Nachweis einer tatsächlich verlangten oder ausgeführten Signatur. **Chat-Modus:** Die genannten Plan-/Ausnahmeentscheidungen benötigten jeweils eine Chat-Antwort; der Neustart erforderte dennoch einen Wechsel ins externe Terminal. Der S0-Neustartbefehl war in mehrere verkettete Variablenzuweisungen zerlegt, ohne einen langen einzelnen Pfad zum Umbruch zu zwingen. Ob er exakt unverändert ausgeführt wurde, ist nicht belegt. Beleg: S0 Z.130.
+
+## Qualitätsfunktionen und Prüfpaket
+
+### Security und Nachweise
+
+Der Audit-Paketversuch liegt als `scratch/forensics/audit-index.md` vor: je Commit Auftrag/Grund, Freigabebezug und vorhandene/fehlende Checks. Er umfasst alle zehn Commits und trennt historische von aktuellen Quellbindungen. Ein vollständiges Prüferpaket lässt sich nicht zusammenstellen: kein Produktkandidat, keine Verify-/Security-/Implementierungs-Critic-/Abnahmebelege und keine vollständigen aktuellen Root-/Child-Rohtraces. Belege: Audit-Index; `project/pipeline.json:8`; `F/lifecycle.json:58`.
+
+Security-Tests und Security-Scan sind **nicht als ausgeführt belegt**. Der Datenschutz-Hook hat einen konkreten Fehler abgefangen, was enger ist als ein Security-Scan. Es wurden weder Scanner installiert noch ein Abschluss nachträglich qualifiziert. Belege: Rohbericht-Normalisierung in `F/evidence/design-review-1.md:1`; fehlende Test-/Scanartefakte im Inventar; S1-T7.
+
+### Architektur
+
+Karte, Modulkonzept, Fitness-Modell und Baseline wurden aus dem genehmigten Paket materialisiert. Ein fachlicher ADR wurde nicht erstellt; `docs/adr/` enthält nur einen Platzhalter. Die Baseline enthält Nullwerte und keine akzeptierten Verletzungen; das ist kein gemessener Fitness-PASS. Im Status sind Fitness-Befunde für Modulbesitz und Verifikationslokalität sowie unbekannte Profil-/Friction-Werte sichtbar. Belege: Commit `b8d0b75`; `architecture/map/voxel-scene.md:1`; `architecture/baseline.json:4`; `project/pipeline-state.json:643`, `:668`, `:683`.
+
+Ein gehaltener Architektur-Entry meldete nach Erstellung des leeren ADR-Verzeichnisses readiness. Das qualifiziert nur die Eintrittsprüfung, nicht die tatsächliche Umsetzung der Architektur. Architekturvorgaben können ohne Implementierung nicht gegen Code geprüft werden. Belege: Kontext S1-T6 „Architecture decisions ... status: ready“; fehlende index.html im Inventar.
+
+### Nutzerdokumentation und weitere Funktionen
+
+- **Nutzerdoku:** Kein README oder Bedienhandbuch vorhanden; PRD/Spec beschreiben geplantes Verhalten. `docs/state.md` kennzeichnet sich ausdrücklich als Design-Snapshot. Der generierte Result-Record sagt hingegen noch „implementation is in progress“, während der aktuelle State wieder Design ohne Freigabe ist. Der Record sagt selbst, dass er keine Abnahme darstellt. Belege: Inventar; `docs/state.md:17`; `F/result.md:6`; `project/pipeline-state.json:6` und `:22`.
+- **Advisor:** Zustimmung und Route konfiguriert, keine tatsächliche Beratung belegt. Das ist bei bedarfsabhängiger Beratung kein Defekt. Belege: `pipeline.user.yaml:1`; `P/docs/operating-model.md:145`; keine Beratungsreceipts im Audit-Inventar.
+- **Reader:** Vier getrennte Reports in zwei gepaarten Runden, eine Korrekturcharge und explizite Annahme verbleibender kleiner Editorial-Präferenzen. Kein vorgetäuschter Source-Repository-Reader-Vertrag. Belege: `F/evidence/reader-review/disposition-2.md:3`, `:16`, `:18`; Regel `P/skills/reader-review/SKILL.md:75`.
+- **Mindest-Sorgfalt/Rigor:** Status enthält eine report-only Rigor-Historie mit vielen unknown/unavailable-Werten und Surface-Expansion durch Pipeline-Dateien. Keine automatische höhere Autorität wurde daraus abgeleitet. Belege: `project/pipeline-state.json:193`, `:203`, `:573`.
+- **Backlog-Abgleich:** Kein Projektbacklog vorhanden und kein Abgleichslauf belegt. Die geplante Item-Bindung wurde aus der Spec versucht, scheiterte aber. Belege: Inventar; `F/evidence/criterion-format-correction.md:3`.
+- **Restart:** Inhaltserhalt ist nützlich belegt; Git-Identitätsweitergabe und komplette unabhängige Consume-Verifikation bleiben unvollständig. Belege: S0 Z.69/88/126; S1-T1.
+- **Änderungsweg:** Die Hashbindung verhinderte stilles Weiterarbeiten mit geänderter Spec, vergrößerte aber die Folgen des spät gefundenen Formatfehlers. Belege: Commit `32bfb54`; `project/pipeline-state.json:695`.
+
+## Laufzeit, Turns, Tool-Aufwand und Tokens
+
+### Gemessene Arbeitszeit der früheren Sitzung
+
+Nach Nutzerdefinition jeweils PO-Nachricht bis Ende der dazugehörigen Agentenantwort: 4,519 s + 59,021 s + 108,133 s = **171,673 s = 2 min 51,673 s**. Die beiden dazwischenliegenden PO-Warteintervalle von zusammen **29,804 s** sind ausgeschlossen. Die Runtime-eigenen duration_ms summieren sich leicht abweichend auf 172,235 s, weil sie etwas andere Startpunkte benutzen. Belege: S0 Z.11/17, Z.21/65, Z.69/133; `scratch/forensics/metrics.json`.
+
+Für S1 fehlen vollständige Endzeit-/PO-Zeitdaten. **Exakte Gesamtarbeitszeit ist nicht belegt.** Als ausdrücklich geschätztes Intervall ergeben sich für das ganze Entwicklungsprojekt etwa **28 min 45 s bis 39 min 48 s**. Methode: Turn-Starts aus UUIDv7-Zeitanteilen des App-Readbacks ableiten, anhand S0 kalibrieren; je Turn bis zur letzten datierten Operation/Artefakterzeugung als Untergrenze, bis zum nächsten Turn als Obergrenze; bekannte äußere PO-Lücken dadurch nicht pauschal als Arbeit zählen. Die Obergrenze enthält weiterhin nicht auflösbare Warteanteile; sie ist **keine gemessene aktive Arbeitszeit**. Fehlende Subagentenzeit wird nicht zusätzlich aufsummiert, weil sie mit Elternarbeit überlappen kann. Die JSON-Rechnung legt alle Annahmen offen. Beleg: `scratch/forensics/metrics.json`.
+
+### Phasenübersicht
+
+| Phase | Zeitachse UTC | PO / Hauptagent / Subagenten | Tool-Aufwand und Arbeitszeit |
+|---|---|---|---|
+| S0 Onboarding | 07:01:14.719–07:04:36.196 | 3 / 3 / 0 | 15 exec-Orchestrierungsaufrufe mit 16 exec_command- und 2 apply_patch-Aufrufen; 171,673 s aktiv gemessen |
+| S1 Wiedereinstieg und Design bis finale Freigabe | Start geschätzt 07:04:46.872; finale Präsentation 07:27:13.805, Freigabe 07:28:20.781 | T1–T5: 7 PO-Nachrichten einschließlich zweier asynchroner Antworten / 5 Hauptturns / 6 Reviews | Exakte Tools unbekannt; für T1–T5 zusammen geschätzt 18:14–23:14 min nach Intervallmethode, nicht zusätzlich zur Gesamtzeit addieren |
+| Implementierungsvorbereitung | PO-Turnstart geschätzt 07:28:00.259; State Implementation 07:30:09.744–07:33:28.705 | 1 PO / Teil von T6 / 0 Implementierer | **0 Produktimplementierung**; tatsächliche aktive Teilzeit nicht isolierbar. Die 3:19 min State-Dauer ist keine Arbeitszeitmessung |
+| Design-Recovery nach Dispatchfehler | Reopen 07:33:28.705; Resubmit 07:34:21.485; zusätzlicher Reviewcommit 07:41:08 | 1 weiterer PO / Rest T6 und T7 / 1 Delta-Review | Keine saubere Trennung innerhalb T6 möglich; T6+T7 zusammen geschätzt 7:39–13:43 min |
+| Verify / Security / Implementierungs-Critic | Nicht erreicht | 0 / 0 / 0 für diese Phase | Keine entsprechenden Ausführungsergebnisse belegt |
+| Abnahme / Abschluss | Nicht erreicht; Entwicklung ausdrücklich gestoppt | Stopp ist kein Abnahme-Turn | Kein Close und keine Abnahme nachgeholt |
+
+Die Phasen-Turnzuordnung ist von den vollständigen Runtime-Eventzählungen zu unterscheiden. Insgesamt vor dem Stopp: **10 abgeschlossene Hauptturns**, **12 PO-Nachrichten** einschließlich der zwei asynchronen Angaben; **7 Entwicklungs-Reviewdispatches**. Der Analyseturn und sein eigener Analyseagent sind ausgeschlossen. S0 ist roh bestätigt; S1-Zahlen stammen aus App-Readback plus sichtbarem Kontext. Eine exakte Gesamtzahl aller S1-Tool-Aufrufe oder Guard-Verweigerungen wäre angesichts der Exportlücke erfunden. Belege: S0, `current-visible-turns.md`, Reviewinventar und `metrics.json`.
+
+Subagenten getrennt: technische Readiness zunächst `design_readiness`, dann `design_final`, später die genehmigte Ausnahme `criterion_format_delta`; Leser `reader_one`, `reader_two`, `reader_round2_one`, `reader_round2_two`. Das sind **3 technische und 4 Leser-Aufträge**, keine Goldfish-Umsetzung und kein Implementierungs-Critic. Einzelne Laufzeiten, Toolzahlen und Tokenkosten der Kinder: **nicht belegt**, Rohtraces fehlen. Berichte liegen in F/evidence/; keine OS-Isolation oder tatsächlich beobachtete Modellidentität wird daraus abgeleitet.
+
+### Tokenübersicht mit drei Töpfen
+
+S0 meldet kumuliert **638.602 Inputtokens**, davon **593.280 gecacht**, sowie **4.116 Outputtokens**; Gesamt **642.718**. Ungecachter Input: 45.322. Das sind wiederholt verarbeitete Kontexte, keine 642.718 verschiedenen Texttokens und kein Geldbetrag. Letzte Runner-Verbrauchsmeldung: S0 Z.131.
+
+| Topf | Belegter Verbrauch S0 | S1 und Kinder |
+|---|---|---|
+| (a) Inhaltliche Produktarbeit | 0 nach Zweckzuordnung der Aufrufe: noch kein Gestaltungskonzept/Code, nur Intake und Setup | Konzeptarbeit vorhanden, Produktcode 0; Tokenzahl unbekannt |
+| (b) Zusätzlich verlangte inhaltliche Pipeline-Arbeit | 0 nach derselben Aufrufzweck-Methode; Produktbrief-Erfassung zählt hier als Verwaltung | PRD/Spec, Architektur, 7 Reviewaufträge und redaktionelle Korrekturen vorhanden; Tokenzahl unbekannt |
+| (c) Reine Pipeline-Verwaltung | 642.718 einschließlich gecachtem/repetiertem Kontext; Zuordnung aller drei S0-Turns zu Einrichtung/Intake/Restart | Viele Gate-/Status-/HGO-/Quellenlese-/Receipt-Schritte; Tokenzahl unbekannt |
+
+Die Zuordnung ist aufrufzweckbezogen, nicht der Versuch, innerhalb jedes Prompt-Inputs Produktwörter aus Verwaltungswörtern herauszurechnen. Das ursprüngliche Briefing als wiederholter Kontext macht einen Setup-Aufruf nicht zu Produktentwicklung.
+
+**Grobe Schätzung ohne Abrechnungsanspruch:** Für S1 ist nur eine Szenariorechnung vertretbar: etwa 100–200 Modellfortsetzungen bei angenommenen durchschnittlich 25.000–100.000 erneut eingelesenen Inputtokens entsprächen **2,5–20 Mio. Inputtokens**. Diese Annahmen sind **nicht gemessen**; ihre breite Spanne illustriert gerade die fehlende Telemetrie und darf nicht als tatsächlicher Verbrauch zitiert werden. Eine manuelle Zweckschätzung der sichtbaren Arbeit gewichtet (a) mit ungefähr 1–5 %, (b) mit 10–25 % und (c) mit dem Rest; das sind **geschätzte Arbeitsanteile, keine nachgewiesenen Tokenanteile**. Belastbarer Gesamtverbrauch bleibt nur die Untergrenze **mindestens 642.718 Tokens plus unbekannte S1-/Child-Verbräuche**. Eine präzisere Aufteilung wäre nicht belegt. Methode/Abgrenzung: fehlende Usage-Felder im App-Readback, dokumentierte Tätigkeits- und Artefaktklassen oben.
+
+## Produktqualität und automatisierter Seed-Durchlauf
+
+Der Auftrag bezeichnet die Produktkriterien nicht als 1–15. Die tatsächliche Spec besitzt **zwölf** Kriterien AC-01…AC-12. Kriterien 13–15 sind **nicht definiert**; dafür werden keine Anforderungen erfunden. Belege: S0 Z.11; `F/spec.md:47` bis `:62`.
+
+| Kriterium | Produktstatus beim Stopp |
+|---|---|
+| AC-01 Abend-Startkomposition | Nicht geliefert; kein ausführbares Produkt |
+| AC-02 Berginsel und Wasserfall | Nicht geliefert |
+| AC-03 Tempel, Torii und Samurai | Nicht geliefert |
+| AC-04 Natur und Teich | Nicht geliefert |
+| AC-05 Drache und Lichtstoß | Nicht geliefert |
+| AC-06 Tageszeiten und Nachtmerkmale | Nicht geliefert |
+| AC-07 Orbit/Touch/Drachenkamera | Nicht geliefert |
+| AC-08 Umweltanimation | Nicht geliefert |
+| AC-09 Seed-Reproduzierbarkeit | Nicht prüfbar; keine Laufzeit |
+| AC-10 FPS, Würfelzahl und Maßstab | Nicht prüfbar; **keine FPS gemessen**, nicht „0 FPS“ |
+| AC-11 Ein-Datei-Produkt und Instancing | Nicht erfüllt als Lieferung; index.html fehlt |
+| AC-12 Zwei visuelle Verbesserungsrunden | Nicht durchgeführt; keine Szenen-Screenshots vorhanden |
+| Angefragte Kriterien 13–15 | Keine normative Definition vorhanden; nicht bewertet |
+
+Beleg für die Statusspalte: vollständige Datei-/Git-Inventare in `scratch/forensics/`, die zehn ausschließlich Gerüst-/Design-/Review-Commits und die explizite Aussage „Die Szene ist noch nicht gebaut“ in S1-T7. Es werden keine visuellen Qualitätsnoten für ein nicht existierendes Bild vergeben.
+
+Ein automatisierter Prüfversuch mit festem **Seed 123** wurde vorbereitet. Der Guard verweigerte bereits `node scratch/forensics/seed-audit.mjs` als opaque Ausführung in `awaiting-approval`, obwohl der Nutzer Analyse-Tests ausdrücklich erlaubt hatte. Der Test wurde daher **nicht ausgeführt**; kein Browser gestartet, kein Seed-Durchlauf absolviert, kein Mess-JSON erzeugt. Unabhängig davon fehlt die Einstiegdatei. Beleg: `scratch/forensics/seed-attempt-status.md:5`; Inventare. Diese konkrete Nutzeranforderung bleibt unerfüllt; das wird nicht durch einen angeblichen Test-PASS ersetzt.
+
+## Gesamtfazit und Mehrwert
+
+**Bestätigt: Der getestete Ablauf erreichte keinen Happy Path bis zur ersten Produktimplementierung.** Zehn lokale Commits, sieben Reviewaufträge und wiederholte Ausnahmefragen stehen keiner gelieferten Szene gegenüber. Belege: Commit-/Datei-Inventare, S1-T7, aktueller State Design/planApproved=false.
+
+Konkreter nachgewiesener Mehrwert: dauerhafte Anforderungssicherung, redaktionelle Verbesserungen durch getrennte Reader, explizite Screenshot-Vergleichsbedingungen und Abfangen privater Pfadlinks. Nicht nachgewiesen sind vermiedene Produktfehler durch Critic, Verify oder Security; diese Stufen wurden nicht erreicht. Dass ein nativer Runner ohne Pipeline dieselben Verbesserungen „wahrscheinlich nicht“ erreicht hätte, ist ein **ungetestetes Gegenfaktum**. Ein Vergleichslauf fehlt. Belege für die tatsächlichen Verbesserungen: `28fe900`, Reader-Disposition :12/:24, normalisierter Bericht :1.
+
+Für dieses Repository ist der beobachtete Aufwand-Nutzen-Saldo negativ: das beabsichtigte Schaustück wurde nicht gebaut. Daraus folgt nicht, dass Governance in großen Projekten nutzlos wäre. Versionierte Verträge, unabhängige Reviews und kandidatgebundene Nachweise können dort mehr Risiko abdecken; ihre hier beobachtete technische Verlässlichkeit ist jedoch noch nicht ausreichend belegt. Der Provenienzfehler ist für kritische Repositories besonders relevant. Diese Bewertung stützt sich auf den Receipt-/Routenwiderspruch und den fehlenden aktuellen Nachweis, nicht auf eine pauschale Ablehnung von Prozess.
+
+Voraussichtlich **fixer Aufwand**: Installation, Runtime-Bindung, erstmalige Kalibrierung und Architekturgrundlage. **Mit Änderungen skalierender Aufwand**: Quellenhashes, Receipts, Kettenpflege, Reviews, erneute Freigaben und HGO-Schleifen. Deren Skalierung ist eine Architekturabschätzung, kein gemessener Großprojektbenchmark. Wenn jede harmlose Formatänderung den hier beobachteten Weg auslöst, amortisiert größere Projektgröße diesen Teil nicht, sondern vervielfacht ihn. Belege für den konkreten Mechanismus: `32bfb54`, State-Invalidierung :695, zusätzliche Ausnahme :3, S1-T7.
+
+Die wichtigste nächste Weichenstellung ist deshalb ein durch echte Guards getesteter End-to-End-Vertrag für den ersten Implementierungsauftrag: parserfähige Spec vor der Freigabe, korrekte Dispatch-Provenienz, automatisch zugelassene interne Entry-Points und fortschrittsfähige Recovery. Mehr Review-Runden oder zusätzliche PO-Bestätigungen allein beheben diese Ursachen nicht. Diese Empfehlung leitet sich aus den P0/P1-Befunden ab; eine Wirksamkeit nach Umsetzung ist noch zu testen.

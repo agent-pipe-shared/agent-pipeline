@@ -1,0 +1,21 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 6c2a6ca20..73037d460 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -119,6 +119,7 @@ import { buildPushInitArgv } from "../scripts/push-init.mjs";
+ // exact command push-init.mjs would present to a human is refused for an agent's own Bash
+ // tool call, never reconstructed by hand.
+ import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
++import { originalGuardOutsideFixtureRoot } from "./guard-lifecycle-ready.fixture-root.mjs";
+ 
+ const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+ const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
+@@ -270,7 +271,7 @@ function tmpdir() {
+   mkdirSync(root, { recursive: true });
+   return root;
+ }
+-const VAR_TMP = process.platform === "win32" ? tmpdir() : "/var/tmp";
++const VAR_TMP = originalGuardOutsideFixtureRoot() ?? (process.platform === "win32" ? tmpdir() : "/var/tmp");
+ 
+ /**
+  * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the

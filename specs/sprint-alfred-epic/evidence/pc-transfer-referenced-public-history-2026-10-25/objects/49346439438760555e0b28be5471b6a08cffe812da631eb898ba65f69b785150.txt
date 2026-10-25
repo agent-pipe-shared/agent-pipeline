@@ -1,0 +1,15 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index e9c5b3ae6..7f8b199e7 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -75,7 +75,9 @@
+           "RC05C010",
+           "RC05C011",
+           "RC05C012",
+-          "RC05C013"
++          "RC05C013",
++          "RC05C014",
++          "RC05C015"
+         ],
+         "maxBytes": 65536
+       }

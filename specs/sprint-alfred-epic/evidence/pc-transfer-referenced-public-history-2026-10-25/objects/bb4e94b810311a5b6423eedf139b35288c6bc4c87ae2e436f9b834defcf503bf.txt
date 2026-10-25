@@ -1,0 +1,30 @@
+import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const root = resolve('scratch/clones/generator-integrated-13-qualification');
+const out = resolve('scratch/agent-out/generator-integrated-13-qualification');
+const home = resolve(root, 'scratch/qualification-home');
+mkdirSync(home, { recursive: true });
+const preload = resolve(out, 'safety.mjs');
+writeFileSync(preload, `import os from 'node:os';\nimport {syncBuiltinESMExports} from 'node:module';\nos.userInfo=()=>{throw new Error('QUALIFICATION-FORBIDDEN-USERINFO');};\nsyncBuiltinESMExports();\n`);
+const env = { ...process.env, HOME: home, USERPROFILE: home, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home,
+  PIPELINE_TEST_TMP_BASE: root, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
+  NODE_OPTIONS: `--import=${preload}` };
+delete env.PIPELINE_PO_APPROVAL_DIRECTORY;
+const pin = resolve(root, 'plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs');
+let args;
+if (process.argv[2] === 'suite') args = ['--test', pin];
+else {
+  let source = readFileSync(pin, 'utf8').replace('import test from "node:test";', 'const test = () => {};');
+  source = source.replace(/from "(\.\.?\/[^"\n]+)"/g, (_, p) => `from ${JSON.stringify(pathToFileURL(resolve(pin, '..', p)).href)}`)
+    .replace(/new URL\("(\.\.?\/[^"\n]+)", import.meta.url\)/g, (_, p) => `new URL(${JSON.stringify(pathToFileURL(resolve(pin, '..', p)).href)})`)
+    .replace(/import\("(\.\.?\/[^"\n]+)"\)/g, (_, p) => `import(${JSON.stringify(pathToFileURL(resolve(pin, '..', p)).href)})`);
+  source += `\nconst measuredRoots=[];\ntry {\nconst measurements=[];\nfor (const target of [14030,56000]) {const text=request(target),r=readyRoot(text);measuredRoots.push(r);const v=cli(r,['--verbose']),s=cli(r,['--summary']),d=cli(r),i=inspect(r),f=JSON.parse(v.out);measurements.push({target,sourceBytes:bytes(text),sourceSha256:sha(text),verboseBytes:bytes(v.out),summaryBytes:bytes(s.out),defaultBytes:bytes(d.out),inspectBytes:bytes(i.out),exits:[v.code,s.code,d.code,i.code],defaultEqualsSummary:d.out===s.out,sourceCopies:Object.fromEntries(Object.entries(f.targets).map(([n,x])=>[n,countOf(x.content,'REQ-START')])),targets:Object.fromEntries(Object.entries(f.targets).map(([n,x])=>[n,{bytes:bytes(x.content),sha256:sha(x.content)}])),outputSha256:{verbose:sha(v.out),summary:sha(s.out),inspect:sha(i.out)}});}\nconst drivers={};for(const runner of ['codex','claude']) {const x=driverOutput(runner);drivers[runner]={bytes:bytes(x.stdout),outcome:x.parsed.outcome,asks:x.parsed.pendingAsks.length,askCopies:x.parsed.pendingAsks.map(a=>countOf(x.stdout,JSON.stringify(a))),primaryCopies:x.parsed.collectInput?countOf(x.stdout,JSON.stringify(x.parsed.collectInput)):null,sha256:sha(x.stdout)};}\nconsole.log(JSON.stringify({schema:'pipeline.generator-integrated-measurement.v1',candidate:'5017a7287',fixture:'original pin helpers, original 14030/56000 requests',measurements,drivers},null,2));\n} finally {for(const r of measuredRoots)rmSync(r,{recursive:true,force:true});}\n`;
+  const measure = resolve(out, 'measure-original-helpers.mjs');
+  writeFileSync(measure, source);
+  args = [measure];
+}
+const run = spawnSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', maxBuffer: 8*1024*1024 });
+process.stdout.write(run.stdout ?? ''); process.stderr.write(run.stderr ?? '');
+process.exitCode = run.status ?? 1;

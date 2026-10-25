@@ -1,0 +1,26 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+label: g21-result-bootstrap-final
+exitCode: 0
+head: a0feac3a4276f06569ec9585ac96ee58877ded2b
+tree: 087b2b96d42fc8854dc78e213397bc672a29b1db
+dirty: true
+--- stdout ---
+✔ win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (275.284374ms)
+✔ win32: an insecure DACL assessment on the private result-bootstrap directory still fails closed (169.270074ms)
+✔ AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence (181.473139ms)
+✔ registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview (463.394652ms)
+✔ registered bootstrap interruption and replay retain a single provable reconciliation plan (677.832217ms)
+✔ registered package authority drift refuses bootstrap before Result, State or manifest mutation (92.888603ms)
+✔ AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation (829.182528ms)
+✔ AC-047-143/148: active work, nonnull authority, State/document drift, absent/fenced and unsafe Result targets fail closed (1044.926039ms)
+✔ AC-047-149: bootstrap requires a current implementing Plan lifecycle before any Result or State mutation (458.01219ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4871.458471
+
+--- stderr ---

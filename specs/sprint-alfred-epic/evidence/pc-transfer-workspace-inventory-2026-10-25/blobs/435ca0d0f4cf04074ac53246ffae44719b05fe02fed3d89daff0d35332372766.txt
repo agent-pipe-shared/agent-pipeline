@@ -1,0 +1,91 @@
+exit 1 null
+ORIGINAL184 CALLBACK START shard=1 index=7 pid=1820810 mono_ns=91819798687474
+PASS  PRD/Spec drift exposes only the validated digest-bound PO rebind action
+ORIGINAL184 CALLBACK END shard=1 index=7 pid=1820810 mono_ns=91839093054789 elapsed_ms=19294.367 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=19 pid=1820810 mono_ns=91839093344179
+PASS  required App-Server failures map to closed aggregates and exact bounded actions
+ORIGINAL184 CALLBACK END shard=1 index=19 pid=1820810 mono_ns=91859615689937 elapsed_ms=20522.346 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=31 pid=1820810 mono_ns=91859615860220
+FAIL  blank real root inspect and plan are read-only -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'architecture/map/index.md',
+    'architecture/map/inventory.json',
+    'AGENTS.md',
+    '.gitignore',
++   'docs/adr/README.txt',
++   'docs/adr/templates/adr-template.md',
+    'pipeline.user.yaml',
+    'project/consumer-verify.mjs',
+    'project/critical-human-proof.json',
+    'project/pipeline.json',
+    'project/pipeline.yaml'
+
+ORIGINAL184 CALLBACK END shard=1 index=31 pid=1820810 mono_ns=91859721886563 elapsed_ms=106.026 outcome=throw
+ORIGINAL184 CALLBACK START shard=1 index=43 pid=1820810 mono_ns=91859722021530
+PASS  an ask whose condition has been resolved stops appearing on the next ordinary inspect
+ORIGINAL184 CALLBACK END shard=1 index=43 pid=1820810 mono_ns=91875733483520 elapsed_ms=16011.462 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=55 pid=1820810 mono_ns=91875733574814
+PASS  the real legacy V0 frontdoor drives migration plan and exact activation before re-anchoring ready
+ORIGINAL184 CALLBACK END shard=1 index=55 pid=1820810 mono_ns=91896876127753 elapsed_ms=21142.553 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=67 pid=1820810 mono_ns=91896876251127
+PASS  runtime target preflight maps every reversible probe permission failure without residue EPERM/fstat
+ORIGINAL184 CALLBACK END shard=1 index=67 pid=1820810 mono_ns=91910865517747 elapsed_ms=13989.267 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=79 pid=1820810 mono_ns=91910865590996
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/directory-fsync
+ORIGINAL184 CALLBACK END shard=1 index=79 pid=1820810 mono_ns=91912634251790 elapsed_ms=1768.661 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=91 pid=1820810 mono_ns=91912634356218
+PASS  a kickoff language switch that also finds a drifted runtime target repairs it atomically, without a separate plan-repair/apply-repair (NVA-W9-DRIFTREPAIR)
+ORIGINAL184 CALLBACK END shard=1 index=91 pid=1820810 mono_ns=91932806939958 elapsed_ms=20172.584 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=103 pid=1820810 mono_ns=91932807061990
+PASS  onboarding seeds ignore rules for the paths it writes into, and never touches a .gitignore the project owns
+ORIGINAL184 CALLBACK END shard=1 index=103 pid=1820810 mono_ns=91971757510297 elapsed_ms=38950.448 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=115 pid=1820810 mono_ns=91971757701440
+PASS  a claude-onboarded root completes kickoff apply and becomes a ready lifecycle
+ORIGINAL184 CALLBACK END shard=1 index=115 pid=1820810 mono_ns=91985230693832 elapsed_ms=13472.992 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=127 pid=1820810 mono_ns=91985230891337
+PASS  public cleanup privatization preserves the historical kickoff seed for CLI promotion
+ORIGINAL184 CALLBACK END shard=1 index=127 pid=1820810 mono_ns=92000287028541 elapsed_ms=15056.137 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=139 pid=1820810 mono_ns=92000287120646
+PASS  legacy V0 is migration-required and never receives a fresh fallback
+ORIGINAL184 CALLBACK END shard=1 index=139 pid=1820810 mono_ns=92000584958659 elapsed_ms=297.838 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=151 pid=1820810 mono_ns=92000585023242
+PASS  manifest repair rejects non-UTF-8 unowned bytes without rewriting them
+ORIGINAL184 CALLBACK END shard=1 index=151 pid=1820810 mono_ns=92015059641771 elapsed_ms=14474.619 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=163 pid=1820810 mono_ns=92015059700713
+PASS  H3 recovery planners are typed, read-only, and closed on invalid source evidence
+ORIGINAL184 CALLBACK END shard=1 index=163 pid=1820810 mono_ns=92015114661147 elapsed_ms=54.960 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=175 pid=1820810 mono_ns=92015114716442
+PASS  H3 source recovery exposes authentic invalid-authority category
+ORIGINAL184 CALLBACK END shard=1 index=175 pid=1820810 mono_ns=92015166245181 elapsed_ms=51.529 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=187 pid=1820810 mono_ns=92015166303762
+PASS  reinstall quarantines only current V3 authority and leaves legacy calibration intact
+ORIGINAL184 CALLBACK END shard=1 index=187 pid=1820810 mono_ns=92030315103397 elapsed_ms=15148.800 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=199 pid=1820810 mono_ns=92030315168491
+PASS  chat acknowledgement consumes the one in-chat PO decision without a second terminal confirmation
+ORIGINAL184 CALLBACK END shard=1 index=199 pid=1820810 mono_ns=92048559829526 elapsed_ms=18244.661 outcome=pass
+ORIGINAL184 CALLBACK START shard=1 index=211 pid=1820810 mono_ns=92048559904659
+PASS  F4 portable rollback preserves foreign content when a created target's inode number is reused
+ORIGINAL184 CALLBACK END shard=1 index=211 pid=1820810 mono_ns=92048651508854 elapsed_ms=91.604 outcome=pass
+
+IPC {"schema":"pipeline.onboarding-test-case-results.v1","shard":1,"chunk":1,"declaredCount":216,"assignedIndices":[7,19,31,43,55,67,79,91,103,115,127,139,151,163,175,187,199,211],"results":[{"index":7,"id":"POV-6dcfdc87a1602815","disposition":"pass"},{"index":19,"id":"POV-20ab90fb3038caaf","disposition":"pass"},{"index":31,"id":"POV-274390584d8de067","disposition":"fail"},{"index":43,"id":"POV-e8c9af39808c1133","disposition":"pass"},{"index":55,"id":"POV-5e9a1b911133e313","disposition":"pass"},{"index":67,"id":"POV-40df3488697a411d","disposition":"pass"},{"index":79,"id":"POV-460a76837e7b5ec0","disposition":"pass"},{"index":91,"id":"POV-d998ddbfe1c3b412","disposition":"pass"},{"index":103,"id":"POV-c6bb046e9ce1e375","disposition":"pass"},{"index":115,"id":"POV-74a0efd0bbb3aa6c","disposition":"pass"},{"index":127,"id":"POV-2192591f669166e1","disposition":"pass"},{"index":139,"id":"POV-68560f1c9516707f","disposition":"pass"},{"index":151,"id":"POV-e534ee76e0ede4ce","disposition":"pass"},{"index":163,"id":"POV-1fd81ac84c6d02c5","disposition":"pass"},{"index":175,"id":"POV-227afe4e773338a8","disposition":"pass"},{"index":187,"id":"POV-0276da1cde1564c2","disposition":"pass"},{"index":199,"id":"POV-1c65985138083f00","disposition":"pass"},{"index":211,"id":"POV-c40f6a54a3065b3d","disposition":"pass"}],"classes":[]}
+B8 producer/guard command classes in shard: 0
+
+project-onboarding-v3 chunk 2/2 shard 2/6: 17 passed, 1 failed
+blank real root inspect and plan are read-only: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'architecture/map/index.md',
+    'architecture/map/inventory.json',
+    'AGENTS.md',
+    '.gitignore',
++   'docs/adr/README.txt',
++   'docs/adr/templates/adr-template.md',
+    'pipeline.user.yaml',
+    'project/consumer-verify.mjs',
+    'project/critical-human-proof.json',
+    'project/pipeline.json',
+    'project/pipeline.yaml'
+

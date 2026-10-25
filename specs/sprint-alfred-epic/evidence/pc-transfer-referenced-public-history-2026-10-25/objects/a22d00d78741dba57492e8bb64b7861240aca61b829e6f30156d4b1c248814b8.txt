@@ -1,0 +1,47 @@
+command: node scratch/agent-out/d124-current-carry-qualification/run-original.mjs
+label: D124-current-original-A1-A3
+exitCode: 1
+head: 5017a7287485783fa2d4ff17d3f3240f2a719e13
+tree: c972b2a380287b5091626ffd40db40eede589883
+dirty: true
+--- stdout ---
+✔ A1: verify null / blank / placeholder classify as typed baseline-only, never configured (0.822222ms)
+✔ A1: the release-contract check reports baseline-only distinctly from configured and states release stays blocked (0.562819ms)
+✔ A1/A3: a fresh verify:null project's design state is not rewritten into a command when entering implementation (91.836223ms)
+✔ A2: a placeholder, blank or whitespace --verify-command is refused at the implementation transition with zero mutation (133.300519ms)
+✔ A2: a missing calibration is refused (not silently treated as deferred) at the implementation transition (45.095074ms)
+✔ A2 (D124, typed baseline-only carry as built): the deferred verify state is admitted at implementation entry only as a typed baseline-only carry, is not relabelled configured, and is rejected at release Verify (release stays blocked) (216.315844ms)
+✖ A3: a real command is supplied once, written to both calibration twins, and replays without it (47.957882ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 897.656586
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs:159:1
+✖ A3: a real command is supplied once, written to both calibration twins, and replays without it (47.957882ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/d124-current-carry-qualification/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs:161:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -57,6 +57,20 @@ Retain the single frozen Critic batch/max3correction-review policy.
 preserve188 artifacts, exact postimages, patches, captures, dependencies and
 full briefings. Seven groups are inert. Do not apply partial patches to Main.
 
+The subsequent rigorous portability audit additionally preserves
+[525 briefing/spec/context/launcher inputs](../specs/sprint-alfred-epic/evidence/pc-transfer-briefing-history-2026-10-25/README.md)
+and closes [three Scratch-only matrix capture dependencies](../specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/README.md).
+The new immutable matrix snapshot changes seven locators, no stages.
+Historical `source` paths inside custody/old logs are provenance, not files
+the next runtime must find locally; use each recorded tracked transport.
+The [detailed portability audit](../specs/sprint-alfred-epic/evidence/pc-transfer-portability-audit-2026-10-25/README.md)
+covers the Evidence tree, all354 local repository roots, archival link limits
+and exclusions. [Workspace inventory](../specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/README.md)
+preserves public deltas and postimages separately from qualified Main Source.
+No current continuation requires the original special worktrees or clones.
+Use new inert candidates restored from tracked transports; never blindly
+merge an old rehearsal or rejected overlay.
+
 1. Re-enter through AGENTS.md, architecture map, touched concepts, compiled
    decisions and the new runtime's own pipeline-start. Last actual Codex
    readback here was `0.7.0+codex.20261025134513.977dad8`, content identity

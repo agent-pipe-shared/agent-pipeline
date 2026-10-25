@@ -1,0 +1,614 @@
+diff --git a/backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md b/backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md
+index ce2c7727d..8fce88e14 100644
+--- a/backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md
++++ b/backlog/items/2026-09-27-installed-design-trailer-example-is-rejected-by-git-guard.md
+@@ -70,3 +70,14 @@ patch prepared in `scratch/design-trailer-consistency/`, unqualified).
+ - **Rationale:** commit(s) `2a466fa59`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++- **Counted evidence (2026-10-22, Linux host, head of the h2 clone):** the first acceptance bullet (a real installed-hook
++  run of every printed commit example) is now pinned in
++  `plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs`: a throwaway enrolled
++  repository gets the real commit-msg hook from `scripts/commit-msg-hook-install.mjs`; every printed `Dispatch:` example
++  plus `design (elephant)` goes through the real `hooks/guard-git.mjs` process and a real `git commit`, and a near-miss
++  (`implementation (elephant)`) is refused by both, which proves the hooks are live in that harness. Run:
++  `node --test plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs`,
++  13 cases, 12 pass, 0 fail, 1 skip (the skip is the fourth acceptance bullet, the provenance-debt disposition of
++  stage-0-labelled history: a documentation decision with no executable surface, still manual). Not verified here: a
++  Windows host run of the commit-msg hook, and a path-based rejection of `design (elephant)` for production files
++  (the pin asserts only the size bound, as the PO decision of 2026-10-16 admits the form without a path grant).
+diff --git a/backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md b/backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md
+index 6c1fe0914..31a9530c3 100644
+--- a/backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md
++++ b/backlog/items/2026-10-03-read-blocks-and-misleading-denial-texts-across-runners.md
+@@ -49,6 +49,28 @@ Concrete cases observed in the Claude/Windows session on 2026-10-03:
+   on guard-denied paths.
+ - One cross-runner test matrix covers these read shapes.
+ 
++## Evidence 2026-10-22 (runner rows of the matrix)
++
++The pin `plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs` now carries
++a Codex row and an Antigravity row next to the Claude row; both start the real native adapters
++(`hooks/codex-pretool-guard.mjs`, `hooks/antigravity-pretool-guard.mjs`) as processes. Run: `node --test` on that file,
++18 cases, 14 pass, 0 fail, 1 skip (the WSL UNC case, a Linux-host typed skip), 3 todo.
++
++- Admitted on all three runners (green): in-root `cat`, `head`, `rg`, `rg -g` and scratch reads.
++- Denied on all three runners with a `BLOCKED (guard-...): GUARD-<code>` text and no absence wording (green): `cat` of an
++  in-root credential file and of `~/.ssh/id_rsa`; `cat` of a missing file and `grep -R` are audited when denied.
++- Codex has no native Read, Grep or Glob tool; each is refused by name (green), but that adapter-level text carries no
++  `GUARD-` code.
++- Open, as `todo` cases (real assertions, they flip to plain passes when fixed):
++  - M5: an Antigravity native `view_file` of a credential file is allowed, because the adapter allows every read-only tool
++    at once (its own test pins that as intended). Acceptance 1 says credential roots stay denied on all runners. Needs a
++    product decision: gate the native read tools, or accept the gap and amend the acceptance.
++  - M6: the Codex-surfaced `GUARD-READ-COMMAND-UNSUPPORTED` text tells the agent to "use the Read, Glob or Grep tools",
++    which Codex refuses. Fix site `lib/guard/grammar-denials.mjs` (protected); a runner-neutral wording patch is prepared.
++  - M7: an in-root credential read (`cat vault/id_rsa`) is refused with `GUARD-READ-COMMAND-UNSUPPORTED`, whose text says
++    the refusal is about flags or spelling and not a path. The path is the cause. Needs a distinct typed code or wording
++    (`lib/guard/evaluate.mjs`, protected); the choice of code is a decision.
++
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+ - **Decision:**
+diff --git a/backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md b/backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md
+index 805d8c75d..3b5fde882 100644
+--- a/backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md
++++ b/backlog/items/2026-10-04-design-trailer-verifier-lost-after-closure.md
+@@ -61,3 +61,28 @@ the same way.
+ The merge `0aeaef18f` dropped the verifier: it took the second parent's version of both files.
+ The first acceptance bullet is met by this measurement. The other two (one trailer grammar, a
+ merge-survival check) remain open.
++
++## Reconciled 2026-10-22: the three bullets against the current tree
++
++The "remain open" sentence above is superseded; all three acceptance bullets hold at the current head and are pinned by
++`plugins/pipeline-core/lib/pins/design-trailer-verifier-lost-after-closure.test.mjs` (`node --test`, Linux host: 8 cases,
++8 pass, 0 fail, 0 skip).
++
++- Bullet 1 (the dropping merge): met by the 2026-10-20 measurement above (`0aeaef18f` took the second parent's version).
++  A one-off forensic act; it has no code property to pin.
++- Bullet 2 (one trailer grammar): decided by PO decision 2026-10-16 #12, which admits exactly `Dispatch: design (elephant)`
++  next to `Dispatch: stage-0 (elephant)`. The verifier (`scripts/dispatch-authorship-verify.mjs`) passes both Elephant ids
++  within the stage-0 size bound and refuses every other Elephant id (`elephant-direct-nonstandard-id`); the commit-message
++  policy refuses the near-misses as `GIT-03-DISPATCH-MALFORMED` in both the finished-message and the `--trailer` lane
++  (cases AC-A1 to AC-A3). The printed obligations carry the form with its bounds (AC-A5), and no non-test source emits a
++  malformed design variant (AC-A4). The lost symbol `ELEPHANT_DESIGN_ID` is intentionally not restored: the verifier names the
++  id `design` directly, and AC-A4 keeps the old symbol gone.
++- Bullet 3 (merge-survival check): the `done_when: contains <path> <needle>` predicate of closed items is evaluated for the
++  whole backlog by `scripts/check-backlog-done-predicate.mjs` (a step of `harness/scripts/verify.mjs`). Cases AC-B1 and AC-B2
++  prove it fails when a needle or its file disappears, and AC-B3 runs it over the real backlog at head: no closed item loses
++  a needle beyond the one recorded pre-existing loss (`2026-08-29-approve-announce-test-fixture-missing-present-plan-step`).
++  The related open item on the printed example (`installed-design-trailer-example-is-rejected-by-git-guard`) carries the
++  real-hook run of every printed example.
++
++Not verified here: that every closed item carries a machine `done_when` (the sweep evaluates the declared predicates only;
++items without one are counted as undeclared, not checked).
+diff --git a/backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md b/backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md
+index ad0e80b86..df4d57a46 100644
+--- a/backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md
++++ b/backlog/items/2026-10-05-critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.md
+@@ -28,6 +28,20 @@ Perf Critic and readiness Critic rounds on 2026-10-05 ended partial with pass/fa
+ 
+ Remaining gap: a Bash-based notes write is not admitted in the closing lane; decide whether to admit a bounded form or document Write/Edit as the only route. Template and guard must state one number. Related read-scope false positives are tracked in `2026-10-03-claude-windows-guard-refuses-every-in-repo-read.md`; the source-vs-installed conflict introduced by the maxTurns change is `2026-10-05-source-agent-definition-change-locks-that-agent-until-install.md`. Verification: a Critic dispatch with a security-class diff completes and persists its notes.
+ 
++## Evidence 2026-10-22 (the two budget-spending classes)
++
++- counter-lock-busy: no longer a refusal. The guard waits (bounded, 3000 ms) for a live holder and admits and counts every
++  parallel call exactly once; a wait that times out is refused under `DISPATCH-BUDGET-COUNTER-LOCK-TIMEOUT` with "this call
++  was not counted". Owned by `plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs` (R7-11a..d, T3, T4): 127 cases,
++  125 pass, 0 fail, 2 skip (the two win32-only cases), `node --test`, Linux host.
++- rg/Glob/Grep read-scope: the Critic read shapes (native Read, Grep on an exact file, Glob with a pattern, Bash `rg` on a
++  directory, Bash `cat`) are admitted by the real read-scope check and each costs exactly one budget call; pinned as E1 in
++  `plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs`
++  (8 cases, 8 pass, 0 fail, 0 skip). Native Grep on a directory is refused by PO decision 2026-10-16 (exact-file rule), and
++  such a refusal still spends a call; the Bash `rg` route is the admitted equivalent.
++- Not verified: the item's own verification line (a live Critic dispatch with a security-class diff completes and persists
++  its notes) needs a real dispatch and is not producible by an agent test.
++
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+ - **Decision:**
+diff --git a/backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md b/backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md
+index 9feffee36..82a0f0d48 100644
+--- a/backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md
++++ b/backlog/items/2026-10-05-node-v24-on-windows-creates-a-real-nul-file.md
+@@ -37,3 +37,11 @@ signed package.
+ - **Rationale:** commit(s) `866be2139, 12ac0a7af`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++- **Counted evidence (2026-10-22, Linux host, head of the h2 clone):** acceptance 1 is the live ratchet in
++  `plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs` (14 cases, 14 pass, 0 fail,
++  0 skip; `node --test`). Acceptance 2 is enforced by the R7-1a ratchets in `plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`
++  (production and fixture trees of `lib/`, `scripts/`, `hooks/`: no `NUL` literal beside a git null-device key;
++  single-source ratchet for `GIT_NULL_DEVICE`; 81/81 checks pass, run as `node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`)
++  and by the real-git cases in `plugins/pipeline-core/lib/git-null-device-sites.test.mjs` (8 cases, 8 pass, 0 fail, 0 skip).
++  The pin now also asserts that these enforcers exist. Not verified here: a native Windows run on Node v24 (the
++  open-target cases that matter on win32 ran on Linux only).
+diff --git a/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md b/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md
+index 55854b177..2e8857dcc 100644
+--- a/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md
++++ b/backlog/items/2026-10-06-git-for-windows-2-56-rejects-git-config-global-nul.md
+@@ -52,3 +52,11 @@ through the next signed package.
+ - **Rationale:** commit(s) `12ac0a7af, 2532a96fe`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++- **Counted evidence (2026-10-22, Linux host, head of the h2 clone):** the shared constant is
++  `plugins/pipeline-core/lib/git-null-device.mjs` (`GIT_NULL_DEVICE = "/dev/null"`). The regression test that spawns real
++  git with the constant is `plugins/pipeline-core/lib/git-null-device-sites.test.mjs` (8 cases, 8 pass, 0 fail, 0 skip;
++  `node --test`). The ratchet scan is in `plugins/pipeline-core/lib/worktree-lifecycle.test.mjs` (R7-1a: production tree,
++  fixture tree, single-source; 81/81 checks pass, run as `node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`). The
++  acceptance line of the Node-v24 NUL item was already updated to require `GIT_NULL_DEVICE`. Not verified here: a real
++  Git for Windows 2.56 run (the real-git cases ran against the Linux git; the Windows-version behaviour is shown by the
++  upstream-regression stub only).
+diff --git a/backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md b/backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md
+index 3c1410094..59e46fc59 100644
+--- a/backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md
++++ b/backlog/items/2026-10-06-goldfish-bugfix-module-conflicts-with-qg-04.md
+@@ -76,3 +76,11 @@ separate test-author dispatch, because a second dispatch must read the whole con
+ - **Rationale:** commit(s) `b3cabc7f8`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++- **Counted evidence (2026-10-22, Linux host, `node --test`, clone head `fe9856572`):** the 2026-10-21 acceptance (one owner,
++  test-first order, rendered by `dispatch-briefing.mjs build`, tier binding by estimate) is pinned by
++  `plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`: 46 cases, 46 pass, 0 fail, 0 skip. The rendered order is the
++  case "the generated briefing prescribes the test-first order in one dispatch (AC-186, PO 2026-10-21)"; the tier binding is
++  "an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale". The template/guardrail
++  side is `plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs`: 6 cases, 6 pass, 0 fail,
++  0 skip. Not verified here: the "independence stays with execution (host re-run, Full Verify) and the fresh Critic" bullet,
++  which is an end-to-end property of a real delivery run.
+diff --git a/backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md b/backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md
+index 325035948..ca015df44 100644
+--- a/backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md
++++ b/backlog/items/2026-10-09-opus-critic-only-batched-for-architecture-and-security.md
+@@ -40,3 +40,19 @@ moves to Haiku at effort medium.
+ ## Triage
+ 
+ Canon part done (2026-10-09, dispatch CRITIC-RULE-20261009), commit `docs(policy): one batched Opus Critic for critical architecture and security, Sonnet otherwise` (SHA in `evidence/dispatch-record-CRITIC-RULE-20261009.json`): MP-07 rewritten, `critic-review.md` gains the batch-scope/re-critic field. STILL OPEN: (a) the word-identical canonical trigger wording in `harness/review-protocol.md` §2.1 (T1-T4), `roles/critic.md` (§3, :215), `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and ADR-0014 still states per-diff A/G/S escalation and needs an ADR amendment; (b) the `critic-review.md` line-25 tier text and criticality example; (c) plugin Critic route/budget checks and test pin; (d) the German reference half of `model-policy.md` is not updated. UPDATE 2026-10-09 (dispatch CRITIC-RULE-2b-20261009, continuing `b90402938`): (a) and (b) are done - ADR-0014 carries the dated amendment (Ruling 156) and the canonical trigger wording is word-identical again in `harness/review-protocol.md` §2.1 (T1-T4 rows), `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and ADR-0014; `roles/elephant.md`, `templates/prompts/critic-review.md`, `templates/prompts/goldfish-task.md`, their plugin template copies and `policies/model-policy.md` are aligned; commit: the one with subject `docs(adr-0014): amend the Critic tier trigger to one batched Opus review for critical architecture and security`. STILL OPEN: (c) and (d). UPDATE 2026-10-09 (dispatch CRITIC-RULE-3-20261009, Ruling 158): the batch rule now covers EVERY Critic (ONE overall Critic per batch, diff-only follow-ups); ADR-0014 carries the second dated amendment and the canonical wording is word-identical again in `harness/review-protocol.md` §2.1, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, ADR-0003 and ADR-0014; MP-07 and `templates/prompts/critic-review.md` are aligned; commit: the one with subject `docs(adr-0014): one batched Critic with diff-only follow-ups for every Critic`. STILL OPEN: (c) plugin Critic route/budget checks and test pin; (d) German reference half of `model-policy.md`; (e) MECH-HAIKU (Ruling 158): `goldfish-mechanic` to Haiku at effort `medium` is NOT installed - `plugins/pipeline-core/config/routing-authority.json` pins the agent (`agentAssignments`), `plugins/pipeline-core/scripts/check-routing-projections.mjs` compares the frontmatter against it (a frontmatter-only change turns it red), `plugins/pipeline-core/config/runner-mappings.json` has no haiku alias, and route fixtures pin mechanic sonnet/low (RP04 in `check-routing-projections.test.mjs`, `p3b-runner-conformance.test.mjs`, `runner-profile-migration-v2/v3.test.mjs`, `project-onboarding-v3.test.mjs`, `runner-contracts.schema.test.mjs`); needs its own slice that edits the registry, the alias and those fixtures together, and a PO/Elephant look at the MP-03 weakest-tier wording.
++
++UPDATE 2026-10-22 (re-verified against the current tree; the "STILL OPEN" markers above are superseded): (c), (d) and (e)
++are delivered and pinned by `plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs`
++(`node --test`, Linux host: 15 cases, 15 pass, 0 fail, 0 skip). (c) The plugin dispatch check refuses an Opus Critic
++without the batch rationale (`DISPATCH-OPUS-NO-BATCH-RATIONALE`, on the model line and on the Requested route line) and
++checks a declared re-critic for batch scope, exactly one delta range, nothing wider than the delta and an ordinal of at
++most four (`DISPATCH-RECRITIC-*`). (d) The German reference half of MP-07 states one full review plus at most three delta
++reviews. (e) `goldfish-mechanic` is Haiku at effort medium in the agent definition, `routing-authority.json` and
++`runner-mappings.json`, and the `models.mechanic` row of `model-policy.md`. Named limits that remain, each owner
++Coordinator, due 2026-10-31: (1) the Opus-rationale check reads briefing prose only, because the tool-layer `model`
++override is not visible to the guard on this runtime (MP-29), so a tool-layer Opus override without a matching label line
++is not caught; (2) the re-critic beyond-delta check reads the search-surface field and the `<sha>..<sha>`,
++`<sha>...<sha>` and `<sha>^..<sha>` spellings only: a flush-left wrapped continuation or a range after a blank line is
++not scanned, ref-name ranges (`main..topic`, `HEAD~2..HEAD`) are not read, SHAs compare as text (an abbreviated and a full
++spelling of one commit differ), and a caret range is judged by its tip and by a start at the previous candidate only.
++Remaining for the item to close: the 0.7.0 candidate host checklist and PO acceptance (neither is an agent step).
+diff --git a/plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs b/plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs
+index a106aee13..ac7560278 100644
+--- a/plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard.test.mjs
+@@ -25,6 +25,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { applyGovernanceScopeDecision, planGovernanceScopeDecision } from "../governance-scope.mjs";
+ import { readAgentMaxTurns } from "../dispatch-budget-binding.mjs";
+ import * as realCore from "../dispatch-budget-core.mjs";
++import { evaluateLifecycleReadyGuard } from "../../hooks/guard-lifecycle-ready.mjs";
+ 
+ const GUARD = fileURLToPath(new URL("../../hooks/guard-dispatch-budget.mjs", import.meta.url));
+ const CORE_PATH = fileURLToPath(new URL("../dispatch-budget-core.mjs", import.meta.url));
+@@ -169,6 +170,44 @@ test("C1 a Critic's Write/Edit to anything but its own notes file gets the typed
+   assert.doesNotMatch(gf.stderr, /CRITIC-WRITE-CONFINED/u, "confinement is the Critic's only");
+ });
+ 
++// ------------------------------------------------------------------ case E: refusals that spend Critic budget
++// The item's second "observed again" paragraph names two classes: counter-lock-busy on parallel calls and
++// rg/Glob/Grep read-scope refusals. E1 pins the read half end to end: the read shapes a Critic uses on a diff are
++// admitted by the real lifecycle read-scope check (so none of them is a refusal that spends budget for nothing) and
++// the real budget guard counts each exactly once. E2 ties the lock half to the suite that owns it.
++const readCounter = (root, id) => JSON.parse(readFileSync(join(root, ".git", "agent-pipeline", "dispatch-budget", `${id}.json`), "utf8")).count;
++
++test("E1 the read shapes a Critic uses are admitted by the read-scope check and each costs exactly one budget call", () => {
++  const root = consumerRoot("reads");
++  const id = "ce";
++  mkdirSync(join(root, "plugins", "x"), { recursive: true });
++  writeFileSync(join(root, "plugins", "x", "a.mjs"), "export const needle = 1;\n");
++  seed(root, { agentId: id, count: 0 });
++  const calls = [
++    { tool_name: "Read", tool_input: { file_path: join(root, "plugins", "x", "a.mjs") } },
++    { tool_name: "Grep", tool_input: { pattern: "needle", path: join(root, "plugins", "x", "a.mjs") } },
++    { tool_name: "Glob", tool_input: { pattern: "plugins/x/*.mjs" } },
++    { tool_name: "Bash", tool_input: { command: "rg -n needle plugins/x" } },
++    { tool_name: "Bash", tool_input: { command: "cat plugins/x/a.mjs" } },
++  ];
++  calls.forEach((input, index) => {
++    const verdict = evaluateLifecycleReadyGuard(input, { projectDir: root });
++    assert.equal(verdict.exitCode, 0, `read-scope refused a Critic read shape: ${JSON.stringify(input)}\n${verdict.stderr ?? ""}`);
++    const counted = call(root, id, input.tool_name, input.tool_input);
++    assert.equal(counted.status, 0, `${JSON.stringify(input)}: ${counted.stderr}`);
++    assert.equal(readCounter(root, id), index + 1, "one call, one count");
++  });
++});
++
++test("E2 the counter-lock half is owned by the dispatch-budget suite: busy locks wait, a timeout is refused uncounted", () => {
++  const suite = readFileSync(join(PLUGIN_ROOT, "hooks", "guard-dispatch-budget.test.mjs"), "utf8");
++  for (const title of [
++    "R7-11a: N concurrent tool calls of one subagent that all meet a live lock holder are all admitted",
++    "R7-11d: at hook level a live holder beyond the bound refuses with counter-lock-timeout, names the holder age and counts nothing",
++  ]) assert.ok(suite.includes(title), `the owning suite no longer carries: ${title}`);
++  assert.match(readFileSync(GUARD, "utf8"), /This call was not counted and the persisted counter was left unchanged; retry the same call/u);
++});
++
+ // ------------------------------------------------------------------ case D: notes persist in the closing lane
+ test("D1 a Critic at the end of its working budget persists notes through Write then Edit", { skip: HOST_LIMITATION }, () => {
+   const root = consumerRoot("persist");
+diff --git a/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs b/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs
+index 9d2ffdf10..15d7cd0c2 100644
+--- a/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs
+@@ -14,8 +14,9 @@
+  *  P4 final integrated Verify is Coordinator-owned; worker results do not certify it;
+  *  P5 root template and vendored copy are byte-identical;
+  *  P6 the three routes appear in order targeted -> quick -> final Verify.
+- * Remaining gap (NOT claimed here): no production code emits briefs, so there is no
+- * emitted-brief consumer to exercise; only the template text is pinned.
++ * Emitted briefs: the briefing generator (lib/dispatch-briefing-build.mjs) now renders the same three routes; its
++ * output is pinned in scripts/dispatch-briefing.test.mjs ("... targeted, quick and final Verify routes in order ...").
++ * This file pins the template text only.
+  * Reads the real template files; the only mirror is the RED mirror of the checker input.
+  */
+ import test from "node:test";
+diff --git a/plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs b/plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs
+index 213abe86a..915dda60d 100644
+--- a/plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs
++++ b/plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs
+@@ -14,17 +14,21 @@
+ // The real modules run (commit-message-policy.mjs, dispatch-authorship-verify.mjs); only the
+ // verifier's documented dependency seam (readCommitMessage/readChangedPaths) is driven. Fixtures
+ // live under the repository's scratch/ (the OS temp root is a protected read scope on this host).
+-// Not covered: a live installed git commit-msg hook run (hook install needs a throwaway repository
+-// and a trusted git executable; the hook body calls finishedCommitMessageFindings with
+-// requireProvenanceWhenSignaled, which is the lane exercised below).
++// The "AC1 (real installed hooks)" cases additionally run the real hooks/guard-git.mjs process and a real
++// `git commit` through the installed commit-msg hook in a throwaway enrolled repository (skipped, typed, when
++// git is not on PATH). Not covered: the commit-msg hook of a Windows host.
+ 
+ import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import test, { after } from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+ import { commitMessageFindings, finishedCommitMessageFindings } from "../commit-message-policy.mjs";
++import { GIT_NULL_DEVICE } from "../git-null-device.mjs";
++import { createGovernanceScopeController } from "../governance-scope.mjs";
++import { applyInstall, planInstall } from "../../scripts/commit-msg-hook-install.mjs";
+ import { verifyCommit, VERDICT, ELEPHANT_STAGE0_MAX_PATHS } from "../../scripts/dispatch-authorship-verify.mjs";
+ 
+ const REPO_ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
+@@ -168,4 +172,80 @@ test("AC3: documentation-only commits during implementation use the same grammar
+   }
+ });
+ 
++// ---- AC1 against the REAL installed hooks -------------------------------------------------------------
++// A throwaway enrolled repository gets the real commit-msg hook installed by the plugin's own installer; every
++// printed example is then (a) fed to the real hooks/guard-git.mjs process exactly as Claude Code feeds it (tool
++// input JSON on stdin) and (b) committed through a real `git commit`, which runs the installed commit-msg hook.
++const GUARD_GIT = join(REPO_ROOT, "plugins/pipeline-core/hooks/guard-git.mjs");
++const PLUGIN_LIB_DIR = join(REPO_ROOT, "plugins/pipeline-core/lib");
++const realGit = spawnSync("git", ["--version"], { encoding: "utf8" });
++const realGitAvailable = !realGit.error && realGit.status === 0;
++
++function realHookRepository() {
++  const root = mkdtempSync(join(FIXTURES, "real-hooks-"));
++  const env = { ...process.env, GIT_CONFIG_GLOBAL: GIT_NULL_DEVICE, GIT_CONFIG_NOSYSTEM: "1" };
++  const git = (args) => {
++    const result = spawnSync("git", args, { cwd: root, encoding: "utf8", env });
++    assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
++    return result.stdout;
++  };
++  git(["init", "-q", "-b", "main"]);
++  git(["config", "user.name", "Fixture"]);
++  git(["config", "user.email", "fixture@example.invalid"]);
++  writeFileSync(join(root, "README.md"), "base\n");
++  git(["add", "README.md"]);
++  git(["commit", "-q", "-m", "chore: base\n\nAI-Assisted: true\nDispatch: stage-0 (elephant)"]);
++  const controller = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-host-state") });
++  const enrollment = controller.planDecision({ rootDir: root, decision: "enroll", by: "disposable-design-trailer-fixture" });
++  assert.equal(controller.applyDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active");
++  const planned = planInstall({ rootDir: root, pluginLibDir: PLUGIN_LIB_DIR });
++  assert.equal(planned.status, "ready");
++  assert.equal(applyInstall({ rootDir: root, pluginLibDir: PLUGIN_LIB_DIR }).status, "installed");
++  mkdirSync(join(root, "docs"), { recursive: true });
++  return { root, env, git };
++}
++
++let commitSeq = 0;
++/** Runs one dispatch value through the real command guard and then the real `git commit` (installed commit-msg hook). */
++function realHooksVerdict(repo, dispatchValue) {
++  commitSeq += 1;
++  const messageFile = join(repo.root, `message-${commitSeq}.txt`);
++  writeFileSync(messageFile, messageWith(dispatchValue));
++  writeFileSync(join(repo.root, "docs", "x.md"), `revision ${commitSeq}\n`);
++  repo.git(["add", "docs/x.md"]);
++  const command = `git commit -F ${JSON.stringify(messageFile)} -- docs/x.md`;
++  const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
++  const guard = spawnSync(process.execPath, [GUARD_GIT], {
++    input: JSON.stringify({ tool_input: { command } }), encoding: "utf8", cwd: repo.root,
++    env: { ...baseEnv, CLAUDE_PROJECT_DIR: repo.root },
++  });
++  const commit = spawnSync("git", ["commit", "-F", messageFile, "--", "docs/x.md"], {
++    cwd: repo.root, encoding: "utf8", env: repo.env, timeout: 60000,
++  });
++  return { guard, commit };
++}
++
++test("AC1 (real installed hooks): every printed Dispatch example passes the real command guard and the real commit-msg hook",
++  { skip: realGitAvailable ? false : "git not on PATH", timeout: 240000 }, () => {
++    const repo = realHookRepository();
++    const examples = printedDispatchExamples();
++    assert.ok(examples.includes("stage-0 (elephant)") && examples.includes("ALF-C-P1-13 (goldfish)"), "the printed set is not empty");
++    for (const value of [...examples, "design (elephant)"]) {
++      const { guard, commit } = realHooksVerdict(repo, value);
++      assert.equal(guard.status, 0, `real command guard (guard-git.mjs) refused printed example "${value}": ${guard.stderr}`);
++      assert.equal(commit.status, 0, `real commit-msg hook refused printed example "${value}": ${commit.stderr}`);
++    }
++  });
++
++test("AC1 (real installed hooks): the same harness refuses a near-miss in both hooks, so the hooks are proven live",
++  { skip: realGitAvailable ? false : "git not on PATH", timeout: 240000 }, () => {
++    const repo = realHookRepository();
++    const { guard, commit } = realHooksVerdict(repo, "implementation (elephant)");
++    assert.equal(guard.status, 2, `the real command guard must block the near-miss: ${guard.stderr}`);
++    assert.match(guard.stderr, /GIT-03-DISPATCH-MALFORMED/u);
++    assert.notEqual(commit.status, 0, commit.stdout);
++    assert.match(commit.stderr, /BLOCKED \(agent-pipeline commit-msg\)/u);
++    assert.match(commit.stderr, /GIT-03-DISPATCH-MALFORMED/u);
++  });
++
+ test("AC4 (host limitation, not claimed): provenance-debt disposition of existing stage-0-labelled history is a history/documentation decision with no executable surface", { skip: "host-limitation: not a behavior; reported as manual disposition, history is not rewritten" }, () => {});
+diff --git a/plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs b/plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs
+index fef25f7ac..977ca7523 100644
+--- a/plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs
++++ b/plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs
+@@ -5,7 +5,11 @@
+ //
+ // Acceptance points pinned here:
+ //   A1. No "NUL" literal is a Node open target anywhere in the repository's JS sources (live ratchet scan).
+-//   A2. `GIT_CONFIG_GLOBAL: "NUL"` (read by git, never opened by Node) is explicitly allowed.
++//   A2. A git config null-device value (`GIT_CONFIG_GLOBAL` and similar) is read by git and never opened by
++//       Node, so this open-target scanner does not flag it. That is not a licence to spell it NUL: Git for Windows
++//       2.56 rejects NUL, and acceptance 2 of the item requires GIT_NULL_DEVICE (lib/git-null-device.mjs). That rule
++//       is enforced by the R7-1a ratchets in lib/worktree-lifecycle.test.mjs (production and fixture trees) and by
++//       the real-git cases in lib/git-null-device-sites.test.mjs, not by this scanner.
+ // Plus: the scanner is proven able to fail (RED fixtures, scratch mirror, never production edits), and the
+ // sanctioned sink (os.devNull) really leaves no NUL file behind.
+ import test from "node:test";
+@@ -149,6 +153,16 @@ test("A2: the allowance does not shelter an actual open of NUL beside a git env
+   assert.equal(offences[0].line, 2);
+ });
+ 
++test("acceptance 2: the git null-device rule has live enforcers beside this scanner (shared constant, ratchets, real git)", () => {
++  const lib = resolve(REPO_ROOT, "plugins", "pipeline-core", "lib");
++  assert.match(readFileSync(join(lib, "git-null-device.mjs"), "utf8"), /export const GIT_NULL_DEVICE = "\/dev\/null";/u);
++  const ratchets = readFileSync(join(lib, "worktree-lifecycle.test.mjs"), "utf8");
++  assert.match(ratchets, /R7-1a ratchet: no production module \(lib, scripts, hooks\) assigns a \\"NUL\\" literal to a git environment or -c value/u);
++  assert.match(ratchets, /R7-1a ratchet: no \*\.test\.mjs fixture/u);
++  const realGit = readFileSync(join(lib, "git-null-device-sites.test.mjs"), "utf8");
++  assert.match(realGit, /real git accepts GIT_CONFIG_GLOBAL=GIT_NULL_DEVICE/u);
++});
++
+ test("allowances: comments and non-open string uses are not offences", () => {
+   assert.deepEqual(nulOpenOffences(`// openSync("${N}", "w") is forbidden\n`), []);
+   assert.deepEqual(nulOpenOffences(`/* openSync("${N}") */\n`), []);
+diff --git a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+index 1a9d10153..1498da028 100644
+--- a/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+@@ -10,6 +10,7 @@
+ // is not yet delivered (fix site: plugins/pipeline-core/lib/guard/read-scope.mjs readToolScopeVerdict for the Grep
+ // glob/type/subtree shapes, plugins/pipeline-core/lib/passive-read-policy.mjs rawCandidate for WSL UNC paths).
+ import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -169,6 +170,141 @@ test("U2 (PO decision 2026-10-16: REFUSE, SEC-11 exact-file rule stays) native G
+   }
+ }));
+ 
++// ---- A3: the cross-runner matrix (Claude row above and in P1-P7; Codex and Antigravity rows below) ------------------
++// The Claude row runs the lifecycle guard in-process. The Codex and Antigravity rows start the REAL native adapters
++// (hooks/codex-pretool-guard.mjs, hooks/antigravity-pretool-guard.mjs) as processes with their own envelope shape,
++// because that is where the text an agent reads is finally assembled. Codex has no native Read/Grep/Glob tool (its
++// adapter accepts Bash, apply_patch, Edit, Write only); Antigravity maps run_command to Bash and treats its native
++// read tools (view_file, list_dir, find_by_name, grep_search, ...) as read-only calls it allows at once.
++const HOOKS_DIR = fileURLToPath(new URL("../../hooks/", import.meta.url));
++const RUNNERS = ["claude", "codex", "antigravity"];
++const ABSENCE_WORDING = /not found|not present|no such file|cannot find|does not exist/iu;
++
++function runnerFixture() {
++  const path = fixture();
++  const init = spawnSync("git", ["init", "-q", path], { encoding: "utf8" });
++  assert.equal(init.status, 0, init.stderr);
++  return path;
++}
++const withRunnerFixture = (fn) => {
++  const path = runnerFixture();
++  try { return fn(path); } finally { rmSync(path, { recursive: true, force: true }); }
++};
++
++/** One call through a runner's real guard surface: { denied, text } where text is what the agent reads. */
++function runnerDecision(runner, toolCall, path) {
++  if (runner === "claude") {
++    const result = run(toolCall.claude, path);
++    return { denied: result.exitCode === 2, text: result.text };
++  }
++  const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
++  const script = join(HOOKS_DIR, runner === "codex" ? "codex-pretool-guard.mjs" : "antigravity-pretool-guard.mjs");
++  const envelope = runner === "codex" ? { cwd: path, session_id: "alf-c-p15-01", ...toolCall.codex } : { cwd: path, ...toolCall.antigravity };
++  const child = spawnSync(process.execPath, [script], {
++    cwd: path, input: JSON.stringify(envelope), encoding: "utf8", timeout: 120000,
++    env: { ...baseEnv, CLAUDE_PROJECT_DIR: path },
++  });
++  let parsed = {};
++  try { parsed = JSON.parse(String(child.stdout).trim().split("\n")[0]); } catch { parsed = {}; }
++  if (runner === "codex") {
++    return {
++      denied: parsed?.hookSpecificOutput?.permissionDecision === "deny",
++      text: String(parsed?.hookSpecificOutput?.permissionDecisionReason ?? ""),
++    };
++  }
++  return { denied: parsed.decision === "deny", text: String(parsed.reason ?? "") };
++}
++
++const shellCall = (command, path) => ({
++  claude: bash(command),
++  codex: { tool_name: "Bash", tool_input: { command } },
++  antigravity: { toolCall: { name: "run_command", args: { CommandLine: command, Cwd: path } } },
++});
++
++test("M1 matrix: ordinary in-root passive shell reads are admitted on Claude, Codex and Antigravity", { timeout: 300000 }, () => withRunnerFixture((path) => {
++  for (const runner of RUNNERS) {
++    for (const command of [
++      "cat docs/2026-09-21-a.md",
++      "head -n 5 docs/2026-09-21-a.md",
++      "rg -n apply docs",
++      `rg -n apply docs -g "*.md"`,
++      `rg -n apply ${fwd(path)}/scratch`,
++    ]) {
++      const decision = runnerDecision(runner, shellCall(command, path), path);
++      assert.equal(decision.denied, false, `${runner}: ${command}\n${decision.text}`);
++    }
++  }
++}));
++
++test("M2 matrix: credential and outside-root shell reads are denied on every runner with a 'BLOCKED (guard ...): GUARD-<code>' text that never implies absence", { timeout: 300000 }, () => withRunnerFixture((path) => {
++  for (const runner of RUNNERS) {
++    for (const command of ["cat vault/id_rsa", "cat ~/.ssh/id_rsa"]) {
++      const decision = runnerDecision(runner, shellCall(command, path), path);
++      assert.equal(decision.denied, true, `${runner}: ${command} must be denied`);
++      assert.deepEqual(denialProblems(decision.text), [], `${runner}: ${command}\n${decision.text}`);
++      assert.doesNotMatch(decision.text, /GUARD-READ-TARGET-MISSING/u, `${runner}: an existing secret must never be reported as missing`);
++    }
++    for (const command of ["cat docs/missing-file.md", "grep -R apply ."]) {
++      const decision = runnerDecision(runner, shellCall(command, path), path);
++      if (!decision.denied) continue; // an admitted shape has no denial text to audit
++      assert.deepEqual(denialProblems(decision.text), [], `${runner}: ${command}\n${decision.text}`);
++    }
++  }
++}));
++
++test("M3 Codex row: native Read, Grep and Glob are not Codex tools; each is refused by name and never as an absent file", { timeout: 300000 }, () => withRunnerFixture((path) => {
++  const doc = join(path, "docs", "2026-09-21-a.md");
++  for (const [name, input] of [
++    ["Read", { file_path: doc }], ["Grep", { pattern: "apply", path: doc }], ["Glob", { pattern: "docs/*" }],
++  ]) {
++    const decision = runnerDecision("codex", { codex: { tool_name: name, tool_input: input } }, path);
++    assert.equal(decision.denied, true, name);
++    assert.match(decision.text, new RegExp(`Codex tool_name "${name}"`, "u"), decision.text);
++    assert.doesNotMatch(decision.text, ABSENCE_WORDING, decision.text);
++  }
++}));
++
++test("M4 Antigravity row: in-root native read tools are allowed by the real adapter", { timeout: 300000 }, () => withRunnerFixture((path) => {
++  const doc = join(path, "docs", "2026-09-21-a.md");
++  for (const [name, args] of [
++    ["view_file", { AbsolutePath: doc }], ["list_dir", { DirectoryPath: join(path, "docs") }],
++    ["find_by_name", { SearchDirectory: path, Pattern: "*.md" }], ["grep_search", { SearchPath: doc, Query: "apply" }],
++  ]) {
++    const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name, args } } }, path);
++    assert.equal(decision.denied, false, `${name}\n${decision.text}`);
++  }
++}));
++
++// The three cases below assert the item's acceptance where the runner rows are NOT yet satisfied. They are `todo`: they
++// run and report, they do not fail the suite, and each flips to a plain pass once its fix site lands (see the item).
++test("M5 (todo: Antigravity native read tools are allowed unconditionally, so a credential file is readable) a native view_file of a credential file is denied on Antigravity (A1: credential roots stay denied)", {
++  todo: "decision needed: hooks/antigravity-pretool-guard.mjs allows every read-only tool call immediately; its own test pins that as intended",
++  timeout: 300000,
++}, () => withRunnerFixture((path) => {
++  const decision = runnerDecision("antigravity", { antigravity: { toolCall: { name: "view_file", args: { AbsolutePath: join(path, "vault", "id_rsa") } } } }, path);
++  assert.equal(decision.denied, true, "a credential file was admitted by the native read tool");
++  assert.deepEqual(denialProblems(decision.text), [], decision.text);
++}));
++
++test("M6 (todo: the note recommends tools the Codex runner refuses) a denial surfaced on Codex does not tell the agent to use native Read, Glob or Grep tools (A2: a truthful, actionable denial)", {
++  todo: "fix site lib/guard/grammar-denials.mjs READ_COMMAND_UNSUPPORTED_NOTE (protected path): runner-neutral wording needed, a source patch is prepared",
++  timeout: 300000,
++}, () => withRunnerFixture((path) => {
++  const decision = runnerDecision("codex", shellCall("cat vault/id_rsa", path), path);
++  assert.equal(decision.denied, true, decision.text);
++  assert.match(decision.text, /GUARD-READ-COMMAND-UNSUPPORTED/u, decision.text);
++  assert.doesNotMatch(decision.text, /use the Read, Glob or Grep tools/u, "Codex refuses Read, Glob and Grep as unsupported tool names");
++}));
++
++test("M7 (todo: a credential target is labelled as a spelling problem) a denied credential read never says the refusal is about flags or spelling and not about a path (A2)", {
++  todo: "decision needed: a distinct typed code for an in-root credential read target; fix site lib/guard/evaluate.mjs (protected)",
++  timeout: 300000,
++}, () => withRunnerFixture((path) => {
++  const decision = runnerDecision("claude", shellCall("cat vault/id_rsa", path), path);
++  assert.equal(decision.denied, true, decision.text);
++  assert.doesNotMatch(decision.text, /refuses the command's own flags or spelling, not a path/u, decision.text);
++}));
++
+ test("U3 (PO decision 2026-10-16: ADMIT) native Read of a user-supplied WSL UNC exact file is admitted; UNC credential roots and secret basenames stay denied (A1: WSL UNC paths)", {
+   skip: !WIN && LINUX_RUN,
+ }, () => withFixture((path) => {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 51a65111e..3e16904f2 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -533,6 +533,56 @@ test("the generated briefing prescribes the test-first order in one dispatch (AC
+   assert.doesNotMatch(text, /separate test-author dispatch/u);
+ });
+ 
++// AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
++// check routes in the order targeted -> quick -> final Verify, never invents a quick command, and leaves the final
++// Verify to the Coordinator. The template wording is pinned in lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs;
++// this case pins what the generator actually emits.
++function checkRouteProblems(text, { verifyCommand }) {
++  const problems = [];
++  const targeted = text.indexOf("- Targeted checks — Goldfish owner:");
++  const quick = text.indexOf("- Quick check: ");
++  const verify = text.indexOf("- Final integrated Verify");
++  if (!(targeted >= 0 && targeted < quick && quick < verify)) problems.push("routes are not in the order targeted, quick, final Verify");
++  const quickLine = text.split("\n").find((line) => line.startsWith("- Quick check: ")) ?? "";
++  if (quickLine !== "- Quick check: missing — unknown, no quick PASS.") problems.push(`quick route is not the honest absent route: ${quickLine}`);
++  if (/Quick check:[^\n]*`/u.test(text)) problems.push("a quick command was invented");
++  const verifyLine = text.split("\n").find((line) => line.startsWith("- Final integrated Verify")) ?? "";
++  if (verifyCommand === null) {
++    if (!verifyLine.includes("this project calibrates no Verify command")) problems.push(`no-Verify route is not stated: ${verifyLine}`);
++  } else if (!(verifyLine.includes("Coordinator owner") && verifyLine.includes(`\`${verifyCommand}\``) && verifyLine.includes("not yours to run"))) {
++    problems.push(`final Verify is not Coordinator-owned: ${verifyLine}`);
++  }
++  return problems;
++}
++
++test("the generated briefing carries the targeted, quick and final Verify routes in order and never invents a quick command (AC-187)", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, pkg, argv } = packageFixture({ targeted: [`\`node --test ${CHECK}\` (green)`, `\`node --test --test-name-pattern=first ${CHECK}\` (green)`] });
++  const built = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(built.ok, true, JSON.stringify(built));
++  const { text } = built;
++  assert.deepEqual(checkRouteProblems(text, { verifyCommand: "node verify.mjs" }), []);
++  const block = text.slice(text.indexOf("- Targeted checks — Goldfish owner:"), text.indexOf("- Quick check: "));
++  for (const command of pkg.targeted) assert.ok(block.includes(`  - ${command}`), `every targeted command is listed under the targeted route: ${command}`);
++  assert.match(block, /Record each printed GREEN line with its counts\./u);
++  // RED proof: the checker fails on a briefing whose routes are swapped, whose quick route is invented, and whose Verify is the worker's.
++  const swapped = text.replace("- Quick check: missing — unknown, no quick PASS.\n", "").replace("- Targeted checks — Goldfish owner:", "- Quick check: missing — unknown, no quick PASS.\n- Targeted checks — Goldfish owner:");
++  assert.ok(checkRouteProblems(swapped, { verifyCommand: "node verify.mjs" }).some((problem) => problem.includes("order")));
++  const invented = text.replace("- Quick check: missing — unknown, no quick PASS.", "- Quick check: `npm run quick` PASS.");
++  assert.ok(checkRouteProblems(invented, { verifyCommand: "node verify.mjs" }).length >= 2);
++  const workerVerify = text.replace("; not yours to run", "");
++  assert.ok(checkRouteProblems(workerVerify, { verifyCommand: "node verify.mjs" }).some((problem) => problem.includes("Coordinator")));
++});
++
++test("a project that calibrates no Verify command still gets targeted -> quick -> final Verify, with the absence stated (AC-187)", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  writeFileSync(join(fx.root, "project/pipeline.json"), JSON.stringify({ project: "fixture-project", handover: "docs/state.md", verify: null }));
++  const result = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  assert.deepEqual(checkRouteProblems(result.text, { verifyCommand: null }), []);
++});
++
+ test("an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale", async () => {
+   const { runDispatchBriefing } = await lib();
+   const base = packageFixture();

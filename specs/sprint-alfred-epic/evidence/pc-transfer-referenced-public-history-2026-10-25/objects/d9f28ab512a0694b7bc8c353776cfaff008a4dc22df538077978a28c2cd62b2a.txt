@@ -1,0 +1,53 @@
+{
+  "schema": "pipeline.r3-method-handoff.v1",
+  "candidateBase": "fcdbd288d3d6b33c8914dd0f8258e727175946c9",
+  "patch": {
+    "path": "scratch/r3-scanner.patch",
+    "sha256": "809cacc541809e6b8ce7962f7aa768a08b682f8a6a5674ffe34fad9768cb9250"
+  },
+  "changedFiles": [
+    {
+      "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "sha256": "81da508574eafeaac4eebd4e7f291d9ecbec4ffa24ce2d44a7bf7515e9b9e48e"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/gitleaks-reproduction-gate.cli.test.mjs",
+      "sha256": "4a8aa3b019db0598cbb82684f58565c8a570164469c0663389dddbe50a33bd0d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs",
+      "sha256": "d6c7091b01eace2fe89e86cb596b732a33f8c970054ff1cdc53e6ad58743ac63"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs",
+      "sha256": "c751f66a18867094d3fdc3602e3e00ba180def26152dd1313566b4242f1b97fe"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "sha256": "ae45a7c034c0e7b8982dcd9e9cebae073b1664175814324e62a793a69b741d00"
+    }
+  ],
+  "captures": [
+    {
+      "path": "scratch/r3-missing-gate-red.json",
+      "sha256": "50ba7f133842ca45be4f2377f90bd95562b4ccf592df0e9903a21eb2e923cf3d"
+    },
+    {
+      "path": "scratch/r3-physical-red.json",
+      "sha256": "41b01f09c7f167552bdb612f3b9fe2102efe052c3c1888db72458b0ad8457599"
+    },
+    {
+      "path": "scratch/r3-real-scanner-control.json",
+      "sha256": "3f331b225c47ee2e7ec2c3d24f07301b4a315789fd03dcf5e542e845210688af"
+    },
+    {
+      "path": "scratch/r3-real-cli-unmatched.json",
+      "sha256": "9fc6a779538ef15d9bc1a58c1754fd5bcdb8b172724e0d769eaf78ac442b77f1"
+    },
+    {
+      "path": "scratch/r3-continuation-final.json",
+      "sha256": "43f41d116eb86d892916c54222c98c46bd9dfd1e8c6a5fd30bf9e2a94a85083f"
+    }
+  ],
+  "authority": "method-only; no commit, native receipt or push approval"
+}

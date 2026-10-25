@@ -1,0 +1,1512 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 1646fa2e3..60f66e2df 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -98,6 +98,8 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/codex-onboarding-app-server.mjs`,
+   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
+   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
++  `lib/current-session-artifact-export.mjs` (the current-session PNG admission
++  delegate imported by kernel evaluate),
+   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
+   `lib/commit-message-policy.mjs`,
+   `lib/critic-route-v3.mjs`, `lib/critic-session-model-route.mjs`,
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 1eaf8e61e..b4037de5f 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -308,6 +308,8 @@
+         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-compact-session-output-tests",
++        "verify-phase:harness/scripts/verify.mjs:codex-critic-actual-baseline-tests",
++        "verify-phase:harness/scripts/verify.mjs:codex-critic-baseline-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-critic-packet-host-tests",
+@@ -375,6 +377,8 @@
+         "verify-phase:harness/scripts/verify.mjs:critic-verify-lifecycle-route-tests",
+         "verify-phase:harness/scripts/verify.mjs:critic-verify-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-chat-tests",
++        "verify-phase:harness/scripts/verify.mjs:current-session-artifact-cross-runner-tests",
++        "verify-phase:harness/scripts/verify.mjs:current-session-artifact-export-tests",
+         "verify-phase:harness/scripts/verify.mjs:darwin-native-process-observer-tests",
+         "verify-phase:harness/scripts/verify.mjs:darwin-requester-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
+@@ -405,6 +409,7 @@
+         "verify-phase:harness/scripts/verify.mjs:design-workflow-package-tests",
+         "verify-phase:harness/scripts/verify.mjs:design-workflow-package-v2-tests",
+         "verify-phase:harness/scripts/verify.mjs:design-workflow-signing-default-tests",
++        "verify-phase:harness/scripts/verify.mjs:diagnostic-toil-cross-runner-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-authorship-verify-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-briefing-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-briefing-route-record-tests",
+@@ -446,9 +451,12 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests",
++        "verify-phase:harness/scripts/verify.mjs:g23-cross-runner-passive-matrix-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
+         "verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests",
++        "verify-phase:harness/scripts/verify.mjs:g6-aggregate-native-boundaries-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+@@ -1177,6 +1185,7 @@
+         "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+         "plugins/pipeline-core/lib/darwin-requester-integration.test.mjs",
+         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
++        "plugins/pipeline-core/lib/g17-publication-observation.test.mjs",
+         "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
+         "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
+         "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+@@ -1200,6 +1209,8 @@
+         "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
+         "plugins/pipeline-core/lib/threat-model.test.mjs",
+         "plugins/pipeline-core/lib/verify-selection.test.mjs",
++        "plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs",
++        "plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs",
+         "plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs",
+         "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+         "plugins/pipeline-core/scripts/sbom-discovery.test.mjs",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index d7db3c8a4..a92c3e57a 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -241,6 +241,16 @@
+       "path": "plugins/pipeline-core/hooks/codex-compact-session-output.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "codex-critic-actual-baseline-tests",
++      "path": "plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "codex-critic-baseline-tests",
++      "path": "plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "codex-critic-host-tests",
+       "path": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+@@ -474,6 +484,16 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "current-session-artifact-cross-runner-tests",
++      "path": "plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "current-session-artifact-export-tests",
++      "path": "plugins/pipeline-core/lib/current-session-artifact-export.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "darwin-native-process-observer-tests",
+       "path": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+@@ -584,6 +604,11 @@
+       "path": "plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "diagnostic-toil-cross-runner-tests",
++      "path": "plugins/pipeline-core/lib/guard/diagnostic-toil-cross-runner.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "dispatch-budget-binding-tests",
+       "path": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+@@ -683,6 +708,16 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "g17-publication-observation-tests",
++      "path": "plugins/pipeline-core/lib/g17-publication-observation.test.mjs",
++      "disposition": "required"
++    },
++    {
++      "name": "g23-cross-runner-passive-matrix-tests",
++      "path": "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "g23-quoted-pipeline-reads-tests",
+       "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+@@ -698,6 +733,11 @@
+       "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "g6-aggregate-native-boundaries-tests",
++      "path": "plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "gate-estimate-tests",
+       "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index cb812df88..ee7fd7d08 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4042,6 +4042,173 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "g23-cross-runner-passive-matrix-tests",
++      "file": "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs",
++      "invariantPinned": "G23 passive exact reads retain credential and missing-target boundaries across supported runner envelopes and fresh processes.",
++      "nonOverlapNote": "Seven bounded cross-runner passive-read cases complement the quoted-pipeline and original option examiners.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G23PM01",
++          "G23PM02",
++          "G23PM03",
++          "G23PM04",
++          "G23PM05",
++          "G23PM06",
++          "G23PM07"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "g17-publication-observation-tests",
++      "file": "plugins/pipeline-core/lib/g17-publication-observation.test.mjs",
++      "invariantPinned": "Original publication custody, complete inventory reconciliation and preimage/new-parent refusal.",
++      "nonOverlapNote": "G17 controlled Source fixture evidence; no native/provider or independent review attestation.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G17P001"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "codex-critic-actual-baseline-tests",
++      "file": "plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs",
++      "invariantPinned": "Every original controlled managed group, fourteen mutations, custody, settlement gap, handles and v4 consumer.",
++      "nonOverlapNote": "G17 controlled Source fixture evidence; no native/provider or independent review attestation.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G17A001",
++          "G17A002",
++          "G17A003",
++          "G17A004",
++          "G17A005",
++          "G17A006",
++          "G17A007",
++          "G17A008",
++          "G17A009",
++          "G17A010",
++          "G17A011",
++          "G17A012",
++          "G17A013",
++          "G17A014",
++          "G17A015",
++          "G17A016",
++          "G17A017",
++          "G17A018",
++          "G17A019",
++          "G17A020",
++          "G17A021",
++          "G17A022",
++          "G17A023",
++          "G17A024",
++          "G17A025",
++          "G17A026",
++          "G17A027",
++          "G17A028",
++          "G17A029"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "codex-critic-baseline-tests",
++      "file": "plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs",
++      "invariantPinned": "Eleven independent complete Git inventory mutation examiners.",
++      "nonOverlapNote": "G17 controlled Source fixture evidence; no native/provider or independent review attestation.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G17I001",
++          "G17I002",
++          "G17I003",
++          "G17I004",
++          "G17I005",
++          "G17I006",
++          "G17I007",
++          "G17I008",
++          "G17I009",
++          "G17I010",
++          "G17I011"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "g6-aggregate-native-boundaries-tests",
++      "file": "plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G6AGG001"
++        ],
++        "maxBytes": 65536
++      },
++      "invariantPinned": "Actual Antigravity aggregate write_file and edit_file envelopes reach intended primary role, plan and protected-test guards for relative and absolute paths with READY lifecycle continuity intact",
++      "nonOverlapNote": "Runs only the G6 aggregate envelope matrix; existing adapter registration does not select the aggregate CLI mode and bounded normalization/read controls are separate"
++    },
++    {
++      "name": "current-session-artifact-export-tests",
++      "file": "plugins/pipeline-core/lib/current-session-artifact-export.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G13A001",
++          "G13A002",
++          "G13A003",
++          "G13A004",
++          "G13A005",
++          "G13A006"
++        ],
++        "maxBytes": 65536
++      },
++      "invariantPinned": "Current-session PNG export admits only physically validated project images into the current artifact directory",
++      "nonOverlapNote": "Unique current-session artifact physical admission contract; no native host qualification"
++    },
++    {
++      "name": "current-session-artifact-cross-runner-tests",
++      "file": "plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G13R001",
++          "G13R002",
++          "G13R003",
++          "G13R004"
++        ],
++        "maxBytes": 65536
++      },
++      "invariantPinned": "Authoritative current-session artifact transport stays runner-specific and rejects argument spoofing",
++      "nonOverlapNote": "Unique current-session artifact runner transport contract; no native host qualification"
++    },
++    {
++      "name": "diagnostic-toil-cross-runner-tests",
++      "file": "plugins/pipeline-core/lib/guard/diagnostic-toil-cross-runner.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "DTC001",
++          "DTC002",
++          "DTC003",
++          "DTC004",
++          "DTC005",
++          "DTC006",
++          "DTC007",
++          "DTC008",
++          "DTC009",
++          "DTC010",
++          "DTC011",
++          "DTC012"
++        ],
++        "maxBytes": 65536
++      },
++      "invariantPinned": "Bounded diagnostic commands retain cross-runner recovery and refuse arbitrary code, global recursion and calibration rollback",
++      "nonOverlapNote": "Unique diagnostic toil behavior matrix across three controlled runner transports"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 805ca0ed7..88700ef38 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -42,6 +42,7 @@ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispa
+ import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
++import { antigravityArtifactHostContext, crossRepositoryDenialReason } from "../lib/current-session-artifact-export.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+ 
+@@ -310,6 +311,16 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
+   return { toolName, toolInput, filePath, command, isReadOnly };
+ }
+ 
++export function antigravityGuardPayload(input, normalized, projectRoot) {
++  return {
++    tool_name: normalized.toolName,
++    tool_input: normalized.toolInput,
++    cwd: projectRoot,
++    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
++    antigravity_artifact_host: antigravityArtifactHostContext(input),
++  };
++}
++
+ // PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
+ // credential-root decision is NOT restated here, and neither is any outside-the-project rule. It is the one the Claude native
+ // Read lane and the shell-read grammar already use -- readToolScopeVerdict (lib/guard/read-scope.mjs)
+@@ -685,12 +696,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+         ? ["guard-dispatch.mjs"]
+         : [];
+ 
+-  const canonicalPayload = JSON.stringify({
+-    tool_name: toolName,
+-    tool_input: toolInput,
+-    cwd: projectRoot,
+-    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
+-  });
++  const canonicalPayload = JSON.stringify(antigravityGuardPayload(input, normalized, projectRoot));
+ 
+   const denials = [];
+   const warnings = [];
+@@ -853,26 +859,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+       deny(denials.map((entry) => entry.reason).join("\n"));
+     }
+     if (crossRepositoryOnlyDenial) {
+-      deny([
+-        denials.map((entry) => entry.reason).join("\n"),
+-        "Guard recovery route:",
+-        JSON.stringify({
+-          status: "external-operator-required",
+-          code: "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY",
+-          nextAction: {
+-            kind: "external-operator",
+-            executionBoundary: "separate-session-rooted-at-plugin-cache",
+-            invocation: "user-copy-only",
+-            action: {
+-              toolName,
+-              toolInputSha256,
+-              repositoryRoot: projectRoot,
+-              ...commandDisclosureFields(projectRoot, toolName, toolInput, command),
+-            },
+-            reason: "the target path is outside this repository's physical authority boundary",
+-          },
+-        }),
+-      ].join("\n"));
++      deny(crossRepositoryDenialReason(denials));
+     }
+ 
+     const overrideSpawn = (executable, args, options) => boundedSpawn(
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 3e9212e81..1610e7dff 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -172,7 +172,7 @@ function agyArchitectureDesignBlock() {
+ // assert a later or different verdict must not be cut short by the missing-model refusal.
+ const AGY_TOOL_LAYER_MODEL = "sonnet";
+ 
+-function readyLifecycleFixture(mode = "chat") {
++function readyLifecycleFixture(mode = "chat", initializeBeforeBinding = null) {
+   const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
+   const home = join(root, "fixture-home");
+   mkdirSync(home, { recursive: true });
+@@ -238,6 +238,9 @@ function readyLifecycleFixture(mode = "chat") {
+   const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+   writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+   writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n${agyArchitectureDesignBlock()}`);
++  // Optional test inputs must precede document markers, acknowledgement and
++  // binding. Existing consumers retain the original fixture unchanged.
++  initializeBeforeBinding?.({ root, generated });
+   const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
+   invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
+   // Mini staging still requires the canonical chat acknowledgement before
+@@ -331,6 +334,96 @@ function decision(result) {
+   }
+ }
+ 
++// Controlled lifecycle/readback/chat inputs qualify Source composition only.
++// No nested guard result is mocked and no native or human authority is claimed.
++if (process.argv.includes("--g6-aggregate")) {
++  let root;
++  let denials = 0;
++  try {
++    const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
++    for (const boundary of ["role", "plan", "test"]) {
++      root = readyLifecycleFixture("chat", ({ root: fixtureRoot, generated }) => {
++        const specPath = join(fixtureRoot, generated.targets.spec.path);
++        put(specPath, readFileSync(specPath, "utf8") + `\n| Risk class | ${boundary === "role" ? "high" : "low"} |\n| Rigor level | 2 |\n`);
++        put(join(fixtureRoot, "project", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
++      });
++      const boundState = readFileSync(pipelineStatePath(root), "utf8");
++      const state = JSON.parse(boundState);
++      assert.equal(state.continuity.featureId, state.activeFeature.id);
++      assert.equal(state.continuity.authority.spec.sha256,
++        sha256(readFileSync(join(root, state.continuity.authority.spec.path), "utf8")));
++      for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
++        // backlog/ is a real dev-plan exemption; only backlog/items/ is an
++        // EL-01 exemption. This selects the role guard without disabling the
++        // plan gate, manufacturing approval or changing bound lifecycle state.
++        const relativePath = boundary === "test" ? "protected.test.mjs"
++          : boundary === "role" ? "backlog/g6.mjs" : "src/g6.mjs";
++        const path = absolute ? join(root, relativePath) : relativePath;
++        const result = decision(run({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } }, root, { timeoutMs: 60000 }));
++        assert.equal(result.decision, "deny", `${tool}/${absolute}/${boundary}`);
++        assert.match(result.reason, boundary === "role" ? /guard-el01-tripwire/ : boundary === "plan" ? /guard-devplan/ : /TP-G6/);
++        assert.doesNotMatch(result.reason, /requires-bootstrap|BOOTSTRAP-REQUIRED|GUARD-LIFECYCLE-NOT-READY/);
++        const primary = result.reason.split("\n")[0];
++        assert.match(primary, boundary === "role" ? /guard-el01-tripwire/
++          : boundary === "plan" ? /guard-devplan/ : /guard-testpath/);
++        assert.equal(readFileSync(pipelineStatePath(root), "utf8"), boundState);
++        denials++;
++        console.log(`G6 aggregate ${tool} ${absolute ? "absolute" : "relative"} ${boundary}: intended denial`);
++      }
++      rmSync(root, { recursive: true, force: true });
++      root = null;
++    }
++    assert.equal(denials, 12);
++    console.log(JSON.stringify({ schema: "pipeline.g6-aggregate-result.v1", primaryDenials: denials, expectedDenials: 12 }));
++  } catch (error) { console.error(error.stack); process.exitCode = 1; }
++  finally { if (root) rmSync(root, { recursive: true, force: true }); }
++  process.exit(process.exitCode ?? 0);
++}
++
++// Bounded G6 qualification avoids the lifecycle/native-dispatch fixture graph.
++if (process.argv.includes("--g6-bounded")) {
++  const scratch = join(process.cwd(), "scratch"); mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-native-boundaries-"));
++  const home = join(root, "fixture-home"); mkdirSync(home);
++  const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: root };
++  const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
++  const guard = (name, input) => spawnSync(process.execPath, [join(hookDir, name)], { cwd: root, env, encoding: "utf8", input: JSON.stringify(input), timeout: 10000 });
++  try {
++    put(join(root, ".agent-pipeline", "onboarding-consent.json"), { schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z" });
++    put(join(root, ".claude", "pipeline.json"), { project: "test", verify: "node verify.mjs" });
++    put(join(root, ".claude", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
++    put(join(root, ".claude", "pipeline.yaml"), "gates:\n  dev-plan:\n    mode: blocking\n");
++    put(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
++    for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
++      const path = absolute ? join(root, "src", "code.mjs") : "src/code.mjs";
++      const normalized = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } });
++      assert.equal(normalized.toolName, tool === "write_file" ? "Write" : "Edit");
++      assert.equal(normalized.toolInput.file_path, path);
++      const input = { tool_name: normalized.toolName, tool_input: normalized.toolInput, cwd: root };
++      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" } });
++      const role = guard("guard-el01-tripwire.mjs", input); assert.equal(role.status, 2, JSON.stringify(role)); assert.match(role.stderr, /guard-el01-tripwire/);
++      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: false, activeFeature: { id: "feat-1", phase: "draft", planPath: "specs/feat-1/prd.md" } });
++      const plan = guard("guard-devplan.mjs", input); assert.equal(plan.status, 2, JSON.stringify(plan)); assert.match(plan.stderr, /guard-devplan/);
++      const protectedPath = absolute ? join(root, "protected.test.mjs") : "protected.test.mjs";
++      const testInput = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: protectedPath, Content: "x", Target: "a", Replacement: "b" } } });
++      const test = guard("guard-testpath.mjs", { tool_name: testInput.toolName, tool_input: testInput.toolInput, cwd: root });
++      assert.equal(test.status, 2, JSON.stringify(test)); assert.match(test.stderr, /TP-G6/);
++    }
++    put(join(root, "README.md"), "readme\n"); put(join(root, "vault", "id_rsa"), "inert credential fixture\n");
++    for (const target of ["README.md", join(root, "README.md"), "vault/id_rsa", join(root, "vault", "id_rsa"), "missing.md", join(root, "missing.md")]) {
++      const read = guard("antigravity-pretool-guard.mjs", { workspacePaths: [root], toolCall: { name: "read_file", args: { Path: target } } });
++      const expected = target.endsWith("README.md") ? "allow" : "deny";
++      const result = read.status === 2 ? { decision: "deny", reason: read.stderr } : JSON.parse(read.stdout);
++      assert.equal(result.decision, expected, target);
++      if (target.endsWith("id_rsa")) assert.match(result.reason, /GUARD-READ-CREDENTIAL-TARGET/);
++      if (target.endsWith("missing.md")) assert.match(result.reason, /GUARD-READ-TARGET-MISSING/);
++    }
++    console.log("G6 bounded native normalization -> actual role/plan/test guards: 12 refusals; native read adapter: 6 decisions passed.");
++  } catch (error) { console.error(error.stack); process.exitCode = 1; }
++  finally { rmSync(root, { recursive: true, force: true }); }
++  process.exit(process.exitCode ?? 0);
++}
++
+ // 1. Normalization tests
+ check("normalizeAntigravityToolInput: translates run_command", () => {
+   const res = normalizeAntigravityToolInput({
+diff --git a/plugins/pipeline-core/install-agy.test.mjs b/plugins/pipeline-core/install-agy.test.mjs
+index bb0fbd661..cf292c8ee 100644
+--- a/plugins/pipeline-core/install-agy.test.mjs
++++ b/plugins/pipeline-core/install-agy.test.mjs
+@@ -11,6 +11,118 @@ import * as installerModule from "./install-agy.mjs";
+ import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plugin-attestation-host.mjs";
+ import { observePipelineStartPreflight } from "./scripts/pipeline-start-preflight.mjs";
+ import { createGovernanceScopeController } from "./lib/governance-scope.mjs";
++import { createAntigravityRefreshHost } from "./lib/antigravity-topology-refresh-host.mjs";
++
++test("G6: installer refresh expands an owned user-level matcher to native file tools", (t) => {
++  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-matcher-"));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const configRoot = join(root, "home", ".gemini");
++  const workspaceRoot = join(root, "workspace");
++  const source = join(workspaceRoot, "plugins", "pipeline-core");
++  mkdirSync(join(configRoot, "config"), { recursive: true });
++  mkdirSync(join(source, "hooks"), { recursive: true });
++  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++  // Use the shipped plugin matcher and scripts as the source of the installer wiring.
++  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
++  writeFileSync(join(source, "hooks.json"), JSON.stringify(manifest));
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) {
++    writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert fixture: never executed\n");
++  }
++  const target = join(configRoot, "config", "hooks.json");
++  const foreign = { matcher: "foreign_tool", hooks: [{ type: "command", command: "foreign-command" }] };
++  writeFileSync(target, JSON.stringify({ PreToolUse: [foreign, {
++    matcher: "run_command",
++    hooks: [{ type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` }],
++  }] }));
++  const calls = [];
++  const result = refreshAntigravityInstallation({ configRoot, workspaceRoot, approvedSourceRoot: source,
++    scope: "workspace", globalChangeApproved: true }, {
++    runCli: (argv) => { calls.push([...argv]); assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; },
++    writeInstalledReceipt: () => { assert.fail("a direct workspace fixture must not create any receipt"); },
++  });
++  assert.equal(result.status, "refreshed", JSON.stringify(result));
++  assert.ok(calls.length > 0);
++  const output = JSON.parse(readFileSync(target, "utf8"));
++  assert.deepEqual(output.PreToolUse[0], foreign);
++  const matcher = output.PreToolUse[1].matcher;
++  const misses = ["run_command", "write_to_file", "replace_file_content", "invoke_subagent", "write_file", "edit_file", "read_file"]
++    .filter((name) => !new RegExp(`^(?:${matcher})$`, "u").test(name));
++  assert.deepEqual(misses, [], "installer must refresh the owned user-level matcher as well as the command path");
++});
++
++test("G6: host matcher ownership, approval, manifest and preimage controls", (t) => {
++  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-controls-"));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const configRoot = join(root, "home", ".gemini"), workspaceRoot = join(root, "workspace");
++  const source = join(workspaceRoot, "plugins", "pipeline-core");
++  mkdirSync(join(configRoot, "config"), { recursive: true });
++  mkdirSync(join(source, "hooks"), { recursive: true });
++  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++  const manifestPath = join(source, "hooks.json");
++  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
++  writeFileSync(manifestPath, JSON.stringify(manifest));
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert\n");
++  const target = join(configRoot, "config", "hooks.json");
++  const owned = { type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` };
++  const foreignBytes = '{ "matcher":"foreign_tool", "hooks":[{"command":"foreign-command"}], "keep":"\\u00df" }';
++  const put = (hooks = [owned], matcher = "run_command") => writeFileSync(target, '{ "PreToolUse":[' + foreignBytes + ',' + JSON.stringify({ matcher, hooks }) + '] }\n');
++  const dependencies = { runCli: argv => { assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; }, writeInstalledReceipt: () => assert.fail("no receipt") };
++  const options = { configRoot, workspaceRoot, approvedSourceRoot: source, scope: "workspace", globalChangeApproved: true };
++  put(); const before = readFileSync(target);
++  assert.equal(refreshAntigravityInstallation({ ...options, globalChangeApproved: false }, dependencies).reason, "ATR-GLOBAL-SCOPE");
++  assert.deepEqual(readFileSync(target), before);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).status, "refreshed");
++  assert.ok(readFileSync(target, "utf8").includes(foreignBytes));
++  assert.equal(JSON.parse(readFileSync(target)).PreToolUse[1].matcher, manifest["pipeline-core"].PreToolUse[0].matcher);
++  const current = readFileSync(target);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).changed, false);
++  assert.deepEqual(readFileSync(target), current);
++  put([owned, { command: "foreign-command" }]); const mixed = readFileSync(target);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-WIRING-MIXED-OWNERSHIP");
++  assert.deepEqual(readFileSync(target), mixed);
++  put([{ command: "node /deleted/pipeline-core/hooks/antigravity-pretool-guard.mjs" }]);
++  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-WIRING-OWNERSHIP-UNVERIFIABLE");
++  put();
++  const host = createAntigravityRefreshHost({ ...options, ...dependencies });
++  for (const surface of [target, manifestPath]) {
++    const plan = host.prepare(); assert.equal(plan.status, "prepared");
++    const bytes = readFileSync(surface); writeFileSync(surface, Buffer.concat([bytes, Buffer.from(" \n")]));
++    assert.equal(host.apply(plan).reason, "ATR-TOPOLOGY-DRIFT");
++    assert.equal(host.apply(plan).reason, "ATR-UNOWNED-PLAN");
++    writeFileSync(surface, bytes);
++  }
++  const group = manifest["pipeline-core"].PreToolUse[0];
++  manifest["pipeline-core"].PreToolUse.push({ ...group, matcher: "different" });
++  writeFileSync(manifestPath, JSON.stringify(manifest));
++  assert.equal(refreshAntigravityInstallation(options, dependencies).reason, "ATR-HOOK-MATCHER");
++});
++
++test("G6: missing and aliased Source scripts refuse before any wiring mutation", (t) => {
++  for (const kind of ["missing", "alias"]) {
++    const root = mkdtempSync(join(tmpdir(), "g6-source-script-"));
++    t.after(() => rmSync(root, { recursive: true, force: true }));
++    const configRoot = join(root, "config"), workspaceRoot = join(root, "workspace"), source = join(workspaceRoot, "source");
++    mkdirSync(join(configRoot, "config"), { recursive: true });
++    mkdirSync(join(source, "hooks"), { recursive: true });
++    writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++    writeFileSync(join(source, "hooks.json"), JSON.stringify({ "pipeline-core": { PreToolUse: [{ matcher: "write_file", hooks: [{ command: "node hooks/antigravity-pretool-guard.mjs" }] }] } }));
++    const script = join(source, "hooks", "antigravity-pretool-guard.mjs");
++    if (kind === "alias") { const other = join(root, "foreign.mjs"); writeFileSync(other, "// inert foreign\n"); symlinkSync(other, script); }
++    const target = join(configRoot, "config", "hooks.json");
++    const bytes = JSON.stringify({ PreToolUse: [{ matcher: "run_command", hooks: [{ command: `node "${script}"` }] }] });
++    writeFileSync(target, bytes);
++    const calls = [];
++    const result = createAntigravityRefreshHost({ configRoot, workspaceRoot, approvedSourceRoot: source, scope: "workspace", globalChangeApproved: true,
++      runCli: argv => { calls.push(argv); return { status: "ok", version: "1.2.12" }; }, writeInstalledReceipt: () => assert.fail("no receipt") }).refresh();
++    assert.equal(result.status, "refused", kind);
++    assert.match(result.reason, /^(ATR-UNAVAILABLE|ATR-HOOK-SCRIPT|ATR-TOPOLOGY-UNVERIFIABLE)$/u, kind);
++    assert.deepEqual(calls, [["--version"]]); assert.equal(readFileSync(target, "utf8"), bytes);
++  }
++});
+ 
+ test("Agy release-tag checkout creates a named branch without changing the tag commit", (t) => {
+   const root = mkdtempSync(join(tmpdir(), "agy-release-tag-checkout-"));
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+index a83b66e0f..8c812bcfd 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+@@ -27,10 +27,13 @@ function command(value){
+  if(!m)return null;return {path:m[1]??m[2]??m[3],arg:m[4]??null};
+ }
+ function templates(root){
+- const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();
+- function visit(v){if(v&&typeof v==='object'){if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
+-    const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');set.add(c.path+'\0'+(c.arg??''));}
+-    for(const value of Object.values(v))visit(value);}}
++ const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();
++ function visit(v,location=[],group=null){if(v&&typeof v==='object'){
++   if(Object.hasOwn(v,'matcher')){if(typeof v.matcher!=='string'||!v.matcher.length||!Array.isArray(v.hooks))throw Error('ATR-HOOK-MATCHER');group={event:location.filter(k=>typeof k==='string').at(-1),matcher:v.matcher};}
++   if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
++    const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');const key=c.path+'\0'+(c.arg??'');set.add(key);
++    if(group){const binding=group.event+'\0'+key;if(set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}}
++    for(const [key,value] of Object.entries(v))visit(value,[...location,Array.isArray(v)?Number(key):key],group);}}
+  visit(f.value);return set;
+ }
+ // Separator-aware containment: the relative path (always '/'-separated) when `path` lies strictly inside `root`, else null.
+@@ -44,10 +47,23 @@ function wiring(observation,configRoot,workspaceRoot){
+  for(const [scope,path] of [['global',join(configRoot,'config','hooks.json')],['global',join(configRoot,'config','external-hooks.json')],['workspace',join(workspaceRoot,'.agents','hooks.json')],['workspace',join(workspaceRoot,'.agents','external-hooks.json')]]){
+   const f=read(path);if(f.status==='absent'){result.push({scope,path,sha256:null,nextBytes:null,changes:0});continue;}
+   let changes=0,visits=0;const replacements=[],deletions=[];
++  function ownedKey(value){const c=command(value?.command);if(!c||!isAbsolute(c.path))return null;
++   for(const [root,set] of sets){const rel=within(root,c.path);if(rel!==null&&set.has(rel+'\0'+(c.arg??'')))return rel+'\0'+(c.arg??'');}
++   if(managedGone){const rel=within(managedRoot,c.path);if(rel!==null)return rel+'\0'+(c.arg??'');}return null;
++  }
+   function transform(value,location=[],parentArray=false){
+    if(++visits>4096)throw Error('ATR-WIRING-BOUND');
+    if(Array.isArray(value)){value.forEach((v,i)=>transform(v,[...location,i],true));return;}
+    if(value===null||typeof value!=='object')return value;
++   if(Array.isArray(value.hooks)){
++    const keys=value.hooks.map(ownedKey),owned=keys.filter(key=>key!==null&&desired.has(key));
++    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),matchers=owned.map(key=>desired.matchers.get(event+'\0'+key));
++     if(!Object.hasOwn(value,'matcher')&&matchers.every(m=>m===undefined)){for(const [key,v] of Object.entries(value))transform(v,[...location,key]);return;}
++     if(!Object.hasOwn(value,'matcher'))throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
++     if(matchers.some(m=>typeof m!=='string')||new Set(matchers).size!==1)throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
++     if(value.matcher!==matchers[0]){if(keys.some(key=>key===null))throw Error('ATR-WIRING-MIXED-OWNERSHIP');changes++;replacements.push({path:[...location,'matcher'],value:matchers[0]});}
++    }
++   }
+    if(Object.hasOwn(value,'command')){
+     const c=command(value.command);let owner=null,key=null;
+     if(c&&isAbsolute(c.path)){
+@@ -112,10 +128,11 @@ export function removeAntigravityWorkspaceRegistration({workspaceRoot,expectedSh
+   const after=observeAntigravityWorkspaceBindings({workspaceRoot});if(after.status!=='observed'||after.ownedIndexes.length)throw Error('ATR-REGISTRY-READBACK');return {status:'removed'};
+  }catch{return {status:'refused',reason:'ATR-WORKSPACE-REGISTRY-UNVERIFIABLE'};}
+ }
+-export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedSourceRoot,scope,globalChangeApproved=false,cliPath=null,runCli,writeInstalledReceipt}={}){
++export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedSourceRoot,scope,globalChangeApproved=false,cliPath=null,runCli,writeInstalledReceipt,beforeFinalReadback}={}){
+  directory(configRoot);directory(workspaceRoot);directory(approvedSourceRoot);
+  if(!['global','workspace'].includes(scope))throw Error('ATR-SCOPE');
+  if(runCli!==undefined&&typeof runCli!=='function')throw Error('ATR-SEALED-CLI');
++ if(beforeFinalReadback!==undefined&&typeof beforeFinalReadback!=='function')throw Error('ATR-SEALED-OBSERVER');
+  // injected function is a sealed host dependency, never read from stdin/JSON.
+  const invoke=runCli??((argv)=>{if(configRoot!==join(homedir(),'.gemini'))return {status:'unavailable'};const path=physicalCli(cliPath);const r=spawnSync(path,argv,{encoding:'utf8',timeout:20000,maxBuffer:65536});return r.error||r.signal||r.status!==0?{status:'failed'}:{status:'ok',version:argv[0]==='--version'?r.stdout.trim():null};});
+  const args={configRoot,workspaceRoot,approvedSourceRoot},plans=new WeakMap();let active=false;
+@@ -190,6 +207,9 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
+      const appends=change.append!==null?[{path:['entries'],values:[{path:change.append}]}]:[];
+      const next=rewriteAntigravityJsonBytes(original,{deletions:change.removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
+    }
++   // Optional in-process host observer: no live ownership objects or verdict input.
++   // Its return value is ignored; every real final check still follows it.
++   if(beforeFinalReadback!==undefined)beforeFinalReadback();
+    const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||!registryBound(final,scope,scope,source))throw Error('ATR-FINAL-READBACK');
+    if(registryPlans.some(({selected})=>!registryBound(final,selected,scope,source)))throw Error('ATR-FINAL-READBACK');
+    if(wiring(final,configRoot,workspaceRoot).some(p=>p.changes>0))throw Error('ATR-FINAL-WIRING-READBACK');
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+index d5ed096b4..6e76ea5df 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+@@ -8,6 +8,7 @@ function test(name, run) {
+   completionCases.push({ id: "RC05C" + String(completionCases.length + 1).padStart(3, "0"), name, run });
+ }
+ import assert from 'node:assert/strict';
++import focusedTest from 'node:test';
+ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,cpSync,existsSync,symlinkSync} from 'node:fs';
+ import {tmpdir, devNull} from 'node:os';
+ import {join} from 'node:path';
+@@ -180,6 +181,31 @@ test('prepared source, actual hook bytes and registry preimages are bound before
+  }
+ });
+ 
++focusedTest('G6: final matcher drift is refused after the real wiring write and before receipt',t=>{
++ const f=fixture(t),wire=join(f.configRoot,'config','hooks.json');
++ const matcher='run_command|write_file|edit_file|read_file';
++ f.put(join(f.approvedSourceRoot,'hooks.json'),{'pipeline-core':{PreToolUse:[{matcher,hooks:[{command:'node hooks/antigravity-start-hint.mjs'}]}]}});
++ f.put(wire,{PreToolUse:[{matcher:'run_command',hooks:[{command:'node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"'}]}]});
++ let observed=0,receipts=0;
++ const result=createAntigravityRefreshHost({...f.args,writeInstalledReceipt:()=>{receipts++;return {status:'written'};},beforeFinalReadback:(...args)=>{
++  assert.deepEqual(args,[]);observed++;
++  const written=JSON.parse(readFileSync(wire));
++  assert.equal(written.PreToolUse[0].matcher,matcher,'actual reconciliation completed');
++  assert.equal(written.PreToolUse[0].hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-start-hint.mjs')+'"');
++  written.PreToolUse[0].matcher='run_command';f.put(wire,written);
++  return {status:'refreshed'};
++ }}).refresh();
++ assert.equal(observed,1);assert.equal(receipts,0);
++ assert.equal(result.status,'partial');assert.equal(result.reason,'ATR-FINAL-WIRING-READBACK');
++ assert.ok(result.completed.includes('wiring-rebind'));
++});
++focusedTest('G6: final observer accepts only a function and cannot replace authorization',t=>{
++ const f=fixture(t);assert.throws(()=>createAntigravityRefreshHost({...f.args,beforeFinalReadback:{approved:true}}),/ATR-SEALED-OBSERVER/);
++ let observed=0;const before=readFileSync(f.imports);
++ const result=createAntigravityRefreshHost({...f.args,globalChangeApproved:false,beforeFinalReadback:()=>{observed++;}}).refresh();
++ assert.equal(result.reason,'ATR-GLOBAL-SCOPE');assert.equal(observed,0);assert.deepEqual(readFileSync(f.imports),before);
++});
++
+ // Each original sibling callback is registered individually; no envelope case.
+ if (completionCases.length !== 15) throw new Error("Required completion declared case count drift");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index c24a31cbc..11861d5d9 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -163,6 +163,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+   "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
+   "plugins/pipeline-core/lib/continuity-state.mjs",
++  "plugins/pipeline-core/lib/current-session-artifact-export.mjs",
+   "plugins/pipeline-core/lib/continuity-status.mjs",
+   "plugins/pipeline-core/lib/commit-message-policy.mjs",
+   "plugins/pipeline-core/lib/critic-export-policy.mjs",
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 89403abd2..1c72c8f22 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -2,6 +2,7 @@
+ // Guard module "evaluate" (layer 6), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
+ import { realpathSync } from "node:fs";
++import { fileURLToPath } from "node:url";
+ import { join, relative, resolve } from "node:path";
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { findResidualHostPath } from "../../scripts/capture-evidence.mjs";
+@@ -12,7 +13,7 @@ import { TESTPATH_SHELL_DENIAL_CODE } from "../protected-test-paths.mjs";
+ import { writeTargetPath } from "../tool-write-target.mjs";
+ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { observeGovernanceScope } from "../governance-scope.mjs";
+-import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
++import { CLAUDE_BASH_SHELL_DIALECT_PLATFORM, PIPELINE_STATE_SCRIPT, READ_TOOLS, SHELL_TOOLS, WRITE_TOOLS } from "./constants.mjs";
+ import { GRAMMAR_DENIAL_GUIDANCE, READ_COMMAND_UNSUPPORTED_CODE, READ_CREDENTIAL_TARGET_CODE, READ_CREDENTIAL_TARGET_GUIDANCE, READ_SCOPE_DENIAL_CODE, READ_SCOPE_DENIAL_GUIDANCE } from "./grammar-denials.mjs";
+ import { firstUnadmittedFlag } from "../read-command-diagnosis.mjs";
+ import { isProjectWritePath } from "./path-containment.mjs";
+@@ -20,7 +21,7 @@ import { grammarRemediation, isReadOnlyDiagnosticCommand, isRejectedReadFamilyCo
+ import { CROSS_REPO_DENIAL_CODE, CROSS_REPO_DENIAL_GUIDANCE, bootstrapAcknowledgementMarkerBlocked, crossRepositoryMutationBlocked, verdict, withLifts } from "./verdict.mjs";
+ import { evaluateBootstrapReceiptGate, recordBootstrapPreflightReceipt } from "./bootstrap-receipt.mjs";
+ import { blocked, boundAuthorityDocumentPath, humanOverrideRoute, protectedAuthorityDocumentWriteOnly, protectedStateWriterOnly } from "./denial-route.mjs";
+-import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation, isSanctionedGovernanceScopeDiagnosticInvocation } from "./sanctioned-args-scripts.mjs";
++import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation, isSanctionedGovernanceScopeDiagnosticInvocation, resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
+ import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
+ import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
+ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
+@@ -33,6 +34,20 @@ import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationCo
+ import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
+ import { powerShellScopeVerdict, sanctionedPowerShellNodeCall } from "./powershell-dialect.mjs";
+ import { envDumpClassifierErrorRefusal, envDumpShellRefusal } from "./env-dump-lane.mjs";
++import { isCurrentSessionArtifactExport } from "../current-session-artifact-export.mjs";
++
++// G2 / EL-36: READY permits agent work, but cannot authorize the human's
++// decision to abandon a feature. Match the actual script and verb, never text
++// mentioning them. The existing parser leaves compound commands to grammar.
++function isHumanOnlyDiscard(command, root) {
++  const invocation = resolveSanctionedScriptInvocation(command, root);
++  if (invocation?.args[0] !== "discard-feature") return false;
++  let script = invocation.script;
++  if (script.startsWith("file:")) {
++    try { script = fileURLToPath(script); } catch { return false; }
++  }
++  return script === PIPELINE_STATE_SCRIPT;
++}
+ 
+ /**
+  * NVA-B-REBWIRE-1 / Requirement 5, the half that is not a relief: EVERY refusal this guard
+@@ -157,6 +172,11 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   if (toolName === "Bash" && isHumanPoSigningCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
+     return externalPoSigningOnly();
+   }
++  if (toolName === "Bash" && isHumanOnlyDiscard(input.tool_input.command ?? input.tool_input.CommandLine, root)) {
++    // Never enter HGO: neither a capability nor a signed plan delegates discard.
++    return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-DISCARD-HUMAN-ONLY: discard-feature is a human-terminal action; the agent cannot discard a feature to escape an implementation block or supply --by.\n"
++      + "PO recovery: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by \"<your name>\" --reason \"<why this feature is being abandoned>\" in your own terminal, using your own name and reason.\n");
++  }
+   if (SHELL_TOOLS.includes(toolName) && isHumanPoProfileChangeCommand(
+     input.tool_input.command ?? input.tool_input.CommandLine, root,
+   )) return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-PROFILE-CHANGE-HUMAN-ONLY: profile acknowledgement changes require the existing attended human confirmation outside agent tools.\n");
+@@ -273,6 +293,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   // action a later check refuses is surfaced rather than silently swallowed; it is already
+   // irreversibly consumed on disk by then, and there is no "un-consume" available here.
+   const lifts = [...shellLifts];
++  // Only AGY's original native host envelope can select this exact image-copy
++  // lane. It clears the cross-root objection only; grammar and READY still run.
++  const artifactExport = isCurrentSessionArtifactExport(input, root, dependencies);
+   const crossRepoReason = `${CROSS_REPO_DENIAL_CODE}: ${CROSS_REPO_DENIAL_GUIDANCE}`;
+   if (WRITE_TOOLS.includes(toolName)) {
+     const target = writeTargetPath(input.tool_input, toolName);
+@@ -372,6 +395,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   // retryActionsForDeniedCommand call site below that has `input` in scope. Never a module-
+   // level constant, unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS: both roots vary per invocation.
+   if (toolName === "Bash"
++    && !artifactExport
+     && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
+     const route = humanOverrideRoute(
+       CROSS_REPO_DENIAL_CODE, crossRepoReason, "command", root, toolName, input.tool_input, dependencies,
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 6a01bf112..19e30e136 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -178,6 +178,43 @@ function isValidPipelineHeadArgs(argv) {
+       && HEAD_PIPELINE_COUNT.test(argv[0].slice(1)));
+ }
+ 
++// Dynamic symbol inspection is data parsing, never execution of the operand.
++// Keep its complete argv closed: GNU response files can introduce loader/output
++// options, so even a physically safe @file must not reach objdump's expander.
++function isSystemDiagnosticSource(segment, root, extraRoots) {
++  // A project executable merely named objdump is not the diagnostic tool.
++  const name = segment.executable;
++  const args = segment.argv;
++  if (name === "objdump" || (process.platform === "win32" && name === "objdump.exe")) {
++    return args.length === 2 && ["-T", "--dynamic-syms"].includes(args[0])
++      && !args[1].startsWith("-") && !args[1].startsWith("@")
++      && isSafeExactPassiveFile(args[1], root, extraRoots);
++  }
++  return false;
++}
++
++function isSystemDiagnosticName(name) {
++  return ["objdump", "objdump.exe", "ldconfig"].includes(basename(name).toLowerCase());
++}
++
++function isSystemDiagnosticPart(command, root) {
++  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++  return parsed.parseStatus === "accepted"
++    && parsed.segments.some((segment) => isSystemDiagnosticName(segment.executable));
++}
++
++function isBoundedSystemDiagnosticPipeline(parsed, root, extraRoots) {
++  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 2
++    || parsed.operators.length !== 1 || parsed.operators[0].operator !== "|"
++    || parsed.redirects.length !== 0
++    || !isSystemDiagnosticSource(parsed.segments[0], root, extraRoots)) return false;
++  const windows = parsed.dialect === "windows-readonly-pipeline";
++  const sink = parsed.segments[1];
++  const name = sink.executable;
++  return name === (windows ? "grep.exe" : "grep") ? isValidPipelineGrepArgs(sink.argv)
++    : name === (windows ? "head.exe" : "head") && isValidPipelineHeadArgs(sink.argv);
++}
++
+ /**
+  * Extends the bounded read-only pipeline family (guard-command-grammar.mjs's
+  * isBoundedReadOnlyPipeline, rg-to-rg/rg-to-head only) with the "grep-to-grep"
+@@ -756,10 +793,14 @@ export function isBoundedReadOnlyAndChain(command, root, extraRoots = []) {
+ 
+ function isBoundedReadOnlyNewlineChain(command, root, extraRoots = []) {
+   const parts = splitTopLevelReadOnlyNewlineChain(command);
+-  return parts !== null && parts.every((part) => isReadOnlyDiagnosticCommand(part, root, extraRoots));
++  return parts !== null && parts.every((part) => !isSystemDiagnosticPart(part, root)
++    && isReadOnlyDiagnosticCommand(part, root, extraRoots));
+ }
+ 
+ export function isChainSegmentAdmitted(part, root, extraRoots = []) {
++  // This diagnostic family is qualified only alone or with its one closed
++  // grep/head sink; it does not extend the existing chain source inventory.
++  if (isSystemDiagnosticPart(part, root)) return false;
+   if (isReadOnlyDiagnosticCommand(part, root, extraRoots)) return true;
+   const parsedPart = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+   return parsedPart.parseStatus === "accepted"
+@@ -1393,6 +1434,14 @@ export function isReadOnlyDiagnosticCommand(command, root, extraRoots = []) {
+   command = win32QuotedDrivePathCommand(command);
+   const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+   const pipelineRoots = [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...extraRoots];
++  // These new diagnostics have one exact shape family; do not inherit the
++  // generic trailing stderr redirect or any wider pipeline source rule.
++  if (parsed.parseStatus === "accepted" && isSystemDiagnosticName(parsed.segments[0].executable)) {
++    return parsed.redirects.length === 0
++      && ((parsed.segments.length === 1 && parsed.operators.length === 0
++        && isSystemDiagnosticSource(parsed.segments[0], root, pipelineRoots))
++        || isBoundedSystemDiagnosticPipeline(parsed, root, pipelineRoots));
++  }
+   if (isBoundedReadOnlyPipeline(parsed, root, pipelineRoots)) return true;
+   if (isBoundedGrepPipeline(parsed, root, pipelineRoots)) return true;
+   if (isBoundedCatPipeline(parsed, root, pipelineRoots)) return true;
+@@ -1409,10 +1458,13 @@ export function isRejectedReadFamilyCommand(command, root) {
+     || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+   const { executable, argv } = parsed.segments[0];
+   const name = basename(executable).toLowerCase();
+-  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)) return true;
++  if (["cat", "rg", "grep", "head", "tail", "wc", "stat", "file", "ls"].includes(name)
++    || isSystemDiagnosticName(name)) return true;
+   if (name === "git" && argv[0] === "diff"
+     && argv.some((arg) => arg === "--output" || arg.startsWith("--output=")
+       || arg === "--ext-diff" || arg === "--textconv")) return true;
++  if (["node", "node.exe"].includes(name)
++    && /^(?:--(?:eval|print)(?:=|$)|-(?:e|p|pe|ep)(?:$|[^-]))/u.test(argv[0] ?? "")) return true;
+   if (["node", "node.exe"].includes(name)
+     && argv.some((arg) => arg === "--test-reporter-destination"
+       || arg.startsWith("--test-reporter-destination="))) return true;
+@@ -1516,6 +1568,9 @@ function heredocFileRemediation(command) {
+ }
+ 
+ export function grammarRemediation(command) {
++  if (typeof command === "string" && /^\s*node(?:\.exe)?\s+(?:-e|--eval|-p|--print)(?:\s|=|$)/u.test(command)) {
++    return "Remediation: arbitrary inline Node code stays refused. Write the probe to a workspace scratch/browser-probe.mjs file with Write/Edit, then run node scratch/browser-probe.mjs as a separate tool call. Ordinary lifecycle, role and filesystem guards still apply to that script route.";
++  }
+   return commitMessageFileRemediation(command) ?? heredocFileRemediation(command);
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+index 3dfd5a995..0dc95b55b 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.mjs
+@@ -5903,9 +5903,9 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault)
+     mutation: false,
+     requiresConfirmation: false,
+     guidance: firstAsk
+-      ? "this machine has never been asked how human approvals are cleared. This ONE shared choice controls every participating human gate, including design/plan approval and remote push approval; it is not a push-only setting. Ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
+-        + `If "signature": the sibling trust-anchor setup question in this same onboarding round collects whether an existing key should be reused or a new one created, its external directory, and the human attribution. Its returned applyAction is the only setup command to execute; do not reconstruct or copy a separate po-human-approval command. The suggested external directory is ${poKeyDirectoryHint ?? "a directory outside every repository"}, but the PO may choose another absolute path outside every checkout. `
+-        + "This repository's gates.human_approval and gates.push_approval in pipeline.user.yaml are both seeded with the answer automatically, so no further write is needed for THIS repository; also record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so the NEXT repository on this machine starts pre-filled with it instead of asking from scratch."
++      ? "this machine has not been asked its human-approval mode. ONE shared choice controls every participating human gate, including design/plan and remote push approval. Ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature; its private key stays in the PO's own terminal (recommended). \"chat\" records session attribution -- a labelled record, not proof. Accept exactly \"signature\" or \"chat\"; never invent an answer. "
++        + `If "signature": the sibling trust-anchor setup question in this same onboarding round collects existing-key reuse or new-key creation, external directory, and human attribution. Execute only its returned applyAction; never reconstruct or copy a separate po-human-approval command. Suggested external directory: ${poKeyDirectoryHint ?? "a directory outside every repository"}; the PO may choose another absolute path outside every checkout. `
++        + "The answer automatically seeds both gates.human_approval and gates.push_approval in pipeline.user.yaml; no further repository write is needed. Also record that answer and, for \"signature\", the key directory in the machine-scoped configuration plane (machine-plane.mjs), pre-filling the NEXT repository on this machine."
+       : `this repository's shared human-approval policy (gates.human_approval and gates.push_approval in pipeline.user.yaml) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to the shared policy. Accept exactly "signature" or "chat" as the answer, never invent one.`,
+     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+   };
+@@ -7136,7 +7136,7 @@ function proposeTrustAnchorAbsentGuidanceAction(root, runner) {
+     ],
+     mutation: false,
+     requiresConfirmation: false,
+-    guidance: `this environment has no recorded PO signing key. This is scoped to the current process's home directory: the machine plane lives at <home>/.agent-pipeline/machine.json, so a WSL shell and a native Windows shell on the same physical box use distinct key pointers. Ask once, in this same onboarding round: (1) import an existing PEM key or create a new key, (2) the absolute external destination directory, and (3) the human name approvals are attributed to. For "existing", also collect the absolute private-key PEM path. For "new", use the literal value "none" for trustAnchorExistingKeyPath; the attended command will prompt locally for the new key's passphrase. Only after the PO confirms those answers, replace the four placeholders in applyAction.argv with exactly them and execute that one returned action through the public onboarding driver. It performs setup, verifies both machine and repository directory pointers, materializes the first public trust anchor into this repository, and re-enters onboarding. It never returns private-key bytes. A repository that already carries a different anchor is refused as a conflict.`,
++    guidance: `this environment has no recorded PO signing key for the current process's home. The machine plane is <home>/.agent-pipeline/machine.json: WSL and native Windows shells on the same physical box use distinct key pointers. Ask once in this same onboarding round: (1) import an existing PEM key or create a new key, (2) absolute external destination directory, (3) human name for approval attribution. For "existing", also collect the absolute private-key PEM path. For "new", use literal "none" for trustAnchorExistingKeyPath; the attended command prompts locally for the new key's passphrase. Only after PO confirmation of those answers, replace the four applyAction.argv placeholders with exactly them and execute that one returned action through the public onboarding driver. It sets up, verifies machine and repository directory pointers, materializes this repository's first public trust anchor, and re-enters onboarding. It never returns private-key bytes; a different existing repository anchor is refused as a conflict.`,
+     applyAction: {
+       kind: "command",
+       executable: "node",
+diff --git a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+index 3f49efd62..ebb2e4b09 100644
+--- a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
++++ b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+@@ -17,6 +17,38 @@ export const authorityDomainDigest=digest;
+ const same=(a,b)=>canonical(a)===canonical(b);
+ const LIMIT=Object.freeze({entries:4096,depth:6,file:1048576,total:16777216});
+ const operationScope=new AsyncLocalStorage();
++// Original publisher receipts are observations, not admission or wire authority.
++const publicationScope=new AsyncLocalStorage(),publicationCaptures=new WeakMap(),publicationOwners=new WeakMap();
++export async function captureDomainAuthorityPublications({repository,owner},effect){
++  const repo=actualAuthorityRepository(repository),handle=Object.freeze(Object.create(null));
++  if(!owner||typeof owner!=='object'||typeof effect!=='function'||publicationScope.getStore())authorityOwnerFailure('domain-publication-capture-context');
++  const held={repo,owner,events:[],closed:false,complete:false};publicationCaptures.set(handle,held);
++  try{const result=await publicationScope.run(held,effect);held.complete=true;return Object.freeze({result,handle});}finally{held.closed=true;}
++}
++function freezePublication(value){if(value&&typeof value==='object'){for(const child of Object.values(value))freezePublication(child);Object.freeze(value);}return value;}
++export function readDomainAuthorityPublications(handle,{repository,owner}={}){
++  const held=publicationCaptures.get(handle);
++  if(!held?.closed||!held.complete||held.owner!==owner||!same(held.repo,actualAuthorityRepository(repository)))authorityOwnerFailure('domain-original-publication-capture-required');
++  // Live writer references stay in the Source-owned capture, never in the projection.
++  return freezePublication(held.events.map(({owner:original,custody,...event})=>structuredClone(event)));
++}
++function publicationImage(file){
++  try{const {sourceFact}=readAuthoritySourceFile({namespaceId:'publication',filePath:file,semantic:({value})=>value});return {type:'file',mode:sourceFact.identity.mode&0o777,bytes:sourceFact.size,sha256:sourceFact.sha256};}
++  catch(error){if(error.code==='ENOENT')return null;throw error;}
++}
++function publish(repo,file,value,expected,owner=null){
++  const held=publicationScope.getStore();
++  if(held&&(!same(repo,held.repo)||held.closed||!owner?.producerPort||!owner?.operationHandle||!owner?.memberRef))authorityOwnerFailure('domain-publication-capture-owner');
++  if(held){const original=publicationOwners.get(owner.producerPort),operation=original?.handles.get(owner.operationHandle);if(!original||!same(original.repo,repo)||!operation||!same(operation.member?.memberRef,owner.memberRef))authorityOwnerFailure('domain-publication-original-owner');if(held.events.length>=LIMIT.entries)authorityOwnerFailure('domain-publication-capture-bound');}
++  let checked=null;
++  const result=publishOriginal(repo,file,value,expected,held?image=>{checked=image;}:null);
++  if(held){
++    const {preimage:before,postimage:after}=checked,bytes=Buffer.from(canonical(value));
++    if(after.sha256!==hash(bytes)||after.bytes!==bytes.length||after.mode!==0o600||(before?.sha256??null)!==expected)authorityOwnerFailure('domain-publication-postimage');
++    held.events.push({repositorySha256:digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir}),path:file,preimage:freezePublication(structuredClone(before)),postimage:freezePublication(structuredClone(after)),expectedSha256:expected,memberRef:freezePublication(structuredClone(owner.memberRef)),owner,custody:checked});
++  }
++  return result;
++}
+ const transitionExecution=new AsyncLocalStorage(),transitionTickets=new WeakMap();
+ export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+ function identity(s){return {dev:String(s.dev),ino:String(s.ino),mode:s.mode,nlink:s.nlink};}
+@@ -142,7 +174,34 @@ export function classifyAuthorityLifetime({value,relativePath},producerId,namesp
+   if(!value||Object.keys(value).sort().join(',')!==['schema','producerId','repositorySha256','bindingSha256','phase','identitySha256'].sort().join(',')||value.schema!=='pipeline.domain-authority-lifetime.v1'||value.producerId!==producerId||![value.repositorySha256,value.bindingSha256,value.identitySha256].every(v=>/^[a-f0-9]{64}$/.test(v))||relativePath.split(/[\\/]/).at(-1)!==value.bindingSha256+'.json'||(repository&&value.repositorySha256!==digest({primaryRoot:repository.primaryRoot,commonDir:repository.commonDir}))||!['armed','running','terminal-observed'].includes(value.phase))authorityOwnerFailure(producerId+':lifetime-shape');return {namespaceId,active:value.phase!=='terminal-observed',semantic:value};
+ }
+ function privateParents(repo,file){const path=dirname(file);if(!path.startsWith(repo.commonDir+sep))authorityOwnerFailure('domain-publication-root');let current=repo.commonDir;for(const segment of relative(current,path).split(sep)){current=join(current,segment);try{owned(lstatSync(current),true,current);}catch(e){if(e.code!=='ENOENT')throw e;if(process.platform==='win32')createWindowsOwnedAuthorityDirectory({path:current});else mkdirSync(current,{mode:0o700});owned(lstatSync(current),true,current);}}}
+-function publish(repo,file,value,expected){privateParents(repo,file);if(process.platform==='win32'){const bytes=Buffer.from(canonical(value)),key=digest({repository:{primaryRoot:repo.primaryRoot,commonDir:repo.commonDir},file}),prior=expected===null?null:nativePublicationCustody.get(key);if(expected!==null&&(!prior||prior.sha256!==expected))authorityOwnerFailure('domain-original-publication-witness-required');if(expected===null&&!nativePublicationCustody.has(key)&&nativePublicationCustody.size>=LIMIT.entries)authorityOwnerFailure('domain-publication-witness-bound');const published=publishWindowsOwnedAuthorityFile({path:file,bytes,expectedSha256:expected,expectedFacts:prior?.nativeFacts??null}),sha256=hash(bytes);nativePublicationCustody.set(key,Object.freeze({sha256,nativeFacts:published.nativeFacts}));return sha256;}let prior=null;function check(){if(expected===null){try{lstatSync(file);authorityOwnerFailure('domain-expected-absent');}catch(e){if(e.code!=='ENOENT')throw e;}}else{const actual=readAuthoritySourceFile({namespaceId:'lifetime',filePath:file,semantic:({value})=>value});if(actual.sourceFact.sha256!==expected||(prior&&!same(actual.sourceFact,prior)))authorityOwnerFailure('domain-publication-CAS');prior=actual.sourceFact;}}check();const bytes=Buffer.from(canonical(value)),temporary=file+'.tmp-'+randomBytes(16).toString('hex');let fd=openSync(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}check();renameSync(temporary,file);fd=openSync(dirname(file),constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_DIRECTORY);try{fsyncSync(fd);}finally{closeSync(fd);}return hash(bytes);}
++function publishOriginal(repo,file,value,expected,record=null){
++  privateParents(repo,file);
++  if(process.platform==='win32'){
++    const bytes=Buffer.from(canonical(value)),key=digest({repository:{primaryRoot:repo.primaryRoot,commonDir:repo.commonDir},file}),prior=expected===null?null:nativePublicationCustody.get(key);
++    if(expected!==null&&(!prior||prior.sha256!==expected))authorityOwnerFailure('domain-original-publication-witness-required');
++    if(expected===null&&!nativePublicationCustody.has(key)&&nativePublicationCustody.size>=LIMIT.entries)authorityOwnerFailure('domain-publication-witness-bound');
++    const preimage=record?publicationImage(file):null;
++    if(record&&(preimage?.sha256??null)!==expected)authorityOwnerFailure('domain-publication-CAS');
++    const published=publishWindowsOwnedAuthorityFile({path:file,bytes,expectedSha256:expected,expectedFacts:prior?.nativeFacts??null}),sha256=hash(bytes);
++    nativePublicationCustody.set(key,Object.freeze({sha256,nativeFacts:published.nativeFacts}));
++    if(record)record({preimage,postimage:publicationImage(file),originalNativePreimage:prior,originalNativePublication:published});
++    return sha256;
++  }
++  let prior=null;
++  function check(){
++    if(expected===null){try{lstatSync(file);authorityOwnerFailure('domain-expected-absent');}catch(e){if(e.code!=='ENOENT')throw e;}}
++    else{const actual=readAuthoritySourceFile({namespaceId:'lifetime',filePath:file,semantic:({value})=>value});if(actual.sourceFact.sha256!==expected||(prior&&!same(actual.sourceFact,prior)))authorityOwnerFailure('domain-publication-CAS');prior=actual.sourceFact;}
++  }
++  check();const bytes=Buffer.from(canonical(value)),temporary=file+'.tmp-'+randomBytes(16).toString('hex');
++  let fd=openSync(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
++  try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}
++  check();
++  const preimage=prior?{type:'file',mode:prior.identity.mode&0o777,bytes:prior.size,sha256:prior.sha256}:null;
++  renameSync(temporary,file);fd=openSync(dirname(file),constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_DIRECTORY);
++  try{fsyncSync(fd);}finally{closeSync(fd);}
++  if(record){const post=readAuthoritySourceFile({namespaceId:'publication',filePath:file,semantic:({value})=>value}).sourceFact;record({preimage,postimage:{type:'file',mode:post.identity.mode&0o777,bytes:post.size,sha256:post.sha256},originalPreimage:prior,originalPostimage:post});}
++  return hash(bytes);
++}
+ 
+ /** Each actual owner keeps this object private; exported domain predicates own the brand. */
+ export function createDomainAuthorityOwner({repository,producerId,kinds,namespaceIds,scan,terminalObservation,sourceModulePaths,transitionScope}){
+@@ -199,9 +258,9 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+     readAssurance(){assertContext();actualAuthorityRepository(repo);scan();return 'physical-readback';},
+   };
+   const port=Object.freeze(Object.fromEntries(Object.entries(methods).map(([name,method])=>[name,(...args)=>{assertContext();return method(...args);}])));
+-  function reserve(identity){const handle=Object.freeze({}),binding=digest({producerId,repoSha,identity,nonce:randomBytes(32).toString('hex')}),operation={phase:'reserved',handle,identity:structuredClone(identity),binding,file:null,sha256:null,result:null,terminalFacts:null,effectFacts:[],beforeFacts:scan().memberships.flatMap(m=>m.sourceFacts)};handles.set(handle,operation);live.set(binding,operation);const reserved=withSessionAuthorityBoundary({repository:repo},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,association:{state:'unbound',target:null},operationHandle:handle}));operation.member=reserved;if(producerId==='local-worker-supervisor'&&identity?.enrollment===true){const initial=readInitialMember(operation);if(initial.sourceFact.sha256!==reserved.memberRef.sha256||initial.sourceFact.size!==reserved.memberRef.size||initial.value.phase!=='reserved'||initial.value.sourceFacts.length!==0)authorityOwnerFailure(producerId+':initial-reservation-CAS');operation.initialMember={value:structuredClone(initial.value),sourceFact:structuredClone(initial.sourceFact)};}operation.file=join(lifetimeRoot,binding+'.json');const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:binding,phase:'armed',identitySha256:digest(identity)};withSessionAuthorityBoundary({repository:repo},boundary=>{operation.sha256=publish(repo,operation.file,record,null);operation.phase='armed';if(operation.initialMember){operation.initialLifetimeFact=initialLifetimeRead(operation).sourceFact;if(initialLifetimeWindow)authorityOwnerFailure(producerId+':initial-reservation-reentrant');initialLifetimeWindow={operation};}try{operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef,operationHandle:handle})};}finally{if(initialLifetimeWindow?.operation===operation)initialLifetimeWindow=null;}});return handle;}
+-  function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256);operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
+-  function observeEffects(handle){const operation=handles.get(handle);if(!operation||(operation.phase!=='armed'&&!(operation.phase==='running'&&activeTransitions.has(operation))))authorityOwnerFailure(producerId+':effect-handle');return withSessionAuthorityBoundary({repository:repo},boundary=>{const current=scan().memberships.flatMap(m=>m.sourceFacts);operation.effectFacts=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));operation.phase='running';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:operation.effectFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256);operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};});}
++  function reserve(identity){const handle=Object.freeze({}),binding=digest({producerId,repoSha,identity,nonce:randomBytes(32).toString('hex')}),operation={phase:'reserved',handle,identity:structuredClone(identity),binding,file:null,sha256:null,result:null,terminalFacts:null,effectFacts:[],beforeFacts:scan().memberships.flatMap(m=>m.sourceFacts)};handles.set(handle,operation);live.set(binding,operation);const reserved=withSessionAuthorityBoundary({repository:repo},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,association:{state:'unbound',target:null},operationHandle:handle}));operation.member=reserved;if(producerId==='local-worker-supervisor'&&identity?.enrollment===true){const initial=readInitialMember(operation);if(initial.sourceFact.sha256!==reserved.memberRef.sha256||initial.sourceFact.size!==reserved.memberRef.size||initial.value.phase!=='reserved'||initial.value.sourceFacts.length!==0)authorityOwnerFailure(producerId+':initial-reservation-CAS');operation.initialMember={value:structuredClone(initial.value),sourceFact:structuredClone(initial.sourceFact)};}operation.file=join(lifetimeRoot,binding+'.json');const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:binding,phase:'armed',identitySha256:digest(identity)};withSessionAuthorityBoundary({repository:repo},boundary=>{operation.sha256=publish(repo,operation.file,record,null,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.phase='armed';if(operation.initialMember){operation.initialLifetimeFact=initialLifetimeRead(operation).sourceFact;if(initialLifetimeWindow)authorityOwnerFailure(producerId+':initial-reservation-reentrant');initialLifetimeWindow={operation};}try{operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef,operationHandle:handle})};}finally{if(initialLifetimeWindow?.operation===operation)initialLifetimeWindow=null;}});return handle;}
++  function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
++  function observeEffects(handle){const operation=handles.get(handle);if(!operation||(operation.phase!=='armed'&&!(operation.phase==='running'&&activeTransitions.has(operation))))authorityOwnerFailure(producerId+':effect-handle');return withSessionAuthorityBoundary({repository:repo},boundary=>{const current=scan().memberships.flatMap(m=>m.sourceFacts);operation.effectFacts=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));operation.phase='running';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:operation.effectFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};});}
+   const asyncPhases=new Map();
+   function effectTransition(handle,effect){
+     const writer=handles.get(handle);if(!writer||!live.has(writer.binding)||!writer.member?.memberRef||typeof effect!=='function')authorityOwnerFailure(producerId+':transition-writer');
+@@ -270,7 +329,7 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+         const current=scan().memberships.flatMap(m=>m.sourceFacts);
+         const effects=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));
+         const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:effects})};
+-        operation.sha256=publish(repo,operation.file,record,operation.sha256);
++        operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});
+         return result;
+       }:effect;
+       const result=effectTransition(handle,settledEffect);
+@@ -307,6 +366,7 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+   function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){asyncPhases.delete(handle);throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(value=>{settleAsyncPhase(handle);return finish(value);},error=>{try{settleAsyncPhase(handle);}catch{}observeEffects(handle);throw error;}):finish(result);});}
+   const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
+   controlledModelDomainOwners.set(owner,{port,producerId,repository:repo,assertContext});
++  publicationOwners.set(port,{repo,handles});
+   return owner;
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 039b484da..0d5012f68 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -43,6 +43,37 @@ const definitions = [
+ ];
+ const boundaryBrands=new WeakMap(), memberBrands=new WeakMap(), stageBrands=new WeakSet();
+ const boundaryContext=new AsyncLocalStorage(), stageContext=new AsyncLocalStorage();
++// Only the private publisher appends receipts; callers retain an opaque capture.
++const publicationScope=new AsyncLocalStorage(),publicationCaptures=new WeakMap();
++export async function captureSessionAuthorityPublications({repository:input,owner},effect){
++  const repo=repository(input),handle=Object.freeze(Object.create(null));
++  if(!owner||typeof owner!=='object'||typeof effect!=='function'||publicationScope.getStore())fail('SDC-AUTHORITY-UNAVAILABLE','publication-capture-context');
++  const held={repo,owner,events:[],closed:false,complete:false};publicationCaptures.set(handle,held);
++  try{const result=await publicationScope.run(held,effect);held.complete=true;return Object.freeze({result,handle});}finally{held.closed=true;}
++}
++export function readSessionAuthorityPublications(handle,{repository:input,owner}={}){
++  const held=publicationCaptures.get(handle);
++  if(!held?.closed||!held.complete||held.owner!==owner||!equal(held.repo,repository(input)))fail('SDC-AUTHORITY-UNAVAILABLE','original-publication-capture-required');
++  return freeze(held.events.map(({boundary,custody,...event})=>structuredClone(event)));
++}
++function publicationImage(repo,path){
++  try{const read=readRaw(repo,path),stat=lstatSync(safePath(repo,path));return {type:'file',mode:stat.mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256};}
++  catch(error){if(error.code==='ENOENT')return null;throw error;}
++}
++function publish(repo,path,value,expected=null){
++  const held=publicationScope.getStore();
++  const originalBoundary=boundaryContext.getStore();
++  if(held&&(!equal(repo,held.repo)||held.closed||!originalBoundary||!boundaryBrands.has(originalBoundary.token)))fail('SDC-AUTHORITY-UNAVAILABLE','publication-capture-boundary');
++  if(held&&held.events.length>=SESSION_AUTHORITY_LIMITS.maxNamespaceEntries)fail('SDC-AUTHORITY-UNAVAILABLE','publication-capture-bound');
++  let checked=null;
++  const result=publishOriginal(repo,path,value,expected,held?image=>{checked=image;}:null);
++  if(held){
++    const {preimage:before,postimage:after}=checked,bytes=Buffer.from(canonical(value));
++    if(after.sha256!==hash(bytes)||after.bytes!==bytes.length||after.mode!==0o600||(before?before.sha256!==expected?.sha256||before.bytes!==expected?.size:expected!==null))fail('SDC-AUTHORITY-CAS','publication-postimage');
++    held.events.push({repositorySha256:repoDigest(repo),path:safePath(repo,path),preimage:freeze(structuredClone(before)),postimage:freeze(structuredClone(after)),expectedRef:freeze(structuredClone(expected)),boundary:originalBoundary.token,producerId:value.producerId??null,custody:checked});
++  }
++  return result;
++}
+ const ROOT='agent-pipeline/session-authority';
+ const SHA=/^[a-f0-9]{64}$/, ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+@@ -110,7 +141,32 @@ function readRecord(repo,path){const read=readRaw(repo,path);try{const value=JSO
+ function readRef(repo,value){ref(value);const read=readRecord(repo,value.path.slice(5));if(!equal(read.ref,value))fail('SDC-AUTHORITY-CAS','reference-preimage-changed');return read;}
+ function privateDirectories(repo,path){if(process.platform==='win32'){let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))windowsAuthority.createWindowsOwnedAuthorityDirectory({path:cursor});windowsAuthority.inspectWindowsOwnedAuthorityPath({path:cursor,directory:true});}return;}let cursor=repo.commonDir;for(const part of dirname(path).split('/')){cursor=resolve(cursor,part);if(!existsSync(cursor))mkdirSync(cursor,{mode:0o700});owned(lstatSync(cursor),true);}}
+ function syncDirectory(path){const fd=openSync(path,constants.O_RDONLY);try{fsyncSync(fd);}finally{closeSync(fd);}}
+-function publish(repo,path,value,expected=null){safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path);const bytes=Buffer.from(canonical(value));if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');if(expected===null){if(existsSync(abs))fail('SDC-AUTHORITY-CAS','expected-absent');}else if(!equal(readRaw(repo,path).ref,expected))fail('SDC-AUTHORITY-CAS','publication-preimage-changed');if(process.platform==='win32')return nativePublish(repo,path,abs,bytes,expected);const temp=`${path}.tmp-${randomBytes(16).toString('hex')}`;const tempAbs=safePath(repo,temp);let fd=openSync(tempAbs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}if(expected===null){if(existsSync(abs))fail('SDC-AUTHORITY-CAS','publication-race');}else if(!equal(readRaw(repo,path).ref,expected))fail('SDC-AUTHORITY-CAS','publication-race');renameSync(tempAbs,abs);syncDirectory(dirname(abs));const read=readRaw(repo,path);if(read.ref.sha256!==hash(bytes))fail('SDC-AUTHORITY-CAS','publication-readback');return freeze(read.ref);}
++function publishOriginal(repo,path,value,expected=null,record=null){
++  safePath(repo,path);privateDirectories(repo,path);const abs=safePath(repo,path),bytes=Buffer.from(canonical(value));
++  if(bytes.length>SESSION_AUTHORITY_LIMITS.maxRecordBytes)fail('SDC-AUTHORITY-UNAVAILABLE','oversized-publication');
++  let preimage=null;
++  function check(reason){
++    if(expected===null){if(existsSync(abs))fail('SDC-AUTHORITY-CAS',reason);}
++    else{
++      const read=readRaw(repo,path);
++      if(!equal(read.ref,expected))fail('SDC-AUTHORITY-CAS',reason);
++      preimage={type:'file',mode:lstatSync(abs).mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256};
++    }
++  }
++  check('publication-preimage-changed');
++  if(process.platform==='win32'){
++    const result=nativePublish(repo,path,abs,bytes,expected);
++    if(record)record({preimage,postimage:publicationImage(repo,path),originalExpectedRef:expected,originalPostimageRef:result});
++    return result;
++  }
++  const temp=`${path}.tmp-${randomBytes(16).toString('hex')}`,tempAbs=safePath(repo,temp);
++  let fd=openSync(tempAbs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
++  try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}
++  check('publication-race');renameSync(tempAbs,abs);syncDirectory(dirname(abs));
++  const read=readRaw(repo,path);if(read.ref.sha256!==hash(bytes))fail('SDC-AUTHORITY-CAS','publication-readback');
++  if(record)record({preimage,postimage:{type:'file',mode:lstatSync(abs).mode&0o777,bytes:read.ref.size,sha256:read.ref.sha256},originalExpectedRef:expected,originalPostimageRef:read.ref});
++  return freeze(read.ref);
++}
+ 
+ export function createSessionAuthorityMethodStageObserver({onStage}){if(typeof onStage!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-stage-observer');const value=Object.freeze({onStage});stageBrands.add(value);return value;}
+ export function withSessionAuthorityMethodStages({observer},callback){if(!stageBrands.has(observer)||typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','unbranded-stage-observer');return stageContext.run(observer,callback);}
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.mjs b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+index 1e8d0c3e0..aab06e5bc 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+@@ -51,7 +51,7 @@ import { routingProvenance } from "../lib/routing-projection.mjs";
+ import { resolveCriticHighRiskRoute, resolveV3DutyRoute, validateCriticHighRiskRoute } from "../lib/critic-route-v3.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+ import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+-import { resolveSessionCodexCriticRoute, recheckHeldCriticFamilyRoute, readHeldCriticFamilyExecution } from "./codex-critic-session-route.mjs";
++import { resolveSessionCodexCriticRoute, recheckHeldCriticFamilyRoute, readHeldCriticFamilyExecution, readHeldCriticFamilyPublications } from "./codex-critic-session-route.mjs";
+ import { createModelFamilyExecutionHost, validateInvocationReadback, digest as familyDigest } from "../lib/model-family-execution.mjs";
+ import { readValidatedNativeCriticReturn } from "./codex-native-critic-host.mjs";
+ import { applyCriticSessionModelRoute } from "../lib/critic-session-model-route.mjs";
+@@ -957,7 +957,7 @@ function adminDirectoryInventory(root, label) {
+     }
+   };
+   walk(root);
+-  return { count: entries.length, bytes, sha256: sha256(canonicalJson(entries)) };
++  return { count: entries.length, bytes, sha256: sha256(canonicalJson(entries)), entries };
+ }
+ 
+ function regularGitIndex(repoRoot, { allowMissing = false } = {}) {
+@@ -1002,7 +1002,10 @@ function gitAdministrativeFingerprint(repoRoot) {
+   roots.worktreeLink = link.isFile()
+     ? { type: "file", sha256: sha256(readFileSync(dotGit)) }
+     : { type: link.isDirectory() ? "directory" : "special", mode: link.mode };
+-  return { sha256: sha256(canonicalJson(roots)), detail: roots };
++  const inventory = { gitDir, commonDir, git: roots.git.entries, ...(roots.common ? { common: roots.common.entries } : {}) };
++  delete roots.git.entries;
++  if (roots.common) delete roots.common.entries;
++  return { sha256: sha256(canonicalJson(roots)), detail: roots, inventory };
+ }
+ 
+ export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
+@@ -1023,9 +1026,10 @@ export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
+     artifacts: Object.fromEntries(declaredArtifacts.map((item) => [item.path, resolveRegularFile(repoRoot, item.path, {
+       allowUntracked: item.kind === "evidence" || item.kind === "diff",
+     }).sha256])),
+-    administrative: gitAdministrativeFingerprint(repoRoot),
+   };
+-  return { sha256: sha256(canonicalJson(parts)), detail: parts };
++  const administrative = gitAdministrativeFingerprint(repoRoot);
++  parts.administrative = { sha256: administrative.sha256, detail: administrative.detail };
++  return { sha256: sha256(canonicalJson(parts)), detail: parts, administrativeInventory: administrative.inventory };
+ }
+ 
+ export function parseObserverArgs(values = []) {
+@@ -1108,16 +1112,52 @@ export function readNativeCriticPreparedRoute(context, { repoRoot, preparedSha25
+ function familyCustodyPaths(held) {
+   return { invocation: `${held.preparedPath}.family-invocation`, consumed: `${held.preparedPath}.family-consumed`, execution: `${held.preparedPath}.family-execution` };
+ }
++// Read only original route-bound frozen Source observations; no JSON admission.
++// There is no settled snapshot reset and no namespace/directory exclusion.
++function expectedOriginalPublicationFingerprint(held) {
++  if (!held?.protectedSnapshots) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
++  const snapshots = structuredClone(held.protectedSnapshots);
++  const snapshot = snapshots.candidate, inventory = snapshot?.administrativeInventory; if (!inventory) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
++  const tables = new Map([[inventory.gitDir, new Map(inventory.git.map(row => [row.path, row]))]]);
++  if (inventory.common) tables.set(inventory.commonDir, new Map(inventory.common.map(row => [row.path, row])));
++  for (const effect of readHeldCriticFamilyPublications(held.route)) {
++    const root = tables.has(inventory.commonDir) && isInside(inventory.commonDir, effect.path) ? inventory.commonDir : inventory.gitDir;
++    if (!isInside(root, effect.path)) fail('CRITIC-FAMILY-PUBLICATION-ROOT-DRIFT');
++    const name = relative(root, effect.path).split(sep).join('/'), table = tables.get(root);
++    const prior = table.get(name), image = prior ? Object.fromEntries(Object.entries(prior).filter(([key]) => key !== 'path')) : null;
++    if (canonicalJson(image) !== canonicalJson(effect.preimage)) fail('repository mutation observed during normal Critic run: publication preimage');
++    const parent = name.slice(0, name.lastIndexOf('/')); // New parent directories require separate writer proof; fail closed below.
++    if (parent && table.get(parent)?.type !== 'directory') fail('CRITIC-FAMILY-PUBLICATION-PARENT-DRIFT');
++    table.set(name, { path: name, ...effect.postimage });
++  }
++  const compare = (a,b) => { const x=a.path.split('/'),y=b.path.split('/');for(let i=0;i<Math.min(x.length,y.length);i++){const c=x[i].localeCompare(y[i]);if(c)return c;}return x.length-y.length; };
++  for (const [root, table] of tables) {
++    const entries=[...table.values()].sort(compare), key=root===inventory.gitDir?'git':'common';
++    snapshot.detail.administrative.detail[key]={count:entries.length,bytes:entries.reduce((n,row)=>n+(row.bytes??0),0),sha256:sha256(canonicalJson(entries))};
++  }
++  snapshot.detail.administrative.sha256=sha256(canonicalJson(snapshot.detail.administrative.detail));
++  snapshot.sha256=sha256(canonicalJson(snapshot.detail));
++  return Object.fromEntries(Object.entries(snapshots).map(([name,value])=>[name,value.sha256]));
++}
+ function heldPreparedFamilyContext(context) {
+   const held = preparedFamilyContexts.get(context);
+   if (!held || readJsonBounded(held.preparedPath).sha256 !== held.preparedSha256) fail("CRITIC-FAMILY-PREPARED-CONTEXT-REQUIRED");
+   readNativeCriticPreparedRoute(context, { repoRoot: held.repoRoot, preparedSha256: held.preparedSha256 });
+   return held;
+ }
++function assertOriginalFamilyCustody(held) {
++  if (!held?.protectedSnapshots || !held.invocationSha256 || !held.consumedSha256 || !held.executionSha256) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
++  const paths = familyCustodyPaths(held);
++  const execution = readJsonBounded(paths.execution);
++  if (['pipeline.critic-family-native-custody.v3', 'pipeline.critic-family-native-custody.v4'].includes(execution.value.schema)) fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
++  for (const [name, expected] of [['invocation', held.invocationSha256], ['consumed', held.consumedSha256], ['execution', held.executionSha256]]) {
++    if (readJsonBounded(paths[name]).sha256 !== expected) fail('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
++  }
++}
+ export function consumeNativeCriticPreparedContext(context, { packet, nativeRequest } = {}) {
+   const held = heldPreparedFamilyContext(context), paths = familyCustodyPaths(held);
+-  atomicWriteExclusive(paths.consumed, { schema: "pipeline.critic-family-consumption.v1", preparedSha256: held.preparedSha256,
+-    packetSha256: familyDigest(packet), nativeRequestSha256: familyDigest(nativeRequest) });
++  held.consumedSha256 = atomicWriteExclusive(paths.consumed, { schema: "pipeline.critic-family-consumption.v1", preparedSha256: held.preparedSha256,
++    packetSha256: familyDigest(packet), nativeRequestSha256: familyDigest(nativeRequest) }).sha256;
+ }
+ export function recordNativeCriticPreparedExecution(context, { packet, nativeRequest, nativeResult } = {}) {
+   const held = heldPreparedFamilyContext(context), paths = familyCustodyPaths(held);
+@@ -1127,8 +1167,8 @@ export function recordNativeCriticPreparedExecution(context, { packet, nativeReq
+   const execution = readHeldCriticFamilyExecution(held.route);
+   if (!execution.ok || execution.value.nativeResultSha256 !== familyDigest(nativeResult)
+     || execution.value.packetSha256 !== familyDigest(packet)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+-  atomicWriteExclusive(paths.execution, { schema: held.generatedHostReturn ? "pipeline.critic-family-native-custody.v2" : "pipeline.critic-family-native-custody.v1", preparedSha256: held.preparedSha256,
+-    nativeResult, packet, nativeRequest, execution: execution.value, ...(held.generatedHostReturn ? { hostReturn: held.generatedHostReturn } : {}) });
++  held.executionSha256 = atomicWriteExclusive(paths.execution, { schema: held.generatedHostReturn ? "pipeline.critic-family-native-custody.v2" : "pipeline.critic-family-native-custody.v1", preparedSha256: held.preparedSha256,
++    nativeResult, packet, nativeRequest, execution: execution.value, ...(held.generatedHostReturn ? { hostReturn: held.generatedHostReturn } : {}) }).sha256;
+   held.nativeResult = structuredClone(nativeResult);
+ }
+ export function captureNativeCriticPreparedReturn(context, validatedHandle) {
+@@ -1164,53 +1204,19 @@ export function readNativeCriticCapturedReturn(context) {
+   return structuredClone(value);
+ }
+ 
+-/** Qualified construction ports independently observe original S4/S6 evidence.
+- * Persisted JSON is a recipe for those verifiers, never an admission handle. */
++/** Persisted JSON cannot reconstruct the original publication capture.
++ * Qualified construction ports still require a fresh preparation. */
+ export function createNativeCriticPreparedContextFactory({ familyInvocationEntry, familyRuntimeHost, familyExecutionPorts } = {}) {
+-  return Object.freeze({ async reconstruct({ repoRoot, preparedPath, requireExecution = true } = {}) {
++  return Object.freeze({ async reconstruct({ preparedPath } = {}) {
+     if ((!familyInvocationEntry && !familyRuntimeHost) || !familyExecutionPorts?.readOriginalInvocation
+       || !familyExecutionPorts?.readLaunchEvidence || !familyExecutionPorts?.contextForInvocation
+       || !familyExecutionPorts?.adapters?.codex?.readActualExecutionIdentity) fail("CRITIC-FAMILY-CUSTODY-RECONSTRUCTION-UNQUALIFIED");
+     const preparedRecord = readJsonBounded(preparedPath), original = readJsonBounded(`${preparedPath}.family-invocation`).value;
+     exactKeys(original, ["schema", "preparedSha256", "receipt"], "family invocation custody");
+     if (original.schema !== "pipeline.critic-family-prepared-custody.v1" || original.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+-    const i = original.receipt;
+-    const route = await resolveSessionCodexCriticRoute({ rootDir: repoRoot, candidateCommit: preparedRecord.value.request.candidate_commit,
+-      dutyId: preparedRecord.value.route.duty, invocationId: i.invocationId, familyInvocationEntry, familyRuntimeHost, familyExecutionPorts });
+-    const checked = recheckHeldCriticFamilyRoute(route);
+-    if (!checked.ok || familyDigest(checked.receipt) !== familyDigest(i)) fail("CRITIC-FAMILY-ORIGINAL-INVOCATION-DRIFT");
+-    const held = { route, repoRoot: realpathSync(repoRoot), preparedPath, preparedSha256: preparedRecord.sha256,
+-      requestSha256: sha256(canonicalJson(preparedRecord.value.request)) };
+-    if (requireExecution) {
+-      const custody = readJsonBounded(`${preparedPath}.family-execution`).value;
+-      const v2 = custody.schema === "pipeline.critic-family-native-custody.v2";
+-      exactKeys(custody, ["schema", "preparedSha256", "nativeResult", "packet", "nativeRequest", "execution", ...(v2 ? ["hostReturn"] : [])], "family execution custody");
+-      if (!["pipeline.critic-family-native-custody.v1", "pipeline.critic-family-native-custody.v2"].includes(custody.schema) || custody.preparedSha256 !== preparedRecord.sha256) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+-      const consumption = readJsonBounded(`${preparedPath}.family-consumed`).value;
+-      if (consumption.preparedSha256 !== preparedRecord.sha256 || consumption.packetSha256 !== familyDigest(custody.packet)
+-        || consumption.nativeRequestSha256 !== familyDigest(custody.nativeRequest)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+-      const host = createModelFamilyExecutionHost({ ...familyExecutionPorts, readInvocation: async () => {
+-        const read = await familyExecutionPorts.readOriginalInvocation({ root: repoRoot, invocationId: i.invocationId, sessionId: i.sessionId, expectedReceiptSha256: i.receiptSha256 });
+-        const valid = validateInvocationReadback(read?.value);
+-        return read?.ok && valid.ok && familyDigest(valid.value.invocation) === familyDigest(i) ? read : { ok: false, code: "CRITIC-FAMILY-ORIGINAL-INVOCATION-DRIFT", retryable: false };
+-      } });
+-      const observed = await host.recordModelFamilyExecution({ invocationId: i.invocationId, rawHostResult: custody.nativeResult });
+-      if (!observed.ok) fail(observed.code);
+-      const receipt = host.readExecutionReceipt(observed.value);
+-      if (!receipt.ok || familyDigest(receipt.value) !== familyDigest(custody.execution.executionReceipt)
+-        || custody.execution.nativeResultSha256 !== familyDigest(custody.nativeResult)
+-        || custody.execution.packetSha256 !== familyDigest(custody.packet)) fail("CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT");
+-      held.reconstructedExecution = receipt.value;
+-      held.nativeResult = custody.nativeResult;
+-      if (v2) {
+-        validateHostReturn(preparedRecord.value, preparedRecord.sha256, custody.hostReturn);
+-        if (familyDigest(custody.hostReturn.critic_result.verdict) !== familyDigest(JSON.parse(custody.nativeResult.result.answer))) fail("CRITIC-FAMILY-NATIVE-RETURN-CUSTODY-DRIFT");
+-        held.generatedHostReturn = custody.hostReturn;
+-      }
+-    }
+-    const context = Object.freeze(Object.create(null)); preparedFamilyContexts.set(context, held);
+-    validatePrepared(preparedRecord.value, repoRoot, context);
+-    return context;
++    // Serialized recipes cannot recover original publisher captures or inventories.
++    // Reprepare before resolving a route or performing any new Source operation.
++    fail('CRITIC-FAMILY-REPREPARE-REQUIRED');
+   } });
+ }
+ function routeForCriticRequest(repoRoot, request, familyContext = null) {
+@@ -1337,7 +1343,9 @@ export function prepareNativeCritic(options, deps = {}) {
+     preparedFamilyContexts.set(context, held);
+     const result = prepareNativeCriticCore(options, deps, context);
+     held.preparedSha256 = result.preparedSha256;
+-    atomicWriteExclusive(familyCustodyPaths(held).invocation, { schema: "pipeline.critic-family-prepared-custody.v1", preparedSha256: result.preparedSha256, receipt: recheckHeldCriticFamilyRoute(route).receipt });
++    held.protectedSnapshots = Object.fromEntries(Object.entries(protectedRootPathMap(repoRoot, options.pipelineRoot, options.observers ?? [])).map(([name, root]) => [name, captureRepositoryFingerprint(root)]));
++    assertFingerprintMapEqual(readJsonBounded(options.preparedPath).value.bindings.protectedBefore, Object.fromEntries(Object.entries(held.protectedSnapshots).map(([name, snapshot]) => [name, snapshot.sha256])), "prepared publication capture");
++    held.invocationSha256 = atomicWriteExclusive(familyCustodyPaths(held).invocation, { schema: "pipeline.critic-family-prepared-custody.v1", preparedSha256: result.preparedSha256, receipt: recheckHeldCriticFamilyRoute(route).receipt }).sha256;
+     preparedFamilyResults.set(result, context);
+     return result;
+   })();
+@@ -1883,7 +1891,7 @@ function recoverReceiptTransaction({ controlRoot, consumePath, completePath, pen
+   return { ok: true, receiptPath, receiptSha256: marker.receiptSha256, reviewPass: recoveredReceipt.reviewPass, recovered: true, cleanupComplete };
+ }
+ 
+-function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution) {
++function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution, expectedAfter = prepared.bindings.protectedBefore) {
+   if (receipt.assurance !== prepared.assurance || JSON.stringify(receipt.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("receipt assurance boundary drift");
+   if ("normalLaneAuthorization" in receipt) fail("current receipt must not carry legacy normal lane authorization");
+   if (receipt.route.providerAttested !== false || receipt.route.coordinatorConfirmed !== true) fail("receipt route claim drift");
+@@ -1919,7 +1927,7 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution
+     || receipt.liveness.evidenceEvents.some(({ evidenceSha256 }) => !SHA256.test(evidenceSha256))
+     || JSON.stringify(receipt.liveness.evidenceEvents) !== JSON.stringify(expectedLivenessEvents)) fail("receipt liveness binding invalid");
+   if (JSON.stringify(receipt.state.before) !== JSON.stringify(prepared.bindings.protectedBefore)
+-    || JSON.stringify(receipt.state.after) !== JSON.stringify(prepared.bindings.protectedBefore)) fail("receipt protected-state binding drift");
++    || JSON.stringify(receipt.state.after) !== JSON.stringify(expectedAfter)) fail("receipt protected-state binding drift");
+   if (sanitizedVerdict.findings.some(({ detailSha256, evidence, specRef }) => !SHA256.test(detailSha256)
+     || !Number.isInteger(evidence.startLine) || evidence.startLine < 1 || !Number.isInteger(evidence.endLine)
+     || evidence.endLine < evidence.startLine || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(specRef))) fail("receipt finding binding invalid");
+@@ -1952,6 +1960,7 @@ export function finalizeNativeCritic(options) {
+   if (familyContext !== null) {
+     const route = readNativeCriticPreparedRoute(familyContext, { repoRoot, preparedSha256: preparedRecord.sha256 });
+     const held = preparedFamilyContexts.get(familyContext);
++    assertOriginalFamilyCustody(held);
+     const executed = held.reconstructedExecution ? { ok: true } : readHeldCriticFamilyExecution(route);
+     if (!executed.ok) fail(executed.code);
+   }
+@@ -1984,7 +1993,8 @@ export function finalizeNativeCritic(options) {
+   const reviewAfter = captureRepositoryFingerprint(prepared.review.root, referenceNow.filter(({ source }) => source === "review"));
+   const after = protectedFingerprintMap(repoRoot, pipelineRoot, observers);
+   const reviewMutation = reviewAfter.sha256 !== prepared.bindings.reviewFingerprintSha256;
+-  const protectedMutation = JSON.stringify(after) !== JSON.stringify(prepared.bindings.protectedBefore);
++  const expectedProtected = familyContext === null ? prepared.bindings.protectedBefore : expectedOriginalPublicationFingerprint(preparedFamilyContexts.get(familyContext));
++  const protectedMutation = JSON.stringify(after) !== JSON.stringify(expectedProtected);
+   if (reviewMutation || protectedMutation) fail("repository mutation observed during normal Critic run");
+   const sanitizedVerdict = sanitizeVerdictForReceipt(validated.result.verdict, prepared.review.root);
+ 
+@@ -2040,7 +2050,7 @@ export function finalizeNativeCritic(options) {
+     reviewPass: validated.reviewPass,
+   };
+   assertSchema(receipt, RECEIPT_SCHEMA_PATH, "receipt");
+-  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution);
++  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution, expectedProtected);
+   const published = completeReceiptTransaction({
+     controlRoot, consumePath, completePath, pendingPath, receiptPath, receipt, prepared, dispatchState, cleanup: options.cleanup,
+   });
+diff --git a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+index 8c9011a6b..9076eea69 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+@@ -8,7 +8,15 @@ import { createModelFamilyInvocationEntry } from "../lib/model-family-invocation
+ import { createModelFamilyRuntimeHost } from "../lib/model-family-runtime-host.mjs";
+ import { createModelFamilyExecutionHost, validateInvocationReadback, digest } from "../lib/model-family-execution.mjs";
+ 
++import { authorityRepositoryFromRoot, captureDomainAuthorityPublications, readDomainAuthorityPublications } from '../lib/session-authority-domain-owner.mjs';
++import { captureSessionAuthorityPublications, readSessionAuthorityPublications } from '../lib/session-authority-registry.mjs';
+ const heldFamilyRoutes = new WeakMap();
++export function readHeldCriticFamilyPublications(route){
++  const held=heldFamilyRoutes.get(route),checked=recheckHeldCriticFamilyRoute(route);
++  if(!checked.ok||!held?.publicationHandles)familyFailure('CRITIC-FAMILY-ORIGINAL-PUBLICATIONS-REQUIRED');
++  const binding={repository:authorityRepositoryFromRoot(held.rootDir),owner:route};
++  return Object.freeze([...readDomainAuthorityPublications(held.publicationHandles.domain,binding),...readSessionAuthorityPublications(held.publicationHandles.registry,binding)]);
++}
+ function familyFailure(code) { const error = new Error(code); error.code = code; throw error; }
+ export function isHeldCriticFamilyRoute(route) { return heldFamilyRoutes.has(route); }
+ export function readHeldCriticFamilyExecution(route) {
+@@ -39,7 +47,17 @@ export function recheckHeldCriticFamilyRoute(route) {
+ 
+ /** Construction-owned route admission. The returned projection is diagnostic;
+  * only its original private object can bind and consume the S5 invocation. */
+-export async function launchHeldCriticFamilyRoute({ route, packet, nativeRequest } = {}) {
++export async function launchHeldCriticFamilyRoute(input = {}) {
++  const held=heldFamilyRoutes.get(input.route);
++  if(!held)return {ok:false,code:'CRITIC-FAMILY-ROUTE-HANDLE-REQUIRED'};
++  if(held.consumed||held.publicationHandles)return {ok:false,code:'CRITIC-FAMILY-CONSUMED'};
++  const repository=authorityRepositoryFromRoot(held.rootDir);
++  const binding={repository,owner:input.route};
++  const domain=await captureDomainAuthorityPublications(binding,()=>captureSessionAuthorityPublications(binding,()=>launchHeldCriticFamilyRouteCore(input)));
++  if(domain.result.result?.ok)held.publicationHandles=Object.freeze({domain:domain.handle,registry:domain.result.handle});
++  return domain.result.result;
++}
++async function launchHeldCriticFamilyRouteCore({ route, packet, nativeRequest } = {}) {
+   const held = heldFamilyRoutes.get(route), checked = recheckHeldCriticFamilyRoute(route);
+   if (!checked.ok) return checked;
+   const ports = held.executionPorts;
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index a11f3c758..960df7a48 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -4,11 +4,11 @@
+   "files": [
+     {
+       "path": "harness/review-protocol.md",
+-      "rawSha256": "66f47ecb26596445bb6d143c50b9f74c58eb1d436350f6555a896fc803986a4a"
++      "rawSha256": "4c305136a6c71dd5b02b524b37c3b5a423e1e0cee5fe984c3983853ee6c1157f"
+     },
+     {
+       "path": "plugins/pipeline-core/agents/critic.md",
+-      "rawSha256": "0a267a61e65d475cc8ba58733b5775235b441d8e65fe98fe98d566c14ffbeca2"
++      "rawSha256": "a79b00961433b6558527550933d74fc42a295b65553434107184d1936f27466d"
+     },
+     {
+       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
+@@ -20,7 +20,7 @@
+     },
+     {
+       "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+-      "rawSha256": "5cae56f6e96fe0005fa4d78a1e7556469836342f27e69aaf24e0d6be9363f1eb"
++      "rawSha256": "ebb58efeffc47a7f343e32d97ac2bc63fec9403979ac81b98fc7da8212f525d4"
+     },
+     {
+       "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
+@@ -32,15 +32,15 @@
+     },
+     {
+       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+-      "rawSha256": "c55220871ce975580a436f791add6b9a4fbeedc4ea6c2343d28148009af47092"
++      "rawSha256": "60cd00b9281b4522eff1bb2f176555084d032d54598bfca22d85223e8d92efab"
+     },
+     {
+       "path": "roles/critic.md",
+-      "rawSha256": "8acc1eb8adc6d86de63075e6f5f42aa06970866064e07a40297617e84e3efbb4"
++      "rawSha256": "4429e56ee9c15afc8f5eeae66ee4db06bc85d8822e7c08090217cc268d287549"
+     },
+     {
+       "path": "templates/prompts/critic-review.md",
+-      "rawSha256": "de3f3cf4f349a5d5de361443557f83aaa634bcd3af98d815730dc66b03960481"
++      "rawSha256": "996419bde7cd9a52bf49eee43d232775602a61a79c7cf225a0654900faf29a74"
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 6cae63e52..b18948fbe 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -12855,11 +12855,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const by = flags.by;
+       const reason = flags.reason;
+       if (isBlank(by)) {
+-        console.error('Error: discard-feature requires --by <name> (non-empty) -- an unattributed discard is refused.');
++        console.error('Error: discard-feature requires --by <name> (non-empty) -- an unattributed discard is refused. PO recovery: in your own terminal, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by "<your name>" --reason "<why this feature is being abandoned>". The agent must not supply your name.');
+         return 2;
+       }
+       if (isBlank(reason)) {
+-        console.error('Error: discard-feature requires --reason <text> (non-empty) -- an unexplained discard is refused.');
++        console.error('Error: discard-feature requires --reason <text> (non-empty) -- an unexplained discard is refused. PO recovery: in your own terminal, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by "<your name>" --reason "<why this feature is being abandoned>".');
+         return 2;
+       }
+       const activeFeature = base.activeFeature;
+@@ -13301,7 +13301,13 @@ directory. There is no --dir flag.
+ 
+ Commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.
+ 
+-Each command validates its own flags and names what it needs when one is missing.`);
++Each command validates its own flags and names what it needs when one is missing.
++
++discard-feature --by "<your name>" --reason "<why this feature is being abandoned>"
++  Human-terminal action: the PO supplies the name and reason and runs the command
++  in the project directory. Agents must not discard to escape an implementation block.
++  This records an abandoned feature; use close-feature when the result is complete.
++  Signed-plan proof import remains agent work; it does not delegate discard.`);
+       return 0;
+     }
+ 

@@ -1,0 +1,115 @@
+command: node --test plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+label: g21-result-bootstrap-original-red
+exitCode: 1
+head: 1e57d58014a2a5c00b3ba5409aa6a9a01aa976d5
+tree: d2cc59df43fc810e7569c6bc7da228290c461963
+dirty: true
+--- stdout ---
+✔ win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged) (280.982713ms)
+✔ win32: an insecure DACL assessment on the private result-bootstrap directory still fails closed (168.739247ms)
+✖ AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence (100.311055ms)
+✖ registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview (96.863255ms)
+✔ AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation (808.311516ms)
+✔ AC-047-143/148: active work, nonnull authority, State/document drift, absent/fenced and unsafe Result targets fail closed (951.705823ms)
+✔ AC-047-149: bootstrap requires a current implementing Plan lifecycle before any Result or State mutation (449.305988ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3539.724947
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs:120:1
+✖ AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence (100.311055ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + Buffer(123) [Uint8Array] [
+  - Buffer(173) [Uint8Array] [
+  -   10,
+  -   60,
+  -   33,
+  -   45,
+  -   45,
+  -   32,
+  -   112,
+  -   105,
+  -   112,
+  -   101,
+  -   108,
+  -   105,
+  -   110,
+  -   101,
+  -   46,
+  -   114,
+  -   101,
+  -   115,
+  -   117,
+  -   108,
+  -   116,
+  -   45,
+  -   114,
+  -   101,
+  -   99,
+  -   111,
+  -   110,
+  -   99,
+  -   105,
+  -   108,
+  -   105,
+  -   97,
+  -   116,
+  -   105,
+  -   111,
+  -   110,
+  -   45,
+  -   102,
+  -   101,
+  -   110,
+  -   99,
+  -   101,
+  -   46,
+  -   118,
+  -   49,
+  -   32,
+  -   45,
+  -   45,
+  -   62,
+  -   10,
+      96,
+      96,
+      96,
+      112,
+      105,
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs:124:108)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: <Buffer 60 60 60 70 69 70 65 6c 69 6e 65 2d 72 65 73 75 6c 74 0a 7b 22 63 6f 75 72 73 65 44 65 63 69 73 69 6f 6e 49 6e 74 65 6e 74 73 22 3a 5b 5d 2c 22 63 6f ... 73 more bytes>,
+    expected: <Buffer 0a 3c 21 2d 2d 20 70 69 70 65 6c 69 6e 65 2e 72 65 73 75 6c 74 2d 72 65 63 6f 6e 63 69 6c 69 61 74 69 6f 6e 2d 66 65 6e 63 65 2e 76 31 20 2d 2d 3e 0a ... 123 more bytes>,
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs:138:1
+✖ registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview (96.863255ms)
+  TypeError: Cannot read properties of undefined (reading 'path')
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs:142:35)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+
+--- stderr ---

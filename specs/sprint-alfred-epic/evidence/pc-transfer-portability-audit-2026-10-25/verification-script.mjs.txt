@@ -1,0 +1,54 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import cp from 'node:child_process';
+import crypto from 'node:crypto';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const prefix='specs/sprint-alfred-epic/evidence/';
+const tracked=new Set(cp.execFileSync('git',['ls-files','-z'],{encoding:'utf8',maxBuffer:32*1024*1024}).split('\0'));
+const manifests=[
+ prefix+'pc-runner-transfer-2026-10-25/portable-custody.json',
+ prefix+'transfer-integrated-qualification-2026-10-25/custody.json',
+ prefix+'pc-transfer-briefing-history-2026-10-25/custody.json',
+ prefix+'pc-transfer-dependency-closure-2026-10-25/custody.json',
+ prefix+'pc-transfer-referenced-public-history-2026-10-25/custody.json',
+ prefix+'pc-transfer-workspace-inventory-2026-10-25/inventory.json',
+];
+const records=[],unique=new Set();
+for(const p of manifests) {
+ if(!tracked.has(p))throw Error('manifest not staged/tracked '+p);
+ const m=JSON.parse(fs.readFileSync(p));
+ for(const a of m.artifacts) {
+  if(!tracked.has(a.transport))throw Error('transport not staged/tracked '+a.transport);
+  if(hash(fs.readFileSync(a.transport))!==a.transportSha256)throw Error('transport hash mismatch '+a.transport);
+  if(a.byteExact&&a.sourceSha256!==a.transportSha256)throw Error('false byteExact '+a.transport);
+  unique.add(a.transport);
+ }
+ records.push({manifest:p,sha256:hash(fs.readFileSync(p)),artifacts:m.artifacts.length});
+}
+const pointerPath=prefix+'delivery-status-current.json',pointer=JSON.parse(fs.readFileSync(pointerPath));
+let next=pointer.snapshot,wanted=pointer.sha256,cuts=0;
+while(next) {
+ if(!tracked.has(next)||hash(fs.readFileSync(next))!==wanted)throw Error('snapshot chain mismatch '+next);
+ const snapshot=JSON.parse(fs.readFileSync(next));cuts++;
+ next=snapshot.previous?.path;wanted=snapshot.previous?.sha256;
+}
+const snapshot=JSON.parse(fs.readFileSync(pointer.snapshot));
+const scratch=[];
+function inspect(v) {if(typeof v==='string'&&v.startsWith('scratch/'))scratch.push(v);else if(Array.isArray(v))v.forEach(inspect);else if(v&&typeof v==='object')Object.values(v).forEach(inspect);}
+inspect(snapshot);if(scratch.length)throw Error('current snapshot Scratch dependency '+scratch[0]);
+const docs=['docs/state.md','specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md',prefix+'delivery-status-current.md',...manifests.map(p=>path.dirname(p)+'/README.md'),prefix+'pc-transfer-portability-audit-2026-10-25/README.md'];
+let links=0;
+for(const p of docs) {
+ if(!tracked.has(p))throw Error('handover not staged/tracked '+p);
+ for(const m of fs.readFileSync(p,'utf8').matchAll(/\]\(([^)]+)\)/g)) {
+  if(m[1].includes('://')||m[1].startsWith('#'))continue;
+  const target=path.normalize(path.join(path.dirname(p),m[1].split('#')[0]));
+  if(!tracked.has(target))throw Error('handover link not tracked '+p+' -> '+target);
+  links++;
+ }
+}
+const ignored=cp.execFileSync('git',['ls-files','--others','--ignored','--exclude-standard','-z','--',prefix],{encoding:'utf8',maxBuffer:32*1024*1024}).split('\0').filter(Boolean);
+if(ignored.length)throw Error('ignored Evidence files remain '+ignored.length);
+const result={schema:'pipeline.final-transfer-portability-validation.v1',basis:'index membership and actual file bytes before final commit; production unchanged',manifests:records,artifactRecords:records.reduce((n,x)=>n+x.artifacts,0),uniqueTransports:unique.size,immutableSnapshots:cuts,currentSnapshot:pointer.snapshot,currentSnapshotSha256:pointer.sha256,matrix:pointer.counts,currentSnapshotStructuredScratchDependencies:0,activeHandoverLinksChecked:links,ignoredEvidenceFiles:0};
+fs.writeFileSync(prefix+'pc-transfer-portability-audit-2026-10-25/final-validation.json',JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result,null,2));

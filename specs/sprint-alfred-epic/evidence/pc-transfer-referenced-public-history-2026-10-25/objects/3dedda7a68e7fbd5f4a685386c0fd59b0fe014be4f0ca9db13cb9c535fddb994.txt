@@ -1,0 +1,22 @@
+{
+  "schema": "scratch.dwp-ordering-reproduction.v1",
+  "observedAt": "2026-09-28T20:21:03.927Z",
+  "candidate": {
+    "commit": "e919762225c317ececc6e83065850f37c282ca0b",
+    "tree": "179e38c4b1a94288fe9f2c693293e249df163b5b"
+  },
+  "approvalIntentSha256": "cd995efd4c38670b39aa2208eeb9170716cd6d54c38eec4d365f82af2d940947",
+  "sameCanonicalBytes": true,
+  "canonicalRequestSha256": "719e8af8d1414d8a1ef81a066b797db646b9b4e94e3c3646101c7071864c6980",
+  "original": {
+    "ok": true,
+    "code": null
+  },
+  "reordered": {
+    "ok": false,
+    "code": "DWP-APPROVAL-INTENT-DRIFT"
+  },
+  "signingCalls": 0,
+  "providerCalls": 0,
+  "sourceWrites": 0
+}

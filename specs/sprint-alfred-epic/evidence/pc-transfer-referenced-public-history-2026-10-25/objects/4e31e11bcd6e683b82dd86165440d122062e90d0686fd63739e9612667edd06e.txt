@@ -1,0 +1,116 @@
+{
+  "schema": "pipeline.architecture-review-proposal.v1",
+  "taskId": "g13-architecture-decision-proposal-20260929",
+  "scopeApproved": false,
+  "decisionStatus": "proposed",
+  "SourceDelivered": false,
+  "testsExecuted": 0,
+  "scannerVersionProviderModelProbes": 0,
+  "signableIntentCreated": false,
+  "publicPreimages": [
+    {
+      "path": "docs/adr/0032-project-doc-structure.md",
+      "actualSha256": "25363237ff37a423a873815cac1d758469a3b6d263d43ec283bc7f095e276e2d"
+    },
+    {
+      "path": "docs/adr/0044-control-execution-boundary.md",
+      "actualSha256": "c8d953059ca752ead89ecf3760f03f8bba09997ca4d0212ff10713a841fcb4d5"
+    },
+    {
+      "path": "docs/adr/0045-canonical-artifact-topology.md",
+      "actualSha256": "74dad6a8dd38b71f3706024b2ee10abfa5fb40767d5aced20fc699e8037fbf4c"
+    },
+    {
+      "path": "docs/adr/0084-ci-failure-reporter-public-log-boundary.md",
+      "actualSha256": "ae052ac9cfb14aa46168fa23cf98f97aaf527b3c0caad14ec59aca61fa7be420"
+    },
+    {
+      "path": "schemas/pipeline.architecture-decision.v1.json",
+      "actualSha256": "29f0f8da63c830a198b368d75c7aedbd8ed35662345cfba656d5192388ef2b97"
+    },
+    {
+      "path": "project/architecture-decisions.compiled.json",
+      "actualSha256": "74a92f967e10620570d3f40b77b95341d409cb4b50c5009ec34192de4de44e2c"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "actualSha256": "84695a1b6bd8e6b70b0ac46601f026828c85e54b07c318ea0fde58e4cd87be12"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/semgrep.mjs",
+      "actualSha256": "dca494dfdbf98ce1c94771b16240bbe9ca9f8608c60407068075ca5ff6f573e1"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
+      "actualSha256": "99a88b6b4feaa77fc57abffaef42f65fee4b1a704cf693fa744a0216fa626112"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "actualSha256": "e02f7b2265bf4e92060a19e3feb50378f586cab8da74f8d64b2b90d2467605c6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-completeness-gate.mjs",
+      "actualSha256": "8e8521764fa6856f819918b8a38a84658eff372cf7a4f5a33cb92dd0a1dd7c1e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+      "actualSha256": "5d17f2ac722f367935a17688842d0f08633cadfe816eadae6c8fe1d70d29652a"
+    },
+    {
+      "path": "specs/2026-07-24-sprint-cyborg-epic/cyb-1f-schema-boundary-draft.md",
+      "actualSha256": "005021353d2a78ea1768f1d7f817f951b85349d574ae5e9d2efa37c69426a59d"
+    }
+  ],
+  "immutableParentArtifacts": [
+    {
+      "path": "manifest.json",
+      "sha256": "cc15f33d64ef82cc8a561dcdece2624ff2b07dd32032e4bb33fec3878cf7094c"
+    },
+    {
+      "path": "report.md",
+      "sha256": "b6775614383174a6e12bca7a52b29b201da91059676c85a6ea4843387d232fb8"
+    },
+    {
+      "path": "proposal.patch",
+      "sha256": "969e97ee410a1d215e28310b76161293c3ed7405fddcbe2436794b191f956c75"
+    },
+    {
+      "path": "inverse.patch",
+      "sha256": "69f2916ed1b6b27a6dbf7f3b89b75c448a2aa147b0b339568a36119448c053be"
+    }
+  ],
+  "intendedArtifactsOnly": [
+    "po-review.md",
+    "storage-and-privacy-contract.md",
+    "draft-g13-scanner-diagnostics.md",
+    "pipeline.security-scanner-diagnostics.v1.schema.proposed.json",
+    "draft-g13-scanner-diagnostics.json",
+    "prepare.py"
+  ],
+  "artifacts": [
+    {
+      "path": "po-review.md",
+      "sha256": "9374e1dcf6ecf3ca5690d1aea78658ac1ae48b6b212f7f0f42557017da9a3504"
+    },
+    {
+      "path": "storage-and-privacy-contract.md",
+      "sha256": "041c4454203e2cdda9840109e4a4e1438bee3cfbb37430ec2df70f6606d6e5d4"
+    },
+    {
+      "path": "draft-g13-scanner-diagnostics.md",
+      "sha256": "3f133000f54b0522230edb3d688cf38ee9d09c2ea48bde27e84270a284cfb634"
+    },
+    {
+      "path": "pipeline.security-scanner-diagnostics.v1.schema.proposed.json",
+      "sha256": "3832223d1d160b631ae4f0edd9dcddd73a5bfdc4b5e6f59ac28e808a90485a34"
+    },
+    {
+      "path": "draft-g13-scanner-diagnostics.json",
+      "sha256": "10a235a637894e22caac8445f98f4ce4086f2f5a665c895339e89474b0a69daf"
+    },
+    {
+      "path": "prepare.py",
+      "sha256": "1e315c2e6362c0b96a52b841dae215020ebc32c89431363d569ed7410cfc6128"
+    }
+  ]
+}

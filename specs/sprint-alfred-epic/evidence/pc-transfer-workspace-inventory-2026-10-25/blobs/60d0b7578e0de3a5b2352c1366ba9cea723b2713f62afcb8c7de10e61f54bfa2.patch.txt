@@ -1,0 +1,30 @@
+diff --git a/GEMINI.md b/GEMINI.md
+index 725c7d185..874018061 100644
+--- a/GEMINI.md
++++ b/GEMINI.md
+@@ -22,10 +22,11 @@ bypass to obtain the readback. The per-platform pre-launch check is in the
+ [Antigravity (Agy) procedure](SETUP.md#antigravity-agy-workspace-local-binding),
+ where "Agy" is defined.
+ 
+-### Antigravity Installation (Workspace-Local)
++### Antigravity Installation (Global)
+ 
+-The installer offers a workspace registration (this procedure) and a global
+-option; the global route and what it writes are in
++The documented default is the installer's global topology refresh; a
++workspace registration is the alternative and needs the plugin directory inside
++the project. What each choice writes and which refusals apply are in
+ [Choosing where to bind](SETUP.md#antigravity-agy-workspace-local-binding).
+ From the project root:
+ 
+@@ -38,7 +39,9 @@ From the project root:
+    node "/absolute/path/to/approved-agent-pipeline/plugins/pipeline-core/install-agy.mjs"
+    ```
+    Select **Approved Plugin Directory** (the default), then
+-   **Workspace-Local** to register the plugin in `.agents/plugins.json`.
++   **Global topology refresh**. Choose **Workspace-Local** only when the
++   plugin directory lies inside the project; a directory outside it is
++   refused (`ATR-WORKSPACE-SOURCE-OUTSIDE`).
+ 
+    The installer also offers an optional autonomous tool policy. If selected,
+    it writes `.agents/settings.json`; this runner-local option does not grant

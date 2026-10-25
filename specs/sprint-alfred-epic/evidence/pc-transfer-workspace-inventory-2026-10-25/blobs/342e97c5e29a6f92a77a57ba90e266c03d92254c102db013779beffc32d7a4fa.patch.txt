@@ -1,0 +1,133 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 4435e490e..f27684159 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -238,24 +238,6 @@
+         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-integration-tests",
+         "verify-phase:harness/scripts/verify.mjs:antigravity-topology-refresh-host-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-orientation-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-baseline-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-boundary-check-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-decision-continuity-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-decision-waiver-store-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-design-test-fixture-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-design-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-effective-decisions-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-entry-readiness-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-entry-required-source-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-inherited-sources-cli-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-map-scaffold-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-prospective-companion-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-prospective-materialization-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-push-currency-tests",
+-        "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+@@ -3331,6 +3313,88 @@
+       ],
+       "configurationPath": "none",
+       "specializedOnlyReason": null
++    },
++    {
++      "id": "architecture-adoption-and-fitness",
++      "publicName": "Architecture adoption and fitness",
++      "problem": "An existing repository needs a bounded, owner-decided way to assess and adopt architecture maps, baselines, and fitness checks without a rewrite.",
++      "benefit": "Read-only status and proposal commands, a request-bound adoption decision, and baseline and fitness checks that fail closed when the decision is absent, expired, malformed, or out of scope.",
++      "status": "optional",
++      "surfaceIds": [
++        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-orientation-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-adoption-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-baseline-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-boundary-check-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-decision-continuity-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-decision-waiver-store-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-design-test-fixture-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-design-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-effective-decisions-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-entry-readiness-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-entry-required-source-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-fitness-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-inherited-sources-cli-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-map-scaffold-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-prospective-companion-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-prospective-materialization-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-push-currency-tests",
++        "verify-phase:harness/scripts/verify.mjs:architecture-remedy-tests"
++      ],
++      "runners": [
++        "runner-neutral"
++      ],
++      "runnerDispositions": {
++        "claude": {
++          "status": "host-dependent",
++          "reasonCode": "runner-evidence-pending"
++        },
++        "codex": {
++          "status": "host-dependent",
++          "reasonCode": "runner-evidence-pending"
++        },
++        "antigravity": {
++          "status": "host-dependent",
++          "reasonCode": "runner-evidence-pending"
++        }
++      },
++      "platforms": [
++        "all"
++      ],
++      "operatingShapes": [
++        "multi-team",
++        "small-team",
++        "solo"
++      ],
++      "prerequisites": [
++        "explicit adopter decision",
++        "pipeline-core plugin"
++      ],
++      "productionEvidence": [
++        "plugins/pipeline-core/scripts/architecture-adoption.mjs",
++        "plugins/pipeline-core/scripts/architecture-baseline.mjs",
++        "plugins/pipeline-core/scripts/architecture-boundary-check.mjs",
++        "plugins/pipeline-core/scripts/architecture-effective-decisions.mjs",
++        "plugins/pipeline-core/scripts/architecture-fitness.mjs",
++        "plugins/pipeline-core/scripts/architecture-inherited-sources.mjs",
++        "plugins/pipeline-core/scripts/architecture-remedy.mjs"
++      ],
++      "testEvidence": [
++        "plugins/pipeline-core/scripts/architecture-adoption.test.mjs",
++        "plugins/pipeline-core/scripts/architecture-baseline.test.mjs",
++        "plugins/pipeline-core/scripts/architecture-boundary-check.test.mjs",
++        "plugins/pipeline-core/scripts/architecture-fitness.test.mjs",
++        "plugins/pipeline-core/scripts/architecture-inherited-sources.test.mjs",
++        "plugins/pipeline-core/scripts/architecture-remedy.test.mjs"
++      ],
++      "targets": [
++        {
++          "document": "README",
++          "anchorId": "capability-architecture-adoption-and-fitness",
++          "status": "pending"
++        }
++      ],
++      "configurationPath": "none",
++      "specializedOnlyReason": null
+     }
+   ]
+ }
+diff --git a/harness/scripts/check-observation-governance.test.mjs b/harness/scripts/check-observation-governance.test.mjs
+index dc74981ac..af988ad99 100644
+--- a/harness/scripts/check-observation-governance.test.mjs
++++ b/harness/scripts/check-observation-governance.test.mjs
+@@ -50,7 +50,9 @@ test("provisional Observation 13 scope keeps audience and lifecycle independent"
+     ["docs/runtime-boundary.md", { audience: "public-user", lifecycle: "maintained" }],
+   ]);
+   for (const [path, value] of expected) assert.deepEqual(classification(document, path), value);
+-  assert.deepEqual(classification(document, "docs/overview.md"), { audience: "public-user", lifecycle: "compatibility-redirect" });
++  assert.deepEqual(classification(document, "docs/overview.md"), { audience: "public-user", lifecycle: "maintained" });
++  // PO decision 2026-10-23 (batch 12), Reader findings 57/41: usage, overview and migration are canonical, not redirects.
++  for (const path of ["docs/usage.md", "docs/migration.md"]) assert.deepEqual(classification(document, path), { audience: "public-user", lifecycle: "maintained" });
+   assert.deepEqual(classification(document, "docs/adr/0011-language-policy.md"), { audience: "maintainer", lifecycle: "normative-record" });
+ });
+ 

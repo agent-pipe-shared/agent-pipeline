@@ -1,0 +1,12 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-fv.md` and the files named in them are your ONLY input. Read the common file first. Clone name: `k145`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261023185750.bd9ee06 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K145-FV-HOST-SUITES-RACE/2026-10-23 · Role Goldfish`
+
+## K145-FV-HOST-SUITES-RACE: three host suites and the address-root race
+
+### 1. Goal
+ 1. `codex-critic-host-tests`, `po-human-approval-tests`, `codex-design-advisor-host-tests`: red alone, cause not isolated by the classification (its table gives the failing assertion and location). For each: read the failing case with its full message, compare fixture and code, decide product defect, stale fixture or environment effect of the private-HOME runner (name the missing precondition exactly), fix or restate accordingly. They may share a cause (for example the K127 identity exemption, the K128 receipt field, the K98 refusal texts, or a pinned plugin path); check for a shared cause first.
+ 2. The address-root race: `prepareAddressRoot` in `plugins/pipeline-core/lib/session-power.mjs` (about line 369) fails with `SessionPowerError: fixed address namespace changed` when processes share one HOME (seen in `native-goldfish-host-state-tests` and `native-goldfish-host-finalizer-tests` in the first classification run, green alone). Establish the mechanism (who changes the namespace between the check and the use; is it a TOCTOU between two concurrent callers, or the D71/D72 address-root repair moving slots aside while another process prepares?), write a reproduction with two concurrent processes on one private HOME (RED pin in an already registered session-power suite), and fix it in the narrowest correct way (the file is probably protected; deliver a protected diff). The repair verb of D71/D72 (`session-power-address-repair.mjs`, `scripts/run-quiet.mjs` calls it after each suite) is a suspect: check whether it races with a running suite; do not weaken the namespace check itself.
+
+### 2. Task id
+TASK_ID: K145-FV-HOST-SUITES-RACE.

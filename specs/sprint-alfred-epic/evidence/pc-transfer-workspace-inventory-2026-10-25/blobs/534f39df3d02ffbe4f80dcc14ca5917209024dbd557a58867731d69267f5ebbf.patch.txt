@@ -1,0 +1,770 @@
+diff --git a/harness/scripts/architecture-entry-required-source.test.mjs b/harness/scripts/architecture-entry-required-source.test.mjs
+index 61f04c2d2..a0b560e54 100644
+--- a/harness/scripts/architecture-entry-required-source.test.mjs
++++ b/harness/scripts/architecture-entry-required-source.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { registerTestCaseCompletion } from "../../plugins/pipeline-core/lib/test-case-completion.mjs";
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+diff --git a/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs b/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs
+index a7d9fdfe4..03742e8b7 100644
+--- a/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs
++++ b/plugins/pipeline-core/lib/afk-isolated-repository-custody.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Physical custody for Source-created, disposable AFK method repositories.
+ // This module grants no requester, operation, member, State, METHOD, or approval authority.
+ import { spawnSync } from "node:child_process";
+diff --git a/plugins/pipeline-core/lib/afk-ledger.mjs b/plugins/pipeline-core/lib/afk-ledger.mjs
+index bd10d1c81..2a63b62e0 100644
+--- a/plugins/pipeline-core/lib/afk-ledger.mjs
++++ b/plugins/pipeline-core/lib/afk-ledger.mjs
+@@ -1,9 +1,9 @@
++// SPDX-License-Identifier: SUL-1.0
+ 
+ import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+ import {readSourceOwnedOnboardingAfkAdmission} from './onboarding-continuity.mjs';
+ import {isCurrentSourceOwnedAfkProjectionAttempt,executeSourceOwnedAfkHostEffect,settleSourceOwnedAfkHostProjection,isSettledSourceOwnedAfkProjectionResult} from './afk-transaction-host.mjs';
+ import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ import { randomBytes } from "node:crypto";
+ import {
+   chmodSync,
+diff --git a/plugins/pipeline-core/lib/afk-transaction-host.mjs b/plugins/pipeline-core/lib/afk-transaction-host.mjs
+index b59b8ae60..d0b640d2d 100644
+--- a/plugins/pipeline-core/lib/afk-transaction-host.mjs
++++ b/plugins/pipeline-core/lib/afk-transaction-host.mjs
+@@ -1,9 +1,9 @@
++// SPDX-License-Identifier: SUL-1.0
+ import {authorityRepositoryFromRoot} from './session-authority-domain-owner.mjs';
+ import {withAfkAuthorityLifetime,executeSourceOwnedAfkProjectionLifetime,readSourceOwnedAfkProjectionPhysicalSnapshot} from './afk-ledger.mjs';
+ import {AsyncLocalStorage} from 'node:async_hooks';
+ import {readAuthoritySourceFile} from './session-authority-domain-owner.mjs';
+ import {readSourceOwnedOnboardingAfkAdmission,settleSourceOwnedOnboardingAfkProjection,observeSourceOwnedControlledMethodAfkHostCheckpoint} from './onboarding-continuity.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ import { hostname } from "node:os";
+ import { execFileSync } from "node:child_process";
+ import { readFileSync, realpathSync } from "node:fs";
+diff --git a/plugins/pipeline-core/lib/codex-host-process-journal.mjs b/plugins/pipeline-core/lib/codex-host-process-journal.mjs
+index b6cdfe525..9bbdf556d 100644
+--- a/plugins/pipeline-core/lib/codex-host-process-journal.mjs
++++ b/plugins/pipeline-core/lib/codex-host-process-journal.mjs
+@@ -1,8 +1,8 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation, nativeManagedPostTerminalRecord } from './native-managed-authority-support.mjs';
+ import { withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord } from './session-authority-registry.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { inspectManagedCodexAuthorityTerminal, readManagedCodexTerminalJournal } from './codex-host-process-supervisor.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ // Linux process journal for owned Codex readiness sessions.
+ import { createHash, randomBytes } from 'node:crypto';
+ import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync,
+diff --git a/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs b/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs
+index 1f17ebf2e..cb77a85e3 100644
+--- a/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs
++++ b/plugins/pipeline-core/lib/codex-host-process-supervisor.mjs
+@@ -1,9 +1,9 @@
++// SPDX-License-Identifier: SUL-1.0
+ import {observeNativePlatformProcess} from './native-platform-process-observer.mjs';
+ import { nativeManagedRepository } from './native-managed-authority-support.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { observeManagedCodexAuthorityRunning, completeManagedCodexAuthority } from './codex-host-process-journal.mjs';
+ import { createManagedCodexRequesterRuntime } from './session-requester-bridge.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ // Owned POSIX process supervision; final receipts belong to readiness composition.
+ import { spawn } from 'node:child_process';
+ import { readFileSync, realpathSync } from 'node:fs';
+diff --git a/plugins/pipeline-core/lib/continuity-authority-drift.mjs b/plugins/pipeline-core/lib/continuity-authority-drift.mjs
+index 73c678921..8064d64b1 100644
+--- a/plugins/pipeline-core/lib/continuity-authority-drift.mjs
++++ b/plugins/pipeline-core/lib/continuity-authority-drift.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Pure projection of PRD/Spec digest drift against a continuity object's recorded authority.
+  * No filesystem access: the caller supplies observeSha256(repoRelativePath), which returns a
+diff --git a/plugins/pipeline-core/lib/continuity-authority-drift.test.mjs b/plugins/pipeline-core/lib/continuity-authority-drift.test.mjs
+index cbaf4e080..202e7889d 100644
+--- a/plugins/pipeline-core/lib/continuity-authority-drift.test.mjs
++++ b/plugins/pipeline-core/lib/continuity-authority-drift.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * RED pins for R6-2 (AC-31): continuity PRD/Spec digest drift, pure projection half.
+  * Task R6-T0a-20261008 (test-only, QG-04). Design note:
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 802120f17..902d710bb 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+ import {registerTestCaseCompletion} from "./test-case-completion.mjs";
+ import {spawnSync} from "node:child_process";
+diff --git a/plugins/pipeline-core/lib/critic-lane-fallback.mjs b/plugins/pipeline-core/lib/critic-lane-fallback.mjs
+index 0982032a4..5b31652eb 100644
+--- a/plugins/pipeline-core/lib/critic-lane-fallback.mjs
++++ b/plugins/pipeline-core/lib/critic-lane-fallback.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Codex Critic lane fallback decision (design note
+ // specs/sprint-alfred-epic/design/codex-critic-lane-2026-10-08.md section 4).
+ // Pure: no I/O. N1 = B (the receipt carries only digests of the native lane
+diff --git a/plugins/pipeline-core/lib/critic-lane-fallback.test.mjs b/plugins/pipeline-core/lib/critic-lane-fallback.test.mjs
+index 372971f5d..1a4211f6c 100644
+--- a/plugins/pipeline-core/lib/critic-lane-fallback.test.mjs
++++ b/plugins/pipeline-core/lib/critic-lane-fallback.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Slice AL-T: pins for the Codex Critic lane fallback decision (design note
+ // specs/sprint-alfred-epic/design/codex-critic-lane-2026-10-08.md section 4).
+ // Fixture-only: no runner is launched; preflight/scratch/readback are injected spies.
+diff --git a/plugins/pipeline-core/lib/fs-durability.mjs b/plugins/pipeline-core/lib/fs-durability.mjs
+index 98fde53f2..58fb452d0 100644
+--- a/plugins/pipeline-core/lib/fs-durability.mjs
++++ b/plugins/pipeline-core/lib/fs-durability.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import nodeFs from "node:fs";
+ 
+ const WIN32_UNSUPPORTED = new Set(["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"]);
+diff --git a/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs b/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs
+index 9a2abe0a9..b94acda5d 100644
+--- a/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs
++++ b/plugins/pipeline-core/lib/legacy-owner-custody-archive.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // RV-4 pins (Spec 20.3, "RV-4", spec.md 1207-1211; design note
+ // specs/sprint-alfred-epic/design/recovery-availability-rv-2026-10-08.md, slice
+ // S5 "RV-4 replay/archive"): a valid matching receipt keeps its exact bytes and
+@@ -71,7 +72,6 @@ const RV4_CODES = Object.freeze({
+   targetUnsafe: "LOC-TARGET-UNSAFE",
+   receiptAmbiguous: "LOC-RECEIPT-AMBIGUOUS",
+ });
+-
+ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import {
+diff --git a/plugins/pipeline-core/lib/legacy-owner-custody.mjs b/plugins/pipeline-core/lib/legacy-owner-custody.mjs
+index 5da0a0e3d..75f0850dd 100644
+--- a/plugins/pipeline-core/lib/legacy-owner-custody.mjs
++++ b/plugins/pipeline-core/lib/legacy-owner-custody.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // RV-2 (specs/sprint-alfred-epic/spec.md lines 1201-1203): CAS-conflict
+ // classification of a legacy session-cleanup receipt. classifyLegacyReceipt()
+ // is classify-only and read-only: it never creates, writes, renames or deletes
+diff --git a/plugins/pipeline-core/lib/legacy-owner-custody.test.mjs b/plugins/pipeline-core/lib/legacy-owner-custody.test.mjs
+index 3cb60c057..26d61710f 100644
+--- a/plugins/pipeline-core/lib/legacy-owner-custody.test.mjs
++++ b/plugins/pipeline-core/lib/legacy-owner-custody.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // RV-2 pins (Spec 20.3, "RV-2"): CAS-conflict classification of a legacy
+ // session-cleanup receipt requires matching bounded status/schema/digest AND
+ // matching compare flags; a mismatch or an ambiguity preserves the bytes and
+diff --git a/plugins/pipeline-core/lib/local-worker-supervisor.mjs b/plugins/pipeline-core/lib/local-worker-supervisor.mjs
+index 2f5684569..5e82f0137 100644
+--- a/plugins/pipeline-core/lib/local-worker-supervisor.mjs
++++ b/plugins/pipeline-core/lib/local-worker-supervisor.mjs
+@@ -1,7 +1,7 @@
++// SPDX-License-Identifier: SUL-1.0
+ 
+ import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+ import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Functional Nova B1-I same-host worker supervisor.
+  *
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.mjs b/plugins/pipeline-core/lib/model-family-host-store.mjs
+index 9a911c7f3..2e1f2b50a 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.mjs
+@@ -1,7 +1,7 @@
++// SPDX-License-Identifier: SUL-1.0
+ 
+ import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+ import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest, createControlledDomainTransitionObservation, beginControlledDomainTransitionObservation, finishControlledDomainTransitionObservation, readControlledDomainTransitionObservation} from './session-authority-domain-owner.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Inert private host store/controller for model-family invocations.
+  *
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 6a08a348c..542602eac 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { withSourceOwnedNativeConcurrentCommit, NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE, nativeGoldfishHostStateInternals } from "./native-goldfish-host-state.mjs";
+ import { validateNativeGoldfishFinal } from "./native-goldfish-host-return.mjs";
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+@@ -6,7 +7,6 @@ import { completeNativeGoldfishAuthority, prepareNativeGoldfishAuthorityTerminal
+ import { readNativeGoldfishHostObservation } from './native-goldfish-host-observation.mjs';
+ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, writeSync, fsyncSync, readdirSync } from 'node:fs';
+ import { parseStrictJson } from './governance-event.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
+ import { realpathSync } from "node:fs";
+ import { resolve, dirname, isAbsolute, join } from "node:path";
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index db61b4478..2b19cf82c 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1,9 +1,9 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
+ import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ /** Private runner-hook correlation state for native Goldfish host commits. */
+ import { createHash } from "node:crypto";
+ import { randomBytes } from "node:crypto";
+diff --git a/plugins/pipeline-core/lib/native-managed-authority-support.mjs b/plugins/pipeline-core/lib/native-managed-authority-support.mjs
+index 55061278b..f27df85a8 100644
+--- a/plugins/pipeline-core/lib/native-managed-authority-support.mjs
++++ b/plugins/pipeline-core/lib/native-managed-authority-support.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Domain-specific physical source adapters. No handles or authority callbacks are minted here.
+ import { createHash } from 'node:crypto';
+ import { existsSync, lstatSync, realpathSync } from 'node:fs';
+diff --git a/plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs b/plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs
+index 1117866d8..7ac478bee 100644
+--- a/plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-managed-copy-first-start-lacks-attestation.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin: pipeline.agy-managed-copy-first-start-lacks-attestation (AC-111, slice ALF-C-P18-02).
+ // Qualifies the original acceptance of backlog item 2026-09-29 against the real installer,
+ // refresh host and preflight. Only documented injection seams are used (observeSource,
+diff --git a/plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs b/plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs
+index c7403246d..9a9cda5a4 100644
+--- a/plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs
++++ b/plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin: pipeline.capture-evidence-does-not-normalize-windows-npm-launch (AC-122, ALF-C-P7-06).
+ //
+ // The original item body is not public (portable-original-requirements.json: association
+diff --git a/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs b/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
+index 41c61fd8d..59a63a528 100644
+--- a/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
++++ b/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Regression pin: pipeline.codex-bootstrap-in-the-typed-next-action (AC-131).
+ //
+ // The original item is deliberately conditional: "After verifying the premise, include the design-readiness
+diff --git a/plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs b/plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs
+index 595964419..6bc3cf343 100644
+--- a/plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs
++++ b/plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import test from 'node:test';
+ import assert from 'node:assert/strict';
+ import { createHash } from 'node:crypto';
+diff --git a/plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs b/plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs
+index cf7617d26..5467cacf3 100644
+--- a/plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs
++++ b/plugins/pipeline-core/lib/pins/git-push-classifier-misses-env-s-and-editor-bang.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin for backlog 2026-10-08-git-push-classifier-misses-env-s-and-editor-bang (AC-180).
+ // Acceptance: `commandIsGitPush` refuses (classifies as a push) both
+ //   - `env -S 'git push origin main'`
+diff --git a/plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs b/plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs
+index a412d42c4..d81a4acc4 100644
+--- a/plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs
++++ b/plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Pin: the Goldfish BUGFIX template module must not conflict with QG-04 (AC-186).
+  * Item: pipeline.goldfish-bugfix-module-conflicts-with-qg-04.
+diff --git a/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs b/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs
+index ea223ad2d..9d2ffdf10 100644
+--- a/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Pin: Goldfish briefs carry targeted and quick command routes (AC-187).
+  * Item: pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes.
+diff --git a/plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs b/plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs
+index 21548d737..049aa94ce 100644
+--- a/plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs
++++ b/plugins/pipeline-core/lib/pins/heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Regression pin: ALF-C-P7-03 / AC-199
+ // Item: pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier (PO decision AF).
+ // Acceptance: a heredoc / here-string received by a command RUNNER (xargs, at, batch, ed, ex, sqlite3, php, lua,
+diff --git a/plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs b/plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs
+index cecf5e8fd..a56502f81 100644
+--- a/plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs
++++ b/plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // ALF-C-P14-01 / AC-203: host crash during Verify leaves a descriptor that no recovery verb can clear.
+ // Pins the recovery routes for an orphaned descriptor whose owner is unobservable (ownerPid -1 =>
+ // status `unavailable`): a zero-authority one is archived by the typed verb; a resource-bearing one
+diff --git a/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs b/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs
+index 318b15760..5c7dfa390 100644
+--- a/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs
++++ b/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin for pipeline.opus-critic-only-batched-for-architecture-and-security (AC-222).
+ // Reads the real canon/route files and calls the real dispatch-policy module; no mocks.
+ //
+diff --git a/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs b/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
+index b33441cf0..26aa311fa 100644
+--- a/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
++++ b/plugins/pipeline-core/lib/pins/orphan-descriptor-recovery-never-offers-the-running-session.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // ALF-C-ORPHAN-DESCRIPTOR3 / AC-203 (PO decision 2026-10-17): session-cleanup must never offer or archive
+ // the RUNNING session's own descriptor. The Claude hook creates that descriptor as `claude-<id>` with a null
+ // owner runtime, so its owner status is `unavailable` and, without an identity check, it is indistinguishable
+diff --git a/plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs b/plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs
+index a6bb63eeb..e6b6c5d1d 100644
+--- a/plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/push-classifier-does-not-model-powershell-backtick-escapes.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin for backlog item pipeline.push-classifier-does-not-model-powershell-backtick-escapes (AC-236, ALF-C-P4-02).
+ //
+ // Acceptance (item Proposal): on the PowerShell lane a backtick escapes the next character, a here-string is one span
+diff --git a/plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs b/plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs
+index ac296b80f..cc7f31443 100644
+--- a/plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/push-classifier-misreads-backslash-escaped-quotes.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin: pipeline.push-classifier-misreads-backslash-escaped-quotes (AC-237, ALF-C-P4-03).
+ // Acceptance points (backlog item Proposal): fail closed on a backslash-escaped quote beside a git word, with
+ // GL-B13, the plain echo-wrapped shape and the quoted-executable shape pinned as classified pushes; harmless
+diff --git a/plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs b/plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs
+index f9d234901..70d5c7589 100644
+--- a/plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs
++++ b/plugins/pipeline-core/lib/pins/push-classifier-misses-nested-quotes-and-redirect-before-push.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin: pipeline.push-classifier-misses-nested-quotes-and-redirect-before-push (ALF-C-P4-04, AC-238).
+ // Exercises the real `commandIsGitPush` (the shared classifier behind guard-push and the Codex pretool route).
+ // Acceptance points (backlog item Description/Proposal):
+diff --git a/plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs b/plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs
+index 838ba55ce..c4deb74c7 100644
+--- a/plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs
++++ b/plugins/pipeline-core/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Regression pin for backlog item pipeline.scratch-has-no-retention-and-no-durability-check
+  * (Alfred AC-246). Two original acceptance points:
+diff --git a/plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs b/plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs
+index eab94fd3a..a6bbd0f04 100644
+--- a/plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs
++++ b/plugins/pipeline-core/lib/pins/semgrep-offline-default-version-check.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Regression pin: pipeline.semgrep-offline-default-version-check (AC-251).
+ // The Semgrep adapter must force SEMGREP_ENABLE_VERSION_CHECK=0 AFTER the caller/process
+ // environment merge, so an offline local-rules scan never blocks on the version check, while
+diff --git a/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs b/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs
+index 95b0a646b..d2a86f716 100644
+--- a/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Pin for pipeline.sign-intent-disclosure-scan-blocks-for-minutes (AC-257).
+ // Proposal points: (1) signed quality package disclosed directly, before the GMW/HGO resolvers;
+ // (2) HGO lookup digest-keyed, never a store scan; (3) readiness before any resolver work;
+diff --git a/plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs b/plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs
+index 8294f95c7..953dc2313 100644
+--- a/plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs
++++ b/plugins/pipeline-core/lib/pins/vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Regression pin (ALF-C-P4-05, AC-268): vim/vi/ex ex-mode and busybox shell applets fed a here-document are NOT data to the
+ // push classifier. Backlog item:
+ // backlog/items/2026-10-07-vim-es-and-busybox-heredoc-runners-are-data-to-the-push-classifier.md
+diff --git a/plugins/pipeline-core/lib/recovery-refusal-registry.mjs b/plugins/pipeline-core/lib/recovery-refusal-registry.mjs
+index 54ff6ca81..152abd62a 100644
+--- a/plugins/pipeline-core/lib/recovery-refusal-registry.mjs
++++ b/plugins/pipeline-core/lib/recovery-refusal-registry.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Recovery refusal registry (RV-7): maps each typed refusal code to what a
+ // recovery caller may do next.
+ //
+diff --git a/plugins/pipeline-core/lib/recovery-refusal-registry.test.mjs b/plugins/pipeline-core/lib/recovery-refusal-registry.test.mjs
+index f2a1af5c2..bd3085a53 100644
+--- a/plugins/pipeline-core/lib/recovery-refusal-registry.test.mjs
++++ b/plugins/pipeline-core/lib/recovery-refusal-registry.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import test from "node:test";
+ import assert from "node:assert/strict";
+ import { readFileSync } from "node:fs";
+diff --git a/plugins/pipeline-core/lib/scratch-package-staging.test.mjs b/plugins/pipeline-core/lib/scratch-package-staging.test.mjs
+index 3e146dc89..4fc7eef33 100644
+--- a/plugins/pipeline-core/lib/scratch-package-staging.test.mjs
++++ b/plugins/pipeline-core/lib/scratch-package-staging.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Root-only substantive controls. Source author has not executed this file.
+ import assert from 'node:assert/strict';
+ import { execFileSync, spawnSync } from 'node:child_process';
+diff --git a/plugins/pipeline-core/lib/scratch-retention.test.mjs b/plugins/pipeline-core/lib/scratch-retention.test.mjs
+index 0cba748d8..6deeb6382 100644
+--- a/plugins/pipeline-core/lib/scratch-retention.test.mjs
++++ b/plugins/pipeline-core/lib/scratch-retention.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Pins the API of `lib/scratch-retention.mjs` (PO decision P, sprint-alfred
+  * slice C-S1): a read-only durability assessment of `scratch/` and a sweep
+diff --git a/plugins/pipeline-core/lib/session-authority-observers.mjs b/plugins/pipeline-core/lib/session-authority-observers.mjs
+index 9733481b8..250fde5ca 100644
+--- a/plugins/pipeline-core/lib/session-authority-observers.mjs
++++ b/plugins/pipeline-core/lib/session-authority-observers.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Source-owned observer assembly. This grants no operation/requester authority.
+ // Resolve factory exports only when called, after cyclic owner modules initialize.
+ import * as onboarding from './onboarding-continuity.mjs';
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index a5fdfd6da..06e8a69f7 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { AsyncLocalStorage } from 'node:async_hooks';
+ import { createHash, randomBytes } from 'node:crypto';
+ import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+@@ -21,7 +22,6 @@ import * as afk from './afk-ledger.mjs';
+ import * as power from './session-power.mjs';
+ import * as worker from './local-worker-supervisor.mjs';
+ import * as windowsAuthority from './windows-owned-authority-backend.mjs';
+-
+ export const SESSION_AUTHORITY_LIMITS = Object.freeze({ maxParticipants:12,maxNamespaceEntries:4096,maxRecordBytes:1048576,maxSourceEntryBytes:1048576,maxJournalEntryBytes:67108864,maxSourceTotalBytes:16777216,maxDirectoryDepth:6,maxModelFamilyReceipts:4096,maxNativePendingBytes:131072,maxNativeRequestBytes:7340032,maxRequesterBindingBytes:16384,maxTransportFrameBytes:16384,transportReadTimeoutMs:2000 });
+ export const SESSION_AUTHORITY_EVENT_STAGES = Object.freeze(['after-reservation-published-before-effects','after-owner-effects-readback','after-terminal-readback-before-release','after-release-published-before-member-update','after-member-release-published']);
+ const KINDS = Object.freeze(['continuity','override','ceremony','dispatch','armed-capability']);
+diff --git a/plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs b/plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs
+index b2bbed113..6312dd080 100644
+--- a/plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs
++++ b/plugins/pipeline-core/lib/session-cleanup-recovery-list-once.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * ALF-C-HK-01D: one planSessionCleanupRecovery call lists the active session
+  * descriptors once, even when the archive offer re-reads them. Fully injected
+diff --git a/plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs b/plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs
+index 40623d371..48eeae876 100644
+--- a/plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs
++++ b/plugins/pipeline-core/lib/session-cleanup-recovery-load-once.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * ALF-C-HK-01F: one planSessionCleanupRecovery call loads each session
+  * descriptor once per distinct argument tuple, even though the retirement,
+diff --git a/plugins/pipeline-core/lib/session-power-address-repair.mjs b/plugins/pipeline-core/lib/session-power-address-repair.mjs
+index 15b443ac0..5b9a6e352 100644
+--- a/plugins/pipeline-core/lib/session-power-address-repair.mjs
++++ b/plugins/pipeline-core/lib/session-power-address-repair.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Typed, plan-bound repair for the per-user session-power address root (PO decisions D71 and D72,
+ // correction cluster K1, AC-203: no dead end in the session-authority domain).
+ //
+diff --git a/plugins/pipeline-core/lib/session-power-address-repair.test.mjs b/plugins/pipeline-core/lib/session-power-address-repair.test.mjs
+index 8c27acb8d..a2e999a4d 100644
+--- a/plugins/pipeline-core/lib/session-power-address-repair.test.mjs
++++ b/plugins/pipeline-core/lib/session-power-address-repair.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // K1 / D71 / D72: the typed repair verb for the session-power address root. Every case uses a private
+ // temporary home passed to the library; nothing here touches the real home or the real address root.
+ // The test never removes anything either: fixtures stay in the runner's private TMPDIR.
+diff --git a/plugins/pipeline-core/lib/session-power.mjs b/plugins/pipeline-core/lib/session-power.mjs
+index 52757ea96..c348c9d00 100644
+--- a/plugins/pipeline-core/lib/session-power.mjs
++++ b/plugins/pipeline-core/lib/session-power.mjs
+@@ -1,8 +1,8 @@
++// SPDX-License-Identifier: SUL-1.0
+ 
+ import {fileURLToPath as authorityFileURLToPath} from 'node:url';
+ import {authorityOwnerFailure, actualAuthorityRepository as authorityActualRepository, authorityRepositoryFromRoot, createDomainAuthorityOwner as authorityCreateDomainOwner, scanAuthorityDomain as authorityScanDomain, classifyAuthorityLifetime as authorityClassifyLifetime, mergeAuthoritySnapshots as authorityMergeSnapshots, readAuthoritySourceFile as authorityReadSource, publishSourceOwnedAuthorityRoot as authorityPublishRoot, authorityDomainDigest as authorityDigest} from './session-authority-domain-owner.mjs';
+ import {inspectOwnedSessionPowerController,readOwnedSessionPowerEndpointSource,registerSessionPowerAuthorityRepository,beginOwnedSessionPowerEndpointClose} from './session-power-owned-lifecycle.mjs';
+-// SPDX-License-Identifier: SUL-1.0
+ 
+ /**
+  * HAW-B's durable, repository-scoped session-power record boundary.
+diff --git a/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs b/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs
+index edcb8bcf6..c7e0e7722 100644
+--- a/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs
++++ b/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Test-only synthetic original chat event; no real human proof is claimed.
+ // Production original-approval producer/observer and physical hashes are used.
+ import assert from 'node:assert/strict';
+diff --git a/plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs b/plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs
+index bbd94c03b..0a791acf2 100644
+--- a/plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs
++++ b/plugins/pipeline-core/lib/windows-private-state-observation-memo.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // ALF-C-LAT-01: the native Windows DACL observation is memoized per process, keyed by exact path
+ // AND lstat identity, never for failures, and never when a test seam (run/environment) is injected.
+ import assert from "node:assert/strict";
+diff --git a/plugins/pipeline-core/scripts/audit-index.mjs b/plugins/pipeline-core/scripts/audit-index.mjs
+index fbed5ac92..9c48d4b8e 100644
+--- a/plugins/pipeline-core/scripts/audit-index.mjs
++++ b/plugins/pipeline-core/scripts/audit-index.mjs
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
+ // Generated audit index: one machine-readable record of the source, commit and
+ // gate digests behind a change, with every step that cannot be evidenced named
+ // explicitly as missing (never silently omitted).
+diff --git a/plugins/pipeline-core/scripts/audit-index.test.mjs b/plugins/pipeline-core/scripts/audit-index.test.mjs
+index 76df88fd6..47602d643 100644
+--- a/plugins/pipeline-core/scripts/audit-index.test.mjs
++++ b/plugins/pipeline-core/scripts/audit-index.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+diff --git a/plugins/pipeline-core/scripts/critic-notes-write.mjs b/plugins/pipeline-core/scripts/critic-notes-write.mjs
+index 7d0e7e465..dbd6ff246 100644
+--- a/plugins/pipeline-core/scripts/critic-notes-write.mjs
++++ b/plugins/pipeline-core/scripts/critic-notes-write.mjs
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
+ // Source-owned, dispatch-bound Critic notes writer (AC-143 / PO decision AC-144 option (a)).
+ //
+ // A Critic has no Write tool outside its notes route and the closed shell grammar admits neither `openssl`
+diff --git a/plugins/pipeline-core/scripts/critic-notes-write.test.mjs b/plugins/pipeline-core/scripts/critic-notes-write.test.mjs
+index 03a704738..b9ea920f5 100644
+--- a/plugins/pipeline-core/scripts/critic-notes-write.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-notes-write.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import test from "node:test";
+ import assert from "node:assert/strict";
+ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync, readdirSync } from "node:fs";
+diff --git a/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/cases.mjs b/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/cases.mjs
+index 9e485bfdd..6a16d263e 100644
+--- a/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/cases.mjs
++++ b/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import { mkdirSync, readFileSync, writeFileSync, lstatSync, realpathSync, readdirSync, chmodSync, unlinkSync, symlinkSync, linkSync } from 'node:fs';
+ import { join, dirname } from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs b/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs
+index c4ef4977a..e33c93f10 100644
+--- a/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs
++++ b/plugins/pipeline-core/scripts/existing-public-anchor-fixtures/stopped-project.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import { mkdirSync, lstatSync, realpathSync, readFileSync, readdirSync } from 'node:fs';
+ import { join, resolve } from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs b/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs
+index 5deb83985..67a5e6612 100644
+--- a/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs
++++ b/plugins/pipeline-core/scripts/existing-public-anchor.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import { after } from 'node:test';
+ import { mkdtempSync, chmodSync, lstatSync, realpathSync, rmSync } from 'node:fs';
+ import { join, dirname, resolve } from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs b/plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs
+index e941d7584..e7ac4ec7a 100644
+--- a/plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs
++++ b/plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Real elapsed-time and real owning-lifetime controls. No clock, transport,
+ // spawn, backend, or authority callback is supplied to product code.
+ import assert from 'node:assert/strict';
+diff --git a/plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs b/plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs
+index 4e1e9607b..8e8015532 100644
+--- a/plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs
++++ b/plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Real subprocess negative controls. This module does not issue an OSV context.
+ // It is evaluated only by Root in a coherent selected Source closure.
+ import assert from 'node:assert/strict';
+diff --git a/plugins/pipeline-core/scripts/osv-owned-file-controls.mjs b/plugins/pipeline-core/scripts/osv-owned-file-controls.mjs
+index 4e4f45400..b345e853c 100644
+--- a/plugins/pipeline-core/scripts/osv-owned-file-controls.mjs
++++ b/plugins/pipeline-core/scripts/osv-owned-file-controls.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import fs from 'node:fs';
+ import path from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/osv-suite-source-controls.mjs b/plugins/pipeline-core/scripts/osv-suite-source-controls.mjs
+index 2cc524763..87fe5dff7 100644
+--- a/plugins/pipeline-core/scripts/osv-suite-source-controls.mjs
++++ b/plugins/pipeline-core/scripts/osv-suite-source-controls.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Test task DATA for the genuine Source-owned authoring producer. These strings
+ // carry no course, identity, registration, requester or verification authority.
+ // Root alone executes a suite after the real production association is issued.
+diff --git a/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs b/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs
+index cd65661cd..8d8ff1b2f 100644
+--- a/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs
++++ b/plugins/pipeline-core/scripts/owning-verification-controller-controls.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Original OSV001–008, prospective executable callbacks. The supplied factory is
+ // ONLY the genuine approved-course fixture constructor selected and pinned by
+ // Root. It is not a Source backend and cannot issue a brand or bypass a check.
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+index 460392a22..b983ed1ea 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-inspect-continuity-drift.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * RED pins for R6-2 (AC-31): the State `inspect` verb reports continuity PRD/Spec digest drift.
+  * Task R6-T0a-20261008 (test-only, QG-04). Design note:
+diff --git a/plugins/pipeline-core/scripts/scratch-sweep.test.mjs b/plugins/pipeline-core/scripts/scratch-sweep.test.mjs
+index bd4486c7c..5873cd854 100644
+--- a/plugins/pipeline-core/scripts/scratch-sweep.test.mjs
++++ b/plugins/pipeline-core/scripts/scratch-sweep.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ /**
+  * Pins the CLI `scripts/scratch-sweep.mjs` (PO decision P, sprint-alfred slice
+  * C-S2): the explicitly invoked front end of `lib/scratch-retention.mjs`
+@@ -45,7 +46,6 @@ import os from 'node:os';
+ import path from 'node:path';
+ import { after, before, describe, test } from 'node:test';
+ import { fileURLToPath, pathToFileURL } from 'node:url';
+-
+ import { assessScratchDurability, planSweep } from '../lib/scratch-retention.mjs';
+ import { privateMkdtemp } from '../lib/test-private-tmp.mjs';
+ 
+diff --git a/plugins/pipeline-core/scripts/session-power-address-repair.mjs b/plugins/pipeline-core/scripts/session-power-address-repair.mjs
+index 54e84a66c..5c23ce93f 100644
+--- a/plugins/pipeline-core/scripts/session-power-address-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-power-address-repair.mjs
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
+ // Repair route for the session-power address root named by the SP-ADDRESS refusal (D71, D72).
+ //
+ //   node <plugin-root>/scripts/session-power-address-repair.mjs plan
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs
+index aa6015779..d78e953ee 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Controlled METHOD tests only: no Human, native or installed authority claim.
+ import assert from 'node:assert/strict';
+ import {after} from 'node:test';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/base-p16.fixture.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/base-p16.fixture.mjs
+index 1a7686614..8bbedd8fa 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/base-p16.fixture.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/base-p16.fixture.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Mechanical extraction of the only base export used by the signing controls.
+ import {readFileSync} from 'node:fs';
+ import {statePath} from '../pipeline-state.mjs';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/presentation-cases.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/presentation-cases.mjs
+index 2f4bec33a..2b5666ca7 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/presentation-cases.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/presentation-cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {join} from 'node:path';
+ import {pathToFileURL} from 'node:url';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method-cases.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method-cases.mjs
+index 983aab2b0..a70438f10 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method-cases.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method-cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {join} from 'node:path';
+ import {readFileSync,readdirSync,lstatSync,writeFileSync,existsSync} from 'node:fs';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method.fixture.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method.fixture.mjs
+index 140d88dbe..9d28bae1c 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method.fixture.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/signing-method.fixture.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {generateKeyPairSync,createHash,randomBytes} from 'node:crypto';
+ import {mkdtempSync,writeFileSync,readFileSync} from 'node:fs';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/state-owner.fixture.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/state-owner.fixture.mjs
+index 153533724..5fc8501fe 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/state-owner.fixture.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/state-owner.fixture.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ // Actual source-owned setup. Loaded only by a Root-authorized isolated child.
+ // Requires a staged genuine base fixture and actual closed I03 source bridge.
+ import assert from 'node:assert/strict';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority-cases.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority-cases.mjs
+index 6b78f9c7f..bf307c24a 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority-cases.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority-cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {readFileSync,readdirSync,lstatSync,existsSync} from 'node:fs';
+ import {join} from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority.fixture.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority.fixture.mjs
+index 44f0225f0..db88a8e58 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority.fixture.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-authority.fixture.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {generateKeyPairSync,createHash,sign} from 'node:crypto';
+ import {join,resolve} from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-cases.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-cases.mjs
+index 5ffc5c56d..c7c6d9704 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-cases.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {readFileSync,existsSync,readdirSync,lstatSync} from 'node:fs';
+ import {join,resolve} from 'node:path';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-physical-method-cases.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-physical-method-cases.mjs
+index 96d3abd2a..8244444b6 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-physical-method-cases.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/sweep-physical-method-cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import fs from 'node:fs';
+ import {syncBuiltinESMExports} from 'node:module';
+diff --git a/plugins/pipeline-core/scripts/signing-disclosure-sweep/typed-hgo-cases.mjs b/plugins/pipeline-core/scripts/signing-disclosure-sweep/typed-hgo-cases.mjs
+index a526f253c..0b946e654 100644
+--- a/plugins/pipeline-core/scripts/signing-disclosure-sweep/typed-hgo-cases.mjs
++++ b/plugins/pipeline-core/scripts/signing-disclosure-sweep/typed-hgo-cases.mjs
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: SUL-1.0
+ import assert from 'node:assert/strict';
+ import {join,resolve} from 'node:path';
+ import {pathToFileURL} from 'node:url';

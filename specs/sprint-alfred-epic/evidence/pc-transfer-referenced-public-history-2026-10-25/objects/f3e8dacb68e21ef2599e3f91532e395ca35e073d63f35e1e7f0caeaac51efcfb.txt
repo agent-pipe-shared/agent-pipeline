@@ -1,0 +1,6 @@
+docs(plans): write the Codex-stretch handover with state, queue, mechanics and standing rules
+
+The Claude tokens are exhausted until 2026-10-25 21:00 and the PO continues with Codex as the Elephant. The handover repeats the rules that live only in Claude memory, lists what was done and what is in flight, orders the queue, records the dispatch-route and guard-hook commit mechanics, and keeps the dispatch specs of K147 to K157 and the apply-diff helper in tracked places.
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

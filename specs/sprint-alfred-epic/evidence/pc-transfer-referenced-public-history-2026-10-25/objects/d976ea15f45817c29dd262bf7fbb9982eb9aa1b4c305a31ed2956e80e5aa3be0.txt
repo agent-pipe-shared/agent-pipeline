@@ -1,0 +1,20 @@
+command: node --test plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs
+label: g28-source-closure-admission-corrected-green
+exitCode: 0
+head: 16c9e1936c623de9b2e8ea2b384b7b93c1cb7ee5
+tree: f62bb2f9560e7724327c6e6b8f6602a5f84752c2
+dirty: true
+--- stdout ---
+✔ the admitted read-only audit CLI source is never liftable in project and installed roots (2.558231ms)
+✔ native Windows request separators normalize within the exact scratch boundary (1.140176ms)
+✔ audit-pack exact read and publication verbs retain separate guard routes (33.048336ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 775.694822
+
+--- stderr ---

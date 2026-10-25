@@ -1,0 +1,33 @@
+command: node <repo-root>/harness/scripts/check-product-capability-inventory.mjs
+label: expanded-po-suite-registration-inventory-final2
+exitCode: 1
+head: 5f3bec25bbe5d4ac5ee0df51dee20d9446272047
+tree: 46352f60ade814535b1b17b3cb59a5341b5b9ff0
+dirty: true
+--- stdout ---
+
+--- stderr ---
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:architecture-close-disposition-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:codex-critic-actual-baseline-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:codex-critic-baseline-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:current-session-artifact-cross-runner-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:current-session-artifact-export-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:diagnostic-toil-cross-runner-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g17-publication-observation-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g23-cross-runner-passive-matrix-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g23-read-help-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:g6-aggregate-native-boundaries-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:mid-session-hook-refresh-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:pin-antigravity-design-phase-scripts-refused-in-draft-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:pipeline-state-calibration-recovery-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:po-human-approval-signing-handoff-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:po-only-discard-boundary-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:public-handover-duty-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:publication-guard-candidate-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:publication-review-requirement-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:security-remote-identity-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:signing-help-delegation-qualification-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[2] references missing surface verify-phase:harness/scripts/verify.mjs:windows-authority-readiness-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)
+FAIL: capabilities[19] references missing surface verify-phase:harness/scripts/verify.mjs:audit-pack-command-admission-tests in committed sourceBaseline 8052bdc5467ea23ce65ccedf10165c9ff319794b (uncommitted worktree files are not discovery evidence)

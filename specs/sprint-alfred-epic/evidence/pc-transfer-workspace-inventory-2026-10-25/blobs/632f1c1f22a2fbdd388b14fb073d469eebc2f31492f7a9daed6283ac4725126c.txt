@@ -1,0 +1,18 @@
+import test from 'node:test';
+import {mkdirSync,mkdtempSync,chmodSync,rmSync,realpathSync,writeFileSync} from 'node:fs';
+import {join,dirname,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {registerRunRecordOwner} from '../../scripts/verify-journal.mjs';
+const repoRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..','..','..','..');
+test('dbg',()=>{
+  const base=join(repoRoot,'scratch');mkdirSync(base,{recursive:true});
+  const root=mkdtempSync(join(base,'alf-c-p3-05-'));
+  let out='';
+  try{
+    const common=realpathSync(root),pipeline=join(common,'agent-pipeline');
+    mkdirSync(pipeline,{mode:0o700});chmodSync(pipeline,0o777);
+    try{registerRunRecordOwner({gitCommonDir:common,runId:'verify-p5',runPath:join(common,'run')});out='NO-THROW';}
+    catch(e){out='message='+e.message+'\ncause='+(e.cause&&e.cause.message)+'\nstack='+e.cause?.stack;}
+  }finally{rmSync(root,{recursive:true,force:true});}
+  writeFileSync(new URL('../../../../dbg8-out.txt',import.meta.url),out);
+});

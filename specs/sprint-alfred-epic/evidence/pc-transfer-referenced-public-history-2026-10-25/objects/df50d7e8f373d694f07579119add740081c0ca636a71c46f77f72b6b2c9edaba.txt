@@ -1,0 +1,206 @@
+{
+  "taskId": "scanner-policy-provenance-20260929",
+  "rulesetSha": "f9ebdd5b6c7b123b39ebdb2aae60acc54bead1b6",
+  "dispatcher": "Root",
+  "model": "gpt-6-sol/medium",
+  "modelReceiptSha256": "7abd7c1533dcfb655ada2e5938c8f664e89b0953adedd56907075963138d1edd",
+  "qualification": "read-only scanner policy/provenance audit with exact line-reference errata; no runtime qualification",
+  "parents": [
+    {
+      "path": "scratch/0.7-readonly-onboarding-scanner-hook-failure-diagnosis-20260929/manifest.json",
+      "sha256": "6421ac9621a63acd0ff53280d1ffe40ab4b276803c6e2037857190ae54ad6a33"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/full-184-after-fixes/manifest.json",
+      "sha256": "3472d2fb8993458dc1d14371ce8774ff046f567ba0502c1f4b5452db9b23e59a"
+    }
+  ],
+  "before": [
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "sha256": "84695a1b6bd8e6b70b0ac46601f026828c85e54b07c318ea0fde58e4cd87be12",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/semgrep.mjs",
+      "sha256": "6533f93a1221ddc6da167e9926f84ce323643a6981a368d192c60177c61ead81",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/tool-identity.mjs",
+      "sha256": "e34da49e289dd58b06592846327fd55a29b4f60769c63febdae44fed828e3f2b",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+      "sha256": "38fdb5b479db758360674a5cd418d59d59fe4af516d0f028cf0a5b949d2a8463",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-policy-resolver.mjs",
+      "sha256": "ab48257037bb18c1e313e87fea357f25190b4daca209b57916b6fc42f5d5b4cb",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
+      "sha256": "99a88b6b4feaa77fc57abffaef42f65fee4b1a704cf693fa744a0216fa626112",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-completeness-gate.mjs",
+      "sha256": "8e8521764fa6856f819918b8a38a84658eff372cf7a4f5a33cb92dd0a1dd7c1e",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "e02f7b2265bf4e92060a19e3feb50378f586cab8da74f8d64b2b90d2467605c6",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "d5285234be90e5c5fe1a5a54ec7758812531be0f3b93df00d5fec4b68fc287ce",
+      "movingOwner": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "sha256": "7584fb64b1f0dcaa98c66c7e8216f2cb721b39de71c1dae88f4213e063dded58",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/security/semgrep/pipeline.yml",
+      "sha256": "837e050c6b9bd680071da6d65cb3a699487a78629dfa55945859d3138a910ef8",
+      "movingOwner": false
+    }
+  ],
+  "after": [
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "sha256": "84695a1b6bd8e6b70b0ac46601f026828c85e54b07c318ea0fde58e4cd87be12",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/semgrep.mjs",
+      "sha256": "6533f93a1221ddc6da167e9926f84ce323643a6981a368d192c60177c61ead81",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/tool-identity.mjs",
+      "sha256": "e34da49e289dd58b06592846327fd55a29b4f60769c63febdae44fed828e3f2b",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/trusted-tool-resolution.mjs",
+      "sha256": "38fdb5b479db758360674a5cd418d59d59fe4af516d0f028cf0a5b949d2a8463",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-policy-resolver.mjs",
+      "sha256": "ab48257037bb18c1e313e87fea357f25190b4daca209b57916b6fc42f5d5b4cb",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-evidence-evaluator.mjs",
+      "sha256": "99a88b6b4feaa77fc57abffaef42f65fee4b1a704cf693fa744a0216fa626112",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/security-completeness-gate.mjs",
+      "sha256": "8e8521764fa6856f819918b8a38a84658eff372cf7a4f5a33cb92dd0a1dd7c1e",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "sha256": "e02f7b2265bf4e92060a19e3feb50378f586cab8da74f8d64b2b90d2467605c6",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "d5285234be90e5c5fe1a5a54ec7758812531be0f3b93df00d5fec4b68fc287ce",
+      "movingOwner": true
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "sha256": "7584fb64b1f0dcaa98c66c7e8216f2cb721b39de71c1dae88f4213e063dded58",
+      "movingOwner": false
+    },
+    {
+      "path": "plugins/pipeline-core/security/semgrep/pipeline.yml",
+      "sha256": "837e050c6b9bd680071da6d65cb3a699487a78629dfa55945859d3138a910ef8",
+      "movingOwner": false
+    }
+  ],
+  "movingPaths": [],
+  "transientPublicReadbacks": true,
+  "atomicSnapshotClaim": false,
+  "rawObservation": {
+    "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/full-184-after-fixes/stdout.txt",
+    "sha256": "ee40b683d082f6254634a0d80a4f49ca01091c6f1be1fc135a77fec9fa7123cd",
+    "lines": "309–325"
+  },
+  "artifacts": [
+    {
+      "path": "scratch/0.7-scanner-policy-provenance-20260929/report.md",
+      "sha256": "6c11fea8a6b6fd113f8b7a26f189afad72ff87380833c1bf0239e759e8ad884c"
+    },
+    {
+      "path": "scratch/0.7-scanner-policy-provenance-20260929/freeze.mjs",
+      "sha256": "1f2bc650c0b8d3821deacf25c4e453dfedeebb0619ca4d3ea2eaa41faccb788d"
+    },
+    {
+      "path": "scratch/0.7-scanner-policy-provenance-20260929/observed-scanner-excerpt.txt",
+      "sha256": "3d527b9886ae3bca4625aed48d1503d124087330a6e42bb43a74dface53e891a"
+    }
+  ],
+  "findings": {
+    "plainFreshConsumerDeclaredRequired": false,
+    "enabledByDefault": true,
+    "legitimateMissingTool": "SKIPPED",
+    "timeout": "ERROR/scanner_error",
+    "executionRefusal": "ERROR/execution_environment",
+    "v1BlockingERROR": true,
+    "v2EmptyRequiredPlanDoesNotOverrideV1": true,
+    "SKIPPEDNativePASS": false,
+    "timeoutCause": "unresolved",
+    "availableProductArtifactProvenance": [
+      "scanners.executableSha256 in v1",
+      "policy/candidate/payload SHA binding",
+      "scanner status/classification/reason"
+    ],
+    "missingRetainedProvenance": [
+      "selected binary path/hash/version",
+      "timeout child output/log",
+      "execution duration/signal detail"
+    ],
+    "controlledFixtureNativePASS": false,
+    "originalHostCoverageWouldNeedSeparateProof": true
+  },
+  "SourceWrites": 0,
+  "scannerInvocations": 0,
+  "versionProbes": 0,
+  "testExecutions": 0,
+  "originalCallbackRetries": 0,
+  "hostConfigurationChanges": 0,
+  "processTerminations": 0,
+  "selectedSourceSnapshotCaptured": false,
+  "claims": {
+    "overallPASS": false,
+    "nativeScannerPASS": false,
+    "provider": false,
+    "nativeIdentity": false,
+    "Critic": false
+  },
+  "parent": {
+    "path": "scratch/0.7-scanner-policy-provenance-20260929/manifest.json",
+    "sha256": "9cd748579b39a3ff0b05d15d2cc762a82fb16264b854bf70c3e72ccccd8dc635"
+  },
+  "referenceErrata": [
+    {
+      "path": "scratch/0.7-scanner-policy-provenance-20260929/line-reference-corrections.md",
+      "sha256": "f149d51d8efb53bf2541d852c463daee05fad6784be733ca75838a70d99fe3bd"
+    },
+    {
+      "path": "scratch/0.7-scanner-policy-provenance-20260929/freeze-final.mjs",
+      "sha256": "9ede81c24c1a544ed37b9ecd3bbfb6bbc27df628e7352f2ca541881f8eff4529"
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+diff --git a/plugins/pipeline-core/hooks/guard-push.mjs b/plugins/pipeline-core/hooks/guard-push.mjs
+index 31a9fbf01..4b9fc41e4 100644
+--- a/plugins/pipeline-core/hooks/guard-push.mjs
++++ b/plugins/pipeline-core/hooks/guard-push.mjs
+@@ -177,6 +177,7 @@ function projectCalibrationRelPath(rootDir) {
+   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
+ }
+ import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
++import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+ import { RELEASE_PROMOTION_DEFAULT_PATH, SECURITY_EVIDENCE_DEFAULT_PATH, validateReleasePromotionEnvelope } from "../lib/release-promotion-envelope.mjs";
+@@ -2379,6 +2380,12 @@ function checkSecurityEvidenceBinding() {
+   if (!sourceTree || candidate?.tree !== sourceTree) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
+   if (!validSha256(candidate?.inputSha256)) failures.push("evidence/security-latest.json: candidate input digest is invalid");
+   if (!validSha256(candidate?.repositorySha256)) failures.push("evidence/security-latest.json: candidate repository identity is invalid");
++  const remoteIdentity = resolveSecurityRemoteIdentity(evidenceProjectDir, pushBinding.remote);
++  if (!remoteIdentity.ok) {
++    failures.push("evidence/security-latest.json: push remote identity is unavailable or ambiguous; configure one push URL and rerun security-scan.mjs --remote <push remote>");
++  } else if (candidate?.repositorySha256 !== remoteIdentity.repositorySha256) {
++    failures.push("evidence/security-latest.json: candidate repository identity does not match the effective push destination; rerun security-scan.mjs --remote <push remote>");
++  }
+   if (!Number.isSafeInteger(candidate?.inventory?.entries) || candidate.inventory.entries < 0
+     || candidate.inventory.symlinkPolicy !== "reject" || candidate.inventory.submodulePolicy !== "reject") {
+     failures.push("evidence/security-latest.json: candidate inventory policy is invalid");
+diff --git a/plugins/pipeline-core/lib/security-remote-identity.mjs b/plugins/pipeline-core/lib/security-remote-identity.mjs
+new file mode 100644
+index 000000000..013384e58
+--- /dev/null
++++ b/plugins/pipeline-core/lib/security-remote-identity.mjs
+@@ -0,0 +1,33 @@
++// SPDX-License-Identifier: SUL-1.0
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++
++/** Resolve one effective Git push destination without publishing its URL. */
++export function resolveSecurityRemoteIdentity(rootDir, remoteName = null, spawn = spawnSync) {
++  const run = (args) => {
++    try {
++      const result = spawn("git", ["-C", rootDir, ...args], {
++        encoding: "utf8", timeout: 5000, shell: false,
++      });
++      return result.status === 0 ? result.stdout : null;
++    } catch { return null; }
++  };
++  const remoteOutput = run(["remote"]);
++  if (remoteOutput === null) return { ok: false, reason: "remote-list-unavailable" };
++  const remotes = remoteOutput.split(/\r?\n/u).filter(Boolean);
++  if (remoteName !== null && (typeof remoteName !== "string" || !remotes.includes(remoteName))) {
++    return { ok: false, reason: "remote-not-configured" };
++  }
++  if (remoteName === null && remotes.length !== 1) {
++    return { ok: false, reason: remotes.length === 0 ? "remote-missing" : "remote-ambiguous" };
++  }
++  const selected = remoteName ?? remotes[0];
++  const output = run(["remote", "get-url", "--push", "--all", selected]);
++  if (output === null) return { ok: false, reason: "push-destination-unavailable" };
++  const urls = output.split(/\r?\n/u).filter(Boolean);
++  if (urls.length !== 1) return { ok: false, reason: "push-destination-ambiguous" };
++  return {
++    ok: true,
++    repositorySha256: createHash("sha256").update(urls[0]).digest("hex"),
++  };
++}
+diff --git a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+new file mode 100644
+index 000000000..4b51873aa
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+@@ -0,0 +1,106 @@
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
++import test from "node:test";
++import { runSecurityScan } from "./security-scan.mjs";
++import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
++
++const scratch = join(process.cwd(), "scratch", "g32-security-remote-fixtures");
++mkdirSync(scratch, { recursive: true });
++const fixture = mkdtempSync(join(scratch, "repo-"));
++test.after(() => rmSync(fixture, { recursive: true, force: true }));
++
++function git(...args) {
++  const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8", shell: false });
++  assert.equal(result.status, 0, `fixture git ${args[0]} failed`);
++}
++function digest(url) { return createHash("sha256").update(url).digest("hex"); }
++function canonicalJson(value) {
++  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
++  if (value && typeof value === "object") return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
++  return JSON.stringify(value);
++}
++async function scan(remoteName) {
++  const { evidence } = await runSecurityScan({ rootDir: fixture, remoteName, env: {}, scanMode: "snapshot" });
++  return evidence.candidate;
++}
++
++test("security evidence follows one effective push destination across a remote rename", async () => {
++  git("init", "-q");
++  git("config", "user.name", "Fixture");
++  git("config", "user.email", "fixture@example.invalid");
++  writeFileSync(join(fixture, "README.md"), "fixture\n");
++  git("add", "README.md");
++  git("commit", "-qm", "fixture");
++  const fetch = "https://example.invalid/fetch.git";
++  const push = "https://example.invalid/push.git";
++  git("remote", "add", "delivery", fetch);
++  git("remote", "set-url", "--push", "delivery", push);
++  const initial = await scan();
++  assert.deepEqual([initial.status, initial.repositorySha256], ["clean", digest(push)]);
++  git("remote", "rename", "delivery", "release");
++  const renamed = await scan();
++  assert.deepEqual([renamed.status, renamed.repositorySha256], ["clean", digest(push)]);
++  git("remote", "set-url", "--push", "release", "https://example.invalid/other.git");
++  assert.equal((await scan()).repositorySha256, digest("https://example.invalid/other.git"));
++  git("remote", "remove", "release");
++  assert.notEqual((await scan()).status, "clean");
++  git("remote", "add", "first", "https://example.invalid/one.git");
++  git("remote", "add", "second", "https://example.invalid/two.git");
++  assert.notEqual((await scan()).status, "clean");
++  const selected = await scan("second");
++  assert.equal(selected.status, "clean");
++  assert.equal(selected.repositorySha256, digest("https://example.invalid/two.git"));
++  git("remote", "set-url", "--push", "second", "https://example.invalid/two-push.git");
++  git("remote", "set-url", "--add", "--push", "second", "https://example.invalid/three-push.git");
++  assert.notEqual((await scan("second")).status, "clean");
++});
++
++test("push guard rejects evidence for a different effective destination", () => {
++  const dir = mkdtempSync(join(scratch, "guard-"));
++  try {
++    const at = (...args) => {
++      const result = spawnSync("git", args, { cwd: dir, encoding: "utf8", shell: false });
++      assert.equal(result.status, 0, `fixture git ${args[0]} failed`);
++      return result.stdout.trim();
++    };
++    at("init", "-q", "-b", "main");
++    at("config", "user.name", "Fixture");
++    at("config", "user.email", "fixture@example.invalid");
++    writeFileSync(join(dir, "README.md"), "fixture\n");
++    at("add", "README.md");
++    at("commit", "-qm", "fixture");
++    const controller = createGovernanceScopeController({ hostStateRoot: join(dir, ".git", "fixture-hoststate") });
++    const plan = controller.planDecision({ rootDir: dir, decision: "enroll", by: "fixture" });
++    assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
++    at("remote", "add", "delivery", "https://example.invalid/right.git");
++    mkdirSync(join(dir, ".claude"));
++    writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n  security:\n    mode: blocking\n    type: automated\n");
++    const head = at("rev-parse", "HEAD"), tree = at("rev-parse", "HEAD^{tree}");
++    mkdirSync(join(dir, "evidence"));
++    const guardPath = join(process.cwd(), "plugins", "pipeline-core", "hooks", "guard-push.mjs");
++    function check(repositorySha256) {
++      const payload = {
++        schema: "pipeline.security-evidence.v1", exitCode: 0, commit: head,
++        candidate: { status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256,
++          inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
++          snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true } },
++        policy: { configurationSha256: "c".repeat(64), sha256: "d".repeat(64) },
++      };
++      writeFileSync(join(dir, "evidence", "security-latest.json"), JSON.stringify({ ...payload, payloadSha256: digest(canonicalJson(payload)) }));
++      return spawnSync(process.execPath, [guardPath], {
++        cwd: dir, encoding: "utf8", shell: false,
++        input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push delivery main:refs/heads/test" } }),
++        env: { ...process.env, CLAUDE_PROJECT_DIR: dir }, timeout: 10000,
++      });
++    }
++    const wrong = check(digest("https://example.invalid/wrong.git"));
++    assert.equal(wrong.status, 2);
++    assert.match(wrong.stderr, /candidate repository identity does not match the effective push destination/);
++    assert.doesNotMatch(wrong.stderr, /wrong\.git|right\.git/);
++    const right = check(digest("https://example.invalid/right.git"));
++    assert.doesNotMatch(right.stderr, /candidate repository identity does not match the effective push destination/);
++  } finally { rmSync(dir, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index 1bbba2cb5..eddf2d245 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -111,6 +111,7 @@ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ // SHARED absent-key default both consumers use) -- see that function's own doc comment for
+ // why "blocking" was chosen and why it moved rather than staying duplicated here.
+ import { resolveSecurityGateMode } from "../lib/security-completeness-gate.mjs";
++import { resolveSecurityRemoteIdentity } from "../lib/security-remote-identity.mjs";
+ import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
+ 
+ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
+@@ -355,7 +356,7 @@ function inspectInventory(bytes) {
+  * and after scanner execution. A missing or dirty Git materialization is typed
+  * uncertainty, never a clean security subject.
+  */
+-function observeCandidate(rootDir) {
++function observeCandidate(rootDir, remoteName = null) {
+   const commit = gitText(rootDir, ["rev-parse", "HEAD"]);
+   const tree = gitText(rootDir, ["rev-parse", "HEAD^{tree}"]);
+   const status = gitText(rootDir, ["status", "--porcelain=v1", "--untracked-files=all"]);
+@@ -368,15 +369,19 @@ function observeCandidate(rootDir) {
+     inventory: null, reason: inspected.reason,
+   };
+   const clean = status.length === 0;
+-  const remote = gitText(rootDir, ["config", "--get", "remote.origin.url"]);
+-  const repositorySha256 = remote && remote.length > 0
+-    ? createHash("sha256").update(remote.toString("utf8").trim()).digest("hex") : null;
++  const remote = resolveSecurityRemoteIdentity(rootDir, remoteName);
++  if (!remote.ok) return {
++    status: "unsupported", commit: commit.toString("utf8").trim(), tree: tree.toString("utf8").trim(),
++    inputSha256: createHash("sha256").update(inventory).digest("hex"), repositorySha256: null,
++    inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
++    reason: remote.reason,
++  };
+   return {
+     status: clean ? "clean" : "dirty",
+     commit: commit.toString("utf8").trim(),
+     tree: tree.toString("utf8").trim(),
+     inputSha256: createHash("sha256").update(inventory).digest("hex"),
+-    repositorySha256,
++    repositorySha256: remote.repositorySha256,
+     inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
+     reason: clean ? null : "working-tree-not-clean",
+   };
+@@ -434,7 +439,7 @@ function securityPolicyBinding(scanRoot, authority, manifest, blockOn, mode) {
+  * root whose bytes cannot be shadowed by this process's mutable worktree. The
+  * detached worktree is disposable and is never used for the evidence output.
+  */
+-function materializeCandidate(rootDir, candidate) {
++function materializeCandidate(rootDir, candidate, remoteName = null) {
+   if (candidate.status !== "clean") return { ok: false, reason: candidate.reason ?? `candidate-${candidate.status}` };
+   let parent;
+   try { parent = mkdtempSync(join(tmpdir(), "pipeline-security-candidate-")); } catch { return { ok: false, reason: "snapshot-temp-unavailable" }; }
+@@ -444,7 +449,7 @@ function materializeCandidate(rootDir, candidate) {
+     try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
+     return { ok: false, reason: "snapshot-materialization-failed" };
+   }
+-  const observed = observeCandidate(snapshotRoot);
++  const observed = observeCandidate(snapshotRoot, remoteName);
+   if (!sameCandidate(candidate, observed)) {
+     gitResult(rootDir, ["worktree", "remove", "--force", snapshotRoot]);
+     try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
+@@ -869,6 +874,7 @@ function buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findin
+  */
+ export async function runSecurityScan({
+   rootDir,
++  remoteName = null,
+   timeoutMs = DEFAULT_TIMEOUT_MS,
+   env = process.env,
+   spawnFn,
+@@ -889,13 +895,13 @@ export async function runSecurityScan({
+   // In snapshot mode the dirt of the caller's tree is not part of the scanned subject, so it
+   // must not make the candidate uncertain either; every other status stays as observed.
+   const observeSubject = (root) => {
+-    const observed = observeCandidate(root);
++    const observed = observeCandidate(root, remoteName);
+     return snapshotMode && observed.status === "dirty"
+       ? { ...observed, status: "clean", reason: null, worktreeDirty: true }
+       : observed;
+   };
+   const candidateBefore = observeSubject(rootDir);
+-  const snapshot = materializeCandidate(rootDir, candidateBefore);
++  const snapshot = materializeCandidate(rootDir, candidateBefore, remoteName);
+   // Non-Git callers retain a diagnostic-only compatibility report. Such
+   // evidence can never satisfy an exact-candidate consumer. A Git candidate
+   // that is dirty, unsupported, or cannot be materialized is stricter: do not
+@@ -1012,7 +1018,7 @@ export async function runSecurityScan({
+   const blockOnSet = new Set(blockOn);
+   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
+   const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
+-  const snapshotAfter = scanRoot ? observeCandidate(scanRoot) : null;
++  const snapshotAfter = scanRoot ? observeCandidate(scanRoot, remoteName) : null;
+   const candidateAfter = observeSubject(rootDir);
+   const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
+     && sameCandidate(candidateBefore, snapshotAfter);
+@@ -1154,6 +1160,9 @@ function parseArgs(argv) {
+       if (opts.scanMode !== "snapshot" && opts.scanMode !== "shared-tree") {
+         throw new Error(`--scan-mode must be "snapshot" or "shared-tree", got: ${opts.scanMode}`);
+       }
++    } else if (a === "--remote") {
++      opts.remoteName = argv[++i];
++      if (!opts.remoteName || opts.remoteName.startsWith("-")) throw new Error("--remote requires a configured remote name");
+     } else {
+       throw new Error(`unknown argument: ${a}`);
+     }
+@@ -1184,6 +1193,7 @@ export async function main(argv = process.argv.slice(2)) {
+   const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({
+     rootDir,
+     timeoutMs: opts.timeoutMs,
++    remoteName: opts.remoteName ?? null,
+     ...(opts.scanMode ? { scanMode: opts.scanMode } : {}),
+   });
+   printSummary(evidence);

@@ -1,0 +1,33 @@
+diff --git a/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md b/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md
+new file mode 100644
+index 000000000..26b3445d5
+--- /dev/null
++++ b/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md
+@@ -0,0 +1,27 @@
++# Counted pin results, 2026-10-23
++
++Measured on commit `d6df0554d` in a local clone (`scratch/clones/k57`), one file after the other, each run with its own private TMPDIR outside every repository (`scripts/run-in.mjs` / `scripts/run-quiet.mjs`); the machine was otherwise idle except for one other agent's pin run (the long host-store runs overlapped with it). Each file was run once; the one red file was re-run once alone to rule out load, with the same result.
++
++Totals: 7 test files plus 1 inventory check; 6 test files green, 1 red (2 cases), the inventory check PASS; 136 cases, 134 passed, 0 reported failed, 0 skipped, 2 todo-marked cases that fail and make the process exit 1.
++
++A skipped or todo case is not a pass. The two todo-marked cases of `model-family-host-store.test.mjs` are the cases that fail: node reports them as `todo` in its summary (`fail 0`) but the process exits 1 and the cases carry errors, so the file is counted red.
++
++Red: `model-family-host-store.test.mjs`, first failing case `MFHS023 real competing transition and prepare serialize on the stored generation` (error `ENOENT ... authority-lifetimes/<id>.json` after a successor transition process failed with `SessionAuthorityError model-family-host:unowned-retained-member`), then `MFHS028 real process contention serializes same-key replay and different invocation CAS generations` (concurrent writer failed with the same `model-family-host:unowned-retained-member`). Neither is one of MFHS002-008 or MFI012/013; both are real-process cases. Identical on the first run and on the lone re-run (elapsed about 32 minutes on the re-run).
++
++| Pin file | Verdict | Cases | Pass | Fail | Skip | Todo |
++|---|---|---|---|---|---|---|
++| `first-enrollment-enters-retirement-before-consent.test.mjs` | GREEN | 9 | 9 | 0 | 0 | 0 |
++| `dispatch-briefing.test.mjs` | GREEN | 49 | 49 | 0 | 0 | 0 |
++| `goldfish-bugfix-module-conflicts-with-qg-04.test.mjs` | GREEN | 6 | 6 | 0 | 0 | 0 |
++| `sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.test.mjs` | GREEN | 4 | 4 | 0 | 0 | 0 |
++| `model-family-host-store.test.mjs` | RED | 32 | 30 | 0 | 0 | 2 |
++| `model-family-invocation.test.mjs` | GREEN | 14 | 14 | 0 | 0 | 0 |
++| `project-resource-budget-headroom-is-not-reported.test.mjs` | GREEN | 22 | 22 | 0 | 0 | 0 |
++
++Paths: `first-enrollment-enters-retirement-before-consent`, `goldfish-bugfix-module-conflicts-with-qg-04`, `sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows` and `project-resource-budget-headroom-is-not-reported` are under `plugins/pipeline-core/lib/pins/`; `dispatch-briefing` is under `plugins/pipeline-core/scripts/`; `model-family-host-store` and `model-family-invocation` are under `plugins/pipeline-core/lib/`.
++
++Inventory check:
++
++| Check | Verdict | Output |
++|---|---|---|
++| `node harness/scripts/check-product-capability-inventory.mjs` | PASS | `PASS: product capability inventory (inventory)` |

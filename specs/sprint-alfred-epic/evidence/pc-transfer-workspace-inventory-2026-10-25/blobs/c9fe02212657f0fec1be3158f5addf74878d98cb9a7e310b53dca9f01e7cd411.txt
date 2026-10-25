@@ -1,0 +1,8 @@
+AssertionError [ERR_ASSERTION]: {"ok":false,"code":"PO-PROFILE-RECEIPT-INVALID","reason":"The common PO profile receipt is missing, unsafe, noncanonical or malformed.","repair":"Run node setup.mjs --publish-po-profile from the canonical primary checkout, then retry. In a consumer project, run node <repo-root>/scratch/clones/g4/plugins/pipeline-core/scripts/po-gate-profile-repair.mjs plan --root <primary checkout>, then apply --activate against that project's own primary checkout; add --human-facing <de|en> to set or correct the operator-facing language."}
+
+false !== true
+
+    at routeFixture (file://<repo-root>/scratch/clones/g4/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs:195:10)
+    at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g4/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs:255:14)
+    at async Test.run (node:internal/test_runner/test:1389:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

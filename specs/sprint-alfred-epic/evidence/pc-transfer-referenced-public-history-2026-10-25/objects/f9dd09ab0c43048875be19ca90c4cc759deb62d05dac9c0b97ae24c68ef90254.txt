@@ -1,0 +1,158 @@
+# Ordinary Codex Advisor integration preparation
+
+Status: contracts and component verification only. No actual Advisor/model call,
+productive integration, registered route adoption or formal stamp.
+
+## Correct current source baseline
+
+The old `advisor-host-route-0.7/integration-review.md` describes an earlier state.
+Current coordinator physically reads repository consent and ends the Codex
+no-child route before constructing its question/evidence prompt. Current bridge
+ends before dispatch.prepare. An admitted callback still deliberately reports
+ordinary-consult-host-callback-unavailable. The explicit governed unavailable
+path is not an answered Advisor or an ordinary host callback.
+
+Selected-sandbox WSL unavailability is separate from ordinary consult. No denied
+export may be retried through another provider/command. No-child produces no
+fake model identity, child launch or actual-attempt row.
+
+## New prepared surfaces
+
+| File | Responsibility | Evidence |
+| --- | --- | --- |
+| codex-advisor-public-evidence-proposal.mjs | Physical public evidence admission before reads, descriptor/rolling byte limits, bounded actual reads, source identity and exact canonical evidence digest | 11 physical cases; forbidden/oversized/aggregate/alias/growth/UTF8/mutation cases and real canonical Unicode/CRLF bundle comparison |
+| codex-advisor-admission-proposal.mjs | Metadata-only ordering, physical consent, host-owned callback seams, lazy factory and per-operation deadlines | 15 cases: missing/refused/denied/drifted/hanging callbacks never advance to factory; physical aliases/UTF8/closed fields and late resolution tested; actual host authority remains unwired |
+| codex-advisor-request-proposal.mjs | One concrete question, bounded exact UTF8 evidence, registered-caller route context, Advisor-specific instructions and closed model answer schema | 12 cases: strict parser/null-prototype compatibility, closed schema and semantic citation/byte checks, canonical bundle and exact generic-host wire request digests |
+| codex-advisor-host-record-proposal.mjs | Closed metadata-only host contract with separate host/public receipt identities, dispatch/candidate/package/demand/recipe/question/evidence/answer bindings, truthful assurance | Combined record/store 12 cases, including coercion and assurance inflation refusals |
+| codex-advisor-private-store-proposal.mjs | Scratch-only exclusive publication, physical private readback and independent registered process journal reconstruction | Actual closed managed Node fixture, immutable publication, mode/link/journal drift refusals; no live private authority store |
+| codex-advisor-binding-proposal.mjs | Reconstruct request from physical evidence/Git, validate receipt/answer, twice read private record and compare independently selected host executable | Seven cases/subtests, real Git/Node with synthetic model/session controls; source/candidate/recipe/answer/receipt/executable drift rejects |
+
+Question/evidence content is transient in request construction; durable records
+contain hashes and public repository paths only. Evidence digest preserves the
+existing lifecycle bundle envelope including exact content and byte lengths.
+The first prototype used a different serializer and therefore a different hash;
+independent physical-bundle parity exposed it. The current request now uses the
+canonical advisoryEvidenceBundleSha256 API and shares the pre-read public path
+policy with the bounded reader. Both binding source reads use that reader.
+Recipe digest includes instructions, dispatch, reason/profile, selected route,
+question/evidence digests and output schema. Request digest matches the generic
+host's JSON.stringify({model,effort,prompt,outputSchema}). Answer digest hashes
+the exact decoded answer UTF8 bytes; response digest hashes the canonical parsed
+structured report, not the original wire JSON serialization. Native raw-output
+custody remains to be connected by the actual execution adapter.
+
+The current generic journal requires a drh_ host ID. That lexical prefix is not
+a Readiness qualification; the Advisor record schema and public receipt ID are
+separate. Session and model-control booleans in process fixtures are synthetic
+contract data. Their tests prove no actual model or Advisor execution.
+
+## Remaining ordered implementation
+
+1. Integrate the prepared model-free admission seam with real readiness, physical
+   repository consent, host-owned export decision, candidate/route capability
+   and metadata bindings. No prompt factory, content copy, provider or launcher
+   before admission; declined/denied means zero calls and terminal no-child.
+   Per-operation deadline/AbortSignal bounds async observations; no retry or
+   late continuation occurs. Noncooperative or blocking synchronous callback
+   work is not forcibly stopped; these dependencies must remain model-free.
+2. Resolve the actual functional Advisor recipe using the registered resolver;
+   current default is gpt-6-sol/max/host-consult. The prepared request accepts
+   trusted resolver context but does not establish its provenance. Current
+   registry/agent documentation still describes selected-sandbox isolation;
+   tool-free host-observed assurance requires an explicit applicable contract.
+3. Connect runIsolatedStructuredHost, managed ownership and this Advisor store
+   through a sealed ordinary adapter. Reobserve admission immediately before
+   input, validate actual strict answer and raw-result custody, recheck physical
+   evidence/candidate and persist only after independent ownership readback.
+4. Wire answered bridge/coordinator and private design-advisory transaction
+   verification. The current prepared binding checker still receives governed
+   question/package/demand/route from its private caller; live entry must derive
+   them itself, including independently configured host executable selection.
+   A journal may not choose the verifier's expected executable: its recorded
+   digest must match independent host selection and a second current-file check.
+   The Node test binary is synthetic; the live adapter selects actual Codex.
+   A caller-returned expected object is never a substitute. Seal
+   the store/provider dependencies; dependency injection in these scratch
+   fixtures is not an externally admitted capability.
+5. Persist the actual consult attempt only when execution really occurred;
+   preserve governed no-child outcomes for admission/capability refusal. Produce
+   the ordinary valid Advisor recipe and receipt, not a Readiness report.
+6. Integrate/register these source surfaces and threat/architecture contract,
+   then run actual admitted Codex/WSL replay on the frozen candidate and installed
+   plugin. Canonical Verify, Critic and release stamps remain separate gates.
+
+## Execution binding
+
+Request evidence: codex-advisor-request-evidence.json.
+Admission ordering evidence: codex-advisor-admission-evidence.json.
+Record/store evidence: codex-advisor-host-record-evidence.json.
+Independent binding plus current summary admission:
+summary-and-advisor-binding-preparation.evidence.json, source 3089f0d6…,
+aggregate 5de8ddca97b83d11c218f4e8d50274e20399c05740e4f0a1bad23e6d283e2029.
+All relevant source hashes remained stable during those executions. That
+aggregate does not include these new Advisor proposals. No release claim.
+
+Subsequent bounded-reader/request/binding composition:
+`codex-advisor-bounded-evidence-composition.evidence.json`, source b925f423…,
+30/30 tests/subtests, zero skips/failures/todo, exit 0, 9,254ms and 21 stable
+source hashes. The three independent audit findings and failed prior physical
+digest comparison remain in `codex-advisor-composition-risk-audit.md`.
+Generic canonical evidence reads still need their own correction; these Scratch
+changes do not repair that canonical API or create host authority.
+
+## Subsequent prepared host and generic source patches
+
+Current virtual aggregate 563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e
+contains the generic canonical bounded-reader correction (seven new physical
+regressions plus two existing evidence cases), registered Advisor journal-root
+extension (eight physical cases) and host pre-content callback/input disposition
+(nine actual managed Node protocol cases). Source remains unapplied. The host
+patch migrates the actual proposed Readiness caller and direct API test.
+All 61 canonical preimages/flat revisions and six worker postimages match;
+53 syntax checks, parsed static imports and Git dry application pass.
+
+The current host now has the proposed beforeTurnInput seam and explicit input
+disposition; the earlier design's statement that the seam is missing describes
+its inspected preimage. It still has no real export observer or ordinary caller.
+The journal's same-controller registration is not Git topology authority; the
+future production Advisor store must derive and bind the exact Advisor root.
+Raw-output custody, truthful complete stdio status, adopted isolation and live
+execution/transaction wiring remain open. New public request/store/binding
+proposals are not added to the aggregate by these patches.
+
+## Custody/identity batch and current composition
+
+Current aggregate cb817e20e9eff56b4c3f6dce0f307e7200b89d38c09159ccac66251d81a799db
+adds output-custody collection/helper/registered tests, pure existing-GUID access
+and tests, generic evidence test registration, compatible shared Journal parent,
+and actual bounded Journal reads/tests. All67 preimages/revisions and twelve
+independently prepared postimages match;59 syntax checks/Git dry application pass.
+The original563fbe7b metadata/patch/revisions are archived without rebinding old
+execution evidence.
+
+The current exact graph passes two real managed Node protocol cases after actual
+sanctioned identity mint: shared0755 remains unchanged, approved sends one turn,
+refused sends none, genuine complete pipes and closed independent ownership are
+observed. Raw report/frame/canonical digests remain distinct. These controlled
+fixtures grant no consent/export/provider/native Codex authority.
+
+Separate production-shaped store proposal independently derives canonical Git
+topology and existing GUID, checks exact Advisor namespace/ownership, bounds own
+receipt reads and immutable publication;10 cases pass. Its separate compatibility
+patch is required even with the Journal correction because it also classified
+the shared parent as private. Journal/Store compatibility16 cases pass. The
+async independent binding counterpart10 cases passes two awaited store reads and
+input/returned-record snapshots; live async callers remain unwired. Current
+store/binding evidence still uses v1 records and synthetic session/model controls.
+
+Separate v2 record validates output custody against the actual private host
+result;1 managed-host case plus invalid custody/digest mutations passes. This
+cannot be adopted by filling privateHostResult from a stored receipt or public
+expected context. A durable controller-owned metadata observation after shutdown
+is being designed for independent Restart verification. Neither raw Q&A nor
+streams/credentials may be persisted; v1/v2 historical modules remain frozen.
+
+Registered route/independent executable context and Readiness shared-parent
+owner/no022/drift hardening are the next disjoint preparations. Ordinary sealed
+adapter/admission/transaction and architecture adoption remain pending. No actual
+Advisor/model call, productive source apply or formal Critic/release stamp exists.

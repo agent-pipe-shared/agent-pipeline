@@ -1,0 +1,238 @@
+diff --git a/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs b/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs
+index 01de191a6..fc61996a3 100644
+--- a/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs
+@@ -8,17 +8,20 @@
+ //   A3. A real command can be supplied once and yields an exact readback
+ //       without repeating unrelated onboarding questions.
+ //
+-// A2 under PO decision D124 (2026-10-22, "Contract A2 stays"): the typed design-stage state `verify: null` (distinct from
+-// PASS) remains the intended design result; implementation entry and release Verify reject it, and the newer
+-// baseline-implementation policy (pinned by pipeline-state.test.mjs NVA-CF-VERIFYDEADLOCK and
+-// pipeline-state-late-verify.test.mjs) SUPPLIES that rejection and does not replace A2. Measured on this source: an explicit
+-// placeholder/blank --verify-command and a missing calibration are refused at the transition; the entry without a command is
+-// carried only as the typed baseline-only contract, which is never relabelled as configured, writes no command, and keeps
+-// release blocked ("release remains blocked" in checkVerifyContractConfigured). Case "A2 (D124)" below pins that rejection
+-// shape. The earlier "A2-literal (measured policy)" case asserted that the transition ADMITS baseline-only as a supersession
+-// of A2; D124 decided the opposite premise, so it was restated (QG-04, K86-PIN-RESTATEMENTS, 2026-10-23).
+-// NOT PROVEN HERE (open, see the K86 notes): a transition REFUSAL of an unconfigured baseline-only entry. The shipped
+-// set-phase still returns 0 for it (pipeline-state.mjs is a protected path), so this pin does not assert a refusal there.
++// A2 under PO decision D124, as decided by the PO on 2026-10-23 (decision tiles, row 34 a: "typed baseline-only carry as built"):
++// the typed design-stage state `verify: null` (distinct from PASS) remains the intended design result. It is ADMITTED at
++// implementation entry only as a typed baseline-only carry (the baseline-implementation policy, pinned by
++// pipeline-state.test.mjs NVA-CF-VERIFYDEADLOCK and pipeline-state-late-verify.test.mjs): never relabelled as configured, no
++// command written, the entry still returns 0. It is REJECTED at release Verify: checkVerifyContractConfigured reports it as
++// "baseline-only", never "configured", and states that release remains blocked. Two refusals remain at the transition itself:
++// an explicit placeholder/blank --verify-command and a missing calibration. No protected source change is part of D124: the
++// earlier gap this header recorded (an entry refusal that the shipped set-phase does not give) is closed by this decision,
++// not by code. Case "A2 (D124)" below pins both sides of the decision. The earlier "A2-literal (measured policy)" case
++// asserted that the transition ADMITS baseline-only as a supersession of A2, which D124 does not decide; it was restated
++// (QG-04, K86-PIN-RESTATEMENTS, 2026-10-23) and is restated again here to the decision as made (K94-THREE-TEST-DECISIONS).
++// Release-side note: the rejection is the typed status plus the "release remains blocked" statement of the satisfiability
++// check (the check itself reports ok: true; the push stays unready because no full Verify command or evidence exists), so the
++// pin asserts the status and message, not an invented refusal return value.
+ import assert from "node:assert/strict";
+ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+@@ -127,13 +130,12 @@ test("A2: a missing calibration is refused (not silently treated as deferred) at
+   assert.equal(phaseOf(root), "design");
+ });
+ 
+-test("A2 (D124): the deferred verify state is never accepted as a real contract: it stays typed baseline-only through implementation entry, is not relabelled configured, and release stays blocked", () => {
+-  // QG-04 restatement, bounded to D124 (PO 2026-10-22: contract A2 stays; the baseline-implementation policy supplies the
+-  // rejection and does not replace A2). The former case "A2-literal (measured policy)" asserted that the transition ADMITS
+-  // baseline-only as a supersession of A2 and so pinned the premise D124 rejected. Every assertion it held (entry result,
+-  // phase, release status, release message) is kept below as the carried-not-accepted shape; the added assertions state the
+-  // rejection: the deferred value is not rewritten into a command, never reads as configured, and an explicit placeholder is
+-  // still refused after the entry.
++test("A2 (D124, typed baseline-only carry as built): the deferred verify state is admitted at implementation entry only as a typed baseline-only carry, is not relabelled configured, and is rejected at release Verify (release stays blocked)", () => {
++  // QG-04 restatement, bounded to D124 as decided by the PO on 2026-10-23 (row 34 a: typed baseline-only carry as built, no
++  // protected source change). Only this case name and these comments change in K94; no assertion is added, weakened or removed.
++  // Entry side: the transition returns 0, the phase becomes implementation, the deferred value is carried unchanged as
++  // baseline-only (no command invented) and an explicit placeholder is still refused afterwards. Release side: the satisfiability
++  // check reports baseline-only, never configured, and states that release remains blocked.
+   for (const verify of [null, PLACEHOLDER]) {
+     const { root, deps } = fixture({ verify });
+     const files = [join(root, "project", "pipeline.json"), join(root, ".claude", "pipeline.json")];
+diff --git a/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs b/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
+index 01f7173fe..0affbde78 100644
+--- a/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
++++ b/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
+@@ -359,11 +359,19 @@ function cleanup(context, recordSha256) {
+ }
+ 
+ const cases = [];
+-function check(name, run) {
+-  cases.push({ id: `LWSC${String(cases.length + 1).padStart(2, "0")}`, name, run });
++// D66(a), extended by PO decision row 30 (decision tiles of 2026-10-23): check(name, { todo: "typed-pending: ... backlog item pipeline.<id>" }, run) = typed
++// pending case (mode todo), body unchanged. Cause: `withWorkerAuthority` (lib/local-worker-supervisor.mjs) deliberately throws
++// `local-worker-supervisor:async-native-journal-phase-unavailable` until the settled journal phase is designed after 0.7.0, so every ready
++// `run --activate` answers LWS-UNAVAILABLE. QG-04 justification (bounded): no assertion is weakened, removed or skipped; the nine cases still run and
++// stay visible as pending, and they turn into plain passing cases when the journal phase lands.
++function check(name, optionsOrRun, maybeRun) {
++  const [options, run] = typeof optionsOrRun === "function" ? [{}, optionsOrRun] : [optionsOrRun, maybeRun];
++  if (options.todo !== undefined && !/^typed-pending: .*backlog item pipeline\.[a-z0-9-]+/.test(options.todo)) throw new Error(`pending case without a typed backlog binding: ${name}`);
++  cases.push({ id: `LWSC${String(cases.length + 1).padStart(2, "0")}`, name, ...(options.todo === undefined ? {} : { mode: "todo" }), run });
+ }
++const JOURNAL_PHASE_PENDING = { todo: "typed-pending: D66(a), PO list row 30; deliberate fail-closed `local-worker-supervisor:async-native-journal-phase-unavailable` in withWorkerAuthority until the settled journal phase after 0.7.0; binding backlog item pipeline.model-family-async-effects-need-a-settled-journal-phase (its acceptance list does not yet name the LWSC cases); assertions unchanged" };
+ 
+-check("plans and runs two overlapping real child processes in separate no-hardlink Git clones", () => {
++check("plans and runs two overlapping real child processes in separate no-hardlink Git clones", JOURNAL_PHASE_PENDING, () => {
+   const context = fixture();
+   try {
+     const { run } = runWave(context, createRequest(context.sourceRoot, context.stateRoot, context.commit));
+@@ -437,7 +445,7 @@ check("returns serial-fallback-required before creating a workspace when recover
+   }
+ });
+ 
+-check("times out and signals only the exact observed child, then permits exact cleanup", () => {
++check("times out and signals only the exact observed child, then permits exact cleanup", JOURNAL_PHASE_PENDING, () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 2_000, timeoutMs: 200, write: false });
+@@ -454,7 +462,7 @@ check("times out and signals only the exact observed child, then permits exact c
+   }
+ });
+ 
+-check("accepts an exact cancellation intent, drains the owned child, and permits cleanup", async () => {
++check("accepts an exact cancellation intent, drains the owned child, and permits cleanup", JOURNAL_PHASE_PENDING, async () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
+@@ -492,7 +500,7 @@ check("accepts an exact cancellation intent, drains the owned child, and permits
+   }
+ });
+ 
+-check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", async () => {
++check("does not deny cancellation of a healthy worker purely because a heartbeat aged the record digest", JOURNAL_PHASE_PENDING, async () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
+@@ -528,7 +536,7 @@ check("does not deny cancellation of a healthy worker purely because a heartbeat
+   }
+ });
+ 
+-check("keeps a failed real child attributable and does not convert nonzero exit into success", () => {
++check("keeps a failed real child attributable and does not convert nonzero exit into success", JOURNAL_PHASE_PENDING, () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 200, exitCode: 7, write: false });
+@@ -551,7 +559,7 @@ check("keeps a failed real child attributable and does not convert nonzero exit
+   }
+ });
+ 
+-check("classifies an ignored unauthorized write and source-checkout drift as recovery-required", async () => {
++check("classifies an ignored unauthorized write and source-checkout drift as recovery-required", JOURNAL_PHASE_PENDING, async () => {
+   const unauthorized = fixture();
+   try {
+     const request = createRequest(unauthorized.sourceRoot, unauthorized.stateRoot, unauthorized.commit, {
+@@ -589,7 +597,7 @@ check("classifies an ignored unauthorized write and source-checkout drift as rec
+   }
+ });
+ 
+-check("reports a killed supervisor with a still-attributable worker as recovery-required", async () => {
++check("reports a killed supervisor with a still-attributable worker as recovery-required", JOURNAL_PHASE_PENDING, async () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
+@@ -617,7 +625,7 @@ check("reports a killed supervisor with a still-attributable worker as recovery-
+   }
+ });
+ 
+-check("admits only one of two concurrent starts for the same exact plan", async () => {
++check("admits only one of two concurrent starts for the same exact plan", JOURNAL_PHASE_PENDING, async () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, {
+@@ -647,7 +655,7 @@ check("admits only one of two concurrent starts for the same exact plan", async
+   }
+ });
+ 
+-check("denies replayed cleanup and foreign workspace marker without broad deletion", () => {
++check("denies replayed cleanup and foreign workspace marker without broad deletion", JOURNAL_PHASE_PENDING, () => {
+   const context = fixture();
+   try {
+     const request = createRequest(context.sourceRoot, context.stateRoot, context.commit, { count: 1, delayMs: 200 });
+diff --git a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+index 636df9918..00edc6be8 100644
+--- a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
++++ b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+@@ -497,7 +497,11 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
+     // Any other outcome (error, no-progress, unsupported-next-action, step-cap-exceeded,
+     // no-automatic-next-step) is a genuine dead end this harness cannot drive past.
+     rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "dead-end" });
+-    return { schema: SCHEMA, root: dir, runner, outcome: result.outcome, turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final };
++    // Additive (PO row 23, K94): name the Driver's last executed step and its stderr so a consumer can type the stop it reached.
++    const lastExecuted = executed.at(-1);
++    return { schema: SCHEMA, root: dir, runner, outcome: result.outcome, turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: result.final,
++      lastStep: lastExecuted === undefined ? null : { subcommand: lastExecuted.argv?.[1] ?? null, exitCode: lastExecuted.exitCode ?? null, faultCode: lastExecuted.faultCode ?? null },
++      stopStderr: typeof result.error?.stderr === "string" ? result.error.stderr.slice(0, 500) : null };
+   }
+ 
+   return { schema: SCHEMA, root: dir, runner, outcome: "turn-cap-exceeded", turns: rounds.length, driverStepsChained, repairSubcommands, rounds, final: null };
+diff --git a/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs b/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
+index 0f92a3e46..bd1fba5ff 100644
+--- a/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/measure-tofu-push-e2e.test.mjs
+@@ -10,9 +10,10 @@
+  * briefing: cover `parseJsonStdout`'s normal case and the F2 regression case, and
+  * `fakeSetupSpawn`'s genpkey/pkey interception (mirroring
+  * `po-human-approval.test.mjs`'s own `fakeSetupSpawn` test pattern).  The
+- * current suite also executes the full disposable Driver path, so a new
+- * onboarding handover shape cannot make the measurement silently stop before
+- * the real TOFU push ceremony.
++ * current suite also executes the full disposable Driver path up to the
++ * ADR-0085 single-review design-course boundary and asserts the typed stop it
++ * reaches there, so a new onboarding handover shape cannot silently move that
++ * stop (PO row 23, option (b)); the signed push is measured by the Greenfield test.
+  */
+ import assert from "node:assert/strict";
+ import { createPrivateKey, createPublicKey } from "node:crypto";
+@@ -120,21 +121,34 @@ test("fakeSetupSpawn: every other openssl invocation falls through to a real spa
+   assert.equal(result.status, 0);
+ });
+ 
+-test("full TOFU measurement follows Driver-provided design answers through to a recorded signed push", { timeout: 120_000 }, () => {
++// QG-04 (bounded justification, PO row 23 of the AFK list, decided 2026-10-23 as option (b), D63 decision): the claim of this case changes from
++// "TOFU through a recorded signed push" to "TOFU up to the ADR-0085 single-review design-course boundary, stopping typed". The real Driver cannot reach a
++// recorded signed push without the design course itself (author the staging PRD/Spec, submit-plan, review receipt, present-plan --review-receipt, signed
++// approval), which a disposable in-process measurement cannot supply. The assertions of the old claim (outcome "signed-push-recorded", a successful
++// approve-push step, trustAnchorPinned false, the critical-human-proof-policy schema) are therefore not carried over; the signed push is measured by the
++// Greenfield test instead, and this case asserts the typed stop the walk actually reaches: setup ok, onboarding ends at the Driver's own refusal to
++// acknowledge a generated placeholder PRD/Spec, within the measured six turns, and no later ceremony step ran.
++test("TOFU measurement stops typed at the ADR-0085 single-review design-course boundary; the Greenfield test measures the signed push", { timeout: 120_000 }, () => {
+   let stdout = "";
+   const status = main([], { write: (chunk) => { stdout += chunk; } });
+-  assert.equal(status, 0, stdout);
+   const result = JSON.parse(stdout);
+-  assert.equal(result.outcome, "signed-push-recorded", stdout);
+-  assert.equal(result.steps[0]?.step, "setup");
++  // Typed stop: the measurement is not a signed push, so main() reports status 1 with the onboarding-not-ready outcome.
++  assert.equal(status, 1, stdout);
++  assert.equal(result.outcome, "onboarding-not-ready", stdout);
++  assert.equal(result.steps[0]?.step, "setup", stdout);
+   assert.equal(result.steps[0]?.ok, true, stdout);
+-  assert.equal(result.steps[1]?.step, "onboarding");
+-  assert.equal(result.steps[1]?.outcome, "ready", stdout);
+-  assert.ok(result.steps.some((step) => step.step === "approve-push" && step.exitCode === 0), stdout);
+-  // The local mirror is accepted only after its authority matches the
+-  // repository-private key-directory pointer established by setup. This
+-  // measurement ends at approve-push; the separate push-guard boundary owns
+-  // any later TOFU policy upgrade.
+-  assert.equal(result.trustAnchorPinned, false, stdout);
+-  assert.equal(result.policy?.schema, "pipeline.critical-human-proof-policy.v1", stdout);
++  assert.equal(result.steps[1]?.step, "onboarding", stdout);
++  assert.equal(result.steps[1]?.outcome, "error", stdout);
++  // Turn count bound as the existing case measured it (six turns up to the boundary).
++  assert.ok(result.steps[1]?.turns <= 6, stdout);
++  assert.equal(result.onboarding?.turns, result.steps[1]?.turns, stdout);
++  // The walk reached the design course: the architecture design was authored, then the Driver's last step was the plan acknowledgement, which refuses the
++  // generated placeholder PRD/Spec (the ADR-0085 course replaces that acknowledgement with the single review).
++  assert.ok(result.onboarding?.rounds.some((round) => round.resolved === "authored-architecture-design" && round.code === "ARCHITECTURE-DESIGN-AUTHORING-INCOMPLETE"), stdout);
++  assert.equal(result.onboarding?.lastStep?.subcommand, "bootstrap-acknowledge-plan", stdout);
++  assert.equal(result.onboarding?.lastStep?.exitCode, 2, stdout);
++  assert.match(result.onboarding?.stopStderr ?? "", /BOOTSTRAP-ACK-PLACEHOLDER-CONTENT/, stdout);
++  // No ceremony step after onboarding ran: the signed push is out of this measurement's bound.
++  assert.equal(result.steps.length, 2, stdout);
++  assert.equal(result.steps.some((step) => step.step === "approve-push"), false, stdout);
+ });

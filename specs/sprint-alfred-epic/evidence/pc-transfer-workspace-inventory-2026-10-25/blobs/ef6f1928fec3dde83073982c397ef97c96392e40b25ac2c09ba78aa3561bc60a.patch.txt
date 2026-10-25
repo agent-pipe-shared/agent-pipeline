@@ -1,0 +1,565 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs
+index a8da1a29d..1390dfd95 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs
+@@ -26,7 +26,7 @@
+  */
+ import assert from "node:assert/strict";
+ import { execFileSync, spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { test } from "node:test";
+@@ -537,3 +537,88 @@ test("hook: no config exits 0 and never touches the ledger", { skip: enrollmentS
+   assert.equal(result.status, 0, result.stderr);
+   assert.equal(existsSync(ledgerPath(c)), false);
+ });
++
++// ---- K93 (PO decision, K12 S2 row 25): write-scope overlap is refused WITHOUT a slice queue ------
++// One tool call carrying several Goldfish dispatches (the parallel batch) and the open dispatch records of the checkout are
++// judged by the declared write scopes alone: no PIPELINE_FANOUT_CONFIG, no queue. The default is enforce; the explicit
++// switch PIPELINE_FANOUT_SCOPE_MODE=shadow admits with a warning. Each case uses its own enrolled repository, because an open
++// dispatch record of one case must not be seen by another.
++const goldfishTemplate = () => {
++  const raw = readFileSync(fileURLToPath(new URL("../../../templates/prompts/goldfish-task.md", import.meta.url)), "utf8");
++  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
++  return raw.slice(raw.indexOf(marker) + marker.length)
++    .replace(/\{\{MODEL_ID\}\}/g, "claude-sonnet-5").replace(/\{\{EFFORT\}\}/g, "medium")
++    .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium").replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses")
++    .replace(/\{\{[^{}]*\}\}/g, "FILLED");
++};
++const scoped = (id, scope) => `${goldfishTemplate()}\n${id === null ? "" : `Slice: ${id}\n`}${scope === null ? "" : `Write scope: ${scope}\n`}`;
++function scopeRepo(name) {
++  const repo = join(root, name);
++  mkdirSync(join(repo, ".claude"), { recursive: true });
++  execFileSync("git", ["init", "-q"], { cwd: repo });
++  recordConsentGiven({ rootDir: repo });
++  // Enrolled but NOT item governed (the shape guard-dispatch.test.mjs uses for its productive Goldfish cases).
++  writeFileSync(join(repo, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++  writeFileSync(join(repo, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
++  return repo;
++}
++function runBatch(repo, prompts, { env = {}, toolInput = {} } = {}) {
++  const Subagents = prompts.map((Prompt) => ({ TypeName: "pipeline-core:goldfish-implementor", Prompt }));
++  const payload = { tool_name: "invoke_subagent", tool_use_id: "toolu_k93", session_id: SESSION, cwd: repo, tool_input: { Subagents, ...toolInput } };
++  const hookEnv = { ...process.env, CLAUDE_PROJECT_DIR: repo, ...env };
++  delete hookEnv.PIPELINE_FANOUT_CONFIG;
++  if (env.PIPELINE_FANOUT_SCOPE_MODE === undefined) delete hookEnv.PIPELINE_FANOUT_SCOPE_MODE;
++  return spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), env: hookEnv, encoding: "utf8", cwd: repo });
++}
++
++test("K93 hook: two dispatches of one call with overlapping write scopes are refused by default, without a queue, naming both, the paths and the repair", { skip: enrollmentSkip ?? false }, () => {
++  const repo = scopeRepo("k93-enforce");
++  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs, src/shared/b.mjs, src/own/x.mjs"), scoped("K93-BETA", "src/shared/")]);
++  assert.equal(result.status, 2, result.stderr);
++  for (const needle of ["GUARD-DISPATCH-SCOPE-OVERLAP", "K93-ALPHA", "K93-BETA", "src/shared/a.mjs", "src/shared/b.mjs", "isolation: \"worktree\"", "PIPELINE_FANOUT_SCOPE_MODE=shadow"]) {
++    assert.ok(result.stderr.includes(needle), `stderr must name ${needle}: ${result.stderr.slice(0, 900)}`);
++  }
++  assert.doesNotMatch(result.stderr, /src\/own\/x\.mjs/u, "a path outside the overlap is not named");
++  assert.match(result.stderr, /Narrow|narrow/u);
++  assert.match(result.stderr, /after .*finished|sequence/iu);
++});
++
++test("K93 hook: more than five overlapping paths name the first five and then a count", { skip: enrollmentSkip ?? false }, () => {
++  const repo = scopeRepo("k93-many");
++  const files = Array.from({ length: 8 }, (_, i) => `src/m/f${i}.mjs`);
++  const result = runBatch(repo, [scoped("K93-M1", files.join(", ")), scoped("K93-M2", "src/m/")]);
++  assert.equal(result.status, 2, result.stderr);
++  assert.ok(result.stderr.includes("src/m/f4.mjs") && !result.stderr.includes("src/m/f5.mjs"), result.stderr.slice(0, 900));
++  assert.match(result.stderr, /and 3 more/u);
++});
++
++test("K93 hook: the explicit shadow switch admits the same overlap with a warning that names the paths", { skip: enrollmentSkip ?? false }, () => {
++  const repo = scopeRepo("k93-shadow");
++  const result = runBatch(repo, [scoped("K93-ALPHA", "src/shared/a.mjs"), scoped("K93-BETA", "src/shared/")], { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
++  assert.equal(result.status, 0, result.stderr);
++  assert.match(result.stderr, /WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
++  assert.ok(result.stderr.includes("src/shared/a.mjs"));
++});
++
++test("K93 hook: disjoint write scopes, and an isolated call, are admitted without a scope finding", { skip: enrollmentSkip ?? false }, () => {
++  const disjoint = runBatch(scopeRepo("k93-disjoint"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", "src/b/")]);
++  assert.equal(disjoint.status, 0, disjoint.stderr);
++  assert.doesNotMatch(disjoint.stderr, /GUARD-DISPATCH-SCOPE/u);
++  const isolated = runBatch(scopeRepo("k93-isolated"), [scoped("K93-ALPHA", "src/s/"), scoped("K93-BETA", "src/s/")], { toolInput: { isolation: "worktree" } });
++  assert.equal(isolated.status, 0, isolated.stderr);
++  assert.doesNotMatch(isolated.stderr, /GUARD-DISPATCH-SCOPE/u);
++});
++
++test("K93 hook: a scope that cannot be read warns only, in a batch and against an open record", { skip: enrollmentSkip ?? false }, () => {
++  const batch = runBatch(scopeRepo("k93-unknown-batch"), [scoped("K93-ALPHA", "src/a/"), scoped("K93-BETA", null)]);
++  assert.equal(batch.status, 0, batch.stderr);
++  assert.match(batch.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
++  assert.ok(batch.stderr.includes("K93-BETA"));
++  const repo = scopeRepo("k93-unknown-record");
++  mkdirSync(join(repo, "evidence"), { recursive: true });
++  writeFileSync(join(repo, "evidence", "dispatch-record-K93-OPEN.json"), JSON.stringify({ taskId: "K93-OPEN", outcome: "in-progress" }));
++  const record = runBatch(repo, [scoped("K93-ALPHA", "src/a/")]);
++  assert.equal(record.status, 0, record.stderr);
++  assert.match(record.stderr, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
++  assert.ok(record.stderr.includes("K93-OPEN"));
++});
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 423d0c08a..ef13911d1 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -688,6 +688,19 @@ export function recordFanoutEvents(plan, events, now) {
+   return recorded;
+ }
+ 
++// K93/K104: the id and write scope one dispatch prompt declares (a generated briefing's allowed paths, else the `Slice:` and
++// `Write scope:` lines; scope is a path list, "none" or null). The overlap judgement itself runs in the spawned
++// scripts/dispatch-record-liveness.mjs --scope-overlap (a spawn, not an import: this hook sits in an import cycle through
++// project-onboarding-v3, and a static import of dispatch-record-liveness.mjs here changed its initialisation order, K104).
++export function dispatchWriteScope(prompt) {
++  try {
++    const bound = parseNativeGoldfishBriefing(prompt);
++    if (bound.ok && bound.binding.allowedPaths?.length > 0) return { id: bound.binding.dispatchId, scope: [...bound.binding.allowedPaths] };
++    const named = parseDispatchSlice(prompt);
++    return { id: named.sliceId, scope: named.writeScope };
++  } catch { return { id: null, scope: null }; }
++}
++
+ // Gate the entire hook body on being the process entrypoint (matching
+ // guard-dispatch-budget.mjs's shape). Importing this module for `extractWorkflowDispatches`
+ // must never itself read stdin, parse it, or call `process.exit` -- see `../lib/entrypoint.mjs`'s
+@@ -813,8 +826,15 @@ if (isDirectInvocation(import.meta.url)) {
+     }
+   }
+   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
+-  const second = blocked.length === 0 && productive.length > 0 && toolInput.isolation !== "worktree" && !/isolation\s*:\s*['"`]worktree/u.test(String(toolInput.script ?? "")) ? spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--second-writer", productive.map(({ dispatch }) => parseDispatchSlice(dispatch.prompt).sliceId).filter(Boolean).join(",") || "-"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 30000 }) : null;
++  const isolatedCall = toolInput.isolation === "worktree" || /isolation\s*:\s*['"`]worktree/u.test(String(toolInput.script ?? ""));
++  const second = blocked.length === 0 && productive.length > 0 && !isolatedCall ? spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--second-writer", productive.map(({ dispatch }) => parseDispatchSlice(dispatch.prompt).sliceId).filter(Boolean).join(",") || "-"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 30000 }) : null;
+   if (second) { process.stderr.write(second.stderr || (second.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the second-writer check could not run; this dispatch is admitted without it (ALF-K39, D110).\n")); if (second.status === 2) process.exit(2); }
++  // K93: write scopes of one call and of the open dispatch records must be disjoint, queue or not (enforce by default).
++  if (blocked.length === 0 && productive.length > 0 && !isolatedCall) {
++    const scopes = spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--scope-overlap", "stdin"], { encoding: "utf8", input: JSON.stringify(productive.map(({ dispatch }) => dispatchWriteScope(dispatch.prompt))), stdio: ["pipe", "ignore", "pipe"], timeout: 30000 });
++    process.stderr.write(scopes.stderr || (scopes.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run; this call is admitted without it.\n"));
++    if (scopes.status === 2) process.exit(2);
++  }
+   // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
+   // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
+   for (const { dispatch } of productive) {
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+index 5507e7074..0dc95112c 100644
+--- a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+@@ -148,3 +148,123 @@ export function secondWriterAdmission({ root, ownTaskIds = [], isolated = false,
+   const advisory = unjudged.length === 0 ? "" : `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: open dispatch record(s) of this checkout whose owner cannot be judged alive or gone: ${unjudged.map(describe).join("; ")}. This dispatch is admitted (an unjudgeable owner never blocks); check them with: node ${LIVENESS_SCRIPT} --root ${root}\n`;
+   return { refusal, advisory };
+ }
++
++// ---------------------------------------------------------------------------------------------------------------------
++// K93 / PO decision (K12 S2, row 25): the write-scope overlap of dispatches is refused WITHOUT a slice queue. Two sources of
++// parties are judged by their declared write scopes alone: the dispatches of ONE tool call (the parallel batch) and the
++// dispatches that may still be writing in this checkout (an open dispatch record whose owner is alive or unjudgeable; the same
++// readback as above). The overlap predicate is the pure `scopesOverlap` of slice-queue.mjs. The default is enforce; the explicit
++// switch PIPELINE_FANOUT_SCOPE_MODE=shadow admits with a warning. A scope that cannot be read warns only. Read-only by
++// construction (file reads, no lock), and neutral across runners and operating systems (no shell syntax in a message).
++export const SCOPE_OVERLAP_SWITCH = "PIPELINE_FANOUT_SCOPE_MODE";
++const SCOPE_SCAN_LIMIT = 500;
++const BRIEFING_MARKER = "<!-- pipeline-native-goldfish-host-commit:v";
++const shownPaths = (paths) => (paths.length <= 5 ? paths.join(", ") : `${paths.slice(0, 5).join(", ")} and ${paths.length - 5} more`);
++
++/** `enforce` unless the environment names `shadow` explicitly; any other value enforces. */
++export const scopeOverlapMode = (env = process.env) => (env?.[SCOPE_OVERLAP_SWITCH] === "shadow" ? "shadow" : "enforce");
++
++// The briefing parsers (`parseNativeGoldfishBriefing`, `parseDispatchSlice`) are injected by the caller, not imported: this module
++// is reached from the import cycle through project-onboarding-v3 (via scripts/dispatch-briefing.mjs), and importing them here changes
++// the initialisation order (a temporal-dead-zone fault in project-onboarding-ready-gate, observed while building K93). For the same
++// reason hooks/guard-dispatch.mjs does not import this module: it spawns scripts/dispatch-record-liveness.mjs (K104).
++/** The allowed paths of every generated briefing directly under scratch/, by dispatch id (read-only, bounded, never throws). */
++function briefedWriteScopes(root, parseBriefing) {
++  const scopes = new Map();
++  try {
++    const dir = realpathSync(join(root, "scratch"));
++    if (dir !== join(realpathSync(root), "scratch")) return scopes;
++    for (const name of readdirSync(dir).filter((entry) => entry.endsWith(".md")).sort().slice(0, SCOPE_SCAN_LIMIT)) {
++      try {
++        const info = lstatSync(join(dir, name));
++        if (!info.isFile() || info.isSymbolicLink() || info.size > READ_LIMIT) continue;
++        const text = readFileSync(join(dir, name), "utf8");
++        const parsed = text.includes(BRIEFING_MARKER) ? parseBriefing(text) : null;
++        if (parsed?.ok && !scopes.has(parsed.binding.dispatchId)) scopes.set(parsed.binding.dispatchId, [...parsed.binding.allowedPaths]);
++      } catch { /* a file that is not a briefing is not a source of scopes */ }
++    }
++  } catch { /* no scratch directory */ }
++  return scopes;
++}
++
++/**
++ * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read. A dispatch
++ * is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably gone (alive, or
++ * unjudgeable, which is the usual Claude case). Its scope is the governed queue row's write scope, else the allowed paths of
++ * its generated briefing under scratch/; `writeScope` is null when neither exists. A checkout whose records cannot be read
++ * has no running dispatch to judge. Shared by this guard and scripts/dispatch-briefing.mjs (one reading of "running").
++ * `queueRowFn(root, id)` (the governed queue row of an id, or null) is injected by the caller: this module must not import the
++ * governed-queue module (an import cycle through guard-dispatch would initialise modules in a different order).
++ */
++export function readRunningDispatches(root, { readFn = readDispatchRecordLiveness, queueRowFn = () => null, parseBriefing = () => null } = {}) {
++  let records;
++  try { records = readFn(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
++  if (records.length === 0) return [];
++  const briefed = briefedWriteScopes(root, parseBriefing);
++  return records.map((entry) => {
++    let row = null;
++    try { row = queueRowFn(root, entry.taskId); } catch { row = null; }
++    return { dispatchId: entry.taskId, verdict: entry.verdict, record: entry.record, writeScope: row?.writeScope ?? briefed.get(entry.taskId) ?? null };
++  });
++}
++
++/**
++ * Judges the write scopes of `dispatches` ([{ prompt }], the Goldfish dispatches of one call) against each other and against
++ * `running` (readRunningDispatches). `declare(prompt)` returns `{ id, scope }` (a path list, "none", or null); `overlaps(a, b)` is `scopesOverlap` of slice-queue.mjs (injected, like `declare`, to keep this module free of imports that join the guard's import cycle). `isolated` (the call runs in its own worktree) judges nothing. Returns strings, empty
++ * when there is nothing to say: `refusal` (enforce, an overlap), `warning` (shadow overlap, and unreadable scopes). Never throws.
++ */
++export function scopeOverlapAdmission({ dispatches = [], running = [], mode = "enforce", isolated = false, declare = () => ({ id: null, scope: null }), overlaps } = {}) {
++  if (isolated) return { refusal: "", warning: "" };
++  try {
++    const parties = [];
++    dispatches.forEach((dispatch, index) => {
++      const declared = declare(dispatch?.prompt);
++      if (declared.scope === "none") return; // read-only: nothing to overwrite
++      parties.push({ id: declared.id, name: declared.id ?? `dispatch #${index + 1} of this call`, where: "this call", scope: Array.isArray(declared.scope) ? declared.scope : null });
++    });
++    if (parties.length === 0) return { refusal: "", warning: "" };
++    const own = new Set(parties.map((party) => party.id).filter(Boolean));
++    const others = running.filter((entry) => !own.has(entry.dispatchId)).map((entry) => ({
++      id: entry.dispatchId, name: plain(entry.dispatchId), running: true, where: `open dispatch record ${plain(entry.record ?? "")}, owner ${plain(entry.verdict ?? "unknown")}`,
++      scope: Array.isArray(entry.writeScope) && entry.writeScope.length > 0 ? entry.writeScope : null,
++    }));
++    const conflicts = [];
++    const unreadable = [];
++    const note = (party) => { if (!unreadable.includes(party)) unreadable.push(party); };
++    parties.forEach((first, index) => {
++      for (const second of [...parties.slice(index + 1), ...others]) {
++        if (first.scope === null || second.scope === null) { if (first.scope === null) note(first); if (second.scope === null) note(second); continue; }
++        const paths = [];
++        for (const mine of first.scope) for (const theirs of second.scope) {
++          const shown = mine === theirs ? mine : `${mine} (against ${theirs})`;
++          if (!paths.includes(shown) && overlaps([mine], [theirs])) paths.push(shown);
++        }
++        if (paths.length > 0) conflicts.push({ first: second.running ? second : first, second: second.running ? first : second, paths });
++      }
++    });
++    let text = "";
++    if (conflicts.length > 0) {
++      const lead = conflicts[0];
++      const switchText = mode === "shadow"
++        ? `Mode: shadow (set explicitly through ${SCOPE_OVERLAP_SWITCH}=shadow); this call is admitted. Unset ${SCOPE_OVERLAP_SWITCH} to enforce.`
++        : `Mode: enforce (the default). To admit such an overlap with a warning instead, set the environment variable ${SCOPE_OVERLAP_SWITCH}=shadow for the hook.`;
++      text = [
++        `GUARD-DISPATCH-SCOPE-OVERLAP: dispatches would write the same paths in one checkout, and two dispatches writing the same paths overwrite each other:`,
++        ...conflicts.map((c) => `  - ${c.first.name} (${c.first.where}) and ${c.second.name} (${c.second.where}) both write: ${shownPaths(c.paths)}`),
++        `Repair, one of:`,
++        `  1. Sequence them: send ${lead.second.name} in a later call, after ${lead.first.name} has finished (a terminal dispatch record).`,
++        `  2. Narrow one allowed-path list (the "Write scope:" line, or the --path list of the generated briefing) of ${lead.first.name} or ${lead.second.name} until the two lists no longer share a path.`,
++        `  3. Where the runner offers isolation, run ${lead.second.name} in its own worktree: set isolation: "worktree" on that dispatch call (a call with that setting is not checked here; it writes in another checkout).`,
++        ...(conflicts.some((c) => c.first.running) ? [`  4. If a running dispatch above is abandoned, finalize its dispatch record with a terminal outcome through the sanctioned dispatch-record writer (scripts/dispatch-record-write.mjs).`] : []),
++        switchText,
++      ].join("\n");
++    }
++    const unknown = unreadable.length === 0 ? "" : `GUARD-DISPATCH-SCOPE-UNKNOWN: the write scope of ${unreadable.map((party) => party.name).join(", ")} could not be read (no "Write scope:" line, generated briefing or governed queue row), so this call was not checked against ${unreadable.length === 1 ? "it" : "them"}; confirm the scopes are disjoint before dispatching.`;
++    return {
++      refusal: mode === "enforce" && text !== "" ? `BLOCKED (guard-dispatch, plugin pipeline-core): ${text}\n` : "",
++      warning: [mode === "enforce" ? "" : text, unknown].filter(Boolean).map((line) => `WARNING (guard-dispatch): ${line}\n`).join(""),
++    };
++  } catch (error) {
++    return { refusal: "", warning: `WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run (${plain(error?.message)}); this call is admitted without it.\n` };
++  }
++}
+diff --git a/plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs b/plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs
+new file mode 100644
+index 000000000..bcdde9412
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs
+@@ -0,0 +1,147 @@
++// SPDX-License-Identifier: SUL-1.0
++//
++// K93 (PO decision, K12 S2 row 25): write-scope overlap of dispatches is refused without a slice queue. These cases pin the pure
++// admission (`scopeOverlapAdmission`, `scopeOverlapMode`, `readRunningDispatches`) in lib/dispatch-record-liveness.mjs, the hook's
++// `dispatchWriteScope`, the spawned `--scope-overlap` mode of scripts/dispatch-record-liveness.mjs (K104) and the import-cycle pin;
++// the hook-level cases (the real process, enforce by default, the shadow switch) are in hooks/guard-dispatch-fanout.test.mjs.
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdtempSync, readFileSync, rmSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++const mod = await import("./dispatch-record-liveness.mjs");
++const liveness = await import("../scripts/dispatch-record-liveness.mjs");
++const gd = await import("../hooks/guard-dispatch.mjs"); // `dispatchWriteScope` is the `declare` the hook injects
++
++const prompt = (id, scope) => `Implement it.\n${id === null ? "" : `Slice: ${id}\n`}${scope === null ? "" : `Write scope: ${scope}\n`}`;
++const running = (over = {}) => ({ dispatchId: "RUN-1", verdict: "unjudgeable", record: "evidence/dispatch-record-RUN-1.json", writeScope: ["src/a/x.mjs"], ...over });
++const { scopesOverlap } = await import("./slice-queue.mjs");
++const judge = (over) => mod.scopeOverlapAdmission({ declare: gd.dispatchWriteScope, overlaps: scopesOverlap, ...over });
++
++test("scopeOverlapMode: enforce by default and for any unrecognised value, shadow only when named", () => {
++  assert.equal(mod.scopeOverlapMode({}), "enforce");
++  assert.equal(mod.scopeOverlapMode({ PIPELINE_FANOUT_SCOPE_MODE: "shadow" }), "shadow");
++  assert.equal(mod.scopeOverlapMode({ PIPELINE_FANOUT_SCOPE_MODE: "Shadow " }), "enforce");
++  assert.equal(mod.scopeOverlapMode({ PIPELINE_FANOUT_SCOPE_MODE: "off" }), "enforce");
++});
++
++test("dispatchWriteScope: the Slice and Write scope lines, none, and an undeclared scope", () => {
++  assert.deepEqual(gd.dispatchWriteScope(prompt("S1", "src/a/, src/b.mjs")), { id: "S1", scope: ["src/a/", "src/b.mjs"] });
++  assert.deepEqual(gd.dispatchWriteScope(prompt("S1", "none")), { id: "S1", scope: "none" });
++  assert.deepEqual(gd.dispatchWriteScope(prompt(null, null)), { id: null, scope: null });
++  assert.deepEqual(gd.dispatchWriteScope(undefined), { id: null, scope: null });
++});
++
++test("a batch with overlapping scopes is refused without any queue, naming both dispatches, the paths and the exact repair", () => {
++  const result = judge({ dispatches: [{ prompt: prompt("S-ONE", "src/a/x.mjs, src/own/y.mjs") }, { prompt: prompt("S-TWO", "src/a/") }] });
++  assert.match(result.refusal, /^BLOCKED \(guard-dispatch, plugin pipeline-core\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
++  for (const needle of ["S-ONE", "S-TWO", "src/a/x.mjs", "isolation: \"worktree\"", "PIPELINE_FANOUT_SCOPE_MODE=shadow", "Sequence them", "Narrow one allowed-path list"]) {
++    assert.ok(result.refusal.includes(needle), `missing ${needle}: ${result.refusal}`);
++  }
++  assert.ok(!result.refusal.includes("src/own/y.mjs"), "a path outside the overlap is not named");
++  assert.ok(!result.refusal.includes("dispatch-record-write.mjs"), "no running dispatch, so no record repair is offered");
++  assert.equal(result.warning, "");
++});
++
++test("an overlap with an open record of an unjudgeable owner is refused and offers the record repair; its own id is not held against it", () => {
++  const result = judge({ dispatches: [{ prompt: prompt("S-NEW", "src/a/") }], running: [running()] });
++  assert.match(result.refusal, /GUARD-DISPATCH-SCOPE-OVERLAP/u);
++  for (const needle of ["RUN-1", "S-NEW", "evidence/dispatch-record-RUN-1.json", "owner unjudgeable", "src/a/x.mjs", "dispatch-record-write.mjs"]) {
++    assert.ok(result.refusal.includes(needle), `missing ${needle}: ${result.refusal}`);
++  }
++  assert.equal(judge({ dispatches: [{ prompt: prompt("RUN-1", "src/a/") }], running: [running()] }).refusal, "", "a rebind is not held against itself");
++});
++
++test("more than five overlapping paths name the first five and then a count", () => {
++  const files = Array.from({ length: 8 }, (_, i) => `src/m/f${i}.mjs`);
++  const result = judge({ dispatches: [{ prompt: prompt("M1", files.join(", ")) }, { prompt: prompt("M2", "src/m/") }] });
++  assert.ok(result.refusal.includes("src/m/f4.mjs") && !result.refusal.includes("src/m/f5.mjs"), result.refusal);
++  assert.match(result.refusal, /and 3 more/u);
++});
++
++test("shadow admits the same overlap with a warning that names the paths and the switch; isolated and disjoint scopes say nothing", () => {
++  const dispatches = [{ prompt: prompt("S-ONE", "src/a/x.mjs") }, { prompt: prompt("S-TWO", "src/a/") }];
++  const shadow = judge({ dispatches, mode: "shadow" });
++  assert.equal(shadow.refusal, "");
++  assert.match(shadow.warning, /^WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
++  assert.ok(shadow.warning.includes("src/a/x.mjs") && shadow.warning.includes("PIPELINE_FANOUT_SCOPE_MODE=shadow"));
++  assert.deepEqual(judge({ dispatches, isolated: true }), { refusal: "", warning: "" });
++  assert.deepEqual(judge({ dispatches: [{ prompt: prompt("A", "src/a/") }, { prompt: prompt("B", "src/b/") }], running: [running({ writeScope: ["src/c/"] })] }), { refusal: "", warning: "" });
++});
++
++test("a read-only dispatch (Write scope: none) overlaps nothing", () => {
++  assert.deepEqual(judge({ dispatches: [{ prompt: prompt("RO", "none") }, { prompt: prompt("W", "src/a/") }] }), { refusal: "", warning: "" });
++  assert.deepEqual(judge({ dispatches: [{ prompt: prompt("RO", "none") }], running: [running({ writeScope: ["src/a/"] })] }), { refusal: "", warning: "" });
++});
++
++test("a scope that cannot be read only warns, for a batch member and for a running dispatch", () => {
++  const batch = judge({ dispatches: [{ prompt: prompt("S-ONE", "src/a/") }, { prompt: prompt("S-NOSCOPE", null) }] });
++  assert.equal(batch.refusal, "");
++  assert.match(batch.warning, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
++  assert.ok(batch.warning.includes("S-NOSCOPE"));
++  const open = judge({ dispatches: [{ prompt: prompt("S-ONE", "src/a/") }], running: [running({ writeScope: null })] });
++  assert.equal(open.refusal, "");
++  assert.ok(open.warning.includes("RUN-1") && /GUARD-DISPATCH-SCOPE-UNKNOWN/u.test(open.warning));
++  assert.deepEqual(judge({ dispatches: [{ prompt: prompt("ALONE", null) }] }), { refusal: "", warning: "" }, "nothing to compare against says nothing");
++});
++
++// K104: the hook must not import dispatch-record-liveness.mjs (an import cycle through project-onboarding-v3: a static edge from the
++// hook changed the initialisation order and scripts/dispatch-briefing.mjs and the hook's own suite stopped loading with a TDZ fault in
++// project-onboarding-ready-gate). The hook spawns scripts/dispatch-record-liveness.mjs --scope-overlap instead, like --second-writer.
++test("the hook has no static or dynamic edge to dispatch-record-liveness.mjs, and both cycle entry points load in a fresh process", () => {
++  const source = readFileSync(fileURLToPath(new URL("../hooks/guard-dispatch.mjs", import.meta.url)), "utf8");
++  assert.ok(!/from\s+["'][^"']*lib\/dispatch-record-liveness\.mjs["']|import\(\s*["'][^"']*dispatch-record-liveness\.mjs/u.test(source), "guard-dispatch.mjs must reach the liveness judgement by spawning its script");
++  for (const entry of ["../scripts/dispatch-briefing.mjs", "../hooks/guard-dispatch.mjs", "../scripts/dispatch-record-liveness.mjs"]) {
++    const loaded = spawnSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(new URL(entry, import.meta.url).href)});`], { encoding: "utf8", timeout: 60000 });
++    assert.equal(loaded.status, 0, `${entry} must load: ${loaded.stderr.slice(0, 400)}`);
++  }
++});
++
++const runScopeMode = (declared, { env = {}, input = JSON.stringify(declared), value = "stdin" } = {}) => {
++  const root = mkdtempSync(join(tmpdir(), "k104-scope-"));
++  try {
++    let errText = "";
++    const code = liveness.runDispatchRecordLiveness(["--root", root, "--scope-overlap", value], () => {}, { cwd: root, err: (text) => { errText += text; }, readInput: () => input, env });
++    return { code, errText };
++  } finally { rmSync(root, { recursive: true, force: true }); }
++};
++
++test("scripts/dispatch-record-liveness.mjs --scope-overlap: enforce refuses an overlap with exit 2, shadow admits it with a warning, disjoint is silent", () => {
++  const overlap = [{ id: "S-ONE", scope: ["src/a/x.mjs"] }, { id: "S-TWO", scope: ["src/a/"] }];
++  const refused = runScopeMode(overlap);
++  assert.equal(refused.code, 2);
++  assert.match(refused.errText, /BLOCKED \(guard-dispatch, plugin pipeline-core\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
++  assert.ok(refused.errText.includes("S-ONE") && refused.errText.includes("S-TWO") && refused.errText.includes("src/a/x.mjs"));
++  const shadow = runScopeMode(overlap, { env: { PIPELINE_FANOUT_SCOPE_MODE: "shadow" } });
++  assert.equal(shadow.code, 0);
++  assert.match(shadow.errText, /^WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-OVERLAP/u);
++  assert.deepEqual(runScopeMode([{ id: "A", scope: ["src/a/"] }, { id: "B", scope: ["src/b/"] }]), { code: 0, errText: "" });
++  assert.deepEqual(runScopeMode([{ id: "RO", scope: "none" }, { id: "W", scope: ["src/a/"] }]), { code: 0, errText: "" });
++  assert.match(runScopeMode([{ id: "A", scope: ["src/a/"] }, { id: "B", scope: null }]).errText, /GUARD-DISPATCH-SCOPE-UNKNOWN/u);
++});
++
++test("scripts/dispatch-record-liveness.mjs --scope-overlap: unusable input is an exit 0 advisory, never a refusal", () => {
++  for (const options of [{ input: "not json" }, { input: JSON.stringify({ id: "x" }) }, { value: "elsewhere", input: "[]" }]) {
++    const result = runScopeMode([], options);
++    assert.equal(result.code, 0);
++    assert.match(result.errText, /^WARNING \(guard-dispatch\): GUARD-DISPATCH-SCOPE-UNJUDGED/u);
++  }
++});
++
++test("readRunningDispatches: a gone owner is not running, an unreadable readback is no running dispatch, a missing scope is null", () => {
++  const records = [
++    { taskId: "A", verdict: "alive", record: "evidence/dispatch-record-A.json" },
++    { taskId: "B", verdict: "gone", record: "evidence/dispatch-record-B.json" },
++    { taskId: "C", verdict: "unjudgeable", record: "evidence/dispatch-record-C.json" },
++  ];
++  const found = mod.readRunningDispatches("/nonexistent-k93-root", { readFn: () => ({ records }) });
++  assert.deepEqual(found.map((entry) => [entry.dispatchId, entry.verdict, entry.writeScope]), [["A", "alive", null], ["C", "unjudgeable", null]]);
++  assert.deepEqual(mod.readRunningDispatches("/nonexistent-k93-root", { readFn: () => { throw new Error("no git"); } }), []);
++  const queued = mod.readRunningDispatches("/nonexistent-k93-root", { readFn: () => ({ records }), queueRowFn: (_root, id) => (id === "C" ? { writeScope: ["src/c/"] } : null) });
++  assert.deepEqual(queued.map((entry) => entry.writeScope), [null, ["src/c/"]], "the governed queue row's scope is used; a throwing reader is no row");
++  const throwing = mod.readRunningDispatches("/nonexistent-k93-root", { readFn: () => ({ records }), queueRowFn: () => { throw new Error("x"); } });
++  assert.deepEqual(throwing.map((entry) => entry.writeScope), [null, null]);
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 272706a22..f67358846 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -36,7 +36,7 @@
+  */
+ import { createHash } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, resolve, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import {
+@@ -62,7 +62,8 @@ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
+ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
+ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+-import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
++// D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
++import { readRunningDispatches } from "../lib/dispatch-record-liveness.mjs";
+ import { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } from "../lib/slice-queue.mjs";
+ import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+ import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
+@@ -165,42 +166,7 @@ function defaultQueueRow(root, sliceId) {
+   } catch { return null; }
+ }
+ 
+-const BRIEFING_SCAN_LIMIT = 500;
+-const BRIEFING_READ_LIMIT = 1048576;
+-
+-/** The allowed paths of every generated briefing directly under scratch/, by dispatch id (read-only, bounded, never throws). */
+-function briefedWriteScopes(root) {
+-  const scopes = new Map();
+-  let names = [];
+-  try { names = readdirSync(resolve(root, "scratch")).filter((name) => name.endsWith(".md")).sort().slice(0, BRIEFING_SCAN_LIMIT); } catch { return scopes; }
+-  for (const name of names) {
+-    const bytes = readRepoFile(root, `scratch/${name}`);
+-    if (!bytes || bytes.byteLength > BRIEFING_READ_LIMIT || !bytes.includes(BLOCK_OPEN.slice(0, BLOCK_OPEN.lastIndexOf(":v") + 2))) continue;
+-    try {
+-      const parsed = parseNativeGoldfishBriefing(bytes.toString("utf8"));
+-      if (parsed.ok && !scopes.has(parsed.binding.dispatchId)) scopes.set(parsed.binding.dispatchId, [...parsed.binding.allowedPaths]);
+-    } catch { /* a file that is not a briefing is not a source of scopes */ }
+-  }
+-  return scopes;
+-}
+-
+-/**
+- * D76: the dispatches that may still be writing in this checkout, each with its write scope when it can be read.
+- * A dispatch is running while its record (evidence/dispatch-record-<id>.json) is open and its owner is not provably
+- * gone (the existing liveness readback: alive, or unjudgeable, which is the usual Claude case). Its scope is the
+- * governed queue row's write scope, else the allowed paths of its generated briefing under scratch/; `writeScope`
+- * is null when neither exists. A checkout whose records cannot be read has no running dispatch to judge.
+- */
+-function defaultRunningDispatches(root) {
+-  let records;
+-  try { records = readDispatchRecordLiveness(root).records.filter((entry) => entry.verdict !== "gone"); } catch { return []; }
+-  if (records.length === 0) return [];
+-  const briefed = briefedWriteScopes(root);
+-  return records.map((entry) => ({
+-    dispatchId: entry.taskId, verdict: entry.verdict, record: entry.record,
+-    writeScope: defaultQueueRow(root, entry.taskId)?.writeScope ?? briefed.get(entry.taskId) ?? null,
+-  }));
+-}
++const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
+ 
+ /** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
+ function defaultRegistryLock(root) {
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs b/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+index 23d17bf69..f3cadb9af 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+@@ -7,36 +7,65 @@
+ //   static or dynamic import of worktree-lifecycle would break). Prints no JSON: a refusal (exit 2) or an unjudgeable advisory (exit 0)
+ //   as text on stderr, exactly as the hook relays it. An open record whose owner is alive refuses; gone never blocks; unjudgeable warns.
+ //
++// dispatch-record-liveness.mjs [--root <root>] --scope-overlap stdin
++//   K93/K104: the second guard-side mode, spawned by hooks/guard-dispatch.mjs for the same reason: judges the write scopes of the Goldfish
++//   dispatches of one call (a JSON list [{ id, scope }] on stdin) against each other and against the open dispatch records whose owner is
++//   not gone. Same text-on-stderr contract: an overlap in enforce mode exits 2, everything else exits 0 (see lib/dispatch-record-liveness.mjs).
++//
+ // PO decision D110: a READ-ONLY readback of whether the owner of each OPEN dispatch record is still running, from the existing session
+ // owner runtime judgement (PID plus process start identity) reached through the record's v2 owner claim. Prints one JSON document
+ // (pipeline.dispatch-record-liveness.v1): per open record its task id, claim kind, verdict (alive | gone | unjudgeable) and a reason
+ // code. `unjudgeable` is deliberate: a v1 claim or a Claude hook identity carries no owner process, and nothing is called gone without
+ // proof. It mutates nothing, takes no lock and never retires or heals. Exit 0: inspected. Exit 2: refused (DRL-ARGS | DRL-ROOT).
+-import { realpathSync, statSync } from "node:fs";
++import { readFileSync, realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness, secondWriterAdmission } from "../lib/dispatch-record-liveness.mjs";
++import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness, readRunningDispatches, scopeOverlapAdmission, scopeOverlapMode, secondWriterAdmission } from "../lib/dispatch-record-liveness.mjs";
++import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
++import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
++import { scopesOverlap } from "../lib/slice-queue.mjs";
+ 
+ const short = (error) => String(error?.message ?? error).replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 240);
+ 
++/** The governed queue row of an id, or null (no governed queue, or no such row). */
++const governedQueueRow = (root, id) => { const governed = resolveGovernedItemQueue({ root }); return governed.status === "required" ? governed.normalized.slices.find((row) => row.id === id) ?? null : null; };
++
+ function parse(argv) {
+   const flags = {};
+   for (let index = 0; index < argv.length; index += 1) {
+     const name = argv[index]?.startsWith("--") ? argv[index].slice(2) : null;
+-    if (name !== "root" && name !== "task" && name !== "second-writer") return { error: `unknown argument ${String(argv[index]).slice(0, 40)}` };
++    if (name !== "root" && name !== "task" && name !== "second-writer" && name !== "scope-overlap") return { error: `unknown argument ${String(argv[index]).slice(0, 40)}` };
+     const value = argv[index + 1];
+     if (typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) return { error: `--${name} needs one value` };
+     flags[name] = value; index += 1;
+   }
+   if (flags.task !== undefined && !/^[A-Za-z0-9._-]+$/u.test(flags.task)) return { error: "--task is not a safe task id" };
+   if (flags["second-writer"] !== undefined && flags.task !== undefined) return { error: "--second-writer and --task cannot be combined" };
++  if (flags["scope-overlap"] !== undefined && (flags["scope-overlap"] !== "stdin" || flags.task !== undefined || flags["second-writer"] !== undefined)) return { error: "--scope-overlap takes exactly the value stdin and cannot be combined" };
+   return { flags };
+ }
+ 
+-export function runDispatchRecordLiveness(argv, out = (text) => process.stdout.write(text), { cwd = process.cwd(), err = (text) => process.stderr.write(text) } = {}) {
++export function runDispatchRecordLiveness(argv, out = (text) => process.stdout.write(text), { cwd = process.cwd(), err = (text) => process.stderr.write(text), readInput = () => readFileSync(0, "utf8"), env = process.env } = {}) {
+   const emit = (value, code) => { out(`${JSON.stringify(value)}\n`); return code; };
+   const refuse = (code, reason) => emit({ schema: DISPATCH_RECORD_LIVENESS_SCHEMA, status: "refused", code, reason }, 2);
+   const parsed = parse(argv);
++  if (argv.includes("--scope-overlap")) {
++    // K93/K104, guard mode: stdin is the JSON list [{ id, scope }] the hook declared for the Goldfish dispatches of one call. Only an
++    // overlap in enforce mode exits 2; every other outcome, including a failure of this check, is an exit 0 advisory on stderr.
++    let verdict;
++    try {
++      if (parsed.error) throw new Error(parsed.error);
++      const root = realpathSync(resolve(cwd, parsed.flags.root ?? "."));
++      const declared = JSON.parse(readInput());
++      if (!Array.isArray(declared)) throw new Error("stdin is not a list of declared dispatches");
++      verdict = scopeOverlapAdmission({
++        dispatches: declared.map((entry) => ({ prompt: entry })), declare: (entry) => entry ?? { id: null, scope: null }, overlaps: scopesOverlap,
++        running: readRunningDispatches(root, { queueRowFn: governedQueueRow, parseBriefing: parseNativeGoldfishBriefing }), mode: scopeOverlapMode(env),
++      });
++    } catch (error) { verdict = { refusal: "", warning: `WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run (${short(error)}); this call is admitted without it.\n` }; }
++    err(`${verdict.warning}${verdict.refusal}`);
++    return verdict.refusal === "" ? 0 : 2;
++  }
+   if (argv.includes("--second-writer")) {
+     // Guard mode: only a live owner may exit 2; every other outcome, including a failure of this check, is an exit 0 advisory.
+     let verdict;

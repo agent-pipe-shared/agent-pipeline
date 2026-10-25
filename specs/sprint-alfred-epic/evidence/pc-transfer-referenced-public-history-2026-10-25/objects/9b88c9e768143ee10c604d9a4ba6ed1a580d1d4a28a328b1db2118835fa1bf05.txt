@@ -1,0 +1,156 @@
+// ALF-B27-D30B Step 4: D30 drop-in for the bundled protected ceremony C7. Run from the repository root:
+//   node scratch/c7/make-dropin.mjs
+// Never writes the real plugins/pipeline-core/scripts/pipeline-state.mjs. It
+//   1. copies it to scratch/c7/pipeline-state.patched.mjs and applies the three D30 hunks (each anchor must match exactly once),
+//   2. writes (or replaces) the D30 section of scratch/c7/edits.md,
+//   3. proves the drop-in the way C4 was proven, but without rewriting any text: two mirror trees under scratch/c7/proof/
+//      reproduce the plugin layout with symlinks to every real entry except scripts/pipeline-state.mjs and
+//      scripts/pipeline-state.test.mjs, which are real copies (baseline = unpatched, patched = with the D30 hunks). Every
+//      relative import and every import.meta.url lookup therefore resolves exactly as in the real layout.
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, symlinkSync, rmSync, existsSync, chmodSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { spawn } from "node:child_process";
+import assert from "node:assert/strict";
+
+const ROOT = resolve(".");
+const REAL_STATE = "plugins/pipeline-core/scripts/pipeline-state.mjs";
+const REAL_TEST = "plugins/pipeline-core/scripts/pipeline-state.test.mjs";
+const OUT_DIR = "scratch/c7";
+const state = readFileSync(REAL_STATE, "utf8");
+const testText = readFileSync(REAL_TEST, "utf8");
+assert.ok(!state.includes("planHandoff") && !state.includes("plan-handoff-readiness"), "pipeline-state.mjs already carries D30 or the helper name is taken");
+const L = (...lines) => lines.join("\n");
+
+const IMPORT_LINE = 'import { inspectArchitectureDesign, inspectArchitectureDesignDraft, inspectArchitectureMaterializationTargets } from "../lib/architecture-design.mjs";';
+const SUBMIT_TAIL = L(
+  "          console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);",
+  "          return 2;",
+  "        }",
+  "      }",
+  "      const profileSha256 = sha256CanonicalJson(profile.value);");
+const PRESENT_HEAD = L(
+  "      const submitted = base.planSubmission;",
+  '      const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);');
+
+const hunks = [
+  { id: "D30-1", where: "import block, directly after the architecture-design import (original line 440)",
+    before: IMPORT_LINE,
+    after: L(IMPORT_LINE, 'import { inspectPlanDeliveryHandoff } from "../lib/plan-handoff-readiness.mjs";') },
+  { id: "D30-2", where: "case \"submit-plan\": after the inspectArchitectureDesignDraft block (closing brace at original line 10765), before `const profileSha256`",
+    before: SUBMIT_TAIL,
+    after: L(
+      ...SUBMIT_TAIL.split("\n").slice(0, 4),
+      "      // AC-264 / D30: a governed Spec that could not be handed off to a delivery briefing is refused here, before anything is recorded.",
+      "      const planHandoff = inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 });",
+      "      if (!planHandoff.ok) {",
+      '        console.error(`Error: submit-plan blocked by ${planHandoff.code}${planHandoff.path ? ` (${planHandoff.path})` : ""}: ${planHandoff.message}. No submission or signature request was recorded.`);',
+      "        return 2;",
+      "      }",
+      SUBMIT_TAIL.split("\n")[4]) },
+  { id: "D30-3", where: "case \"present-plan\": after the lifecycle check (closing brace at original line 10972), before the approval request is written (original line 10986)",
+    before: PRESENT_HEAD,
+    after: L(
+      "      const submitted = base.planSubmission;",
+      "      // AC-264 / D30: re-check the exact submitted Spec before the signature request is written; approve-plan is deliberately not a call site (a refusal there burns the signature).",
+      "      const planHandoff = inspectPlanDeliveryHandoff({ rootDir: dir, specPath: submitted?.specPath, expectedSpecSha256: submitted?.specSha256 });",
+      "      if (!planHandoff.ok) {",
+      '        console.error(`Error: present-plan blocked by ${planHandoff.code}${planHandoff.path ? ` (${planHandoff.path})` : ""}: ${planHandoff.message}. No presentation or approval request was recorded.`);',
+      "        return 2;",
+      "      }",
+      '      const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);') },
+];
+
+let patched = state;
+for (const hunk of hunks) {
+  assert.equal(patched.split(hunk.before).length - 1, 1, `${hunk.id}: anchor must match exactly once`);
+  patched = patched.replace(hunk.before, () => hunk.after);
+}
+mkdirSync(OUT_DIR, { recursive: true });
+writeFileSync(join(OUT_DIR, "pipeline-state.patched.mjs"), patched);
+
+function writeSection(proof) {
+  const file = join(OUT_DIR, "edits.md");
+  const body = [
+    "## D30 - plan-readiness hand-off call sites (AC-264, ALF-B27-D30B)",
+    "",
+    "Target: plugins/pipeline-core/scripts/pipeline-state.mjs (protected, PB-SANCTIONED-WRITER) - one import and two call sites; no helper is added",
+    "(the two blocks are four lines each and share no state). approve-plan is NOT a call site: a refusal there burns the PO's signature.",
+    "The unprotected half (lib/plan-handoff-readiness.mjs, the scanAcceptedCriterionRows export, regression cases R1-R6) is already in the tree.",
+    "Full result: scratch/c7/pipeline-state.patched.mjs (copy of the real file with exactly these three hunks; `diff` against the real file is the authoritative hunk list).",
+    "The three regions are non-adjacent: one ceremony per region, or one Edit whose old_string spans them (CLAUDE.md, ceremony paragraph).",
+    "",
+    ...hunks.flatMap((hunk) => [
+      `### ${hunk.id} - ${hunk.where}`, "", "Anchor / before (must match exactly once):", "```js", hunk.before, "```", "", "After:", "```js", hunk.after, "```", ""]),
+    "### Proof (the way C4 was proven: scratch copies, real layout mirrored by symlinks, no text rewritten)",
+    "",
+    proof,
+    "",
+  ].join("\n");
+  const existing = existsSync(file) ? readFileSync(file, "utf8") : "";
+  const start = existing.indexOf("## D30 - plan-readiness");
+  let next;
+  if (start === -1) next = (existing ? existing.replace(/\n*$/u, "\n\n") : "# C7 bundled protected ceremony - hunks by section\n\n") + body;
+  else {
+    const tail = existing.indexOf("\n## ", start + 4);
+    next = existing.slice(0, start) + body + (tail === -1 ? "" : existing.slice(tail + 1));
+  }
+  writeFileSync(file, next);
+}
+writeSection("pending: proof run not finished yet");
+
+function mirror(dir, stateText) {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  for (const entry of readdirSync(ROOT)) if (entry !== "plugins" && entry !== "scratch") symlinkSync(join(ROOT, entry), join(dir, entry));
+  mkdirSync(join(dir, "plugins"));
+  for (const entry of readdirSync(join(ROOT, "plugins"))) if (entry !== "pipeline-core") symlinkSync(join(ROOT, "plugins", entry), join(dir, "plugins", entry));
+  const plugin = join(dir, "plugins", "pipeline-core");
+  mkdirSync(plugin);
+  for (const entry of readdirSync(join(ROOT, "plugins", "pipeline-core"))) if (entry !== "scripts") symlinkSync(join(ROOT, "plugins", "pipeline-core", entry), join(plugin, entry));
+  const scripts = join(plugin, "scripts");
+  mkdirSync(scripts);
+  const copied = new Set(["pipeline-state.mjs", "pipeline-state.test.mjs"]);
+  for (const entry of readdirSync(join(ROOT, "plugins", "pipeline-core", "scripts"))) if (!copied.has(entry)) symlinkSync(join(ROOT, "plugins", "pipeline-core", "scripts", entry), join(scripts, entry));
+  writeFileSync(join(scripts, "pipeline-state.mjs"), stateText);
+  writeFileSync(join(scripts, "pipeline-state.test.mjs"), testText);
+  return join(scripts, "pipeline-state.test.mjs");
+}
+
+function runVariant(name, stateText) {
+  const dir = join(ROOT, OUT_DIR, "proof", name);
+  const entry = mirror(dir, stateText);
+  const tmp = join(homedir(), "pipeline-test-tmp", "ALF-B27-D30B-proof", name);
+  mkdirSync(tmp, { recursive: true, mode: 0o700 });
+  chmodSync(tmp, 0o700);
+  const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+  delete env.NODE_TEST_CONTEXT;
+  return new Promise((done) => {
+    const child = spawn(process.execPath, [entry], { cwd: ROOT, env });
+    let out = "";
+    child.stdout.on("data", (chunk) => { out += chunk; });
+    child.stderr.on("data", (chunk) => { out += chunk; });
+    const timer = setTimeout(() => child.kill("SIGKILL"), 570000);
+    child.on("close", (status, signal) => {
+      clearTimeout(timer);
+      writeFileSync(join(ROOT, OUT_DIR, "proof", `${name}.out.txt`), out);
+      const lines = out.split("\n");
+      done({ name, status, signal, pass: lines.filter((line) => line.startsWith("PASS ")), fail: lines.filter((line) => line.startsWith("FAIL ")), last: lines.filter(Boolean).at(-1) ?? "" });
+    });
+  });
+}
+
+const [baseline, patchedRun] = await Promise.all([runVariant("baseline", state), runVariant("patched", patched)]);
+const realGreen = existsSync("scratch/evidence-d30b-green.txt") ? readFileSync("scratch/evidence-d30b-green.txt", "utf8").split("\n").filter((line) => line.startsWith("PASS ")).length : null;
+const same = JSON.stringify(baseline.pass) === JSON.stringify(patchedRun.pass);
+const row = (run) => `- ${run.name}: exit ${run.status}${run.signal ? ` (${run.signal})` : ""}, PASS lines ${run.pass.length}, FAIL lines ${run.fail.length}, last line: ${JSON.stringify(run.last)}`;
+const proof = [
+  "Run once unpatched (baseline) and once patched, each as `node <mirror>/plugins/pipeline-core/scripts/pipeline-state.test.mjs` with a private TMPDIR outside the checkout, cwd = repository root.",
+  row(baseline), row(patchedRun),
+  `- PASS-line sequences identical between baseline and patched: ${same}`,
+  `- reference: the real (non-mirrored) GREEN run, scratch/evidence-d30b-green.txt, has ${realGreen} PASS lines`,
+  "- the ungoverned fixtures of the existing suite skip the new check (PLR-NO-GOVERNANCE before the Spec is read), so equal counts are the expected result; a difference would be a finding.",
+].join("\n");
+writeSection(proof);
+console.log(proof);
+process.exit(baseline.status === 0 && patchedRun.status === 0 && same ? 0 : 1);

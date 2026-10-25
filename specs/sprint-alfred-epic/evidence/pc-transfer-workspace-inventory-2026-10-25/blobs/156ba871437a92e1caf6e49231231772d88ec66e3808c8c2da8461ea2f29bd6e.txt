@@ -1,0 +1,15 @@
+// diagnostic: run a suite with private TMPDIR (like run-quiet) and print not-ok blocks in full
+import { spawnSync } from "node:child_process";
+import { mkdirSync, chmodSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+const [label, file] = process.argv.slice(2);
+const tmp = join(homedir(), "pipeline-test-tmp", label);
+mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+delete env.NODE_TEST_CONTEXT;
+const r = spawnSync(process.execPath, [file], { cwd: new URL(".", import.meta.url).pathname, env, encoding: "utf8", timeout: 3600000, maxBuffer: 256 * 1024 * 1024 });
+const out = (r.stdout ?? "") + (r.stderr ?? "");
+console.log("exit", r.status);
+if (process.env.G3_FULL) console.log(out.slice(-Number(process.env.G3_FULL)));
+console.log(out.split("\n").filter((l) => /^(ok|not ok|AssertionError|All |G3TIME)/.test(l)).map((l) => l.slice(0, 700)).join("\n"));

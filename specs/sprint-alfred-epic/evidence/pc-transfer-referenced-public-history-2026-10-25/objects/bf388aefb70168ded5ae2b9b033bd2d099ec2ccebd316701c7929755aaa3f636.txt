@@ -1,0 +1,45 @@
+// K145 helper (derived from k141-run.mjs): run suites directly IN a given clone (no worker clones) with private HOME and TMPDIR.
+// Usage: node scratch/k145-run.mjs <clone-name> <label> <suite-name|file>[,more] [--par=N] [--branch=main] [--tail=N]
+// Output: scratch/k145-raw/<label>/<name>.txt ; summary lines on stdout (tail of output with --tail=N).
+import { spawn, execFileSync } from "node:child_process";
+import { mkdirSync, chmodSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { join, resolve, basename } from "node:path";
+import { homedir } from "node:os";
+const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => a.slice(2).split("=")));
+const [cloneName, label, namesArg] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const clone = resolve("scratch/clones", cloneName);
+const map = JSON.parse(readFileSync("scratch/k141-map.json", "utf8"));
+const items = namesArg.split(",").map((n) => map.find((m) => m.name === n) ?? { name: basename(n, ".mjs"), file: n });
+const cfg = (k) => execFileSync("git", ["config", k], { encoding: "utf8" }).trim();
+const base = join(homedir(), "pipeline-test-tmp", `k145-${label}`);
+rmSync(base, { recursive: true, force: true });
+mkdirSync(base, { recursive: true, mode: 0o700 });
+const outDir = resolve("scratch/k145-raw", label);
+mkdirSync(outDir, { recursive: true });
+const par = Number(flags.par ?? 1);
+const lanes = Array.from({ length: par }, (_, n) => {
+  const home = join(base, `home-${n}`), tmp = join(base, `t${n}`);
+  for (const d of [home, tmp]) { mkdirSync(d, { recursive: true, mode: 0o700 }); chmodSync(d, 0o700); }
+  writeFileSync(join(home, ".gitconfig"), `[user]\n\tname = ${cfg("user.name")}\n\temail = ${cfg("user.email")}\n${flags.branch ? `[init]\n\tdefaultBranch = ${flags.branch}\n` : ""}`);
+  return { home, tmp };
+});
+const queue = [...items];
+const num = (out, k) => (new RegExp(`^ℹ ${k} (\\d+)`, "m").exec(out) ?? [])[1] ?? "?";
+await Promise.all(lanes.map(async (lane) => {
+  while (queue.length) {
+    const it = queue.shift();
+    const env = { ...process.env, HOME: lane.home, USERPROFILE: lane.home, TMPDIR: lane.tmp, TMP: lane.tmp, TEMP: lane.tmp };
+    delete env.NODE_TEST_CONTEXT;
+    const t0 = Date.now();
+    const out = await new Promise((done) => {
+      let buf = "";
+      const child = spawn(process.execPath, [it.file], { cwd: clone, env });
+      const timer = setTimeout(() => child.kill("SIGKILL"), 3600000);
+      child.stdout.on("data", (d) => { buf += d; }); child.stderr.on("data", (d) => { buf += d; });
+      child.on("close", (code) => { clearTimeout(timer); done({ code, buf }); });
+    });
+    writeFileSync(join(outDir, `${it.name}.txt`), out.buf);
+    console.log(`${out.code === 0 ? "GREEN" : "RED  "} ${it.name} exit ${out.code} tests ${num(out.buf, "tests")} pass ${num(out.buf, "pass")} fail ${num(out.buf, "fail")} ${Date.now() - t0}ms`);
+    if (flags.tail) console.log(out.buf.split("\n").slice(-Number(flags.tail)).join("\n"));
+  }
+}));

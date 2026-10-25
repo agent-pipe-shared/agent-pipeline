@@ -1,0 +1,24 @@
+import test from 'node:test';
+import {mkdirSync,mkdtempSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {evaluateLifecycleReadyGuard} from '../../hooks/guard-lifecycle-ready.mjs';
+import {PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,ProjectOnboardingReadyError} from '../project-onboarding-ready-gate.mjs';
+const SCRATCH=fileURLToPath(new URL('../../../../scratch/',import.meta.url));
+const out=[];
+const deny=status=>{throw new ProjectOnboardingReadyError('PORG-NOT-READY','synthetic',{intent:'session',lifecycleStatus:status});};
+const depsFor=(project,status)=>({projectDir:project,requireProjectOnboardingReadyFn(){deny(status);}});
+const ps=(command,deps)=>evaluateLifecycleReadyGuard({tool_name:'PowerShell',tool_input:{command}},deps);
+test('dbg9',()=>{
+  mkdirSync(SCRATCH,{recursive:true});
+  const base=mkdtempSync(join(SCRATCH,'dbg9-')),project=join(base,'project');
+  mkdirSync(join(project,'scratch','nested'),{recursive:true});mkdirSync(join(project,'src'));
+  const status='bootstrap-binding-required';
+  const abs=(...p)=>join(project,'scratch',...p);
+  const alias=join(base,'project-alias');symlinkSync(project,alias,'dir');
+  const cases=[[project,'New-Item -Path scratch/made -ItemType Directory -Force'],[project,'New-Item -Path scratch/nested/new.md -ItemType File'],[project,'Set-Content -LiteralPath scratch/nested/report.md -Value report'],[project,'Set-Content -Path scratch/nested/report.md -Value report -Encoding utf8'],[project,'Add-Content -LiteralPath scratch/nested/report.md -Value more'],[project,`New-Item -Path '${abs('nested','abs.md')}' -ItemType File`],[project,`Set-Content -LiteralPath '${abs('nested','abs.md')}' -Value x`],
+   [alias,'Set-Content -LiteralPath scratch/nested/a.md -Value x'],[alias,`Set-Content -LiteralPath '${join(alias,'scratch','nested','a.md')}' -Value x`],[alias,'Set-Content -LiteralPath src/a.md -Value x']];
+  for(const [dir,c] of cases){const r=ps(c,depsFor(dir,status));out.push(`${r.exitCode} | ${dir===alias?'ALIAS ':''}${c}\n    ${String(r.stderr).slice(0,500).replace(/\n/g,' ')}`);}
+  rmSync(base,{recursive:true,force:true});
+  writeFileSync(new URL('../../../../dbg9-out.txt',import.meta.url),out.join('\n'));
+});

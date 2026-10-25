@@ -55,6 +55,14 @@ installed Codex build remains the previously observed977dad8 build; changed
 Source duties or patches do not become installed runtime enforcement merely
 because they are committed.
 
+The PO then explicitly required a detailed ignored-file/Evidence/workspace
+audit. Its [record and restore procedure](../evidence/pc-transfer-portability-audit-2026-10-25/README.md)
+supersede the first checkpoint's incomplete portability assertion. Preserve
+all required public content in this branch, including full briefing inputs,
+older workspace variants and current matrix captures. Physical deletion of
+unknown local/private fixture state is not a transfer requirement. No original
+Scratch path or special worktree is required on the next PC.
+
 No close-block activation is authorized or needed. A read-only coordinator
 inspection found no journal for the guessed feature lifecycle and made no
 State transition; it is not a transfer prerequisite or a reason to delay the

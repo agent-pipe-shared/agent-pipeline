@@ -1,0 +1,10 @@
+command: node scratch/clones/k149/harness/scripts/check-doc-contracts.mjs
+label: k149-doc
+exitCode: 0
+head: 439f4c60d512dc351021304c2919f5dfc9ed5807
+tree: 17e76c0fe69c7bd22bdb616a561984a3be372f86
+dirty: true
+--- stdout ---
+Documentation contracts valid: 2595 Markdown file(s), 1978 link(s), 106 anchor check(s), 41 known vendored-copy link(s) excluded, 9 immutable snapshot missing-reference exclusion(s) accepted.
+
+--- stderr ---

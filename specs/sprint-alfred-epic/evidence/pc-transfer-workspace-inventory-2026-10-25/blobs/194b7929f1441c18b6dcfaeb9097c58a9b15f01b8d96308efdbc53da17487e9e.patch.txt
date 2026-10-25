@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/install-agy.mjs b/plugins/pipeline-core/install-agy.mjs
+index 6aa7e983a..856e52259 100755
+--- a/plugins/pipeline-core/install-agy.mjs
++++ b/plugins/pipeline-core/install-agy.mjs
+@@ -210,7 +210,7 @@ export function updateAutonomousSettings({ targetFile }) {
+   }
+ }
+ 
+-import { publishAgyRunnerView, pruneAgyRunnerViews, agyRunnerViewDigestOfTree } from "./lib/agy-central-snapshot.mjs";
++import { publishAgyRunnerView, agyRunnerViewDigestOfTree } from "./lib/agy-central-snapshot.mjs";
+ 
+ /**
+  * What still points at a generated view: registry entries (global and this workspace), import-manifest sources, and the view
+@@ -240,12 +240,19 @@ function observeRunnerViewReferences({ configRoot, workspaceRoot }) {
+   } catch { return null; }
+ }
+ 
+-/** Bounded storage after a successful view install: older Pipeline-created views nothing references any more are removed. Never throws. */
+-function pruneRunnerViewsAfterInstall({ view, configRoot, workspaceRoot, deps }) {
++/**
++ * A successful install cannot establish that an older loaded view is inactive. Registry, import and managed-copy
++ * references omit a session's loaded root; the Source-owned session descriptor liveness observer reports owner
++ * status but does not bind that owner to its loaded view or enumerate every Antigravity session. Retain all older
++ * views until a complete Source-owned view/liveness observation exists. The low-level custody prune remains available
++ * for an explicitly proven inactive view, with its digest and foreign-path checks unchanged.
++ */
++function pruneRunnerViewsAfterInstall({ configRoot, workspaceRoot }) {
+   try {
+     const references = observeRunnerViewReferences({ configRoot, workspaceRoot });
+     if (references === null) return { removed: [], retained: [], skipped: "AGV-PRUNE-UNCERTAIN" };
+-    return pruneAgyRunnerViews({ keepPaths: [view.root, ...references.paths], keepDigests: references.digests, deps });
++    // The observed references are useful custody facts, but absence from them is not proof of session inactivity.
++    return { removed: [], retained: [], skipped: "AGV-PRUNE-LIVENESS-UNOBSERVABLE" };
+   } catch { return { removed: [], retained: [], skipped: "AGV-PRUNE-UNAVAILABLE" }; }
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+index d63673d71..6bf19f0cc 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+@@ -556,7 +556,26 @@ function storageWorld(t) {
+ }
+ const names = (w) => readdirSync(viewBase(w)).sort();
+ 
+-test('bounded storage: after two installs the older view is removed; foreign view-<sha> directories, view-tmp-*, notes and a view an import source names stay', (t) => {
++test('runner continuity: an older loaded view survives updates when session liveness is unobservable', (t) => {
++  const { w } = storageWorld(t);
++  const first = installView(w, fakeCli(w));
++  assert.equal(first.status, 'refreshed');
++  const oldRoot = join(viewBase(w), `view-${first.runnerView.viewSha256}`);
++  reviseSource(w, 'A second revision of the shared source.\n');
++  const second = installView(w, fakeCli(w));
++  assert.equal(second.status, 'refreshed');
++  assert.notEqual(second.runnerView.viewSha256, first.runnerView.viewSha256);
++  assert.equal(second.runnerView.pruneSkipped, 'AGV-PRUNE-LIVENESS-UNOBSERVABLE');
++  assert.deepEqual(second.runnerView.removed, []);
++  assert.equal(existsSync(oldRoot), true);
++  const repeated = installView(w, fakeCli(w));
++  assert.equal(repeated.status, 'refreshed');
++  assert.equal(repeated.runnerView.viewSha256, second.runnerView.viewSha256);
++  assert.deepEqual(repeated.runnerView.removed, []);
++  assert.equal(existsSync(oldRoot), true);
++});
++
++test('bounded storage: after two installs the older view remains when liveness is unobservable; foreign view-<sha> directories, view-tmp-*, notes and an import source stay', (t) => {
+   const { w, other } = storageWorld(t);
+   const referenced = snap.publishAgyRunnerView({ sourcePluginRoot: other, deps: w.snapshotDeps });
+   writeFileSync(w.importsPath, `${JSON.stringify({ imports: [{ name: 'foreign-plugin', source: referenced.root }] })}\n`);
+@@ -577,8 +596,9 @@ test('bounded storage: after two installs the older view is removed; foreign vie
+   const second = installView(w, fakeCli(w));
+   assert.equal(second.status, 'refreshed', JSON.stringify(second));
+   assert.notEqual(second.runnerView.viewSha256, first.runnerView.viewSha256);
+-  assert.deepEqual(second.runnerView.removed, [`view-${first.runnerView.viewSha256}`], 'only the older view is removed');
+-  assert.deepEqual(names(w), [note, foreignView, `view-${second.runnerView.viewSha256}`, `view-${referenced.viewSha256}`, tmpView].sort());
++  assert.deepEqual(second.runnerView.removed, [], 'unobservable session liveness cannot authorize pruning');
++  assert.equal(second.runnerView.pruneSkipped, 'AGV-PRUNE-LIVENESS-UNOBSERVABLE');
++  assert.deepEqual(names(w), [note, foreignView, `view-${first.runnerView.viewSha256}`, `view-${second.runnerView.viewSha256}`, `view-${referenced.viewSha256}`, tmpView].sort());
+   assert.equal(readFileSync(join(viewBase(w), foreignView, 'keep.txt'), 'utf8'), 'not a view this module published\n');
+   assert.equal(readFileSync(join(viewBase(w), tmpView, 'partial.txt'), 'utf8'), 'an interrupted publish\n');
+   assert.equal(readFileSync(join(viewBase(w), note), 'utf8'), 'operator note\n');

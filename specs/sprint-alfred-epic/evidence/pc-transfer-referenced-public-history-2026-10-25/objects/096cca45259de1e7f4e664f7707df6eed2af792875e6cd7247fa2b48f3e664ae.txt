@@ -1,0 +1,7 @@
+// K127 helper: apply a saved diff in a clone via git apply. usage: node scratch/K127-apply.mjs <clone> <diff> [--check]
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
+const [cloneDir, diff, ...rest] = process.argv.slice(2);
+const args = ["-C", cloneDir, "apply", ...(rest.includes("--check") ? ["--check"] : []), "--whitespace=nowarn", resolve(diff)];
+try { console.log(execFileSync("git", args, { encoding: "utf8" }) || "apply ok"); }
+catch (e) { console.error(String(e.stderr || e.message)); process.exit(1); }

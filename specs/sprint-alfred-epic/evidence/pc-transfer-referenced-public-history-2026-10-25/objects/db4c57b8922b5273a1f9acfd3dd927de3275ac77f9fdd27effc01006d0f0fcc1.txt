@@ -1,0 +1,12 @@
+command: node scripts/run-in.mjs scratch/clones/k150 k150-cpg plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+label: k150-cpg-base
+exitCode: 1
+head: 439f4c60d512dc351021304c2919f5dfc9ed5807
+tree: 17e76c0fe69c7bd22bdb616a561984a3be372f86
+dirty: true
+--- stdout ---
+RED   exit 1 tests ? pass ? fail ? skip ? todo ?  plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+   (no summary) tail:     at check (file://<repo-root>/scratch/clones/k150/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:434:5) |     at file://<repo-root>/scratch/clones/k150/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1215:1 |     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+   address-root repair: repaired ARR-OK moved 21
+
+--- stderr ---

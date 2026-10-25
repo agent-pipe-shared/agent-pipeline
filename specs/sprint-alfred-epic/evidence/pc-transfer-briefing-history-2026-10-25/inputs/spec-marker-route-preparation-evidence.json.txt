@@ -1,0 +1,144 @@
+{
+  "schema": "scratch.spec-marker-route-preparation-evidence.v1",
+  "observedAt": "2026-09-28T02:21:21.355Z",
+  "sourceCommit": "9cc0114b44282a11b6d0534dba4758608d928531",
+  "files": {
+    "scratch/onboarding-spec-marker-core.patch": "11bd3feeea86ac561c0fb31a3846ff60e48c2b75d3e821fb5f9a21510b37a32f",
+    "scratch/onboarding-spec-marker-route.patch": "73425d32cfb2d3aeb046d3630da87785a50caac67a779536f9e96ba8d7ffcb12",
+    "scratch/onboarding-spec-marker-route-tests.patch": "82ca37ba41cbe4912065a98e2e62c850b56ab9cc1b7e3b2d2beffcf3eb480463",
+    "scratch/spec-marker-coordinator-proposal.test.mjs": "9444c7bd7ca145919df519fa2ae78314aa2a9f318d29921e9331753560e691b8",
+    "scratch/load-proposed-onboarding-for-tests.mjs": "93797498b62d696aa4c9341854826308a0fbf2ee29791a91f96fb21c9cb15e20",
+    "scratch/0.7-virtual-integration.patch": "9d9453201110a95cae4a3154ecda4c7b012e21658439b8d3e042ce506d0a34a6"
+  },
+  "proposedMembers": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "beforeSha256": "e5629b80a205ff3b02818855eb7c9a145ff9e8f7ba1071e953225308c59af9e8",
+      "sha256": "d0e5cb8813df637303c46256f79f3d11c31641d2fd1b19a5e93b9d82f4d39dcf",
+      "patches": [
+        "scratch/slice-b-critical-apply.patch",
+        "scratch/physical-scratch-guard-union.patch",
+        "scratch/onboarding-driver-language.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "beforeSha256": "40e1603848b622c21b2141d6c34ef16a65b44041ff93f61c622a1c6312a1fc5f",
+      "sha256": "7307673a32e3782b710cbde49dc9360c29e111de995c9aebab4ec4797c5e3559",
+      "patches": [
+        "scratch/slice-b-critical-apply.patch",
+        "scratch/onboarding-driver-language.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-argv-shapes.mjs",
+      "beforeSha256": "f8c3d2fff5cc5f70cf47c8cf7399421d88e705c343cdafcf63ff803f545ecbaf",
+      "sha256": "872f117566bdbf2fd1d6430c936c8c841298a528dcaa810ae7f4a12fffae83d7",
+      "patches": [
+        "scratch/slice-b-critical-apply.patch",
+        "scratch/onboarding-spec-marker-route.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/physical-scratch-boundary.mjs",
+      "beforeSha256": null,
+      "sha256": "70943471205b08ebc235c55533c5aafc02e5ed9ffce48d99d211e335ca29d8be",
+      "patches": [
+        "scratch/physical-scratch-guard-union.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs",
+      "beforeSha256": null,
+      "sha256": "e74e13c7c2f9353a072e4fae8dfba5e8e97b0429995a782b999dfbcb0a84e504",
+      "patches": [
+        "scratch/physical-scratch-guard-union.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "beforeSha256": "eec0e2acd6853c15a0eb4208ebfae259d3c689e3733c92b77da1d8db0786a9f5",
+      "sha256": "e1ce0ceab6f1dbf1037dc2ff6c73e24b39da15a0e7289f593c2bc867a2b32deb",
+      "patches": [
+        "scratch/onboarding-generator-summary.patch",
+        "scratch/onboarding-zero-design-questions.patch",
+        "scratch/onboarding-spec-marker-route.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "beforeSha256": "86d6b934c2300a98116320730cf60ec4840daa75dc9d12a3ab89b0891fb65210",
+      "sha256": "d458748c80c7d9b47b08718156145355a0e716831ce081d4c0267f327d4bc13d",
+      "patches": [
+        "scratch/onboarding-generator-summary.patch",
+        "scratch/onboarding-zero-design-questions.patch",
+        "scratch/onboarding-spec-marker-route.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "beforeSha256": "55100fb351cb70729968cafee948d8bf7dea4411a87196ab1815a3321f73d3f2",
+      "sha256": "0d71f5cdf5cbcdfeda124d23343fd277729ab7d7391cd99764813e2888a4d6dc",
+      "patches": [
+        "scratch/onboarding-zero-design-questions.patch",
+        "scratch/onboarding-handover-truth.patch",
+        "scratch/onboarding-spec-marker-core.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "beforeSha256": "c415517dce914a203e561eadefeb485716f3618a6828bbaf57bd04d9655a1d9e",
+      "sha256": "21f2809fb1ad2bad70a7af4d78b6a8c591afa37c731e37ed915c2ee2ba4eba89",
+      "patches": [
+        "scratch/onboarding-zero-design-questions.patch",
+        "scratch/onboarding-handover-truth.patch",
+        "scratch/onboarding-case-completion-parity.patch",
+        "scratch/onboarding-spec-marker-core.patch",
+        "scratch/onboarding-spec-marker-route-tests.patch"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "terminalSession": 51839,
+      "finalChunk": "e69516",
+      "exitCode": 0,
+      "passed": 10,
+      "failed": 0,
+      "durationMs": 4714.552492,
+      "caseIds": [
+        "OBC288",
+        "OBC289",
+        "OBC290",
+        "OBC291",
+        "OBC292",
+        "OBC293",
+        "OBC294",
+        "OBC295",
+        "OBC296",
+        "OBC297"
+      ],
+      "scope": "Exact proposed core/CLI/guard bytes over generated fixture roots; marker-only repair, stability, alias refusal, CLI applied/no-op and closed argv."
+    },
+    {
+      "terminalSession": 33972,
+      "finalChunk": "e90e04",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "durationMs": 5489.343144,
+      "scope": "Codex coordinator fixture: stale Spec -> admitted repair -> chat-policy acknowledgement action; unavailable/malformed observations refuse acknowledgement."
+    }
+  ],
+  "aggregatePatchSha256": "9d9453201110a95cae4a3154ecda4c7b012e21658439b8d3e042ce506d0a34a6",
+  "fullCorpusRegistered": 297,
+  "fullCorpusExecuted": false,
+  "fullStdoutRetained": false,
+  "typedRoutePrepared": true,
+  "canonicalWrites": false,
+  "productiveIntegration": false,
+  "actualCodexGreenfieldReplay": false,
+  "formalCriticStamp": false,
+  "candidateQualification": false,
+  "signatureRequested": false
+}

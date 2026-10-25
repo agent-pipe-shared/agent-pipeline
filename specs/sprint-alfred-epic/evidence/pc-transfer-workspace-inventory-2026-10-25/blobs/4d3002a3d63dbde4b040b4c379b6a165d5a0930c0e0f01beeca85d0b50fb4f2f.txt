@@ -1,0 +1,10 @@
+docs(cost-and-measurement): place the not-measured caveat before the proposals, label the two Claude runs and the maintainer link
+
+Reader round 20261023b findings 16, 28, 38 and 51: move "What is not
+measured yet" before the proposed and maintainer material, give "the new
+policy" its antecedent, align the H1 with the map label, label the
+separate Claude session, turn the backlog link into a labelled
+maintainer reference and link the Terms section for Greenfield.
+
+AI-Assisted: true
+Dispatch: K124-READER-FIX2-GROUP-D (goldfish)

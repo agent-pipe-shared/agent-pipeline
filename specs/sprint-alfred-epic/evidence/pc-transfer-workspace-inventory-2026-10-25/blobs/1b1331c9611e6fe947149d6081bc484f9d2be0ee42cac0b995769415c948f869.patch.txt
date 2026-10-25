@@ -1,0 +1,80 @@
+diff --git a/plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs b/plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs
+new file mode 100644
+index 000000000..cb14de647
+--- /dev/null
++++ b/plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs
+@@ -0,0 +1,15 @@
++// SPDX-License-Identifier: SUL-1.0
++// K98 (PO decision 2026-10-23, row 7/7): the GIT-03 administrative refusal names the admitted Elephant form.
++// Message-only: the code and the verdict are unchanged.
++import assert from "node:assert/strict";
++import test from "node:test";
++import { finishedCommitMessageFindings } from "./commit-message-policy.mjs";
++
++const message = "docs(plans): record a decision\n\nBody.\n\nDispatch: administrative (elephant)\nAI-Assisted: true\n";
++
++test("K98 row 7/7: the administrative refusal names Dispatch: stage-0 (elephant) as the admitted form", () => {
++  const finding = finishedCommitMessageFindings(message).findings.find((f) => f.code === "GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED");
++  assert.ok(finding, "the administrative binding without evidence is still refused");
++  assert.match(finding.detail, /Dispatch: stage-0 \(elephant\)/u);
++  assert.match(finding.detail, /AI-Assisted: true/u);
++});
+diff --git a/plugins/pipeline-core/lib/commit-message-policy.mjs b/plugins/pipeline-core/lib/commit-message-policy.mjs
+index 1ac913dfb..02a6ddaf4 100644
+--- a/plugins/pipeline-core/lib/commit-message-policy.mjs
++++ b/plugins/pipeline-core/lib/commit-message-policy.mjs
+@@ -185,7 +185,7 @@ export function finishedCommitMessageFindings(message, {
+     const exact = trailers.length === 2 && trailers[0].key === "Dispatch" && trailers[1].key === "AI-Assisted" && trailers[1].value === "true";
+     const admitted = exact && administrativeAdmission?.ok === true && administrativeAdmission.schema === "pipeline.administrative-commit-content.v1"
+       && administrativeAdmission.code === "GIT-03-ADMINISTRATIVE-VERIFIED" && administrativeAdmission.messageSha256 === messageDigest(text);
+-    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred"});
++    if (!admitted) findings.push({code:"GIT-03-ADMINISTRATIVE-EVIDENCE-REQUIRED",detail:"administrative binding requires independently inspected exact Git paths and official projection bytes; no authorship or approval is inferred. The admitted Elephant form for a bounded commit of your own is `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`"});
+   }
+   const integration = trailers.filter((entry) => entry.key === "Dispatch" && entry.value.startsWith("quality-package-"));
+   if (integration.length > 0) {
+diff --git a/plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs b/plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs
+new file mode 100644
+index 000000000..af8a55bf7
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs
+@@ -0,0 +1,20 @@
++// SPDX-License-Identifier: SUL-1.0
++// K98 (PO decision 2026-10-23, tiles row 1/2 part 2): TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE names the home directory.
++import assert from "node:assert/strict";
++import { mkdtempSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { applyTrustAnchorBootstrap } from "./onboarding-init.mjs";
++
++test("K98 row 1/2: the machine-plane refusal names the unusable home directory and the repair", () => {
++  const rootDir = mkdtempSync(join(tmpdir(), "oi-machine-plane-"));
++  const result = applyTrustAnchorBootstrap({
++    rootDir, mode: "new", directory: join(rootDir, "keys"), humanName: "Fixture",
++    env: { ...process.env, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: "relative-home-not-absolute" },
++  });
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE");
++  assert.match(result.reason, /relative-home-not-absolute/u);
++  assert.match(result.reason, /absolute home directory/u);
++});
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 540693917..fa4399a96 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -440,7 +440,14 @@ export function applyTrustAnchorBootstrap({
+     ?? homedir();
+   const machineDependencies = { homedirFn: () => home };
+   const machinePath = machinePlaneFilePath(machineDependencies);
+-  if (machinePath === null) return { ok: false, code: "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE" };
++  if (machinePath === null) {
++    return {
++      ok: false,
++      code: "TRUST-ANCHOR-MACHINE-PLANE-UNAVAILABLE",
++      reason: `the machine-plane file path cannot be derived from the home directory ${typeof home === "string" && home !== "" ? `"${home}"` : "(none: HOME, USERPROFILE and PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE are all unset)"}; `
++        + "name an existing absolute home directory in HOME (or USERPROFILE on Windows) and run the command again",
++    };
++  }
+   const common = runGit("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"], {
+     encoding: "utf8", shell: false, env: effectiveEnv,
+   });

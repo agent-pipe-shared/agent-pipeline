@@ -1,0 +1,152 @@
+diff --git a/.gitleaks.toml b/.gitleaks.toml
+index e51169aa1..0f206b548 100644
+--- a/.gitleaks.toml
++++ b/.gitleaks.toml
+@@ -64,6 +64,16 @@
+ [extend]
+ useDefault = true
+ 
++# K98 (PO decision 2026-10-23, row 13): the scan source excludes `scratch/clones` (throwaway working
++# clones, never part of a candidate commit), so the security gate does not depend on how many
++# clones the machine holds. Path form as above: gitleaks reports the absolute path. Known limit: a
++# scan whose own root lies below `scratch/clones/` is skipped in full; scan a clone from its parent.
++[allowlist]
++description = "scratch/clones working clones are not part of the scanned source"
++paths = [
++  '''.*/scratch/clones/.*''',
++]
++
+ [[rules]]
+ id = "sentry-access-token"
+ 
+diff --git a/plugins/pipeline-core/config/security/gitleaks-default.toml b/plugins/pipeline-core/config/security/gitleaks-default.toml
+index 365e12235..481c0e185 100644
+--- a/plugins/pipeline-core/config/security/gitleaks-default.toml
++++ b/plugins/pipeline-core/config/security/gitleaks-default.toml
+@@ -22,6 +22,16 @@
+ [extend]
+ useDefault = true
+ 
++# K98 (PO decision 2026-10-23, row 13): the scan source excludes `scratch/clones` (throwaway working
++# clones, never part of a candidate commit), so the security gate does not depend on how many
++# clones the machine holds. Path form as above: gitleaks reports the absolute path. Known limit: a
++# scan whose own root lies below `scratch/clones/` is skipped in full; scan a clone from its parent.
++[allowlist]
++description = "scratch/clones working clones are not part of the scanned source"
++paths = [
++  '''.*/scratch/clones/.*''',
++]
++
+ [[rules]]
+ id = "sentry-access-token"
+ 
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+index 6bb3864cf..7b088059a 100644
+--- a/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.mjs
+@@ -44,7 +44,18 @@ function parse(argv) {
+   return flags.agent === undefined ? { error: `state who runs it: --agent (an agent session) or --human (a PO terminal commit); ${usage}` } : flags;
+ }
+ 
+-export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
++const FOREIGN_BASE = "other files are uncommitted; this command commits only the Pipeline's own state files";
++const PUSH_APPROVAL_RECORD = "project/pipeline-state.json";
++
++/** The refusal text: it names the working form for the one dirty file agents most often meet here. */
++export function foreignChangesReason(others) {
++  if (!Array.isArray(others) || !others.includes(PUSH_APPROVAL_RECORD)) return FOREIGN_BASE;
++  return `${FOREIGN_BASE}. ${PUSH_APPROVAL_RECORD} is the push-approval record: the next push-prepare run folds it into a commit by itself, so do not commit it by hand and do not add it to a commit of other work. `
++    + "To commit other work in the meantime, leave that file out of the pathspec and use the Elephant trailer form `Dispatch: stage-0 (elephant)` with `AI-Assisted: true`; "
++    + "`Dispatch: administrative (elephant)` is refused without independently inspected evidence.";
++}
++
++export function commitPipelineOwned(argv,{ spawn = spawnSync } = {}) {
+   const parsed = parse(argv);
+   if (parsed.error) return { status: "refused", code: "CPO-ARGS", reason: parsed.error };
+   let root;
+@@ -54,7 +65,7 @@ export function commitPipelineOwned(argv, { spawn = spawnSync } = {}) {
+   const status = git(["status", "--porcelain=v1", "--untracked-files=all"]);
+   if (!isSuccessfulSpawn(status) || typeof status.stdout !== "string") return { status: "refused", code: "CPO-GIT", reason: "git status failed" };
+   const { owned, others } = classifyDirtyTree(status.stdout);
+-  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: "other files are uncommitted; this command commits only the Pipeline's own state files", others, owned };
++  if (others.length) return { status: "refused", code: "CPO-FOREIGN-CHANGES", reason: foreignChangesReason(others), others, owned };
+   if (!owned.length) return { status: "nothing-to-commit", owned: [] };
+   if (parsed.dryRun) return { status: "dry-run", owned };
+   const add = git(["add", "--", ...owned]);
+diff --git a/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+new file mode 100644
+index 000000000..396704a03
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs
+@@ -0,0 +1,35 @@
++// SPDX-License-Identifier: SUL-1.0
++// K98 (PO decision 2026-10-23, row 7/7): a CPO-FOREIGN-CHANGES refusal for the push-approval record
++// names the working form. Message-only: no new write right, the refusal code and shape stay.
++import assert from "node:assert/strict";
++import { mkdtempSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { commitPipelineOwned } from "./commit-pipeline-owned.mjs";
++
++function refusedFor(statusOut) {
++  const root = mkdtempSync(join(tmpdir(), "cpo-k98-"));
++  const spawn = (_cmd, args) => (args.includes("status")
++    ? { status: 0, stdout: statusOut, stderr: "" }
++    : { status: 0, stdout: "", stderr: "" });
++  return commitPipelineOwned(["--root", root, "--agent"], { spawn });
++}
++
++test("K98 row 7/7: the push-approval record refusal names the fold and the admitted trailer form", () => {
++  const result = refusedFor(" M project/pipeline-state.json\n");
++  assert.equal(result.status, "refused");
++  assert.equal(result.code, "CPO-FOREIGN-CHANGES");
++  assert.deepEqual(result.owned, []);
++  assert.deepEqual(result.others, ["project/pipeline-state.json"]);
++  assert.match(result.reason, /push-prepare/u);
++  assert.match(result.reason, /do not commit it by hand/u);
++  assert.match(result.reason, /Dispatch: stage-0 \(elephant\)/u);
++});
++
++test("K98 row 7/7: a refusal for any other foreign file keeps the plain reason", () => {
++  const result = refusedFor(" M other.txt\n");
++  assert.equal(result.code, "CPO-FOREIGN-CHANGES");
++  assert.doesNotMatch(result.reason, /push-prepare/u);
++  assert.match(result.reason, /commits only the Pipeline's own state files/u);
++});
+diff --git a/plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs b/plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs
+new file mode 100644
+index 000000000..33d902dc7
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: SUL-1.0
++// K98 (PO decision 2026-10-23, row 13): both shipped gitleaks configs (repo root and the plugin mirror)
++// carry a global path allowlist that excludes `scratch/clones` from the scan source, and nothing else.
++import assert from "node:assert/strict";
++import { readFileSync } from "node:fs";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++const CONFIGS = {
++  "repo-root .gitleaks.toml": new URL("../../../../.gitleaks.toml", import.meta.url),
++  "plugin mirror gitleaks-default.toml": new URL("../../config/security/gitleaks-default.toml", import.meta.url),
++};
++
++function globalAllowlistPaths(text) {
++  const match = /^\[allowlist\]\n(?:.*\n)*?paths = \[\n((?:\s+'''.*''',\n)+)\]/mu.exec(text);
++  if (!match) return null;
++  return [...match[1].matchAll(/'''(.*)'''/gu)].map((entry) => new RegExp(entry[1], "u"));
++}
++
++for (const [label, url] of Object.entries(CONFIGS)) {
++  test(`K98 row 13: ${label} excludes scratch/clones from the scan source and nothing else`, () => {
++    const paths = globalAllowlistPaths(readFileSync(fileURLToPath(url), "utf8"));
++    assert.ok(paths, "a global [allowlist] with a paths list exists");
++    const excluded = (path) => paths.some((re) => re.test(path));
++    assert.equal(excluded("/work/repo/scratch/clones/k98/plugins/a.mjs"), true);
++    assert.equal(excluded("/work/repo/scratch/notes.md"), false, "scratch/ itself stays scanned");
++    assert.equal(excluded("/work/repo/plugins/pipeline-core/scripts/a.mjs"), false);
++    assert.equal(excluded("/work/repo/backlog/transitions.ndjson"), false);
++  });
++}

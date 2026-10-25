@@ -1,0 +1,26 @@
+// K118 helper: re-computes the VCR01 assertions after the first deepEqual (which is red for pre-existing sites drift) and lists the sites drift. Usage: node scratch/k118-classify.mjs [clone]
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
+import { classifyVulnerableSuite, DEFAULT_REGISTRY, checkVerifyCaseCompletion } from "../scratch/clones/k108/harness/scripts/check-verify-case-completion.mjs";
+const root = process.argv[2] ?? "scratch/clones/k108";
+const testSource = readFileSync(join(root, "harness/scripts/check-verify-case-completion.test.mjs"), "utf8");
+const block = testSource.slice(testSource.indexOf("const newlyCounted = ["), testSource.indexOf("const registry = JSON.parse"));
+const pinned = [...block.matchAll(/^\s+\["([^"]+)","([^"]+)","([^"]+)",(\d+)\],$/gmu)].map((m) => [m[1], m[2], m[3], Number(m[4])]);
+const registry = JSON.parse(readFileSync(join(root, DEFAULT_REGISTRY), "utf8"));
+const classified = registry.entries.flatMap((entry) => {
+  const decision = classifyVulnerableSuite(readFileSync(join(root, entry.path), "utf8"));
+  return decision === null ? [] : [[entry.name, entry.path, decision.classification, decision.sites]];
+}).sort((left, right) => left[0].localeCompare(right[0]));
+const addedNames = new Set(pinned.map((r) => r[0]));
+const added = classified.filter((r) => addedNames.has(r[0]));
+let drift = 0;
+for (const row of added) {
+  const want = pinned.find((p) => p[0] === row[0]);
+  if (JSON.stringify(want) !== JSON.stringify(row)) { drift += 1; console.log("DRIFT", row[0], "pinned", want[3], want[2], "actual", row[3], row[2]); }
+}
+console.log("pinned rows", pinned.length, "classified-in-pinned", added.length, "drift rows", drift);
+const retained = classified.filter((r) => !addedNames.has(r[0])).map(([n, p]) => [n, p]);
+console.log("retained", retained.length, createHash("sha256").update(JSON.stringify(retained)).digest("hex"));
+const result = checkVerifyCaseCompletion({ root });
+console.log("ok", result.ok, "vulnerableCount", result.vulnerableCount, "classified", classified.length, "registryCount", result.registryCount);

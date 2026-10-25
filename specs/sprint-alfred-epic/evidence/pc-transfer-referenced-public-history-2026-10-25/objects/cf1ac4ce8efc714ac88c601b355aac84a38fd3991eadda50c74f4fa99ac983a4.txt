@@ -1,0 +1,81 @@
+// Helper (untracked): replay runbook steps in scratch/clones/k133 literally.
+// usage: node scratch/k133-run.mjs <NN> [<NN>...]   (steps from the runbook of the clone)
+// Extra/override: scratch/k133-overrides.json = { "<runbook path>": "<replacement path relative to main checkout>", "extra": { "<NN>": [lines] } }
+// Appends one JSON line per step to scratch/agent-out/K133-status.jsonl. Stops at the first failing git line.
+import { spawnSync } from "node:child_process";
+import { readFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+const clone = resolve("scratch/clones/k133");
+const main = resolve(".");
+mkdirSync("scratch/agent-out", { recursive: true });
+const ov = existsSync("scratch/k133-overrides.json") ? JSON.parse(readFileSync("scratch/k133-overrides.json", "utf8")) : {};
+const runbook = readFileSync(`${clone}/specs/sprint-alfred-epic/evidence/sitting/runbook.md`, "utf8");
+
+const kinds = {};
+function stepsOf(text) {
+  const out = {};
+  const parts = text.split(/^## /m).slice(1);
+  for (const p of parts) {
+    const n = p.slice(0, 2);
+    kinds[n] = /^\d\d (PRO|UN)\b/.exec(p)?.[1] ?? "UN";
+    const lines = [];
+    for (const m of p.matchAll(/```\n([\s\S]*?)```/g)) for (const l of m[1].split("\n")) if (l.trim()) lines.push(l.trim());
+    out[n] = lines;
+  }
+  return out;
+}
+const steps = ov.replaceSteps ? { ...stepsOf(runbook), ...ov.replaceSteps } : stepsOf(runbook);
+if (ov.extra) for (const [k, v] of Object.entries(ov.extra)) steps[k] = v;
+
+const run = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+// identity once
+if (run("git", ["-C", clone, "config", "user.name"], main).status !== 0) {
+  run("git", ["-C", clone, "config", "user.name", "The Agent-Pipeline Contributors"], main);
+  run("git", ["-C", clone, "config", "user.email", "<operator-email>"], main);
+}
+
+for (const n of process.argv.slice(2)) {
+  const lines = steps[n];
+  if (!lines) { console.log(n, "NO SUCH STEP"); process.exit(9); }
+  const rec = { step: n, at: new Date().toISOString(), lines: [] };
+  const t0 = Date.now();
+  let failed = false;
+  for (let line of lines) {
+    if (line.startsWith("#")) continue;
+    // path overrides
+    for (const [from, to] of Object.entries(ov.paths ?? {})) line = line.split(from).join(to);
+    const tok = line.split(/\s+/);
+    const t1 = Date.now();
+    let r;
+    if (tok[0] === "git") {
+      // apply of a protected target: still via execFileSync, with -C clone; paths relative to main checkout
+      const args = tok.slice(1).map((a) => (/^(specs|scratch)\//.test(a) && !a.startsWith("scratch/agent-out/K133-notes") ? (existsSync(`${main}/${a}`) ? `${main}/${a}` : a) : a));
+      if (tok[1] !== "commit") r = run("git", ["-C", clone, ...args], main);
+      if (tok[1] === "commit") {
+        const fi = tok.indexOf("-F");
+        const mf = tok[fi + 1];
+        const pathsIdx = tok.indexOf("--");
+        const gargs = ["-C", clone, "commit", "-F", existsSync(`${main}/${mf}`) ? `${main}/${mf}` : `${clone}/${mf}`, "--", ...tok.slice(pathsIdx + 1)];
+        // probes: the main checkout's generated hooks run against the staged state / message, without being a commit
+        const msgAbs = gargs[4];
+        const pc = run("sh", [`${main}/.git/hooks/pre-commit`], clone);
+        rec.lines.push({ line: "[probe pre-commit] kind=" + kinds[n], status: pc.status, out: (pc.stdout + pc.stderr).slice(0, 700) });
+        const cmh = run("sh", [`${main}/.git/hooks/commit-msg`, msgAbs], clone);
+        rec.lines.push({ line: "[probe commit-msg]", status: cmh.status, out: (cmh.stdout + cmh.stderr).slice(0, 700) });
+        r = run("git", gargs, main);
+      }
+    } else if (tok[0] === "node") {
+      r = run("node", tok.slice(1), clone);
+    } else { rec.lines.push({ line, skipped: true }); continue; }
+    const e = { line: line.length > 160 ? line.slice(0, 160) + "..." : line, status: r.status, ms: Date.now() - t1, out: (r.stdout + r.stderr).slice(0, 1800) };
+    rec.lines.push(e);
+    if (r.status !== 0 && tok[0] === "git") { failed = true; break; }
+  }
+  rec.head = run("git", ["-C", clone, "rev-parse", "--short", "HEAD"], main).stdout.trim();
+  rec.ms = Date.now() - t0;
+  rec.result = failed ? "FAILED" : "OK";
+  appendFileSync("scratch/agent-out/K133-status.jsonl", JSON.stringify(rec) + "\n");
+  console.log(n, rec.result, rec.head, rec.ms + "ms", rec.lines.filter((l) => l.status && l.status !== 0).map((l) => l.line.startsWith("[probe pre-commit]") ? { ...l, out: l.out.split("\n")[1] ?? "" } : l).map((l) => l.line + " => " + l.status + " " + l.out.slice(0, 600)).join("\n"));
+  if (failed) process.exit(2);
+}

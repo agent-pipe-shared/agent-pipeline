@@ -1,0 +1,8 @@
+// K145 helper: revert the four diagnostic probe edits in the k145 clone.
+import { execFileSync } from "node:child_process";
+execFileSync("git", ["-C", "scratch/clones/k145", "checkout", "--",
+  "plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs",
+  "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+  "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+  "plugins/pipeline-core/lib/session-authority-registry.mjs"]);
+console.log(execFileSync("git", ["-C", "scratch/clones/k145", "status", "--short"], { encoding: "utf8" }) || "clean");

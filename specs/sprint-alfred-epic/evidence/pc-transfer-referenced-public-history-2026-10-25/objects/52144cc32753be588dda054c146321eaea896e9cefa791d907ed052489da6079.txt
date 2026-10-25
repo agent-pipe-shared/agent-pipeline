@@ -1,0 +1,114 @@
+{
+  "command": [
+    "bwrap",
+    "--unshare-net",
+    "--ro-bind",
+    "/",
+    "/",
+    "--dev",
+    "/dev",
+    "--proc",
+    "/proc",
+    "--tmpfs",
+    "/tmp",
+    "--setenv",
+    "HOME",
+    "/tmp/pushseed-native-private-home",
+    "--setenv",
+    "USERPROFILE",
+    "/tmp/pushseed-native-private-home",
+    "--setenv",
+    "PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE",
+    "/tmp/pushseed-native-private-home",
+    "--setenv",
+    "TMPDIR",
+    "/tmp",
+    "--chdir",
+    "<repo-root>",
+    "<home>/.local/lib/node-v24.15.0/bin/node",
+    "--experimental-vm-modules",
+    "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/pushseed-after-scanner-fix/directed.mjs"
+  ],
+  "exitCode": 0,
+  "error": null,
+  "before": [
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "e5b0e455457db33d98ff9f2433861a1a035e7c1c30d871f7150b92f79b6eee7c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "04de51bdf4ee33908cd46e2ebde0f57b917bb2c7c6c6ca10b9fe238a6e58a9f6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "466e78c654666c4e6dc459ea7aacc490237403d79cb012bf40865fdf51dbc3f9"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.test.mjs",
+      "sha256": "61986d9e09d6a1a70c4c12dd333000941ae52c36fab1fdcb61d3407c1b85e8fc"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/semgrep.mjs",
+      "sha256": "dca494dfdbf98ce1c94771b16240bbe9ca9f8608c60407068075ca5ff6f573e1"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "sha256": "d152533ca2ebcc7475e8275c2834cbeaac9ea083f534b768e6def99d5f053cff"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "50246313d2e0a722bf1840dd8fd2d43556c1cc279b1ac71441f5b39500d13cc0"
+    }
+  ],
+  "after": [
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "e5b0e455457db33d98ff9f2433861a1a035e7c1c30d871f7150b92f79b6eee7c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "04de51bdf4ee33908cd46e2ebde0f57b917bb2c7c6c6ca10b9fe238a6e58a9f6"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "466e78c654666c4e6dc459ea7aacc490237403d79cb012bf40865fdf51dbc3f9"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.test.mjs",
+      "sha256": "61986d9e09d6a1a70c4c12dd333000941ae52c36fab1fdcb61d3407c1b85e8fc"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/semgrep.mjs",
+      "sha256": "dca494dfdbf98ce1c94771b16240bbe9ca9f8608c60407068075ca5ff6f573e1"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "sha256": "d152533ca2ebcc7475e8275c2834cbeaac9ea083f534b768e6def99d5f053cff"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "50246313d2e0a722bf1840dd8fd2d43556c1cc279b1ac71441f5b39500d13cc0"
+    }
+  ],
+  "SourceStable": true,
+  "terminal": {
+    "schema": "pipeline.test-case-completion.v1",
+    "event": "TERMINAL",
+    "declaredCount": 1,
+    "disposedCount": 1,
+    "caseIds": [
+      "OFS001"
+    ],
+    "caseSetSha256": "4a9cc3749ff655223e98f7319c248f44fd4e1aa17561a95c14cbcdd7b899a737",
+    "dispositionsSha256": "7e90a349f8dbd2fa61c024500d047d3d95a43a7ac9f0935d256312058bfd4518",
+    "counts": {
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  },
+  "qualification": "unchanged original PUSHSEED callback/env/assertions, actual native scanner and Source; virtual registration only; no full suite claim",
+  "producerPersistence": "original callback disposes its root in finally; producer candidate files not retained independently"
+}

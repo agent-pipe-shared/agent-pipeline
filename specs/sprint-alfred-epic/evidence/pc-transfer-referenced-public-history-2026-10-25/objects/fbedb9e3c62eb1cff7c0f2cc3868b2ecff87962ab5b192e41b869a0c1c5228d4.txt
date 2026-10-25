@@ -1,0 +1,321 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 272706a22..7713ae791 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -29,6 +29,11 @@
+  * checkout (open dispatch record, owner not provably gone); an overlap is DBG-SCOPE-OVERLAP, naming the dispatch,
+  * the overlapping paths and the repair. The overlap predicate is the pure `scopesOverlap` of lib/slice-queue.mjs.
+  *
++ * PO decision D75 (A): a briefing for an item whose earlier attempt the governed queue cancelled as wrong-premise is
++ * refused DBG-RECON-REQUIRED unless it carries a recon note (package field `reconNote`, flag `--recon-note`), a
++ * non-empty file under scratch/ or specs/; the refusal names the slice, the earlier attempt and the repair. K106: the
++ * duty ends once any slice of the same item is delivered (integrated, the lib's only completed-delivery status).
++ *
+  * The generator calls no model and runs no mutating git command. `binding` writes no file and
+  * leaves the judgment fields (goal, context, DoD, forbidden, stop) as template placeholders;
+  * `build` (PO decision D78) fills them from a closed package through
+@@ -49,8 +54,10 @@ import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "
+ import {
+   BRIEFING_BUILD_SCHEMA,
+   BriefingPackageRefusal,
++  RECON_NOTE_PREFIXES,
+   assertPackagePathsExist,
+   budgetDecision,
++  isReconNotePath,
+   renderGoldfishBriefing,
+   resolveBriefingCalibration,
+   skeletonToolBudget,
+@@ -61,7 +68,7 @@ import { dispatchBudgetLineForRole, parseDispatchSlice } from "../lib/dispatch-p
+ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
+ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
+ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+-import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
++import { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
+ import { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } from "../lib/slice-queue.mjs";
+ import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
+@@ -79,7 +86,7 @@ const AGENT_TYPES = Object.freeze(["goldfish-implementor", "goldfish-mechanic",
+ const ACCEPTED_CRITERION_STATUSES = Object.freeze(["explicit-actual-independent-pass", "no-explicit-criterion"]);
+ const SINGLE_FLAGS = Object.freeze({
+   "--root": "root", "--dispatch-id": "dispatchId", "--item": "item", "--agent-type": "agentType",
+-  "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion",
++  "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion", "--recon-note": "reconNote",
+ });
+ const REPEATED_FLAGS = Object.freeze({ "--path": "paths" });
+ const REQUIRED_FLAGS = Object.freeze(["--dispatch-id", "--item", "--agent-type", "--model-id", "--check"]);
+@@ -165,6 +172,36 @@ function defaultQueueRow(root, sliceId) {
+   } catch { return null; }
+ }
+ 
++/** Every slice row of the governed queue (read-only); an empty list outside an approved item course or when it cannot be read. */
++function defaultQueueRows(root) {
++  try {
++    const governed = resolveGovernedItemQueue({ root });
++    return governed.status === "required" ? governed.normalized.slices : [];
++  } catch { return []; }
++}
++
++/**
++ * K106: ids of the governed queue slices the lib treats as a completed delivery. The queue stores no delivered state
++ * (SLICE_STATES is ready|hold-po|blocked-external|deferred|cancelled); readyAndLive derives status "done" from the
++ * integrated ids this observation returns (native integration record or orchestrator commit evidence). A refused
++ * observation, a fault or a repository without an item course yields no delivery (the safe direction: the duty stays).
++ */
++function defaultIntegratedSliceIds(root) {
++  try {
++    const observed = observeGovernedItemIntegrationReadiness({ root });
++    return observed.status === "observed" ? [...observed.integrated] : [];
++  } catch { return []; }
++}
++
++/** K106: is any row of this item, other than the wrong-premise attempts themselves, an integrated (delivered) slice? Never throws. */
++function hasDeliveredSliceOfItem(rows, itemId, wrongPremiseIds, readIntegrated, root) {
++  let ids;
++  try { ids = readIntegrated(root); } catch { return false; }
++  if (!Array.isArray(ids) && !(ids instanceof Set)) return false;
++  const delivered = new Set(ids);
++  return rows.some((entry) => entry?.delivery?.itemId === itemId && delivered.has(entry.id) && !wrongPremiseIds.includes(entry.id));
++}
++
+ const BRIEFING_SCAN_LIMIT = 500;
+ const BRIEFING_READ_LIMIT = 1048576;
+ 
+@@ -443,6 +480,9 @@ export function generateDispatchBinding(options, deps = {}) {
+   for (const path of [check, ...options.paths]) {
+     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
+   }
++  if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
++    refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
++  }
+   if (!/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file`);
+   const allowedPaths = [...new Set([check, ...options.paths])].sort();
+ 
+@@ -522,6 +562,23 @@ export function generateDispatchBinding(options, deps = {}) {
+     }
+   }
+ 
++  // D75 (A): a briefing for an item whose earlier attempt the governed queue cancelled as wrong-premise repeats that stop
++  // unless it carries a recon note that corrects the premise. Other classes, other items and a repository without a queue
++  // are not touched, and nothing in the output changes unless a note is given.
++  const queueRows = (deps.queueRows ?? defaultQueueRows)(root) ?? [];
++  const wrongPremise = queueRows
++    .filter((entry) => entry?.state === "cancelled" && entry.cancelClass === "wrong-premise" && entry.delivery?.itemId === itemId && entry.id !== dispatchId)
++    .map((entry) => entry.id).sort();  // K106: the duty ends once a slice of the SAME item was delivered (integrated: the lib's only completed-delivery status).
++  // The integration read runs only when a wrong-premise cancel exists; any fault leaves the duty in force.
++  const dutyEnded = wrongPremise.length > 0 && hasDeliveredSliceOfItem(queueRows, itemId, wrongPremise, deps.integratedSliceIds ?? defaultIntegratedSliceIds, root);
++  if (wrongPremise.length > 0 && !dutyEnded) {
++    const readNote = options.reconNote === undefined ? null : readRepoFile(root, options.reconNote);
++    if (readNote === null || readNote.toString("utf8").trim() === "") {
++      const fault = options.reconNote === undefined ? "none was given" : `${options.reconNote} is not a non-empty regular file under --root`;
++      refuse("DBG-RECON-REQUIRED", `slice ${dispatchId} re-dispatches item ${itemId}, whose earlier attempt ${wrongPremise.join(", ")} the governed queue cancelled as wrong-premise (${CANCEL_CLASS_HELP["wrong-premise"]}); a new briefing built on the same premise repeats that stop, so it must carry a recon note and ${fault}. repair: write a recon note (what the earlier attempt assumed, what the code or Spec actually shows, the corrected premise) under ${RECON_NOTE_PREFIXES.join(" or ")}, add it to the briefing package as "reconNote": "<repository-relative path>" (for the binding command: --recon-note <path>), and regenerate the briefing. This duty ends once a slice of item ${itemId} has been delivered (integrated into the candidate): after that no recon note is needed for this item`);
++    }
++  }
++
+   // D76: the write scope is admitted only when it is disjoint from every other running dispatch of this checkout. The check
+   // dependencies of this binding are its allowed paths (assertBindingInvariants), so one scope test covers both clauses.
+   const others = (deps.runningDispatches ?? defaultRunningDispatches)(root).filter((entry) => entry.dispatchId !== dispatchId);
+@@ -734,7 +791,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   const calibration = resolveBriefingCalibration(root, deps.calibration);
+   const bind = (agentType) => generateDispatchBinding({
+     root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
+-    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion,
++    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote,
+   }, deps);
+   // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
+   let generated = bind(pkg.agentType);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index cd1ce7a90..9f86bca48 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -775,3 +775,170 @@ test("D76 the default reader finds a running dispatch from its open record and i
+   writeFileSync(record, JSON.stringify({ taskId: "ALF-RUN", outcome: "succeeded" }));
+   assert.equal(runDispatchBriefing(argvOf(fx), deps).ok, true, "a terminal record is not a running dispatch");
+ });
++
++// --- D75 (A): a re-dispatch after a wrong-premise stop needs a recon reference ---
++
++const SLICE_ITEM = "pipeline.sample-slug";
++const RECON_REL = "scratch/recon-ALF-T1.md";
++const cancelledRow = (cancelClass, over = {}) => ({
++  id: "ALF-T0", state: "cancelled", cancelClass, writeScope: [PATH_A, CHECK], delivery: { itemId: SLICE_ITEM }, ...over,
++});
++const withRows = (fx, rows, over = {}) => depsOf(fx, { queueRows: () => rows, ...over });
++const putFile = (fx, rel, text) => {
++  mkdirSync(dirname(join(fx.root, rel)), { recursive: true });
++  writeFileSync(join(fx.root, rel), text);
++};
++
++test("D75 A a re-dispatch of a slice whose earlier attempt was cancelled wrong-premise is refused DBG-RECON-REQUIRED without a recon note, naming the slice, the attempt and the repair", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")]));
++  assert.equal(result.ok, false, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.code, "DBG-RECON-REQUIRED", result.message);
++  assert.ok(result.message.includes("ALF-T1"), "names the slice being re-dispatched");
++  assert.ok(result.message.includes("ALF-T0"), "names the earlier cancelled attempt");
++  assert.ok(result.message.includes("wrong-premise"), "names the stop class");
++  assert.match(result.message, /repair: write a recon note/u);
++  assert.ok(result.message.includes("reconNote"), "names the package field");
++  assert.match(result.message, /regenerate/u);
++  assert.equal(result.skeleton, undefined);
++});
++
++test("D75 A an existing, non-empty recon note admits the re-dispatch and changes nothing else in the binding", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  putFile(fx, RECON_REL, "Earlier attempt assumed X; the code shows Y.\n");
++  const plain = runDispatchBriefing(argvOf(fx), depsOf(fx));
++  const noted = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", RECON_REL]), withRows(fx, [cancelledRow("wrong-premise")]));
++  assert.equal(noted.ok, true, JSON.stringify(noted).slice(0, 300));
++  assert.equal(noted.skeleton, plain.skeleton, "the binding output carries nothing new");
++  assert.deepEqual(noted.warnings, plain.warnings);
++});
++
++test("D75 A a recon note that does not exist, is empty or sits outside scratch/ and specs/ is refused", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const rows = [cancelledRow("wrong-premise")];
++  const missing = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", RECON_REL]), withRows(fx, rows));
++  assert.equal(missing.code, "DBG-RECON-REQUIRED", JSON.stringify(missing).slice(0, 300));
++  assert.ok(missing.message.includes(RECON_REL), "names the unusable path");
++  assert.match(missing.message, /repair: /u);
++  putFile(fx, RECON_REL, "  \n");
++  const blank = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", RECON_REL]), withRows(fx, rows));
++  assert.equal(blank.code, "DBG-RECON-REQUIRED", JSON.stringify(blank).slice(0, 300));
++  putFile(fx, "docs/recon.md", "A real note in the wrong place.\n");
++  const elsewhere = runDispatchBriefing(argvOf(fx, {}, ["--recon-note", "docs/recon.md"]), withRows(fx, rows));
++  assert.equal(elsewhere.code, "DBG-PATH-INVALID", JSON.stringify(elsewhere).slice(0, 300));
++  assert.ok(elsewhere.message.includes("scratch/") && elsewhere.message.includes("specs/"));
++});
++
++test("D75 A the other cancel classes, an unclassified cancel, another item and a live row do not require a recon note", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  for (const cancelClass of ["budget", "review-defect", "integrated-elsewhere", "superseded", "unclassified"]) {
++    assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow(cancelClass)])).ok, true, cancelClass);
++  }
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise", { delivery: { itemId: "other.item" } })])).ok, true, "another item's stop");
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise", { state: "ready", cancelClass: null })])).ok, true, "a row that is not cancelled");
++});
++
++test("D75 A a repository without a slice queue is unchanged, with the injected reader and with the default reader", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [])).ok, true, "empty queue");
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, null)).ok, true, "unreadable queue");
++  assert.equal(runDispatchBriefing(argvOf(fx), depsOf(fx)).ok, true, "default reader on a fixture without a governed queue");
++});
++
++test("D75 A the package field reconNote is optional and closed: a string path under scratch/ or specs/ that exists", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { validateBriefingPackage } = await buildLib();
++  const base = packageFixture().pkg;
++  assert.doesNotThrow(() => validateBriefingPackage(base), "absent is valid");
++  assert.doesNotThrow(() => validateBriefingPackage({ ...base, reconNote: RECON_REL }));
++  for (const bad of [42, "", "docs/recon.md", "/etc/passwd", "scratch/../x.md", "scratch\\recon.md"]) {
++    assert.throws(() => validateBriefingPackage({ ...base, reconNote: bad }), (error) => error.code === "DBG-PACKAGE-FIELD-TYPE" && /reconNote/u.test(error.message) && /repair: /u.test(error.message), JSON.stringify(bad));
++  }
++  const absent = packageFixture({ reconNote: RECON_REL });
++  const refused = runDispatchBriefing(absent.argv, depsOf(absent.fx));
++  assert.equal(refused.code, "DBG-PACKAGE-PATH-MISSING", JSON.stringify(refused).slice(0, 300));
++  assert.ok(refused.message.includes(RECON_REL));
++});
++
++test("D75 A build: a wrong-premise earlier attempt makes the package field mandatory, and the recon note is then listed as a context file", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { verifyGeneratedBriefing } = await buildLib();
++  const rows = [cancelledRow("wrong-premise")];
++  const bare = packageFixture();
++  const refused = runDispatchBriefing(bare.argv, withRows(bare.fx, rows));
++  assert.equal(refused.code, "DBG-RECON-REQUIRED", JSON.stringify(refused).slice(0, 300));
++  assert.match(refused.message, /"reconNote"/u);
++  const noted = packageFixture({ reconNote: RECON_REL });
++  putFile(noted.fx, RECON_REL, "Earlier attempt assumed X; the code shows Y.\n");
++  const result = runDispatchBriefing(noted.argv, withRows(noted.fx, rows));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  const context = result.text.split("### 2. Context files")[1].split("### 3. DoD checks")[0];
++  assert.ok(context.includes(RECON_REL), "the recon note is a context file");
++  assert.match(context, /recon note/u);
++  assert.deepEqual(verifyGeneratedBriefing(result.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
++  const plain = packageFixture();
++  const plainText = runDispatchBriefing(plain.argv, depsOf(plain.fx)).text;
++  assert.doesNotMatch(plainText, /recon/iu, "a briefing without the field renders nothing new");
++});
++
++// --- K106 (D75 A amendment): the recon-note duty ends once a delivery of the SAME item exists ---
++// Delivery is not a stored queue state (SLICE_STATES has no delivered/merged/closed value); the lib derives it:
++// readyAndLive marks a slice "done" when its id is integrated (commit evidence or a native integration record, read by
++// observeGovernedItemIntegrationReadiness). The generator therefore takes the integrated ids as one injectable reader.
++
++const successorRow = (over = {}) => ({ id: "ALF-T2", state: "ready", writeScope: [PATH_A, CHECK], delivery: { itemId: SLICE_ITEM }, ...over });
++const integrated = (...ids) => ({ integratedSliceIds: () => ids });
++
++test("K106 a wrong-premise cancel plus a delivered successor row of the SAME item no longer requires a recon note, in either row order", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const plain = runDispatchBriefing(argvOf(fx), depsOf(fx));
++  for (const rows of [[cancelledRow("wrong-premise"), successorRow()], [successorRow(), cancelledRow("wrong-premise")]]) {
++    const result = runDispatchBriefing(argvOf(fx), withRows(fx, rows, integrated("ALF-T2")));
++    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++    assert.equal(result.skeleton, plain.skeleton, "the binding output carries nothing new");
++  }
++  const packaged = packageFixture();
++  const built = runDispatchBriefing(packaged.argv, withRows(packaged.fx, [cancelledRow("wrong-premise"), successorRow()], integrated("ALF-T2")));
++  assert.equal(built.ok, true, JSON.stringify(built).slice(0, 300));
++});
++
++test("K106 a successor row that is merely ready, held, deferred or blocked (not integrated) keeps the duty", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  for (const state of ["ready", "hold-po", "deferred", "blocked-external"]) {
++    const result = runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise"), successorRow({ state })], integrated()));
++    assert.equal(result.code, "DBG-RECON-REQUIRED", `${state}: ${JSON.stringify(result).slice(0, 200)}`);
++  }
++  assert.match(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")])).message, /ends once a slice of item pipeline\.sample-slug has been delivered/u, "the refusal says when the duty ends");
++});
++
++test("K106 a delivered row of a DIFFERENT item, an integrated id with no row, or an unreadable integration reader keeps the duty", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const rows = [cancelledRow("wrong-premise"), successorRow({ delivery: { itemId: "other.item" } })];
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, rows, integrated("ALF-T2"))).code, "DBG-RECON-REQUIRED", "other item");
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")], integrated("ALF-T9"))).code, "DBG-RECON-REQUIRED", "no such row");
++  const same = [cancelledRow("wrong-premise"), successorRow()];
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, same, { integratedSliceIds: () => null })).code, "DBG-RECON-REQUIRED", "unreadable (null)");
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, same, { integratedSliceIds: () => { throw new Error("git fault"); } })).code, "DBG-RECON-REQUIRED", "unreadable (throws)");
++  assert.equal(runDispatchBriefing(argvOf(fx), withRows(fx, [cancelledRow("wrong-premise")], integrated("ALF-T0"))).code, "DBG-RECON-REQUIRED", "the wrong-premise row itself is not the delivery");
++});
++
++test("K106 pin: the queue lib has no stored delivered state and the derived delivery vocabulary is exactly done; a new state forces a decision here", async () => {
++  const { SLICE_STATES, readyAndLive } = await import("../lib/slice-queue.mjs");
++  assert.deepEqual([...SLICE_STATES], ["ready", "hold-po", "blocked-external", "deferred", "cancelled"], "a new stored state must be classified as delivered or not for the recon-note duty (K106)");
++  const raw = {
++    schema: "pipeline.slice-queue.v1", feature: "unit", defaults: { commitMode: "diff-only", tier: "implementor" }, monoliths: [],
++    slices: ["A", "B"].map((id) => ({ id, title: id, state: "ready", dependsOn: [], writeScope: [`lib/${id}.mjs`], tier: "implementor", commitMode: "diff-only", loadClass: "light", briefing: { ref: `specs/unit/briefings/${id}.md` } })),
++  };
++  const result = readyAndLive({ queue: raw, terminalIds: ["A"], now: Date.parse("2026-10-05T12:00:00.000Z") }, { platform: "linux" });
++  assert.deepEqual(Object.keys(result.counts), ["ready", "live", "done", "held", "blocked", "cancelled"], "a new derived status must be classified as delivered or not for the recon-note duty (K106)");
++  assert.equal(result.slices.find((entry) => entry.id === "A").status, "done", "done is the one completed-delivery status");
++  assert.notEqual(result.slices.find((entry) => entry.id === "B").status, "done");
++});
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+index 3e8112aeb..4fe8524da 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md
+@@ -149,6 +149,16 @@ that overlaps a running dispatch (`DBG-SCOPE-OVERLAP`), naming that dispatch,
+ the overlapping paths and the repair (narrow the scope, wait for the other
+ dispatch, finalize an abandoned record, or use a worktree).
+ 
++**Recon before a re-dispatch after a wrong-premise stop (PO decision D75 (A)).**
++When the governed slice queue holds a slice cancelled with `--class wrong-premise`
++for the same item, the briefing generator refuses a new briefing for that item
++(`DBG-RECON-REQUIRED`) until the package carries `reconNote`, the path of a
++non-empty recon note under `scratch/` or `specs/`; the note is then listed as a
++context file. Write the note, add the field, regenerate. The duty ends once a
++slice of the same item has been delivered (integrated into the candidate, the
++queue lib's only completed-delivery status): from then on no recon note is
++required for that item, whatever the order of the cancelled and delivered rows.
++
+ ## Tool-call budget — the ~50-call termination cliff
+ 
+ `guardrails/token-budget.md` (TB-06, Claude compatibility projection)

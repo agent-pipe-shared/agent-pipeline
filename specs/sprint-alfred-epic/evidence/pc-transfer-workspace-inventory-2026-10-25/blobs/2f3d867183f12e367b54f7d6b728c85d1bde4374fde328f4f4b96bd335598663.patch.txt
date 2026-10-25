@@ -1,0 +1,1263 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 5464a2516..026c532c9 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -289,6 +289,10 @@ below assumes it holds and is written to catch a change that would break it.
+   `push-prepare.mjs` imports `release-promotion-envelope.mjs`, so neither
+   evidence capture nor candidate release promotion can be altered via a
+   maintenance window.
++- G28's admitted read-only audit command adds `scripts/audit-pack.mjs` as a
++  never-liftable Source root. Its direct first-party import
++  `scripts/publication-gate-evidence.mjs` is also never liftable. GMWKC01 walks
++  their import closure; the other direct dependencies were already protected.
+ - The 2026-09-20 Alfred candidate architecture adoption, design advisory, and rigor closure adds:
+   `lib/advisory-receipt.mjs`, `lib/architecture-adoption-authority.mjs`,
+   `lib/architecture-adoption-orientation.mjs`, `lib/architecture-design.mjs`,
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 984724fa8..7a7765553 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -445,6 +445,7 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-estimate-tests",
+         "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+         "verify-phase:harness/scripts/verify.mjs:generate-elephant-role-prohibitions-tests",
+@@ -658,6 +659,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pin-agy-el01-write-authorization-gap-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-agy-imported-plugin-snapshot-shadows-registered-plugin-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-agy-managed-copy-first-start-lacks-attestation-tests",
++        "verify-phase:harness/scripts/verify.mjs:pin-antigravity-design-phase-scripts-refused-in-draft-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-antigravity-global-refresh-recovers-and-installs-a-runner-view-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-antigravity-refresh-validates-the-source-before-retiring-the-managed-copy-tests",
+         "verify-phase:harness/scripts/verify.mjs:pin-approval-bound-design-package-lives-in-an-ignored-directory-tests",
+@@ -878,6 +880,7 @@
+         "verify-phase:harness/scripts/verify.mjs:po-guarded-push-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-key-pairing-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-openssl-path-tests",
++        "verify-phase:harness/scripts/verify.mjs:po-human-approval-signing-handoff-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
+         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
+@@ -1008,6 +1011,7 @@
+         "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-readiness-harness-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-readiness-tests",
++        "verify-phase:harness/scripts/verify.mjs:security-remote-identity-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-snapshot-tests",
+         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+@@ -2280,6 +2284,7 @@
+       "surfaceIds": [
+         "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
++        "verify-phase:harness/scripts/verify.mjs:audit-pack-command-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:audit-pack-tests",
+         "verify-phase:harness/scripts/verify.mjs:capture-evidence-tests",
+         "verify-phase:harness/scripts/verify.mjs:evidence-viewer-tests",
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 7f8b199e7..0824981d1 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1121,6 +1121,339 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "design-authoring-tests",
++      "file": "plugins/pipeline-core/lib/design-authoring.test.mjs",
++      "previousPolicySha256": "3da2f96bbb65cbeb3dda14d5bc60664dedf50f9f276ef4fef1bb22b7252b5385",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "DAU001",
++          "DAU002",
++          "DAU003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "onboarding-continuity-tests",
++      "file": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
++      "previousPolicySha256": "0dc05afa7fdb77c4dffb3274efb82fd60d191a55522ffcbb9e3a96af141b51ab",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "OBC001",
++          "OBC002",
++          "OBC003",
++          "OBC004",
++          "OBC005",
++          "OBC006",
++          "OBC007",
++          "OBC008",
++          "OBC009",
++          "OBC010",
++          "OBC011",
++          "OBC012",
++          "OBC013",
++          "OBC014",
++          "OBC015",
++          "OBC016",
++          "OBC017",
++          "OBC018",
++          "OBC019",
++          "OBC020",
++          "OBC021",
++          "OBC022",
++          "OBC023",
++          "OBC024",
++          "OBC025",
++          "OBC026",
++          "OBC027",
++          "OBC028",
++          "OBC029",
++          "OBC030",
++          "OBC031",
++          "OBC032",
++          "OBC033",
++          "OBC034",
++          "OBC035",
++          "OBC036",
++          "OBC037",
++          "OBC038",
++          "OBC039",
++          "OBC040",
++          "OBC041",
++          "OBC042",
++          "OBC043",
++          "OBC044",
++          "OBC045",
++          "OBC046",
++          "OBC047",
++          "OBC048",
++          "OBC049",
++          "OBC050",
++          "OBC051",
++          "OBC052",
++          "OBC053",
++          "OBC054",
++          "OBC055",
++          "OBC056",
++          "OBC057",
++          "OBC058",
++          "OBC059",
++          "OBC060",
++          "OBC061",
++          "OBC062",
++          "OBC063",
++          "OBC064",
++          "OBC065",
++          "OBC066",
++          "OBC067",
++          "OBC068",
++          "OBC069",
++          "OBC070",
++          "OBC071",
++          "OBC072",
++          "OBC073",
++          "OBC074",
++          "OBC075",
++          "OBC076",
++          "OBC077",
++          "OBC078",
++          "OBC079",
++          "OBC080",
++          "OBC081",
++          "OBC082",
++          "OBC083",
++          "OBC084",
++          "OBC085",
++          "OBC086",
++          "OBC087",
++          "OBC088",
++          "OBC089",
++          "OBC090",
++          "OBC091",
++          "OBC092",
++          "OBC093",
++          "OBC094",
++          "OBC095",
++          "OBC096",
++          "OBC097",
++          "OBC098",
++          "OBC099",
++          "OBC100",
++          "OBC101",
++          "OBC102",
++          "OBC103",
++          "OBC104",
++          "OBC105",
++          "OBC106",
++          "OBC107",
++          "OBC108",
++          "OBC109",
++          "OBC110",
++          "OBC111",
++          "OBC112",
++          "OBC113",
++          "OBC114",
++          "OBC115",
++          "OBC116",
++          "OBC117",
++          "OBC118",
++          "OBC119",
++          "OBC120",
++          "OBC121",
++          "OBC122",
++          "OBC123",
++          "OBC124",
++          "OBC125",
++          "OBC126",
++          "OBC127",
++          "OBC128",
++          "OBC129",
++          "OBC130",
++          "OBC131",
++          "OBC132",
++          "OBC133",
++          "OBC134",
++          "OBC135",
++          "OBC136",
++          "OBC137",
++          "OBC138",
++          "OBC139",
++          "OBC140",
++          "OBC141",
++          "OBC142",
++          "OBC143",
++          "OBC144",
++          "OBC145",
++          "OBC146",
++          "OBC147",
++          "OBC148",
++          "OBC149",
++          "OBC150",
++          "OBC151",
++          "OBC152",
++          "OBC153",
++          "OBC154",
++          "OBC155",
++          "OBC156",
++          "OBC157",
++          "OBC158",
++          "OBC159",
++          "OBC160",
++          "OBC161",
++          "OBC162",
++          "OBC163",
++          "OBC164",
++          "OBC165",
++          "OBC166",
++          "OBC167",
++          "OBC168",
++          "OBC169",
++          "OBC170",
++          "OBC171",
++          "OBC172",
++          "OBC173",
++          "OBC174",
++          "OBC175",
++          "OBC176",
++          "OBC177",
++          "OBC178",
++          "OBC179",
++          "OBC180",
++          "OBC181",
++          "OBC182",
++          "OBC183",
++          "OBC184",
++          "OBC185",
++          "OBC186",
++          "OBC187",
++          "OBC188",
++          "OBC189",
++          "OBC190",
++          "OBC191",
++          "OBC192",
++          "OBC193",
++          "OBC194",
++          "OBC195",
++          "OBC196",
++          "OBC197",
++          "OBC198",
++          "OBC199",
++          "OBC200",
++          "OBC201",
++          "OBC202",
++          "OBC203",
++          "OBC204",
++          "OBC205",
++          "OBC206",
++          "OBC207",
++          "OBC208",
++          "OBC209",
++          "OBC210",
++          "OBC211",
++          "OBC212",
++          "OBC213",
++          "OBC214",
++          "OBC215",
++          "OBC216",
++          "OBC217",
++          "OBC218",
++          "OBC219",
++          "OBC220",
++          "OBC221",
++          "OBC222",
++          "OBC223",
++          "OBC224",
++          "OBC225",
++          "OBC226",
++          "OBC227",
++          "OBC228",
++          "OBC229",
++          "OBC230",
++          "OBC231",
++          "OBC232",
++          "OBC233",
++          "OBC234",
++          "OBC235",
++          "OBC236",
++          "OBC237",
++          "OBC238",
++          "OBC239",
++          "OBC240",
++          "OBC241",
++          "OBC242",
++          "OBC243",
++          "OBC244",
++          "OBC245",
++          "OBC246",
++          "OBC247",
++          "OBC248",
++          "OBC249",
++          "OBC250",
++          "OBC251",
++          "OBC252",
++          "OBC253",
++          "OBC254",
++          "OBC255",
++          "OBC256",
++          "OBC257",
++          "OBC258",
++          "OBC259",
++          "OBC260",
++          "OBC261",
++          "OBC262",
++          "OBC263",
++          "OBC264",
++          "OBC265",
++          "OBC266",
++          "OBC267",
++          "OBC268",
++          "OBC269",
++          "OBC270",
++          "OBC271",
++          "OBC272",
++          "OBC273",
++          "OBC274",
++          "OBC275",
++          "OBC276",
++          "OBC277",
++          "OBC278",
++          "OBC279",
++          "OBC280",
++          "OBC281",
++          "OBC282",
++          "OBC283",
++          "OBC284",
++          "OBC285",
++          "OBC286",
++          "OBC287",
++          "OBC288",
++          "OBC289",
++          "OBC290",
++          "OBC291",
++          "OBC292",
++          "OBC293",
++          "OBC294",
++          "OBC295",
++          "OBC296",
++          "OBC297",
++          "OBC298",
++          "OBC299",
++          "OBC300",
++          "OBC301",
++          "OBC302",
++          "OBC303",
++          "OBC304",
++          "OBC305",
++          "OBC306",
++          "OBC307",
++          "OBC308"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 636859f88..aaf752eda 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -98,6 +98,11 @@
+       "path": "plugins/pipeline-core/lib/async-execution.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "audit-pack-command-admission-tests",
++      "path": "plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "audit-pack-tests",
+       "path": "plugins/pipeline-core/scripts/audit-pack.test.mjs",
+@@ -673,6 +678,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "g23-read-help-tests",
++      "path": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "gate-estimate-tests",
+       "path": "plugins/pipeline-core/lib/gate-estimate.test.mjs",
+@@ -1274,6 +1284,11 @@
+       "path": "plugins/pipeline-core/lib/physical-scratch-boundary.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
++      "path": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "pin-denial-names-a-diagnosis-it-refuses-tests",
+       "path": "plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs",
+@@ -1368,6 +1383,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "po-human-approval-signing-handoff-tests",
++      "path": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "po-language-projection-tests",
+       "path": "harness/scripts/po-language-projection.test.mjs",
+@@ -1740,6 +1760,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "security-remote-identity-tests",
++      "path": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "security-scanner-diagnostics-tests",
+       "path": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 679c5ee9d..a4c0a658e 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3814,6 +3814,83 @@
+       "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
+       "invariantPinned": "The gitleaks scan source excludes scratch/clones and nothing else (K98 row 13)",
+       "nonOverlapNote": "Unique cases: the scratch/clones exclusion of the gitleaks adapter scan source"
++    },
++    {
++      "name": "audit-pack-command-admission-tests",
++      "file": "plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs",
++      "invariantPinned": "The audit-pack command guard admits the exact read and publication routes and keeps source kernel paths protected across project and installed roots.",
++      "nonOverlapNote": "Unique G28 audit-pack command admission witness; the audit-pack script suite checks artifact behavior.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "APC001",
++          "APC002",
++          "APC003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "g23-read-help-tests",
++      "file": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
++      "invariantPinned": "Bounded read globs, source-owned PO help and missing target diagnostics remain distinct and preserve credential exclusions.",
++      "nonOverlapNote": "Unique G23 read/help guard interaction witness; separate from the wider guard lifecycle suite.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G23C001",
++          "G23C002",
++          "G23C003"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
++      "file": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
++      "invariantPinned": "The design-phase command catalogue admits exactly the documented model-role bootstrap and native dispatch preparation argv shapes and refuses variants.",
++      "nonOverlapNote": "Unique K152 script admission pin; distinct from runner route tests.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "K152C001",
++          "K152C002",
++          "K152C003",
++          "K152C004",
++          "K152C005"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "po-human-approval-signing-handoff-tests",
++      "file": "plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs",
++      "invariantPinned": "Human signing handoff retains exact material identity in bounded disclosure, refuses malformed paths and names the external proof.",
++      "nonOverlapNote": "Unique signing-handoff disclosure witness; separate from core approval transaction tests.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PHS001",
++          "PHS002",
++          "PHS003",
++          "PHS004"
++        ],
++        "maxBytes": 65536
++      }
++    },
++    {
++      "name": "security-remote-identity-tests",
++      "file": "plugins/pipeline-core/scripts/security-remote-identity.test.mjs",
++      "invariantPinned": "Security evidence follows the effective push destination and the push guard refuses evidence bound to another destination.",
++      "nonOverlapNote": "Unique remote-identity integration witness; separate from scanner diagnostics.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "SRI001",
++          "SRI002"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/docs/audit-packs.md b/plugins/pipeline-core/docs/audit-packs.md
+index bbaa56a24..6792f5428 100644
+--- a/plugins/pipeline-core/docs/audit-packs.md
++++ b/plugins/pipeline-core/docs/audit-packs.md
+@@ -1,4 +1,4 @@
+-# Local project audit packs
++# Project audit packs and historical public archives
+ 
+ `audit-pack.mjs` prepares a local, ignored review pack from one completed
+ Feature Package. Planning requires the package candidate to equal the current
+@@ -15,24 +15,48 @@ Package's own `evidence/` directory; both files are copied only after the
+ canonical PO proof verifier accepts the intent-bound signature and current
+ project trust anchor. `verifyEvidencePath` may name an exact public Verify
+ receipt and is checked with the canonical candidate selection validator.
++`securityEvidencePath` may name an exact public Security v0 receipt. The
++existing security gate evidence derivation checks its outcome and candidate;
++an unreferenced Security receipt is explicitly missing. A scan artifact in a
++Feature Package is listed separately and never counted as a Security pass.
+ Signed quality-package integration trailers are discovered from at most 128
+ candidate commits and reverified through the canonical post-commit verifier.
+ 
+ The planner excludes private keys, operator profiles, environment values,
+ raw private Critic packet/report prose, and private local quality-package
+ authorization receipts. It never reads a private key or publishes anything.
+-Output is restricted to `scratch/audit-packs/<pack-id>` and must be Git-
+-ignored. Building re-runs the canonical evidence checks and refuses source or
+-candidate drift. Offline verification checks only the pack's internal digests;
+-it does not repeat signature authority checks or certify the evidence.
++Local build output is restricted to ignored `scratch/audit-packs/<pack-id>`.
++The `publish` operation accepts the same preview plan and writes a create-only
++historical archive at the exact tracked home
++`specs/<feature-id>/evidence/audit-packs/<pack-id>`. It reruns the canonical
++source checks and refuses candidate or source drift before writing. Commit the
++archive with the ordinary exact-path Git route. Public verification checks
++that every archived file still equals its committed blob and that the named
++historical candidate commit has the named tree; it works in a fresh clone.
++The public manifest omits the local Critic packet ID while retaining its
++candidate, review range, digests, finding count and assurance summary. The
++local scratch pack keeps its existing shape for canonical receipt rechecks.
++It does not qualify the archive commit for Verify, Security, Critic, approval,
++or release. The archive records which checks ran on its historical candidate
++and which evidence remains missing.
+ 
+ Use a request file with these commands:
+ 
+ ```text
+ node plugins/pipeline-core/scripts/audit-pack.mjs plan --request <request.json>
+ node plugins/pipeline-core/scripts/audit-pack.mjs build --request <build-request.json>
++node plugins/pipeline-core/scripts/audit-pack.mjs publish --request <publish-request.json>
+ node plugins/pipeline-core/scripts/audit-pack.mjs verify --request <verify-request.json>
+ ```
+ 
+-Review the exact plan before building. A successful digest check means only
+-that copied bytes still match the pack manifest.
++The publish request has exactly `repositoryRoot`, `plan`, and `outputPath`;
++the output path must match the tracked home above. Review the plan before
++building or publishing. A successful archive check establishes committed
++historical integrity only, not fresh gate authority or native provenance.
++
++The governed command catalogue admits exact physical `audit-pack.mjs`
++`plan`/`verify` requests as read-only operations. It routes exact `build` and
++`publish` requests through the existing artifact-publication lane, which
++still applies READY, output write policy and the source CLI's proof/candidate
++checks. This source change is an inert proposal until integrated with normal
++hooks; it is not evidence of a live installed guard.
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 371ac1f7c..86c927345 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -488,6 +488,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // push-prepare.mjs imports release-promotion-envelope.mjs.
+   "plugins/pipeline-core/scripts/capture-evidence.mjs",
+   "plugins/pipeline-core/lib/release-promotion-envelope.mjs",
++  // G28 read-only lifecycle admission invokes audit-pack.mjs as trusted Source.
++  // Its publication-gate evidence dependency must remain protected as well.
++  "plugins/pipeline-core/scripts/audit-pack.mjs",
++  "plugins/pipeline-core/scripts/publication-gate-evidence.mjs",
+   // Alfred architecture-adoption, design-advisory, and candidate verification closure (GMWKC01):
+   "plugins/pipeline-core/lib/advisory-receipt.mjs",
+   "plugins/pipeline-core/lib/architecture-adoption-authority.mjs",
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 442845334..1aa996c57 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -4,14 +4,14 @@
+ import { createHash } from "node:crypto";
+ import { fileURLToPath } from "node:url";
+ import { lstatSync, readFileSync, realpathSync } from "node:fs";
+-import { basename, dirname, isAbsolute, join, posix, resolve, sep, win32 } from "node:path";
++import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from "node:path";
+ import { inspectSourceOwnedContinuityVerificationGuardContext, inspectSourceOwnedApprovedControllerCourse } from "../session-requester-bridge.mjs";
+ import { readOwnedVerificationPhysicalFile, recheckOwnedVerificationPhysicalRefs, readOwnedVerificationRegistration } from "../owned-continuity-verification.mjs";
+ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/owning-verification-controller.mjs";
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+@@ -21,6 +21,62 @@ const DESIGN_COURSE_SOURCES = ["input", "prd", "spec", "design", "traceability"]
+ const DESIGN_COURSE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+ 
+ const DESIGN_COURSE_SHA = /^[a-f0-9]{64}$/u;
++const AUDIT_PACK_ID = /^[a-z][a-z0-9-]{2,63}$/u;
++const AUDIT_PACK_REQUEST = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,220}\.json$/u;
++const auditExact = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
++  && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
++
++export function auditPackRequestPath(root, typed, dialect = process.platform === "win32" ? win32 : posix) {
++  if (typeof root !== "string" || typeof typed !== "string") return null;
++  const typedParts = dialect === win32 ? typed.split(/[\\/]/u) : typed.split("/");
++  if (typedParts.some(part => part === "." || part === "..")) return null;
++  const nativeRelative = dialect.isAbsolute(typed) ? dialect.relative(root, typed) : typed;
++  const path = nativeRelative.split(dialect.sep).join("/");
++  return AUDIT_PACK_REQUEST.test(path) && path.split("/").every(part => part && part !== "." && part !== "..")
++    ? path : null;
++}
++
++// Only the source CLI's one --request form. This observes the request path and
++// output scope; audit-pack.mjs remains responsible for proof/candidate checks.
++function auditPackRequest(args, root) {
++  if (args.length !== 3 || !["plan", "build", "publish", "verify"].includes(args[0]) || args[1] !== "--request"
++    || typeof args[2] !== "string" || !isAbsolute(root) || resolve(root) !== root) return null;
++  try {
++    if (realpathSync(root) !== root) return null;
++    const path = auditPackRequestPath(root, args[2]);
++    if (path === null) return null;
++    let cursor = root;
++    const parts = path.split("/");
++    for (const [index, part] of parts.entries()) {
++      cursor = join(cursor, part);
++      const info = lstatSync(cursor);
++      if (info.isSymbolicLink() || realpathSync(cursor) !== cursor
++        || (index < parts.length - 1 ? !info.isDirectory() : !info.isFile() || info.nlink !== 1 || info.size > 1048576)) return null;
++    }
++    const request = JSON.parse(readFileSync(cursor, "utf8"));
++    if (request.repositoryRoot !== root) return null;
++    if (args[0] === "plan") {
++      const keys = ["repositoryRoot", "manifestPath", "packId", "outputPath", "criticPacketIds", "approvalPairs", "verifyEvidencePath"];
++      return (auditExact(request, keys) || auditExact(request, [...keys, "securityEvidencePath"]))
++        && AUDIT_PACK_ID.test(request.packId ?? "") && request.outputPath === `scratch/audit-packs/${request.packId}`
++        ? { verb: "plan" } : null;
++    }
++    if (args[0] === "verify") {
++      if (!auditExact(request, ["repositoryRoot", "packPath"])) return null;
++      return /^scratch\/audit-packs\/[a-z][a-z0-9-]{2,63}$/u.test(request.packPath)
++        || /^specs\/[a-z][a-z0-9-]{2,63}\/evidence\/audit-packs\/[a-z][a-z0-9-]{2,63}$/u.test(request.packPath)
++        ? { verb: "verify" } : null;
++    }
++    const pack = request.plan?.pack;
++    if (!AUDIT_PACK_ID.test(pack?.featureId ?? "") || !AUDIT_PACK_ID.test(pack?.packId ?? "")
++      || pack.outputPath !== `scratch/audit-packs/${pack.packId}`) return null;
++    if (args[0] === "build") return auditExact(request, ["repositoryRoot", "plan"])
++      ? { verb: "build", outputPath: pack.outputPath } : null;
++    const outputPath = `specs/${pack.featureId}/evidence/audit-packs/${pack.packId}`;
++    return auditExact(request, ["repositoryRoot", "plan", "outputPath"]) && request.outputPath === outputPath
++      ? { verb: "publish", outputPath } : null;
++  } catch { return null; }
++}
+ 
+ function designCourseRelativePath(value) {
+   return typeof value === "string" && value.length <= 240 && !/[\\:\0]/u.test(value)
+@@ -252,6 +308,7 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   // The source CLI returns its static usage before parsing or reading signing state.
+   if (script === PO_HUMAN_APPROVAL_SCRIPT) return args.length === 1 && ["--help", "-h"].includes(args[0]);
++  if (script === AUDIT_PACK_SCRIPT) return ["plan", "verify"].includes(auditPackRequest(args, root)?.verb);
+   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
+   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+@@ -357,6 +414,11 @@ export function resolveBoundArtifactPublicationInvocation(command, root, options
+   if (invocation === null || typeof root !== "string" || !isAbsolute(root) || resolve(root) !== root) return null;
+   const transfer = fileURLToPath(new URL("../../scripts/bound-artifact-transfer.mjs", import.meta.url));
+   const comparison = fileURLToPath(new URL("../../scripts/greenfield-public-comparison.mjs", import.meta.url));
++  if (invocation.script === AUDIT_PACK_SCRIPT) {
++    const request = auditPackRequest(invocation.args, root);
++    return ["build", "publish"].includes(request?.verb)
++      ? Object.freeze({ kind: `audit-pack-${request.verb}`, outputPath: request.outputPath }) : null;
++  }
+   if (![transfer, comparison].includes(invocation.script)) return null;
+   const relativePath = value => typeof value === "string" && value.length > 0 && value.length <= 512
+     && !/[\\:\x00-\x1f\x7f]/u.test(value)
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 4cdcbd938..f48e2c436 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -31,6 +31,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
+ // today. Closing the residual half is an eligibility() change in lib/human-guard-override.mjs,
+ // which is out of scope for this file.
+ export const GOVERNANCE_SCOPE_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/governance-scope-diagnose.mjs", import.meta.url));
++export const AUDIT_PACK_SCRIPT = fileURLToPath(new URL("../../scripts/audit-pack.mjs", import.meta.url));
+ 
+ export const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+ 
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+index 954dc5ca0..dec492cbe 100644
+--- a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -4,13 +4,15 @@ import { spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
+ 
+ const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
+ const fixtureBase = resolve("scratch");
++const cases = [];
++function test(name, run) { cases.push({ id: `G23C${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
+   mkdirSync(fixtureBase, { recursive: true });
+@@ -66,3 +68,6 @@ test("G23 missing local targets are distinct from unknown grammar and protected
+     rmSync(outside, { recursive: true, force: true });
+   }
+ });
++
++if (cases.length !== 3) throw new Error("G23 read/help case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+index abbd30275..d0a24df15 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
+ import { mkdtempSync, rmSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+-import test from "node:test";
++import nodeTest from "node:test";
++import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { fileURLToPath } from "node:url";
+ import { isSanctionedLifecycleCommand } from "../guard/command-catalogue.mjs";
+ 
+@@ -17,8 +18,10 @@ const bootstrap = join(scripts, "model-role-bootstrap.mjs");
+ const prepare = join(scripts, "antigravity-native-dispatch-prepare.mjs");
+ const receipt = join(scripts, "design-review-receipt.mjs");
+ const root = mkdtempSync(join(tmpdir(), "k152-draft-scripts-"));
+-test.after(() => rmSync(root, { recursive: true, force: true }));
++nodeTest.after(() => rmSync(root, { recursive: true, force: true }));
+ const admitted = (command) => isSanctionedLifecycleCommand(command, root);
++const cases = [];
++function test(name, run) { cases.push({ id: `K152C${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("K152: model-role-bootstrap is admitted with exactly its documented argv shapes", () => {
+   assert.equal(admitted(`node ${bootstrap} --repo-root ${root} --runner antigravity --host-session-id sess-1234`), true);
+@@ -69,3 +72,6 @@ test("K152: no other script of the plugin is admitted by these pins (design-revi
+   assert.equal(admitted(`node ${receipt} create`), false, "an incomplete design-review-receipt argv is refused");
+   assert.equal(admitted(`node ${receipt}`), false);
+ });
++
++if (cases.length !== 5) throw new Error("K152 admission case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/audit-pack.mjs b/plugins/pipeline-core/scripts/audit-pack.mjs
+index b2b90448c..0b6e06975 100644
+--- a/plugins/pipeline-core/scripts/audit-pack.mjs
++++ b/plugins/pipeline-core/scripts/audit-pack.mjs
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Project-scoped, local audit-pack planner and create-only builder. */
+ import { createHash } from "node:crypto";
+-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+ import { spawnSync } from "node:child_process";
+ import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { pathToFileURL } from "node:url";
+@@ -14,6 +14,7 @@ import { verifyQualityPackageIntegrationPostCommit } from "../lib/signed-quality
+ import { parseIntegrationTrailerBlock } from "../lib/commit-message-policy.mjs";
+ import { readBoundConsumedCriticReceipt } from "../lib/critic-verify-lifecycle.mjs";
+ import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
++import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
+ 
+ export const AUDIT_PACK_SCHEMA = "pipeline.audit-pack.v1";
+ export const AUDIT_PACK_PLAN_SCHEMA = "pipeline.audit-pack-plan.v1";
+@@ -86,6 +87,24 @@ function safeOutput(root, outputPath, packId) {
+   if (existsSync(absolute)) fail("AP-OUTPUT-EXISTS");
+   return absolute;
+ }
++function publicPackPath(featureId, packId) {
++  return `specs/${featureId}/evidence/audit-packs/${packId}`;
++}
++function safePublicOutput(root, outputPath, featureId, packId) {
++  if (!SAFE_ID.test(featureId ?? "") || outputPath !== publicPackPath(featureId, packId)) fail("AP-PUBLIC-OUTPUT-SCOPE");
++  let cursor = root;
++  for (const part of outputPath.split("/").slice(0, -1)) {
++    cursor = join(cursor, part);
++    if (!existsSync(cursor)) continue;
++    const stat = lstatSync(cursor);
++    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(cursor) !== cursor) fail("AP-PUBLIC-OUTPUT-PARENT");
++  }
++  const ignored = spawnSync("git", ["-C", root, "check-ignore", "--quiet", outputPath], { timeout: 3000, shell: false });
++  if (ignored.error || ignored.status !== 1) fail("AP-PUBLIC-OUTPUT-IGNORED");
++  const absolute = resolve(root, outputPath);
++  if (existsSync(absolute)) fail("AP-OUTPUT-EXISTS");
++  return absolute;
++}
+ function candidatePackage(root, manifestPath) {
+   const manifestBytes = sourceBytes(root, manifestPath);
+   const checked = validateFeaturePackage(root, manifestPath);
+@@ -183,8 +202,25 @@ function verifyEvidence(root, featureId, candidate, path) {
+     missing: [],
+   };
+ }
++function securityEvidence(root, featureId, candidate, path) {
++  if (path === null) return { verified: null, sources: [], missing: ["candidate-security-evidence-not-referenced"] };
++  if (!publicEvidencePath(featureId, path)) fail("AP-SECURITY-EVIDENCE-PATH");
++  const bytes = sourceBytes(root, path);
++  const value = parseStrictJson(bytes);
++  if (value.schema !== "pipeline.security-evidence.v0") fail("AP-SECURITY-EVIDENCE-INVALID");
++  let derived;
++  try { derived = deriveGateEvidence({ rootDir: root, gate: "security", sourcePath: path }); }
++  catch { fail("AP-SECURITY-EVIDENCE-INVALID"); }
++  if (derived.evidence.candidate.commit !== candidate.commit || derived.evidence.candidate.tree !== candidate.tree
++    || derived.evidence.status !== "passed" || derived.source.sha256 !== digest(bytes)) fail("AP-SECURITY-EVIDENCE-INVALID");
++  return {
++    verified: { path, sha256: digest(bytes), verification: "canonical-security-gate-evidence-derived" },
++    sources: [{ kind: "security-evidence", path, sha256: digest(bytes), candidateBound: false }],
++    missing: [],
++  };
++}
+ 
+-export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath, criticPacketIds = [], approvalPairs = [], verifyEvidencePath = null } = {}) {
++export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath, criticPacketIds = [], approvalPairs = [], verifyEvidencePath = null, securityEvidencePath = null } = {}) {
+   const root = realpathSync(resolve(repositoryRoot ?? ""));
+   if (!SAFE_ID.test(packId ?? "")) fail("AP-PACK-ID");
+   safeOutput(root, outputPath, packId);
+@@ -192,11 +228,12 @@ export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath
+   const approval = approvals(root, pkg.featureId, approvalPairs, pkg.candidate);
+   const critic = critics(root, pkg.candidate, criticPacketIds);
+   const verify = verifyEvidence(root, pkg.featureId, pkg.candidate, verifyEvidencePath);
++  const security = securityEvidence(root, pkg.featureId, pkg.candidate, securityEvidencePath);
+   const qualityIntegrations = qualityPackageIntegrations(root, pkg.candidate);
+-  if (pkg.totalBytes + approval.sourceBytes + verify.sources.reduce((sum, source) => sum + sourceBytes(root, source.path, pkg.candidate.commit).length, 0) > MAX_TOTAL_BYTES) fail("AP-SOURCE-BUDGET");
+-  const sources = [...pkg.sources, ...approval.sources, ...verify.sources];
++  if (pkg.totalBytes + approval.sourceBytes + [...verify.sources, ...security.sources].reduce((sum, source) => sum + sourceBytes(root, source.path).length, 0) > MAX_TOTAL_BYTES) fail("AP-SOURCE-BUDGET");
++  const sources = [...pkg.sources, ...approval.sources, ...verify.sources, ...security.sources];
+   const scanSources = sources.filter((entry) => entry.kind === "supply-chain" || /scan/iu.test(basename(entry.path)));
+-  const missingEvidence = [...approval.missing, ...critic.missing, ...verify.missing];
++  const missingEvidence = [...approval.missing, ...critic.missing, ...verify.missing, ...security.missing];
+   if (scanSources.length === 0) missingEvidence.push("candidate-bound-scan-artifact-not-present");
+   const status = missingEvidence.length === 0 ? "complete" : "partial";
+   const manifest = {
+@@ -211,6 +248,7 @@ export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath
+     scanSources: scanSources.map((entry) => ({ path: entry.path, sha256: entry.sha256, binding: "candidate-feature-package-digest" })),
+     approvals: approval.verified,
+     verifyEvidence: verify.verified,
++    securityEvidence: security.verified,
+     criticReports: critic.verified,
+     qualityPackageIntegrations: qualityIntegrations,
+     missingEvidence,
+@@ -221,8 +259,9 @@ export function planAuditPack({ repositoryRoot, manifestPath, packId, outputPath
+ }
+ 
+ function planShape(plan) {
++  const baseKeys = ["schema", "packId", "status", "candidate", "featureId", "featurePackage", "sources", "sourceKindCounts", "scanSources", "approvals", "verifyEvidence", "criticReports", "qualityPackageIntegrations", "missingEvidence", "outputPath", "privacyOmissions"];
+   return exact(plan, ["schema", "status", "pack", "packSha256"]) && plan.schema === AUDIT_PACK_PLAN_SCHEMA
+-    && plan.status === "preview" && exact(plan.pack, ["schema", "packId", "status", "candidate", "featureId", "featurePackage", "sources", "sourceKindCounts", "scanSources", "approvals", "verifyEvidence", "criticReports", "qualityPackageIntegrations", "missingEvidence", "outputPath", "privacyOmissions"])
++    && plan.status === "preview" && (exact(plan.pack, baseKeys) || exact(plan.pack, [...baseKeys, "securityEvidence"]))
+     && plan.pack.schema === AUDIT_PACK_SCHEMA && SAFE_ID.test(plan.pack.packId ?? "") && ["complete", "partial"].includes(plan.pack.status)
+     && OID.test(plan.pack.candidate?.commit ?? "") && OID.test(plan.pack.candidate?.tree ?? "")
+     && SHA.test(plan.packSha256 ?? "") && canonicalSha256(plan.pack) === plan.packSha256;
+@@ -230,10 +269,14 @@ function planShape(plan) {
+ function README(pack) {
+   const sources = pack.sources.map((entry) => `- ${entry.path} (${entry.kind}, SHA-256 ${entry.sha256})`).join("\n");
+   const missing = pack.missingEvidence.length ? pack.missingEvidence.map((entry) => `- ${entry}`).join("\n") : "- None recorded by the pack planner.";
+-  return `# Local audit pack: ${pack.packId}\n\nStatus: **${pack.status}**. Candidate: ${pack.candidate.commit} (tree ${pack.candidate.tree}).\n\n## Included candidate sources\n\n${sources}\n\n## Missing evidence\n\n${missing}\n\n## Privacy omissions\n\n${pack.privacyOmissions.map((entry) => `- ${entry}`).join("\n")}\n\nThis local pack is a review aid, not a release approval, compliance certificate, publication, or proof of external retention. Canonical verifiers were used for any included public PO proof, consumed Critic receipt, and signed quality-package integration. Pack verification checks internal digests only; it does not re-evaluate authority or freshness.\n`;
++  return `# Audit pack: ${pack.packId}\n\nStatus: **${pack.status}**. Historical candidate: ${pack.candidate.commit} (tree ${pack.candidate.tree}).\n\n## Included candidate sources\n\n${sources}\n\n## Missing evidence\n\n${missing}\n\n## Privacy omissions\n\n${pack.privacyOmissions.map((entry) => `- ${entry}`).join("\n")}\n\nThis pack is a review aid, not a release approval or compliance certificate. Canonical verifiers were used when it was built for any included public PO proof, consumed Critic receipt, and signed quality-package integration. Offline verification checks archived bytes and, for a committed public pack, its Git blobs; it does not re-evaluate authority, freshness, or qualify the archive commit as the candidate.\n`;
++}
++/** Remove local packet correlation only after the ordinary builder has reverified it. */
++export function projectPublicAuditPack(pack) {
++  return { ...pack, criticReports: pack.criticReports.map(({ packetId: _localPacketId, ...summary }) => summary) };
+ }
+ 
+-export function buildAuditPack({ repositoryRoot, plan } = {}) {
++export function buildAuditPack({ repositoryRoot, plan, outputPath = null } = {}) {
+   if (!planShape(plan)) fail("AP-PLAN");
+   const root = realpathSync(resolve(repositoryRoot ?? ""));
+   const fresh = planAuditPack({
+@@ -244,9 +287,14 @@ export function buildAuditPack({ repositoryRoot, plan } = {}) {
+     criticPacketIds: plan.pack.criticReports.map((item) => item.packetId),
+     approvalPairs: plan.pack.approvals.map((item) => ({ intentPath: item.intentPath, proofPath: item.proofPath })),
+     verifyEvidencePath: plan.pack.verifyEvidence?.path ?? null,
++    securityEvidencePath: plan.pack.securityEvidence?.path ?? null,
+   });
+   if (canonicalizeJson(fresh.pack) !== canonicalizeJson(plan.pack) || fresh.packSha256 !== plan.packSha256) fail("AP-PLAN-DRIFT");
+-  const output = safeOutput(root, plan.pack.outputPath, plan.pack.packId);
++  const publicArchive = outputPath !== null;
++  const resolvedOutputPath = publicArchive ? outputPath : plan.pack.outputPath;
++  const output = publicArchive
++    ? safePublicOutput(root, resolvedOutputPath, plan.pack.featureId, plan.pack.packId)
++    : safeOutput(root, resolvedOutputPath, plan.pack.packId);
+   const current = gitCandidate(root);
+   if (current.commit !== plan.pack.candidate.commit || current.tree !== plan.pack.candidate.tree) fail("AP-CANDIDATE-DRIFT");
+   const content = [];
+@@ -259,8 +307,11 @@ export function buildAuditPack({ repositoryRoot, plan } = {}) {
+     const ext = basename(source.path).replace(/[^a-z0-9.-]/giu, "_").slice(-40) || "artifact";
+     content.push({ source, path: `artifacts/${String(index + 1).padStart(3, "0")}-${ext}`, bytes });
+   }
+-  mkdirSync(join(root, "scratch", "audit-packs"), { recursive: true });
+-  for (const parent of [join(root, "scratch"), join(root, "scratch", "audit-packs")]) {
++  const parentPath = publicArchive ? join(root, "specs", plan.pack.featureId, "evidence", "audit-packs") : join(root, "scratch", "audit-packs");
++  mkdirSync(parentPath, { recursive: true });
++  for (const parent of publicArchive
++    ? [join(root, "specs"), join(root, "specs", plan.pack.featureId), join(root, "specs", plan.pack.featureId, "evidence"), parentPath]
++    : [join(root, "scratch"), parentPath]) {
+     const stat = lstatSync(parent);
+     if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(parent) !== parent) fail("AP-OUTPUT-PARENT");
+   }
+@@ -272,35 +323,74 @@ export function buildAuditPack({ repositoryRoot, plan } = {}) {
+     artifacts.push({ path: item.path, sourcePath: item.source.path, kind: item.source.kind, sha256: digest(item.bytes) });
+   }
+   const readmeBytes = Buffer.from(README(plan.pack), "utf8");
+-  const manifest = { schema: "pipeline.audit-pack-manifest.v1", pack: plan.pack, artifacts, readmeSha256: digest(readmeBytes) };
++  const manifest = { schema: "pipeline.audit-pack-manifest.v1", pack: publicArchive ? projectPublicAuditPack(plan.pack) : plan.pack, artifacts, readmeSha256: digest(readmeBytes) };
+   const manifestBytes = Buffer.from(`${canonicalizeJson(manifest)}\n`, "utf8");
+   writeFileSync(join(output, "manifest.json"), manifestBytes, { flag: "wx", mode: 0o644 });
+   writeFileSync(join(output, "README.md"), readmeBytes, { flag: "wx", mode: 0o644 });
+-  return { schema: "pipeline.audit-pack-build-receipt.v1", status: plan.pack.status, packId: plan.pack.packId, outputPath: plan.pack.outputPath, manifestSha256: digest(manifestBytes), artifactCount: artifacts.length, missingEvidence: plan.pack.missingEvidence };
++  return { schema: "pipeline.audit-pack-build-receipt.v1", status: plan.pack.status, packId: plan.pack.packId, outputPath: resolvedOutputPath, manifestSha256: digest(manifestBytes), artifactCount: artifacts.length, missingEvidence: plan.pack.missingEvidence };
+ }
+ 
+ export function verifyAuditPack({ repositoryRoot, packPath } = {}) {
+   const root = realpathSync(resolve(repositoryRoot ?? ""));
+-  if (typeof packPath !== "string" || !packPath.startsWith("scratch/audit-packs/")) fail("AP-VERIFY-PATH");
++  const local = typeof packPath === "string" && /^scratch\/audit-packs\/[a-z][a-z0-9-]{2,63}$/u.test(packPath);
++  const publicMatch = typeof packPath === "string" ? /^specs\/([a-z][a-z0-9-]{2,63})\/evidence\/audit-packs\/([a-z][a-z0-9-]{2,63})$/u.exec(packPath) : null;
++  if (!local && !publicMatch) fail("AP-VERIFY-PATH");
+   const packRoot = resolve(root, packPath); const rel = relative(root, packRoot);
+   if (rel.startsWith(`..${sep}`) || isAbsolute(rel)) fail("AP-VERIFY-PATH");
+   const findings = [];
+   let manifest;
+   try { manifest = parseStrictJson(readFileSync(join(packRoot, "manifest.json"))); }
+   catch { return { schema: "pipeline.audit-pack-verification.v1", status: "invalid", findings: ["AP-MANIFEST"] }; }
+-  if (!exact(manifest, ["schema", "pack", "artifacts", "readmeSha256"]) || manifest.schema !== "pipeline.audit-pack-manifest.v1" || !planShape({ schema: AUDIT_PACK_PLAN_SCHEMA, status: "preview", pack: manifest.pack, packSha256: canonicalSha256(manifest.pack) }) || !Array.isArray(manifest.artifacts) || !SHA.test(manifest.readmeSha256 ?? "")) findings.push("AP-MANIFEST");
++  if (!exact(manifest, ["schema", "pack", "artifacts", "readmeSha256"]) || manifest.schema !== "pipeline.audit-pack-manifest.v1" || !Array.isArray(manifest.artifacts) || !SHA.test(manifest.readmeSha256 ?? ""))
++    return { schema: "pipeline.audit-pack-verification.v1", status: "invalid", findings: ["AP-MANIFEST"] };
++  try { if (!planShape({ schema: AUDIT_PACK_PLAN_SCHEMA, status: "preview", pack: manifest.pack, packSha256: canonicalSha256(manifest.pack) })) findings.push("AP-MANIFEST"); }
++  catch { findings.push("AP-MANIFEST"); }
++  if (findings.length) return { schema: "pipeline.audit-pack-verification.v1", status: "invalid", findings };
+   try { if (digest(readFileSync(join(packRoot, "README.md"))) !== manifest.readmeSha256) findings.push("AP-README-DIGEST"); } catch { findings.push("AP-README-MISSING"); }
++  if (publicMatch && (manifest.pack?.featureId !== publicMatch[1] || manifest.pack?.packId !== publicMatch[2])) findings.push("AP-PUBLIC-BINDING");
++  if (publicMatch && manifest.pack.criticReports.some((entry) => Object.hasOwn(entry, "packetId"))) findings.push("AP-PUBLIC-PRIVATE-FIELD");
++  const expectedArtifacts = new Set((manifest.artifacts ?? []).map((entry) => entry.path));
++  if (expectedArtifacts.size !== manifest.artifacts?.length || manifest.artifacts?.length !== manifest.pack?.sources?.length) findings.push("AP-ARTIFACT-COVERAGE");
++  for (const [index, artifact] of (manifest.artifacts ?? []).entries()) {
++    const source = manifest.pack?.sources?.[index];
++    if (artifact.sourcePath !== source?.path || artifact.kind !== source?.kind || artifact.sha256 !== source?.sha256) findings.push("AP-ARTIFACT-COVERAGE");
++  }
++  try {
++    const actual = readdirSync(join(packRoot, "artifacts"));
++    if (actual.length !== expectedArtifacts.size || actual.some((name) => !expectedArtifacts.has(`artifacts/${name}`))) findings.push("AP-ARTIFACT-COVERAGE");
++  } catch { findings.push("AP-ARTIFACT-COVERAGE"); }
++  if (publicMatch) {
++    try {
++      const entries = readdirSync(packRoot);
++      if (entries.length !== 3 || entries.some((name) => !["manifest.json", "README.md", "artifacts"].includes(name))) findings.push("AP-PUBLIC-COVERAGE");
++    } catch { findings.push("AP-PUBLIC-COVERAGE"); }
++  }
+   for (const artifact of manifest.artifacts ?? []) {
+     if (!exact(artifact, ["path", "sourcePath", "kind", "sha256"]) || !/^artifacts\/[0-9]{3}-[-a-z0-9._]{1,40}$/u.test(artifact.path) || !SHA.test(artifact.sha256 ?? "")) { findings.push("AP-ARTIFACT-SHAPE"); continue; }
+     try { if (digest(readFileSync(join(packRoot, artifact.path))) !== artifact.sha256) findings.push(`AP-DIGEST:${artifact.path}`); }
+     catch { findings.push(`AP-MISSING:${artifact.path}`); }
+   }
+-  return { schema: "pipeline.audit-pack-verification.v1", status: findings.length ? "invalid" : manifest.pack.status, candidate: manifest.pack.candidate, findings, assurance: "internal-digests-only" };
++  if (publicMatch) {
++    const paths = ["manifest.json", "README.md", ...(manifest.artifacts ?? []).map((entry) => entry.path)];
++    for (const path of paths) {
++      const relPath = `${packPath}/${path}`;
++      try {
++        const physical = physicalFile(root, relPath);
++        const committed = git(root, ["show", `HEAD:${relPath}`], null);
++        if (digest(readFileSync(physical)) !== digest(committed)) findings.push(`AP-PUBLIC-UNCOMMITTED:${path}`);
++      } catch { findings.push(`AP-PUBLIC-UNCOMMITTED:${path}`); }
++    }
++    try {
++      const historicalTree = String(git(root, ["rev-parse", `${manifest.pack.candidate.commit}^{tree}`])).trim();
++      if (historicalTree !== manifest.pack.candidate.tree) findings.push("AP-HISTORICAL-CANDIDATE");
++    } catch { findings.push("AP-HISTORICAL-CANDIDATE"); }
++  }
++  return { schema: "pipeline.audit-pack-verification.v1", status: findings.length ? "invalid" : manifest.pack.status, candidate: manifest.pack.candidate, findings, assurance: publicMatch ? "committed-historical-archive-integrity-only" : "internal-digests-only" };
+ }
+ 
+ function parseCli(argv) {
+   const [command, ...rest] = argv;
+-  if (!new Set(["plan", "build", "verify"]).has(command) || rest.length % 2 !== 0) fail("AP-ARGUMENT", "Usage: audit-pack.mjs plan|build|verify --request <json>");
++  if (!new Set(["plan", "build", "publish", "verify"]).has(command) || rest.length % 2 !== 0) fail("AP-ARGUMENT", "Usage: audit-pack.mjs plan|build|publish|verify --request <json>");
+   const args = new Map();
+   for (let index = 0; index < rest.length; index += 2) {
+     const key = rest[index]; const value = rest[index + 1];
+@@ -314,13 +404,18 @@ export function main(argv = process.argv.slice(2)) {
+   const { command, requestPath } = parseCli(argv);
+   const request = parseStrictJson(readFileSync(requestPath));
+   if (command === "plan") {
+-    if (!exact(request, ["repositoryRoot", "manifestPath", "packId", "outputPath", "criticPacketIds", "approvalPairs", "verifyEvidencePath"])) fail("AP-REQUEST");
++    const baseKeys = ["repositoryRoot", "manifestPath", "packId", "outputPath", "criticPacketIds", "approvalPairs", "verifyEvidencePath"];
++    if (!exact(request, baseKeys) && !exact(request, [...baseKeys, "securityEvidencePath"])) fail("AP-REQUEST");
+     return planAuditPack(request);
+   }
+   if (command === "build") {
+     if (!exact(request, ["repositoryRoot", "plan"])) fail("AP-REQUEST");
+     return buildAuditPack(request);
+   }
++  if (command === "publish") {
++    if (!exact(request, ["repositoryRoot", "plan", "outputPath"])) fail("AP-REQUEST");
++    return buildAuditPack(request);
++  }
+   if (!exact(request, ["repositoryRoot", "packPath"])) fail("AP-REQUEST");
+   return verifyAuditPack(request);
+ }
+diff --git a/plugins/pipeline-core/scripts/audit-pack.test.mjs b/plugins/pipeline-core/scripts/audit-pack.test.mjs
+index b2bfe7e98..8d2fe2b75 100644
+--- a/plugins/pipeline-core/scripts/audit-pack.test.mjs
++++ b/plugins/pipeline-core/scripts/audit-pack.test.mjs
+@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+-import { tmpdir, devNull } from "node:os";
++import { devNull } from "node:os";
+ import { join } from "node:path";
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { openSync as openCompletionDescriptor } from "node:fs";
+ import { canonicalSha256 } from "../lib/governance-event.mjs";
+ import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+-import { buildAuditPack, planAuditPack, verifyAuditPack } from "./audit-pack.mjs";
++import { buildAuditPack, planAuditPack, projectPublicAuditPack, verifyAuditPack } from "./audit-pack.mjs";
+ const completionCases = [];
+ function test(name, optionsOrRun, possibleRun) {
+   const options = typeof optionsOrRun === "function" ? {} : optionsOrRun ?? {};
+@@ -22,8 +22,13 @@ function test(name, optionsOrRun, possibleRun) {
+ 
+ 
+ function git(root, ...args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: "pipe" }).trim(); }
++function fixtureDirectory(prefix) {
++  const base = join(process.cwd(), "scratch", "audit-pack-fixtures");
++  mkdirSync(base, { recursive: true });
++  return mkdtempSync(join(base, prefix));
++}
+ function completedPackageFixture() {
+-  const root = mkdtempSync(join(tmpdir(), "audit-pack-completed-"));
++  const root = fixtureDirectory("audit-pack-completed-");
+   git(root, "init", "--quiet", "--template=");
+   git(root, "config", "user.name", "Audit Pack Fixture");
+   git(root, "config", "user.email", "audit-pack-fixture@example.test");
+@@ -90,7 +95,7 @@ test("completed candidate audit pack is candidate-bound, partial on missing revi
+     assert.deepEqual(Object.keys(plan).sort(), ["pack", "packSha256", "schema", "status"]);
+     assert.deepEqual(Object.keys(plan.pack).sort(), [
+       "approvals", "candidate", "criticReports", "featureId", "featurePackage", "missingEvidence",
+-      "outputPath", "packId", "privacyOmissions", "qualityPackageIntegrations", "scanSources", "schema",
++      "outputPath", "packId", "privacyOmissions", "qualityPackageIntegrations", "scanSources", "schema", "securityEvidence",
+       "sourceKindCounts", "sources", "status", "verifyEvidence",
+     ].sort());
+     assert.equal(plan.pack.schema, "pipeline.audit-pack.v1");
+@@ -101,6 +106,7 @@ test("completed candidate audit pack is candidate-bound, partial on missing revi
+     assert.equal(plan.pack.status, "partial");
+     assert.equal(plan.pack.featurePackage.state, "completed");
+     assert.deepEqual([...plan.pack.missingEvidence].sort(), [
++      "candidate-security-evidence-not-referenced",
+       "candidate-verify-evidence-not-referenced",
+       "fresh-critic-report-not-referenced",
+       "public-approval-proof-not-referenced",
+@@ -124,6 +130,77 @@ test("completed candidate audit pack is candidate-bound, partial on missing revi
+   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+ });
+ 
++test("populated Critic summary loses local packet correlation in the public projection", () => {
++  const fixture = completedPackageFixture();
++  try {
++    const plan = planAuditPack({ repositoryRoot: fixture.root, manifestPath: fixture.manifestPath,
++      packId: "case-audit-pack", outputPath: "scratch/audit-packs/case-audit-pack",
++      criticPacketIds: [], approvalPairs: [], verifyEvidencePath: null });
++    const packetId = "a".repeat(32);
++    const summary = { kind: "consumed-session-critic", packetId,
++      candidate: plan.pack.candidate, reviewRange: { base: "b".repeat(40), head: plan.pack.candidate.commit },
++      reviewPass: true, receiptSha256: "c".repeat(64), verdictSha256: "d".repeat(64),
++      findingCount: 0, assurance: "synthetic-summary-only", verification: "synthetic-not-a-receipt" };
++    const local = { ...plan.pack, criticReports: [summary] };
++    const publicPack = projectPublicAuditPack(local);
++    assert.equal(local.criticReports[0].packetId, packetId);
++    assert.equal(Object.hasOwn(publicPack.criticReports[0], "packetId"), false);
++    assert.equal(JSON.stringify(publicPack).includes(packetId), false);
++    const { packetId: _privateId, ...expectedPublicSummary } = summary;
++    assert.deepEqual(publicPack.criticReports[0], expectedPublicSummary);
++  } finally { rmSync(fixture.root, { recursive: true, force: true }); }
++});
++
++test("public archive preserves signed bytes and reports historical integrity after a fresh clone", () => {
++  const fixture = completedPackageFixture();
++  const cloneParent = fixtureDirectory("audit-pack-clone-");
++  try {
++    const approval = createApprovalEvidence(fixture);
++    const candidate = { commit: git(fixture.root, "rev-parse", "HEAD"), tree: git(fixture.root, "rev-parse", "HEAD^{tree}") };
++    const securityPath = "specs/case-completed/evidence/security.json";
++    writeFileSync(join(fixture.root, securityPath), `${JSON.stringify({ schema: "pipeline.security-evidence.v0", candidate, findings: [], exitCode: 0 })}\n`);
++    const input = { repositoryRoot: fixture.root, manifestPath: fixture.manifestPath,
++      packId: "case-audit-pack", outputPath: "scratch/audit-packs/case-audit-pack",
++      criticPacketIds: [], approvalPairs: [approval], verifyEvidencePath: null, securityEvidencePath: securityPath };
++    const plan = planAuditPack(input);
++    assert.equal(plan.pack.securityEvidence.verification, "canonical-security-gate-evidence-derived");
++    assert.ok(plan.pack.missingEvidence.includes("fresh-critic-report-not-referenced"));
++    const publicPath = "specs/case-completed/evidence/audit-packs/case-audit-pack";
++    assert.throws(() => buildAuditPack({ repositoryRoot: fixture.root, plan, outputPath: "project/private/archive" }), { code: "AP-PUBLIC-OUTPUT-SCOPE" });
++    const signedBytes = readFileSync(join(fixture.root, approval.proofPath));
++    const receipt = buildAuditPack({ repositoryRoot: fixture.root, plan, outputPath: publicPath });
++    assert.equal(receipt.status, "partial");
++    assert.equal(verifyAuditPack({ repositoryRoot: fixture.root, packPath: publicPath }).status, "invalid");
++    const archiveManifest = JSON.parse(readFileSync(join(fixture.root, publicPath, "manifest.json"), "utf8"));
++    const proofArtifact = archiveManifest.artifacts.find((entry) => entry.sourcePath === approval.proofPath);
++    assert.deepEqual(readFileSync(join(fixture.root, publicPath, proofArtifact.path)), signedBytes);
++    const validSecurityBytes = readFileSync(join(fixture.root, securityPath));
++    writeFileSync(join(fixture.root, securityPath), `${JSON.stringify({ schema: "pipeline.security-evidence.v0", candidate: { ...candidate, commit: "f".repeat(40) }, findings: [], exitCode: 0 })}\n`);
++    assert.throws(() => planAuditPack(input), { code: "AP-SECURITY-EVIDENCE-INVALID" });
++    writeFileSync(join(fixture.root, securityPath), validSecurityBytes);
++    assert.throws(() => planAuditPack({ ...input, securityEvidencePath: "project/private/security.json" }), { code: "AP-SECURITY-EVIDENCE-PATH" });
++    git(fixture.root, "add", "--", publicPath);
++    git(fixture.root, "commit", "--quiet", "-m", "test: carry historical audit archive");
++    const current = verifyAuditPack({ repositoryRoot: fixture.root, packPath: publicPath });
++    assert.equal(current.status, "partial", JSON.stringify(current));
++    assert.equal(current.assurance, "committed-historical-archive-integrity-only");
++    const clone = join(cloneParent, "checkout");
++    execFileSync("git", ["clone", "--quiet", fixture.root, clone], { stdio: "pipe" });
++    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "partial");
++    const artifactPath = join(clone, publicPath, proofArtifact.path);
++    writeFileSync(artifactPath, "altered\n");
++    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "invalid");
++    writeFileSync(artifactPath, signedBytes);
++    const extraPath = join(clone, publicPath, "extra.txt");
++    writeFileSync(extraPath, "not indexed\n");
++    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "invalid");
++    rmSync(extraPath);
++    rmSync(artifactPath);
++    assert.equal(verifyAuditPack({ repositoryRoot: clone, packPath: publicPath }).status, "invalid");
++    writeFileSync(artifactPath, signedBytes);
++  } finally { rmSync(fixture.root, { recursive: true, force: true }); rmSync(cloneParent, { recursive: true, force: true }); }
++});
++
+ test("audit pack refuses public-proof references outside the candidate evidence boundary", () => {
+   const fixture = completedPackageFixture();
+   try {
+@@ -164,7 +241,7 @@ test("audit pack verifies and copies exact public PO intent and proof bytes with
+   } finally { rmSync(fixture.root, { recursive: true, force: true }); }
+ });
+ 
+-if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
++if (completionCases.length !== 5) throw new Error("case completion count drift: expected 5, got " + completionCases.length);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+index 42cc17965..00d7f7369 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+@@ -1,10 +1,12 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { compactSigningDisclosure, formatHumanApprovalCliResult } from "./po-human-approval.mjs";
+ 
+ const digest = "a".repeat(64);
+ const longPath = `scratch/${"nested/".repeat(25)}review-${digest}.json`;
++const cases = [];
++function test(name, run) { cases.push({ id: `PHS${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ test("K150B: a long material path retains its full identity and digest in the disclosure", () => {
+   assert.ok(longPath.length > 240);
+@@ -49,3 +51,6 @@ test("G31: human-facing critical authorization names the external proof", () =>
+     null, "a missing external path cannot fall back to the scratch mirror");
+   assert.deepEqual(JSON.parse(formatHumanApprovalCliResult(result, { humanFacing: false })), result);
+ });
++
++if (cases.length !== 4) throw new Error("signing handoff case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+index 4b51873aa..3a195017d 100644
+--- a/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
++++ b/plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+@@ -3,14 +3,17 @@ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
+-import test from "node:test";
++import nodeTest from "node:test";
++import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { runSecurityScan } from "./security-scan.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+ 
+ const scratch = join(process.cwd(), "scratch", "g32-security-remote-fixtures");
+ mkdirSync(scratch, { recursive: true });
+ const fixture = mkdtempSync(join(scratch, "repo-"));
+-test.after(() => rmSync(fixture, { recursive: true, force: true }));
++nodeTest.after(() => rmSync(fixture, { recursive: true, force: true }));
++const cases = [];
++function test(name, run) { cases.push({ id: `SRI${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+ 
+ function git(...args) {
+   const result = spawnSync("git", args, { cwd: fixture, encoding: "utf8", shell: false });
+@@ -104,3 +107,6 @@ test("push guard rejects evidence for a different effective destination", () =>
+     assert.doesNotMatch(right.stderr, /candidate repository identity does not match the effective push destination/);
+   } finally { rmSync(dir, { recursive: true, force: true }); }
+ });
++
++if (cases.length !== 2) throw new Error("security remote identity case count drift");
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

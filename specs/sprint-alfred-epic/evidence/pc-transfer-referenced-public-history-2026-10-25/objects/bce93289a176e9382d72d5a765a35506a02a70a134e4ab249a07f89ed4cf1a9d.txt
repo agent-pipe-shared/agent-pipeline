@@ -1,0 +1,62 @@
+// K141 helper: run the red steps (from scratch/k141-map.json) on N isolated workers; keep the RAW output per step.
+// Usage: node scratch/k141-run.mjs <workers> <label> [name,name,...]   (run from main checkout root)
+// Output: scratch/k141-raw/<label>/<name>.txt + scratch/k141-raw/<label>/summary.json ; progress lines on stdout.
+import { spawn, execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, chmodSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+const flagArgs = process.argv.slice(2).filter((a) => a.startsWith("--"));
+for (const f of flagArgs) { const [k, v] = f.slice(2).split("="); if (k === "tmpbase") process.env.K141_TMPBASE = v; if (k === "branch") process.env.K141_DEFAULT_BRANCH = v; if (k === "node") process.env.K141_NODE = v; }
+const [nArg, label, namesArg] = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const workers = Number(nArg);
+const srcDir = resolve("scratch/clones/k141");
+const map = JSON.parse(readFileSync("scratch/k141-map.json", "utf8"));
+const names = namesArg ? namesArg.split(",") : map.map((m) => m.name);
+const items = names.map((n) => map.find((m) => m.name === n)).filter(Boolean).sort((a, b) => b.durationMs - a.durationMs);
+const cfg = (k) => execFileSync("git", ["config", k], { encoding: "utf8" }).trim();
+const gitIn = (dir, ...a) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
+const name = cfg("user.name"); const email = cfg("user.email");
+const srcCommit = gitIn(srcDir, "rev-parse", "HEAD");
+const base = process.env.K141_TMPBASE ? resolve(process.env.K141_TMPBASE) : join(homedir(), "pipeline-test-tmp", `k141-${label}`);
+rmSync(base, { recursive: true, force: true });
+mkdirSync(base, { recursive: true, mode: 0o700 });
+const outDir = resolve("scratch/k141-raw", label);
+mkdirSync(outDir, { recursive: true });
+const lanes = Array.from({ length: workers }, (_, n) => {
+  const clone = resolve("scratch/clones", `pw-k141-${label}-${n}`);
+  if (!existsSync(clone)) execFileSync("git", ["clone", "--local", "--quiet", srcDir, clone]);
+  gitIn(clone, "fetch", "--quiet", srcDir, "HEAD");
+  gitIn(clone, "checkout", "--quiet", "--force", "--detach", "FETCH_HEAD");
+  gitIn(clone, "clean", "-fdq");
+  const home = join(base, `home-${n}`); const tmp = join(base, `tmp-${n}`);
+  for (const d of [home, tmp]) { mkdirSync(d, { recursive: true, mode: 0o700 }); chmodSync(d, 0o700); }
+  writeFileSync(join(home, ".gitconfig"), `[user]\n\tname = ${name}\n\temail = ${email}\n${process.env.K141_DEFAULT_BRANCH ? `[init]\n\tdefaultBranch = ${process.env.K141_DEFAULT_BRANCH}\n` : ""}`);
+  return { n, clone, home, tmp };
+});
+console.log(`k141-run: commit=${srcCommit} workers=${workers} label=${label} items=${items.length}`);
+const queue = [...items];
+const summary = [];
+const num = (out, k) => (new RegExp(`^ℹ ${k} (\\d+)`, "m").exec(out) ?? [])[1] ?? "?";
+const runLane = async (lane) => {
+  while (queue.length) {
+    const it = queue.shift();
+    const env = { ...process.env, HOME: lane.home, USERPROFILE: lane.home, TMPDIR: lane.tmp, TMP: lane.tmp, TEMP: lane.tmp };
+    delete env.NODE_TEST_CONTEXT;
+    const t0 = Date.now();
+    const out = await new Promise((done) => {
+      let buf = "";
+      const child = spawn(process.env.K141_NODE || process.execPath, [it.file], { cwd: lane.clone, env });
+      const timer = setTimeout(() => child.kill("SIGKILL"), 3600000);
+      child.stdout.on("data", (d) => { buf += d; }); child.stderr.on("data", (d) => { buf += d; });
+      child.on("close", (code) => { clearTimeout(timer); done({ code, buf }); });
+    });
+    writeFileSync(join(outDir, `${it.name}.txt`), out.buf);
+    const failing = [...new Set([...out.buf.matchAll(/^\s*✖ (.+?) \(\d/gm)].map((m) => m[1]).filter((t) => t !== "failing tests:"))];
+    const r = { name: it.name, file: it.file, code: out.code, tests: num(out.buf, "tests"), pass: num(out.buf, "pass"), fail: num(out.buf, "fail"), skipped: num(out.buf, "skipped"), ms: Date.now() - t0, failing };
+    summary.push(r);
+    writeFileSync(join(outDir, "summary.json"), JSON.stringify(summary, null, 1));
+    console.log(`${r.code === 0 ? "GREEN" : "RED  "} ${r.name} exit ${r.code} tests ${r.tests} pass ${r.pass} fail ${r.fail} ${r.ms}ms`);
+  }
+};
+await Promise.all(lanes.map(runLane));
+console.log("k141-run: finished");

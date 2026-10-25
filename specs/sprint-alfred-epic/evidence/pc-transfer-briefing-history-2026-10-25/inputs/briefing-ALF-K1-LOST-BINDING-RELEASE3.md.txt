@@ -1,0 +1,83 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K1-LOST-BINDING-RELEASE3","candidateCommit":"d82f24747e135baff0611cab6953372986dd39f2","candidateTree":"c6350a2ff9026d1cfc65999b9a5db3d004932c38","runner":"claude","role":"pipeline-core:goldfish-deep","agentType":"goldfish-deep","model":"claude-sonnet-5-5","effort":"xhigh","rulesetSha":"b03cc4052421e47ecf1dea0ed231a88ed38ac9857584e5f864c4ca0e4478a30e","allowedPaths":["plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/session-authority-registry.mjs","plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs","plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs","plugins/pipeline-core/lib/session-cleanup-recovery.mjs","plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs","plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K1-LOST-BINDING-RELEASE3","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k1-lost-binding-release3-check","path":"plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs","dependencies":["plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/session-authority-registry.mjs","plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs","plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs","plugins/pipeline-core/lib/session-cleanup-recovery.mjs","plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs","plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K1-LOST-BINDING-RELEASE3","candidateCommit":"d82f24747e135baff0611cab6953372986dd39f2","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K1-LOST-BINDING-RELEASE3: land the lost-binding recovery route from its draft, with one narrow registry termination and a crash-safe order (AC-203, D70 (a), third dispatch)
+
+### 1. Goal
+
+Do not redo discovery: the design and two drafts exist. Drafts (git-ignored, unrun): `scratch/k1l2/session-cleanup-lost-binding.mjs` and `scratch/k1l2/session-cleanup-lost-binding.test.mjs`; the plan of record is in this goal. Steps, in order: (1) `lib/onboarding-continuity.mjs`: prefix `export` to `function releaseOnboardingSessionCleanupInternal(` (~4054) and to `function continuityAuthorityRepository(` (~9150); no other change, no line growth. (2) `lib/session-authority-registry.mjs` (accepted bound 1390 lines, must not grow; its code is one-line minified style, edit by appending to an existing line): add `'lost-binding-recovered'` to the allowed terminals in `validateRelease` (~226), and add ONE exported function `releaseLostSessionAuthorityMember({boundary:token, producerId, target})` instead of the draft's `lostBindingRegistryKit` (do NOT export a kit or any raw writer such as `publish`, `stateRead` or `updateMembership`). It runs inside the given boundary and itself enforces, before any write: the target's active descriptor file `agent-pipeline/session-descriptors/active/<sessionId>.json` does not exist; exactly one member of `producerId` is bound to exactly that `{sessionId, descriptorSha256}` and is `armed` or `running` (none: return `{status:'none'}`; more than one: fail `SDC-AUTHORITY-CAS` with a repair text); then it writes the release record (terminal `lost-binding-recovered`, sourceFacts from the producer port's reconcile), the released member, and `updateMembership`, in the same order as `releaseSessionAuthorityMember`, and returns `{status:'released', releaseRef, memberRef}`. (3) Copy the draft module to `lib/session-cleanup-lost-binding.mjs` and change its boundary block: inside `withSessionAuthorityBoundary`, after `checkBinding()`, call `releaseLostSessionAuthorityMember({boundary:token, producerId:'onboarding-continuity', target:tuple})` FIRST, then `releaseOnboardingSessionCleanupInternal(...)`, then the strict read-back. Reason for the order: if the process dies after the member step, the registry has no in-flight member, so `healDrift` heals the namespace and the still-present binding can be released by rerunning the recovery; the reverse order wedges the registry. If `validateRelease` refuses sourceFacts taken before the binding release, stop and name the exact check. Keep `WT-LOST-BINDING-MEMBER` for the more-than-one case (map the registry refusal). (4) `lib/session-cleanup-recovery.mjs` (bound 3161, must not grow): replace lines 77-124 (`canonicalJson`, `digest`, `recoveryBinding`) by an import from `./session-cleanup-lost-binding.mjs` together with `releaseLostSessionCleanupBinding`; replace the two release blocks at ~793 (composite apply) and ~1835 (`release-lost-binding` apply) with `deps.releaseOnboardingSessionCleanupFn ? deps.releaseOnboardingSessionCleanupFn({rootDir: plan.root, expectedStateSha256: plan.stateSha256, expectedRevision: plan.revision, sessionCleanup: plan.sessionCleanup}) : releaseLostSessionCleanupBinding({plan, expectedPlanSha256, activate: true, scriptPath, deps})`; leave ~1216 unchanged. (5) Add `applyRecoveryInFreshProcess({rootDir, expectedPlanSha256})` to `lib/test-session-cleanup-requester-fixture.mjs` (`spawnSync(process.execPath, ['--input-type=module','-e', code], {encoding:'utf8', shell:false})`, `code` imports `applySessionCleanupRecovery` via `new URL('./session-cleanup-recovery.mjs', import.meta.url).href`, prints the JSON result; the parent parses the last stdout line). (6) Copy the draft test to `lib/session-cleanup-lost-binding.test.mjs`; it must also cover: a crash after the member step (call `releaseLostSessionAuthorityMember` alone, then rerun the full recovery in a fresh process: it converges and the registry reads back), and that `releaseLostSessionAuthorityMember` refuses while the target's active descriptor exists, with nothing written. (7) In `lib/session-cleanup-recovery.test.mjs`, the two red cases ('retire-orphans-release-lost-binding (composite)', 'release-lost-binding') call `applyRecoveryInFreshProcess` instead of `applySessionCleanupRecovery`; no line growth. RED-to-GREEN: run the new test file once before step 4 and record its red cases. Name `lib/session-cleanup-lost-binding.test.mjs` as needing registration in `harness/verify-suites.json` (C16). Open judgement already settled: a descriptor that cannot be loaded counts as an owner that is not observable as live (the draft's reading); the OWNER-LIVE case may use the draft's injected `inspectSessionOwnerRuntimeFn`, and the report names that as the only injected seam.
+
+### 2. Context files
+
+- `scratch/k1l2/session-cleanup-lost-binding.mjs` and `scratch/k1l2/session-cleanup-lost-binding.test.mjs` — the drafts (start here).
+- `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` — section 'K1 measurement 5' (only if a step is unclear).
+- `plugins/pipeline-core/lib/session-authority-registry.mjs` — read only the lines you edit: `validateRelease` ~226, `healDrift` 310-331, `releaseSessionAuthorityMember` 413 (the write order to copy), `descriptorGuard` 408 (the active descriptor path).
+- `plugins/pipeline-core/lib/session-cleanup-recovery.mjs` — lines 77-124, ~793, ~1835.
+
+### 3. DoD checks
+
+- Acceptance criteria: AC-203 (session-cleanup descriptor and recovery verbs: no dead end after a host crash), PO decision D70 (a) in `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`.
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node scratch/run-quiet.mjs k1l3-new plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs` (new, all green)
+  - `node scratch/run-quiet.mjs k1l3-recovery plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs` (from 35/39 to 37/39)
+  - `node scratch/run-quiet.mjs k1l3-binding plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` (from 46/66; must not drop)
+  - `node scratch/run-quiet.mjs k1l3-repair plugins/pipeline-core/scripts/session-authority-repair.test.mjs` (must not drop against HEAD; record the HEAD count first)
+  - `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` (no new violation)
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`).
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/lib/onboarding-continuity.mjs`, `plugins/pipeline-core/lib/session-authority-registry.mjs`, `plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs`, `plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs`, `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`, `plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs`, `plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- Do not export a registry kit or any raw registry writer or reader; the registry gains exactly one exported function, `releaseLostSessionAuthorityMember`, which enforces its own precondition.
+- Never weaken an existing authority check (requester context, tuple CAS, State CAS, namespace checks, healDrift's in-flight rule); never raise an accepted count in `architecture/boundary-policy.json`; no change to `harness/verify-suites.json` or the requester bridge.
+- Do not stub the registry, the bridge or the release in the new cases, except the one named owner-runtime seam.
+- Never leave a test run in the background when you end your turn; run full files only in the foreground through `scratch/run-quiet.mjs`, one at a time, with the Bash tool timeout set to 600000 ms. Use one simple shell command per call (no `;` chains, no `grep -B/-A`).
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020064459.a8ddf85` · content identity `b03cc4052421e47ecf1dea0ed231a88ed38ac9857584e5f864c4ca0e4478a30e`.
+- Model/effort: `claude-sonnet-5-5` / xhigh (goldfish-deep; agent definition alias `sonnet`).
+- Tier: goldfish-deep. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K1-LOST-BINDING-RELEASE3
+- Write scope: plugins/pipeline-core/lib/onboarding-continuity.mjs, plugins/pipeline-core/lib/session-authority-registry.mjs, plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs, plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs, plugins/pipeline-core/lib/session-cleanup-recovery.mjs, plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs, plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs
+- **Tool budget (TB-09, hard cap):** ≤45 tool uses (min(tier cap 45, maxTurns 80 - 15)). 80 % checkpoint at about call 36: stop editing and end the turn with an interim report naming what remains.
+- Model justification: deep tier: lands authority code from a reviewed draft; one narrow registry function with a safety precondition and a crash-order requirement.
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

@@ -1,0 +1,585 @@
+diff --git a/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md b/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md
+index 1389e72a6..1ad545693 100644
+--- a/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md
++++ b/backlog/items/2026-10-03-advertised-git-to-head-pipeline-is-refused.md
+@@ -45,10 +45,28 @@ Then fix the `git … | head` case, including `<rev>:<path>` arguments.
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
++- **Decision:** the original defect (`git <read-only> ... | head`, including `<rev>:<path>`) is fixed and pinned; the 2026-10-18 addendum is partly fixed and partly open (see the measurement below).
++- **Rationale:** `plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs` pairs every advertised grammar example with an admission check and drives the real grammar.
+ - **Assignment (if accepted):**
+-- **Date:**
++- **Date:** 2026-10-22.
++
++## Measurement 2026-10-22 of the addendum shapes (current head)
++
++- Admitted now: `rg -o <pattern> <file>`, `ls -la <dir>`, `ls -la`, `rg -n ... | head -n N`.
++- Still refused, fix handed over as a patch for the protected grammar file (`hooks/guard-command-grammar.mjs`
++  `SEARCH_BOOLEAN`): `rg -c`, `rg --count`, `rg --no-filename` (also `-I`, `-H`, `--with-filename`). `rg -h` is not
++  added: in ripgrep it is the help flag.
++- Refused on purpose today, needs a guard-owner decision: `git -C <repo> show <rev>:<path> | head -n N`.
++  `isBoundedGitPipeline` excludes `-C` as a cross-repository reach, while the un-piped form admits `-C <dir inside the
++  roots>`. Also refused, by the AP11 contract of the Windows read pin: `git show <rev>:<path>` combined with any other
++  token (`--format=`, `--`, `--stat`), so `git show HEAD:<path> --format= -- | head` stays refused until that contract is
++  widened by a decision.
++- The refusal text does not name the triggering flag. `plugins/pipeline-core/lib/read-command-diagnosis.mjs` (new, with
++  its own suite) names the one flag whose removal makes the grammar admit the command; the call site is a protected guard
++  file, handed over as a patch. A value-taking bad flag, two bad flags and a bad operand are deliberately not diagnosed.
++
++Pin additions (same file as above) carry the admitted shapes as green cases and the three open shapes as `todo` cases that
++name their patch or decision. Counted result, run alone on 2026-10-22: 54 cases, 48 pass, 0 fail, 0 skipped, 6 todo.
+ 
+ ## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-17)
+ 
+diff --git a/backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md b/backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md
+index f802513f8..b715316f4 100644
+--- a/backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md
++++ b/backlog/items/2026-10-05-agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.md
+@@ -34,3 +34,12 @@ Edit the generator source text to match the guard ("one simple command per call;
+ - **Rationale:** commit(s) `7b1b4083b`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++
++## Follow-up 2026-10-22: the optional better option is done
++
++The `&&` segment bound in section 1 is no longer a hand-written `6`: `harness/scripts/generate-agent-obligations.mjs`
++imports the guard's exported `MAX_AND_CHAIN_SEGMENTS` and interpolates it, and the section's piping sentence no longer
++claims that only `rg` pipelines are admitted (the guard also admits `grep`, `cat` and `git` into `head`). Both
++generated copies were regenerated. Pin cases AP8 and AP9 in
++`plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs` fail
++against the previous generator and pass now.
+diff --git a/backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md b/backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md
+index 3cd3ce04c..6fb937e55 100644
+--- a/backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md
++++ b/backlog/items/2026-10-05-commit-producer-path-order-failures-count-against-the-tool-cap.md
+@@ -43,3 +43,22 @@ Fix direction: sort the paths inside the producer (the order is canonical, so re
+ - **Rationale:** commit(s) `c277e4aac`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++
++## Verification 2026-10-22: every observed refusal path is closed and pinned
++
++All three observed failure shapes were re-checked against the current source, not the earlier characterization:
++
++- Path order: `plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs` sorts the `--path` values before calling the
++  library, so any permutation yields the identical result (cases "CLI normalizes unsorted --path input" and "never spends a
++  refusal on path order for any permutation"). Duplicates and invalid paths are still refused, by design.
++- `--summary` and `--body`: `templates/prompts/goldfish-task.md` (final-report section) and its vendored copy state that
++  both are mandatory and that omitting either gives `GF-COMMAND-INPUT`; case "the template states that --summary and --body
++  are mandatory" pins the sentence and the refusal code.
++- Multi-line `copyCommand`: both `copyCommand.posix` and `copyCommand.powershell` are one physical line, admitted by the
++  guard grammar at linux and win32 (COMMITFLOW-T2 cases (b) to (e) for three scenarios).
++
++Counted result, `node --test plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs`, run alone on 2026-10-22:
++29 cases, 29 pass, 0 fail, 0 skipped, 0 todo. The suite is registered in `harness/verify-suites.json` as
++`goldfish-commit-command-flow-tests`. A refused producer call still spends one counted tool use by design; the item's
++"exempt producer refusals from the counted budget" alternative was not taken and is not needed once the three shapes above
++cannot occur.
+diff --git a/backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md b/backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md
+index 988a34a49..6d905f045 100644
+--- a/backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md
++++ b/backlog/items/2026-10-06-critic-scratch-name-randomness-has-no-admitted-command.md
+@@ -48,3 +48,20 @@ improvise a randomness source.
+ - **Rationale:** commit(s) `f95fc6998`.
+ - **Assignment (if accepted):** sprint-alfred-epic close-out batch.
+ - **Date:** 2026-10-08.
++
++## Verification 2026-10-22: the pin the item asked for
++
++`templates/prompts/critic-review.md`, its vendored copy and `plugins/pipeline-core/agents/critic.md` carry no random-name,
++`openssl`, `/dev/urandom`, `mktemp` or CSPRNG instruction, and each names the single admitted route (Write/Edit only, the
++guard-allocated `critic-<authenticated-native-agent-id>` target, persistence reported as unavailable when admission is
++missing). Nine cases were added to `plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs`
++(the registered pin of the same notes lane): the no-randomness and route checks for each of the three texts, canonical
++versus vendored paragraph equality, a mirror that proves the detector catches the old instruction, and a check that the
++closed shell grammar still admits no randomness command. Counted result, run alone on 2026-10-22: 28 cases, 26 pass,
++0 fail, 2 skipped (the two typed host-limitation skips for synthetic mode bits), 0 todo.
++
++Residual, not changed here: `roles/critic.md` CR-03 (standard stage) still tells the Critic to create a
++`scratch/dispatch/critic-<task-or-codename>-a1/` directory with a bare `mkdir`, and three texts say the Critic "already
++creates" a per-dispatch subdirectory, while the template and agent now say the native dispatch guard allocates the notes
++directory on the first admitted Write. The role text predates the guard-owned route and should be reconciled by the
++role owner.
+diff --git a/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md b/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
+index d45233bea..f02d14102 100644
+--- a/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
++++ b/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
+@@ -32,3 +32,25 @@ approved feature whose approval cannot be re-verified must degrade to advisory,
+ - **Rationale:**
+ - **Assignment (if accepted):**
+ - **Date:**
++
++## Extension 2026-10-22: every other denial that names a command
++
++The admitted-recovery pin (`plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs`) covered only the
++design-advisory emitter. It now also holds a source inventory of every guard denial text that prints a "Run ..." command
++(`hooks/` and `lib/guard/`): a new or removed one fails the inventory until it is classified. Result of the classification:
++
++- `GUARD-BOOTSTRAP-RECEIPT-MISSING` names the preflight script: sanctioned, green.
++- The `guard-push` feature-checkpoint denial names the bare `push-init.mjs --checkpoint`, which is not a runnable spelling,
++  and `sanctionedPushInitArgs()` does not admit `--checkpoint`, `--candidate` or `--record-ref` although `push-init.mjs`
++  parses them and `buildPushInitArgv()` emits them, so in a blocked lifecycle state the shell lane refuses the command
++  the denial points at. Two `todo` cases pin this; the fix touches protected guard files and is handed over as a JSON
++  patch.
++- The GG-22 ledger denial (`reconcile-backlog-ledger.mjs --activate`) and the dispatch-record lane
++  (`capture-evidence.mjs`) name scripts that are not in the sanctioned catalogue. They are refused as
++  `opaque-script-execution` only while the lifecycle gate blocks, which cannot be the state of a commit or a
++  dispatch-record write; pinned as an observed limit, not as a defect.
++
++Not covered: denials whose command is not introduced by a "Run"/"then run"/"use plugins/pipeline-core/scripts" phrasing,
++and the PO-run commands that human-guard-override denials print (those are attended-operator steps by design). The second
++half of the Proposal (an approved feature whose approval cannot be re-verified degrades to advisory) is a product
++decision and was not touched.
+diff --git a/backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md b/backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md
+index 95478070e..40a39cdff 100644
+--- a/backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md
++++ b/backlog/items/2026-10-09-agent-obligations-recommends-a-commit-spelling-guard-push-refuses.md
+@@ -43,7 +43,11 @@ Pin the agreement with a test that runs the recommended spelling through the gua
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
+-- **Assignment (if accepted):**
+-- **Date:**
++- **Decision:** fixed in source and pinned; verified live 2026-10-22 (closes after the 0.7.0 candidate host checklist).
++- **Rationale:** the generated obligations document (section 1) recommends the `-F <msgfile>` spelling and names
++  `-m` with `--trailer` as refused. Three contract cases in `harness/scripts/generate-agent-obligations.test.mjs`
++  (added by `afe6b7f61`, `80c5a9922`, `a34415842`) drive the recommended spelling through guard-push, guard-git and
++  guard-lifecycle-ready and keep a negative control per guard. Counted result on 2026-10-22: 13 cases, 13 pass,
++  0 fail, 0 skipped, 0 todo (`node --test harness/scripts/generate-agent-obligations.test.mjs`, run alone).
++- **Assignment (if accepted):** sprint-alfred-epic close-out batch.
++- **Date:** 2026-10-22.
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index d0a7909e8..057333abc 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -26,7 +26,8 @@
+  *
+  * WHAT IS DERIVED, AND WHAT IS NOT. Derived: the protected-path table (from
+  * `project/guard-config.json`), the draft-phase write prefixes (from
+- * `guard-devplan.mjs`'s exported constant), the gate-strength shell exemption
++ * `guard-devplan.mjs`'s exported constant), the `&&` chain bound in section 1
++ * (from `grammar-denials.mjs`'s exported `MAX_AND_CHAIN_SEGMENTS`), the gate-strength shell exemption
+  * (from `guard-lifecycle-ready.mjs`'s exported table), and the admitted/refused
+  * command shapes (MEASURED by asking the guard's own exported predicates, not by
+  * restating its documentation). Hand-maintained lines are marked as such in the
+@@ -49,6 +50,7 @@ import {
+   isReadOnlyDiagnosticCommand,
+   retryActionsForDeniedCommand,
+ } from "../../plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
++import { MAX_AND_CHAIN_SEGMENTS } from "../../plugins/pipeline-core/lib/guard/grammar-denials.mjs";
+ 
+ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+ export const OBLIGATIONS_PATH = join(REPO_ROOT, "templates", "prompts", "agent-obligations.md");
+@@ -125,17 +127,21 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+ 
+   put("## 1. One simple command per Bash call (the closed shell grammar)");
+   put();
+-  put("<!-- hand-maintained: no component exports the grammar as data, so this rule");
+-  put("     is stated rather than derived. Source of truth:");
++  put("<!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's");
++  put("     exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/");
++  put("     grammar-denials.mjs); the rest of this rule is stated, because no component");
++  put("     exports the whole grammar as data. Source of truth:");
+   put("     plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables");
+   put("     below ARE measured. -->");
+   put();
+   put("`guard-lifecycle-ready` admits **one simple command per tool call**.");
+   put("No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining");
+-  put("with `&&` is admitted only as up to 6 segments, and only when every segment is");
++  put(`with \`&&\` is admitted only as up to ${MAX_AND_CHAIN_SEGMENTS} segments, and only when every segment is`);
+   put("itself an admitted read-only shape (or the small always-safe-write allowlist:");
+-  put("`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`");
+-  put("diagnostic pipelines are the only admitted piping.");
++  put("`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded");
++  put("read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into");
++  put("`rg`/`grep`); every grammar refusal prints the complete current list with its");
++  put("bounds, so read that list instead of guessing.");
+   put();
+   put("The two workarounds that cost the most time before they were written down:");
+   put();
+diff --git a/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs b/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
+index 168c4dbfa..7ea6eae68 100644
+--- a/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
++++ b/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
+@@ -112,6 +112,41 @@ for (const command of [
+   });
+ }
+ 
++// ------------------------------------------------------------------ P5 (2026-10-18 addendum, PF-17)
++// The real-project observation listed four more refused shapes. Measured on 2026-10-22: `rg -o ...` and `ls -la <dir>` are admitted
++// now (green below); `rg -c`, `rg --count` and `rg --no-filename`/`-I`/`-H` are still refused because the rg option set in
++// hooks/guard-command-grammar.mjs (SEARCH_BOOLEAN) lacks them (todo, fix reported as patch h1-patch-02); `git -C <repo> ... | head`
++// is refused on purpose today (the generic git pipeline excludes -C as a cross-repository reach, see isBoundedGitPipeline), which is a
++// guard-owner decision, recorded as a todo and not guessed.
++for (const command of ["rg -o needle README.md", "rg -n needle README.md", "ls -la docs", "ls -la", "rg -n needle README.md | head -n 3"]) {
++  test(`P5 addendum shape admitted: ${command}`, () => {
++    assert.equal(guard(command), true);
++  });
++}
++
++for (const command of [
++  "rg -c needle README.md",
++  "rg --count needle README.md",
++  "rg --no-filename needle README.md",
++  "rg -o --no-filename needle README.md",
++  "rg -c needle README.md | head -n 3",
++]) {
++  test(`P5 addendum shape (needs the rg option set widened): ${command}`,
++    { todo: "needs a protected guard file: hooks/guard-command-grammar.mjs SEARCH_BOOLEAN lacks -c/--count/-I/--no-filename/-H/--with-filename (patch h1-patch-02)" },
++    () => { assert.equal(guard(command), true); });
++}
++
++test("P5 addendum shape (needs a guard-owner decision): git -C <repo> show <rev>:<path> | head",
++  { todo: "decision: isBoundedGitPipeline excludes -C on purpose (cross-repository reach); admitting -C <project dir> in the pipeline is a security trade, not made here" },
++  () => { assert.equal(guard("git -C . show HEAD:docs/state.md | head -n 3"), true); });
++
++test("P5 control: the other refused addendum rg flags and an escaping -C target stay refused", () => {
++  for (const command of ["rg --hidden needle README.md", "rg --pre cat needle README.md", "rg -c -c needle README.md",
++    "rg -c needle ../outside.txt", "git -C .. show HEAD:docs/state.md | head -n 3"]) {
++    assert.equal(guard(command), false, command);
++  }
++});
++
+ // ------------------------------------------------------------------ P4 (RED against a mirror)
+ function mirrorWithoutGitPipeline(name) {
+   let source = readFileSync(join(guardDir, "shell-grammar.mjs"), "utf8");
+diff --git a/plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs b/plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs
+index acbc04b61..a4a4247dd 100644
+--- a/plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agent-obligations-says-no-and-and-while-the-guard-admits-six-segments.test.mjs
+@@ -69,6 +69,25 @@ test("AP6: the guard's refusal grammar lists the same bound the document states"
+   assert.equal(admitted(shape.example.replaceAll("probe.txt", "CLAUDE.md")), true, "the table's own example must be admitted");
+ });
+ 
++test("AP8: the chain bound in section 1 is derived from the guard export, not a literal in the generator", () => {
++  const source = readFileSync(join(REPO_ROOT, "harness", "scripts", "generate-agent-obligations.mjs"), "utf8");
++  assert.match(source, /import \{ MAX_AND_CHAIN_SEGMENTS \} from "[^"]*lib\/guard\/grammar-denials\.mjs"/u,
++    "the generator must import the guard's exported bound");
++  assert.match(source, /up to \$\{MAX_AND_CHAIN_SEGMENTS\} segments/u, "the section text must interpolate the exported bound");
++  assert.doesNotMatch(source, /up to \d+ segments/u, "no hand-written numeric bound may remain in the generator");
++});
++
++test("AP9: section 1 does not claim rg-only piping while the guard admits grep, cat and git pipelines", () => {
++  for (const command of ["rg -n needle CLAUDE.md | head -n 3", "grep -n needle CLAUDE.md | head -n 3",
++    "cat CLAUDE.md | head -n 3", "git log | head -n 3"]) {
++    assert.equal(admitted(command), true, `fixture must be admitted by the guard: ${command}`);
++  }
++  const text = section1(readFileSync(OBLIGATIONS_PATH, "utf8")).replace(/\s+/gu, " ");
++  assert.doesNotMatch(text, /`rg`-to-`rg` and `rg`-to-`head`[^.]*only admitted piping/u,
++    "section 1 must not restrict piping to rg when the guard admits more");
++  assert.match(text, /only admitted piping is the bounded read-only diagnostic pipelines/u);
++});
++
+ test("AP7: the committed canonical and vendored documents equal a fresh generation", () => {
+   const committed = readFileSync(OBLIGATIONS_PATH, "utf8");
+   assert.equal(renderAgentObligations(), committed);
+diff --git a/plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs b/plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs
+index 374771cdb..c9e67e966 100644
+--- a/plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs
++++ b/plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs
+@@ -203,7 +203,55 @@ test("injected platform linux: a wrong-mode receipt (synthetic 0666) is refused
+   assert.match(second.stderr, /DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: critic-notes-binding-unavailable/u);
+ });
+ 
+-test("own directory is created with mode 0700 and the receipt with 0600", { skip: IS_WINDOWS ? HOST_LIMIT : false }, async () => {
++// --- pipeline.critic-scratch-name-randomness-has-no-admitted-command: the Critic-facing text names no randomness source ---
++// The closed shell grammar admits neither `openssl` nor a bare `mkdir` of a scratch subdirectory, and an improvised
++// `/dev/urandom` read once hung a dispatch. The only notes target is guard-allocated (critic-<native-agent-id>), so the
++// Critic's text must carry no instruction to draw a random suffix and must name the Write/Edit route.
++const CRITIC_TEXTS = [
++  "templates/prompts/critic-review.md",
++  "plugins/pipeline-core/templates/prompts/critic-review.md",
++  "plugins/pipeline-core/agents/critic.md",
++];
++const RANDOMNESS_INSTRUCTION = /openssl|urandom|rand\s+-hex|CSPRNG|random[- ]hex|\$RANDOM|uuidgen|mktemp/iu;
++const readText = (rel) => readFileSync(join(REPO_ROOT, ...rel.split("/")), "utf8").replace(/\s+/gu, " ");
++
++for (const rel of CRITIC_TEXTS) {
++  test(`randomness: ${rel} carries no random-name or openssl instruction`, () => {
++    const text = readText(rel);
++    assert.doesNotMatch(text, RANDOMNESS_INSTRUCTION, "a Critic must never be told to draw a random scratch suffix");
++    assert.doesNotMatch(text, /<random-hex>|<random>/iu);
++  });
++
++  test(`randomness: ${rel} names the Write/Edit route, the guard-allocated target and the unavailable-persistence fallback`, () => {
++    const text = readText(rel);
++    assert.match(text, /scratch\/dispatch\/critic-<authenticated-native-agent-id>\/critic-notes\.md/u);
++    assert.match(text, /Write\/Edit only; no Bash notes or random-name command/u);
++    assert.match(text, /the native dispatch guard creates the exact private notes directory exclusively/u);
++    assert.match(text, /return the report as text and disclose persistence as unavailable/u);
++  });
++}
++
++test("randomness: the canonical and vendored Critic templates carry the identical scratchpad paragraph", () => {
++  const paragraph = (rel) => /\*\*Scratchpad isolation[\s\S]*?native Windows behavior\./u.exec(readText(rel))?.[0];
++  const canonical = paragraph(CRITIC_TEXTS[0]);
++  assert.ok(canonical, "the scratchpad isolation paragraph must be present");
++  assert.equal(paragraph(CRITIC_TEXTS[1]), canonical);
++});
++
++test("randomness: the detector is meaningful, a template carrying the old openssl instruction is caught (RED mirror)", () => {
++  const mutant = `${readText(CRITIC_TEXTS[0])} Create scratch/dispatch/<codename>-<random-hex>/ with at least 8 hex characters from a CSPRNG (e.g. openssl rand -hex 4).`;
++  assert.match(mutant, RANDOMNESS_INSTRUCTION);
++  assert.match(mutant, /<random-hex>/u);
++});
++
++test("randomness: the shell grammar still admits no randomness command, so the text cannot reintroduce one", async () => {
++  const { isReadOnlyDiagnosticCommand } = await import("../guard/shell-grammar.mjs");
++  for (const command of ["openssl rand -hex 4", "head -c 4 /dev/urandom", "mktemp -d scratch/dispatch/critic-XXXXXXXX"]) {
++    assert.equal(isReadOnlyDiagnosticCommand(command, REPO_ROOT), false, command);
++  }
++});
++
++test("own directory is created with mode 0700 and the receipt with 0600",{ skip: IS_WINDOWS ? HOST_LIMIT : false }, async () => {
+   const { statSync } = await import("node:fs");
+   const root = criticRoot();
+   assert.equal(write(root, notesRel()).status, 0);
+diff --git a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+index 0cacb6e20..0c11a5f92 100644
+--- a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
++++ b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+@@ -119,3 +119,87 @@ test('exact rendered recovery text: the denial spelling is observed against the
+   assert.equal(bare, false);
+   assert.equal(prefixed, false);
+ });
++
++// --- Extension (2026-10-22): every OTHER guard denial that names a command ---
++// The cases above cover the design-advisory emitter. These cover the remaining denial texts in hooks/ and lib/guard/ that print a
++// "Run ..." style command, found by a source scan so that a NEW denial naming a command fails the inventory until it is classified.
++// Cases marked `todo` pin a defect that needs a protected guard file; the exact fix is a JSON patch for the operator and the
++// case turns green when it is applied (it is then to be un-marked). Reported as patch h1-patch-01 (not a tracked file).
++const pluginDir = fileURLToPath(new URL('../../', import.meta.url)).replace(/[\\/]$/u, '');
++const NAMED_COMMAND_LINE = /(?:Run exactly:|[Tt]hen run:|\bRun:|\bRun `|\brun `|\bRun \w+ \w+:)\s*(?:node\b|["`]?[\w.${}/-]+\.mjs)|\buse plugins\/pipeline-core\/scripts\/[\w-]+\.mjs/u;
++const { readdirSync } = await import('node:fs');
++function namedCommandHits() {
++  const hits = [];
++  for (const rel of ['hooks', 'lib/guard']) {
++    const dir = join(pluginDir, ...rel.split('/'));
++    for (const name of readdirSync(dir).filter(n => n.endsWith('.mjs') && !n.endsWith('.test.mjs'))) {
++      readFileSync(join(dir, name), 'utf8').split('\n').forEach((line) => {
++        if (/^\s*(\/\/|\*|\/\*)/u.test(line)) return;
++        const match = NAMED_COMMAND_LINE.exec(line);
++        if (match) hits.push(`${rel}/${name} :: ${match[0]}`);
++      });
++    }
++  }
++  return hits.sort();
++}
++const buildPushInit = async (options) => {
++  const { buildPushInitArgv } = await import(new URL('../../scripts/push-init.mjs', import.meta.url));
++  return buildPushInitArgv({ root, by: 'tester', remote: 'origin', destination: 'refs/heads/feat-x', ...options });
++};
++const pushInitCommand = (argv) => `node "${join(pluginDir, 'scripts', 'push-init.mjs')}" ${argv.join(' ')}`;
++
++test('inventory: the denial texts that name a command are exactly the classified ones', () => {
++  assert.deepEqual(namedCommandHits(), [
++    'hooks/guard-git.mjs :: then run: node',
++    'hooks/guard-push.mjs :: Run: push-init.mjs',
++    'lib/guard/bootstrap-receipt.mjs :: Run exactly: node',
++    'lib/guard/dispatch-record-lane.mjs :: use plugins/pipeline-core/scripts/capture-evidence.mjs',
++  ], 'a denial that names a command is new or was removed: classify it in this file (admitted, or a todo with its patch)');
++});
++
++test('GUARD-BOOTSTRAP-RECEIPT-MISSING: the named preflight command is sanctioned and not lane-refused in the blocked state', async () => {
++  const { START_PREFLIGHT_SCRIPT } = await import(new URL('../guard/constants.mjs', import.meta.url));
++  const source = readFileSync(fileURLToPath(new URL('../guard/bootstrap-receipt.mjs', import.meta.url)), 'utf8');
++  assert.ok(source.includes('Run exactly: node "${START_PREFLIGHT_SCRIPT}"'), 'the denial no longer names the preflight script as pinned');
++  const command = `node "${START_PREFLIGHT_SCRIPT}"`;
++  assert.equal(isSanctionedLifecycleCommand(command, root, {}), true);
++  assert.equal(devPlanShellRefusalHit(command, root, blockedDraft), null);
++});
++
++test('guard-push checkpoint denial: control, the default push-init argv is sanctioned', async () => {
++  assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({})), root, {}), true);
++  assert.equal(isSanctionedLifecycleCommand(pushInitCommand(await buildPushInit({ base: 'main' })), root, {}), true);
++});
++
++test('guard-push checkpoint denial: the argv push-init emits for --checkpoint is sanctioned by the shell lane',
++  { todo: 'needs a protected guard file: sanctionedPushInitArgs() does not admit --checkpoint/--candidate/--record-ref (patch h1-patch-01)' },
++  async () => {
++    const argv = await buildPushInit({ checkpoint: true });
++    assert.equal(isSanctionedLifecycleCommand(pushInitCommand(argv), root, {}), true, `refused: ${argv.join(' ')}`);
++    assert.equal(devPlanShellRefusalHit(pushInitCommand(argv), root, blockedDraft), null);
++  });
++
++test('guard-push checkpoint denial: the text names a complete, runnable push-init invocation',
++  { todo: 'needs a protected guard file: guard-push.mjs prints the bare "push-init.mjs --checkpoint" (patch h1-patch-01)' },
++  async () => {
++    const source = readFileSync(join(pluginDir, 'hooks', 'guard-push.mjs'), 'utf8');
++    const named = /"Run: (node <plugin-root>\/scripts\/push-init\.mjs --root <project-dir> --by <name> --remote <remote> --destination refs\/heads\/<branch> --checkpoint) prints/u.exec(source)?.[1];
++    assert.ok(named, 'the checkpoint denial must name the full invocation, not only the script name');
++    const concrete = named.replace('<plugin-root>', pluginDir).replace('<project-dir>', root).replace('<name>', 'tester')
++      .replace('<remote>', 'origin').replace('<branch>', 'feat-x');
++    assert.equal(isSanctionedLifecycleCommand(concrete, root, {}), true, `named command refused: ${concrete}`);
++  });
++
++test('observed limit: the commands GG-22 and the dispatch-record lane name are refused only while the lifecycle gate blocks', () => {
++  // Neither script is in the sanctioned catalogue; both are admitted in the states that produce those denials (a commit and a
++  // dispatch-record write, which need an approved plan) because the opaque-script lane only fires on a blocking gate verdict.
++  const allow = { devPlanGateVerdictFn: () => ({ verdict: 'allow', reason: 'fixture' }) };
++  for (const command of [
++    'node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate',
++    `node "${join(pluginDir, 'scripts', 'capture-evidence.mjs')}" --out scratch/evidence/x.txt --label x -- node --version`,
++  ]) {
++    assert.equal(isSanctionedLifecycleCommand(command, root, {}), false, `not sanctioned: ${command}`);
++    assert.equal(devPlanShellRefusalHit(command, root, blockedDraft)?.lane, 'opaque-script-execution');
++    assert.equal(devPlanShellRefusalHit(command, root, allow), null);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+new file mode 100644
+index 000000000..a0baf56a0
+--- /dev/null
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.mjs
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Names the one flag that makes a single read-family command fall outside the closed shell grammar.
++ *
++ * Backlog item pipeline.advertised-git-to-head-pipeline-is-refused (2026-10-18 addendum): the refusal of a single
++ * read command ("a flag, a repeated option or a spelling it does not admit") did not say WHICH token it objected to,
++ * so an agent re-spelled blindly and spent tool uses. This helper asks the grammar itself, never a second copy of it:
++ * a flag is the culprit when removing that one token makes the grammar admit the command. It reports nothing when no single removal is enough (two bad flags, a bad operand, a pipeline) --
++ * a diagnosis that may be wrong is worse than none.
++ *
++ * Pure and read-only: it parses and re-asks `isReadOnlyDiagnosticCommand`, it grants nothing.
++ */
++import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
++import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
++
++const quote = (word) => `'${String(word).replaceAll("'", "'\\''")}'`;
++
++/** @returns {string|null} the flag token (as written) whose removal makes the command admitted, else null. */
++export function firstUnadmittedFlag(command, root) {
++  if (typeof command !== "string" || command.trim() === "") return null;
++  let parsed;
++  try { parsed = parseGuardCommand(command, root, { platform: "linux" }); } catch { return null; }
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return null;
++  if (isReadOnlyDiagnosticCommand(command, root)) return null;
++  const { executable, argv } = parsed.segments[0];
++  const endOfOptions = argv.indexOf("--");
++  const limit = endOfOptions === -1 ? argv.length : endOfOptions;
++  for (let index = 0; index < limit; index += 1) {
++    const token = argv[index];
++    if (typeof token !== "string" || !token.startsWith("-") || token === "-") continue;
++    // Single-token removal only. Dropping the following token as well (a flag's value) would let a bad operand or the
++    // pattern itself vanish and be mistaken for a flag fault, so a bad value flag is simply not diagnosed (null).
++    const rest = argv.filter((_, position) => position !== index);
++    if (isReadOnlyDiagnosticCommand([executable, ...rest.map(quote)].join(" "), root)) return token;
++  }
++  return null;
++}
+diff --git a/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+new file mode 100644
+index 000000000..c77d710af
+--- /dev/null
++++ b/plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+@@ -0,0 +1,72 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { dirname, join } from "node:path";
++import test from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { firstUnadmittedFlag } from "./read-command-diagnosis.mjs";
++import { isReadOnlyDiagnosticCommand } from "./guard/shell-grammar.mjs";
++
++const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
++
++test("RCD1: an rg flag the grammar does not know is named", () => {
++  assert.equal(isReadOnlyDiagnosticCommand("rg --hidden needle README.md", root), false, "fixture must be refused");
++  assert.equal(firstUnadmittedFlag("rg --hidden needle README.md", root), "--hidden");
++  assert.equal(firstUnadmittedFlag("rg -n --hidden needle README.md", root), "--hidden");
++});
++
++test("RCD2: the flag is found even when the bad flag sits between admitted ones", () => {
++  assert.equal(firstUnadmittedFlag("rg -n --hidden -i needle README.md", root), "--hidden");
++  assert.equal(firstUnadmittedFlag("rg -i --hidden -n needle README.md", root), "--hidden");
++});
++
++test("RCD3: a git diff output flag is named", () => {
++  assert.equal(firstUnadmittedFlag("git diff --output=scratch/x.txt", root), "--output=scratch/x.txt");
++});
++
++test("RCD4: nothing is named for an admitted command, a bad operand, two bad flags, a pipeline or a redirect", () => {
++  assert.equal(firstUnadmittedFlag("rg -n needle README.md", root), null, "admitted command");
++  assert.equal(firstUnadmittedFlag("rg -n needle ../outside.txt", root), null, "the operand is the problem, not a flag");
++  assert.equal(firstUnadmittedFlag("rg --hidden --pre cat needle README.md", root), null, "no single removal is enough");
++  assert.equal(firstUnadmittedFlag("rg --hidden needle README.md | head -n 3", root), null, "pipelines are not diagnosed");
++  assert.equal(firstUnadmittedFlag("rg --hidden needle README.md > out.txt", root), null, "redirects are not diagnosed");
++  assert.equal(firstUnadmittedFlag("", root), null);
++  assert.equal(firstUnadmittedFlag(undefined, root), null);
++});
++
++test("RCD5: a bad flag that takes a value is not diagnosed (removing the value too could hide an operand fault)", () => {
++  assert.equal(isReadOnlyDiagnosticCommand("rg --max-filesize 1M needle README.md", root), false);
++  assert.equal(firstUnadmittedFlag("rg --max-filesize 1M needle README.md", root), null);
++  assert.equal(firstUnadmittedFlag("rg -n needle ../outside.txt", root), null, "an operand fault must not blame the admitted -n");
++});
++
++test("RCD6: a pattern with an apostrophe survives the re-ask", () => {
++  assert.equal(firstUnadmittedFlag("rg --hidden \"it's\" README.md", root), "--hidden");
++});
++
++async function refusal(command) {
++  const guard = await import("../hooks/guard-lifecycle-ready.mjs");
++  return guard.evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command } }, {
++    projectDir: root, runner: "claude",
++    inspectProjectOnboardingV3Fn() { throw new Error("fixture: no onboarding observation"); },
++  });
++}
++
++test("RCD8: the unsupported-read refusal is the typed code today", async () => {
++  const result = await refusal("rg --hidden needle README.md");
++  assert.equal(result.exitCode, 2);
++  assert.match(String(result.stderr), /GUARD-READ-COMMAND-UNSUPPORTED/u);
++});
++
++test("RCD9: the refusal names the flag it objects to",
++  { todo: "needs a protected guard file: lib/guard/evaluate.mjs does not pass the diagnosed flag as the rejected element (patch h1-patch-03)" },
++  async () => {
++    const result = await refusal("rg --hidden needle README.md");
++    assert.match(String(result.stderr), /Rejected element: the flag "--hidden"\./u);
++  });
++
++test("RCD7: the helper never grants: the diagnosed command itself stays refused", () => {
++  const command = "rg --hidden needle README.md";
++  assert.equal(firstUnadmittedFlag(command, root), "--hidden");
++  assert.equal(isReadOnlyDiagnosticCommand(command, root), false);
++});
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index 39bba48c7..e9c6e1a14 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -18,8 +18,10 @@ spends a tool use from the budget that is also the stop condition.
+ 
+ ## 1. One simple command per Bash call (the closed shell grammar)
+ 
+-<!-- hand-maintained: no component exports the grammar as data, so this rule
+-     is stated rather than derived. Source of truth:
++<!-- hand-maintained, except the `&&` segment bound below, which is read from the guard's
++     exported MAX_AND_CHAIN_SEGMENTS (plugins/pipeline-core/lib/guard/
++     grammar-denials.mjs); the rest of this rule is stated, because no component
++     exports the whole grammar as data. Source of truth:
+      plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs. The two tables
+      below ARE measured. -->
+ 
+@@ -27,8 +29,10 @@ spends a tool use from the budget that is also the stop condition.
+ No `;`, no redirects (`>`, `2>&1`, `| tee`), no line continuations. Chaining
+ with `&&` is admitted only as up to 6 segments, and only when every segment is
+ itself an admitted read-only shape (or the small always-safe-write allowlist:
+-`echo`, `mkdir -p` under `scratch/`). Bounded `rg`-to-`rg` and `rg`-to-`head`
+-diagnostic pipelines are the only admitted piping.
++`echo`, `mkdir -p` under `scratch/`). The only admitted piping is the bounded
++read-only diagnostic pipelines (a read command into `head` or `tail`, or `rg`/`grep` into
++`rg`/`grep`); every grammar refusal prints the complete current list with its
++bounds, so read that list instead of guessing.
+ 
+ The two workarounds that cost the most time before they were written down:
+ 

@@ -1,0 +1,843 @@
+diff --git a/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md b/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md
+index dd08b07cb..b1b948af7 100644
+--- a/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md
++++ b/backlog/items/2026-09-29-claude-greenfield-seeds-unselected-codex-targets.md
+@@ -17,3 +17,11 @@ only. Native Codex files and restart barrier are projected only after Codex
+ is explicitly enabled. Preserve the shared neutral/Claude authority tier and
+ support later multi-runner activation without repairing a false drift.
+ Verify across all three runners and supported host platforms.
++
++## Triage
++
++- **Agent work (2026-10-22):** the real-apply pin exists. `plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs`
++  cases (e) and (f) apply the portable seed and the runtime initialization for a Claude-only and an Antigravity-only project
++  (no `.codex` file on disk, no Codex restart barrier, clean readback), then enable Codex in `pipeline.user.yaml`, plan and apply
++  the runtime again (only the `.codex` targets are created, every earlier file stays byte-identical, readback is `noop`). The
++  Windows host run and the Codex-enrolling native walk remain native-host work.
+diff --git a/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md b/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md
+index 6f896392b..eb21e1f22 100644
+--- a/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md
++++ b/backlog/items/2026-10-03-agy-driver-dispatch-and-design-routes-incomplete.md
+@@ -90,3 +90,19 @@ Added acceptance (0.7.0, minor unless the PO raises it):
+ - **Rationale:**
+ - **Assignment (if accepted):**
+ - **Date:**
++
++### Agent measurement of the open acceptance (2026-10-22)
++
++`plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs` now has 14 cases (13 pass, 0 fail, 1 typed todo):
++
++- Handover in every phase: through the Antigravity adapter on a governed high-risk project, a `docs/state.md` write is not refused by
++  the EL-01 tripwire, the dev-plan gate, the handover-size guard, the test-path guard or the gate-strength guard in the design phase
++  (before plan approval) or the implementation phase, while a production-code write in the same fixture is refused by EL-01 or the
++  dev-plan gate. The lifecycle guard has no phase input, and with readiness satisfied it admits the write for the `antigravity` runner
++  in both phases. Not measured: a native Antigravity session with a fully onboarded project (the adapter fixture is not ready, so
++  lifecycle readiness is the guard that still refuses there), and the 0.6.2-era report that `docs/state.md` stayed at its stage-0 text.
++- Critic and Advisor routes: not met. With a native host observation for every role, Antigravity advisor, critic, readiness and the
++  mechanic/deep implementors still resolve to `unavailable` with `RRP-ROUTE-CELL-UNAVAILABLE`, and the self-dispatch fallback is legal
++  only for the Claude advisor. Registering Antigravity route cells or admitting a fallback for Antigravity is a route-policy decision
++  (typed todo in the pin). The implementor and the plan verifier have a native route; every other role resolves to a typed state.
++- Verify: not measured as a route. The pin covers only the node-sandbox probe, the Antigravity prerequisite of running the project's verify command.
+diff --git a/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md b/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md
+index 3434b8876..2aef65955 100644
+--- a/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md
++++ b/backlog/items/2026-10-03-claude-windows-greenfield-lifecycle-not-walkable.md
+@@ -58,3 +58,19 @@ Remaining Claude/Windows-specific frictions:
+ - **Rationale:**
+ - **Assignment (if accepted):**
+ - **Date:**
++
++### Agent measurement (2026-10-22)
++
++`plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs` now has 36 cases (35 pass, 0 fail, 1 skipped).
++
++- V-9, V-12, V-13: covered by the existing pin cases, unchanged and green.
++- V-10: the route digest is bound to the inline briefing, the producer and the guard admission step record it, and the caller set is pinned.
++  The header listed three typed gaps. One is stale: Codex registers `guard-dispatch.mjs` on the `spawn_agent` matcher in
++  `hooks/codex-hooks.json`, and the Antigravity adapter runs it for every Task/Agent entry, once per Subagents element. That is now a
++  source-scan case with a RED proof. It reads the shipped files and does not prove a live host fires the hook. The other two gaps are
++  still open and are not fixable from an unprotected file: a Critic or unrelated-role dispatch carries no Slice line, so there is
++  nothing to bind, and a dynamically built Workflow script cannot be resolved statically by `hooks/guard-dispatch.mjs` (protected). Both
++  need a route-policy decision about what a route record means for a dispatch without a slice.
++- The CAS/"missing" failure: not reproduced and not located. It needs the Windows run, and no code or message text from the report is
++  available here. Searching the library for CAS-style codes returns many unrelated hits, so naming one would be a guess. It stays open.
++- The two-approval happy path (implementation and push) stays a skipped native case that needs a live interactive Claude/Windows session.
+diff --git a/backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md b/backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md
+index cfd2279c0..83c38acf1 100644
+--- a/backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md
++++ b/backlog/items/2026-10-03-three-runner-happy-path-with-two-po-approvals.md
+@@ -120,6 +120,23 @@ Added acceptance (0.7.0, minor; toil, PO 2026-10-18):
+ - **Assignment (if accepted):**
+ - **Date:**
+ 
++### Agent measurement of the added 0.7.0 acceptance (2026-10-22)
++
++The pin `plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs` now states the added acceptance
++with one real case per point (19 cases: 16 pass, 0 fail, 1 typed skip for the per-runner host run, 2 typed todo):
++
++- Typed absent course with a repair: delivered (`SQ-DELIVERY-COURSE-ABSENT`, repair names the governed course writer and `slice-queue.json`;
++  an unsafe course file still fails closed as `SQ-DELIVERY-STATE-UNAVAILABLE`). The repair is prose naming the writer, not an argv action.
++- Course writer for German-table Specs and `.test.js` checks: delivered (numbered and `R-n` rows under `Abnahmekriterien`, `.test.js` admitted).
++- Delivery hand-off at plan readiness: `lib/plan-handoff-readiness.mjs` is delivered and tested, but no code calls it. `submit-plan` and
++  `present-plan` in the protected `scripts/pipeline-state.mjs` do not invoke it, so the failure can still first appear after approval.
++  Typed todo; the call sites are the patch `three-runner-patch-01.json` (operator applies it in the signature sitting).
++- Onboarding answers surviving the restart: the intake record holds the Git author, language and profile and a fresh process reads
++  them back, and no restart plan is offered before the record is complete. Not met: after the record holds the Git author the next
++  inspection still publishes `gitAuthorName`/`gitAuthorEmail` as pending asks (language is honoured). Typed todo, blocked on a design
++  call; `lib/project-onboarding-v3.mjs` is exactly at its architecture line bound, so code must move out before any line is added.
++- Not covered: the per-runner end-to-end runs (host evidence), the fix for the two todo points, PO acceptance.
++
+ ## Observed 2026-10-20: Codex WSL greenfield, second run (major)
+ 
+ Source: PO-supplied forensic analysis of a Codex greenfield run on WSL
+diff --git a/backlog/items/2026-10-07-desktop-app-support-is-unverified.md b/backlog/items/2026-10-07-desktop-app-support-is-unverified.md
+index ddf879c3b..f8b1b97b3 100644
+--- a/backlog/items/2026-10-07-desktop-app-support-is-unverified.md
++++ b/backlog/items/2026-10-07-desktop-app-support-is-unverified.md
+@@ -45,3 +45,12 @@ release candidate.
+ - **Rationale:** a runner surface the PO uses must be verified, and an unprotected surface must be named, not discovered.
+ - **Assignment (if accepted):** final host verification of the 0.7.0 candidate; docs slice for the WSL warning.
+ - **Date:** 2026-10-07
++
++### Agent measurement of the docs slice (2026-10-22)
++
++The docs slice is already delivered and pinned: `plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs` has 15 cases
++(10 pass, 0 fail, 5 skipped). The maintained runner-support doc states that Desktop WSL sessions carry no pipeline protection and are not
++for governed repositories, that PO and signing commands run in the integrated or an external terminal, that the Desktop surface is
++unverified and names this item, and that Desktop loads no PowerShell profiles; four RED cases mutate that text and are detected. The four
++live-host checks (bootstrap line, guard denial with plugin-supplied hooks, background Goldfish, statusLine identity) are skipped as
++`native: pending` and need the real Desktop app. This item stays open for that host verification only.
+diff --git a/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md b/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md
+index 1b1d78f00..099c4ebeb 100644
+--- a/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md
++++ b/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md
+@@ -37,7 +37,23 @@ Owner: pipeline; due 2026-10-31.
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:** needs-verification.
++- **Decision:** needs-verification (2026-10-08); premise refuted on verification (2026-10-22), disposition below.
+ - **Rationale:** decision AO: automatable admin step.
+ - **Assignment (if accepted):** post-0.7.0 automation lane unless pulled in.
+ - **Date:** 2026-10-08
++
++## Verification of the premise (agent, 2026-10-22)
++
++Premise refuted on two independent grounds, pinned in `plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs`:
++
++1. The script is not a host setup step. `codex-design-readiness-bootstrap.mjs` is a per-design-package readiness producer: its
++   usage needs `--repo-root`, `--dispatch-id`, `--queue-revision`, `--session-id`, `--expected-descriptor-sha256`, `--receipt`,
++   five `--source` entries and an advisor preparation. A fresh host has none of these, so there is no fresh-host action to fold it into.
++2. ADR-0085 retired the design course behaviorally. `runCodexDesignReadinessBootstrap` returns `DESIGN-COURSE-RETIRED` before
++   parsing, state access, dispatch or publication, and `runDesignCourseV2` returns the same retirement. Nothing runs, so nothing
++   needs automating.
++
++The deferral pin is retargeted to this state (it still fails if the preflight starts naming the script). Recommended disposition for the
++Elephant triage: close as obsolete (premise refuted, route retired). The inventory row `docs/admin-steps-inventory.md` line 54 and
++candidate 6 still describe the step as automatable and are stale; correcting them was left to the triage because the inventory
++carries row counts.
+diff --git a/backlog/items/2026-10-22-project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry.md b/backlog/items/2026-10-22-project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry.md
+index 4e8efe72e..d28331172 100644
+--- a/backlog/items/2026-10-22-project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry.md
++++ b/backlog/items/2026-10-22-project-uninstall-refuses-a-tracked-relative-antigravity-registry-entry.md
+@@ -34,3 +34,13 @@ relative entry, which is why the suites are green.
+ - Whether the real Antigravity host resolves a relative `entries[].path` against the
+   workspace is verified on a native host; until then the installer behavior is marked
+   unverified.
++
++## Triage
++
++- **Agent work (2026-10-22):** implemented. `observeAntigravityWorkspaceBindings` takes `trackedRelative`
++  (uninstall callers only): a repo-relative entry that resolves strictly inside the workspace to a readable plugin
++  directory is classified by its manifest name like an absolute one; a relative entry that resolves elsewhere or is
++  unreadable stays unavailable, and `PU-WORKSPACE-UNVERIFIABLE` now carries a typed `instructions` repair. The refresh
++  paths keep their rule (a tracked entry is never owned or removed). RED-first pins: `UC02C018` to `UC02C020` in
++  `plugins/pipeline-core/lib/project-uninstall.test.mjs` (the plan refused with `PU-WORKSPACE-UNVERIFIABLE` before the
++  change). The native-host check of the relative `entries[].path` resolution stays open and is not an agent task.
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+index 346c8dc06..a83b66e0f 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+@@ -95,11 +95,12 @@ export function observeAntigravityLoadedTopologyWithWiring(args){
+  try{const observation=observeAntigravityPluginTopology({configRoot:args.configRoot,workspaceRoot:args.workspaceRoot,approvedSourceRoot:result.sourcePluginRoot});const plans=wiring(observation,args.configRoot,args.workspaceRoot);return Object.freeze({...result,status:result.status==='current'&&plans.some(p=>p.changes>0)?'refresh-required':result.status,wiringStatus:plans.some(p=>p.changes>0)?'stale-owned':'current-or-foreign'});}
+  catch(e){return Object.freeze({...result,status:'unavailable',reason:/^ATR-[A-Z-]+$/.test(e?.message)?e.message:'ATR-WIRING-OWNERSHIP-UNVERIFIABLE',wiringStatus:'unverifiable'});}
+ }
+-export function observeAntigravityWorkspaceBindings({workspaceRoot}){
++// `trackedRelative` (uninstall only): a tracked, path-free (repo-relative) entry is resolved against the workspace, must lie strictly inside it, and is then classified by its manifest name like an absolute one. Without the flag a relative entry stays unavailable (the refresh paths never own or remove a tracked entry). A relative entry that resolves elsewhere or cannot be read stays unavailable.
++export function observeAntigravityWorkspaceBindings({workspaceRoot,trackedRelative=false}){
+  const path=join(workspaceRoot,'.agents','plugins.json');
+  try{directory(workspaceRoot);const f=read(path);if(f.status==='absent')return {schema:'pipeline.antigravity-workspace-bindings.v1',status:'absent',path,sha256:null,ownedIndexes:[],foreignIndexes:[]};
+   if(!Array.isArray(f.value?.entries)||f.value.entries.length>128)throw Error('ATR-REGISTRY');const ownedIndexes=[],foreignIndexes=[];
+-  f.value.entries.forEach((entry,index)=>{if(typeof entry?.path!=='string')throw Error('ATR-REGISTRY');directory(entry.path);const manifest=read(join(entry.path,'plugin.json'));if(manifest.status!=='observed'||typeof manifest.value?.name!=='string')throw Error('ATR-REGISTRY');(manifest.value.name===NAME?ownedIndexes:foreignIndexes).push(index);});
++  f.value.entries.forEach((entry,index)=>{if(typeof entry?.path!=='string')throw Error('ATR-REGISTRY');let target=entry.path;if(trackedRelative&&!isAbsolute(target)){target=resolve(workspaceRoot,target);if(within(workspaceRoot,target)===null)throw Error('ATR-REGISTRY');}directory(target);const manifest=read(join(target,'plugin.json'));if(manifest.status!=='observed'||typeof manifest.value?.name!=='string')throw Error('ATR-REGISTRY');(manifest.value.name===NAME?ownedIndexes:foreignIndexes).push(index);});
+   return {schema:'pipeline.antigravity-workspace-bindings.v1',status:'observed',path,sha256:f.sha256,ownedIndexes,foreignIndexes};
+  }catch{return {schema:'pipeline.antigravity-workspace-bindings.v1',status:'unavailable',path,sha256:null,ownedIndexes:[],foreignIndexes:[]};}
+ }
+diff --git a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+index 795b4894b..d1c0581ed 100644
+--- a/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs
+@@ -2,12 +2,16 @@
+ // Pin for pipeline.agy-driver-dispatch-and-design-routes-incomplete (AC-108),
+ // slice ALF-C-P20-12B: Antigravity bootstrap lock freshness and per-session isolation.
+ import assert from "node:assert/strict";
+-import { mkdirSync, rmSync, statSync, utimesSync, writeFileSync, existsSync } from "node:fs";
++import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync, existsSync } from "node:fs";
++import { tmpdir } from "node:os";
+ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import test from "node:test";
+ import { spawnSync } from "node:child_process";
+ import { readFileSync } from "node:fs";
++import { evaluateLifecycleReadyGuard } from "../guard/evaluate.mjs";
++import { registeredFunctionalTaskRoutes } from "../model-role-route-source.mjs";
++import { evaluateRoleRoutePreflight } from "../role-route-preflight.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const REPO = resolve(HERE, "../../../..");
+@@ -212,3 +216,90 @@ test("AC-108: the start preflight reports a sandbox-unreachable node with a type
+   assert.equal(unknown.ready, false);
+   assert.equal(observeNodeSandboxProbe({ execPath: "", spawn: () => ok }).status, "unknown");
+ });
++
++// ---------------------------------------------------------------------------
++// Added 0.7.0 acceptance (2026-10-22 measurement): the main agent can update the calibrated handover
++// (docs/state.md) through an admitted route in every phase, and Critic, Advisor and Verify have an
++// Antigravity route or the recorded self-dispatch fallback.
++// ---------------------------------------------------------------------------
++const ADAPTER = join(REPO, "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs");
++
++/** A governed, high-risk project in a given phase. No dispatch record is open: the EL-01 tripwire's own refusal condition holds. */
++function phaseFixture({ planApproved, phase }) {
++  const root = mkdtempSync(join(tmpdir(), "agy-handover-pin-"));
++  for (const dir of [".claude", "project", ".agent-pipeline", "specs/feat-1", "docs"]) mkdirSync(join(root, dir), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: "test", verify: "node verify.mjs" }));
++  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
++    schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z",
++  }));
++  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
++    schema: "pipeline.state.v0", planApproved, activeFeature: { id: "feat-1", phase, planPath: "specs/feat-1/prd.md" },
++  }));
++  writeFileSync(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
++  writeFileSync(join(root, "docs", "state.md"), "# State\n");
++  return root;
++}
++function runAdapter(root, toolCall) {
++  const result = spawnSync(process.execPath, [ADAPTER], {
++    cwd: root, env: { ...process.env, CLAUDE_PROJECT_DIR: root }, input: JSON.stringify({ workspacePaths: [root], toolCall }),
++    encoding: "utf8", timeout: 60_000,
++  });
++  if (result.status === 2) return { decision: "deny", reason: String(result.stderr) };
++  assert.equal(result.status, 0, `adapter failed: ${result.stderr}`);
++  return { decision: "allow", reason: "" };
++}
++const handoverWrite = (root) => ({ name: "write_to_file", args: { TargetFile: join(root, "docs", "state.md"), CodeContent: "# State\nupdated\n" } });
++const codeWrite = (root) => ({ name: "write_to_file", args: { TargetFile: join(root, "src", "code.js"), CodeContent: "const a = 1;" } });
++
++for (const [name, fixture] of [["design phase before plan approval", { planApproved: false, phase: "design" }], ["implementation phase", { planApproved: true, phase: "implementation" }]]) {
++  test(`AC-108: ${name}: the only guard that can still refuse a docs/state.md write through the Antigravity adapter is lifecycle readiness (EL-01 and the dev-plan gate exempt docs/)`, () => {
++    const root = phaseFixture(fixture);
++    try {
++      const handover = runAdapter(root, handoverWrite(root));
++      assert.doesNotMatch(handover.reason, /guard-el01-tripwire|guard-devplan|guard-handover-size|guard-testpath|guard-gate-strength/u, handover.reason);
++      // Control: the same fixture refuses a production-code write for the EL-01 tripwire's own reason, so the exemption is what lets the handover through.
++      const code = runAdapter(root, codeWrite(root));
++      assert.equal(code.decision, "deny");
++      assert.match(code.reason, /guard-el01-tripwire|guard-devplan/u, code.reason);
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  });
++}
++
++test("AC-108: with project readiness satisfied the lifecycle guard admits the handover write for the antigravity runner whatever the feature phase", () => {
++  const ready = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
++  for (const [name, fixture] of [["design", { planApproved: false, phase: "design" }], ["implementation", { planApproved: true, phase: "implementation" }]]) {
++    const root = phaseFixture(fixture);
++    try {
++      for (const tool_name of ["Write", "Edit"]) {
++        const result = evaluateLifecycleReadyGuard({ tool_name, tool_input: { file_path: "docs/state.md" } },
++          { projectDir: root, runner: "antigravity", requireProjectOnboardingReadyFn() { return ready; } });
++        assert.deepEqual(result, { exitCode: 0, stderr: "" }, `${name}/${tool_name}`);
++      }
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  }
++});
++
++test("AC-108: Antigravity has a native route for the implementor and the plan verifier, and every other role resolves to a typed state, never a silent gap", () => {
++  const source = registeredFunctionalTaskRoutes();
++  assert.equal(source.ok, true);
++  const observed = (kind) => ({ kind, evidenceSha256: "a".repeat(64), hookRecordedStart: true, hookRecordedTerminal: true });
++  const roles = ["advisor", "critic", "goldfish.implement", "goldfish.mechanic", "goldfish.deep", "readiness", "plan-verifier"];
++  const result = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: Object.fromEntries(roles.map((role) => [role, observed("native")])) });
++  assert.equal(result.roles["goldfish.implement"].state, "native");
++  assert.equal(result.roles["plan-verifier"].state, "native");
++  for (const role of roles) {
++    assert.ok(["native", "fallback-self-dispatch", "unavailable"].includes(result.roles[role].state), role);
++    assert.match(result.roles[role].reasonCode, /^RRP-/u, role);
++  }
++});
++
++test("AC-108: Critic and Advisor each have an Antigravity route or the recorded self-dispatch fallback", {
++  todo: "BLOCKED-NEEDS-DECISION (measured on this head): with a native host observation for every role, antigravity advisor, critic, readiness and the mechanic/deep implementors still resolve to unavailable with RRP-ROUTE-CELL-UNAVAILABLE (the registry cells are unavailable), and fallback-self-dispatch is legal only for the claude advisor. Registering the cells or admitting a fallback for Antigravity is a route-policy decision, not a code fix.",
++}, () => {
++  const source = registeredFunctionalTaskRoutes();
++  const observed = (kind) => ({ kind, evidenceSha256: "a".repeat(64), hookRecordedStart: true, hookRecordedTerminal: true });
++  const result = evaluateRoleRoutePreflight({ source, runner: "antigravity", hostObservations: { advisor: observed("native"), critic: observed("native") } });
++  for (const role of ["critic", "advisor"]) {
++    assert.ok(["native", "fallback-self-dispatch"].includes(result.roles[role].state), `${role}: ${result.roles[role].state} ${result.roles[role].reasonCode}`);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs b/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs
+index ca663cdc4..a59c6a8ec 100644
+--- a/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs
+@@ -18,12 +18,15 @@
+ // worker's scope, refused (fail closed) when that evidence is missing or
+ // unauthenticated. guard-el01-tripwire.mjs has no carrier input and no
+ // worker-scope input, so none of those three clauses can be exercised here.
+-// OPEN PO DECISION (R2.md line 14): whether the criterion is accepted on a
+-// documented carrier-unavailable disposition or held until native carrier
+-// evidence exists. Owner: Coordinator. Due: 2026-10-19 (specs/sprint-alfred-epic/spec.md, unresolved-originals disposition). Until that decision
+-// lands, whether the Antigravity adapter must fail closed without an
+-// authenticated role carrier is undecided and no production behaviour is
+-// pinned for it.
++// DISPOSITION (the question of R2.md line 14 is decided): Elephant decision E6
++// (plans/elephant-decisions-2026-10-19.md) accepts the criterion on a documented
++// "carrier unavailable" disposition, and PO decision D63 (plans/po-decisions-2026-10-18.md,
++// 2026-10-20) closes AC-109 as not reconstructable. Antigravity provides no authenticated
++// per-call carrier today, so no carrier or worker-scope behaviour is pinned here and none is
++// owed. MEASURED AGAINST E6's rationale ("the fail-closed refusal is already the safe
++// state"): that holds for the three cases below only; the tripwire still exits 0 in the
++// fail-open conditions listed next, so authorization is NOT never-inferred on this head.
++// That gap is recorded here, not pinned as a refusal.
+ //
+ // FAIL-OPEN CONDITIONS of hooks/guard-el01-tripwire.mjs (the tripwire exits 0
+ // and therefore allows the write; none of these is pinned as a refusal). This
+diff --git a/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs b/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs
+index 456520ff8..520bfeada 100644
+--- a/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-greenfield-seeds-unselected-codex-targets.test.mjs
+@@ -5,15 +5,22 @@
+ // Codex/Claude runtime targets; a later migration reports no false drift for
+ // .codex targets, and an explicit Codex selection is what makes them appear.
+ //
+-// Plan-only: no apply/activate and no child process. The git probe is answered
+-// by an in-process fake (the fakeDeps pattern of project-onboarding-v3.test.mjs).
++// (a)-(d) are plan-only: no apply/activate and no child process. The git probe is
++// answered by an in-process fake (the fakeDeps pattern of project-onboarding-v3.test.mjs).
++// (e)-(g) are REAL applies on a disposable root under scratch/: the portable seed and
++// the runtime initialization are applied through the lifecycle the product ships, the
++// files that exist on disk afterwards are listed, and a later multi-runner activation
++// is applied and read back (the shared fakeDeps of project-onboarding-v3.test.mjs
++// answers only the machine facts: git version, Codex capability, machine plane).
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { test } from "node:test";
+ import { fileURLToPath } from "node:url";
+-import { planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
++import { readRestartBarrier } from "../codex-onboarding-runtime.mjs";
++import { applyProjectOnboardingLifecycleV4, applyProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
++import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
+ import { planRunnerProfileMigrationV3 } from "../runner-profile-migration-v3.mjs";
+ import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "../runner-profiles-v3.mjs";
+ import { loadRuntimeProjectionV3OwnedKeys } from "../runtime-projection-v3.mjs";
+@@ -203,3 +210,73 @@ test("(d) the same root with Codex baselines present and only Claude selected st
+     assert.ok(["ready", "noop"].includes(plan.status), `${plan.status} ${JSON.stringify(plan.diagnostics)}`);
+   } finally { dispose(root); }
+ });
++
++// Real apply: the portable seed, then the runtime initialization, exactly as the shipped lifecycle runs them.
++function appliedProject(runner) {
++  const root = freshRoot(`apply-${runner}`);
++  const portable = planProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner });
++  assert.equal(portable.status, "ready", JSON.stringify(portable.diagnostics));
++  assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true, deps: machineDeps }).status, "applied");
++  return { root, runtimeResult: applyRuntime(root, runner) };
++}
++function applyRuntime(root, runner) {
++  const runtime = planProjectOnboardingLifecycleV4({ rootDir: root, deps: machineDeps, operation: "runtime", runner });
++  assert.equal(runtime.status, "runtime-initialization-required", JSON.stringify(runtime.diagnostics));
++  const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
++  assert.match(digest, /^[a-f0-9]{64}$/u);
++  return applyProjectOnboardingLifecycleV4({ rootDir: root, deps: machineDeps, operation: "runtime", planSha256: digest, activate: true, runner });
++}
++// Every file on disk below the root as a repo-relative path with its bytes; the Git control directory is excluded.
++function filesOf(root, prefix = "") {
++  const found = {};
++  for (const entry of readdirSync(join(root, prefix), { withFileTypes: true })) {
++    if (entry.name === ".git") continue;
++    const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
++    if (entry.isDirectory()) Object.assign(found, filesOf(root, relative));
++    else found[relative] = readFileSync(join(root, relative), "utf8");
++  }
++  return found;
++}
++const noCodexOnDisk = (files) => assert.deepEqual(Object.keys(files).filter((path) => path === ".codex" || isCodexPath(path)), [], "no native Codex file exists");
++const enabledBlock = (runners) => `runners:\n  default: "${runners[0]}"\n  enabled:\n${runners.map((name) => `    - "${name}"\n`).join("")}schema:`;
++
++for (const runner of ["claude", "antigravity"]) {
++  test(`(e) real apply: a ${runner}-only project gets no .codex file and no Codex restart barrier, and its readback is clean`, () => {
++    const { root, runtimeResult } = appliedProject(runner);
++    try {
++      assert.equal(runtimeResult.status, "intake-required", JSON.stringify(runtimeResult.diagnostics));
++      const files = filesOf(root);
++      noCodexOnDisk(files);
++      assert.ok(files[".claude/settings.json"] !== undefined && files["pipeline.user.yaml"] !== undefined, "the shared tier was really applied (the listing is not vacuous)");
++      assert.ok(files["pipeline.user.yaml"].includes(enabledBlock([runner])), `exactly [${runner}] is enabled on disk`);
++      assert.equal(readRestartBarrier({ rootDir: root }).status, "absent", "no Codex restart barrier is published for an unselected Codex");
++      const readback = planRunnerProfileMigrationV3({ rootDir: root });
++      assert.equal(readback.status, "noop", JSON.stringify(readback.diagnostics));
++      assert.deepEqual(codexPathsOf(readback), []);
++    } finally { dispose(root); }
++  });
++}
++
++test("(f) real apply: enabling Codex later plans only the .codex creations, applies them, and reports no drift on the Claude tier", () => {
++  const { root } = appliedProject("claude");
++  try {
++    const before = filesOf(root);
++    noCodexOnDisk(before);
++    const yamlPath = join(root, "pipeline.user.yaml");
++    assert.ok(before["pipeline.user.yaml"].includes(enabledBlock(["claude"])));
++    writeFileSync(yamlPath, before["pipeline.user.yaml"].replace(enabledBlock(["claude"]), enabledBlock(["claude", "codex"])));
++    const plan = planRunnerProfileMigrationV3({ rootDir: root, deps: machineDeps, initializeMissingRuntimeForSlimV3: true, overlayCalibration: false });
++    assert.equal(plan.status, "ready", JSON.stringify(plan.diagnostics));
++    const changed = plan.targets.filter((target) => target.changed).map((target) => target.path).sort();
++    assert.ok(changed.length > 0 && changed.every(isCodexPath), `only .codex targets change: ${changed.join(",")}`);
++    assert.deepEqual(plan.targets.filter((target) => !isCodexPath(target.path) && target.changed), [], "no Claude/shared target is reported as drift");
++    const applied = applyRuntime(root, "claude");
++    assert.equal(applied.status, "intake-required", JSON.stringify(applied.diagnostics));
++    const after = filesOf(root);
++    assert.deepEqual(Object.keys(after).filter((path) => !(path in before)).sort(), changed, "the new files are exactly the planned .codex targets");
++    assert.deepEqual(Object.keys(before).filter((path) => before[path] !== after[path]), ["pipeline.user.yaml"], "every earlier file is byte-identical except the one selection edit");
++    assert.throws(() => noCodexOnDisk(after), /no native Codex file exists/u, "the no-.codex check fails once Codex is enabled");
++    const readback = planRunnerProfileMigrationV3({ rootDir: root, deps: machineDeps });
++    assert.equal(readback.status, "noop", `a settled multi-runner project reports no drift: ${JSON.stringify(readback.diagnostics)}`);
++  } finally { dispose(root); }
++});
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+index ffc513900..f825032ce 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+@@ -31,7 +31,10 @@
+ //         Typed gaps (no fake record is written for any of them):
+ //         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): open, owner Coordinator, due 2026-10-31
+ //         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no admission point: open, owner Coordinator, due 2026-10-31
+-//         V-10 Codex/Antigravity runner registration of guard-dispatch (outside this repository scope: hooks.json matches Task|Agent|Workflow only): open, owner Coordinator, due 2026-10-31
++//         (The former gap "Codex/Antigravity runner registration of guard-dispatch" is closed at this head and is pinned by the
++//         source-scan case "V-10 runner registration": hooks/codex-hooks.json registers guard-dispatch.mjs on the spawn_agent
++//         matcher, and hooks/antigravity-pretool-guard.mjs runs it for every Task/Agent entry, once per Subagents array element.
++//         That case reads the shipped files; it does not prove a live Codex or Antigravity host fires the hook.)
+ //         V-10 role-dispatch-preflight records the direct transport only; the other transports are recorded by the guard,
+ //         because a Workflow digest is taken over the script literal the guard extracts, not over packet.prompt: by design
+ //         The caller set below is pinned by a source scan; when a caller is added or removed this header must be
+@@ -770,4 +773,32 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
+   });
+ });
+ 
++describe("V-10 runner registration: the shipped Codex and Antigravity routes reach guard-dispatch", () => {
++  const dispatchCommands = (manifest, matcher) => (manifest.hooks?.PreToolUse ?? [])
++    .filter((entry) => entry.matcher === matcher)
++    .flatMap((entry) => entry.hooks ?? [])
++    .map((hook) => `${hook.command ?? ""} ${hook.commandWindows ?? ""}`);
++
++  test("V-10 runner registration: codex-hooks.json runs guard-dispatch.mjs on spawn_agent and the Antigravity adapter runs it for Task and Agent per Subagents element", () => {
++    const codex = JSON.parse(readFileSync(join(PLUGIN_ROOT, "hooks", "codex-hooks.json"), "utf8"));
++    const commands = dispatchCommands(codex, "spawn_agent");
++    assert.ok(commands.length > 0, "codex-hooks.json has no spawn_agent PreToolUse entry");
++    assert.ok(commands.every((c) => /hooks\/guard-dispatch\.mjs/u.test(c)), `spawn_agent must run guard-dispatch.mjs: ${JSON.stringify(commands)}`);
++    const adapter = stripComments(readFileSync(join(PLUGIN_ROOT, "hooks", "antigravity-pretool-guard.mjs"), "utf8"));
++    assert.match(adapter, /toolName === "Task" \|\| toolName === "Agent"\s*\?\s*\["guard-dispatch\.mjs"\]/u);
++    assert.match(adapter, /guardName === "guard-dispatch\.mjs" && multiSubagentDispatch/u);
++  });
++
++  test("V-10 runner registration RED proof: a manifest without the spawn_agent entry, or one that runs another script there, fails the same check", () => {
++    const check = (manifest) => {
++      const commands = dispatchCommands(manifest, "spawn_agent");
++      assert.ok(commands.length > 0);
++      assert.ok(commands.every((c) => /hooks\/guard-dispatch\.mjs/u.test(c)));
++    };
++    assert.throws(() => check({ hooks: { PreToolUse: [] } }));
++    assert.throws(() => check({ hooks: { PreToolUse: [{ matcher: "spawn_agent", hooks: [{ command: "node hooks/codex-slicing-hint.mjs" }] }] } }));
++    check({ hooks: { PreToolUse: [{ matcher: "spawn_agent", hooks: [{ command: "node hooks/guard-dispatch.mjs" }] }] } });
++  });
++});
++
+ test("two-approval happy path to implementation and push", { skip: "native: pending (live interactive Claude/Windows session)" }, () => {});
+diff --git a/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs b/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
+index 59a63a528..00012deb3 100644
+--- a/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
++++ b/plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
+@@ -3,16 +3,22 @@
+ //
+ // The original item is deliberately conditional: "After verifying the premise, include the design-readiness
+ // bootstrap in the fresh-host typed action." The premise (a PO hand-runs the Codex design-readiness bootstrap on
+-// fresh hosts, as recurring toil) is recorded as UNVERIFIED with no toil row. The qualified state is therefore
+-// "defer retained": the existing script and its typed producer route exist, and the fresh-host bootstrap typed
+-// next action does NOT yet fold the script in. These cases pin that state through the real modules. A case in
+-// the "deferral" group going RED means someone folded the script into the bootstrap action: retarget this pin to
+-// the new acceptance (and bind the toil record) rather than deleting it.
++// fresh hosts, as recurring toil) was UNVERIFIED with no toil row. It was verified on 2026-10-22 and is REFUTED
++// on two independent grounds, both pinned below through the real modules:
++//   1. The script is not a host setup step. It is a per-design-package readiness producer: its argument contract
++//      needs five committed package sources, a receipt path, an advisor preparation, a dispatch id and a session
++//      descriptor (the usage string and the typed producer action), none of which exist on a fresh host.
++//   2. ADR-0085 retired the design course behaviorally: `runCodexDesignReadinessBootstrap` returns
++//      DESIGN-COURSE-RETIRED before parsing, state access, dispatch or publication. There is nothing to fold in.
++// The fresh-host bootstrap typed next action therefore does not name the script, and must not. A case in the
++// last group going RED means someone folded the script into the bootstrap action: that contradicts both
++// grounds, so re-open the item with a new premise (and bind a toil record) rather than deleting this pin.
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { DESIGN_COURSE_RETIRED, retiredDesignResult } from "../retired-design-codes.mjs";
+ 
+ const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+ const REPO_ROOT = resolve(PLUGIN_ROOT, "..", "..");
+@@ -33,11 +39,13 @@ function sourcesMentioning(dir, needle, base = dir, out = []) {
+   return out.sort();
+ }
+ 
+-test("premise is recorded as unverified: item and inventory name no recurring-toil evidence", () => {
++test("premise is recorded as refuted: the item names the two grounds and the inventory names no recurring-toil evidence", () => {
+   const item = read("backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md");
+   assert.match(item, /After verifying the premise, include the design-readiness\s+bootstrap in the fresh-host typed action/u);
+-  assert.match(item, /not evidenced\s+as recurring toil/u);
+   assert.match(item, /None measured: no toil row exists/u);
++  assert.match(item, /premise refuted/iu);
++  assert.match(item, /per-design-package/u);
++  assert.match(item, /DESIGN-COURSE-RETIRED/u);
+   const inventory = read("docs/admin-steps-inventory.md");
+   const row = inventory.split("\n").find((line) => line.includes("Run Codex design-readiness bootstrap script on a fresh host"));
+   assert.ok(row, "inventory row exists");
+@@ -61,6 +69,23 @@ test("the existing script is present and exports its entry point", async () => {
+   assert.equal(typeof mod.runCodexDesignReadinessBootstrap, "function");
+ });
+ 
++test("ground 2: the script is retired (ADR-0085) and answers before parsing, even with no arguments", async () => {
++  const mod = await import(new URL(`file:///${join(PLUGIN_ROOT, "scripts", SCRIPT).split(sep).join("/")}`));
++  const retired = await mod.runCodexDesignReadinessBootstrap([]);
++  assert.deepEqual(retired, retiredDesignResult(DESIGN_COURSE_RETIRED));
++  assert.equal(retired.ok, false);
++  assert.equal(retired.implementationAuthority, false);
++});
++
++test("ground 1: the script's argument contract is per design package, nothing a fresh host has", () => {
++  const source = read(`plugins/pipeline-core/scripts/${SCRIPT}`);
++  const usage = /const USAGE = "([^"]+)"/u.exec(source)?.[1] ?? "";
++  for (const required of ["--repo-root", "--dispatch-id", "--session-id", "--expected-descriptor-sha256", "--receipt", "--source"]) {
++    assert.ok(usage.includes(required), `the usage requires ${required}`);
++  }
++  assert.ok(usage.includes("--advisor-preparation"), "the readiness binds an already-authored advisor preparation");
++});
++
+ test("existing typed producer route: codex readiness resolves to the Codex bootstrap as a confirmed, non-shell action", async () => {
+   const { buildDesignCourseProducerAction } = await import("../../scripts/design-course-session.mjs");
+   mkdirSync(SCRATCH, { recursive: true });
+@@ -94,7 +119,7 @@ test("existing typed producer route: codex readiness resolves to the Codex boots
+   }
+ });
+ 
+-test("deferral: the fresh-host bootstrap typed next action does not yet fold in the Codex bootstrap", () => {
++test("refuted premise: the fresh-host bootstrap typed next action does not fold in the Codex bootstrap", () => {
+   const mentions = sourcesMentioning(PLUGIN_ROOT, SCRIPT);
+   assert.deepEqual(mentions, [
+     "lib/guard-maintenance-window.mjs",
+@@ -102,7 +127,7 @@ test("deferral: the fresh-host bootstrap typed next action does not yet fold in
+     "scripts/design-course-session.mjs",
+   ], "only the script itself, its design-course producer route and the maintenance-window allowlist may name it");
+   const preflight = readFileSync(join(PLUGIN_ROOT, "scripts", "pipeline-start-preflight.mjs"), "utf8");
+-  assert.ok(!preflight.includes(SCRIPT), "the preflight typed next action must not name the Codex bootstrap while the item is deferred");
++  assert.ok(!preflight.includes(SCRIPT), "the preflight typed next action must not name the retired, per-package Codex bootstrap");
+ });
+ 
+ test("detector self-check: the deferral scan reports a planted mention (the pin can fail)", () => {
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index f6097fa5d..c1ab22552 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -11,21 +11,36 @@
+  * `pipeline-state.mjs --help` output, so a newly added approval-bearing verb that
+  * nobody classified fails here. The per-runner end-to-end proof is host evidence
+  * (E) and stays a typed skip.
++ *
++ * The same file also carries the item's added 0.7.0 acceptance (2026-10-17 P0-1, 2026-10-20 D64), each case
++ * driving the real module: the typed absent course, the German-table criterion scan, the `.test.js` check
++ * admission, the plan-readiness hand-off inspection, and the onboarding answers held in one intake record
++ * across a real restart. Two acceptance points are not met on this head and are typed `todo` cases that flip
++ * to passing when delivered: the submit-plan/present-plan call sites of the hand-off inspection (protected
++ * file, patch three-runner-patch-01) and the Git author no longer asked once the intake record holds it.
+  */
+ import assert from "node:assert/strict";
+ import { after, test } from "node:test";
+ import { createHash, generateKeyPairSync } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { devNull } from "node:os";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+-import { fileURLToPath } from "node:url";
++import { fileURLToPath, pathToFileURL } from "node:url";
+ 
+ import { readState, run } from "../../scripts/pipeline-state.mjs";
+ import { compactSigningDisclosure, runHumanApproval, spawnOpenssl } from "../../scripts/po-human-approval.mjs";
+ import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
+ import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
+ import { createGovernanceScopeController } from "../governance-scope.mjs";
+-import { applyOnboardingIntakeConsent } from "../onboarding-continuity.mjs";
++import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "../onboarding-continuity.mjs";
++import { scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
++import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
++import { resolveGovernedItemQueue } from "../native-goldfish-host-state.mjs";
++import { inspectPlanDeliveryHandoff } from "../plan-handoff-readiness.mjs";
++import { applyProjectOnboardingV3, inspectProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
++import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
++import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
+ import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
+ import * as po from "../po-gate-authority.mjs";
+ import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
+@@ -322,6 +337,159 @@ test("RED mirror: the bare --intent-sha256 form (no resolvable request) disclose
+   assert.match(fallback, /guard-lift\/guard-override authorization/u);
+ });
+ 
++// ---------------------------------------------------------------------------------------------------------------------
++// Added 0.7.0 acceptance of the item (observed 2026-10-17 P0-1 and 2026-10-20 D64): a typed absent-course result with a
++// repair, a course writer that binds a German-table Spec and `.test.js` checks without reformatting the signed bytes,
++// the delivery hand-off proven at plan readiness, and onboarding answers that survive the restart. Each case drives the
++// real module on a disposable root under scratch/. A case whose acceptance is not met on this head is a `todo` that names
++// the missing piece and flips to a normal passing case once it is delivered; nothing here is a silent skip.
++// ---------------------------------------------------------------------------------------------------------------------
++const GERMAN_TABLE = [
++  "| Nr. | Kriterium |", "| --- | --- |",
++  "| 1 | Das System speichert jede Bestellung mit Zeitstempel. |",
++  "| R-2 | Das System zeigt den Warenkorb mit allen gewählten Produkten an. |",
++];
++const germanSpec = (...extra) => ["# Spezifikation Bestell-App", "", "## Abnahmekriterien", "", ...GERMAN_TABLE, "", ...extra, ""].join("\n");
++const hex = (bytes) => createHash("sha256").update(bytes).digest("hex");
++const acceptanceRoots = [];
++after(() => { for (const path of acceptanceRoots) rmSync(path, { recursive: true, force: true, maxRetries: 3 }); });
++
++/** A disposable Git root under the repository's fixture parent (the authority walk refuses a group-writable ancestor such as /tmp). */
++function gitRoot(label) {
++  const root = mkdtempSync(join(nativeContractFixtureParent(), `tri-${label}-`));
++  acceptanceRoots.push(root);
++  const config = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", `core.hooksPath=${devNull}`, "-c", "commit.gpgsign=false"];
++  for (const args of [["init", "-q", root], ["-C", root, ...config, "commit", "--allow-empty", "-q", "-m", "fixture"]]) {
++    const out = spawnSync("git", args, { encoding: "utf8" });
++    assert.equal(out.status, 0, `SETUP git ${args[0]}: ${out.stderr}`);
++  }
++  return root;
++}
++function enroll(root) {
++  const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
++  const decision = controller.planDecision({ rootDir: root, decision: "enroll", by: "tri-acceptance-fixture" });
++  assert.equal(controller.applyDecision(decision, { activate: true, planSha256: decision.planSha256 }).state, "active", "SETUP governance enrollment");
++}
++function writeIn(root, path, text) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); }
++
++test("AC-264 added (P0-1): an approved feature without a delivery course reports a typed absent course with a repair, and an unsafe course file still fails closed", () => {
++  const root = gitRoot("absent");
++  enroll(root);
++  writeIn(root, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\n");
++  writeIn(root, ".claude/pipeline-state.json", JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "unit", planPath: "specs/unit/plan.md", phase: "implementation" }, planApproved: true }));
++  mkdirSync(join(root, "specs/unit"), { recursive: true });
++  const absent = resolveGovernedItemQueue({ root });
++  assert.equal(absent.status, "refused");
++  assert.equal(absent.code, "SQ-DELIVERY-COURSE-ABSENT");
++  assert.notEqual(absent.code, "SQ-DELIVERY-STATE-UNAVAILABLE", "the absent course is not reported as the generic unavailable state");
++  assert.match(absent.repair, /slice-queue\.json/u);
++  assert.match(absent.repair, /prepareGovernedItemQueue/u, "the repair names the governed course writer");
++  symlinkSync(join(root, "nowhere.json"), join(root, "specs/unit/slice-queue.json"));
++  assert.equal(resolveGovernedItemQueue({ root }).code, "SQ-DELIVERY-STATE-UNAVAILABLE", "only a missing file is an absent course");
++});
++
++test("AC-264 added (P0-1): the criterion scan binds numbered and R-n rows of a German table under a non-English heading and leaves the Spec bytes alone", () => {
++  const text = germanSpec();
++  const bytes = Buffer.from(text);
++  const rows = scanAcceptedCriterionRows(text);
++  assert.deepEqual(rows.map((row) => [row.id, row.normative]), [["AC-1", true], ["AC-2", true]]);
++  assert.match(bytes.subarray(rows[0].startByte, rows[0].endByte).toString("utf8"), /Das System speichert jede Bestellung mit Zeitstempel\./u);
++  assert.match(bytes.subarray(rows[1].startByte, rows[1].endByte).toString("utf8"), /Warenkorb/u);
++  assert.equal(Buffer.from(text).equals(bytes), true, "the scan reads the bytes; it never rewrites them");
++  assert.deepEqual(scanAcceptedCriterionRows(text.replace("## Abnahmekriterien", "## Beispiele")).filter((row) => row.normative === true), [],
++    "RED mirror: the same table under a non-acceptance heading binds nothing");
++});
++
++test("AC-264 added (P0-1): the item delivery briefing admits the project's own .test.js check files and refuses other suffixes and shapes", () => {
++  const text = germanSpec();
++  const bytes = Buffer.from(text);
++  const [row] = scanAcceptedCriterionRows(text);
++  const locator = { schema: "pipeline.critic-criterion-locator.v1", sourcePath: "specs/orders/spec.md", sourceSha256: hex(bytes), criterionId: row.id,
++    startByte: row.startByte, endByte: row.endByte, excerptSha256: hex(bytes.subarray(row.startByte, row.endByte)) };
++  const briefing = (path) => ({ schema: "pipeline.item-delivery-briefing.v1", sliceId: "slice-1", itemId: "item-1", criterionLocator: locator,
++    checks: [{ id: "check-1", path, dependencies: [path] }] });
++  for (const path of ["tests/orders.test.js", "tests/orders.test.mjs", "tests/orders.test.cjs"]) assert.equal(validateItemDeliveryBriefing(briefing(path)).ok, true, path);
++  for (const path of ["tests/orders.spec.js", "tests/orders.test.ts", "../orders.test.js", "/abs/orders.test.js"]) assert.equal(validateItemDeliveryBriefing(briefing(path)).ok, false, path);
++});
++
++test("AC-264 added (P0-1): plan readiness proves the delivery hand-off from the Spec bytes: a German table with .test.js checks is ready, a Spec without a criterion row is refused before approval", () => {
++  const root = gitRoot("handoff");
++  enroll(root);
++  writeIn(root, "specs/orders/spec.md", germanSpec("## Prüfungen", "", "- tests/orders.test.js (vorhanden)", "- tests/neu.test.js (noch nicht vorhanden)"));
++  writeIn(root, "tests/orders.test.js", "// present\n");
++  const ready = inspectPlanDeliveryHandoff({ rootDir: root, specPath: "specs/orders/spec.md", expectedSpecSha256: hex(readFileSync(join(root, "specs/orders/spec.md"))) });
++  assert.equal(ready.ok, true, JSON.stringify(ready));
++  assert.equal(ready.code, "PLR-HANDOFF-READY");
++  assert.deepEqual(ready.admittedCriteria, ["AC-1", "AC-2"]);
++  assert.deepEqual(ready.checks, [{ path: "tests/neu.test.js", state: "absent" }, { path: "tests/orders.test.js", state: "present" }]);
++  writeIn(root, "specs/empty/spec.md", "# Spezifikation\n\nKeine Kriterien hier.\n");
++  const refused = inspectPlanDeliveryHandoff({ rootDir: root, specPath: "specs/empty/spec.md", expectedSpecSha256: hex(readFileSync(join(root, "specs/empty/spec.md"))) });
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "PLR-HANDOFF-NO-CRITERION");
++});
++
++/** The body of one `case "<verb>": { ... }` handler of the lifecycle CLI, up to the next top-level case label. */
++function lifecycleHandler(source, verb) {
++  const start = source.indexOf(`    case "${verb}": {`);
++  if (start < 0) return "";
++  const next = source.indexOf('\n    case "', start + 10);
++  return source.slice(start, next < 0 ? source.length : next);
++}
++const pipelineStateSource = readFileSync(join(PLUGIN, "scripts", "pipeline-state.mjs"), "utf8");
++const handoffWired = ["submit-plan", "present-plan"].every((verb) => lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"));
++test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", {
++  todo: handoffWired ? false : "PATCH-FOR-OPERATOR: scripts/pipeline-state.mjs is protected; the call sites are in the patch file three-runner-patch-01.json. lib/plan-handoff-readiness.mjs is delivered and covered above but has no caller.",
++}, () => {
++  for (const verb of ["submit-plan", "present-plan"]) {
++    assert.ok(lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
++  }
++  assert.equal(lifecycleHandler(pipelineStateSource, "approve-plan").includes("inspectPlanDeliveryHandoff"), false, "never at approval: a refusal there would burn the signature");
++});
++
++/** A fresh Codex onboarding root through the real portable apply (the shared fakeDeps answers only the machine facts). */
++function codexOnboardedRoot() {
++  const scratch = join(DESIGN_REPO_ROOT, "scratch");
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "tri-intake-"));
++  acceptanceRoots.push(root);
++  const portable = planProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });
++  assert.equal(portable.status, "ready", JSON.stringify(portable.diagnostics));
++  assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true, deps: machineDeps }).status, "applied");
++  return root;
++}
++const intakeAnswers = { gitAuthor: { name: "Test Owner", email: "owner@example.invalid" }, language: "de", profile: "feature" };
++
++test("AC-264 added (D64): the answers live in one typed intake record, the first Codex restart is not offered before it is complete, and a fresh process reads the same record", () => {
++  const root = codexOnboardedRoot();
++  const runtimePlan = () => planProjectOnboardingLifecycleV4({ rootDir: root, deps: machineDeps, operation: "runtime", runner: "codex" });
++  assert.equal(runtimePlan().status, "intake-required", "no restart plan is offered while the intake record is missing");
++  const applied = applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
++  assert.equal(applied.status, "applied");
++  const settled = runtimePlan();
++  assert.equal(settled.status, "runtime-initialization-required", JSON.stringify(settled.diagnostics));
++  assert.equal(settled.runtime.firstRestartIntake.status, "captured", "the restart is offered only once the material is captured and read back");
++  const stored = readOnboardingIntakeCheckpoint({ rootDir: root });
++  assert.equal(stored.status, "present");
++  assert.deepEqual(stored.value.values, intakeAnswers);
++  // A restart is a new process: nothing in this process's memory may be what carries the answers.
++  const reader = pathToFileURL(resolve(PLUGIN, "lib", "onboarding-continuity.mjs")).href;
++  const script = `import { readOnboardingIntakeCheckpoint } from ${JSON.stringify(reader)};const r = readOnboardingIntakeCheckpoint({ rootDir: ${JSON.stringify(root)} });process.stdout.write(JSON.stringify({ status: r.status, values: r.value.values, consent: r.value.consent !== null, material: r.value.materialInput.length }));`;
++  const child = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 60000 });
++  assert.equal(child.status, 0, child.stderr);
++  assert.deepEqual(JSON.parse(child.stdout), { status: "present", values: intakeAnswers, consent: true, material: 1 });
++});
++
++test("AC-264 added (D64): the next session does not ask again for an answer the intake record already holds", {
++  todo: "BLOCKED-NEEDS-DECISION (measured on this head): the intake record keeps the language and the pending-ask computation honours it, but it still publishes gitAuthorName and gitAuthorEmail as pending asks after the record holds the Git author. lib/project-onboarding-v3.mjs sits exactly on its architecture line bound (7807 lines), so a fix there must first move code out of that file.",
++}, () => {
++  const root = codexOnboardedRoot();
++  applyOnboardingIntakeConsent({ rootDir: root, granted: true, ...intakeAnswers, text: "Build a local keyboard game.\n", activate: true });
++  const inspected = inspectProjectOnboardingV3({ rootDir: root, deps: machineDeps, runner: "codex" });
++  const asked = (inspected.nextAction?.pendingAsks ?? []).flatMap((ask) => (ask.inputs ?? []).map((input) => input.name));
++  assert.equal(asked.includes("language"), false, "the language held by the record is not asked again");
++  assert.equal(asked.includes("gitAuthorName") || asked.includes("gitAuthorEmail"), false, `the Git author held by the record is not asked again: ${asked.join(",")}`);
++});
++
+ test("E: per-runner end-to-end greenfield scenario (Claude Windows, Codex, Antigravity) reaches a pushed branch with exactly two PO proofs and zero guard overrides",
+   { skip: "E-HOLD pipeline.three-runner-happy-path-with-two-po-approvals: needs genuine installed host runs per runner (native/installed host evidence); not producible in-repo" },
+   () => {});
+diff --git a/plugins/pipeline-core/lib/project-uninstall-workspace.mjs b/plugins/pipeline-core/lib/project-uninstall-workspace.mjs
+index b1b5a60ed..fd22fd3c8 100644
+--- a/plugins/pipeline-core/lib/project-uninstall-workspace.mjs
++++ b/plugins/pipeline-core/lib/project-uninstall-workspace.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Physically verified workspace ownership; unrelated JSON spans stay exact.
+-import {basename,dirname,isAbsolute,join} from 'node:path';
++import {basename,dirname,isAbsolute,join,resolve} from 'node:path';
+ import {isDeepStrictEqual} from 'node:util';
+ import {readPhysicalFootprint,physicalFootprintPath,footprintSha256,footprintIdentity,footprintFail} from './git-hook-footprint.mjs';
+ import {parseStrictJson} from './governance-event.mjs';
+@@ -14,7 +14,7 @@ export function deriveUninstallWorkspaceFootprint({rootDir,workspace}){
+  function record(path,row,after){observations.push({path,sha256:row.sha256,identity:row.identity});if(after&&!after.equals(row.bytes))actions.push({path,kind:'owned-keys',beforeSha256:row.sha256,beforeIdentity:row.identity,afterBytes:after.toString('utf8'),afterSha256:footprintSha256(after),mode:row.mode});}
+  if(workspace.status==='observed'){
+   const path='.agents/plugins.json',row=readPhysicalFootprint(join(rootDir,path),{max:262144}),value=parseStrictJson(row.bytes);
+-  roots.push(...workspace.ownedIndexes.map(i=>value.entries[i].path));
++  roots.push(...workspace.ownedIndexes.map(i=>isAbsolute(value.entries[i].path)?value.entries[i].path:resolve(rootDir,value.entries[i].path)));
+   // The publisher owns only the original {path} registration element. A
+   // matching manifest does not authorize deleting user-added entry fields.
+   const modified=workspace.ownedIndexes.some(i=>Object.keys(value.entries[i]).length!==1||!Object.hasOwn(value.entries[i],'path'));
+@@ -72,7 +72,7 @@ export function requireUninstallPostconditions(journal,{rootDir,scope,stages=jou
+   }
+   for(const entry of journal.plan.footprint.observations){if(uninstallWorkspacePath(entry)!==(stage==='workspace')||journal.actions.some(a=>a.path===entry.path))continue;if(readPhysicalFootprint(join(rootDir,entry.path))?.sha256!==entry.sha256)footprintFail(stage==='workspace'?'PU-WORKSPACE-DRIFT':'PU-KEY-DRIFT');}
+   if(stage==='workspace'){
+-   const current=observeAntigravityWorkspaceBindings({workspaceRoot:rootDir});if(current.status==='unavailable'||current.ownedIndexes.length)footprintFail('PU-WORKSPACE-DRIFT');
++   const current=observeAntigravityWorkspaceBindings({workspaceRoot:rootDir,trackedRelative:true});if(current.status==='unavailable'||current.ownedIndexes.length)footprintFail('PU-WORKSPACE-DRIFT');
+    const wiring=deriveUninstallWorkspaceFootprint({rootDir,workspace:current});if(wiring.conflicts.length||wiring.actions.length)footprintFail('PU-WORKSPACE-DRIFT');
+   }
+  }
+diff --git a/plugins/pipeline-core/lib/project-uninstall.mjs b/plugins/pipeline-core/lib/project-uninstall.mjs
+index b031f9a1a..8b66b846d 100644
+--- a/plugins/pipeline-core/lib/project-uninstall.mjs
++++ b/plugins/pipeline-core/lib/project-uninstall.mjs
+@@ -68,7 +68,7 @@ export function createProjectUninstallController({hostStateRoot=join(homedir(),'
+  const scope=createGovernanceScopeController({hostStateRoot}),plans=new WeakMap();
+  function derive(rootDir){const observed=scope.observe({rootDir});if(observed.root===null||observed.repositoryKind==='unavailable')footprintFail('PU-ROOT-UNAVAILABLE');const root=observed.root,rootIdentity=footprintIdentity(physicalFootprintPath(root,{directory:true})),git=observed.repositoryKind==='git'?observeGitHookFootprint({rootDir:root}):null;
+   if(git&&git.worktrees.some(path=>path!==root&&scope.observe({rootDir:path}).state!=='declined'))footprintFail('PU-SHARED-ACTIVE-WORKTREE');
+-  const content=deriveContentPreservingPipelineFootprint({rootDir:root}),workspace=observeAntigravityWorkspaceBindings({workspaceRoot:root});if(workspace.status==='unavailable')footprintFail('PU-WORKSPACE-UNVERIFIABLE');const privateArchives=[],conflicts=[...content.conflicts];
++  const content=deriveContentPreservingPipelineFootprint({rootDir:root}),workspace=observeAntigravityWorkspaceBindings({workspaceRoot:root,trackedRelative:true});if(workspace.status==='unavailable')throw Object.assign(new Error('PU-WORKSPACE-UNVERIFIABLE'),{code:'PU-WORKSPACE-UNVERIFIABLE',instructions:{path:'.agents/plugins.json',removed:false,attendedStep:'The repository owner makes every entry of .agents/plugins.json an absolute path or a repo-relative path to a readable plugin directory inside this workspace (one with a plugin.json), or removes the unreadable entry, then re-runs the uninstall.'}});const privateArchives=[],conflicts=[...content.conflicts];
+   const wiring=deriveUninstallWorkspaceFootprint({rootDir:root,workspace});content.observations.push(...wiring.observations);content.actions.push(...wiring.actions);content.conflicts.push(...wiring.conflicts);conflicts.push(...wiring.conflicts);
+   for(const hook of git?.hooks??[]){if(hook.status==='conflict'){conflicts.push({path:resolve(hook.hookPath),code:'PU-FOREIGN-HOOK-CONFLICT'});continue;}try{const archive=privateHookArchive(hook);if(archive)privateArchives.push(archive);}catch(e){conflicts.push({path:hook.state,code:e.code??'PU-PRIVATE-UNVERIFIED'});}}
+   const controls=git?join(git.commonDir,'pipeline-uninstall',observed.scopeKey):join(resolve(hostStateRoot),'transactions',observed.scopeKey);return {root,rootIdentity,scopeKey:observed.scopeKey,scopeState:observed.state,scopeObservation:observed,git,content,workspace,privateArchives,conflicts,controls};
+diff --git a/plugins/pipeline-core/lib/project-uninstall.test.mjs b/plugins/pipeline-core/lib/project-uninstall.test.mjs
+index d14c2e906..66bf111cf 100644
+--- a/plugins/pipeline-core/lib/project-uninstall.test.mjs
++++ b/plugins/pipeline-core/lib/project-uninstall.test.mjs
+@@ -239,9 +239,31 @@ test('AC216-B4: an oversized log.jsonl is validated to its last byte: a bad reco
+  writeFileSync(log,big);assert.deepEqual(f.controller.plan({rootDir:f.root}).conflicts,[]);
+ });
+ 
++// D79 follow-up: the installer writes a repo-relative Pipeline entry into the tracked workspace registry.
++function relativeRegistry(f,relativePath){
++ f.put('plugins/pipeline-core/plugin.json',JSON.stringify({name:'agent-pipeline-core',version:'0.7.0'}));
++ const registry=' \n{ "custom" : "\\u00df", "entries" : [ {"path":'+JSON.stringify(relativePath)+'},\n { "path" : '+JSON.stringify(f.foreign)+', "enabled" : false } ], "tail" : 1 }\n';
++ f.put('.agents/plugins.json',registry);return registry;
++}
++test('D79: a tracked repo-relative Pipeline registry entry inside the workspace is an owned binding that the uninstall removes and reads back',t=>{
++ const f=fixture(t),registry=relativeRegistry(f,'plugins/pipeline-core'),before=readFileSync(join(f.root,'plugins/pipeline-core/plugin.json'));
++ const plan=f.controller.plan({rootDir:f.root});assert.deepEqual(plan.conflicts,[]);assert.deepEqual(plan.workspace.ownedIndexes,[0]);assert.deepEqual(plan.workspace.foreignIndexes,[1]);
++ assert(plan.footprint.actions.some(a=>a.path==='.agents/plugins.json'));
++ const r=f.controller.apply(plan,options(plan));assert.equal(r.status,'uninstalled');completed(f,plan);
++ const after=readFileSync(join(f.root,'.agents/plugins.json'),'utf8'),value=JSON.parse(after);
++ assert.deepEqual(value.entries,[{path:f.foreign,enabled:false}]);assert(after.startsWith(' \n{ "custom" : "\\u00df"'));assert(after.endsWith('], "tail" : 1 }\n'));assert.notEqual(after,registry);
++ assert.deepEqual(readFileSync(join(f.root,'plugins/pipeline-core/plugin.json')),before,'the plugin directory itself is project content and stays');
++});
++for(const [name,relativePath] of [['resolves outside the workspace','../foreign-plugin'],['names a directory that does not exist','plugins/missing']])test('D79: a tracked relative registry entry that '+name+' stays unavailable with a runnable repair and nothing changes',t=>{
++ const f=fixture(t),registry=relativeRegistry(f,relativePath),bytes=f.digests(),config=readFileSync(join(f.root,'.git/config'));
++ assert.throws(()=>f.controller.plan({rootDir:f.root}),e=>e.code==='PU-WORKSPACE-UNVERIFIABLE'&&e.instructions.path==='.agents/plugins.json'&&e.instructions.removed===false&&/re-runs the uninstall/.test(e.instructions.attendedStep)&&!/\/home\/|[A-Z]:\\/.test(e.instructions.attendedStep));
++ assert.equal(readFileSync(join(f.root,'.agents/plugins.json'),'utf8'),registry);assert.deepEqual(f.digests(),bytes);assert.deepEqual(readFileSync(join(f.root,'.git/config')),config);assert.equal(f.scope.observe({rootDir:f.root}).state,'active');
++});
++
+ // Each original sibling callback is registered individually; no envelope case. The count is the fifteen originals plus the
+-// two oversized-log cases above (UC02C016, UC02C017); the originals keep their ids because new cases are appended.
+-if (completionCases.length !== 17) throw new Error("Required completion declared case count drift");
++// two oversized-log cases above (UC02C016, UC02C017) plus the three D79 relative-entry cases (UC02C018-UC02C020); the originals
++// keep their ids because new cases are appended.
++if (completionCases.length !== 20) throw new Error("Required completion declared case count drift");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

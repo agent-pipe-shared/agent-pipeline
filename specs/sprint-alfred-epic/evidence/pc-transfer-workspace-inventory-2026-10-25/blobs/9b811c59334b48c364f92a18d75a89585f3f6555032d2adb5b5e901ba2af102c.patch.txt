@@ -1,0 +1,241 @@
+diff --git a/plugins/pipeline-core/lib/advisory-answered-receipt.mjs b/plugins/pipeline-core/lib/advisory-answered-receipt.mjs
+index eb441ed74..43f46044a 100644
+--- a/plugins/pipeline-core/lib/advisory-answered-receipt.mjs
++++ b/plugins/pipeline-core/lib/advisory-answered-receipt.mjs
+@@ -58,6 +58,7 @@ export function verifyAnsweredAdvisoryReceipt({ receipt, execution, answer, dema
+     || execution.dutyReceipt?.status !== "answered") return refuse("advisory_answered_execution_missing", "execution");
+   if (!same(receipt.dispatch, dispatch) || !same(demand?.dispatch, dispatch)
+     || execution.dispatch?.candidateCommit !== dispatch?.candidateCommit
++    || execution.dispatch?.candidateTree !== dispatch?.candidateTree
+     || execution.dispatch?.queueRevision !== dispatch?.queueRevision) return refuse("advisory_answered_candidate_mismatch", "dispatch");
+   const configured = receipt.configuredRoute;
+   const observed = receipt.observed.identity;
+diff --git a/plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs b/plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs
+index 17346a8ac..c11b3d0c5 100644
+--- a/plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs
++++ b/plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs
+@@ -10,7 +10,7 @@ import {join} from 'node:path';
+ import {hostDigest} from '../codex-host-process-journal.mjs';
+ import {canonicalJson} from '../codex-sandbox-compatibility.mjs';
+ import {readinessFixture} from '../codex-readiness-finalization.fixture.mjs';
+-import {runCodexToolFreeDesignReadiness} from '../codex-tool-free-design-readiness.mjs';
++import {runCodexToolFreeDesignReadiness,verifyCodexToolFreeBindingFromSources} from '../codex-tool-free-design-readiness.mjs';
+ import {validateReadinessFinalization,validateReadinessOutputCustody,readFinalizedReadinessObservation} from '../codex-readiness-finalization.mjs';
+ 
+ const h=c=>c.repeat(64),CAP=8388608,EMPTY=hostDigest(Buffer.alloc(0));
+@@ -93,6 +93,53 @@ test('point 5: committed source paths and bytes stay bound: any source digest ch
+ 
+ // Physical reader cap cases: the host store is Linux-only (CRHS-INPUT elsewhere), so these are skipped on other platforms.
+ const linuxOnly=process.platform==='linux'?{}:{skip:'codex host store is Linux-only on this platform'};
++
++// Productive path: a real host run writes the private finalization and the private receipt; the package reader must refuse both
++// a forged and a missing output custody in either file. Every verdict below is asserted against a positive control first.
++async function productive(t){
++ const f=readinessFixture(t),result=await runCodexToolFreeDesignReadiness(f.args);assert.equal(result.status,'reviewed',JSON.stringify(result));
++ const journal=join(f.store.processRoot,'codex-host-'+result.receiptId),finalization=join(journal,'readiness-finalization.json'),
++  receipt=join(f.store.processRoot,'..','receipts',result.receiptId+'.json');
++ const sourceBytes=Object.fromEntries(Object.entries(f.sources).map(([name,s])=>[name,{path:s.path,bytes:readFileSync(join(f.root,s.path))}]));
++ const verify=()=>verifyCodexToolFreeBindingFromSources({repoRoot:f.root,hostExecution:result.report.hostExecution,report:result.report,candidate:f.candidate,
++  sources:f.sources,sourceBytes,route:f.route,store:f.store,repoFingerprint:f.repoFingerprint});
++ const bytes={finalization:readFileSync(finalization),receipt:readFileSync(receipt)};
++ const restore=()=>{writeFileSync(finalization,bytes.finalization);writeFileSync(receipt,bytes.receipt);};
++ const rewrite=(path,mutate)=>{const v=JSON.parse(readFileSync(path));mutate(v);writeFileSync(path,canonicalJson(v));};
++ assert.ok(readFinalizedReadinessObservation(journal,result.expected),'positive control: finalization reads');
++ assert.ok(f.store.read(result.receiptId,result.expected),'positive control: store reads');assert.equal(verify().ok,true,'positive control: package reader accepts');
++ return {f,result,journal,finalization,receipt,verify,restore,rewrite};
++}
++// reader=false: the mutation is shape-valid and only the private receipt / host store comparison can see it.
++const refused=(p,label,reader=true)=>{
++ if(reader)assert.equal(readFinalizedReadinessObservation(p.journal,p.result.expected),null,label+': finalization reader');
++ assert.equal(p.f.store.read(p.result.receiptId,p.result.expected),null,label+': host store');
++ assert.equal(p.verify().ok,false,label+': package reader');
++};
++test('productive path: a private finalization without output custody, or with a member removed, is refused by reader, store and package reader',linuxOnly,async t=>{
++ const p=await productive(t);
++ p.rewrite(p.finalization,v=>{delete v.outputCustody;});refused(p,'custody absent');p.restore();
++ p.rewrite(p.finalization,v=>{delete v.outputCustody.stdout.sha256;});refused(p,'stdout digest absent');p.restore();
++ p.rewrite(p.finalization,v=>{delete v.outputCustody.reportCanonicalSha256;});refused(p,'canonical report digest absent');p.restore();
++ assert.equal(p.verify().ok,true,'restored files are accepted again');
++});
++test('productive path: forged output custody in the private finalization is refused by reader, store and package reader',linuxOnly,async t=>{
++ const p=await productive(t);
++ p.rewrite(p.finalization,v=>{v.outputCustody.stdout.sha256=h('b');});refused(p,'forged stdout digest',false);p.restore();
++ p.rewrite(p.finalization,v=>{v.outputCustody.stdout.closed=false;});refused(p,'unclosed stdout claimed');p.restore();
++ p.rewrite(p.finalization,v=>{v.outputCustody.reportRawJsonSha256=h('b');});
++ assert.equal(p.f.store.read(p.result.receiptId,p.result.expected),null,'forged raw report digest: host store');
++ assert.equal(p.verify().ok,false,'forged raw report digest: package reader');p.restore();
++ assert.equal(p.verify().ok,true,'restored files are accepted again');
++});
++test('productive path: missing or forged output custody in the private receipt is refused by the host store and package reader',linuxOnly,async t=>{
++ const p=await productive(t);
++ p.rewrite(p.receipt,v=>{delete v.outputCustody;});refused(p,'receipt custody absent',false);p.restore();
++ p.rewrite(p.receipt,v=>{v.outputCustody.stdout.sha256=h('b');});refused(p,'receipt forged stdout digest',false);p.restore();
++ p.rewrite(p.receipt,v=>{v.outputCustody.stderr.bytes=v.outputCustody.stderr.bytes+1;v.outputCustody.stderr.retainedBytes=v.outputCustody.stderr.bytes;});
++ refused(p,'receipt forged stderr length',false);p.restore();
++ assert.equal(p.verify().ok,true,'restored files are accepted again');
++});
+ test('point 5: finalization reader accepts a file exactly at 65536 bytes and refuses one byte more',linuxOnly,async t=>{
+  const f=readinessFixture(t),result=await runCodexToolFreeDesignReadiness(f.args);assert.equal(result.status,'reviewed',JSON.stringify(result));
+  const journal=join(f.store.processRoot,'codex-host-'+result.receiptId),path=join(journal,'readiness-finalization.json'),original=readFileSync(path);
+diff --git a/plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs b/plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs
+index b414d5a30..72e47f186 100644
+--- a/plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs
++++ b/plugins/pipeline-core/lib/pins/codex-wsl-required-advisor-has-no-completable-route.test.mjs
+@@ -335,6 +335,12 @@ test("AC-135: each binding mismatch is refused with its typed code and a runner-
+     ["candidate commit", "advisory_answered_candidate_mismatch", (p) => ({ dispatch: { ...p.dispatch, candidateCommit: "d".repeat(40) } })],
+     ["candidate tree", "advisory_answered_candidate_mismatch", (p) => ({ dispatch: { ...p.dispatch, candidateTree: "e".repeat(40) } })],
+     ["execution queue revision", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, queueRevision: 9 } })],
++    ["execution candidate commit", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, candidateCommit: "d".repeat(40) } })],
++    ["execution candidate tree", "advisory_answered_candidate_mismatch", (p) => withExecution(p, { dispatch: { ...p.execution.dispatch, candidateTree: "e".repeat(40) } })],
++    ["execution candidate tree absent", "advisory_answered_candidate_mismatch", (p) => {
++      const { candidateTree: _omitted, ...rest } = p.execution.dispatch;
++      return withExecution(p, { dispatch: rest });
++    }],
+     ["route model", "advisory_answered_route_mismatch", (p) => ({ route: { ...p.route, model: "other-model" } })],
+     ["route effort", "advisory_answered_route_mismatch", (p) => ({ route: { ...p.route, effort: "high" } })],
+     ["requested route", "advisory_answered_route_mismatch", (p) => withExecution(p, { requested: { runner: "codex", model: "other-model" } })],
+diff --git a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+index 4195bf758..4abdb2819 100644
+--- a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
++++ b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+@@ -519,5 +519,83 @@ test("PARWORK-M3c (control): a different not-ready status is refused on the FIRS
+   } finally { fx.cleanup(); }
+ });
+ 
++// ===================================================================================================================
++// MODE 4 -- Critic evidence for an EARLIER commit is produced without touching a checkout a Goldfish is writing in (PF-57, D62)
++// ===================================================================================================================
++// Drives the real CLI (scripts/verify-evidence-producer.mjs --commit) against a checkout with uncommitted edits to two tracked
++// files and an untracked file, and requires every byte of the checkout, HEAD, status and the worktree list to be unchanged, no
++// temporary worktree left behind, and no session-authority registry lock created. The verify command passes only inside a clean
++// checkout of the older commit, so a run against the shared checkout would fail instead of passing.
++import { createHash } from "node:crypto";
++import { prepareConsumerVerify } from "../consumer-verify.mjs";
++
++function git4(root, args) {
++  return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE } }).trim();
++}
++function commit4(root, paths, message) {
++  git4(root, ["add", "--", ...paths]);
++  git4(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
++  return git4(root, ["rev-parse", "HEAD"]);
++}
++function bytes4(root, rel = "") {
++  const found = {};
++  for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
++    const path = rel === "" ? entry.name : `${rel}/${entry.name}`;
++    if (path === ".git" || path === "evidence") continue;
++    if (entry.isDirectory()) { found[`${path}/`] = "directory"; Object.assign(found, bytes4(root, path)); }
++    else found[path] = createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
++  }
++  return found;
++}
++const observe4 = (root) => ({
++  head: git4(root, ["rev-parse", "HEAD"]),
++  status: git4(root, ["status", "--porcelain=v1", "--untracked-files=all"]),
++  bytes: bytes4(root),
++  worktrees: git4(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")),
++});
++
++test("PARWORK-M4a: the real producer CLI makes Critic evidence for an older commit and leaves a dirty checkout, its worktree list and the session-authority registry untouched", { skip: process.platform === "win32" ? "host-limitation: the pin drives a POSIX node -e verify command through git worktree; owner Coordinator, due 2026-11-04 (Linux/WSL run, PO decision K7)" : false, timeout: 300000 }, () => {
++  const root = join(FIXTURE, "m4-root");
++  mkdirSync(join(root, ".claude"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: "parwork-m4", verify: "node -e \"process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)\"" }, null, 2)}\n`);
++  writeFileSync(join(root, "README.md"), "# Fixture\n");
++  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
++  prepareConsumerVerify({ rootDir: root });
++  git4(root, ["init", "-q"]);
++  const first = commit4(root, ["."], "initial");
++  mkdirSync(join(root, "specs"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++  writeFileSync(join(root, "specs", "spec.md"), "# Older candidate\n");
++  const older = commit4(root, [".claude/pipeline.yaml", "specs/spec.md"], "older candidate");
++  writeFileSync(join(root, "README.md"), "# Fixture moved on\n");
++  const head = commit4(root, ["README.md"], "head moved on");
++  assert.notEqual(older, head);
++  // The Goldfish is mid-edit: two tracked files and one untracked file differ from HEAD.
++  writeFileSync(join(root, "specs", "spec.md"), "# uncommitted edit of a tracked file\n");
++  writeFileSync(join(root, "README.md"), "# uncommitted edit of another tracked file\n");
++  writeFileSync(join(root, "untracked-note.txt"), "an untracked file the Goldfish is writing\n");
++  const before = observe4(root);
++  assert.match(before.status, /README\.md/u);
++  assert.match(before.status, /\?\? untracked-note\.txt/u);
++
++  const script = fileURLToPath(new URL("../../scripts/verify-evidence-producer.mjs", import.meta.url));
++  const result = spawnSync(process.execPath, [script, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/critic-older.json"],
++    { encoding: "utf8", env: { ...process.env, GIT_CEILING_DIRECTORIES: FIXTURE }, timeout: 240000 });
++  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
++  const evidence = JSON.parse(readFileSync(join(root, "evidence", "critic-older.json"), "utf8"));
++  assert.equal(evidence.commit, older, "the evidence is bound to the named earlier commit, not HEAD");
++  assert.equal(evidence.exitCode, 0);
++
++  assert.deepEqual(observe4(root), before, "HEAD, status, every tracked and untracked byte and the worktree list are unchanged");
++  assert.deepEqual(readdirSync(join(root, "evidence")), ["critic-older.json"], "the evidence file is the only thing written into the checkout");
++  const commitWorktrees = join(root, ".git", "agent-pipeline", "verify", "commit-worktrees");
++  assert.deepEqual(existsSync(commitWorktrees) ? readdirSync(commitWorktrees) : [], [], "the temporary worktree area is empty again");
++  assert.equal(existsSync(join(root, ".git", "agent-pipeline", "session-authority", "registry.lock")), false, "the producer leaves no session-authority registry lock");
++});
++
++// NOT PINNED HERE (reported to the Elephant, see the item's 2026-10-20 section): the session-authority registry staying readable with
++// no orphaned lock after a Critic and a Goldfish dispatch RAN IN PARALLEL needs a live two-session run (or a harness that drives two
++// real hook sessions against one registry); M4a only shows the producer itself never takes the registry lock.
+ // DEFERRED, out of scope of this item's functional delivery (PO decision item): the liveness readback for open dispatch
+-// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here.
++// records ("Observed again 2026-10-05 (round 3b)"); no case for it is pinned here. Its guard-side check belongs to the
++// protected guard-dispatch hook and needs a decision on the liveness signal first (pid, heartbeat or runner task state).
+diff --git a/plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs b/plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs
+index 1a0cd3d07..9b96442e0 100644
+--- a/plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs
++++ b/plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs
+@@ -340,3 +340,38 @@ test('AC-241 point 3: drift after the actual turn refuses publication and the pr
+     assert.equal(existsSync(receiptFileOf(late.f, late.receiptId)), false, `${file}: no private readiness record is published`);
+   }
+ });
++
++// Acceptance 5 (historical preservation): the old not-ready reports stay as recorded failures. Byte digests pin them as unchanged
++// public receipts; no ready report may reuse a not-ready report's dispatch or candidate (a manual conversion would have to).
++// Final package validation of a not-ready report is counted coverage of design-workflow-package.test.mjs (DWP02, DWP-READINESS-BINDING).
++const HISTORICAL = {
++  'design-readiness-08ef241a-20260928a.json': ['2145305cef32223b27030446e22cc88f7de51f47d63804bab256e61ea2896920', 'not-ready'],
++  'design-readiness-3b05a045-20260928.json': ['a40d44e3dcb8149fb059a349f5640b0de44ea75ee08ff1693cd1175b17533252', 'not-ready'],
++  'design-readiness-628df5aa-20260928c.json': ['b82512c75810865347bf6b33e63491ab50557a88d5f44ba6f70be57cbfa3f855', 'not-ready'],
++  'design-readiness-9a416793-20260928b.json': ['8b8c53a5b76ac8f3a1eee2a89f58879111cd8052f6c6e8167b57a86b6d4349cc', 'not-ready'],
++  'design-readiness-c22c1cd2-20260928.json': ['cb6e6371330f6b9a8408e6da35880a72e8ae710aaa5ffbcfb1bf34e0f2c6e00d', 'ready-for-po-review'],
++  'design-readiness-f038d96e-20260928d.json': ['926bf9396d3976f42dddb215c7649a9651f0290c42cf6ab3dbfbd8a1c1f6a491', 'ready-for-po-review'],
++};
++test('AC-241 point 5: old not-ready Readiness reports are preserved unchanged and none was converted to ready', () => {
++  const dir = join(repoRoot, 'specs', 'sprint-alfred-epic', 'evidence');
++  const reports = Object.entries(HISTORICAL).map(([file, [digest, outcome]]) => {
++    const bytes = readFileSync(join(dir, file));
++    assert.equal(sha(bytes), digest, `${file}: the public receipt bytes changed`);
++    const report = JSON.parse(bytes.toString('utf8'));
++    assert.equal(report.outcome, outcome, file);
++    assert.equal(report.schema, 'pipeline.design-readiness-receipt.v1', file);
++    return { file, report };
++  });
++  const notReady = reports.filter(({ report }) => report.outcome === 'not-ready'), ready = reports.filter(({ report }) => report.outcome === 'ready-for-po-review');
++  assert.equal(notReady.length, 4); assert.equal(ready.length, 2);
++  for (const { file, report } of notReady) assert.equal(report.findings.some(f => f.severity === 'blocking') && report.findings.length > 0, true, `${file}: a not-ready report keeps its blocking findings`);
++  for (const { file, report } of ready) assert.deepEqual(report.findings.filter(f => f.severity === 'blocking'), [], `${file}: a ready report carries no blocking finding`);
++  for (const { report: r } of ready) for (const { file, report: o } of notReady) {
++    assert.notEqual(r.dispatchId, o.dispatchId, `${file}: a ready report reuses its dispatch`);
++    assert.notEqual(r.candidate.commit, o.candidate.commit, `${file}: a ready report claims its candidate`);
++  }
++  // The two reports named by the item still record the missing current Advisor binding, not a waiver of it.
++  const codes = file => notReady.find(entry => entry.file === file).report.findings.map(f => f.code);
++  assert.deepEqual(codes('design-readiness-9a416793-20260928b.json'), ['CURRENT_ADVISOR_BINDING_MISSING', 'SUBMISSION_ACK_GATE_CONFLICT']);
++  assert.deepEqual(codes('design-readiness-628df5aa-20260928c.json'), ['ADVISOR-CURRENT-BINDING-MISSING']);
++});
+diff --git a/plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs b/plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs
+index 71a66b7c7..66e565278 100644
+--- a/plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs
++++ b/plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs
+@@ -62,7 +62,7 @@ function selectedAdvisory(model = ADVISORY_MODEL) {
+   }).requestSha256;
+   return {
+     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
+-    dispatch: { queueRevision: 1, candidateCommit, candidateTree: "b".repeat(40), referenceSetSha256, requestSha256 },
++    dispatch: { queueRevision: 1, candidateCommit, candidateTree, referenceSetSha256, requestSha256 },
+     toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
+     host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
+     profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },

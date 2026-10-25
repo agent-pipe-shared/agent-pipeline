@@ -1,0 +1,80 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K11-S1-GRANT-SUMMARY","candidateCommit":"799e8d12d70134cac52c7ea6b9a3d13873934ea2","candidateTree":"216ed2c21528ba45418e384f5ab4cae66843ef95","runner":"claude","role":"pipeline-core:goldfish-implementor","agentType":"goldfish-implementor","model":"claude-sonnet-5-5","effort":"medium","rulesetSha":"751aadf19d274e266657d573960cf30555d5c3d3f6ca10c6661955adf4c7848f","allowedPaths":["plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","plugins/pipeline-core/lib/dispatch-budget-core.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K11-S1-GRANT-SUMMARY","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k11-s1-grant-summary-check","path":"plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","dependencies":["plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","plugins/pipeline-core/lib/dispatch-budget-core.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K11-S1-GRANT-SUMMARY","candidateCommit":"799e8d12d70134cac52c7ea6b9a3d13873934ea2","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K11-S1-GRANT-SUMMARY: D75 B: a grant-record summary the budget hook can show to the agent (S1)
+
+### 1. Goal
+
+Read slice S1 and the grant-notice text in `scratch/d75-build-plan-2026-10-21.md`. In `lib/dispatch-budget-core.mjs` add an exported `describeGrantRecord(record, agentId)` built on the existing `validateGrantRecord` (~186): on a valid record it returns `{ok:true, totalExtra, digest, count, last:{seq, extra, reason, grantedAt, digest}}` where `digest` is the record's chain head; on an invalid record it returns exactly what `validateGrantRecord` returns. Leave `validateGrantRecord`'s return shape unchanged (its tests pin `{ok:true,totalExtra:12}`). The `reason` field is returned as stored; the hook layer labels it later. Add cases to `hooks/guard-dispatch-budget-checkpoint.test.mjs` next to the existing grant-record cases (~214-226): a valid two-entry record returns the head digest, count 2 and the last entry; a tampered record returns the same refusal as `validateGrantRecord`; an empty or foreign-agent record is refused.
+
+### 2. Context files
+
+- `scratch/d75-build-plan-2026-10-21.md` — slice S1 and the grant notice text.
+- `plugins/pipeline-core/lib/dispatch-budget-core.mjs` — `validateGrantRecord` ~186 and the grant entry digest.
+- `plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs` — the grant-record cases ~214-226.
+
+### 3. DoD checks
+
+- Acceptance criteria: PO decision D75 (B) in `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` and the D75 B finding in `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md`; plan `scratch/d75-build-plan-2026-10-21.md` slice S1.
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node scratch/run-quiet.mjs k11-s1-checkpoint plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs` (all existing cases stay green, the new cases green)
+  - `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` (only the two known violations guard-git.test.mjs and git-cmd.test.mjs)
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`).
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs`, `plugins/pipeline-core/lib/dispatch-budget-core.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- Do not change `validateGrantRecord`'s return shape or any existing assertion.
+- Do not touch `hooks/guard-dispatch-budget.mjs` or `scripts/dispatch-budget-grant.mjs` (later slice).
+- Another Goldfish edits `lib/onboarding-continuity.mjs`, `lib/session-authority-orphan-member-step.mjs` and `scripts/pipeline-state.mjs` in parallel: never touch them and never run suites that import them.
+- Never leave a test run in the background when you end your turn; run test files only in the foreground through `scratch/run-quiet.mjs`, with the Bash tool timeout set to 600000 ms.
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+- The checkpoint test imports the hook in a way that a new export breaks: stop and report the import chain.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020195107.231d1a0` · content identity `751aadf19d274e266657d573960cf30555d5c3d3f6ca10c6661955adf4c7848f`.
+- Model/effort: `claude-sonnet-5-5` / medium (goldfish-implementor; agent definition alias `sonnet`).
+- Tier: goldfish-implementor. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K11-S1-GRANT-SUMMARY
+- Write scope: plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs, plugins/pipeline-core/lib/dispatch-budget-core.mjs
+- **Tool budget (TB-09, hard cap):** ≤35 tool uses (min(tier cap 40, maxTurns 50 - 15)). 80 % checkpoint at about call 28: stop editing and end the turn with an interim report naming what remains.
+- Model justification: small additive export on the grant-record core with its pins; no design latitude.
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

@@ -1,0 +1,6 @@
+{
+ "ok": false,
+ "code": "MODEL-FAMILY-ACTIVATION-UNCERTAIN",
+ "retryable": false,
+ "status": "uncertain"
+}

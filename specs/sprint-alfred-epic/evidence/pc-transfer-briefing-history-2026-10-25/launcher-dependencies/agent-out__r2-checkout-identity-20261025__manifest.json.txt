@@ -1,0 +1,121 @@
+{
+  "schema": "pipeline.method-only-patch-handoff.v1",
+  "outcome": "pipeline.greenfield.r2.branch-checkout-runtime-continuity",
+  "methodOnly": true,
+  "source": {
+    "baseCommit": "73afcf74241fd38627161d5a5e9956d12b7e9341",
+    "baseTree": "29ffb1b7e1441d0c6879fc002337e024b6536293",
+    "clone": "scratch/clones/r2-checkout-identity-20261025",
+    "installedRulesetSha256": "1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe"
+  },
+  "patch": {
+    "path": "complete.patch",
+    "sha256": "4ed123c5926f4f43d3cabc4d6a64398c54beb7ea4ffc862e52f8b136a3851dcc"
+  },
+  "files": [
+    {
+      "path": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+      "preimageSha256": "4b236db5c462e43f4d3184d49b40de71d47d2efbb5ec07466f2e28950fe079e7",
+      "postimageSha256": "bf5dbefc518bbdcc26660884c4f9849d5a345f94e2c3a8589b014e755a5451e8"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+      "preimageSha256": "c5c36af596955b92068d00cdc6e670654d2607c858c76f31cd50c60769b6bd68",
+      "postimageSha256": "f8359768630385c74dd135d7519ea9830541c7fa25faa3365e80740a6f11cf8c"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+      "preimageSha256": "237ecc1c65b1b91e60dc364bdb855437abbbe8e944639dffcf0ebb7371343e61",
+      "postimageSha256": "c73011e58d66fed8e4cd1762c74c814e857a512ab81f30bcbc6cabd841315174"
+    }
+  ],
+  "captures": [
+    {
+      "path": "green-named-commit.txt",
+      "sha256": "1ef7f33b9543c9fec4414b640754980cff1e74fc3f2f6de43f6e79cca6e9cdad",
+      "exitCode": 0,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "green-original-suites-complete.txt",
+      "sha256": "68d3e0cf9212bf0201a6064b787642340cb3e7b6e237347dc21e3eb65c08f1a7",
+      "exitCode": 0,
+      "counts": {
+        "tests": 87,
+        "pass": 87,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "green-original-suites-final.txt",
+      "sha256": "affc0bf9ecdb0f0d3885f79020f24c7351186e195855302af40ffa277453d8a8",
+      "exitCode": 0,
+      "counts": {
+        "tests": 86,
+        "pass": 86,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "green-original-suites-settled.txt",
+      "sha256": "fac8c7c5a61ba2515c78ecdcb2fce079bfe47eee785b0ab280ba7f6482988823",
+      "exitCode": 0,
+      "counts": {
+        "tests": 87,
+        "pass": 87,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "green-original-suites.txt",
+      "sha256": "657ed683b188aba4274d807d0e4824e8eee663de4b747d3fa3ed23d2fc186b0b",
+      "exitCode": 1,
+      "counts": {
+        "tests": 86,
+        "pass": 80,
+        "fail": 6,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "red-named-commit.txt",
+      "sha256": "91727dfa593879adad216c2246ff2ee36c50d14af5699d92174babe874ef2bc9",
+      "exitCode": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "skipped": 0
+      }
+    }
+  ],
+  "auxiliary": [
+    {
+      "path": "synthetic-preload.mjs",
+      "sha256": "ceb5951a3a5e39191e2260c4d0a84ac8822f7ca02382133d43c139d5c0c46d48"
+    },
+    {
+      "path": "package-handoff.mjs",
+      "sha256": "b887f213d1330e2fdf5e7595f620fa79ca6e5efb312aa2763993854ea389a87e"
+    },
+    {
+      "path": "report.md",
+      "sha256": "bec0b88c44ea2a6465e546297f0a5fd4d6073ebce029420d85791bc4b0d6fb1d"
+    }
+  ],
+  "limits": [
+    "No native runner/model/dispatch assurance; optional model identity conflict remains unavailable.",
+    "No integrated Verify, independent Critic, Security, PO acceptance or release claim.",
+    "Linked root metadata must match a physically registered Git primary project and byte-identical original calibration; arbitrary historical calibration differences remain refused.",
+    "No Main writes/staging/commits or protected Verify enrollment changes.",
+    "Earlier history-ID search mistake and mid-run implementation edit are retained in the report."
+  ]
+}

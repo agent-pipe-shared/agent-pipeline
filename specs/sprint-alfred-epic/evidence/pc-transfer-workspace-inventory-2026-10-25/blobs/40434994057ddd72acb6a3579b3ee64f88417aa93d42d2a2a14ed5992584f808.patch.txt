@@ -1,0 +1,17 @@
+diff --git a/GEMINI.md b/GEMINI.md
+index 83149db28..725c7d185 100644
+--- a/GEMINI.md
++++ b/GEMINI.md
+@@ -24,8 +24,10 @@ where "Agy" is defined.
+ 
+ ### Antigravity Installation (Workspace-Local)
+ 
+-Antigravity uses a workspace registration rather than a global plugin install
+-command. From the project root:
++The installer offers a workspace registration (this procedure) and a global
++option; the global route and what it writes are in
++[Choosing where to bind](SETUP.md#antigravity-agy-workspace-local-binding).
++From the project root:
+ 
+ 1. Follow the [Agy installation and upgrade procedure](SETUP.md#antigravity-agy-workspace-local-binding)
+    to obtain an approved plugin directory from the official GitHub repository

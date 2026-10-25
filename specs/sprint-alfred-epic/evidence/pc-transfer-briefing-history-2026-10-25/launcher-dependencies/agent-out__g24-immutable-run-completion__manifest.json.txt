@@ -1,0 +1,22 @@
+{
+  "schema": "pipeline.g24-inert-patch-manifest.v1",
+  "base": "fcdbd288d3d6b33c8914dd0f8258e727175946c9",
+  "paths": {
+    "plugins/pipeline-core/scripts/capture-evidence.mjs": "f1006ad4455d52ac383ed841ccf9b504ab2a18ea67a1976138158f3e511c35fa",
+    "plugins/pipeline-core/scripts/publish-evidence-run.mjs": "9be5828cb283c123e3c9da5d411f957657e69efb455a90c75297f00021fc4e4d",
+    "plugins/pipeline-core/scripts/publish-evidence-run.test.mjs": "1b5ada04b39d872059aea14d2198a1f9eacbd6d70a7806a66fe8d413c96c1dfb"
+  },
+  "baseCaptureWriterSha256": "2756d81af80475d022135832da72b750d6a149b28955ec170697bc47345e8c12",
+  "captures": {
+    "scratch/g24-run-red.txt": "445d359927d012e5aa05875b1795a0560afd7d27e201d59cb48d6ebafde46872",
+    "scratch/g24-run-green.txt": "0e5114c902dd889f4bd5698012ef7b747b1e4aae77e7918287b0af3e0db913ea",
+    "scratch/g24-focused-green.txt": "f547f65802e7994fd143bf1c4844222ce0f68c03967b561351cf701501da2529",
+    "scratch/g24-consumer-safe-green.txt": "c8c2e64c831491200aa6479f70e5f32b8fb9ded47dd6c38784e058545e2e0894",
+    "scratch/g24-schema-red.txt": "5dad675cc5248f035591413691d688cfbc555229d01e922ac3ccb1d182b413e2",
+    "scratch/g24-cas-red.txt": "68431e4539fd779b09c03a61c19f74446b6d0719d3c1069cec4dc72253265750",
+    "scratch/g24-schema-cas-green.txt": "c946e545e4a9d84da7605c62e7a1952ba850d9f06f49786b9efc8a3f7b3900b3",
+    "scratch/g24-focused-green-final.txt": "50b61acaba643c568898f9633a3d41dea2bc62de10fdaf6e2455897f6e72592e",
+    "scratch/g24-consumer-safe-green-final.txt": "0f49939d488e2cce5ad6b0f16104a143e904760c04324d5d21f39624caec4def"
+  },
+  "patchSha256": "b82bdc025aa2cac91434d6a78b090dd56879c526fc9162a29b56501cb8501edf"
+}

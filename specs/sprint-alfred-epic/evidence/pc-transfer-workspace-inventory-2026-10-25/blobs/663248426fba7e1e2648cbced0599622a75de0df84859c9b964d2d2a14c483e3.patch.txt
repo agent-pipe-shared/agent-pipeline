@@ -1,0 +1,109 @@
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index c8f90f11a..94b9b49fc 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -133,12 +133,30 @@ function activateAuthorization(authorizeAction, selectionSha256) {
+   return { status, stdout, stderr };
+ }
+ 
+-function fixture() {
++// K150: the adapter's scope-only admission (hook-governance-admission.mjs, b8d4b4019) exits 0 with empty
++// stdout on a root that is not governance-enrolled, so a case that expects a guard decision must enroll
++// its temporary root. The exact consent marker is the smallest recognized positive enrollment (same
++// shape as the Antigravity twin's fixture()); unenrolledFixture() keeps the passive, un-enrolled root.
++function unenrolledFixture() {
+   const root = mkdtempSync(join(tmpdir(), "codex-pretool-"));
+   mkdirSync(join(root, ".claude"), { recursive: true });
+   return root;
+ }
+ 
++function enrollFixtureRoot(root) {
++  mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
++    schema: "pipeline.onboarding-consent-marker.v1",
++    status: "consent-given-onboarding-incomplete",
++    consentGivenAt: "2026-10-02T00:00:00.000Z",
++  }));
++  return root;
++}
++
++function fixture() {
++  return enrollFixtureRoot(unenrolledFixture());
++}
++
+ function validPipelineUser(mode = "signature") {
+   return readFileSync(join(pluginRoot, "..", "..", "pipeline.user.yaml"), "utf8")
+     .replace('push_approval: "signature"', `push_approval: "${mode}"`);
+@@ -916,8 +934,21 @@ check("local plugin-cache installation offers the human-gated HGO route without
+     const reason = output.permissionDecisionReason;
+     assert.match(reason, /GUARD-CROSS-REPO-MUTATION/u);
+     assert.match(reason, /Human override available for this exact command/u);
+-    assert.match(reason, /Step: prepare-authorization/u);
+-    assert.match(reason, /Step: authorize/u);
++    // K150: the denial now prints only `Step: plan` and defers the mode-specific continuation to the
++    // plan JSON (guard-lifecycle-ready ceremony text, d1a015ff5). Keep the original strength: run the
++    // printed plan command and require the same continuation steps in the plan it returns.
++    assert.match(reason, /Step: plan/u);
++    assert.match(reason, /The plan JSON gives the mode-specific nextAction/u);
++    const printed = reason.replace(/'\nCMD=\$\{CMD\}'/gu, "").match(/plan --repo (\S+) --request-sha256 ([a-f0-9]{64})/u);
++    assert.notEqual(printed, null, `no plan command in: ${reason}`);
++    const planned = spawnSync(process.execPath, [humanOverrideScript, "plan", "--repo", printed[1], "--request-sha256", printed[2]], { cwd: root, encoding: "utf8", shell: false });
++    assert.equal(planned.status, 0, planned.stderr);
++    assert.match(planned.stdout, /prepare-authorization/u);
++    const planSha = JSON.parse(planned.stdout).planSha256;
++    const prepared = spawnSync(process.execPath, [humanOverrideScript, "prepare-authorization", "--repo", printed[1], "--request-sha256", printed[2], "--plan-sha256", planSha, "--reason", "K150 fixture"], { cwd: root, encoding: "utf8", shell: false });
++    assert.equal(prepared.status, 0, prepared.stderr);
++    planned.stdout += prepared.stdout; // the attended-authorization step follows from prepare-authorization's own nextAction
++    assert.match(planned.stdout, /authorize/u);
+     assert.doesNotMatch(reason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
+     assert.doesNotMatch(reason, /separate-session-rooted-at-plugin-cache/u);
+     assert.doesNotMatch(reason, /verify-audit/u);
+@@ -925,7 +956,7 @@ check("local plugin-cache installation offers the human-gated HGO route without
+     // The offered route is human-gated, not an agent-only loop. The fixture commits chat mode
+     // as part of real onboarding, so the configured continuation must retain its attended
+     // authorization step rather than silently clearing the denial.
+-    assert.match(reason, /--activate/u);
++    assert.match(planned.stdout, /--activate/u);
+     assert.equal((reason.match(/Human override available for this exact command/gu) ?? []).length, 1);
+     assert.doesNotMatch(reason, /retry the exact original denial/u);
+     assert.doesNotMatch(reason, /fresh emergency plan/u);
+@@ -1053,6 +1084,9 @@ check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
+   assert.equal(currentResult.status, 0, currentResult.stderr);
+   assert.equal(currentResult.stdout, "");
+ 
++  // K150: the stale root above is enrolled (fixture()), so honouring it would deny; the current root is
++  // only governed once it is enrolled too, so enroll it before the second half.
++  enrollFixtureRoot(current);
+   writeFileSync(join(current, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+   const staleResult = decision(run({
+     tool_name: "Bash",
+@@ -1180,13 +1214,16 @@ check("Codex adapter blocks consumer-to-source drift for Edit, apply_patch and p
+   assert.match(installed.permissionDecisionReason, /plugin installation/u);
+ });
+ 
++// K150: an un-enrolled root now exits at the adapter's scope-only admission (hook-governance-admission.mjs,
++// b8d4b4019) before any write guard runs, so the former stderr warning from guard-testpath cannot occur
++// there by design. The restated contract: a broken guard config never blocks an un-enrolled root.
+ check("existing write-guard warnings remain warnings in an ungoverned repository", () => {
+-  const root = fixture();
++  const root = unenrolledFixture();
+   writeFileSync(join(root, ".claude", "guard-config.json"), "{broken");
+   const result = run({ tool_name: "Edit", tool_input: { file_path: "src/warning.mjs" } }, root);
+   assert.equal(result.status, 0);
+   assert.equal(result.stdout, "");
+-  assert.match(result.stderr, /guard-testpath/);
++  assert.equal(result.stderr, "");
+ });
+ 
+ check("malformed, unsupported and incomplete tool inputs fail closed", () => {
+@@ -1395,7 +1432,9 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
+       assert.equal(denied.permissionDecision, "deny");
+       assert.match(denied.permissionDecisionReason, /GUARD-LIFECYCLE-NOT-READY/u);
+       assert.match(denied.permissionDecisionReason, /Technical repair is required before retrying/u);
+-      assert.doesNotMatch(denied.permissionDecisionReason, /Re-run the typed project-onboarding-v3 inspection/u);
++      // K150: every controlling lifecycle status now names its typed recovery command (8c9146d3d); the
++      // denial must still offer no override ceremony (asserted below), only that typed recovery.
++      assert.match(denied.permissionDecisionReason, /Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction/u);
+       assert.doesNotMatch(
+         denied.permissionDecisionReason,
+         /Human override available|sign-intent|human-held Ed25519 key|authorize-by-signature|verify-audit/u,

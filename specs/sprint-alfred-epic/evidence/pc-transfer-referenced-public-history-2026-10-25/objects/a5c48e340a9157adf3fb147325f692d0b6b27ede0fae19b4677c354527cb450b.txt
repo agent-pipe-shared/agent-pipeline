@@ -1,0 +1,29 @@
+// untracked probe: stack of each onboarding inspection in the RC04C001 fixture
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
+const base = resolve("scratch/clones/k73/plugins/pipeline-core");
+const { evaluateLifecycleReadyGuard } = await import(base + "/hooks/guard-lifecycle-ready.mjs");
+const { planGovernanceScopeDecision, applyGovernanceScopeDecision } = await import(base + "/lib/governance-scope.mjs");
+const { ProjectOnboardingReadyError } = await import(base + "/lib/project-onboarding-ready-gate.mjs");
+const tmp = join(homedir(), "pipeline-test-tmp", "k73-probe1");
+mkdirSync(tmp, { recursive: true });
+const root = mkdtempSync(join(tmp, "p-"));
+spawnSync("git", ["init", "--quiet"], { cwd: root });
+const en = planGovernanceScopeDecision({ rootDir: root, decision: "enroll", by: "probe" });
+applyGovernanceScopeDecision(en, { activate: true, planSha256: en.planSha256 });
+writeFileSync(join(root, "pipeline.user.yaml"), "marker\n");
+mkdirSync(join(root, "scratch"));
+const writer = join(root, "scratch", "disallowed-recovery.mjs"); writeFileSync(writer, "//\n");
+const q = v => "'" + v.replaceAll("'", "'\\''") + "'";
+const action = { kind: "command", executable: process.execPath, argv: [writer, "--credential", "x"], mutation: true, requiresConfirmation: false };
+const observed = { schema: "pipeline.project-onboarding.v4", status: "intake-required", root, runner: "codex", intent: "session", repository: { mode: "local" }, runtime: { sourceSha256: "a".repeat(64) }, continuity: { status: "absent-pristine" }, nextAction: action };
+let n = 0;
+const deps = { projectDir: root, runner: "codex", subagentIdentityFn: () => ({ kind: "orchestrator" }), readOnboardingIntakeCheckpointFn: () => ({ status: "absent" }),
+  requireProjectOnboardingReadyFn() { throw new ProjectOnboardingReadyError("PORG-NOT-READY", "x", { intent: "session", lifecycleStatus: observed.status }); },
+  inspectProjectOnboardingV3Fn() { n++; console.log("INSPECT #" + n + "\n" + new Error().stack.split("\n").slice(2, 7).join("\n").replaceAll(process.cwd(), ".")); return observed; } };
+const input = { tool_name: "Bash", session_id: "s1", tool_input: { command: [action.executable, ...action.argv].map(q).join(" ") } };
+const r = evaluateLifecycleReadyGuard(input, deps);
+console.log("exit", r.exitCode, "inspections", n);
+rmSync(root, { recursive: true, force: true });

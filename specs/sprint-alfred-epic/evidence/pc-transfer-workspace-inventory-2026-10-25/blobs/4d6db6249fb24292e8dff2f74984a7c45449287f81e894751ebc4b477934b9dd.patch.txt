@@ -1,0 +1,162 @@
+diff --git a/specs/sprint-alfred-epic/evidence/native-windows-counted-results-2026-10-22.md b/specs/sprint-alfred-epic/evidence/native-windows-counted-results-2026-10-22.md
+new file mode 100644
+index 000000000..48fc14d0c
+--- /dev/null
++++ b/specs/sprint-alfred-epic/evidence/native-windows-counted-results-2026-10-22.md
+@@ -0,0 +1,156 @@
++# Native-Windows counted results, 2026-10-22
++
++Engineering evidence from a measurement slice (ALF-K30). It is not an independent Critic review and not PO acceptance. No product
++code, test or pin was changed to produce it. Commit measured: `b02abaa78ef0e6ff41b0375c1d88e9ad12a60eba` (branch feat/sprint-alfred).
++
++## How it was measured
++
++- Native Windows: the WSL session reaches the Windows node (v24) through interop. A clone is made on the Windows drive with
++  `--no-hardlinks` (hardlinks fail across devices) and each suite is run ALONE as
++  `cmd.exe /c "cd /d <native Windows clone> && node --test <suite path with backslashes>"`, stdin closed, default Windows temp root.
++- Linux comparison: the same suite, `node --test <suite>` in a clone on the WSL filesystem, TMPDIR set to a private directory outside every git repository.
++- Counts are taken from the Node test runner summary (tests / pass / fail / cancelled / skipped / todo). Raw per-suite logs were kept outside the repository.
++- Per-suite time limit: 25 minutes on Windows, 15 minutes on Linux. A suite that hit the limit is recorded as TIMEOUT and is NOT a measured result.
++- Suites run strictly one at a time, but this machine was shared with other agents, and the suites that timed out on Windows left their
++  child node processes running (they could not be stopped from this session), so durations are upper bounds and later Windows runs may have been slowed.
++- The native Windows clone sits directly under a top-level directory on a non-system drive that was created from WSL. Its ancestor ACLs were not inspected or hardened.
++  Several failures below depend on ancestor or temp-root ACL assessments and may be an effect of that location (see classification).
++
++## Selection
++
++288 test files outside `specs/` mention `process.platform`, `win32`, a HOST-LIMITATION marker, "native Windows", or carry "windows" in the file name.
++They were ordered: backlog-named native-Windows pins and files with Windows in the name first, then files with a HOST-LIMITATION or "native Windows" marker,
++then the rest by number of win32 mentions; the guard-lifecycle-ready, worktree-lifecycle, passive-read-policy, human-guard-override, verify-journal and
++po-human-approval suites were deferred to the end because of their run time. The run was stopped on the tool budget, so only the head of that order was measured.
++
++## Result table
++
++Column format: `exit tests/pass/fail/skipped/todo seconds`. `pc/` stands for `plugins/pipeline-core/`. A "not run" cell was not measured.
++
++| Suite | Native Windows (exit tests/pass/fail/skip/todo secs) | Linux WSL2 (same) |
++|---|---|---|
++| `pc/hooks/guard-git.test.mjs` | ok 1/1/0/0/0 666s | ok 1/1/0/0/0 247s |
++| `pc/hooks/guard-lifecycle-ready.test.mjs` | exit null TIMEOUT ?/?/?/?/? 1500s | not run |
++| `pc/lib/pins/signed-quality-package-route-is-not-agent-operable-on-windows.test.mjs` | ok 15/14/0/1/0 40s | ok 15/14/0/1/0 4s |
++| `pc/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs` | ok 10/10/0/0/0 29s | ok 10/10/0/0/0 18s |
++| `pc/lib/pins/hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows.test.mjs` | ok 12/11/0/1/0 81s | ok 12/11/0/1/0 1s |
++| `pc/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs` | ok 14/13/0/1/0 42s | ok 14/12/0/2/0 20s |
++| `pc/lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs` | exit 1 8/5/1/2/0 2s | ok 8/5/0/3/0 1s |
++| `pc/lib/windows-private-state-observation-memo.test.mjs` | ok 12/12/0/0/0 19s | ok 12/1/0/11/0 0s |
++| `pc/lib/pins/windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures.test.mjs` | ok 14/13/0/1/0 33s | ok 14/6/0/8/0 1s |
++| `pc/scripts/security-adapters/gitleaks.windows-suppression.test.mjs` | ok 44/43/0/1/0 1s | ok 44/38/0/6/0 0s |
++| `pc/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs` | ok 11/11/0/0/0 6s | ok 11/9/0/2/0 0s |
++| `pc/lib/pins/gitleaks-content-suppression-does-not-match-on-windows.test.mjs` | ok 26/26/0/0/0 1s | ok 26/25/0/1/0 0s |
++| `pc/lib/pins/windows-greenfield-scratch-write-denied.test.mjs` | ok 12/11/0/1/0 28s | ok 12/11/0/1/0 6s |
++| `pc/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs` | exit 1 13/12/1/0/0 739s | ok 13/4/0/9/0 0s |
++| `pc/lib/windows-private-state.test.mjs` | ok 16/16/0/0/0 15s | ok 16/12/0/4/0 0s |
++| `pc/lib/pins/sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.test.mjs` | ok 4/1/0/3/0 1s | ok 4/4/0/0/0 1s |
++| `pc/lib/pins/concurrent-session-warning-never-fires-on-native-windows.test.mjs` | ok 6/6/0/0/0 48s | ok 6/6/0/0/0 2s |
++| `pc/lib/quality-package-windows-path.test.mjs` | ok 1/1/0/0/0 0s | ok 1/1/0/0/0 0s |
++| `pc/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs` | ok 15/15/0/0/0 96s | ok 15/14/0/1/0 29s |
++| `pc/lib/pins/claude-design-readiness-cannot-start-on-windows.test.mjs` | ok 10/10/0/0/0 1s | ok 10/10/0/0/0 1s |
++| `pc/lib/pins/gitleaks-repair-ignore-cli-is-a-no-op-on-windows.test.mjs` | ok 9/8/0/1/0 2s | ok 9/9/0/0/0 1s |
++| `pc/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs` | ok 8/8/0/0/0 99s | ok 8/0/0/8/0 0s |
++| `pc/lib/pins/windows-portable-seed-rolls-back-with-hidden-worktree-error.test.mjs` | ok 9/8/0/1/0 5s | ok 9/7/0/2/0 1s |
++| `pc/lib/git-null-device-sites.test.mjs` | ok 8/8/0/0/0 1s | ok 8/8/0/0/0 1s |
++| `pc/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs` | ok 14/14/0/0/0 2s | ok 14/14/0/0/0 2s |
++| `pc/lib/worktree-process-start.test.mjs` | ok 2/0/0/2/0 0s | ok 2/2/0/0/0 1s |
++| `pc/lib/pins/windows-pre-push-installer-fsync-and-relative-action.test.mjs` | ok 14/13/0/1/0 212s | ok 14/14/0/0/0 61s |
++| `pc/lib/windows-native-type-cache.test.mjs` | ok 13/13/0/0/0 31s | ok 13/4/0/9/0 0s |
++| `pc/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs` | ok 6/6/0/0/0 218s | ok 6/6/0/0/0 43s |
++| `pc/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs` | ok 7/5/0/2/0 7s | ok 7/6/0/1/0 1s |
++| `pc/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs` | ok 36/35/0/1/0 133s | ok 36/35/0/1/0 66s |
++| `pc/lib/windows-assurance-verify-registration.test.mjs` | ok 1/1/0/0/0 2s | ok 1/1/0/0/0 0s |
++| `pc/lib/hardened-private-directory.test.mjs` | ok 52/40/0/12/0 12s | ok 52/47/0/5/0 0s |
++| `pc/lib/trusted-tool-resolution.test.mjs` | ok 1/1/0/0/0 0s | ok 1/1/0/0/0 0s |
++| `pc/lib/po-gate-authority.test.mjs` | ok 1/1/0/0/0 612s | ok 1/1/0/0/0 11s |
++| `pc/lib/signed-quality-package.test.mjs` | exit 1 43/36/6/1/0 199s | ok 43/43/0/0/0 17s |
++| `pc/scripts/guard-human-override.test.mjs` | exit 1 28/10/15/3/0 218s | ok 28/28/0/0/0 14s |
++| `pc/scripts/pipeline-state-result-case-migration.test.mjs` | exit 1 3/0/3/0/0 10s | ok 3/3/0/0/0 4s |
++| `pc/lib/onboarding-continuity.test.mjs` | exit null TIMEOUT ?/?/?/?/? 1500s | exit 1 TIMEOUT ?/?/?/?/? 900s |
++| `pc/scripts/pipeline-state-result-bootstrap.test.mjs` | exit 1 6/0/6/0/0 40s | ok 6/6/0/0/0 6s |
++| `pc/scripts/design-approval-route.e2e.test.mjs` | exit 1 14/9/5/0/0 778s | ok 14/14/0/0/0 66s |
++| `pc/lib/governance-event-store.win-fsync.test.mjs` | ok 31/31/0/0/0 4s | ok 31/31/0/0/0 1s |
++| `pc/lib/local-supervisor-state.test.mjs` | exit 1 1/0/1/0/0 2s | ok 1/1/0/0/0 1s |
++| `pc/scripts/session-cleanup-owner-nonce.test.mjs` | exit 1 3/2/1/0/0 3s | ok 3/3/0/0/0 1s |
++| `pc/scripts/afk-claude-host.test.mjs` | ok 10/10/0/0/0 3s | ok 10/10/0/0/0 1s |
++| `pc/hooks/stop-fanout.test.mjs` | exit 1 24/23/1/0/0 81s | ok 24/24/0/0/0 41s |
++| `pc/lib/codex-onboarding-runtime.test.mjs` | exit 1 24/17/7/0/0 181s | ok 24/24/0/0/0 26s |
++| `pc/scripts/pre-commit-hook-install.test.mjs` | exit null TIMEOUT ?/?/?/?/? 1500s | ok 59/59/0/0/0 423s |
++| `pc/scripts/critic-route-activation.test.mjs` | exit 1 8/5/3/0/0 1s | ok 8/8/0/0/0 0s |
++| `pc/lib/governance-scope-win32-acl.test.mjs` | exit 1 1/0/1/0/0 5s | ok 1/0/0/1/0 1s |
++| `pc/lib/git-hook-runtime-snapshot-fast-verify.test.mjs` | ok 19/19/0/0/0 67s | ok 19/13/0/6/0 3s |
++| `pc/lib/security-scanner-diagnostics.test.mjs` | ok 24/9/0/15/0 1s | ok 24/24/0/0/0 3s |
++| `pc/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs` | ok 11/5/0/6/0 17s | ok 11/11/0/0/0 6s |
++| `pc/lib/human-guard-override-disjoint.test.mjs` | exit 1 35/30/3/2/0 5169s | ok 35/35/0/0/0 24s |
++| `pc/scripts/installed-plugin-attestation-host.test.mjs` | ok 11/11/0/0/0 116s | ok 11/11/0/0/0 27s |
++| `pc/scripts/onboarding-init.test.mjs` | exit 1 55/40/13/2/0 954s | ok 55/55/0/0/0 277s |
++| `pc/scripts/worktree-create.test.mjs` | exit 1 3/2/1/0/0 1s | ok 3/3/0/0/0 0s |
++| `setup.test.mjs` | ok 1/1/0/0/0 1s | ok 1/1/0/0/0 1s |
++| `pc/lib/afk-ledger.test.mjs` | exit 1 14/7/7/0/0 33s | ok 14/14/0/0/0 1s |
++| `pc/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs` | ok 8/7/0/1/0 1s | ok 8/2/0/6/0 0s |
++| `pc/lib/pins/advisor-demand-reuse-has-no-design-course-bound.test.mjs` | ok 15/12/0/3/0 20s | ok 15/15/0/0/0 30s |
++| `pc/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs` | ok 13/11/0/2/0 38s | ok 13/13/0/0/0 13s |
++| `pc/lib/design-workflow-package-v2.test.mjs` | ok 2/0/0/2/0 1s | ok 2/2/0/0/0 325s |
++| `pc/lib/pins/preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt.test.mjs` | ok 12/11/0/1/0 5s | ok 12/1/0/11/0 0s |
++| `pc/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs` | ok 75/74/0/1/0 2s | ok 74/73/0/1/0 1s |
++| `pc/lib/pins/scratch-has-no-retention-and-no-durability-check.test.mjs` | ok 13/12/0/1/0 41s | ok 13/13/0/0/0 2s |
++| `pc/lib/pins/security-scanner-failure-provenance.test.mjs` | ok 12/11/0/1/0 10s | ok 12/12/0/0/0 1s |
++| `pc/lib/runner-profile-migration-v2.test.mjs` | ok 1/1/0/0/0 3s | ok 1/1/0/0/0 2s |
++| `pc/scripts/pipeline-start-preflight.path-spelling.test.mjs` | ok 13/12/0/1/0 1s | ok 13/1/0/12/0 0s |
++| `pc/lib/installed-plugin-attestation.test.mjs` | ok 10/10/0/0/0 11s | ok 10/10/0/0/0 1s |
++| `pc/lib/native-platform-process-observer.test.mjs` | ok 5/2/0/3/0 0s | ok 5/4/0/1/0 0s |
++| `pc/lib/pins/commit-grammar-hint-still-requires-scratch-message-file.test.mjs` | ok 8/7/0/1/0 1s | ok 8/7/0/1/0 0s |
++| `pc/scripts/goldfish-commit-command-flow.test.mjs` | ok 30/30/0/0/0 2s | ok 30/30/0/0/0 1s |
++| `pc/lib/governance-scope.test.mjs` | ok 27/21/0/6/0 80s | ok 27/27/0/0/0 15s |
++| `pc/scripts/document-binding.test.mjs` | ok 1/1/0/0/0 57s | ok 1/1/0/0/0 1s |
++| `pc/lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs` | ok 42/41/0/1/0 176s | ok 42/42/0/0/0 54s |
++| `pc/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs` | ok 13/10/0/3/0 58s | ok 13/13/0/0/0 2s |
++
++## Summary
++
++- 77 of the 288 candidates were started; 74 have a result on both platforms. Never started: 211 (see "Not measured").
++- Native Windows: 17 suites red with 76 failing cases in total; 57 suites green; 3 TIMEOUT (guard-lifecycle-ready, onboarding-continuity, pre-commit-hook-install).
++- Linux (WSL2): every measured suite green (0 failing cases); 1 TIMEOUT (onboarding-continuity, 15 minutes, so slow on both platforms, not Windows-specific).
++- Several suites that exercise native-Windows behaviour pass with a typed skip on Linux (for example windows-authority-ancestors-above-repository-are-human-controlled: 8 skipped on Linux, 8 pass on Windows).
++- The reverse also occurs and deserves a look: some suites skip on Windows what Linux runs, for instance worktree-process-start (0 pass / 2 skipped on Windows, 2 pass on Linux),
++  design-workflow-package-v2 (2 skipped on Windows), sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows (3 of 4 skipped on Windows), security-scanner-diagnostics (15 of 24 skipped on Windows).
++- The guard-lifecycle-ready suite did not finish within 25 minutes on Windows, so the 60-failure figure of backlog item
++  `pipeline.guard-suite-fails-60-tests-on-native-windows` is still not re-measured at this commit. The Linux baseline for it is in
++  `specs/sprint-alfred-epic/evidence/guard-lifecycle-ready-suite-baseline-2026-10-22.md`.
++
++## Failing cases on native Windows, classified (not fixed here)
++
++Classification is a first reading of the first failing assertion, not a root-cause proof. "Undetermined" means the first error does not decide it.
++Linux passes every one of these suites, so none is a cross-platform regression.
++
++| Suite (pc/ = plugins/pipeline-core/) | Failing | First failing assertion (path text normalised) | Class |
++|---|---|---|---|
++| pc/lib/signed-quality-package.test.mjs | 6 | EPERM: operation not permitted, symlink | Environment (symlink privilege is not granted to a standard Windows user). The tests carry no typed skip for a missing symlink privilege, so also a stale-test candidate. |
++| pc/lib/codex-onboarding-runtime.test.mjs | 7 | EPERM: operation not permitted, symlink (COR001, COR002, COR003, COR006, COR015, COR018 ...) | Environment, same cause and same missing-skip remark. |
++| pc/scripts/pipeline-state-result-bootstrap.test.mjs | 6 | State authority route unavailable (WIN-AUTH-ANCESTOR-MUTATION); EPERM symlink; missing-approval | Mixed: the authority error is undetermined (see next row), the symlink part is environment. |
++| pc/scripts/guard-human-override.test.mjs | 15 | SessionAuthorityError WIN-AUTH-ANCESTOR-MUTATION from windows-owned-authority-backend | Undetermined, environment-suspect (the clone location's ancestor ACLs); needs a rerun from a hardened location before it is called a product defect. |
++| pc/scripts/pipeline-state-result-case-migration.test.mjs | 3 | State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: WIN-AUTH-ANCESTOR-MUTATION) | Same as above. |
++| pc/lib/human-guard-override-disjoint.test.mjs | 3 | HumanGuardOverrideError: override directory DACL is not owner-private (suite also took 5169 s) | Environment-suspect (temp-root or ancestor DACL; see backlog item windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures). |
++| pc/lib/afk-ledger.test.mjs | 7 | Expected values to be strictly equal (generation and DACL/owner assurance cases) | Undetermined, DACL-assurance related, environment-suspect. |
++| pc/lib/governance-scope-win32-acl.test.mjs | 1 | WINACL001: FAIL-OPEN: assessWindowsPrivatePath still reports secure after Everyone:R was granted | Potential PRODUCT defect (a fail-open in a security assessment). Highest priority to re-verify at a hardened location, because an environment cause would not make the assessment report "secure". |
++| pc/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs | 1 | case D2: ENOENT lstat of the session-authority catalogue under the fixture repository (session-authority-registry readRaw) | Undetermined; possibly product (readRaw does not tolerate a missing catalogue on this path) or fixture. Its sibling pin windows-authority-ancestors-... passes 8/8. |
++| pc/lib/pins/design-workflow-package-v2-readiness-fixture-fails-on-windows.test.mjs | 1 | B2: source does not match the expected win32 HOST-LIMITATION skip | Known open defect with a red pin (backlog item 2026-10-07-design-workflow-package-v2-readiness-fixture-fails-on-windows); product/test fix pending, pin documents it. |
++| pc/scripts/critic-route-activation.test.mjs | 3 | EPERM: operation not permitted, fsync | Product/host: directory fsync on Windows (backlog windows-directory-durability family); also the two win32 DACL-injection cases fail. |
++| pc/hooks/stop-fanout.test.mjs | 1 | SF22: on win32 every ledger-side spawn is reached through windows-private-state.mjs | Known deviation named in the test itself (ledger PowerShell spawns, bound 4 must drop to 0; backlog fanout-ledger-spawns-powershell-on-every-stop-on-windows). Product defect, pinned. |
++| pc/scripts/session-cleanup-owner-nonce.test.mjs | 1 | POSIX: a mode-0600 single-link owner-nonce file is admitted (regression, unchanged) | Stale test for Windows: a POSIX mode-bit case that has no meaning on NTFS (backlog windows-posix-mode-bit-checks-are-meaningless-on-ntfs); needs a platform guard. |
++| pc/scripts/worktree-create.test.mjs | 1 | same POSIX owner-nonce case, "Got unwanted exception" | Stale test for Windows, same as above. |
++| pc/lib/local-supervisor-state.test.mjs | 1 | file-level failure (one test, no assertion text) | Undetermined; needs its log read. |
++| pc/scripts/design-approval-route.e2e.test.mjs | 5 | DABC001, DABR001-004: Expected values to be strictly equal | Undetermined; probably the Windows authority or path route; needs its log read. |
++| pc/scripts/onboarding-init.test.mjs | 13 | Cannot find module (loader) and INITIAL-ANSWERS-JOURNAL-UNSAFE | Undetermined: the module-not-found part looks like a stale test path spelling on Windows, the journal part is private-state assurance. |
++
++TIMEOUTs (no verdict): guard-lifecycle-ready (Windows, 25 min), onboarding-continuity (Windows 25 min and Linux 15 min), pre-commit-hook-install (Windows 25 min; Linux passes 59/59 in 423 s).
++These need a longer limit run in the background; the 25-minute limit was a budget choice, not a finding.
++
++## Not measured
++
++- 211 of the 288 candidate files were never started: the deferred heavy suites (guard-lifecycle-ready, worktree-lifecycle, passive-read-policy, human-guard-override, verify-journal, po-human-approval),
++  and the tail of the ordering (most of the files that mention win32 only in passing, and the Darwin or Codex or Antigravity host suites).
++- po-human-approval did not finish within a 40-minute attempt before the first run was restarted and was deferred; its Windows result is open.
++- Windows runs from a hardened (non-world-writable ancestor) location, to separate the environment-suspect rows above from product defects.
++- The long-running suites listed under TIMEOUT.

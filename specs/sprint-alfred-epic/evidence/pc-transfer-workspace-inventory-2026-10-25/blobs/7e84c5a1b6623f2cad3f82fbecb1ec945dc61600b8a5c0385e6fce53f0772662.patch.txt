@@ -1,0 +1,794 @@
+diff --git a/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md b/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md
+index 84cc0c005..8b692b25a 100644
+--- a/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md
++++ b/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md
+@@ -76,6 +76,22 @@ committed or registered yet because the current product commit is held at the
+ normal protected-path backstop. Do not mark it closed from the static diagnosis
+ or an isolated snapshot test.
+ 
++## Counted runs 2026-10-22 (Linux/WSL2, commit `f3a9f02cb`, one suite at a time)
++
++- `lib/project-onboarding-v3.test.mjs` (the sharded ORIGINAL184 harness): 216 cases across 2 sequential chunks of 6
++  shards, 0 shards failed, 216 PASS lines and 0 fail, skip, cancel or timeout outcomes; wrapper duration 467 s (the
++  earlier prepared attempt stopped at 900 s with 149 passed, 1 failed, 34 unobserved). The onboarding handover cases
++  `the public onboarding handover is executable for every runner with baseline-only and configured verify`
++  (codex, antigravity, claude) all PASS: the handover commit runs through the installed hook and the snapshot-local
++  protected-baseline catalog.
++- `lib/git-hook-runtime-snapshot.test.mjs`: 8 cases, 8 pass, 0 fail, 0 skip (exact catalog and digest in the snapshot;
++  missing, changed, removed, symlinked and hard-linked catalog refused; no other root file copied).
++- `scripts/pre-commit-hook-install.test.mjs` (the original hook suite): 59 cases, 59 pass, 0 fail, 0 skip (55/55 at the
++  time of the Intake status above).
++
++Still open and not agent work: Full Verify and the candidate-bound closure checks on the Linux/WSL host, the independent
++Critic review, and PO acceptance. The item status stays `open`.
++
+ ## Triage
+ 
+ - **Decision:** fixed in source — closes after the 0.7.0 candidate host checklist (status stays `open` until then).
+diff --git a/backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md b/backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md
+index 2a8b803c2..265ab47ba 100644
+--- a/backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md
++++ b/backlog/items/2026-10-03-session-readiness-drops-to-partial-after-bootstrap-ready.md
+@@ -68,3 +68,19 @@ returned `partial` under 4-5 concurrent agents. Both carried
+ code path is the bare strict-mode `catch` in `lib/project-onboarding-v3.mjs`
+ (about lines 1869-1886), which turns any observation failure into that code.
+ A fix dispatch (FLAP) is in progress.
++
++## Covered and measured 2026-10-22
++
++The two FLAP fixes (`073a5a230` bounded re-observation, `d3c41ca5e` skip of a descriptor retired between listing and
++loading) are now pinned over real shared on-disk state: `lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs`
++AC7a/AC7b run a separate OS process that owns a real session descriptor and retires it at an exact point of the parent's
++strict cleanup-recovery observation. Both cases fail (`cleanup_recovery_observation_unavailable`, cause
++`WT-SESSION-MISSING`) with either fix reverted and pass with both in place.
++
++Residual, measured and not asserted: a dense create/retire loop of sub-millisecond descriptors (3-4 processes) still
++makes a share of the strict observations `partial` (26 of 46 raw plans before the fixes, 2 of 28-31 observations with the
++retry in place, about 25 percent of raw plan calls throwing `WT-SESSION-MISSING` from the retirement inspector's
++required load). A listed descriptor retired before `inspectSessionRetirement` loads it is only absorbed by the three-attempt
++re-observation, not skipped. Real sessions hold a descriptor for far longer than a plan takes, so this is a stress bound,
++not the measured 2-of-60 schedule; whether the inspector should skip a listed-then-retired descriptor like the listing
++does is a design question for the owner of `session-cleanup-recovery.mjs`.
+diff --git a/backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md b/backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md
+index 32214d19a..5c81957b2 100644
+--- a/backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md
++++ b/backlog/items/2026-10-04-guard-suite-fails-60-tests-on-native-windows.md
+@@ -42,6 +42,13 @@ their activation assumptions).
+ - Keep a recorded baseline count so a later change can be attributed without a
+   staging experiment.
+ 
++## Recorded baseline 2026-10-22
++
++The second Proposal bullet (a recorded baseline count) is met for Linux/WSL2:
++`specs/sprint-alfred-epic/evidence/guard-lifecycle-ready-suite-baseline-2026-10-22.md` records 392 cases, 389 pass,
++0 fail, 3 skipped (typed native-Windows skips) at commit `f3a9f02cb`. Open: the native-Windows count at the current
++commit, and the classification of the 60 failures reported on 2026-10-04 (273 cases then; 392 now).
++
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+ - **Decision:**
+diff --git a/plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs b/plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs
+index c803c389b..e6b681ff0 100644
+--- a/plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs
++++ b/plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs
+@@ -18,9 +18,10 @@
+ import assert from 'node:assert/strict';
+ import { test } from 'node:test';
+ import { spawnSync } from 'node:child_process';
+-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, lstatSync, linkSync } from 'node:fs';
++import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, lstatSync, linkSync, symlinkSync } from 'node:fs';
+ import { join } from 'node:path';
+ import { fileURLToPath, pathToFileURL } from 'node:url';
++import { symlinkCapability, symlinkSkip } from '../symlink-capability.mjs';
+ 
+ const repository = fileURLToPath(new URL('../../../../', import.meta.url));
+ const libUrl = process.env.HEADROOM_PIN_LIB
+@@ -33,9 +34,6 @@ const cli = process.env.HEADROOM_PIN_SCRIPT
+   ? await import(pathToFileURL(scriptPath).href)
+   : await import('../../scripts/report-resource-headroom.mjs');
+ 
+-const HOST_LIMITATION = 'host-limitation: native Windows host cannot create directory symlinks or mode bits; '
+-  + 'owner Coordinator, due 2026-10-19, to be run on the Linux/WSL host (PO decision K7)';
+-
+ const base = join(repository, 'scratch', 'headroom-pin-fixtures');
+ mkdirSync(base, { recursive: true });
+ const fixture = () => {
+@@ -238,7 +236,41 @@ test('A4 the guard admits the bundled reporter as a read-only command and refuse
+   assert.equal(isReadOnlyDiagnosticCommand(cmd(real, '../escape.json'), root), false);
+ });
+ 
+-test('A3 CLI refuses an input reached through a symlinked parent or aliased file', { skip: HOST_LIMITATION }, () => {});
++// The physical-alias refusals (symlinked parent directory, symlinked file) are exercised wherever the host can create the link;
++// each case first runs the same input by its physical path, so a refusal cannot be a fixture mistake.
++const DIRECTORY_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: 'dir' }));
++const FILE_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: 'file' }));
++const symlinkRefusalFixture = () => {
++  const root = fixture();
++  mkdirSync(join(root, 'real'));
++  const payload = JSON.stringify(doc([{ id: 'a', limit: limit(100), measurement: meas(25) }]));
++  writeFileSync(join(root, 'real', 'obs.json'), payload, { flag: 'wx' });
++  return { root, payload };
++};
++
++test('A3 CLI refuses an input reached through a symlinked parent directory', { skip: DIRECTORY_SYMLINK_SKIP }, async () => {
++  const { root, payload } = symlinkRefusalFixture();
++  symlinkSync(join(root, 'real'), join(root, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
++  const physical = await runMain(root, ['--input', 'real/obs.json']);
++  assert.equal(physical.code, 0, physical.err);
++  const aliased = await runMain(root, ['--input', 'linked/obs.json']);
++  assert.equal(aliased.code, 2);
++  assert.equal(aliased.out, '');
++  assert.match(aliased.err, /^RESOURCE-HEADROOM-INPUT: /u);
++  assert.equal(readFileSync(join(root, 'real', 'obs.json'), 'utf8'), payload, 'the reporter left the input unchanged');
++});
++
++test('A3 CLI refuses an input that is a symlink to a regular file', { skip: FILE_SYMLINK_SKIP }, async () => {
++  const { root } = symlinkRefusalFixture();
++  symlinkSync(join(root, 'real', 'obs.json'), join(root, 'real', 'alias.json'), 'file');
++  const physical = await runMain(root, ['--input', 'real/obs.json']);
++  assert.equal(physical.code, 0, physical.err);
++  const aliased = await runMain(root, ['--input', 'real/alias.json']);
++  assert.equal(aliased.code, 2);
++  assert.equal(aliased.out, '');
++  assert.match(aliased.err, /^RESOURCE-HEADROOM-INPUT: /u);
++});
++
+ test('A3 CLI refuses a hard-linked input (nlink != 1)', async () => {
+   const root = fixture();
+   const file = join(root, 'inputs', 'obs.json');
+diff --git a/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs b/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs
+index 0ac13c7d7..1984ee8dd 100644
+--- a/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs
++++ b/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs
+@@ -13,15 +13,17 @@
+ // The real preflight module runs; only its project-readiness probe (a documented dependency seam,
+ // `requireProjectOnboardingReadyFn`) is driven so the bootstrap-ready/session-partial state is
+ // deterministic. The guard's admission of the emitted command is decided by the guard's own real
+-// function. Not covered (named, not claimed): the concurrent-schedule cause of intermittent
+-// `cleanup_recovery_observation_unavailable` (measured 2026-10-05, separate FLAP fix; typed
+-// uncovered point UNCOVERED-CONCURRENT-CAUSE: AC6 starts real parallel processes over one
+-// deterministic probe state, but the real intermittent cause needs live shared on-disk state this pin
+-// does not fabricate), and SKILL.md prose.
++// function. The concurrent-schedule cause of the intermittent `cleanup_recovery_observation_unavailable`
++// (measured 2026-10-05, FLAP fixes 073a5a230 and d3c41ca5e) is covered by AC7a/AC7b over real shared
++// on-disk state: a separate OS process owns a real session descriptor in an onboarded fixture repository and
++// retires it at an exact point of the parent's real strict cleanup-recovery observation (AC6 starts real
++// parallel processes over one deterministic probe state). Not covered (named, not claimed): SKILL.md prose,
++// other concurrent writers than session descriptors, and a dense create/retire loop of sub-millisecond
++// descriptors, which the bounded re-observation does not absorb (see the backlog item).
+ 
+ import assert from "node:assert/strict";
+ import { spawn } from "node:child_process";
+-import { writeSync } from "node:fs";
++import { existsSync, realpathSync, rmSync, writeFileSync, writeSync } from "node:fs";
+ import { join, resolve } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+@@ -29,6 +31,10 @@ import { fileURLToPath } from "node:url";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { ProjectOnboardingReadyError } from "../project-onboarding-ready-gate.mjs";
+ import { isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
++import { partialCleanupRecoveryResultCore } from "../project-onboarding-v3.mjs";
++import { planSessionCleanupRecovery } from "../session-cleanup-recovery.mjs";
++import { listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor } from "../worktree-lifecycle.mjs";
++import { createLegacyLayoutFixture } from "../test-session-cleanup-requester-fixture.mjs";
+ 
+ const CWD = resolve("/projects/current");
+ // The readiness guard compares `--root` against a real repository identity, so admission is checked
+@@ -102,6 +108,21 @@ const commandOf = (action) => {
+   return [action.executable, ...action.argv].map(word).join(" ");
+ };
+ 
++// Child mode (AC7): the same file, run as a separate process, is one concurrent "agent" that owns a real session
++// descriptor in the SHARED on-disk repository the parent observes. It announces the descriptor, then retires it the
++// instant the parent drops the signal file (the owner retiring its own session at an exact point of the parent's read).
++if (process.env.ALF_PIN_OWNER_CHILD === "1") {
++  const root = process.env.ALF_PIN_OWNER_ROOT;
++  const signal = process.env.ALF_PIN_OWNER_SIGNAL;
++  const handle = startSessionDescriptor(root, { ownerRuntime: null });
++  writeSync(1, `${JSON.stringify({ sessionId: handle.sessionId, path: handle.path })}\n`);
++  const deadline = Date.now() + 30_000;
++  while (!existsSync(signal) && Date.now() < deadline) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2);
++  if (!existsSync(signal)) process.exit(3);
++  retireSessionDescriptor(root, { sessionId: handle.sessionId, ownerNonce: handle.ownerNonce, descriptorSha256: handle.descriptorSha256 });
++  process.exit(0);
++}
++
+ // Child mode (AC6): the same file, run as a separate process, emits the preflight action as JSON.
+ if (process.env.ALF_PIN_PREFLIGHT_CHILD === "1") {
+   const result = preflight(({ intent }) => {
+@@ -188,6 +209,92 @@ test("AC6: real parallel read-only preflight processes over the same probe state
+   assert.equal(results[0].nextAction.mutation, false);
+ });
+ 
++// AC7: the measured intermittent cause (2026-10-05: 2 of 60 `inspect --intent session` runs under 4-5 concurrent
++// agents) was ANOTHER session's descriptor being retired by its owner while the cleanup-recovery plan listed and loaded
++// it. These cases reproduce that over REAL shared on-disk state: an onboarded fixture repository, a separate OS
++// process that owns a real session descriptor in it and retires it at an exact point of this process's read, and
++// the real strict cleanup-recovery observation (the function behind `inspect --intent session`). The retire is
++// scheduled by a handshake (the owner retires only after the parent has read the descriptor), so the schedule is
++// exact and never depends on timing. A dense create/retire loop is deliberately NOT asserted: a descriptor that lives
++// for a fraction of a millisecond is outside any bounded re-observation (measured, see the backlog item).
++async function withDescriptorOwnedByAnotherProcess(run) {
++  const root = realpathSync(createLegacyLayoutFixture({ prefix: "pin-flap", name: "owner", goal: "Concurrent readiness pin" }));
++  const signal = join(root, ".git", "pin-retire-now.signal");
++  let child = null;
++  try {
++    child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
++      env: { ...process.env, ALF_PIN_OWNER_CHILD: "1", ALF_PIN_OWNER_ROOT: root, ALF_PIN_OWNER_SIGNAL: signal }, stdio: ["ignore", "pipe", "pipe"],
++    });
++    let out = "";
++    let err = "";
++    child.stderr.on("data", (d) => { err += d; });
++    const announced = await new Promise((res, rej) => {
++      child.on("error", rej);
++      child.on("close", (code) => rej(new Error(`owner exited before announcing its descriptor (${code}): ${err}`)));
++      child.stdout.on("data", (d) => { out += d; if (out.includes("\n")) res(JSON.parse(out.split("\n")[0])); });
++    });
++    const closed = new Promise((res) => child.on("close", res));
++    // Retire the descriptor in the OTHER process and wait until this process sees it gone.
++    const retireInOtherProcess = () => {
++      writeFileSync(signal, "retire\n");
++      const deadline = Date.now() + 20_000;
++      while (existsSync(announced.path) && Date.now() < deadline) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2);
++      assert.equal(existsSync(announced.path), false, "the owning process retired its descriptor");
++    };
++    assert.equal(existsSync(announced.path), true, "positive control: the descriptor existed on shared disk before the race");
++    await run({ root, announced, retireInOtherProcess });
++    assert.equal(await closed, 0, "the owning process retired cleanly");
++  } finally {
++    child?.kill();
++    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
++  }
++}
++
++function observeStrict(root, planDeps) {
++  let planCalls = 0;
++  const result = partialCleanupRecoveryResultCore({
++    root, runner: "claude", intent: "session", repository: {}, strict: true,
++    deps: {
++      sleepSync: () => {},
++      planSessionCleanupRecovery: (args) => { planCalls += 1; return planSessionCleanupRecovery({ ...args, deps: planDeps(planCalls) }); },
++    },
++  });
++  return { result, planCalls };
++}
++
++test("AC7a: a descriptor retired by another process between the directory read and its load is skipped; the observation is ready on the first attempt", async () => {
++  await withDescriptorOwnedByAnotherProcess(({ root, retireInOtherProcess }) => {
++    let raced = false;
++    const { result, planCalls } = observeStrict(root, () => ({
++      listActiveSessionDescriptorsFn: (rootDir, options = {}) => listActiveSessionDescriptors(rootDir, {
++        ...options,
++        descriptorStageHook: (stage) => { if (stage === "listed" && !raced) { raced = true; retireInOtherProcess(); } },
++      }),
++    }));
++    assert.equal(raced, true, "the race really happened: the descriptor was listed, then retired by its owner, then loaded");
++    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
++    assert.ok(result === null);
++    assert.equal(planCalls, 1, "no re-observation was needed");
++  });
++});
++
++test("AC7b: a descriptor retired by another process after it was listed, before it is inspected, is absorbed by the bounded re-observation", async () => {
++  await withDescriptorOwnedByAnotherProcess(({ root, retireInOtherProcess }) => {
++    let raced = false;
++    const { result, planCalls } = observeStrict(root, () => ({
++      listActiveSessionDescriptorsFn: (rootDir, options = {}) => {
++        const listed = listActiveSessionDescriptors(rootDir, options);
++        if (!raced) { raced = true; retireInOtherProcess(); }
++        return listed;
++      },
++    }));
++    assert.equal(raced, true, "the race really happened: the stale listing named a descriptor its owner had already retired");
++    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
++    assert.ok(result === null);
++    assert.equal(planCalls, 2, "the plan was re-observed exactly once, then converged");
++  });
++});
++
+ // Typed-reason cases (AC-253, ALF-C-P1-01C). The preflight result carries an additive
+ // `sessionReadiness: { reasonCode, lifecycleStatus }` when the session probe is not clean:
+ // PORG-NOT-READY + lifecycleStatus for the typed denial, `session-probe-failed` + null otherwise.
+diff --git a/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs b/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs
+index d2a86f716..f52f16b05 100644
+--- a/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/sign-intent-disclosure-scan-blocks-for-minutes.test.mjs
+@@ -3,23 +3,75 @@
+ // Proposal points: (1) signed quality package disclosed directly, before the GMW/HGO resolvers;
+ // (2) HGO lookup digest-keyed, never a store scan; (3) readiness before any resolver work;
+ // (4) a sanctioned sweep for consumed/expired HGO requests.
+-// Host limitation: the full CLI ceremony and the HGO store sweep need a real git common dir with
+-// secure private-directory modes; they are NOT exercised on this native Windows host
+-// (owner Coordinator, due 2026-10-19, Linux/WSL run, PO decision K7).
++//
++// Every point is exercised by behaviour, never by reading source text: a populated request store is timed
++// (point 2), the real `sign-intent` entry point is run with counting resolver seams (points 1 and 3) and
++// the real sweep is run over expired requests (point 4). The original defect measured 563 s for a lookup
++// over 111 recorded requests; the bound below is two orders of magnitude tighter than that.
+ import assert from "node:assert/strict";
+-import { createHash } from "node:crypto";
+-import { readFileSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { createHash, generateKeyPairSync } from "node:crypto";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
+ 
+ import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, qualityPackageIntentSha256 } from "../signed-quality-package.mjs";
+-import { describeHumanGuardOverrideSelection, sweepHumanGuardOverrideRequests } from "../human-guard-override.mjs";
++import {
++  describeHumanGuardOverrideSelection,
++  humanGuardOverrideInternals,
++  planHumanGuardOverride,
++  prepareHumanGuardOverrideForSignature,
++  recordHumanGuardDenial,
++  sweepHumanGuardOverrideRequests,
++} from "../human-guard-override.mjs";
++import { runHumanApproval } from "../../scripts/po-human-approval.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+-const approvalSource = readFileSync(join(HERE, "..", "..", "scripts", "po-human-approval.mjs"), "utf8");
+-const hgoSource = readFileSync(join(HERE, "..", "human-guard-override.mjs"), "utf8");
+-const sha = (text) => createHash("sha256").update(text).digest("hex");
++const PLUGIN_ROOT = join(HERE, "..", "..");
++const HUMAN_OVERRIDE_SCRIPT = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
++const APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
++const sha = (value) => createHash("sha256").update(value).digest("hex");
++const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }];
++
++// The measured defect was 563 s for 111 recorded requests; a digest-keyed lookup is milliseconds. The bound is
++// generous for a loaded machine and still ~100x below the defect.
++const STORE_REQUESTS = 111;
++const LOOKUP_BUDGET_MS = 5000;
++const POSIX_MODES = process.platform === "win32" && "host-limitation: the HGO private-directory modes need POSIX mode bits; the native Windows run is the separate DACL obligation (owner Coordinator, PO decision K7)";
++
++function git(root, ...args) {
++  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
++  assert.equal(result.status, 0, result.stderr);
++  return String(result.stdout).trim();
++}
++
++function signatureRepository(prefix) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
++  git(root, "init", "-q", "-b", "main");
++  git(root, "config", "user.name", "Fixture");
++  git(root, "config", "user.email", "fixture@example.invalid");
++  git(root, "config", "commit.gpgsign", "false");
++  writeFileSync(join(root, "README.md"), "fixture\n");
++  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
++  git(root, "add", "README.md", "pipeline.user.yaml");
++  git(root, "commit", "-q", "-m", "fixture");
++  return root;
++}
++
++const cleanup = (...dirs) => { for (const dir of dirs) rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); };
++
++function recordRequests(root, count) {
++  const recorded = [];
++  for (let n = 0; n < count; n++) {
++    const result = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
++      toolInput: { file_path: `notes-${n}.md`, content: `pin store request ${n}\n` }, denials: denial, nowMs: Date.now() });
++    assert.equal(typeof result.requestSha256, "string", JSON.stringify(result));
++    recorded.push(result.requestSha256);
++  }
++  return recorded;
++}
+ 
+ function qualityPackage() {
+   const body = { schema: SIGNED_QUALITY_PACKAGE_SCHEMA, baseCommit: "a".repeat(40),
+@@ -38,35 +90,125 @@ test("point 1: a signed quality package is disclosed directly (base commit, path
+   assert.equal(describeSignedQualityPackageIntent(pkg, sha("other")), null, "a digest that does not bind the package never discloses");
+ });
+ 
+-test("point 1: sign-intent handles the quality-package schema before, and instead of, the GMW/HGO resolvers", () => {
+-  const qp = approvalSource.indexOf("case SIGNED_QUALITY_PACKAGE_SCHEMA:");
+-  const gmw = approvalSource.indexOf("record = describeGmw(");
+-  assert.ok(qp > 0 && gmw > qp, "quality-package case precedes the generic resolver chain");
+-  const caseBody = approvalSource.slice(qp, approvalSource.indexOf("break;", qp));
+-  assert.ok(!/describeGmw|describeHgo/u.test(caseBody));
+-  const defaultBranch = approvalSource.slice(approvalSource.indexOf("default:", qp), gmw);
+-  assert.match(defaultBranch, /scratchRequestRecord !== null/u, "a recognised --request never reaches the resolver scan");
++// ---- the real sign-intent entry point over a fixture that stops at the readiness check --------------------------------
++// A repository with no committed trust anchor and a key directory outside every repository: sign-intent must refuse in
++// its readiness step. Counting seams stand in for the GMW and HGO resolvers and for OpenSSL.
++function signIntentFixture() {
++  const repository = signatureRepository("alf-sign-intent-repo-");
++  const directory = realpathSync(mkdtempSync(join(tmpdir(), "alf-sign-intent-keys-")));
++  const home = realpathSync(mkdtempSync(join(tmpdir(), "alf-sign-intent-home-")));
++  const keys = generateKeyPairSync("ed25519");
++  const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
++  writeFileSync(join(directory, "po-private.pem"), keys.privateKey.export({ type: "pkcs8", format: "pem" }));
++  writeFileSync(join(directory, "po-public.pem"), publicKey);
++  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ keyReference: "pin-key", publicKeySha256: sha(publicKey), humanName: "Pin Operator" })}\n`);
++  const calls = { gmw: 0, hgo: 0, openssl: 0 };
++  const dependencies = {
++    homedirFn: () => home,
++    describeIntentRecord: () => { calls.gmw += 1; throw new Error("the GMW resolver must not run"); },
++    describeHgoIntentRecord: () => { calls.hgo += 1; throw new Error("the HGO resolver must not run"); },
++    spawn: () => { calls.openssl += 1; return { status: 0, stdout: "OpenSSL 3.0.0 pin\n", stderr: "" }; },
++    stderrWriteFn: () => {},
++  };
++  return { repository, directory, home, calls, dependencies, cleanup: () => cleanup(repository, directory, home) };
++}
++
++test("point 3: readiness is checked before any resolver work in sign-intent", () => {
++  const item = signIntentFixture();
++  try {
++    assert.throws(
++      () => runHumanApproval(["sign-intent", "--repo-root", item.repository, "--directory", item.directory, "--intent-sha256", sha("any digest")], item.dependencies),
++      (error) => error?.code === "SIGN-READINESS-FAILED",
++      "a missing prerequisite fails with its typed readiness repair",
++    );
++    assert.deepEqual({ gmw: item.calls.gmw, hgo: item.calls.hgo }, { gmw: 0, hgo: 0 }, "no resolver ran before the readiness failure");
++  } finally { item.cleanup(); }
++});
++
++test("point 1: a quality-package --request is disclosed by its own case and never reaches the GMW/HGO resolvers", () => {
++  const item = signIntentFixture();
++  try {
++    const pkg = qualityPackage();
++    mkdirSync(join(item.repository, "scratch"), { recursive: true });
++    writeFileSync(join(item.repository, "scratch", "quality-package-request.json"), JSON.stringify(pkg));
++    assert.throws(
++      () => runHumanApproval(["sign-intent", "--repo-root", item.repository, "--directory", item.directory, "--request", "scratch/quality-package-request.json"], item.dependencies),
++      (error) => error?.code === "SIGN-READINESS-FAILED",
++      "the request was accepted and disclosed (not refused as invalid or unsupported); only the later readiness step refused",
++    );
++    assert.deepEqual({ gmw: item.calls.gmw, hgo: item.calls.hgo }, { gmw: 0, hgo: 0 }, "the generic resolver chain never ran");
++  } finally { item.cleanup(); }
+ });
+ 
+-test("point 3: readiness runs before any resolver work in sign-intent", () => {
+-  const ready = approvalSource.indexOf("assertSigningReadyBeforePrompt({ repository");
+-  const gmw = approvalSource.indexOf("record = describeGmw(");
+-  assert.ok(ready > 0 && ready < gmw);
++test("point 1: a request whose digest does not bind the package is refused as invalid, still without a resolver scan", () => {
++  const item = signIntentFixture();
++  try {
++    const pkg = { ...qualityPackage(), intentSha256: sha("a digest that does not bind this package") };
++    mkdirSync(join(item.repository, "scratch"), { recursive: true });
++    writeFileSync(join(item.repository, "scratch", "quality-package-request.json"), JSON.stringify(pkg));
++    assert.throws(
++      () => runHumanApproval(["sign-intent", "--repo-root", item.repository, "--directory", item.directory, "--request", "scratch/quality-package-request.json"], item.dependencies),
++      /QUALITY-PACKAGE-SIGN-REQUEST-INVALID/u,
++    );
++    assert.deepEqual({ gmw: item.calls.gmw, hgo: item.calls.hgo }, { gmw: 0, hgo: 0 });
++  } finally { item.cleanup(); }
+ });
+ 
+-test("point 2: the HGO lookup is digest-keyed and unknown digests resolve without scanning", () => {
+-  const start = hgoSource.indexOf("function describeHumanGuardOverrideSelectionCore");
+-  const body = hgoSource.slice(start, hgoSource.indexOf("export function describeHumanGuardOverrideSelection(", start));
+-  assert.match(body, /readIndexedDisclosurePlan/u);
+-  assert.ok(!/readdirSync|hgoAuthorityInventory|for \(const .* of .*requests/u.test(body), "no store scan inside the describe path");
+-  const unresolved = describeHumanGuardOverrideSelection({ rootDir: HERE, intentSha256: "not-a-digest" });
+-  assert.equal(unresolved.resolved, false);
+-  assert.equal(unresolved.code, "HGO-RECORD-DIGEST-INVALID");
++// ---- point 2: the HGO lookup over a populated request store ----------------------------------------------------------
++test("point 2: with a populated request store an unknown digest is unresolved within the time budget and without touching the store", { skip: POSIX_MODES }, () => {
++  const root = signatureRepository("alf-sign-intent-store-");
++  try {
++    recordRequests(root, STORE_REQUESTS);
++    const requests = join(root, ".git", "agent-pipeline", "human-guard-overrides", "requests");
++    assert.equal(readdirSync(requests).length, STORE_REQUESTS, "the store holds the recorded requests the defect measured");
++    const started = Date.now();
++    const unresolved = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: sha("an intent no request names"), scriptPath: HUMAN_OVERRIDE_SCRIPT });
++    const elapsed = Date.now() - started;
++    assert.equal(unresolved.resolved, false);
++    assert.equal(unresolved.code, "HGO-RECORD-INDEX-UNAVAILABLE", "an unknown digest has no index; it is not matched against every request");
++    assert.deepEqual(unresolved.lines, []);
++    assert.ok(elapsed < LOOKUP_BUDGET_MS, `the lookup took ${elapsed} ms over ${STORE_REQUESTS} requests (budget ${LOOKUP_BUDGET_MS} ms; the defect took 563000 ms)`);
++  } finally { cleanup(root); }
+ });
+ 
+-test("point 4: a sanctioned sweep for consumed/expired HGO requests exists", () => {
+-  assert.equal(typeof sweepHumanGuardOverrideRequests, "function");
+-  assert.match(hgoSource, /if \(expiry <= nowMs \|\| consumed\) eligible\.push\(row\)/u);
++test("point 2: with a populated request store a digest with a published index resolves its own request within the time budget", { skip: POSIX_MODES }, () => {
++  const root = signatureRepository("alf-sign-intent-resolve-");
++  try {
++    const hashes = recordRequests(root, STORE_REQUESTS);
++    const chosen = hashes[Math.floor(STORE_REQUESTS / 2)];
++    const planned = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: chosen, scriptPath: HUMAN_OVERRIDE_SCRIPT });
++    assert.equal(typeof planned.planSha256, "string", JSON.stringify(planned));
++    const published = prepareHumanGuardOverrideForSignature({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: chosen, scriptPath: HUMAN_OVERRIDE_SCRIPT, humanApprovalScriptPath: APPROVAL_SCRIPT });
++    const started = Date.now();
++    const resolved = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: published.intentSha256, scriptPath: HUMAN_OVERRIDE_SCRIPT });
++    const elapsed = Date.now() - started;
++    assert.equal(resolved.resolved, true, JSON.stringify(resolved));
++    assert.equal(resolved.code, "HGO-RECORD-RESOLVED");
++    assert.ok(resolved.lines.join("\n").includes("notes-55.md"), "the disclosure names the chosen request's own path");
++    assert.ok(elapsed < LOOKUP_BUDGET_MS, `the lookup took ${elapsed} ms over ${STORE_REQUESTS} requests (budget ${LOOKUP_BUDGET_MS} ms)`);
++  } finally { cleanup(root); }
+ });
+ 
+-test("host limitation: live store sweep and full CLI ceremony", { skip: "host-limitation: needs POSIX private-directory modes; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)" }, () => {});
++// ---- point 4: the sanctioned sweep -----------------------------------------------------------------------------------
++test("point 4: sweep-requests removes expired requests from a populated store and keeps a live one", { skip: POSIX_MODES }, () => {
++  const root = signatureRepository("alf-sign-intent-sweep-");
++  try {
++    const [live] = recordRequests(root, 1);
++    const base = join(root, ".git", "agent-pipeline", "human-guard-overrides");
++    const { canonical } = humanGuardOverrideInternals;
++    const expired = [];
++    for (let n = 0; n < 40; n++) {
++      const retired = { schema: "pipeline.human-guard-override-request.v2", root, plugin: {}, repository: {}, toolName: "Bash",
++        toolInputSha256: "a".repeat(64), denials: [], policy: {}, preview: {}, eligiblePaths: [], commandClass: `expired-${n}`, mode: "standard",
++        authorSourceRoot: null, createdAt: "2026-08-31T09:00:00.000Z", expiresAt: "2026-08-31T10:00:00.000Z" };
++      const name = `${createHash("sha256").update(canonical(retired)).digest("hex")}.json`;
++      writeFileSync(join(base, "requests", name), JSON.stringify(retired), { mode: 0o600 });
++      expired.push(name);
++    }
++    const swept = sweepHumanGuardOverrideRequests({ rootDir: root });
++    assert.equal(swept.status, "swept", JSON.stringify(swept));
++    assert.equal(swept.removed, expired.length, "every expired request was removed");
++    for (const name of expired) assert.equal(existsSync(join(base, "requests", name)), false, name);
++    assert.equal(existsSync(join(base, "requests", `${live}.json`)), true, "a live request is retained");
++  } finally { cleanup(root); }
++});
+diff --git a/plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs b/plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs
+index 2018bf274..4bb734fb0 100644
+--- a/plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs
++++ b/plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs
+@@ -12,17 +12,22 @@
+  *     route is exercised by P7 below)
+  *  P7 the real sign-intent route, run against a contained git-initialised fixture
+  *     repository, prints only the compact disclosure for a 4000-line review record
++ *  P6 custody of the review file the real route writes beside a --request: single-link
++ *     regular 0600 file named by its own digest; hard link, symlink and linked scratch
++ *     directory refused (mode-bit and symlink variants are typed conditional skips)
+  * RED mirrors below prove the assertions can fail.
+  */
+ import assert from "node:assert/strict";
+ import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign as cryptoSign, verify as cryptoVerify } from "node:crypto";
+ import { spawnSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { linkSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+ import test, { after } from "node:test";
+ import { fileURLToPath } from "node:url";
+ import { GIT_NULL_DEVICE } from "../git-null-device.mjs";
++import { SIGNED_QUALITY_PACKAGE_SCHEMA, qualityPackageIntentSha256 } from "../signed-quality-package.mjs";
++import { symlinkCapability, symlinkSkip } from "../symlink-capability.mjs";
+ import { compactSigningDisclosure, formatHumanApprovalCliResult, runHumanApproval } from "../../scripts/po-human-approval.mjs";
+ 
+ /**
+@@ -216,7 +221,130 @@ test("P8: push/critical-action approve and the generic signing command share com
+   assert.ok(hgo.slice(0, signOnce).includes("compactSigningDisclosure({ intentSha256, record, materialArtifact })"),"the human-guard-override signing request is rendered by sign-intent through the same compact disclosure");
+ });
+ 
+-test("P6 (host limitation): directory-mode / symlink custody cases of the review file", { skip: "host-limitation: Windows has no directory mode bits or directory symlinks; owner Coordinator, due 2026-10-19, Linux/WSL run (PO decision K7)" }, () => {});
++// ---- P6: custody of the review file written beside a --request ----------------------------------------------------------
++// The real sign-intent route, run against a signed-quality-package request in a contained git-initialised fixture, writes the
++// review material beside the request. The case below pin its custody: the file is a single-link regular 0600 file named by the
++// digest of its own bytes, and a symlink, a hard link or a linked scratch directory in its place is refused without writing
++// through it. The mode-bit and symlink variants are typed conditional skips (not an empty body) where the host cannot express them.
++const DIRECTORY_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: "dir" }));
++const FILE_SYMLINK_SKIP = symlinkSkip(symlinkCapability({ type: "file" }));
++const MODE_BITS_SKIP = process.platform === "win32" && "host-limitation: native Windows reports 0o666 for every file and has no POSIX mode bits; the DACL variant is the separate native-host obligation (PO decision K7)";
++
++function qualityPackageRequest() {
++  const body = { schema: SIGNED_QUALITY_PACKAGE_SCHEMA, baseCommit: "a".repeat(40),
++    unifiedDiff: "diff --git a/x/b.txt b/x/b.txt\n--- a/x/b.txt\n+++ b/x/b.txt\n@@ -1 +1 @@\n-a\n+b\n",
++    expectedDigests: { "x/b.txt": createHash("sha256").update("b\n").digest("hex") } };
++  return { ...body, intentSha256: qualityPackageIntentSha256(body) };
++}
++
++function routeFixture() {
++  const passphrase = "pin-fixture-passphrase";
++  const repoRoot = initFixtureGitRepository(fixtureTemp("pin-p6-repo-"));
++  const directory = fixtureTemp("pin-p6-key-");
++  const home = mkdtempSync(join(tmpdir(), "pin-p6-home-"));
++  const { privateKey, publicKey } = generateKeyPairSync("ed25519", { privateKeyEncoding: { type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase }, publicKeyEncoding: { type: "spki", format: "pem" } });
++  writeFileSync(join(directory, "po-private.pem"), privateKey);
++  writeFileSync(join(directory, "po-public.pem"), publicKey);
++  const authority = { keyReference: "pin-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
++  writeFileSync(join(directory, "trust-policy.json"), JSON.stringify({ ...authority, humanName: "Pin Operator" }));
++  mkdirSync(join(repoRoot, "project"), { recursive: true });
++  writeFileSync(join(repoRoot, "project/critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["governance-fork-disposition"], waivedKinds: [], trustAnchors: [authority] }));
++  const spawn = (executable, args = []) => {
++    const a = args.map(String);
++    if (executable === "openssl" && a[0] === "pkeyutl" && a.includes("-sign") && a.some((e) => /po-private\.pem/u.test(e))) {
++      writeFileSync(a[a.indexOf("-out") + 1], cryptoSign(null, readFileSync(a[a.indexOf("-in") + 1]), createPrivateKey({ key: privateKey, format: "pem", passphrase })));
++      return { status: 0 };
++    }
++    return healthyOpensslStub(executable, a);
++  };
++  const request = qualityPackageRequest();
++  mkdirSync(join(repoRoot, "scratch"), { recursive: true });
++  const requestPath = join(repoRoot, "scratch", "quality-package-request.json");
++  writeFileSync(requestPath, JSON.stringify(request));
++  const sign = () => {
++    const realWrite = process.stdout.write;
++    let captured = "";
++    process.stdout.write = (chunk) => { captured += chunk; return true; };
++    try {
++      const result = runHumanApproval(["sign-intent", "--repo-root", repoRoot, "--directory", directory, "--request", "scratch/quality-package-request.json"], {
++        spawn, isTTY: true, homedirFn: () => home, stderrWriteFn: () => {},
++        readConfirmation: () => { throw new Error("encrypted key: no typed confirmation expected"); },
++      });
++      return { result, captured };
++    } finally { process.stdout.write = realWrite; }
++  };
++  const reviewFiles = () => readdirSync(join(repoRoot, "scratch")).filter((name) => name.startsWith(`review-${request.intentSha256}-`));
++  const clearOutputs = () => { for (const name of readdirSync(join(repoRoot, "scratch"))) if (name !== "quality-package-request.json") rmSync(join(repoRoot, "scratch", name), { recursive: true, force: true }); };
++  const cleanupAll = () => { for (const d of [repoRoot, directory, home]) rmSync(d, { recursive: true, force: true }); };
++  return { repoRoot, request, requestPath, sign, reviewFiles, clearOutputs, cleanup: cleanupAll };
++}
++
++test("P6: the review file is one regular single-link file named by the digest of its own bytes, beside the request", () => {
++  const item = routeFixture();
++  try {
++    const { result, captured } = item.sign();
++    assert.equal(result.ok, true, JSON.stringify(result));
++    const [name, ...more] = item.reviewFiles();
++    assert.deepEqual(more, [], "exactly one review file is written");
++    const path = join(item.repoRoot, "scratch", name);
++    const metadata = lstatSync(path);
++    assert.equal(metadata.isFile() && !metadata.isSymbolicLink(), true);
++    assert.equal(metadata.nlink, 1);
++    const digest = createHash("sha256").update(readFileSync(path)).digest("hex");
++    assert.equal(name, `review-${item.request.intentSha256}-${digest}.json`, "the file name embeds the digest of the bytes on disk");
++    assert.ok(captured.includes(`scratch/${name}`) && captured.includes(digest), "the operator output names the path and digest of that file");
++  } finally { item.cleanup(); }
++});
++
++test("P6: the review file is private to its owner (mode 0600)", { skip: MODE_BITS_SKIP }, () => {
++  const item = routeFixture();
++  try {
++    assert.equal(item.sign().result.ok, true);
++    const [name] = item.reviewFiles();
++    assert.equal(statSync(join(item.repoRoot, "scratch", name)).mode & 0o777, 0o600);
++  } finally { item.cleanup(); }
++});
++
++test("P6: a hard link planted at the review path is refused and its other name is not written through", () => {
++  const item = routeFixture();
++  try {
++    assert.equal(item.sign().result.ok, true);
++    const [name] = item.reviewFiles();
++    item.clearOutputs();
++    const decoy = join(item.repoRoot, "scratch", "decoy.txt");
++    writeFileSync(decoy, "decoy\n");
++    linkSync(decoy, join(item.repoRoot, "scratch", name));
++    // Two independent layers refuse a multi-link review file (the publisher's own custody check and the shared
++    // physical-file reader); either typed refusal is the contract, a successful signing is not.
++    assert.throws(() => item.sign(), /single-link regular artifact|DAB-SIGN-FILE-UNSAFE/u);
++    assert.equal(readFileSync(decoy, "utf8"), "decoy\n", "the decoy sharing the inode was not written through");
++  } finally { item.cleanup(); }
++});
++
++test("P6: a symlink planted at the review path is refused and its target is not written through", { skip: FILE_SYMLINK_SKIP }, () => {
++  const item = routeFixture();
++  try {
++    assert.equal(item.sign().result.ok, true);
++    const [name] = item.reviewFiles();
++    item.clearOutputs();
++    const decoy = join(item.repoRoot, "scratch", "decoy.txt");
++    writeFileSync(decoy, "decoy\n");
++    symlinkSync(decoy, join(item.repoRoot, "scratch", name), "file");
++    assert.throws(() => item.sign(), /single-link regular artifact/u);
++    assert.equal(readFileSync(decoy, "utf8"), "decoy\n", "the symlink target was not written through");
++  } finally { item.cleanup(); }
++});
++
++test("P6: a scratch directory that is a directory link is refused and nothing is written through it", { skip: DIRECTORY_SYMLINK_SKIP }, () => {
++  const item = routeFixture();
++  try {
++    const moved = join(item.repoRoot, "moved-scratch");
++    renameSync(join(item.repoRoot, "scratch"), moved);
++    symlinkSync(moved, join(item.repoRoot, "scratch"), process.platform === "win32" ? "junction" : "dir");
++    assert.throws(() => item.sign(), /--request must be a path inside this repository's own scratch\/ directory/u);
++    assert.deepEqual(readdirSync(moved).filter((name) => name.startsWith("review-")), [], "no review file was written through the link");
++  } finally { item.cleanup(); }
++});
+ 
+ test("RED mirror: an uncapped renderer fails the P1 bound, so the pin can fail", () => {
+   const uncapped = ({ intentSha256, record }) => [`intent sha256: ${intentSha256}`, ...record.lines];
+diff --git a/plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs b/plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs
+index f152bd706..8f97cb018 100644
+--- a/plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs
++++ b/plugins/pipeline-core/lib/pins/worktree-process-start-parser-misreads-spaced-comm.test.mjs
+@@ -17,13 +17,14 @@
+ // L-* observe it through the module's exported routes against real /proc and are skipped off Linux with a typed reason.
+ //
+ // QG-06 skip record (a documented, owned, dated exception, not a silent decay): L-1 and L-2 are SKIPPED, not run, on every
+-// non-Linux host, and no Linux/WSL run of this pin has been recorded yet.
+-//   pending : one Linux or WSL run of this file in which L-1 and L-2 execute and pass (not skipped)
++// non-Linux host (native Windows); they are not skipped on Linux, where they run against the real /proc.
++//   recorded: the Linux/WSL run is counted in specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md (commit
++//             1e2592108): this file, 7 cases, 6 pass, 0 fail, 1 skip, 0 todo. L-1 and L-2 executed and passed (not skipped);
++//             the one skip is H-1, a typed Linux-only skip ("/proc is readable on Linux"; the unreadable-stat path is S-3).
+ //   owner   : Coordinator
+-//   due     : 2026-10-19
++//   due     : 2026-10-19 (the recorded run is dated 2026-10-22, three days after the due date; the date was not kept)
+ //   decision: PO decision K7
+-// At the due date the recorded Linux/WSL run replaces the skip, or the skip is promoted to a blocking failure or deleted; the
+-// date is never extended silently. Until then S-1..S-4 run on every host and carry A1, A2 and A4 at source level.
++// The native-Windows skip of L-1 and L-2 stays by design: S-1..S-4 run on every host and carry A1, A2 and A4 at source level.
+ 
+ import assert from "node:assert/strict";
+ import { spawn, spawnSync } from "node:child_process";
+@@ -47,11 +48,11 @@ const repoRoot = join(here, "..", "..", "..", "..");
+ const SOURCE_PATH = join(here, "..", "worktree-lifecycle.mjs");
+ const SOURCE = readFileSync(SOURCE_PATH, "utf8");
+ 
+-// QG-06 skip record (see the header): pending Linux/WSL run, owner Coordinator, due 2026-10-19, PO decision K7.
++// QG-06 skip record (see the header): the Linux/WSL run is recorded; the skip applies off Linux only.
+ const HOST_LIMITATION_SKIP = process.platform === "linux"
+   ? false
+   : "host-limitation: real /proc/<pid>/stat process identity exists only on Linux; this host is " + process.platform
+-    + "; pending Linux/WSL run, owner Coordinator, due 2026-10-19, PO decision K7, QG-06";
++    + "; the Linux/WSL run is recorded in pin-counted-results-2026-10-22.md, owner Coordinator, PO decision K7, QG-06";
+ 
+ const SPACED_COMM = "a (b) c";
+ const roots = [];
+diff --git a/specs/sprint-alfred-epic/evidence/guard-lifecycle-ready-suite-baseline-2026-10-22.md b/specs/sprint-alfred-epic/evidence/guard-lifecycle-ready-suite-baseline-2026-10-22.md
+new file mode 100644
+index 000000000..a74bfe9cf
+--- /dev/null
++++ b/specs/sprint-alfred-epic/evidence/guard-lifecycle-ready-suite-baseline-2026-10-22.md
+@@ -0,0 +1,59 @@
++# Recorded baseline: the guard-lifecycle-ready suite, 2026-10-22
++
++Backlog item: `pipeline.guard-suite-fails-60-tests-on-native-windows` (Proposal, second bullet: "Keep a recorded baseline
++count so a later change can be attributed without a staging experiment"). This file is that record. It does not close
++the item: the 60 native-Windows failures of 2026-10-04 were not re-measured here.
++
++## Command
++
++```
++node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++```
++
++Run in a fresh local clone, TMPDIR set to a private directory outside every repository, other agents running their own
++suites on the same machine (so the duration is an upper bound, not a budget).
++
++## Baseline (Linux, WSL2)
++
++Measured on commit `f3a9f02cb613f3c0b978bf48dddff81273b6379c` (the guard hook, its library and its test file are
++byte-identical in the clone head the run used; only pin tests and a backlog item text were added after that commit).
++
++| Cases | Pass | Fail | Cancelled | Skipped | Todo | Duration |
++|---|---|---|---|---|---|---|
++| 392 | 389 | 0 | 0 | 3 | 0 | 537 s |
++
++The three skipped cases are typed native-Windows skips, each naming why:
++
++- `QP3-2a G8 on native Windows the signed-package lane admits backslash path words only as their canonical rendering`
++- `QP3-2d F-B on native Windows a letter-case variant of the real script is admitted because it is the same physical file`
++- `QP4-2 R5 on native Windows a double-quoted drive path of plain path characters is admitted; protected and mixed-quote spellings stay refused`
++
++```json
++{
++  "schema": "pipeline.suite-baseline.v1",
++  "suite": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
++  "platform": "linux-wsl2",
++  "commit": "f3a9f02cb613f3c0b978bf48dddff81273b6379c",
++  "cases": 392,
++  "pass": 389,
++  "fail": 0,
++  "cancelled": 0,
++  "skipped": 3,
++  "todo": 0
++}
++```
++
++## How to attribute a later change
++
++A later run on the same platform with a different failure count is attributable to the commits between the two. The
++comparison needs no staging experiment: run the command above before and after, and compare the row. A changed case
++count with an unchanged fail count means cases were added or removed; the skipped list above names the only expected
++skips on Linux.
++
++## Not established here
++
++- The native-Windows baseline. The item records 273 cases, 213 pass, 60 fail on 2026-10-04 (and 194 pass, 79 fail with a
++  guard change staged, which the item attributes to staging artefacts). The suite has since grown to 392 cases; the
++  Windows count at this commit has to be measured on the native host and recorded beside the Linux row.
++- The classification of those 60 failures (stale fixture assumption, platform difference, real defect). The Linux run
++  shows no failing case, which says the Linux side is not affected; it does not classify the Windows failures.

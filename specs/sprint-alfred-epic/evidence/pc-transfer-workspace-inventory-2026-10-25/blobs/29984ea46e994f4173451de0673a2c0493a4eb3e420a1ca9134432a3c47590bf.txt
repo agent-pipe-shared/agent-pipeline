@@ -1,0 +1,394 @@
+---
+name: pipeline-start
+description: Mandatory Agent-Pipeline bootstrap for Elephant, Goldfish and Critic.
+argument-hint: "[elephant|goldfish|critic]"
+---
+
+# Pipeline start (runner-neutral happy path)
+
+NVA-B60-17 uses `lib/bootstrap-payload-budget.mjs` (metric
+`utf8-byte-upper-bound`: a conservative UTF-8-byte upper bound, not a model
+token count). A full Elephant bootstrap is session-bound: run it at
+`startup|resume|clear`, a runtime re-entry, or a typed recovery needing it —
+never for an ordinary task, message, tool result, commit, test, PO response,
+or active-goal continuation in the same ready session. Normal bootstrap
+targets 10–15k units; an original payload over 45,000 is rejected.
+## Role and runtime identity
+
+Resolve the plugin root, then run exactly:
+
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
+
+Accept only schema `pipeline.start-preflight.v1`, status `ready`,
+`pipeline-governance-inactive`, `plugin-refresh-required`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
+version/source/boundary/handoff, and a read-only `nextAction` when ready.
+Goldfish/Critic validate but never execute onboarding; Elephant executes the
+returned action at its declared boundary. Resolve role before preflight:
+conflicting or unknown carriers stop — Critic is closed, never Elephant.
+
+For `pipeline-governance-inactive`, ask the human once whether this project
+should use the Pipeline. Only after an affirmative answer, execute the exact
+read-only `onboarding-init.mjs` command in `nextAction`; the driver handles
+subsequent consent and mutations. A decline leaves the project inactive.
+
+Status `hook-provisioning-required` or `hook-refresh-required` (Elephant only)
+carries a mutating `nextAction`: `clone-hook-readiness.mjs --root <root> --apply`
+or `refresh-mandatory-hooks.mjs --root <root>`. Elephant executes that exact
+action once, then reruns the identical preflight and continues only on `ready`;
+a missing or failed action stops bootstrap. Goldfish and Critic never execute it.
+
+Status `plugin-attestation-required` is a closed hard recovery, never the
+soft `plugin-refresh-required` advisory. For Codex, accept it only with
+`nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
+`kind: host-postinstall`, `executionBoundary: host`, `mutation: true`,
+`requiresPoApproval: false`, executable `node`, and expected result schema
+`pipeline.installed-plugin-attestation-host-result.v1` with status `written`.
+Elephant executes that exact action once at the declared host boundary without
+asking the PO, accepts only its exact expected result, then reruns the identical
+`pipeline-start-preflight.mjs` command. Continue only when that fresh readback is
+`ready`; a missing, malformed or failed action, another
+`plugin-attestation-required`, or any other non-ready status stops bootstrap.
+Goldfish and Critic never perform this mutation and remain blocked for Elephant
+recovery. Never reconstruct the argv or add a source path from conversation.
+For a Claude or Antigravity `plugin-attestation-required` result with no
+`nextAction`, stop and load `references/local-plugin-attestation.md`; recover
+from a verified source checkout, never a guessed source path or gitless copy.
+Rerun preflight after the documented recovery.
+
+Print only after a ready result:
+
+`Agent Pipeline start: version {{MANIFEST_VERSION}} · plugin root {{ABSOLUTE_PLUGIN_ROOT}}`
+
+For local development also print the source line → `references/freshness.md`.
+
+A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
+`docs/push-release-flow.md`) means repo-root if present, else the vendored
+`${PIPELINE_PLUGIN_ROOT}` copy — rule: `references/canon-references.md`.
+
+## Scratch space
+
+Use only the repository's `scratch/` for temporary files in every lifecycle
+phase, including intake. Do not use host temp or `.git/` as agent scratch; a
+scratch refusal needs typed recovery. For cleanup-bound files, ignored evidence,
+or any new durable directory, load `references/scratch-and-directory.md`.
+
+## Normal bootstrap command sequence
+
+### One onboarding consent, not a chain of prompts
+
+Private Critic export requires a separate, project-bound consent decision before
+candidate-bearing child creation. Load `references/critic-export.md` when
+preparing it; never infer host approval from a saved consent or model label.
+
+When the user has directly agreed to use Agent Pipeline for this repository,
+consent authorizes the bounded local onboarding happy path: read-only plans
+and readbacks, portable authority seed, any plan-disclosed local Git init,
+runtime init, restart-barrier prep, and the first kickoff artifacts. State
+the bounded effects once, then execute each returned digest-bound action and
+readback without re-asking per digest. `requiresConfirmation` describes the
+action's safety shape, not a second PO chat gate.
+
+A local Git init result carrying a `collect-input` action for the repository's
+commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
+neither `user.name` nor `user.email` resolves locally or globally) is a
+blocking question, same tier as the kickoff goal/profile/language questions —
+never a diagnostic to notice and act on later, never a default or invented
+value. Ask the PO once now for both, hold the answered values, and apply them
+via `git config user.name "<name>"` / `git config user.email "<email>"` in
+THIS repository's local config only, immediately before the first commit,
+never sooner — never `--global`, never an untyped value.
+
+Restart bounds and what this consent does NOT grant →
+`references/onboarding-recovery.md`.
+
+**Before this consent exists:** never create a deliverable file — reading,
+explaining, answering are fine, artifacts are not, even in the turn you say
+you will wait for a yes. Never volunteer whether the Pipeline fits the task;
+that call is the human's — if asked, state cost/benefit neutrally, not a
+recommendation.
+
+1. **Step 0 / V4 onboarding:** First complete the
+   `plugin-attestation-required` recovery above. `nextAction.kind: "advisory"` runs nothing --
+   go to Step 2, surfaced. Otherwise execute the exact action returned by
+   preflight, verbatim, never hand-constructed from memory. For a project
+   that is not yet ready, that action names the guided driver,
+   `onboarding-init.mjs --root <root> [--runner <runner>] [--step-cap <n>]`
+   (`scripts/onboarding-init.mjs`) -- it walks the whole onboarding chain
+   step by step and re-anchors after each apply, replacing what used to be a
+   manual turn-by-turn `inspect`/apply loop. For an already-ready project the
+   returned action is the read-only
+   `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap`.
+   Accept only ready `pipeline.project-onboarding.v4` native-local or
+   receipt-bound plugin-managed forms, including CAS-READY App-Server
+   readback where required. Empty `.codex` is not authority.
+2. **Loaded authority:** read ruleset presence, V3 source/runtime authority,
+   profile, model/effort, Advisor model-free preflight, calibration, role
+   prohibitions, freshness/update availability, handover/state and Verify
+   availability. Machine-read full sources and emit digest-bound compact
+   facts; never claim a skipped or cached check passed.
+   In a new session run the optional model-role bootstrap for the installed
+   runner only: `references/model-role-codex-claude.md` for Codex/Claude or
+   `references/model-role-antigravity.md` for Antigravity. A changed
+   mapping needs an attended digest confirmation; absent optional evidence
+   keeps the existing governed V3 route and does not degrade lifecycle.
+3. **Boundary:** one simple shell command per tool call; never compose
+   `&&`, `;`, redirects or pipelines except bounded, expansions-free
+   `rg … | rg …`, `rg … | head -n 1..500`, or `rg … | tail -n 1..500`
+   diagnostics, and never a heredoc
+   or a multi-line command. The full closed grammar, its costliest
+   workarounds, and the commit-trailer rule (`AI-Assisted: true`, plus
+   `Dispatch: <TASK_ID> (goldfish)` for a dispatched Goldfish, nothing else
+   identifying provider/model/session/run/trace/account — GIT-03,
+   `guardrails/git.md`, no override) are in
+   `templates/prompts/agent-obligations.md` §1/§6 — read it before hitting
+   the same refusal live. This binds a Goldfish/Critic dispatch and an
+   undispatched Elephant session alike. Treat
+   `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
+   returned action directly at that boundary, including every Git
+   observation, keeping that routing authoritative. For Codex, never retry
+   in the Codex workspace sandbox first, and never probe both sandbox and
+   host views. Runner-owned structured `executable`/`argv` actions are
+   primary; a human copy-only rendering must use a tested native Bash/zsh,
+   PowerShell or cmd.exe renderer with explicit safe continuation, never a
+   visually wrapped long command. When a tool result already carries such a
+   pre-rendered field — for example `launch.copyCommand` in
+   `project-onboarding-v3.mjs`'s `restartCopyCommands`, whose `posix`/
+   `powershell`/`cmd` arrays are each a line already bounded under
+   `COPY_COMMAND_MAX_COLUMNS` — relay it VERBATIM, line for line, from that
+   same tool result. Never hand-reconstruct the command from memory of a
+   prior turn, even for the identical restart action seen before: a
+   correctly relayed rendering on one occasion does not carry over to the
+   next if the command is retyped instead of re-read.
+4. **Confirmation:** after all checks print exactly this line, five concrete
+   fields, no placeholder (additions, role variants → typed references):
+
+   > Bootstrap check passed: ruleset {{VERSION_OR_SHA}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE}} · State {{HANDOVER_DATE}} · Role {{Elephant|Goldfish|Critic}}
+
+   Never print it without Steps 1–5. "Non-ready" excludes
+   `plugin-refresh-required` (soft-refresh; carried forward, not withheld). No
+   confirmation on non-ready, unavailable, stale, malformed or drifted state.
+   The ready envelope carries `modelRoleBootstrap` (`unavailable` is legal,
+   absent is not); the session consumes it before the confirmation.
+   For the Elephant, the MP-04 check (`CLAUDE_CODE_SUBAGENT_MODEL` unset) is read from the
+   preflight line's `subagentModelEnv.status` (`unset` or `set`, never the value); `set` blocks the confirmation.
+   The four required confirmation facts are: `runtime.status`, `profile/model`
+   and `role`, `calibration/handover`, and `Verify availability`; each is
+   digest-bound to the machine readback and printed before continuation. If
+   this project has `gates.push_approval` configured, note here that any push
+   will need a signed or chat-cleared approval before it can land —
+   `references/push-approval.md` explains the full ceremony when a push is
+   actually being constructed or discussed.
+5. **Observation governance:** run
+   `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
+   before confirmation. `not-applicable` is the successful Consumer result; a
+   source checkout runs `node harness/scripts/check-observation-governance.mjs`,
+   and a `failed` one is case **F6** → `references/failure-cases.md`.
+
+6. **Architecture orientation, never a bootstrap prerequisite:** consume the
+   mandatory `architectureOrientation` readback in the ready preflight
+   envelope. Follow `references/architecture-orientation.md` for its typed
+   status. The proposal is not authority to write a map or make a PO decision.
+
+7. **Restart hint for material session input:** before a first kickoff **and
+   before proposing, displaying, or performing any restart, session cut or
+   Compact after kickoff**, the agent MUST determine whether the user supplied
+   material design input, scope, constraints, or open questions since the last
+   durable PRD/Spec update or Resume-Hint capture. This includes input received
+   after a short kickoff goal has already initialized the project. When it did,
+   distil that input into a bounded, closed context card and capture it; do not
+   reduce it to a new short kickoff goal or merely promise to remember it.
+   **Before a restart the session is not ready, and then exactly one argv shape
+   is admitted** — card at the fixed path, no other flags, `--help` included in
+   what is refused:
+   `node <plugin-root>/scripts/resume-hint.mjs capture --root <root> --card-file <root>/project/.resume-hint-input.json --consume-card`.
+   Write the card to that exact path first. Elsewhere (a ready session) any
+   `--card-file <json>` works. A short goal with no further
+   material input needs no card. Read back `resume-hint.mjs inspect` after a
+   successful capture and state that the `available` card will be used in the
+   next session; when no restart follows, use it as context for the current
+   kickoff or planning step instead.
+   At the start of the NEXT session, when `resume-hint.mjs inspect` reports
+   status `available`, the agent MUST read `project/resume-hint.json`'s
+   content in that same turn and incorporate its `intent`, `constraints`,
+   `scope`, and `questions` into its understanding of the session's goal
+   before presenting the bootstrap confirmation line — noting the card's
+   availability without reading its content does not satisfy this step. A
+   failed or skipped read must be surfaced honestly, never silently skipped
+   or claimed as done when it was not; this is a MUST-DO consumption step, not
+   a new readiness precondition, so it never blocks or gates the session.
+   The card is never a gate and capture failure must be surfaced honestly rather
+   than claimed as persisted context.
+   Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
+   their shapes differ: `intent` is one string; the other three are **arrays** of
+   short strings, at most 4, 4 and 3 entries. Every entry is a distilled
+   statement, never a transcript. Interpret user intent
+   rather than keywords: an intended restart/session cut captures it; changed
+   scope or constraints refresh it; canonised or revoked information is
+   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
+   `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
+   actions, authority, approval, close state, or exit status. Do not capture
+   raw transcripts, commands, approvals, lifecycle instructions, host paths,
+   URLs, credentials, secrets, or private identifiers. The validator rejects
+   those forms rather than persisting them.
+
+   If the card contains verbatim `materialInput` or already-answered onboarding
+   `values`, read and use both at the next session start; never re-ask an
+   answered value. For their exact shapes, screens, and resumed-intake source
+   rules, load `references/resume-hint.md` before capture or consumption.
+
+7. **Normal restart is handover-only:** a same-topic restart, context cut, or
+   request to save progress is not a block close. Update only the calibrated
+   handover and, where needed, the sanitised Resume-Hint, then re-enter with
+   this bootstrap. Never invoke `close-block`, `close-feature`, or the close
+   coordinator merely to start a new chat. `close-block` is available only
+   when the PO explicitly selects `durable-stop` (the topic ends) or
+   `runtime-transfer` (PC/CLI/runtime changes); its coordinator rejects any
+   other start intent before it can write private lifecycle state.
+
+<!-- GENERATED FROM roles/elephant.md -- do not hand-edit this block; regenerate
+     it via this repository's own generator script (self-application-only,
+     ADR-0015). Which EL ids appear here, and why every other MUST/MUST-NOT
+     id in roles/elephant.md is excluded, is documented at the generator's
+     own source — never restated here, so there is exactly one place
+     selection can drift. -->
+**Role prohibitions (Elephant, embedded — read no file for this):** EL-01 You
+write no production code · EL-02 Never direct a goldfish step-by-step in chat ·
+EL-03 Judgment stays at the right level, in three directions · EL-04 Any new
+foundational decision ⇒ register entry (`docs/state.md`) + ADR · EL-16 "The
+Elephant writes no bulk artifacts itself; if a task is dispatchable, dispatch
+it (the implement-tier model default). Elephant time on the design-tier model
+is reserved for judgment, not production." · EL-18 One repo, one elephant at a
+time — never two elephant sessions writing the same repo concurrently · EL-19
+For **rigor ≥ 1 OR risk class high**, after the spec passes its readiness check
+(EL-07) and BEFORE the first implementation dispatch (EL-05/EL-08), obtain the
+PO's PRD release · EL-34 Perceived process friction — the pipeline's
+setup/bootstrap process, or any other mandatory pipeline step, feeling
+laborious or costly in time/tokens — is never, on its own, grounds to propose
+bypassing, skipping, or abandoning that step · EL-35 Reaching a push gate under
+`gates.push_approval: signature` is never grounds to propose switching the mode
+to `chat`, or to suggest the PO push the commit themselves instead of walking
+the signing ceremony · EL-36 Never fill `--by`, or any operator/actor label,
+with a value the PO did not supply for that exact command · EL-37 A protected
+or guard-denied mutation goes only through its sanctioned route. Print verbatim
+under the Model/Effort line:
+
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19/EL-34/EL-35/EL-36/EL-37 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: complete the package, then use the policy-selected single PO approval ceremony
+<!-- END GENERATED: role-prohibitions block -->
+
+### Kickoff intake, durable design package, and document quality
+
+A pristine project, a first `kickoff plan`, material design input, or a design
+package about to be created or promoted — in any of those states load
+`references/kickoff-design.md` before writing or promoting anything, and follow
+it. It carries the two PO questions in full, the package directory and file
+names, the promotion transaction, the source-evidence rules, and the PRD/Spec
+quality bar.
+
+A pristine project's `v4Inspection` status is not always `kickoff-required`:
+since commit `10e1b6a0`, a genuinely fresh repository (no prior kickoff
+transaction) is routed instead to `intake-required`,
+`intake-design-questions-required`, or `bootstrap-binding-required` — load
+`references/intake-generate-design.md` for that path instead of
+`kickoff-design.md`. A repository already mid-kickoff under the old model
+keeps following `kickoff-design.md` untouched.
+
+Three of its rules are stated here as well, because a session that never loads
+it is still bound by them. No artifact of a pristine project is written before
+its bootstrap questions are answered. Two of those answers are PO input and are
+never inferred, defaulted, or claimed after the fact: the operator-facing
+language of this project's documents, and the PO profile. And the
+`specs/kickoff-*` files a bootstrap transaction creates are provisional anchors
+only — once material design input exists the durable package replaces them,
+through the promotion flow in the reference, before a planning result is
+presented or a restart proposed.
+
+## Typed lazy loading
+
+Load each reference only at its stated condition. A new-session model readback
+and a ready architecture readback each load their matching reference at that
+step; later implementation or Critic work loads its reference when reached:
+
+- `references/onboarding-recovery.md` for non-ready V4, restart, kickoff,
+  private handoff or host-bound recovery;
+- `references/local-plugin-attestation.md` for Claude/Antigravity
+  `plugin-attestation-required` with no executable action;
+- `references/model-role-codex-claude.md` for Codex/Claude model readback,
+  or `references/model-role-antigravity.md` for Antigravity's own hook-bound
+  model readback;
+- `references/scratch-and-directory.md` for temporary-file cleanup, ignored
+  evidence or any new durable directory;
+- `references/critic-export.md` before private Critic export;
+- `references/resume-hint.md` before material-input capture or consumption;
+- `references/architecture-orientation.md` for the ready preflight's typed
+  architecture readback;
+- `references/implementation-continuation.md` before implementation dispatch
+  or Critic preparation;
+- `references/design-course.md` before first `submit-plan` for an `epic` or
+  `feature`, and again when `inspect` requests a design-workflow package;
+- `references/private-overlay.md` for private overlay, cleanup or
+  project-authority privatization;
+- `references/roles.md` for Goldfish/Critic role-specific prohibitions;
+- `references/freshness.md` for freshness/update/calibration/handover detail;
+- `references/failure-cases.md` for typed failure and recovery cases;
+- `references/continuation.md` for `PCR-BLOCKED` or `PCR-DECISION-PENDING`;
+- `references/kickoff-design.md` for kickoff intake questions, the durable
+  design package, promotion, and the PRD/Spec quality bar;
+- `references/intake-generate-design.md` for the `intake-*`/
+  `bootstrap-binding-required` coordinator path a genuinely fresh repository
+  now actually routes toward, its staging output, and its handoff into the
+  same promotion transaction `kickoff-design.md` documents;
+- `references/push-approval.md` for the point a session constructs,
+  explains, or discusses the push-approval gate (`gates.push_approval`),
+  before a human clears it;
+- `references/transcript-forensics.md` for preparing a forensic-analysis
+  dispatch of a runner's own session transcript after a live test run.
+- `references/workflow-dispatch.md` for using the Workflow tool or
+  `isolation: "worktree"` to fan out Goldfish/Critic work: the
+  Elephant-only orchestration rule, the mandatory worktree self-heal
+  briefing text, the ~50-tool-call termination cliff and required budget
+  language, and how to recover a truncated dispatch's real work.
+- `references/antigravity-native-dispatch.md` before an Elephant or other
+  authorized dispatcher constructs an Antigravity `invoke_subagent` call that
+  includes a Pipeline role. This applies whether or not the dispatcher uses
+  Workflow or worktrees.
+- `references/antigravity-feature-close.md` when an Antigravity session is
+  actually closing an approved feature, not for a normal restart.
+
+Lazy loading never widens authority and must preserve lifecycle, V3 authority,
+calibration, handover, Verify and continuation checks.
+
+## Gate authority and autonomous continuation
+
+The applicable Operating Model, compiled runtime manifest and recorded active
+plan are the only gate authority. Never add a chat or human checkpoint for a
+routine implementation step.
+
+Once bootstrap is ready and the required plan gate is recorded, continue the
+approved implementation autonomously: scoped edits, focused tests, state
+readback, one-line commits, Verify, Critic preparation, execution and ordinary block
+continuation are agent work. A standing approval is not a fresh human touch.
+**Agent work under `epic` or `feature` starts with Goldfish dispatch from the
+first implementation edit; the Elephant does not write that diff.** `mini` is
+the sole direct-implementation exception. A completed feature requires a
+returned `critic-review` result. Load `references/implementation-continuation.md`
+before dispatch or Critic preparation for the model route, sealed packet,
+review and autonomous-continuation contracts. A recorded PRD/Spec approval
+mandates its accepted scope; routine work needs no fresh PO approval.
+
+Ask the human only for a configured decision gate, required final acceptance,
+an irreversible or externally consequential action, or a typed hard block
+whose safe recovery actions cannot progress. A guard
+denial alone is not a human gate: first run its exact typed read-only or
+lifecycle recovery action. Never bypass a real gate or turn an automated
+evidence failure into an invented PO approval.
+
+When one of those does require asking, a confirmation with only one real
+option (proceed or don't, with nothing else meaningfully on offer) is plain
+text plus waiting for the reply — never `AskUserQuestion`, whose own
+validator rejects a single-option call outright.
+
+## Compact
+
+Compact preserves active goal/revision, emits bounded re-grounding. It
+does not trigger a second full Elephant bootstrap unless a real SessionStart or
+typed recovery follows; `PCR-READY` loads no recovery references.

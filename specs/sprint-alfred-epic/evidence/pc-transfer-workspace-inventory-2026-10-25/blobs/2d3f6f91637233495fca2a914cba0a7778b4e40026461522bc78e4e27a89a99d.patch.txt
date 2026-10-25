@@ -1,0 +1,50 @@
+diff --git a/plugins/pipeline-core/install-agy.test.mjs b/plugins/pipeline-core/install-agy.test.mjs
+index bb0fbd661..08cb1386a 100644
+--- a/plugins/pipeline-core/install-agy.test.mjs
++++ b/plugins/pipeline-core/install-agy.test.mjs
+@@ -12,6 +12,45 @@ import { resolveAntigravityRegistryInstalledRoot } from "./scripts/installed-plu
+ import { observePipelineStartPreflight } from "./scripts/pipeline-start-preflight.mjs";
+ import { createGovernanceScopeController } from "./lib/governance-scope.mjs";
+ 
++test("G6: installer refresh expands an owned user-level matcher to native file tools", (t) => {
++  const scratch = fileURLToPath(new URL("../../scratch/", import.meta.url));
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "g6-matcher-"));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const configRoot = join(root, "home", ".gemini");
++  const workspaceRoot = join(root, "workspace");
++  const source = join(workspaceRoot, "plugins", "pipeline-core");
++  mkdirSync(join(configRoot, "config"), { recursive: true });
++  mkdirSync(join(source, "hooks"), { recursive: true });
++  writeFileSync(join(source, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++  // Use the shipped plugin matcher and scripts as the source of the installer wiring.
++  const manifest = JSON.parse(readFileSync(new URL("./hooks.json", import.meta.url), "utf8"));
++  writeFileSync(join(source, "hooks.json"), JSON.stringify(manifest));
++  for (const name of ["antigravity-slicing-hint", "antigravity-pretool-guard", "antigravity-stop-hook", "antigravity-start-hint"]) {
++    writeFileSync(join(source, "hooks", `${name}.mjs`), "// inert fixture: never executed\n");
++  }
++  const target = join(configRoot, "config", "hooks.json");
++  const foreign = { matcher: "foreign_tool", hooks: [{ type: "command", command: "foreign-command" }] };
++  writeFileSync(target, JSON.stringify({ PreToolUse: [foreign, {
++    matcher: "run_command",
++    hooks: [{ type: "command", command: `node "${join(source, "hooks", "antigravity-pretool-guard.mjs")}"` }],
++  }] }));
++  const calls = [];
++  const result = refreshAntigravityInstallation({ configRoot, workspaceRoot, approvedSourceRoot: source,
++    scope: "workspace", globalChangeApproved: true }, {
++    runCli: (argv) => { calls.push([...argv]); assert.deepEqual(argv, ["--version"]); return { status: "ok", version: "1.2.12" }; },
++    writeInstalledReceipt: () => { assert.fail("a direct workspace fixture must not create any receipt"); },
++  });
++  assert.equal(result.status, "refreshed", JSON.stringify(result));
++  assert.ok(calls.length > 0);
++  const output = JSON.parse(readFileSync(target, "utf8"));
++  assert.deepEqual(output.PreToolUse[0], foreign);
++  const matcher = output.PreToolUse[1].matcher;
++  const misses = ["run_command", "write_to_file", "replace_file_content", "invoke_subagent", "write_file", "edit_file", "read_file"]
++    .filter((name) => !new RegExp(`^(?:${matcher})$`, "u").test(name));
++  assert.deepEqual(misses, [], "installer must refresh the owned user-level matcher as well as the command path");
++});
++
+ test("Agy release-tag checkout creates a named branch without changing the tag commit", (t) => {
+   const root = mkdtempSync(join(tmpdir(), "agy-release-tag-checkout-"));
+   t.after(() => rmSync(root, { recursive: true, force: true }));

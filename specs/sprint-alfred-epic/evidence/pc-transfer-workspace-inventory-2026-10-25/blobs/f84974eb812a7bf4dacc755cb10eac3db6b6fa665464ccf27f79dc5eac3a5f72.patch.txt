@@ -1,0 +1,221 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 743f46ff5..49e7c01bc 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -663,6 +663,17 @@ sealed host-owned executor, and it reports an answer only when
+ only kernel paths and `lib/advisory-lifecycle-v2.mjs` and `lib/advisory-receipt-assurance.mjs`
+ (both already kernel paths), and is itself one.
+ 
++ALF-K39 (PO decision D110) adds two first-party files that `hooks/guard-dispatch.mjs` reaches
++and that execute with kernel authority: `plugins/pipeline-core/scripts/dispatch-record-liveness.mjs`
++(the hook spawns it, a spawn edge rather than an import, because the hook sits in a module
++cycle that an import of `lib/worktree-lifecycle.mjs` would break) and
++`plugins/pipeline-core/lib/dispatch-record-liveness.mjs` (the read-only owner-liveness
++readback and the second-writer decision it imports). Both only read: no lock, no registry
++write, nothing retired or healed. They import kernel paths only (`lib/dispatch-record.mjs`,
++`lib/guard/dispatch-record-lane.mjs`, `lib/worktree-lifecycle.mjs`, `lib/entrypoint.mjs`) and are
++themselves kernel paths. A failure of the check is an advisory, never a silent pass and never a
++refusal; only an owner judged alive refuses a second writer.
++
+ ## Threats and controls
+ 
+ | Threat | Control |
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 6e0c9e529..d419bfbb5 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -71,6 +71,7 @@ import { createHash } from "node:crypto";
+ import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { spawnSync } from "node:child_process";
+ 
+ import {
+   persistPendingAdvisorProhibitionBindings,
+@@ -93,17 +94,14 @@ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ 
+-const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
+-const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
+-// D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports
+-// the cause and the exact command that clears it.
++const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url)); const LIVENESS_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url)); const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
++// D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports the cause and the exact command that clears it.
+ const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
+   ? `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} inspect --root ${root} names the cause and the command that clears it`
+   : null;
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+ 
+-
+ // Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
+ // script body. Regex-based, not a JS parser: it only claims the statically-obvious case.
+ // Exported so another module (a Workflow-dispatch preflight, a test) can recover the same
+@@ -809,6 +807,8 @@ if (isDirectInvocation(import.meta.url)) {
+     }
+   }
+   const productive = evaluated.filter(({ policy }) => requiresGovernedItemAdmission(policy));
++  const second = blocked.length === 0 && productive.length > 0 && toolInput.isolation !== "worktree" && !/isolation\s*:\s*['"`]worktree/u.test(String(toolInput.script ?? "")) ? spawnSync(process.execPath, [LIVENESS_SCRIPT, "--root", routeRoot, "--second-writer", productive.map(({ dispatch }) => parseDispatchSlice(dispatch.prompt).sliceId).filter(Boolean).join(",") || "-"], { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 30000 }) : null;
++  if (second) { process.stderr.write(second.stderr || (second.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the second-writer check could not run; this dispatch is admitted without it (ALF-K39, D110).\n")); if (second.status === 2) process.exit(2); }
+   // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
+   // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
+   for (const { dispatch } of productive) {
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+index 19aba4dd2..5507e7074 100644
+--- a/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.mjs
+@@ -19,6 +19,7 @@
+ import { createHash } from "node:crypto";
+ import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+ import { join } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { isSafeTaskId, isTerminalOutcome } from "./dispatch-record.mjs";
+ import { DISPATCH_RECORD_INTERIM_OUTCOME, DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
+@@ -118,3 +119,32 @@ export function readDispatchRecordLiveness(root, options = {}) {
+   for (const entry of records) counts[entry.verdict] += 1;
+   return { schema: DISPATCH_RECORD_LIVENESS_SCHEMA, status: "inspected", readOnly: true, records, counts };
+ }
++
++const LIVENESS_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url));
++const WRITER_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-write.mjs", import.meta.url));
++const plain = (text) => String(text).replace(/[\u0000-\u001f\u007f]+/gu, " ").trim().slice(0, 200);
++
++/**
++ * ALF-K39 / D110: the guard-side use of the readback. Before a dispatch that would start a SECOND WRITER in the checkout at `root` is
++ * admitted, every open dispatch record of that checkout is consulted. An `alive` owner refuses (self-describing, one runnable repair);
++ * `gone` never blocks (a stale record is not a lock); `unjudgeable` never blocks and is announced, never a silent pass. A record of the
++ * dispatch being admitted (`ownTaskIds`) is never held against it, and a dispatch isolated in its own worktree writes in another checkout.
++ * Returns `{ refusal, advisory }` (strings, empty when none); never throws, and an unreadable readback is itself an advisory.
++ */
++export function secondWriterAdmission({ root, ownTaskIds = [], isolated = false, readFn = readDispatchRecordLiveness, ...seams } = {}) {
++  if (isolated) return { refusal: "", advisory: "" };
++  let records;
++  try { records = readFn(root, seams).records.filter((entry) => !ownTaskIds.includes(entry.taskId)); }
++  catch (error) {
++    return { refusal: "", advisory: `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the open dispatch records of this checkout could not be read (${plain(error?.message)}), so this dispatch is admitted without a second-writer check. Re-check with: node ${LIVENESS_SCRIPT} --root ${root}\n` };
++  }
++  const alive = records.filter((entry) => entry.verdict === "alive");
++  const unjudged = records.filter((entry) => entry.verdict === "unjudgeable");
++  const describe = (entry) => `${entry.record} (outcome ${entry.outcome ?? "unreadable"}${entry.sessionId ? `, owner session ${entry.sessionId}` : ""}, ${entry.reason})`;
++  const refusal = alive.length === 0 ? "" : [
++    `BLOCKED (guard-dispatch, plugin pipeline-core): GUARD-DISPATCH-SECOND-WRITER: this dispatch would start a second writer in a checkout where an open dispatch record is owned by a process that is still alive: ${alive.map(describe).join("; ")}.`,
++    `A second writer would overwrite that dispatch's files (backlog 2026-10-04-parallel-work-in-one-checkout-is-unsafe). Repair, one of: wait until that dispatch finishes and dispatch again (re-check with: node ${LIVENESS_SCRIPT} --root ${root}); or, if you know it is abandoned, finalize its record with a terminal outcome through the sanctioned writer (node ${WRITER_SCRIPT} --repo-root ${root} --request <repo-relative request json>); or isolate this dispatch in its own worktree.`, "",
++  ].join("\n");
++  const advisory = unjudged.length === 0 ? "" : `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: open dispatch record(s) of this checkout whose owner cannot be judged alive or gone: ${unjudged.map(describe).join("; ")}. This dispatch is admitted (an unjudgeable owner never blocks); check them with: node ${LIVENESS_SCRIPT} --root ${root}\n`;
++  return { refusal, advisory };
++}
+diff --git a/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs b/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
+index e251b044d..c4d973005 100644
+--- a/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs
+@@ -232,3 +232,37 @@ test("DRL-11 the CLI prints the same typed result as one JSON document, exits 0,
+   assert.equal(notRepo.status, 2);
+   assert.equal(JSON.parse(notRepo.stdout).code, "DRL-ROOT");
+ });
++
++test("DRL-12 --second-writer (the guard mode): alive -> exit 2 with a repair on stderr; the dispatch's own record, gone and unjudgeable -> exit 0; a failed check is an advisory, never a refusal", { skip: SKIP }, async () => {
++  const fx = fixture();
++  const run = (...args) => spawnSync(process.execPath, [SCRIPT, "--root", fx.primary, "--second-writer", ...args], { encoding: "utf8" });
++  const none = run("-");
++  assert.deepEqual([none.status, none.stderr], [0, ""], "no open record: silent exit 0");
++  openRecordOwnedBySession(fx, "SW-ALIVE-1");
++  const refused = run("-");
++  assert.equal(refused.status, 2);
++  assert.match(refused.stderr, /GUARD-DISPATCH-SECOND-WRITER: .*dispatch-record-SW-ALIVE-1\.json.*session-SW-ALIVE-1/su);
++  assert.match(refused.stderr, /Repair, one of: wait .*dispatch-record-liveness\.mjs --root .*dispatch-record-write\.mjs/su);
++  assert.equal(run("SW-ALIVE-1").status, 0, "the dispatch's own record never refuses it");
++  assert.equal(run("OTHER,SW-ALIVE-1").status, 0);
++  const child = spawn("sleep", ["60"], { stdio: "ignore" });
++  children.push(child);
++  openRecordOwnedBySession(fx, "SW-GONE-1", { ownerPid: child.pid });
++  child.kill("SIGKILL");
++  await once(child, "exit");
++  assert.equal(run("SW-ALIVE-1").status, 0);
++  assert.doesNotMatch(run("SW-ALIVE-1").stderr, /SW-GONE-1/u, "a gone owner is neither refused nor announced");
++  writeRecord(fx, "SW-V1-1", "in-progress");
++  writeV1Claim(fx, "SW-V1-1");
++  const unjudged = run("SW-ALIVE-1");
++  assert.equal(unjudged.status, 0);
++  assert.match(unjudged.stderr, /GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: .*dispatch-record-SW-V1-1\.json.*claim-v1-has-no-owner-process/su);
++  const outside = mkdtempSync(join(tmpdir(), "dispatch-liveness-norepo-"));
++  roots.push(outside);
++  const broken = spawnSync(process.execPath, [SCRIPT, "--root", outside, "--second-writer", "-"], { encoding: "utf8" });
++  assert.equal(broken.status, 0);
++  assert.match(broken.stderr, /GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the open dispatch records of this checkout could not be read/u);
++  const badArgs = spawnSync(process.execPath, [SCRIPT, "--second-writer"], { encoding: "utf8" });
++  assert.equal(badArgs.status, 0);
++  assert.match(badArgs.stderr, /could not run/u);
++});
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 671676f29..a74f19083 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -834,6 +834,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+   "plugins/pipeline-core/lib/dispatch-briefing-route-record.mjs",
+   "plugins/pipeline-core/lib/fanout-ledger.mjs",
++  // ALF-K39 (GMWKC01): guard-dispatch.mjs spawns the liveness script, which imports the readback module.
++  "plugins/pipeline-core/lib/dispatch-record-liveness.mjs", "plugins/pipeline-core/scripts/dispatch-record-liveness.mjs",
+   "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs",
+ ]);
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs b/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+index e4a88e563..23d17bf69 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-liveness.mjs
+@@ -2,6 +2,10 @@
+ // SPDX-License-Identifier: SUL-1.0
+ //
+ // dispatch-record-liveness.mjs [--root <root>] [--task <task id>]
++// dispatch-record-liveness.mjs [--root <root>] --second-writer <own task ids, comma separated, or "-">
++//   ALF-K39: the guard-side mode, spawned by hooks/guard-dispatch.mjs (a spawn, not an import: the hook sits in a module cycle that a
++//   static or dynamic import of worktree-lifecycle would break). Prints no JSON: a refusal (exit 2) or an unjudgeable advisory (exit 0)
++//   as text on stderr, exactly as the hook relays it. An open record whose owner is alive refuses; gone never blocks; unjudgeable warns.
+ //
+ // PO decision D110: a READ-ONLY readback of whether the owner of each OPEN dispatch record is still running, from the existing session
+ // owner runtime judgement (PID plus process start identity) reached through the record's v2 owner claim. Prints one JSON document
+@@ -11,7 +15,7 @@
+ import { realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+-import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness } from "../lib/dispatch-record-liveness.mjs";
++import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness, secondWriterAdmission } from "../lib/dispatch-record-liveness.mjs";
+ 
+ const short = (error) => String(error?.message ?? error).replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 240);
+ 
+@@ -19,19 +23,31 @@ function parse(argv) {
+   const flags = {};
+   for (let index = 0; index < argv.length; index += 1) {
+     const name = argv[index]?.startsWith("--") ? argv[index].slice(2) : null;
+-    if (name !== "root" && name !== "task") return { error: `unknown argument ${String(argv[index]).slice(0, 40)}` };
++    if (name !== "root" && name !== "task" && name !== "second-writer") return { error: `unknown argument ${String(argv[index]).slice(0, 40)}` };
+     const value = argv[index + 1];
+     if (typeof value !== "string" || value === "" || value.startsWith("--") || Object.hasOwn(flags, name)) return { error: `--${name} needs one value` };
+     flags[name] = value; index += 1;
+   }
+   if (flags.task !== undefined && !/^[A-Za-z0-9._-]+$/u.test(flags.task)) return { error: "--task is not a safe task id" };
++  if (flags["second-writer"] !== undefined && flags.task !== undefined) return { error: "--second-writer and --task cannot be combined" };
+   return { flags };
+ }
+ 
+-export function runDispatchRecordLiveness(argv, out = (text) => process.stdout.write(text), { cwd = process.cwd() } = {}) {
++export function runDispatchRecordLiveness(argv, out = (text) => process.stdout.write(text), { cwd = process.cwd(), err = (text) => process.stderr.write(text) } = {}) {
+   const emit = (value, code) => { out(`${JSON.stringify(value)}\n`); return code; };
+   const refuse = (code, reason) => emit({ schema: DISPATCH_RECORD_LIVENESS_SCHEMA, status: "refused", code, reason }, 2);
+   const parsed = parse(argv);
++  if (argv.includes("--second-writer")) {
++    // Guard mode: only a live owner may exit 2; every other outcome, including a failure of this check, is an exit 0 advisory.
++    let verdict;
++    try {
++      if (parsed.error) throw new Error(parsed.error);
++      const root = realpathSync(resolve(cwd, parsed.flags.root ?? "."));
++      verdict = secondWriterAdmission({ root, ownTaskIds: parsed.flags["second-writer"].split(",").filter((id) => /^[A-Za-z0-9._-]+$/u.test(id)) });
++    } catch (error) { verdict = { refusal: "", advisory: `WARNING (guard-dispatch): GUARD-DISPATCH-SECOND-WRITER-UNJUDGED: the second-writer check could not run (${short(error)}); this dispatch is admitted without it.\n` }; }
++    err(`${verdict.advisory}${verdict.refusal}`);
++    return verdict.refusal === "" ? 0 : 2;
++  }
+   if (parsed.error) return refuse("DRL-ARGS", `${parsed.error}; usage: dispatch-record-liveness.mjs [--root <root>] [--task <task id>]`);
+   let result;
+   try {

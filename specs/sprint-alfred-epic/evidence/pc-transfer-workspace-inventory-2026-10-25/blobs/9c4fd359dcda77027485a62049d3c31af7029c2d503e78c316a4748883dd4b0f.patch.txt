@@ -1,0 +1,633 @@
+diff --git a/harness/scripts/check-consumer-safe-paths.mjs b/harness/scripts/check-consumer-safe-paths.mjs
+index fbdb49e99..d5dc4079b 100644
+--- a/harness/scripts/check-consumer-safe-paths.mjs
++++ b/harness/scripts/check-consumer-safe-paths.mjs
+@@ -521,12 +521,6 @@ export const ALLOWLIST = Object.freeze([
+     reason:
+       "Class A: constructed verdict message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as the WARN-message entry above; not fixed by this dispatch -- deferred.",
+   },
+-  {
+-    file: "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
+-    match: "rewrite only via harness/scripts/pipeline-state.mjs, never by hand",
+-    reason:
+-      "Class A: constructed WARN message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as guard-devplan.mjs's analogous WARN message above; not fixed by this dispatch -- deferred.",
+-  },
+   {
+     file: "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
+     match: "harness/scripts/pipeline-state.mjs` and any",
+diff --git a/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs b/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs
+index 4a7df098e..318cb453f 100644
+--- a/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs
++++ b/plugins/pipeline-core/hooks/guard-el01-tripwire.mjs
+@@ -134,12 +134,28 @@
+  * is as much a source path as a .mjs file, and this repo already paid once
+  * for a matcher that silently missed NotebookEdit).
+  *
+- * EXIT SEMANTICS (shared with the guard family): 0 allow (fail-open on
+- * anything unreadable/absent/undeterminable -- consistent with
+- * guard-devplan.mjs/guard-testpath.mjs's own "no config/state -> nothing to
+- * enforce yet" philosophy) · 2 block (stderr reason) · 1 allow + non-blocking
+- * WARN (state file present but not valid JSON -- surfaced loudly rather than
+- * silently either blocking or silently no-op'ing, QG-05).
++ * EXIT SEMANTICS (shared with the guard family): 0 allow · 2 block (stderr reason
++ * naming the cause and one repair).
++ *   ABSENT evidence exits 0 (nothing to enforce): not a governed repository; no
++ *   state file; no active feature; a low or medium (or unclassified) risk class;
++ *   a path outside the project root or under EL-01's permitted set; unparseable
++ *   hook input or an input with no write target (tool-write-target.mjs: "a guard
++ *   is a safety net for the paths it can see").
++ *   EVIDENCE THAT IS PRESENT BUT CANNOT BE EVALUATED fails CLOSED (PO decision D86,
++ *   2026-10-22 -- "EL-01 tripwire fails open ... fixed"): a state file that is
++ *   corrupt, not an object or unreadable; an activeFeature that is present but
++ *   malformed; a spec path that cannot be resolved or a spec that cannot be read;
++ *   a Risk class row whose value is outside low/medium/high. Each is treated as the
++ *   risk flag being set, so the write is refused unless an open dispatch record
++ *   admits it, and the refusal carries `Cause:` and `Repair:` lines. While the
++ *   state file itself is the unevaluable thing, a write to that one file is admitted
++ *   so the repair is runnable. (This replaces the earlier exit 1 / "skipped
++ *   (fail-open)" WARN for an invalid state file.)
++ *
++ * KNOWN OPEN (reported, not changed here): the dispatch-record signal is not
++ * bound to the calling session or path (see NOT COVERED); a spec with NO Risk
++ * class row at all still reads as "not risk-flagged" (8 of 11 live specs carry no
++ * such row, so refusing on absence needs a backfill decision first).
+  *
+  * VERIFY: node plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs
+  */
+@@ -193,11 +209,35 @@ function resolveSpecPath(state) {
+   return null;
+ }
+ 
+-function extractRiskClass(specText) {
+-  const m = /^\|\s*risk class\s*\|\s*([^|]+?)\s*\|/im.exec(specText);
+-  if (!m) return null;
+-  const word = /^[a-z]+/i.exec(m[1].trim());
+-  return word ? word[0].toLowerCase() : null;
++const RISK_VOCABULARY = new Set(["low", "medium", "high"]);
++
++/** Markdown emphasis and code-span marks are presentation, not part of a cell's meaning. */
++function stripMarkup(cell) {
++  return String(cell ?? "").replace(/[*_`]/g, "").trim();
++}
++
++/**
++ * The first `| Risk class | <value> |` row of the spec's ID card.
++ *   { kind: "low" | "medium" | "high" }  a classified feature (templates/spec.md vocabulary)
++ *   { kind: "absent" }                   no row, or a value with no leading word (an unfilled
++ *                                        template placeholder): the author never classified it
++ *   { kind: "unrecognized", value }      a row whose leading word is outside the vocabulary
++ * Emphasis marks around the label or the value (`**Risk class**`, `**high**`, `high`) are
++ * ignored: a row that plainly says high must not read as "no row" because of its styling.
++ */
++function readRiskRow(specText) {
++  for (const line of String(specText).split(/\r?\n/)) {
++    const cells = /^\s*\|([^|]*)\|([^|]*)\|/.exec(line);
++    if (!cells || stripMarkup(cells[1]).toLowerCase() !== "risk class") continue;
++    const value = stripMarkup(cells[2]);
++    const word = /^[a-z]+/i.exec(value);
++    if (!word) return { kind: "absent" };
++    const lowered = word[0].toLowerCase();
++    return RISK_VOCABULARY.has(lowered)
++      ? { kind: lowered }
++      : { kind: "unrecognized", value: value.slice(0, 40) };
++  }
++  return { kind: "absent" };
+ }
+ 
+ function isValidDispatchRecord(value) {
+@@ -281,54 +321,139 @@ const baseName = relPath.split("/").pop() ?? "";
+ if (DISPATCH_RECORD_BASENAME.test(baseName)) process.exit(0);
+ if (EXEMPT_PREFIXES.some((prefix) => normalizedPath.startsWith(normalize(prefix)))) process.exit(0);
+ 
+-// ---- state: activeFeature (fail-open on absent, WARN on malformed) ----------------
++// ---- state: nothing to enforce is allowed; evidence that cannot be read is not --------
++// PO decision D86 (2026-10-22): the tripwire must not fail open on conditions it cannot
++// evaluate. The line it draws: ABSENT evidence (no state file, no active feature, a low or
++// medium risk class) means there is nothing to enforce and exits 0, unchanged; evidence that
++// IS there but cannot be read or interpreted (a corrupt state file, a malformed activeFeature,
++// an unresolvable or unreadable spec, a risk row outside the vocabulary) is treated as the
++// risk flag being set, so the write is refused unless an open dispatch record admits it --
++// the same outcome as a feature that is plainly risk class high.
+ const projectAuthority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+-const statePath = join(
+-  projectDir,
+-  projectAuthority.status === "ready"
+-    ? projectAuthority.state
+-    : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE),
+-);
++const stateRel = projectAuthority.status === "ready"
++  ? projectAuthority.state
++  : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
++const statePath = join(projectDir, stateRel);
++
++/** Set when the guard cannot evaluate its evidence: { cause, repair, selfRepairable? }. */
++let unevaluable = null;
++let state;
++let feature;
++let specPath = null;
++let riskClass = null;
++
+ let stateRaw;
+ try {
+   stateRaw = readFileSync(statePath, "utf8");
+-} catch {
+-  process.exit(0); // no state file at all -- fail-open, nothing to enforce yet
+-}
+-let state;
+-try {
+-  state = JSON.parse(stateRaw);
+ } catch (e) {
+-  emit(1, [
+-    `[guard-el01-tripwire] WARN: ${statePath} contains invalid JSON (${e.message}).`,
+-    "EL-01 write-time tripwire is being skipped (fail-open) -- please repair the state file " +
+-      "(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).",
+-  ]);
++  // No state file at all means no active feature: nothing to enforce yet. Any other failure
++  // (EISDIR, EACCES, ...) means the file is there and unreadable -- not the same thing.
++  if (e?.code === "ENOENT" || e?.code === "ENOTDIR") process.exit(0);
++  unevaluable = {
++    cause: `the state file ${stateRel} exists but cannot be read (${e?.code ?? "read error"})`,
++    repair: `make ${stateRel} a readable file holding valid pipeline state JSON (restore the last committed copy with "git show HEAD:${stateRel}" as the reference), then retry.`,
++    selfRepairable: true,
++  };
++}
++if (!unevaluable) {
++  try {
++    state = JSON.parse(stateRaw);
++  } catch (e) {
++    unevaluable = {
++      cause: `the state file ${stateRel} contains invalid JSON (${String(e.message).slice(0, 120)})`,
++      repair: `fix the JSON syntax in ${stateRel}, or restore the last committed copy ("git show HEAD:${stateRel}" prints it); a write to that one file is admitted while the tripwire cannot evaluate it, then retry.`,
++      selfRepairable: true,
++    };
++  }
++}
++if (!unevaluable && (state === null || typeof state !== "object" || Array.isArray(state))) {
++  unevaluable = {
++    cause: `the state file ${stateRel} is not a JSON object`,
++    repair: `replace ${stateRel} with the pipeline state object ("git show HEAD:${stateRel}" prints the last committed copy); a write to that one file is admitted while the tripwire cannot evaluate it, then retry.`,
++    selfRepairable: true,
++  };
+ }
+ 
+-const feature = state && typeof state === "object" ? state.activeFeature : undefined;
+-if (!feature || typeof feature !== "object" || typeof feature.id !== "string" || feature.id === "") {
+-  process.exit(0); // no active feature -- nothing to enforce
++if (!unevaluable) {
++  feature = state.activeFeature;
++  if (feature === undefined || feature === null) {
++    process.exit(0); // no active feature -- nothing to enforce
++  }
++  if (typeof feature !== "object" || Array.isArray(feature) || typeof feature.id !== "string" || feature.id === "") {
++    unevaluable = {
++      cause: `activeFeature in ${stateRel} is present but malformed (it must be an object with a non-empty string id)`,
++      repair: `restore a well-formed activeFeature in ${stateRel} through the pipeline-state writer, or close the feature (close-feature) if it is finished; a write to that one file is admitted while the tripwire cannot evaluate it, then retry.`,
++      selfRepairable: true,
++    };
++  }
+ }
+ 
+ // ---- risk class: the one EL-01 stage-0 criterion resolvable per-call (see header) --
+-const specPath = resolveSpecPath(state);
+-if (!specPath) process.exit(0); // cannot determine risk class -- fail-open, not invented
++if (!unevaluable) {
++  specPath = resolveSpecPath(state);
++  if (!specPath) {
++    unevaluable = {
++      cause: `the spec path of feature "${feature.id}" cannot be resolved (no continuity.authority.spec.path and no planPath with a directory)`,
++      repair: `give the feature a planPath whose directory holds a spec.md with a "| Risk class | low, medium or high |" row (for example specs/${feature.id}/prd.md beside specs/${feature.id}/spec.md), then retry. Writes under specs/ are admitted.`,
++    };
++  }
++}
++if (!unevaluable) {
++  let specText;
++  try {
++    specText = readFileSync(resolve(projectDir, specPath), "utf8");
++  } catch (e) {
++    unevaluable = {
++      cause: `the spec ${specPath} of feature "${feature.id}" cannot be read (${e?.code ?? "read error"})`,
++      repair: `create or restore ${specPath} with a "| Risk class | low, medium or high |" row in its ID card, then retry. Writes under specs/ are admitted.`,
++    };
++  }
++  if (!unevaluable) {
++    const row = readRiskRow(specText);
++    if (row.kind === "unrecognized") {
++      unevaluable = {
++        cause: `the Risk class row of ${specPath} says "${row.value.replace(/[^\x20-\x7e]/g, "?")}", which is not low, medium or high`,
++        repair: `set the Risk class row of ${specPath} to low, medium or high (templates/spec.md; when in doubt: higher), then retry. Writes under specs/ are admitted.`,
++      };
++    } else {
++      riskClass = row.kind;
++    }
++  }
++}
+ 
+-let specText;
+-try {
+-  specText = readFileSync(resolve(projectDir, specPath), "utf8");
+-} catch {
+-  process.exit(0); // spec unreadable -- fail-open
++if (!unevaluable && riskClass !== "high") process.exit(0); // EL-01's "no risk flag set" criterion holds
++
++// The one write that must stay possible while the state file is unreadable is the repair of
++// that file itself: refusing it would make the refusal unrepairable by the agent.
++if (unevaluable?.selfRepairable && normalizedPath === normalize(posix.normalize(stateRel.replace(/\\/g, "/")))) {
++  process.exit(0);
+ }
+-const riskClass = extractRiskClass(specText);
+-if (riskClass !== "high") process.exit(0); // EL-01's "no risk flag set" criterion holds
+ 
+ // ---- dispatch-record match: the PO-adopted, independently-checkable signal ---------
+ const openRecord = findOpenDispatchRecord(projectDir);
+ if (openRecord) process.exit(0);
+ 
+ // ---- verdict ------------------------------------------------------------------------
++const NO_RECORD_LINES = [
++  `No active, matching, currently-open dispatch record (dispatch-record*.json, outcome ` +
++    `"in-progress") was found anywhere under the project root -- this write cannot be tied to ` +
++    `a dispatched Goldfish.`,
++  `Sanctioned route: dispatch a Goldfish from templates/prompts/goldfish-task.md (EL-05); its ` +
++    `opening act (GF-09-D) creates exactly the dispatch-record*.json this guard looks for.`,
++];
++if (unevaluable) {
++  emit(2, [
++    `BLOCKED (guard-el01-tripwire, plugin pipeline-core): orchestrator-session write to a ` +
++      `source path while the EL-01 risk flag cannot be evaluated.`,
++    `Cause: ${unevaluable.cause}.`,
++    `File: ${filePath}`,
++    `Why: the tripwire fails closed (PO decision D86) when it cannot read the evidence it ` +
++      `enforces on; an unevaluable risk flag is treated as set, so the rigor-0/no-risk-flag ` +
++      `stage-0 exception (EL-01, roles/elephant.md) is unavailable until the evidence is readable.`,
++    `Repair: ${unevaluable.repair}`,
++    ...NO_RECORD_LINES,
++  ]);
++}
+ emit(2, [
+   `BLOCKED (guard-el01-tripwire, plugin pipeline-core): orchestrator-session write to a ` +
+     `source path while a risk-flagged feature is active.`,
+@@ -337,9 +462,5 @@ emit(2, [
+   `Why: EL-01 (roles/elephant.md) forbids the Elephant from writing production code outside ` +
+     `the narrow rigor-0/no-risk-flag stage-0 fast path; this feature's risk flag is set, so ` +
+     `that exception is categorically unavailable.`,
+-  `No active, matching, currently-open dispatch record (dispatch-record*.json, outcome ` +
+-    `"in-progress") was found anywhere under the project root -- this write cannot be tied to ` +
+-    `a dispatched Goldfish.`,
+-  `Sanctioned route: dispatch a Goldfish from templates/prompts/goldfish-task.md (EL-05); its ` +
+-    `opening act (GF-09-D) creates exactly the dispatch-record*.json this guard looks for.`,
++  ...NO_RECORD_LINES,
+ ]);
+diff --git a/plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs b/plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs
+index eb753eea4..06ccfe890 100644
+--- a/plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs
+@@ -263,6 +263,11 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
+ }
+ 
+ // ---- TP-09: fail-open baselines -- no state, no active feature, unreadable spec -------
++// NOTE: TP-09a-c use UNGOVERNED fixture directories (freshDir), so they exit 0 at the
++// governance-scope admission before any state is read. They pin "an ungoverned repository is
++// never touched", not the governed no-state/no-feature/no-spec paths; those governed paths
++// are pinned in lib/pins/agy-el01-write-authorization-gap.test.mjs (no state and no feature
++// still allow; an unresolvable or unreadable spec now fails closed, D86).
+ {
+   const dir = freshDir("fail-open-no-state");
+   check("TP-09a ALLOW: no state file at all", "Edit", "src/foo.mjs", ALLOW, { projectDir: dir, stderrEmpty: true });
+@@ -282,11 +287,17 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
+   check("TP-09c ALLOW: activeFeature present but its spec.md cannot be found", "Edit", "src/foo.mjs", ALLOW, { projectDir: dir, stderrEmpty: true });
+ }
+ {
+-  const dir = freshGovernedDir("warn-invalid-state-json");
++  // QG-04 restatement (PO decision D86, 2026-10-22: the EL-01 tripwire must not fail open):
++  // this case used to pin the fail-open itself -- exit 1, "skipped (fail-open)", write
++  // allowed -- for a governed repository whose state file is corrupt. It now pins the
++  // fail-closed contract: refused, naming the cause ("invalid JSON") and a repair. The
++  // governed-repository contract for the other unreadable-evidence conditions is pinned in
++  // lib/pins/agy-el01-write-authorization-gap.test.mjs.
++  const dir = freshGovernedDir("block-invalid-state-json");
+   writeJson(join(dir, "project", "pipeline-state.json"), "{not valid json");
+-  check("TP-09d WARN: state file present but not valid JSON", "Edit", "src/foo.mjs", WARN, {
++  check("TP-09d BLOCK: state file present but not valid JSON -- fails closed (was WARN, D86)", "Edit", "src/foo.mjs", BLOCK, {
+     projectDir: dir,
+-    stderrIncludes: ["WARN", "invalid JSON"],
++    stderrIncludes: ["BLOCKED (guard-el01-tripwire", "invalid JSON", "Repair:"],
+   });
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs b/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs
+index a59c6a8ec..1fd3c8614 100644
+--- a/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs
++++ b/plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs
+@@ -24,35 +24,52 @@
+ // 2026-10-20) closes AC-109 as not reconstructable. Antigravity provides no authenticated
+ // per-call carrier today, so no carrier or worker-scope behaviour is pinned here and none is
+ // owed. MEASURED AGAINST E6's rationale ("the fail-closed refusal is already the safe
+-// state"): that holds for the three cases below only; the tripwire still exits 0 in the
+-// fail-open conditions listed next, so authorization is NOT never-inferred on this head.
+-// That gap is recorded here, not pinned as a refusal.
++// state"): that held for the three adapter cases below only. The tripwire exited 0 in the
++// conditions listed next; PO decision D86 (2026-10-22, "EL-01 tripwire fails open ... fixed")
++// orders them fixed, and the direct-hook cases further down pin the result.
+ //
+-// FAIL-OPEN CONDITIONS of hooks/guard-el01-tripwire.mjs (the tripwire exits 0
+-// and therefore allows the write; none of these is pinned as a refusal). This
+-// list is the set of conditions found by reading the file at this commit; it is
+-// NOT a proof of completeness:
+-//   0a. the tool input cannot be parsed as JSON (lines 253-258), and an empty
+-//       write target (line 259) both exit 0;
+-//   0b. an absolute target outside the project root exits 0 (line 273), and a
+-//       target whose basename matches dispatch-record*.json is exempt (line 281),
+-//       as is any path under an EXEMPT_PREFIXES entry (line 282);
+-//   1. the repository is not governed (requiresEnforcement is false; line 158);
+-//   2. there is no pipeline state file at all (line 296), and an unparsable
+-//      state file only warns (line 302-307);
+-//   3. there is no active feature (line 311);
+-//   4. the spec path cannot be resolved (line 316) or the spec cannot be read
+-//      (line 322);
+-//   5. the spec's risk class is anything but "high" (line 325);
+-//   6. ANY open dispatch-record exists anywhere under the project (lines
+-//      328-329), whoever the writer is: the record is not bound to the calling
+-//      session, to a role, or to a target path. Any valid in-progress record
+-//      suffices, so the writer can create its own authorizing record (the
+-//      dispatch-record*.json basename is itself write-exempt, line 281) and
+-//      then write the guarded path.
+-// The third case below touches only condition 6, and only to show that the
+-// tripwire itself stops refusing: it is not evidence that the caller is an
+-// authorized worker.
++// CONDITIONS of hooks/guard-el01-tripwire.mjs that exited 0 or 1 (allow), each probed with
++// crafted input against the unchanged hook and classified. The list is what reading the file
++// and probing found; it is NOT a proof of completeness.
++//  (a) already fail-closed, pinned below with no RED step: an upper-case "HIGH" value, a
++//      closed dispatch record, a traversal under an exempt prefix ("docs/../src"), and a
++//      spec referenced by an absolute path outside the root.
++//  (b) really fail-open, now fail-closed with a Cause: and a Repair: line (RED pins first,
++//      all red on the unchanged hook with exit 0/1 where 2 was expected):
++//      2b  state file invalid JSON (was exit 1 "skipped (fail-open)"), empty, a top-level
++//          array or null, or present but unreadable (a directory, a permission error);
++//      3b  activeFeature present but not an object with a non-empty string id;
++//      4   the spec path cannot be resolved (no continuity path, no planPath directory) or
++//          the resolved spec cannot be read;
++//      5   a Risk class row the parser could not read: bold/code markup around the label or
++//          the value, or a value outside low | medium | high ("critical").
++//      Unevaluable evidence is treated as the risk flag being set: an open dispatch record
++//      still admits the write, and the unreadable state file itself stays writable so the
++//      repair is runnable.
++//  (c) intentionally exits 0, by a recorded decision or contract (pinned as such below
++//      where the behaviour is a decision rather than a gap):
++//      1   the repository is not governed (hook line 158; pin
++//          pipeline-hooks-act-in-repositories-that-never-opted-in);
++//      2a  no state file / 3 no active feature: no feature means no risk flag can be set
++//          (hook header TRIGGER CONDITION); 5a a low or medium risk class: EL-01's own
++//          stage-0 exception holds;
++//      0b  an absolute target outside the project root, EL-01's permitted prefixes
++//          (docs/, specs/, backlog/items/, .claude/) and the dispatch-record*.json basename
++//          bootstrap exemption (PO decision 2026-08-18 in the hook header).
++//  OPEN, reported and NOT changed (each needs a decision the dispatch does not carry):
++//      0a  unparseable hook input and an empty write target exit 0 (documented family-wide
++//          contract of lib/tool-write-target.mjs, 2026-08-06: a guard is a safety net for the
++//          paths it can see; diverging only the tripwire is a design call);
++//      5b  a spec with NO Risk class row (or an unfilled placeholder) still reads as not
++//          risk-flagged: 8 of the 11 live specs carry no row, so refusing on absence needs a
++//          backfill decision first;
++//      6   ANY open dispatch record anywhere under the project admits any writer: the record
++//          is not bound to the calling session, role or target path, and the writer can
++//          create its own record (the dispatch-record*.json basename is write-exempt).
++//          Binding needs the authenticated carrier or a session id in the record schema,
++//          both outside the hook (E6, D63).
++// The third adapter case above touches only condition 6, and only to show that the tripwire
++// itself stops refusing: it is not evidence that the caller is an authorized worker.
+ import assert from "node:assert/strict";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+@@ -60,8 +77,10 @@ import { dirname, join } from "node:path";
+ import { spawnSync } from "node:child_process";
+ import test from "node:test";
+ import { fileURLToPath } from "node:url";
++import { createGovernanceScopeController } from "../governance-scope.mjs";
+ 
+-const adapter = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "hooks", "antigravity-pretool-guard.mjs");
++const tripwire = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "hooks", "guard-el01-tripwire.mjs");
++const adapter =join(dirname(fileURLToPath(import.meta.url)), "..", "..", "hooks", "antigravity-pretool-guard.mjs");
+ 
+ function riskFixture({ openDispatch }) {
+   const root = mkdtempSync(join(tmpdir(), "agy-el01-pin-"));
+@@ -133,3 +152,220 @@ test("Antigravity Write with an open dispatch record is not refused by the EL-01
+     assert.doesNotMatch(String(res.reason ?? ""), /guard-el01-tripwire/);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// ---------------------------------------------------------------------------------------
++// FAIL-CLOSED CONDITIONS (PO decision D86, 2026-10-22: "EL-01 tripwire fails open ... fixed").
++// These cases drive guard-el01-tripwire.mjs directly. The rule they pin: in a governed
++// repository, when the tripwire CANNOT EVALUATE the evidence it enforces on (a corrupt or
++// unreadable state file, a malformed activeFeature, a spec it cannot resolve or read, a risk
++// row it cannot interpret) it treats the feature as risk-flagged, so a write is refused unless
++// a genuinely open dispatch record exists. Every refusal names its cause and one runnable
++// repair. Nothing here changes the cases where there is genuinely nothing to enforce.
++// ---------------------------------------------------------------------------------------
++const created = [];
++function freshRoot({ governed = true } = {}) {
++  const root = mkdtempSync(join(tmpdir(), "el01-fc-pin-"));
++  created.push(root);
++  if (!governed) return root;
++  const init = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8" });
++  assert.equal(init.status, 0, init.stderr);
++  const scope = createGovernanceScopeController({ hostStateRoot: join(root, ".git", "fixture-hoststate") });
++  const plan = scope.planDecision({ rootDir: root, decision: "enroll", by: "EL-01 fail-closed pin fixture" });
++  const active = scope.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
++  assert.ok(active.requiresEnforcement, "fixture must be governed or every case below passes vacuously");
++  return root;
++}
++test.after(() => { for (const root of created) rmSync(root, { recursive: true, force: true }); });
++
++const put = (root, rel, body) => {
++  mkdirSync(dirname(join(root, rel)), { recursive: true });
++  writeFileSync(join(root, rel), typeof body === "string" ? body : JSON.stringify(body));
++};
++const STATE_REL = "project/pipeline-state.json";
++const featureState = (feature = { id: "f1", planPath: "specs/f1/prd.md", phase: "implementation" }, extra = {}) => ({ schema: "pipeline.state.v0", activeFeature: feature, ...extra });
++const HIGH_SPEC = "| Field | Value |\n| --- | --- |\n| Risk class | high |\n";
++const openRecord = (root) => put(root, "dispatch-record-OPEN.json", {
++  taskId: "T-OPEN", rulesetSha: "a".repeat(64), dispatcher: "elephant", outcome: "in-progress", log: [],
++});
++function fire(root, file = "src/code.mjs", toolName = "Edit") {
++  const toolInput = toolName === "NotebookEdit"
++    ? { notebook_path: file, cell_id: "1" }
++    : { file_path: file, old_string: "a", new_string: "b" };
++  const res = spawnSync(process.execPath, [tripwire], {
++    input: JSON.stringify({ tool_name: toolName, tool_input: toolInput }),
++    encoding: "utf8",
++    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
++    timeout: 20_000,
++  });
++  return { code: res.status, stderr: String(res.stderr ?? "") };
++}
++function assertRefusedWithRepair(res, causeNeedle) {
++  assert.equal(res.code, 2, `expected a refusal (exit 2), got exit ${res.code}: ${res.stderr.trim().slice(0, 300)}`);
++  assert.match(res.stderr, /BLOCKED \(guard-el01-tripwire/);
++  assert.ok(res.stderr.includes(causeNeedle), `refusal must name its cause "${causeNeedle}": ${res.stderr}`);
++  assert.match(res.stderr, /^Repair: .+/m, "a refusal must carry one runnable repair");
++}
++
++// ---- (b) really fail-open before D86: now fail closed -----------------------------------
++const CORRUPT_STATE = [
++  ["state file is not valid JSON (verdict 2b; was exit 1 'WARN ... skipped (fail-open)')", "{not valid json", "invalid JSON"],
++  ["state file is empty", "", "invalid JSON"],
++  ["state file is a top-level JSON array", "[]", "not a JSON object"],
++  ["state file is the JSON literal null", "null", "not a JSON object"],
++];
++for (const [name, body, cause] of CORRUPT_STATE) {
++  test(`EL-01 tripwire fails closed: ${name}`, () => {
++    const root = freshRoot();
++    put(root, STATE_REL, body);
++    assertRefusedWithRepair(fire(root), cause);
++  });
++}
++
++test("EL-01 tripwire fails closed: state path exists but cannot be read as a file", () => {
++  const root = freshRoot();
++  mkdirSync(join(root, STATE_REL), { recursive: true }); // a directory where the state file belongs
++  assertRefusedWithRepair(fire(root), "cannot be read");
++});
++
++for (const [name, feature] of [
++  ["activeFeature is a string, not an object", "f1"],
++  ["activeFeature is an array", ["f1"]],
++  ["activeFeature object has an empty id", { id: "", planPath: "specs/f1/prd.md" }],
++  ["activeFeature object has a non-string id", { id: 7, planPath: "specs/f1/prd.md" }],
++]) {
++  test(`EL-01 tripwire fails closed: ${name}`, () => {
++    const root = freshRoot();
++    put(root, STATE_REL, featureState(feature));
++    put(root, "specs/f1/spec.md", HIGH_SPEC);
++    assertRefusedWithRepair(fire(root), "activeFeature");
++  });
++}
++
++for (const [name, feature, withSpecAt] of [
++  ["spec path cannot be resolved: no planPath and no continuity", { id: "f1" }, "specs/f1/spec.md"],
++  ["spec path cannot be resolved: planPath without a directory", { id: "f1", planPath: "prd.md" }, "spec.md"],
++]) {
++  test(`EL-01 tripwire fails closed: ${name}`, () => {
++    const root = freshRoot();
++    put(root, STATE_REL, featureState(feature));
++    put(root, withSpecAt, HIGH_SPEC);
++    assertRefusedWithRepair(fire(root), "cannot be resolved");
++  });
++}
++
++test("EL-01 tripwire fails closed: the resolved spec file does not exist", () => {
++  const root = freshRoot();
++  put(root, STATE_REL, featureState());
++  assertRefusedWithRepair(fire(root), "specs/f1/spec.md");
++});
++
++test("EL-01 tripwire fails closed: the resolved spec path is a directory", () => {
++  const root = freshRoot();
++  put(root, STATE_REL, featureState());
++  mkdirSync(join(root, "specs", "f1", "spec.md"), { recursive: true });
++  assertRefusedWithRepair(fire(root), "specs/f1/spec.md");
++});
++
++for (const [name, specText] of [
++  ["risk-class label wrapped in bold markup", "| **Risk class** | high |\n"],
++  ["risk-class value wrapped in bold markup", "| Risk class | **high** |\n"],
++  ["risk-class value wrapped in backticks", "| Risk class | `high` |\n"],
++  ["risk-class value is out of vocabulary (low | medium | high)", "| Risk class | critical |\n"],
++]) {
++  test(`EL-01 tripwire is not blinded by a spec risk row it cannot read: ${name}`, () => {
++    const root = freshRoot();
++    put(root, STATE_REL, featureState());
++    put(root, "specs/f1/spec.md", specText);
++    const res = fire(root);
++    assert.equal(res.code, 2, `exit ${res.code}: ${res.stderr.trim().slice(0, 300)}`);
++    assert.match(res.stderr, /BLOCKED \(guard-el01-tripwire/);
++  });
++}
++
++test("EL-01 tripwire: an out-of-vocabulary risk value names the cause and the repair", () => {
++  const root = freshRoot();
++  put(root, STATE_REL, featureState());
++  put(root, "specs/f1/spec.md", "| Risk class | critical |\n");
++  assertRefusedWithRepair(fire(root), "critical");
++});
++
++// ---- the refusals above keep the sanctioned routes open ----------------------------------
++test("EL-01 tripwire: an open dispatch record still admits a write when the state is corrupt or the spec is unreadable", () => {
++  for (const arrange of [
++    (root) => put(root, STATE_REL, "{not valid json"),
++    (root) => { put(root, STATE_REL, featureState()); /* spec absent */ },
++  ]) {
++    const root = freshRoot();
++    arrange(root);
++    openRecord(root);
++    const res = fire(root);
++    assert.equal(res.code, 0, `exit ${res.code}: ${res.stderr.trim().slice(0, 300)}`);
++  }
++});
++
++test("EL-01 tripwire: the unreadable state file itself stays writable so the named repair is runnable", () => {
++  const root = freshRoot();
++  put(root, STATE_REL, "{not valid json");
++  const res = fire(root, STATE_REL);
++  assert.equal(res.code, 0, `exit ${res.code}: ${res.stderr.trim().slice(0, 300)}`);
++  // Only that one path: any other source path is still refused in the same state.
++  assert.equal(fire(root, "src/code.mjs").code, 2);
++});
++
++// ---- (a) already fail-closed: proven here, RED not applicable -----------------------------
++test("EL-01 tripwire already refuses: upper-case risk value, closed dispatch record, traversal under an exempt prefix", () => {
++  const root = freshRoot();
++  put(root, STATE_REL, featureState());
++  put(root, "specs/f1/spec.md", "| Risk class | HIGH |\n");
++  put(root, "dispatch-record-DONE.json", { taskId: "T-D", rulesetSha: "a".repeat(64), dispatcher: "elephant", outcome: "passed", log: [] });
++  assert.equal(fire(root, "src/code.mjs").code, 2);
++  assert.equal(fire(root, "docs/../src/code.mjs").code, 2);
++});
++
++test("EL-01 tripwire already refuses: a spec outside the project root that says high is still read", () => {
++  const root = freshRoot();
++  const elsewhere = freshRoot({ governed: false });
++  put(elsewhere, "spec.md", HIGH_SPEC);
++  put(root, STATE_REL, featureState({ id: "f1", planPath: "specs/f1/prd.md" }, {
++    continuity: { featureId: "f1", authority: { spec: { path: join(elsewhere, "spec.md") } } },
++  }));
++  assert.equal(fire(root).code, 2);
++});
++
++// ---- (c) intentionally exits 0: nothing to enforce, or a recorded exemption ---------------
++// 1  not governed: the Pipeline's hooks never act in a repository that did not opt in
++//    (hook header line 158; pin pipeline-hooks-act-in-repositories-that-never-opted-in).
++// 2a no state file / 3 no active feature: no feature means no risk flag can be set (header
++//    TRIGGER CONDITION). 5a risk class low or medium: EL-01's own stage-0 exception holds.
++// 0b outside the project root, EL-01's permitted prefixes and the dispatch-record bootstrap
++//    exemption (PO decision 2026-08-18 in the hook header, roles/elephant.md EL-01).
++test("EL-01 tripwire intentionally allows: ungoverned repository, no state, no active feature, low or medium risk", () => {
++  const ungoverned = freshRoot({ governed: false });
++  put(ungoverned, STATE_REL, featureState());
++  put(ungoverned, "specs/f1/spec.md", HIGH_SPEC);
++  assert.equal(fire(ungoverned).code, 0, "1: not governed");
++
++  assert.equal(fire(freshRoot()).code, 0, "2a: governed, no state file");
++
++  const noFeature = freshRoot();
++  put(noFeature, STATE_REL, { schema: "pipeline.state.v0" });
++  assert.equal(fire(noFeature).code, 0, "3: governed, state without activeFeature");
++
++  for (const risk of ["low", "medium"]) {
++    const root = freshRoot();
++    put(root, STATE_REL, featureState());
++    put(root, "specs/f1/spec.md", `| Risk class | ${risk} |\n`);
++    assert.equal(fire(root).code, 0, `5a: risk class ${risk}`);
++  }
++});
++
++test("EL-01 tripwire intentionally allows: outside the root, EL-01 permitted prefixes, and the dispatch-record bootstrap write", () => {
++  const root = freshRoot();
++  put(root, STATE_REL, featureState());
++  put(root, "specs/f1/spec.md", HIGH_SPEC);
++  const outside = freshRoot({ governed: false });
++  assert.equal(fire(root, join(outside, "x.mjs")).code, 0, "absolute path outside the project root");
++  for (const rel of ["docs/state.md", "specs/f1/prd.md", "backlog/items/x.md", ".claude/pipeline-state.json", "dispatch-record-NEW.json"]) {
++    assert.equal(fire(root, rel).code, 0, rel);
++  }
++});

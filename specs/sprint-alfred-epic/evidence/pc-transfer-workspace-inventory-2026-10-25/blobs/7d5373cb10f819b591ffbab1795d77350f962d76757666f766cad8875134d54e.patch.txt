@@ -1,0 +1,320 @@
+diff --git a/plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs b/plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs
+index c2ff07aea..16673476e 100644
+--- a/plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs
+@@ -141,9 +141,9 @@ function deliver(root, action, file, opts) {
+ 
+ /**
+  * A sibling is never refused for ITS OWN drift. Consuming a different action examines every armed capability, and the
+- * module audits a 'rejected' row against each non-matching one (driftedChecks always names toolInputSha256 because the
+- * presented tool input is not that capability's). Such cross-examination rows are tolerated here (see the TODO cases
+- * at the end of the file); a row WITHOUT toolInputSha256 would mean the sibling itself drifted.
++ * module no longer audits anything against a non-matching one (ALF-K22; the cases after the per-action matrix pin
++ * that). The tolerance of a cross-examination row naming toolInputSha256 is kept as a weaker, historical bound; a row
++ * WITHOUT toolInputSha256 would mean the sibling itself drifted.
+  */
+ function assertNoOwnDrift(root, action) {
+   for (const event of eventsFor(root, action, "rejected")) {
+@@ -301,7 +301,7 @@ for (const [toolName, build] of TOOLS) {
+       const later = 200_000; // past the short window (61 s), far inside the default 30 minute window
+       const expired = consume(root, short, { nowMs: later });
+       assert.equal(expired.status, "replan", JSON.stringify(expired));
+-      // The result CODE is not asserted here: with armed siblings it reads HGO-DRIFT (see the TODO case below).
++      // The result CODE is pinned in the "reports HGO-EXPIRED even while unexpired siblings are armed" case below.
+       assert.equal(eventsFor(root, short, "expired").length >= 1, true, "the expiry must be audited against the short action");
+       deliver(root, second, "existing-b.md", { nowMs: later });
+       deliver(root, third, "existing-c.md", { nowMs: later });
+@@ -354,15 +354,13 @@ for (const [toolName, build] of TOOLS) {
+ }
+ 
+ // ---------------------------------------------------------------------------------------------
+-// Open contract gaps found by this matrix (no sibling is ever invalidated; the diagnostics of a
+-// consumption are what leaks across siblings). Registered as node:test `todo` so the file stays green
+-// while the desired contract is documented; a fix flips them to passing without editing the cases.
++// Diagnostics of a consumption must not leak across siblings (ALF-K22, PO decision 2026-10-22: skip
++// non-matching capabilities first). These two cases were registered as node:test `todo` by ALF-K17
++// while the module audited a spurious HGO-DRIFT row for every non-matching sibling; they now pass.
+ // ---------------------------------------------------------------------------------------------
+ 
+ for (const [toolName, build] of TOOLS) {
+-  test(`${toolName}: an expired action reports HGO-EXPIRED even while unexpired siblings are armed`, {
+-    todo: "consumeHumanGuardOverride() examines every armed capability and audits a 'rejected' HGO-DRIFT row for each non-matching sibling; driftReplanRequired then masks replanRequired, so the expired action reads HGO-DRIFT",
+-  }, () => {
++  test(`${toolName}: an expired action reports HGO-EXPIRED even while unexpired siblings are armed`, () => {
+     const root = fixture();
+     try {
+       const short = signAndArm(root, { toolName, toolInput: build("existing-a.md"), ttlMs: 60_000 });
+@@ -375,16 +373,14 @@ for (const [toolName, build] of TOOLS) {
+     }
+   });
+ 
+-  test(`${toolName}: delivering one action audits no rejection against its undisturbed siblings`, {
+-    todo: "the non-matching sibling is reclassified against the PRESENTED tool input and audited as rejected with driftedChecks [toolInputSha256, nativeTargets] before the input check skips it",
+-  }, () => {
++  test(`${toolName}: delivering one action audits no rejection against its undisturbed siblings`, () => {
+     const root = fixture();
+     try {
+       const armed = ["existing-a.md", "existing-b.md", "existing-c.md"].map((file) => ({
+         file, ...signAndArm(root, { toolName, toolInput: build(file) }),
+       }));
+       // Capabilities are examined in file-name (plan digest) order and the scan stops at the match, so deliver the
+-      // action that sorts LAST: that makes every sibling a candidate examined (and, today, audited) first.
++      // action that sorts LAST: that makes every sibling a candidate passed over before the match.
+       armed.sort((x, y) => (x.plan.planSha256 < y.plan.planSha256 ? -1 : 1));
+       const last = armed.pop();
+       deliver(root, last, last.file);
+@@ -393,6 +389,46 @@ for (const [toolName, build] of TOOLS) {
+       rmSync(root, { recursive: true, force: true });
+     }
+   });
++
++  // ALF-K22 additions (new cases; no existing case was changed).
++  test(`${toolName}: a call matching no signed action is refused as before but audits nothing against any armed sibling`, () => {
++    const root = fixture();
++    try {
++      const actions = ["existing-a.md", "existing-b.md", "existing-c.md"].map((file) => signAndArm(root, { toolName, toolInput: build(file) }));
++      const before = capabilityBytes(root);
++      const eventsBefore = auditEvents(root).length;
++      const refused = consume(root, { toolName, toolInput: build("never-signed.md") });
++      assert.equal(refused.status, "replan", JSON.stringify(refused));
++      // The refusal verdict is unchanged (a different native target reads as drift of the bound target set) ...
++      assert.equal(refused.code, "HGO-DRIFT");
++      // ... but it is derived read-only: no audit row, no capability rewrite.
++      assert.equal(auditEvents(root).length, eventsBefore, "a call matching no signed action must append no audit row");
++      assert.deepEqual(capabilityBytes(root), before, "a call matching no signed action must not rewrite any capability");
++      for (const [index, action] of actions.entries()) deliver(root, action, ["existing-a.md", "existing-b.md", "existing-c.md"][index], { nowMs: 11_000 });
++    } finally {
++      rmSync(root, { recursive: true, force: true });
++    }
++  });
++
++  test(`${toolName}: an expired sibling is neither audited nor reported for a call that is not its action`, () => {
++    const root = fixture();
++    try {
++      const short = signAndArm(root, { toolName, toolInput: build("existing-a.md"), ttlMs: 60_000 });
++      const live = signAndArm(root, { toolName, toolInput: build("existing-b.md") });
++      const later = 200_000;
++      // The unexpired action matches and is consumed; the expired sibling is passed over without an audit row.
++      deliver(root, live, "existing-b.md", { nowMs: later });
++      assert.deepEqual(eventsFor(root, short, "expired"), []);
++      assert.deepEqual(eventsFor(root, short, "rejected"), []);
++      // The expired action itself still reads HGO-EXPIRED and is audited as expired.
++      const expired = consume(root, short, { nowMs: later });
++      assert.equal(expired.status, "replan", JSON.stringify(expired));
++      assert.equal(expired.code, "HGO-EXPIRED");
++      assert.equal(eventsFor(root, short, "expired").length, 1);
++    } finally {
++      rmSync(root, { recursive: true, force: true });
++    }
++  });
+ }
+ 
+ // ---------------------------------------------------------------------------------------------
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index 547dc3043..86db4172a 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -4934,6 +4934,7 @@ function consumeHumanGuardOverrideCore({
+   let replanRequired = false;
+   let driftReplanRequired = false;
+   let inputMismatch = null;
++  const nonMatching = [];
+   // NVA-SIGDISCLOSE-1 Finding 6: a capability file this process cannot read or validate
+   // at all (unreadable, malformed JSON, a stale/wrong schema version, a bad MAC) is
+   // SKIPPED and RECORDED here, never treated as a whole-store failure. Before this fix,
+@@ -4948,6 +4949,61 @@ function consumeHumanGuardOverrideCore({
+   try {
+     files.push(...readdirSync(paths.capabilities).filter((name) => name.endsWith(".json")).sort());
+   } catch { return { status: "absent" }; }
++  // The full verdict for one authenticated capability against this call: plugin-install shape,
++  // expiry and every drift check. Moved out of the scan loop unchanged (ALF-K22) so the matching
++  // candidate and the no-match fallback below evaluate a capability through ONE code path.
++  const examineCapability = (capability) => {
++    const plugin = pluginIdentity(pluginRoot, provider);
++    const policy = policyIdentity(repo.root, pluginRoot, denials);
++    const isLocalPluginInstall = capability.mode === "global-plugin-install";
++    if (isLocalPluginInstall && !exactLocalPluginInstall(toolName, toolInput, repo.root)) {
++      return { shapeRefused: true };
++    }
++    const repository = isLocalPluginInstall
++      ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
++      : repositoryObservation(repo.root, spawn);
++    const expired = new Date(capability.expiresAt).getTime() <= nowMs;
++    let nativeTargetDrift = false;
++    if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
++      try {
++        // ALF-B6-HGO: the tool call is reclassified from the SAME vantage point
++        // recordHumanGuardDenial() classified it from. Under the cross-repository class that
++        // is the coordinating session's own root, not the bound target repository: against
++        // the target the identical absolute paths read as an in-root patch with relative
++        // paths and could never equal the recorded set. Every other class keeps the bound
++        // root. The kind must also be the recorded kind, not merely any admissible kind: a
++        // standard capability needs a standard reclassification of its recorded command
++        // class, an author-repair capability needs the fully resolved author-repair
++        // reclassification over its own bound source root.
++        const reclassified = eligibility(
++          capability.commandClass === "cross-repository-target" ? physicalRoot(rootDir) : repo.root,
++          toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
++        const sameKind = capability.mode === "pipeline-author-repair"
++          ? reclassified.mode === "pipeline-author-repair" && reclassified.sourceRoot === capability.authorSourceRoot
++          : reclassified.mode === "standard"
++            && (reclassified.commandClass ?? "exact-project-action") === capability.commandClass;
++        if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths) || !sameKind) nativeTargetDrift = true;
++        assertNativeTargets(repo.root, capability);
++      } catch { nativeTargetDrift = true; }
++    }
++    const driftChecks = {
++      status: capability.status !== "armed",
++      root: capability.root !== repo.root,
++      toolName: capability.toolName !== toolName,
++      toolInputSha256: capability.toolInputSha256 !== toolInputSha256,
++      denials: canonical(capability.denials) !== canonical(currentDenialDigests),
++      plugin: canonical(capability.plugin) !== canonical(plugin),
++      policy: canonical(capability.policy) !== canonical(policy),
++      repository: capability.schema === NATIVE_CAPABILITY_SCHEMA
++        ? !nativeRepositoryMatches(capability.repository, repository)
++        : canonical(capability.repository) !== canonical(repository),
++      ...(capability.schema === NATIVE_CAPABILITY_SCHEMA ? { nativeTargets: nativeTargetDrift } : {}),
++      authorEligiblePaths: capability.mode === "pipeline-author-repair"
++        && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null,
++    };
++    const drifted = Object.entries(driftChecks).some(([check, changed]) => check !== "toolInputSha256" && changed);
++    return { shapeRefused: false, expired, driftChecks, drifted };
++  };
+   for (const name of files) {
+     const planSha256 = name.slice(0, -5);
+     if (!SHA256.test(planSha256)) continue;
+@@ -4960,6 +5016,16 @@ function consumeHumanGuardOverrideCore({
+     }
+     if (capability.status !== "armed" || capability.toolName !== toolName
+       || canonical(capability.denials) !== canonical(currentDenialDigests)) continue;
++    // ALF-K22 (PO decision 2026-10-22, "skip non-matching capabilities first"): a capability bound
++    // to a DIFFERENT tool input is not the requested action. It is set aside here, before any lock,
++    // drift computation or audit row, so a sibling signed for another action can neither be
++    // reclassified against this call's input (a spurious [toolInputSha256, nativeTargets] HGO-DRIFT
++    // row) nor mask the matching capability's own expired/drifted verdict. If nothing matches, the
++    // set-aside records are evaluated read-only after this loop.
++    if (capability.toolInputSha256 !== toolInputSha256) {
++      nonMatching.push({ path });
++      continue;
++    }
+     const lock = join(paths.locks, `${planSha256}.lock`);
+     let lockFd;
+     try { lockFd = openSync(lock, "wx", 0o600); }
+@@ -4972,55 +5038,9 @@ function consumeHumanGuardOverrideCore({
+       if (!authorized) {
+         return { status: "invalid", code: "HGO-AUDIT" };
+       }
+-      const plugin = pluginIdentity(pluginRoot, provider);
+-      const policy = policyIdentity(repo.root, pluginRoot, denials);
+-      const isLocalPluginInstall = capability.mode === "global-plugin-install";
+-      if (isLocalPluginInstall && !exactLocalPluginInstall(toolName, toolInput, repo.root)) {
+-        return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
+-      }
+-      const repository = isLocalPluginInstall
+-        ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
+-        : repositoryObservation(repo.root, spawn);
+-      const expired = new Date(capability.expiresAt).getTime() <= nowMs;
+-      let nativeTargetDrift = false;
+-      if (capability.schema === NATIVE_CAPABILITY_SCHEMA) {
+-        try {
+-          // ALF-B6-HGO: the tool call is reclassified from the SAME vantage point
+-          // recordHumanGuardDenial() classified it from. Under the cross-repository class that
+-          // is the coordinating session's own root, not the bound target repository: against
+-          // the target the identical absolute paths read as an in-root patch with relative
+-          // paths and could never equal the recorded set. Every other class keeps the bound
+-          // root. The kind must also be the recorded kind, not merely any admissible kind: a
+-          // standard capability needs a standard reclassification of its recorded command
+-          // class, an author-repair capability needs the fully resolved author-repair
+-          // reclassification over its own bound source root.
+-          const reclassified = eligibility(
+-            capability.commandClass === "cross-repository-target" ? physicalRoot(rootDir) : repo.root,
+-            toolName, toolInput, { selectedAuthorSourceRoot: capability.authorSourceRoot });
+-          const sameKind = capability.mode === "pipeline-author-repair"
+-            ? reclassified.mode === "pipeline-author-repair" && reclassified.sourceRoot === capability.authorSourceRoot
+-            : reclassified.mode === "standard"
+-              && (reclassified.commandClass ?? "exact-project-action") === capability.commandClass;
+-          if (!reclassified.eligible || canonical(reclassified.paths) !== canonical(capability.eligiblePaths) || !sameKind) nativeTargetDrift = true;
+-          assertNativeTargets(repo.root, capability);
+-        } catch { nativeTargetDrift = true; }
+-      }
+-      const driftChecks = {
+-        status: capability.status !== "armed",
+-        root: capability.root !== repo.root,
+-        toolName: capability.toolName !== toolName,
+-        toolInputSha256: capability.toolInputSha256 !== toolInputSha256,
+-        denials: canonical(capability.denials) !== canonical(currentDenialDigests),
+-        plugin: canonical(capability.plugin) !== canonical(plugin),
+-        policy: canonical(capability.policy) !== canonical(policy),
+-        repository: capability.schema === NATIVE_CAPABILITY_SCHEMA
+-          ? !nativeRepositoryMatches(capability.repository, repository)
+-          : canonical(capability.repository) !== canonical(repository),
+-        ...(capability.schema === NATIVE_CAPABILITY_SCHEMA ? { nativeTargets: nativeTargetDrift } : {}),
+-        authorEligiblePaths: capability.mode === "pipeline-author-repair"
+-          && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null,
+-      };
+-      const drifted = Object.entries(driftChecks).some(([check, changed]) => check !== "toolInputSha256" && changed);
++      const examined = examineCapability(capability);
++      if (examined.shapeRefused) return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
++      const { expired, driftChecks, drifted } = examined;
+       if (expired || drifted) {
+         appendAudit(paths, {
+           type: expired ? "expired" : "rejected",
+@@ -5042,20 +5062,6 @@ function consumeHumanGuardOverrideCore({
+         driftReplanRequired = true;
+         continue;
+       }
+-      // Only authenticated, current-context authority may disclose bound hashes.
+-      // Keep searching so a later exact capability retains consumption precedence.
+-      if (driftChecks.toolInputSha256) {
+-        inputMismatch ??= {
+-          schema: "pipeline.human-guard-override-input-mismatch.v1",
+-          code: "HGO-INPUT-MISMATCH",
+-          requestSha256: capability.requestSha256,
+-          planSha256: capability.planSha256,
+-          expectedToolInputSha256: capability.toolInputSha256,
+-          observedToolInputSha256: toolInputSha256,
+-          differingInputs: ["toolInputSha256"],
+-        };
+-        continue;
+-      }
+       const consumedCore = {
+         ...capability,
+         status: "consumed",
+@@ -5085,6 +5091,36 @@ function consumeHumanGuardOverrideCore({
+       try { unlinkSync(lock); } catch {}
+     }
+   }
++  // ALF-K22: no capability matched the presented input. Only now are the set-aside, differently
++  // bound capabilities evaluated, through the same examineCapability() and in the same order as
++  // before, to derive the same no-match refusal as before (HGO-DRIFT, HGO-EXPIRED, HGO-INPUT-MISMATCH
++  // or absent) -- but READ-ONLY: no lock, no audit row, no write. They rank below any verdict a
++  // matching capability already produced (the loop above only reaches here with none consumed), so
++  // they can no longer mask a matching capability's expired/drifted result. Bound hashes are still
++  // disclosed only for an authenticated capability whose own context is current.
++  for (const { path } of driftReplanRequired || replanRequired ? [] : nonMatching) {
++    let capability;
++    try { capability = validatedCapability(paths, path); }
++    catch { continue; }
++    if (capability.status !== "armed") continue;
++    let authorized = false;
++    try { authorized = hasAuthorizedAuditEntry(paths, capability); }
++    catch { return { status: "invalid", code: "HGO-AUDIT" }; }
++    if (!authorized) return { status: "invalid", code: "HGO-AUDIT" };
++    const examined = examineCapability(capability);
++    if (examined.shapeRefused) return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
++    if (examined.expired) { replanRequired = true; continue; }
++    if (examined.drifted) { driftReplanRequired = true; continue; }
++    inputMismatch ??= {
++      schema: "pipeline.human-guard-override-input-mismatch.v1",
++      code: "HGO-INPUT-MISMATCH",
++      requestSha256: capability.requestSha256,
++      planSha256: capability.planSha256,
++      expectedToolInputSha256: capability.toolInputSha256,
++      observedToolInputSha256: toolInputSha256,
++      differingInputs: ["toolInputSha256"],
++    };
++  }
+   return {
+     ...(driftReplanRequired ? { status: "replan", code: "HGO-DRIFT" }
+       : replanRequired ? { status: "replan", code: "HGO-EXPIRED" }

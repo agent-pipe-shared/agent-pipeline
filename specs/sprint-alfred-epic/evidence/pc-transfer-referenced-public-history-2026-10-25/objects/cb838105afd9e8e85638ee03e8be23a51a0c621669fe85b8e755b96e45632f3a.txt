@@ -1,0 +1,30 @@
+// K127 proof: this repository's real identity files under a differently named directory.
+// usage: node scratch/K127-proof.mjs <clone-dir>   (prints one line per variant; creates fixtures under scratch/K127-proof-fixtures)
+import { spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+const clone = resolve(process.argv[2]);
+const { readConsumerVerifyConfiguration } = await import(pathToFileURL(join(clone, "plugins/pipeline-core/lib/consumer-verify.mjs")).href);
+const base = resolve("scratch/K127-proof-fixtures");
+mkdirSync(base, { recursive: true });
+const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")));
+const git = (cwd, ...args) => spawnSync("git", args, { cwd, env, encoding: "utf8" });
+
+function variant(label, name, calibrationLegacySource) {
+  const root = join(mkdtempSync(join(base, "v-")), name);
+  mkdirSync(root);
+  git(root, "init", "-q");
+  const copy = (from, to) => { mkdirSync(join(root, to, ".."), { recursive: true }); copyFileSync(join(clone, from), join(root, to)); };
+  copy("project/pipeline.json", "project/pipeline.json");
+  copy(calibrationLegacySource, ".claude/pipeline.json");
+  copy(".claude-plugin/marketplace.json", ".claude-plugin/marketplace.json");
+  git(root, "add", "-A");
+  try {
+    const cfg = readConsumerVerifyConfiguration(root);
+    console.log(`${label}: resolved project=${cfg.project} identityMode=${cfg.projectIdentity.identityMode}`);
+  } catch (error) { console.log(`${label}: ${String(error.message).slice(0, 160)}`); }
+}
+variant("real files as committed (legacy tier differs)", "machine-two-name", ".claude/pipeline.json");
+variant("real files, legacy tier byte-equal to neutral", "machine-two-name", "project/pipeline.json");

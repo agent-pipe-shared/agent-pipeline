@@ -1,0 +1,13 @@
+// Helper (untracked): import one module of the k93 clone (or another clone, 2nd arg) and print the outcome.
+// usage: node scratch/k104-probe.mjs <path-relative-to-clone> [clone-name]
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+const [rel, clone = "k93"] = process.argv.slice(2);
+const file = resolve("scratch/clones", clone, rel);
+try {
+  await import(pathToFileURL(file).href);
+  console.log(`LOADS ${clone}/${rel}`);
+} catch (e) {
+  console.log(`FAILS ${clone}/${rel}: ${e && e.name}: ${e && e.message}`);
+  console.log(String(e && e.stack).split("\n").slice(0, 8).join("\n"));
+}

@@ -1,0 +1,356 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+index b8cbc7326..09e793a6a 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs
+@@ -51,6 +51,8 @@ const bindingRepo = mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-bindin
+ execFileSync("git", ["init", "-q"], { cwd: bindingRepo });
+ mkdirSync(join(bindingRepo, ".claude"), { recursive: true });
+ recordConsentGiven({ rootDir: bindingRepo });
++writeFileSync(join(bindingRepo, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++writeFileSync(join(bindingRepo, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
+ assert.equal(observeGovernanceScope({ rootDir: bindingRepo }).requiresEnforcement, true,
+   "guard fixture must be admitted through canonical governance enrollment");
+ process.once("exit", () => rmSync(bindingRepo, { recursive: true, force: true }));
+@@ -84,7 +86,7 @@ function check(id, payload, expectExit, { stderrIncludes, projectDir } = {}) {
+   register(id, () => {
+     const { code, stderr } = run(payload, projectDir);
+     assert.equal(code, expectExit, `exit ${code} (expected ${expectExit}) -- ${stderr.trim().slice(0, 200)}`);
+-    for (const needle of [].concat(stderrIncludes ?? [])) assert.ok(stderr.includes(needle), `stderr missing "${needle}"`);
++    for (const needle of [].concat(stderrIncludes ?? [])) assert.ok(stderr.includes(needle), `stderr missing "${needle}" -- DIAG ${code} ${stderr.slice(0, 1500)}`);
+   });
+ }
+ function manualCheck(id, fn) {
+@@ -126,7 +128,10 @@ manualCheck("GD15n prepare a native pending binding for a complete dispatched Co
+     recordConsentGiven({ rootDir: fixture });
+     assert.equal(observeGovernanceScope({ rootDir: fixture }).requiresEnforcement, true,
+       "native fixture must be admitted through canonical governance enrollment");
+-    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", "src/change.mjs"], { cwd: fixture });
++    mkdirSync(join(fixture, ".claude"), { recursive: true });
++    writeFileSync(join(fixture, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
++    writeFileSync(join(fixture, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" })}\n`);
++    execFileSync("git", ["add", "--", ".agent-pipeline/onboarding-consent.json", "src/change.mjs", ".claude/pipeline.yaml", ".claude/pipeline-state.json"], { cwd: fixture });
+     execFileSync("git", ["commit", "-q", "-m", "fixture candidate"], { cwd: fixture });
+     assert.equal(execFileSync("git", ["status", "--porcelain"], { cwd: fixture, encoding: "utf8" }).trim(), "",
+       "native preparation fixture must begin from a clean committed tree");
+@@ -176,7 +181,7 @@ check("GD15l block a marked Codex worker binding with an unknown field", {
+ }, BLOCK, { stderrIncludes: ["NGHR-BRIEFING-SHAPE"], projectDir: repoRoot });
+ check("GD15m check a marked worker packet against the functional Goldfish briefing", {
+   tool_name: "spawn_agent", tool_input: { agent_type: "worker", message: nativeCodexWorkerPrompt() },
+-}, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING"], projectDir: repoRoot });
++}, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING"] });
+ 
+ assert.equal(cases.length, 4, "the native-worker dispatch regression corpus must register four cases");
+ 
+diff --git a/plugins/pipeline-core/lib/agy-session-authority.mjs b/plugins/pipeline-core/lib/agy-session-authority.mjs
+index d8037c2f7..a479d63fd 100644
+--- a/plugins/pipeline-core/lib/agy-session-authority.mjs
++++ b/plugins/pipeline-core/lib/agy-session-authority.mjs
+@@ -331,7 +331,7 @@ export function createAgyFamilyConsentAuthority({ readFamilyAuthority, readInvoc
+           });
+         });
+       }
+-      catch { return failConsent("AGY-CONSENT-ADMISSION-UNAVAILABLE"); }
++      catch (e) { console.error("DIAG-AGY-ADMIT", e && e.stack); return failConsent("AGY-CONSENT-ADMISSION-UNAVAILABLE"); }
+     },
+     async bind(handle, { invocationId, requestedModel, requestedEffort, role, scope, requiredPaths = [], fallbackPolicy, nowEpochMs = Date.now() } = {}) {
+       try {
+diff --git a/plugins/pipeline-core/lib/codex-host-output-custody.test.mjs b/plugins/pipeline-core/lib/codex-host-output-custody.test.mjs
+index e36382eb9..8bf739760 100644
+--- a/plugins/pipeline-core/lib/codex-host-output-custody.test.mjs
++++ b/plugins/pipeline-core/lib/codex-host-output-custody.test.mjs
+@@ -2,7 +2,10 @@
+ // Actual managed synthetic Node protocol plus focused custody-event boundaries.
+ import test from 'node:test';
+ import assert from 'node:assert/strict';
+-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
++import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync} from 'node:fs';
++import {fileURLToPath} from 'node:url';
++import {execFileSync} from 'node:child_process';
++import {prepareSessionAuthorityRegistryFixture} from './test-item-approved-course-fixture.mjs';
+ import {join} from 'node:path';
+ import {tmpdir} from 'node:os';
+ import {randomBytes,createHash} from 'node:crypto';
+@@ -15,8 +18,9 @@ import {createHostOutputCustody} from './codex-host-output-custody.mjs';
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const rawReport='{\r\n "outcome" : "ok", "note" : "🧪"\r\n}';
+ function fixture(t,scenario){
+-  const root=mkdtempSync(join(tmpdir(),'codex-host-output-custody-fixture-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+-  const cwd=join(root,'input'),common=join(root,'.git');mkdirSync(cwd,{mode:0o700});mkdirSync(common,{mode:0o700});
++  const root=realpathSync(mkdtempSync(join(tmpdir(),'codex-host-output-custody-fixture-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
++  execFileSync('git',['init','-q',root]);
++  const cwd=join(root,'input'),common=join(root,'.git');mkdirSync(cwd,{mode:0o700});
+   const repoFingerprint='a'.repeat(64),receiptId='drh_'+randomBytes(16).toString('hex');
+   const journalParent=registerCodexHostProcessRoot({gitCommonDir:common,repoFingerprint,purpose:'design-readiness'});
+   const expected=join(cwd,'expected.json');
+@@ -58,6 +62,7 @@ else{stdout(frame+'\\n');finish();}
+ }
+ for(const scenario of ['valid','split-utf8','invalid-utf8','duplicate-outer','trailing-partial','trailing-full','invalid-report','invalid-stderr','terminal-error'])test('managed output custody: '+scenario,async t=>{
+   const f=fixture(t,scenario),result=await runIsolatedStructuredHost(f.args),custody=result.observed.outputCustody;
++  console.error('DIAG-RESULT',scenario,result.ok,result.code,JSON.stringify(result.observed).slice(0,300));
+   const expected=JSON.parse(readFileSync(f.expected,'utf8'));
+   assert.deepEqual(Object.keys(custody).sort(),['schema','stdioStatus','stdin','stdout','stderr','finalMessageFrameSha256','reportRawJsonSha256','reportRawJsonBytes','reportCanonicalSha256'].sort());
+   assert.equal(custody.schema,'pipeline.codex-host-output-custody.v1');
+diff --git a/plugins/pipeline-core/lib/model-family-execution.test.mjs b/plugins/pipeline-core/lib/model-family-execution.test.mjs
+index 36d807e4d..11f296103 100644
+--- a/plugins/pipeline-core/lib/model-family-execution.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-execution.test.mjs
+@@ -11,7 +11,8 @@ import { createModelFamilyDiscoveryHost } from "./model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
+ import { createClaudeFamilyAdapter } from "./model-family-claude-adapter.mjs";
+ import { createAntigravityFamilyAdapter } from "./model-family-antigravity-adapter.mjs";
+-import { createModelFamilyHostController } from "./model-family-host-store.mjs";
++import { createModelFamilyHostController, createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
++import { prepareSessionAuthorityRegistryFixture } from "./test-item-approved-course-fixture.mjs";
+ import { canonicalizeJson } from "./governance-event.mjs";
+ import { createModelFamilyDiscoveryHost as createAssemblyDiscoveryHost, RULE_FIELDS as ASSEMBLY_RULE_FIELDS, digest as assemblyS2Digest } from "./model-family-discovery.mjs";
+ import { createCodexFamilyAdapter as createAssemblyCodexAdapter } from "./model-family-codex-adapter.mjs";
+@@ -121,7 +122,8 @@ async function realS4Receipt() {
+     hardEligibility: { runner: "codex", taskRoute: route.taskRoute, role: "frontier", effort: route.effort,
+       evidenceSha256: sha("hard"), minimumVersion: null, deniedModelIds: [] }, variantRule: null,
+     compatibility: { runner: "codex", taskRoute: route.taskRoute, role: "frontier", effort: route.effort, modelId, evidenceSha256: sha("compat") }, latestAlias: null };
+-  const root = mkdtempSync(join(resolve("/var/tmp"), "s4-s6-real-receipt-"));
++  const registryFixture = prepareSessionAuthorityRegistryFixture({ prefix: "s4-s6-real-receipt-" });
++  const root = registryFixture.root;
+   const source = {
+     readAuthorityInputs: () => ({ bundle, routeSource: { ok: true, taskRoutes, configuredRoutes }, trustAnchors: anchors, predecessor: null }),
+     readPinInputs: () => [],
+@@ -130,13 +132,14 @@ async function realS4Receipt() {
+     launchDriver: () => ({ ok: true, value: null }),
+   };
+   try {
+-    const host = createModelFamilyHostController({ rootDir: root, trustedSources: source, clock: () => Date.parse("2026-10-01T10:00:30.000Z") });
++    const host = createModelFamilyHostController({ rootDir: root, trustedSources: source, clock: () => Date.parse("2026-10-01T10:00:30.000Z"),
++      authorityLifecycle: createModelFamilyHostAuthorityLifecycle({ repository: registryFixture.repository }) });
+     const active = host.activate(); if (!active.ok) throw new Error(`S4 activation failed: ${active.code}`);
+     const prepared = host.prepare({ key: { runner: "codex", installationBindingSha256: bindings.installationBindingSha256,
+       accountBindingSha256: bindings.accountBindingSha256, sessionId: "session:interop", invocationId: "invocation:interop" }, assignment: route });
+     if (!prepared.ok) throw new Error(`S4 prepare failed: ${prepared.code}`);
+     return { receipt: prepared.value.receipt, bindings, provenanceSha256: sha("s4-provenance") };
+-  } finally { rmSync(root, { recursive: true, force: true }); }
++  } finally { rmSync(registryFixture.repoDir, { recursive: true, force: true }); }
+ }
+ 
+ for (const runner of EXECUTION_RUNNERS) {
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.mjs b/plugins/pipeline-core/lib/model-family-host-store.mjs
+index 9a911c7f3..07a6da70b 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.mjs
+@@ -991,7 +991,7 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+       admitted = await trustedSources.admitNativeRequest({ rootDir,
+         invocation: frozenClone(invocation.receipt), key: frozenClone(invocation.key),
+         assignment: frozenClone(invocation.assignment), request: snapshot });
+-    } catch { nativeAdmissions.delete(receiptSha256); return fail("MODEL-FAMILY-NATIVE-REQUEST-REFUSED"); }
++    } catch (e) { console.error("DIAG-ADMIT-THROW", e && e.stack); nativeAdmissions.delete(receiptSha256); return fail("MODEL-FAMILY-NATIVE-REQUEST-REFUSED"); }
+     if (!admitted || admitted.ok !== true || Object.keys(admitted).some((key) => !["ok", "code"].includes(key))) {
+       nativeAdmissions.delete(receiptSha256);
+       return fail(admitted?.code === "MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED"
+diff --git a/plugins/pipeline-core/lib/model-family-invocation.mjs b/plugins/pipeline-core/lib/model-family-invocation.mjs
+index d5c487d04..9858024b0 100644
+--- a/plugins/pipeline-core/lib/model-family-invocation.mjs
++++ b/plugins/pipeline-core/lib/model-family-invocation.mjs
+@@ -152,7 +152,8 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
+       if (typeof held.store.admitNativeRequest !== "function") return fail("MODEL-FAMILY-NATIVE-PORT-UNQUALIFIED");
+       let admission;
+       try { admission = await held.store.admitNativeRequest({ invocation: held.invocation, request: input.nativeRequest }); }
+-      catch { return fail("MODEL-FAMILY-NATIVE-REQUEST-REFUSED"); }
++      catch (e) { console.error("DIAG-INVOC-THROW", e && e.stack); return fail("MODEL-FAMILY-NATIVE-REQUEST-REFUSED"); }
++      if (!admission?.ok || !admission.value) console.error("DIAG-ADMISSION", JSON.stringify(admission));
+       if (!admission?.ok || !admission.value) return fail(admission?.code ?? "MODEL-FAMILY-NATIVE-REQUEST-REFUSED",
+         admission?.retryable === true);
+       nativeRequestCapability = admission.value;
+diff --git a/plugins/pipeline-core/scripts/design-advisory-admission.test.mjs b/plugins/pipeline-core/scripts/design-advisory-admission.test.mjs
+index 114f82b03..e06c4cb9d 100644
+--- a/plugins/pipeline-core/scripts/design-advisory-admission.test.mjs
++++ b/plugins/pipeline-core/scripts/design-advisory-admission.test.mjs
+@@ -1,59 +1,47 @@
+ // SPDX-License-Identifier: SUL-1.0
++// ADR-0085 retired the durable initial-design Advisor admission course: the CLI answers every command with the typed
++// retirement result before it parses arguments, reads state or touches a private receipt. The former cases (an answered
++// inspect that rechecks its private transaction, an unavailable inspect that never reuses the write-time final
++// approval claim) exercised the retired route and cannot hold; the transaction writer/reader they drove is covered by
++// lib/design-advisory-admission.test.mjs.
+ import assert from "node:assert/strict";
+-import { createHash } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ 
+-import { writeDesignAdvisoryTransaction } from "../lib/design-advisory-transaction.mjs";
++import { DESIGN_ADVISORY_COURSE_RETIRED, retiredDesignResult } from "../lib/retired-design-codes.mjs";
+ import { runDesignAdvisoryAdmission } from "./design-advisory-admission.mjs";
+ 
+-const digest = value => createHash("sha256").update(value).digest("hex");
+-const planPath = "specs/feature-1/prd.md";
+-const specPath = "specs/feature-1/spec.md";
+-function fixture(t, status) {
++function fixture(t) {
+   const root = mkdtempSync(join(tmpdir(), "advisor-admission-cli-"));
+   t.after(() => rmSync(root, { recursive: true, force: true }));
+   execFileSync("git", ["-C", root, "init", "-q"]);
+-  mkdirSync(join(root, "project"));
+-  mkdirSync(join(root, "specs", "feature-1"), { recursive: true });
+-  mkdirSync(join(root, ".git", "agent-pipeline", "design-advisory-receipts"), { recursive: true });
+-  writeFileSync(join(root, planPath), "# Plan\n");
+-  writeFileSync(join(root, specPath), "# Spec\n");
+-  const receipt = {
+-    schema: "pipeline.advisory-receipt.v1", receiptId: "advisor-1",
+-    dispatch: { dispatchId: "design-1", queueRevision: 0,
+-      candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40) },
+-    duty: "advisory", profile: "feature",
+-    configuredRoute: { runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, effort: "high" },
+-    adapter: "consult",
+-    observed: status === "answered"
+-      ? { status, identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "high" } }
+-      : { status, identity: null },
+-    questionSha256: digest("# Plan\n"), answerSha256: status === "answered" ? "b".repeat(64) : null,
+-    fallback: status === "answered" ? { reason: "none", redactedErrorClass: null }
+-      : { reason: "consult-unavailable", redactedErrorClass: "unavailable" },
+-    emittedAtMs: 1,
+-  };
+-  writeFileSync(join(root, ".git", "agent-pipeline", "design-advisory-receipts", "advisor-1.json"), `${JSON.stringify(receipt)}\n`);
+-  const written = writeDesignAdvisoryTransaction({ repoRoot: root, gitCommonDir: join(root, ".git"),
+-    featureId: "feature-1", planPath, specPath, receiptId: "advisor-1", nativeAvailable: false,
+-    disposition: status === "answered" ? { decision: "accept", rationale: "The plan is bounded." } : null,
+-    finalApprovalValid: status !== "answered", expectedPublicSha256: null });
+-  const argv = ["inspect", "--repo-root", root, "--feature", "feature-1", "--plan", planPath, "--spec", specPath];
+-  return { root, argv, written };
++  return root;
+ }
++const common = ["--repo-root", "", "--feature", "feature-1", "--plan", "specs/feature-1/prd.md", "--spec", "specs/feature-1/spec.md"];
++const argvFor = (command, root, extra = []) => [command, ...common.map((value, index) => index === 1 ? root : value), ...extra];
+ 
+-test("answered Advisor inspect rechecks its actual private transaction", t => {
+-  const { argv, written } = fixture(t, "answered");
+-  const result = runDesignAdvisoryAdmission(argv);
+-  assert.equal(result.status, "valid");
+-  assert.equal(result.id, written.id);
++test("every Advisor admission command is answered with the typed retirement result and no effect", t => {
++  const root = fixture(t);
++  const before = readdirSync(join(root, ".git")).sort();
++  for (const argv of [
++    argvFor("plan", root),
++    argvFor("inspect", root),
++    argvFor("apply", root, ["--receipt-id", "advisor-1", "--native-available", "false", "--expected-public-sha256", "absent"]),
++  ]) {
++    const result = runDesignAdvisoryAdmission(argv);
++    assert.deepEqual(result, retiredDesignResult(DESIGN_ADVISORY_COURSE_RETIRED), argv[0]);
++    assert.equal(result.ok, false);
++    assert.equal(result.implementationAuthority, false);
++  }
++  assert.deepEqual(readdirSync(join(root, ".git")).sort(), before, "the retired command wrote nothing under the git directory");
++  assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false);
+ });
+ 
+-test("unavailable Advisor inspect never reuses the write-time final approval claim", t => {
+-  const { argv } = fixture(t, "unavailable");
+-  assert.throws(() => runDesignAdvisoryAdmission(argv), error => error.code === "DAA-PUBLIC-INVALID");
++test("the retirement answer precedes argument parsing and repository access", () => {
++  for (const argv of [[], ["unknown-command"], argvFor("inspect", join(tmpdir(), "advisor-admission-cli-missing-root"))]) {
++    assert.deepEqual(runDesignAdvisoryAdmission(argv), retiredDesignResult(DESIGN_ADVISORY_COURSE_RETIRED));
++  }
+ });
+diff --git a/plugins/pipeline-core/scripts/local-worker-supervisor.mjs b/plugins/pipeline-core/scripts/local-worker-supervisor.mjs
+index dc5d52722..462d9f07e 100644
+--- a/plugins/pipeline-core/scripts/local-worker-supervisor.mjs
++++ b/plugins/pipeline-core/scripts/local-worker-supervisor.mjs
+@@ -110,7 +110,8 @@ export async function run(argv = process.argv.slice(2)) {
+     });
+     write({ schema: "pipeline.local-worker-supervisor-cli.v1", ...result });
+     return result.ok ? 0 : 2;
+-  } catch {
++  } catch (diagError) {
++    (await import("node:fs")).appendFileSync("<repo-root>/scratch/clones/g1/diag-out/lws.txt", "DIAG-LWS " + (diagError && diagError.stack) + "\n");
+     write({ schema: "pipeline.local-worker-supervisor-cli.v1", ok: false, code: "LWS-UNAVAILABLE" });
+     return 2;
+   }
+diff --git a/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs b/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
+index 01f7173fe..883eebafd 100644
+--- a/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
++++ b/plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs
+@@ -33,6 +33,7 @@ import {
+   resolveLocalSupervisorRoot,
+ } from "../lib/local-supervisor-state.mjs";
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
++import { prepareSessionAuthorityRegistryFixture } from "../lib/test-item-approved-course-fixture.mjs";
+ 
+ const CLI = realpathSync(fileURLToPath(new URL("./local-worker-supervisor.mjs", import.meta.url)));
+ const NODE = realpathSync(process.execPath);
+@@ -199,6 +200,9 @@ function fixture() {
+     git(["add", ".gitignore", "src/a.txt", "src/b.txt"], sourceRoot);
+     git(["commit", "-q", "-m", "fixture"], sourceRoot);
+     const commit = git(["rev-parse", "HEAD"], sourceRoot);
++    // The supervisor's lifetimes reserve their members in the session-authority registry, which exists only in an
++    // initialized checkout; excludeFromStatus keeps the candidate checkout clean (the helper's inputs are never tracked).
++    prepareSessionAuthorityRegistryFixture({ root: realpathSync(sourceRoot), excludeFromStatus: true });
+     const resolved = resolveLocalSupervisorRoot({
+       platform: "linux",
+       env: { XDG_STATE_HOME: stateBase },
+diff --git a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+index 8ab88c627..b733386e0 100644
+--- a/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
++++ b/plugins/pipeline-core/scripts/measure-fresh-repo-onboarding-turns.mjs
+@@ -160,6 +160,29 @@ function answerArgvForCollectInput(dir, action) {
+     return publishedActionWithSingleReplacement("<PO_VERIFY_COMMAND>", DEFAULT_ANSWERS.verifyCommand);
+   }
+ 
++  // No native UserPromptSubmit reference exists in a disposable measurement: take the published existing-file route
++  // with a regular repository file holding the fixture material (the guidance names this as the only alternative).
++  if (names.includes("textTurnRef") && Array.isArray(action.existingFileApplyAction?.argv)) {
++    const relative = "scratch/measure-intake-material.txt";
++    mkdirSync(join(dir, "scratch"), { recursive: true });
++    writeFileSync(join(dir, relative), DEFAULT_ANSWERS.text);
++    const sha256 = createHash("sha256").update(readFileSync(join(dir, relative))).digest("hex");
++    const fill = { "<existing-repository-file>": relative, "<sha256-of-existing-file>": sha256 };
++    return { kind: "command", executable: action.existingFileApplyAction.executable,
++      argv: action.existingFileApplyAction.argv.map((value) => Object.hasOwn(fill, value) ? fill[value] : value), publishedAction: true };
++  }
++  // The consent action now publishes its own command with typed language/profile placeholders (and omits the Git author
++  // fields once repository-local Git resolves them); execute that exact action with only those slots filled.
++  const consentAction = action.applyAction;
++  if (Array.isArray(consentAction?.argv) && consentAction.argv.includes("intake-consent-apply")
++    && consentAction.argv.some((value) => value === "<PO_INTAKE_LANGUAGE>" || value === "<PO_INTAKE_PROFILE>")) {
++    const fill = { "<PO_INTAKE_LANGUAGE>": DEFAULT_ANSWERS.language, "<PO_INTAKE_PROFILE>": DEFAULT_ANSWERS.profile,
++      "<PO_GIT_AUTHOR_NAME>": DEFAULT_ANSWERS.gitAuthorName, "<PO_GIT_AUTHOR_EMAIL>": DEFAULT_ANSWERS.gitAuthorEmail };
++    const argv = consentAction.argv.map((value) => Object.hasOwn(fill, value) ? fill[value] : value);
++    if (!argv.some((value) => /^<PO_[A-Z_]+>$/u.test(value))) {
++      return { kind: "command", executable: consentAction.executable, argv, publishedAction: true };
++    }
++  }
+   if (names.includes("gitAuthorName") || guidance.includes("intake-consent-apply")) {
+     const argv = [ONBOARDING_SCRIPT, "intake-consent-apply", "--root", dir, "--granted", "--activate"];
+     if (names.includes("gitAuthorName")) argv.push("--git-author-name", DEFAULT_ANSWERS.gitAuthorName);
+@@ -439,6 +462,7 @@ export function measureFreshRepoOnboardingTurns({ rootDir, runner = "claude", en
+ 
+     if (result.outcome === "unsupported-next-action" && result.final?.nextAction?.kind === "architecture-design-required") {
+       const na = result.final.nextAction;
++      if (turn === 6) writeFileSync("<repo-root>/scratch/clones/g1/diag-out/arch.json", JSON.stringify({ na, diagnostics: result.final.diagnostics, architecture: result.final.architecture }, null, 2));
+       authorArchitectureDesign(dir, na.prdPath);
+       turns += 1;
+       rounds.push({ turn, outcome: result.outcome, driverStepsThisRound: executed.length, resolved: "authored-architecture-design" });
+diff --git a/plugins/pipeline-core/scripts/model-family-approval-request.test.mjs b/plugins/pipeline-core/scripts/model-family-approval-request.test.mjs
+index 07a32ffa8..392c983a8 100644
+--- a/plugins/pipeline-core/scripts/model-family-approval-request.test.mjs
++++ b/plugins/pipeline-core/scripts/model-family-approval-request.test.mjs
+@@ -309,11 +309,14 @@ test("closed request schema rejects extra authority fields and an invalid candid
+ 
+ test("canonical PO signer resolves the family request before guard fallback and rejects an unresolved family schema", () => {
+   const signer = readFileSync(new URL("./po-human-approval.mjs", import.meta.url), "utf8");
+-  const resolveAt = signer.indexOf("const modelFamilyApproval =");
+-  const denyAt = signer.indexOf("scratchRequestRecord?.schema === MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA && modelFamilyApproval === null");
+-  const selectAt = signer.indexOf("?? modelFamilyApproval");
+-  const genericFallbackAt = signer.indexOf("describeGmw({ rootDir: repository, intentSha256 })");
+-  assert.ok(resolveAt >= 0 && denyAt > resolveAt && selectAt > denyAt && genericFallbackAt > selectAt,
++  // The signer selects the disclosure with a schema switch: the family case resolves its own request and names its
++  // invalid-request refusal, the generic HGO/GMW describers live only in the null-request default branch, and the
++  // closed refusal follows the switch. (The earlier `const modelFamilyApproval =` form was replaced by that switch.)
++  const resolveAt = signer.indexOf("case MODEL_FAMILY_APPROVAL_REQUEST_SCHEMA:");
++  const denyAt = signer.indexOf("the model-family request does not bind the current candidate");
++  const genericFallbackAt = signer.indexOf("record = describeGmw({ rootDir: repository, intentSha256 })");
++  const selectAt = signer.indexOf("if (invalidRequest !== null && (record === null || record.resolved !== true)) fail(invalidRequest)");
++  assert.ok(resolveAt >= 0 && denyAt > resolveAt && genericFallbackAt > denyAt && selectAt > genericFallbackAt,
+     "family requests must receive their own exact disclosure and fail closed before generic HGO/GMW fallback");
+   assert.match(signer, /the model-family request does not bind the current candidate/u);
+ });

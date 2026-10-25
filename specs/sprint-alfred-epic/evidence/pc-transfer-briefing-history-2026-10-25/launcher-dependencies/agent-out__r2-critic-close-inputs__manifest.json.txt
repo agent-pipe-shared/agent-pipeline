@@ -1,0 +1,69 @@
+{
+  "schema": "pipeline.method-only-r2-handoff.v1",
+  "baseCommit": "69643e345443ca4100ab164e0db808d275b2cd78",
+  "paths": [
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "ec2f6feee7679ec83776513427c39b566318135c73da952f07f7462e0357c4a8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "sha256": "a36aa1a0e6e8867bcb85be050b292139138f3b0d3022459a56c9002ddf876341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "sha256": "914bee757426fec6a3f0f3ffe6465cfdb9354bd39c7b5481c89cc1e1bb846dff"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "sha256": "d46297dbca165dfb96c9e09ade7b362f3e9cbb633c799eae7fcc97952883128f"
+    }
+  ],
+  "patch": {
+    "path": "patch.diff",
+    "sha256": "a32aed3e9224f325d56140ce1db4c36d1dadbcd26aac9a4fd36811b3255b9165",
+    "bytes": 26113
+  },
+  "captures": [
+    {
+      "path": "r2-generic-red.log",
+      "sha256": "600700d813a475857be27dbcc79e5fd3659a6248ded7da5a1f645806f8b54627"
+    },
+    {
+      "path": "r2-course-red.log",
+      "sha256": "03c689d05fbed446e4fca2bfd880ec11e2d43406e3842251917119ea3d4b1d5d"
+    },
+    {
+      "path": "r2-live-owner-red.log",
+      "sha256": "34b579d06f03d13a87c7d3eba32fa7f0b9340cc7de5b678bc6e346598ff6ce8e"
+    },
+    {
+      "path": "r2-live-owner-green.log",
+      "sha256": "e3960b2eef92c2dc939528837e50eeb06f21c58ff4f7bd53b2b331eeccb690c8"
+    },
+    {
+      "path": "r2-feature-reserve-red.log",
+      "sha256": "64ac5434f2fe3e5d311b59645e9b492d69073973013393dace498548cb072030"
+    },
+    {
+      "path": "r2-all-targeted-green.log",
+      "sha256": "429595af8140eac7afb413da8ead58d67cf6e1b77af162522d05545407fa58e5"
+    },
+    {
+      "path": "r2-all-consumer-safe.log",
+      "sha256": "88cea267c78e8e6ab33c8953f52470e78769bed18b7f197213ec7ee25cabbbcd"
+    }
+  ],
+  "targeted": {
+    "command": "node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/lib/critic-generic-batch.test.mjs plugins/pipeline-core/lib/critic-course-admission.test.mjs plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs plugins/pipeline-core/lib/critic-packet-governance.test.mjs",
+    "exitCode": 0,
+    "passed": 40,
+    "failed": 0
+  },
+  "fixtureRationale": "The public feature reserve case stages only the committed lifecycle manifest and its declared JSON and log members; the generic fixture root captures are unrelated to that exact diagnostic transport.",
+  "limitations": [
+    "method-only Source evidence; no native or provider attestation",
+    "ambiguous live or legacy transaction holds receive digest-bound inspection and remain held pending established owner or approved quiescence proof",
+    "Main integration, Full Verify, Critic, and PO acceptance are parent-owned"
+  ]
+}

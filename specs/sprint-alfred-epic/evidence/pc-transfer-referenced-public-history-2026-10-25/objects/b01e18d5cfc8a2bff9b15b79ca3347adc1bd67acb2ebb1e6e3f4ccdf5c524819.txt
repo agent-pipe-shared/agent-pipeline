@@ -1,0 +1,68 @@
+{
+  "schema": "pipeline.project-resource-observations.v1",
+  "candidate": {
+    "commit": "5017a7287485783fa2d4ff17d3f3240f2a719e13",
+    "tree": "c972b2a380287b5091626ffd40db40eede589883"
+  },
+  "resources": [
+    {
+      "id": "fixture-summary",
+      "limit": {
+        "value": 8192,
+        "unit": "utf8-bytes",
+        "sourceRef": {
+          "path": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+          "sha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+          "locator": "assertCompact(summary.out, 8192); COLLECT_INPUT_REFERENCE_BOUND = 15_000"
+        }
+      },
+      "measurement": {
+        "value": 2620,
+        "unit": "utf8-bytes",
+        "candidate": {
+          "commit": "5017a7287485783fa2d4ff17d3f3240f2a719e13",
+          "tree": "c972b2a380287b5091626ffd40db40eede589883"
+        },
+        "limitSourceSha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+        "command": "node scratch/agent-out/generator-integrated-13-qualification/run.mjs measure",
+        "artifactRef": {
+          "path": "scratch/agent-out/generator-integrated-13-qualification/measurement.log",
+          "sha256": "fc09fc8caed655ebef14221b0a515faba6a461fc6e080ce560c49c0c57fea8e2"
+        },
+        "exitCode": 0
+      }
+    },
+    {
+      "id": "fixture-driver-primary-reference",
+      "limit": {
+        "value": 15000,
+        "unit": "utf8-bytes",
+        "sourceRef": {
+          "path": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+          "sha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+          "locator": "assertCompact(summary.out, 8192); COLLECT_INPUT_REFERENCE_BOUND = 15_000"
+        }
+      },
+      "measurement": {
+        "value": 15230,
+        "unit": "utf8-bytes",
+        "candidate": {
+          "commit": "5017a7287485783fa2d4ff17d3f3240f2a719e13",
+          "tree": "c972b2a380287b5091626ffd40db40eede589883"
+        },
+        "limitSourceSha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+        "command": "node scratch/agent-out/generator-integrated-13-qualification/run.mjs measure",
+        "artifactRef": {
+          "path": "scratch/agent-out/generator-integrated-13-qualification/measurement.log",
+          "sha256": "fc09fc8caed655ebef14221b0a515faba6a461fc6e080ce560c49c0c57fea8e2"
+        },
+        "exitCode": 0
+      }
+    },
+    {
+      "id": "native-host-output-budget",
+      "limit": null,
+      "measurement": null
+    }
+  ]
+}

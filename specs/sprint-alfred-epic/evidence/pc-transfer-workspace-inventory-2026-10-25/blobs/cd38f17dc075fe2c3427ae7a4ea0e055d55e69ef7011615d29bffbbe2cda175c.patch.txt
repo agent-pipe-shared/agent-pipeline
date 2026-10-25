@@ -1,0 +1,40 @@
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+index 6ce392f6e..b3d751a4e 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+@@ -29,8 +29,11 @@
+ //         it is refused DISPATCH-BRIEFING-DIGEST-MISMATCH, as are two different briefings of one slice in one call.
+ //         Only a dispatch that is itself recorded (a Goldfish briefing) can supersede an admission record.
+ //         Typed gaps (no fake record is written for any of them):
+-//         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): open, owner Coordinator, due 2026-10-31
+-//         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no admission point: open, owner Coordinator, due 2026-10-31
++//         V-10 Critic and unrelated-role dispatches are not recorded (critic-review.md carries no Slice line): dispositioned, out of scope of V-10
++//              (PO decision 2026-10-22, ALF-K35, commit 38e94a0ef: a Critic has no slice of its own, so a slice-keyed record has no governed effect)
++//         V-10 a dynamically built Workflow script (not statically resolvable, fail-open in the guard) has no route record: dispositioned
++//              (PO decision 2026-10-22, ALF-K35, commits c080a1e22 and f294d0fa3: still admitted, with the typed advisory
++//              GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED; the repair is a static string literal prompt, 10d12d897)
+ //              (measured, ALF-K28: the Workflow CALL reaches guard-dispatch -- hooks.json matches Task|Agent|Workflow, "V-10 runner registration" --
+ //              and a static agent() literal is recorded; a prompt built at run time (interpolation, a named const) is admitted and records no
+ //              route, "V-10 typed gap, measured". Whether the host re-fires the hook per inner agent() is not observable here and not claimed.)
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 1297fa00f..b7d5ee192 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -15,11 +15,12 @@
+  * The same file also carries the item's added 0.7.0 acceptance (2026-10-17 P0-1, 2026-10-20 D64), each case
+  * driving the real module: the typed absent course, the German-table criterion scan, the `.test.js` check
+  * admission, the plan-readiness hand-off inspection, and the onboarding answers held in one intake record
+- * across a real restart. Three acceptance points are not met on this head and are typed `todo` cases (owner
+- * Coordinator, due 2026-10-31) that flip to passing when delivered: the submit-plan/present-plan call sites of
+- * the hand-off inspection (deferred to 0.7.x by PO decision D85; protected file), the briefing generator
+- * binding a numbered or R-n row of a German two-column table (scripts/dispatch-briefing.mjs
+- * findCriterionOccurrences), and the Git author no longer asked once the intake record holds it.
++ * across a real restart. Measured on this head: 22 cases, 21 pass, 1 typed skip (the per-runner host proof
++ * above, E-HOLD), 0 `todo`. The three acceptance points that were once typed `todo` cases are delivered and
++ * strict: the submit-plan/present-plan call sites of the hand-off inspection (the formerly deferred D85 clause,
++ * pulled into 0.7.0 by PO decision 2026-10-22), the briefing generator binding a numbered or R-n row of a German
++ * two-column table (scripts/dispatch-briefing.mjs findCriterionOccurrences), and the Git author no longer asked
++ * once the intake record holds it.
+  */
+ import assert from "node:assert/strict";
+ import { after, test } from "node:test";

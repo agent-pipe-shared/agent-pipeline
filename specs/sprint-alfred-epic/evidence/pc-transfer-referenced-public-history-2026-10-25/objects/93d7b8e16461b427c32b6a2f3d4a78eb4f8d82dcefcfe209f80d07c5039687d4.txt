@@ -1,0 +1,31 @@
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 391465c75..0bb1cf59f 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -2849,6 +2849,12 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/governance-scope-rejects-readonly-host-git-control.test.mjs"
+     },
++    {
++      "name": "pin-governed-check-child-ignores-inherited-node-test-context-tests",
++      "file": "plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs",
++      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/pins/governed-check-child-ignores-inherited-node-test-context.test.mjs"
++    },
+     {
+       "name": "pin-greenfield-approval-policy-applies-after-intake-transition-tests",
+       "file": "plugins/pipeline-core/lib/pins/greenfield-approval-policy-applies-after-intake-transition.test.mjs",
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 2b19cf82c..da91d2716 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1232,6 +1232,9 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate}=
+     // child. No inherited descriptor is advertised when it is not passed.
+     delete checkEnv.PIPELINE_VERIFY_CASE_COMPLETION_FD;
+     delete checkEnv.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES;
++    // An inherited outer test-runner context makes a nested `node --test` exit 0 with empty output even when its
++    // test fails; the verdict of a check must not depend on the runner that happens to host this process.
++    delete checkEnv.NODE_TEST_CONTEXT;
+     for(const check of itemDelivery.checks) {
+       const run=spawnSync(process.execPath,['--test',resolve(root,check.path)],{cwd:before.repository.primaryRoot,env:checkEnv,shell:false,timeout:60000,maxBuffer:1024*1024});
+       results.push({id:check.id,path:check.path,executable:process.execPath,args:['--test',check.path],status:run.status,signal:run.signal,error:run.error?.code??null,

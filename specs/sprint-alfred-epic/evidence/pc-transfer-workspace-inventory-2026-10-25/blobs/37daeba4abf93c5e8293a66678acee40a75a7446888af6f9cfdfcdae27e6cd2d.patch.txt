@@ -1,0 +1,243 @@
+diff --git a/backlog/STATUS.md b/backlog/STATUS.md
+index e1f126163..85f88f46c 100644
+--- a/backlog/STATUS.md
++++ b/backlog/STATUS.md
+@@ -184,7 +184,7 @@
+ | pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | closed | workflow-improvement | pipeline | — | 2026-08-19 | — | — |
+ | pipeline.codex-advisor-evidence-fails-after-host-update | open | defect | pipeline | alfred | 2026-09-29 | — | — |
+ | pipeline.codex-advisor-shared-namespace-rejects-fresh-repository-identity | open | defect | pipeline | none | 2026-09-28 | — | — |
+-| pipeline.codex-bootstrap-in-the-typed-next-action | open | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
++| pipeline.codex-bootstrap-in-the-typed-next-action | closed | workflow-improvement | pipeline | alfred | 2026-10-08 | 2026-10-31 | — |
+ | pipeline.codex-compact-sessionstart-json-rejects-measurement-fields | closed | defect | pipeline | alfred | 2026-09-28 | — | — |
+ | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
+ | pipeline.codex-design-readiness-child-rejects-valid-review | open | defect | pipeline | alfred | 2026-09-28 | — | — |
+@@ -779,6 +779,7 @@
+ | pipeline.scratch-write-exemption-does-not-cover-restart-required | closed | defect | pipeline | nova | 2026-08-29 | — | — |
+ | pipeline.scratch-write-refused-during-intake-against-documented-exemption | closed | defect | pipeline | nova | 2026-08-28 | — | — |
+ | pipeline.script-mediated-writes-bypass-protected-test-paths | open | defect | pipeline | alfred | 2026-10-05 | — | — |
++| pipeline.second-writer-check-skips-a-worktree-isolation-that-may-not-be-granted | open | defect | pipeline | none | 2026-10-22 | — | — |
+ | pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | — | 2026-08-17 | — | — |
+ | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | — | 2026-07-25 | — | — |
+ | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | — | 2026-08-09 | 2026-08-16 | — |
+@@ -967,6 +968,6 @@
+ 
+ - open: 270
+ - in_progress: 0
+-- closed: 673
++- closed: 674
+ - rejected: 3
+ - deferred: 11
+diff --git a/backlog/index.json b/backlog/index.json
+index 431366fcf..2dde7c3d4 100644
+--- a/backlog/index.json
++++ b/backlog/index.json
+@@ -3,12 +3,12 @@
+   "generatedFrom": {
+     "items": "backlog/items/*.md",
+     "ledger": "backlog/transitions.ndjson",
+-    "transitionHead": "bafed581403d7ff1bf1771a0339a979b32d72c953e3544a45803d6af6292a668"
++    "transitionHead": "996af27bd591cd493b2a65fac3c155261a4f712e3954862a57e70fdc63c90499"
+   },
+   "counts": {
+     "open": 270,
+     "in_progress": 0,
+-    "closed": 673,
++    "closed": 674,
+     "rejected": 3,
+     "deferred": 11
+   },
+@@ -2295,14 +2295,18 @@
+     },
+     {
+       "id": "pipeline.codex-bootstrap-in-the-typed-next-action",
+-      "status": "open",
++      "status": "closed",
+       "type": "workflow-improvement",
+       "owner": "pipeline",
+       "created": "2026-10-08",
+       "source": "admin-step inventory (docs/admin-steps-inventory.md), decision AO",
+       "deferred": false,
+       "due": "2026-10-31",
+-      "sprint": "alfred"
++      "sprint": "alfred",
++      "closedAt": "2026-10-22",
++      "closureRepository": "self",
++      "closureCommit": "d1a24c6a6da46232b493138b11d777c42aa1220e",
++      "closureEvidence": "plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs"
+     },
+     {
+       "id": "pipeline.codex-compact-sessionstart-json-rejects-measurement-fields",
+@@ -9922,6 +9926,16 @@
+       "deferred": false,
+       "sprint": "alfred"
+     },
++    {
++      "id": "pipeline.second-writer-check-skips-a-worktree-isolation-that-may-not-be-granted",
++      "status": "open",
++      "type": "defect",
++      "owner": "pipeline",
++      "created": "2026-10-22",
++      "source": "K39 delivery (guard-side second-writer refusal, D110) and CLAUDE.md note of 2026-08-25 on worktree isolation that was not granted.",
++      "deferred": false,
++      "sprint": "none"
++    },
+     {
+       "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
+       "status": "closed",
+diff --git a/backlog/items/2026-09-27-bounded-reader-terminal-binding.md b/backlog/items/2026-09-27-bounded-reader-terminal-binding.md
+index 54e47e828..a07734f20 100644
+--- a/backlog/items/2026-09-27-bounded-reader-terminal-binding.md
++++ b/backlog/items/2026-09-27-bounded-reader-terminal-binding.md
+@@ -48,9 +48,16 @@ the real-Git restoration regression and original corpus pass9/9. No fifth
+ Reader was launched. Bounded correction review and the final Alfred binding
+ remain distinct obligations; no release acceptance or item closure is claimed.
+ 
+-- **Decision:** pending
++- **Decision:** accepted (D66, 2026-10-20, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`, AC-118): a
++  report-bound `adjudicated-no-change` disposition form for the seven phase-two no-change adjudications; the two
++  remaining findings (the carried relocation and the partly evidenced terminal finding) are corrected by
++  documentation commits and bound; no fifth Reader, no inferred owner acceptance. The form exists in
++  `harness/scripts/doc-reader-terminal-binding.mjs` (status `adjudicated`, quotes bound to the immutable
++  phase-two report) and is pinned by `plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs`.
++  The item stays open: the actual Alfred terminal record is not built (see "Terminal record attempt 2026-10-22").
++  The owner acceptance and the policy-transition field remain unset for the PO.
+ - **Assignment:** Alfred release preparation
+-- **Date:** 2026-09-27
++- **Date:** 2026-09-27 (opened), 2026-10-22 (decision recorded)
+ 
+ ## Preparation evidence (2026-09-28)
+ 
+@@ -121,6 +128,30 @@ non-passing. Do not infer owner acceptance, fabricate resolution commits,
+ restart the bounded course, or launch a fifth Reader. Actual Alfred binding
+ remains pending even though all eight report blobs are immutable.
+ 
++### Terminal record attempt 2026-10-22
++
++The historical inputs exist and were re-checked: the four reviewed commits, the eight immutable reports under
++`specs/sprint-alfred-epic/evidence/reader-review/{phase-one,phase-two}/` and the correction commits of each interval. The
++terminal record was nevertheless NOT built, because a record that passes the committed checker cannot be built honestly
++from them today. Measured against the live repository:
++
++1. Two findings have no supported disposition. Round 1 finding 7 (Codex host contract relocation) and round 4 finding 4
++   (retained README availability passage) are neither resolved by a commit in their own correction batch, nor
++   phase-two adjudicated, nor owner accepted. D66 closes them by documentation commits (not yet made); the owner
++   acceptance stays unset for the PO.
++2. The covered state moved after the terminal correction `641b6d17`. Nine commits since then changed covered documents
++   (`99e0fba95`, `e779200cf`, `030a6111f`, `69c4d0bd1`, `3c0396bb0`, `d02409a8a`, `101ed4ef5`, `96ccb175e`,
++   `15722ce6a`) and none was read by a Reader; listing them as correction-batch commits would present unreviewed changes as
++   reviewed corrections.
++3. `docs/product-capability-inventory.json` changed in more than twenty commits after the fourth reviewed commit
++   `c3ff4084`; the checker refuses an unreviewed inventory transition (`unreviewed inventory or governance transition`).
++4. The per-round disposition files, `owner-decision.json` (needs the owner's name and decision) and `record.json` do not
++   exist in the repository. The owner decision source `course-decision-request-2026-09-27.md` does.
++
++No checker run was made over a record, since none was written. The next step needs a PO decision on points 2 and 3
++(re-baseline the course on a freshly reviewed state, or bound the post-course changes), plus the two documentation
++commits of point 1. Owner acceptance and the policy-transition field are left unset.
++
+ ### Blocker analysis 2026-10-22
+ 
+ Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+diff --git a/backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md b/backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md
+index f53beb7eb..02c34de03 100644
+--- a/backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md
++++ b/backlog/items/2026-10-04-claude-design-readiness-cannot-start-on-windows.md
+@@ -43,10 +43,22 @@ run:
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
+-- **Assignment (if accepted):**
+-- **Date:**
++- **Decision:** accepted in part. The Acceptance clauses named below as superseded are dropped; every other
++  clause stays open and unchanged.
++- **Rationale:** PO decision D63 (2026-10-20, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`) confirms
++  that only the named clauses of AC-124 (R4-7, R4-9, R4-10) drop as superseded by the retirement in
++  [ADR-0085](../../docs/adr/0085-one-review-one-signature-design-approval.md) (the machinery it removes is
++  retired). Nothing else in the item is superseded by D63.
++- **Assignment (if accepted):** the retained clause stays with the Alfred sprint (`sprint: alfred`); the open
++  native Windows run is tracked in the blocker analysis below.
++- **Date:** 2026-10-22
++
++Acceptance annotation (the Acceptance text above is unchanged):
++
++- Clause 1 (Spec §21.4 R4-7, R4-9, R4-10): **superseded** by D63 / ADR-0085; these are exactly the three
++  clauses of AC-124 that D63 drops, so the whole clause is no longer an acceptance criterion.
++- Clause 2 (documented runner-CLI install locations trusted on every platform, no wrappers or non-executables):
++  **not superseded**, remains an acceptance clause.
+ 
+ ### Blocker analysis 2026-10-22
+ 
+diff --git a/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md b/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md
+index b499fae51..f15cd285a 100644
+--- a/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md
++++ b/backlog/items/2026-10-08-codex-bootstrap-in-the-typed-next-action.md
+@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
+ id: pipeline.codex-bootstrap-in-the-typed-next-action
+ type: workflow-improvement
+ owner: pipeline
+-status: open
++status: closed
+ created: 2026-10-08
++closed_at: 2026-10-22
++closure_repository: self
++closure_commit: d1a24c6a6da46232b493138b11d777c42aa1220e
++closure_evidence: plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs
+ source: "admin-step inventory (docs/admin-steps-inventory.md), decision AO"
+ sprint: alfred
+ done_when: manual
+@@ -37,10 +41,10 @@ Owner: pipeline; due 2026-10-31.
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:** needs-verification (2026-10-08); premise refuted on verification (2026-10-22), disposition below.
+-- **Rationale:** decision AO: automatable admin step.
+-- **Assignment (if accepted):** post-0.7.0 automation lane unless pulled in.
+-- **Date:** 2026-10-08
++- **Decision:** needs-verification (2026-10-08); premise refuted on verification (2026-10-22); closed as obsolete (refuted premise, retired route) on 2026-10-22.
++- **Rationale:** decision AO: automatable admin step. On verification the premise does not hold (see "Verification of the premise"): the script is a per-design-package producer, not a host setup step, and ADR-0085 retired it. Closure evidence is the pin that records both grounds; the closure commit is the one that retargeted that pin (`d1a24c6a6`).
++- **Assignment (if accepted):** none; closed. The stale inventory entries were corrected the same day: `docs/admin-steps-inventory.md` row 54 is marked retired and uncounted (Codex count 4 to 3) and candidate 6 is withdrawn.
++- **Date:** 2026-10-08 (opened), 2026-10-22 (closed)
+ 
+ ## Verification of the premise (agent, 2026-10-22)
+ 
+@@ -55,8 +59,7 @@ Premise refuted on two independent grounds, pinned in `plugins/pipeline-core/lib
+ 
+ The deferral pin is retargeted to this state (it still fails if the preflight starts naming the script). Recommended disposition for the
+ Elephant triage: close as obsolete (premise refuted, route retired). The inventory row `docs/admin-steps-inventory.md` line 54 and
+-candidate 6 still describe the step as automatable and are stale; correcting them was left to the triage because the inventory
+-carries row counts.
++candidate 6 described the step as automatable and were stale; they were corrected at triage on 2026-10-22 (the inventory carries row counts, adjusted accordingly).
+ 
+ ### Blocker analysis 2026-10-22
+ 
+diff --git a/docs/admin-steps-inventory.md b/docs/admin-steps-inventory.md
+index ac960e499..a7013cbdd 100644
+--- a/docs/admin-steps-inventory.md
++++ b/docs/admin-steps-inventory.md
+@@ -51,7 +51,7 @@ Agent-executable layers (1b reconcile, `push-init`, `push-prepare`, `approve-pus
+ | Update via `/plugins` then `/new` when update is recommended | per session (when notified) | PO | automatable (helper never updates or restarts; operator boundary stays explicit) | `harness/session-bootstrap.md:211` |
+ | Select official versus local Pipeline source for the shared Codex App Server (affected sessions closed) | per host | PO | required because one App Server cannot run different Pipeline versions per repository | `harness/session-bootstrap.md:185` |
+ | Install and bootstrap only for the runner in use; confirm model routing | install | PO | required because model routes this runner cannot use stay unavailable | `docs/runner-support.md:10-14` |
+-| Run Codex design-readiness bootstrap script on a fresh host | per host | PO terminal | automatable (fold into the bootstrap typed next action) | `plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs` (no toil row; cited as existing script only) |
++| Run Codex design-readiness bootstrap script on a fresh host | per host | PO terminal | retired, not counted (premise refuted 2026-10-22: the script is a per-design-package producer, not a host setup step, and ADR-0085 retired it; formerly marked automatable, fold into the bootstrap typed next action) | `plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.mjs` (no toil row; cited as existing script only; it answers `DESIGN-COURSE-RETIRED`) |
+ 
+ ## Antigravity (agy)
+ 
+@@ -62,7 +62,8 @@ Agent-executable layers (1b reconcile, `push-init`, `push-prepare`, `approve-pus
+ | Install only for the runner in use; confirm model routing | install | PO | required because unavailable routes stay explicit | `docs/runner-support.md:10-14` |
+ 
+ Counts (rows; C-rows counted once): neutral 12 = 6 required, 6 automatable;
+-Claude Code 7 = 6 required, 1 automatable; Codex 4 = 2 required, 2 automatable;
++Claude Code 7 = 6 required, 1 automatable; Codex 3 = 2 required, 1 automatable
++(a fourth Codex row is listed as retired and not counted);
+ Antigravity 3 = 3 required, 0 automatable.
+ 
+ ## Planned automation
+@@ -79,4 +80,4 @@ to be set by the PO):
+ 3. **Signing toolchain readiness** (C9, T15/T16): check and resolve openssl in the readiness report with a typed repair per finding.
+ 4. **Catalogue-admit prescribed lifecycle verbs** (C12, T21/T23/T24): every verb the course prescribes runs for the agent in its state.
+ 5. **Typed plugin-update next action** (Claude, Codex): bootstrap offers the runner's update command instead of prose.
+-6. **Codex bootstrap in the typed next action** (Codex): include the design-readiness bootstrap in the fresh-host action.
++6. ~~**Codex bootstrap in the typed next action** (Codex): include the design-readiness bootstrap in the fresh-host action.~~ Withdrawn 2026-10-22: premise refuted (the script is a per-design-package producer, not a host setup step) and the route is retired by ADR-0085; the backlog item is closed as obsolete.

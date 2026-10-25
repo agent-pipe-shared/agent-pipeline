@@ -1,0 +1,195 @@
+diff --git a/harness/scripts/architecture-entry-required-source.test.mjs b/harness/scripts/architecture-entry-required-source.test.mjs
+index 61f04c2d2..28683300a 100644
+--- a/harness/scripts/architecture-entry-required-source.test.mjs
++++ b/harness/scripts/architecture-entry-required-source.test.mjs
+@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { inspectArchitectureEntryReadiness, ARCHITECTURE_ENTRY_SCOPE } from "../../plugins/pipeline-core/lib/architecture-entry-readiness.mjs";
+ import { inspectArchitectureDecisionContinuity } from "../../plugins/pipeline-core/lib/architecture-decision-continuity.mjs";
+-import { inspectEffectiveArchitectureDecisions } from "../../plugins/pipeline-core/lib/architecture-effective-decisions.mjs";
++import { inspectArchitectureDecisionAuthoringSources } from "../../plugins/pipeline-core/lib/architecture-effective-decisions.mjs";
+ import { resolveOrganizationArchitectureSources } from "../../plugins/pipeline-core/lib/organization-architecture-source.mjs";
+ 
+ const testDirectory = dirname(fileURLToPath(import.meta.url));
+@@ -42,7 +42,7 @@ function observe(inherited) {
+       schema: "pipeline.architecture-decision.v1", id: "ADR-REPRO", title: "Reproduction",
+       status: "accepted", digest: sha(body), scope: "project", date: "2026-10-09",
+     }) + "\n");
+-    const local = inspectEffectiveArchitectureDecisions({ rootDir: root, area: "pipeline-core", now });
++    const local = inspectArchitectureDecisionAuthoringSources({ rootDir: root, area: "pipeline-core", now });
+     assert.equal(local.status, "ready", JSON.stringify(local));
+     const readerCalls = [];
+     const result = inspectArchitectureEntryReadiness({
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 033dcd631..d8eb0419f 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -214,7 +214,23 @@ function readyLifecycleFixture(mode = "chat") {
+   const prdFile = join(root, generated.targets.prd.path);
+   const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+   writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+-  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n`);
++  // Greenfield intake requires a bounded architecture package before the acknowledgement writer.
++  const agyContract = "docs/agy-fixture-contract.md", agyVerification = "tests/agy-fixture.test.mjs";
++  mkdirSync(join(root, "docs"), { recursive: true });
++  mkdirSync(join(root, "tests"), { recursive: true });
++  writeFileSync(join(root, agyContract), "# AGY fixture contract\n");
++  writeFileSync(join(root, agyVerification), "import assert from 'node:assert/strict';\nassert.equal(true, true);\n");
++  const agyModule = { id: "agy-fixture", responsibility: "Bounded Antigravity guard fixture.", nonResponsibilities: ["Production services"],
++    ownedPaths: ["src/agy-fixture.mjs", agyContract, agyVerification], publicContracts: [agyContract], allowedDependencies: [],
++    authorityEffects: [], verificationEntryPoints: [agyVerification], adrReferences: [] };
++  const agyArchitecture = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["specs/", "architecture/", "src/agy-fixture.mjs", agyContract, agyVerification], rationale: "Bounded fixture design for lifecycle-guard coverage." },
++    modules: [agyModule], implementationSurface: ["src/agy-fixture.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "agy-fixture", revision: 1,
++      modules: [{ id: agyModule.id, ownedPaths: agyModule.ownedPaths, allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [agyVerification] }],
++      allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true, rejectDuplicatedFacades: true, minStatementsPerModule: 1 } },
++    baseline: { schema: "pipeline.architecture-baseline.v1", baselineRevision: 1, acceptedViolations: [], ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 } } };
++  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(agyArchitecture, null, 2)}\n\`\`\`\n`);
+   const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
+   invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
+   // Mini staging still requires the canonical chat acknowledgement before
+@@ -259,7 +275,7 @@ function readyLifecycleFixture(mode = "chat") {
+ function run(input, root = fixture(), {
+   claudeProjectDir = root,
+   hookCwd = root,
+-  timeoutMs = 8_000,
++  timeoutMs = Number(process.env.G3_TIMEOUT ?? 8_000),
+ } = {}) {
+   const envelope = typeof input === "string" ? input : {
+     workspacePaths: [root],
+@@ -284,8 +300,11 @@ function run(input, root = fixture(), {
+ }
+ 
+ function check(name, fn) {
++  if (process.env.G3_ONLY && !name.includes(process.env.G3_ONLY)) return;
+   try {
++    const t0 = Date.now();
+     fn();
++    process.stderr.write(`G3TIME ${Date.now() - t0}ms ${name}\n`);
+     passed++;
+     process.stdout.write(`ok ${passed} - ${name}\n`);
+   } catch (error) {
+diff --git a/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs b/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
+index ce7b02ceb..c8c0e1dcf 100644
+--- a/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
++++ b/plugins/pipeline-core/hooks/notebook-write-coverage.test.mjs
+@@ -162,7 +162,9 @@ try {
+     // Stops the class returning one guard at a time: a bare file_path read is blind to
+     // NotebookEdit, and blindness here means fail-open.
+     for (const name of ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-lifecycle-ready.mjs"]) {
+-      const source = code(readFileSync(join(HOOKS, name), "utf8"));
++      const GUARD_LIB = join(HOOKS, "..", "lib", "guard");
++      const source = code(readFileSync(join(HOOKS, name), "utf8")
++        + (name === "guard-lifecycle-ready.mjs" ? readdirSync(GUARD_LIB).filter((f) => f.endsWith(".mjs") && !f.endsWith(".test.mjs")).map((f) => readFileSync(join(GUARD_LIB, f), "utf8")).join("\n") : ""));
+       assert.ok(source.includes("writeTargetPath"), `${name} does not use the shared write-target reader`);
+       assert.doesNotMatch(source, /tool_input\?\.file_path|tool_input\.file_path/u,
+         `${name} still reads tool_input.file_path directly`);
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs
+index 7911bc9bc..4d62038aa 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight-enforcement.test.mjs
+@@ -159,6 +159,11 @@ async function assertBaseline(role) {
+   const { result } = await run({ role, hooks: {} });
+   assert.equal(result.status, "ready", "precondition: all-current hooks must give a ready envelope");
+   assert.equal(result.mandatoryHookReadiness.status, "ready");
++  if (role === "goldfish" || role === "critic") {
++    // AC-245 / P1-1 (scopePreflightToRole): a Goldfish/Critic envelope withholds the executable onboarding action.
++    assert.equal(result.nextAction, null, "precondition: subagent envelope withholds the coordinator action");
++    return result;
++  }
+   assert.equal(result.nextAction?.kind, "command", "precondition: ready envelope carries the onboarding action");
+   assert.equal(basename(result.nextAction.argv[0]), "project-onboarding-v3.mjs");
+   assert.equal(result.nextAction.argv[1], "inspect");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index f62c0ca62..5fff6a39c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -554,6 +554,7 @@ import {
+   readSourceOwnedOnboardingAfkProjectionForState,
+   observeSourceOwnedControlledMethodAfkStateRename,
+   syncStateMdNextAction,
++  finishOrphanSessionCleanupBindingRelease,
+ } from "../lib/onboarding-continuity.mjs";
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+ import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+@@ -12416,6 +12417,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         }
+         return 2;
+       }
++      // D73 E: runs after writeState released the State lock (the continuity snapshot refuses a foreign one).
++      if (written.afterCommit?.status === "released" && releasePlan.binding?.sessionCleanup) {
++        try {
++          finishOrphanSessionCleanupBindingRelease({ plan: releasePlan });
++        } catch (error) {
++          console.error(`Error: discard-feature public State committed; orphan-cleanup-required (${error?.code ?? "SESSION-CLEANUP-ORPHAN-RELEASE-FAILED"}): ${error?.message ?? "no message"}`);
++          return 2;
++        }
++      }
+       syncNextActionDocs(dir, discardNext);
+       console.log(
+         `Feature "${activeFeature.id}" discarded by "${by}" (commit ${discardForCommit ?? "—"}, ${discardedAt}). Reason: ${reason}. activeFeature removed, planApproved=false.`,
+diff --git a/plugins/pipeline-core/scripts/security-scan.mjs b/plugins/pipeline-core/scripts/security-scan.mjs
+index e28b84d2d..33b7edbc9 100644
+--- a/plugins/pipeline-core/scripts/security-scan.mjs
++++ b/plugins/pipeline-core/scripts/security-scan.mjs
+@@ -382,8 +382,9 @@ function observeCandidate(rootDir) {
+   };
+ }
+ 
+-function sameCandidate(left, right) {
+-  return left.status === "clean" && right.status === "clean"
++function sameCandidate(left, right, { allowDirty = false } = {}) {
++  const admitted = allowDirty ? ["clean", "dirty"] : ["clean"];
++  return admitted.includes(left.status) && admitted.includes(right.status)
+     && left.commit === right.commit && left.tree === right.tree && left.inputSha256 === right.inputSha256
+     && left.repositorySha256 === right.repositorySha256;
+ }
+@@ -434,8 +435,8 @@ function securityPolicyBinding(scanRoot, authority, manifest, blockOn, mode) {
+  * root whose bytes cannot be shadowed by this process's mutable worktree. The
+  * detached worktree is disposable and is never used for the evidence output.
+  */
+-function materializeCandidate(rootDir, candidate) {
+-  if (candidate.status !== "clean") return { ok: false, reason: candidate.reason ?? `candidate-${candidate.status}` };
++function materializeCandidate(rootDir, candidate, { allowDirty = false } = {}) {
++  if (candidate.status !== "clean" && !(allowDirty && candidate.status === "dirty")) return { ok: false, reason: candidate.reason ?? `candidate-${candidate.status}` };
+   let parent;
+   try { parent = mkdtempSync(join(tmpdir(), "pipeline-security-candidate-")); } catch { return { ok: false, reason: "snapshot-temp-unavailable" }; }
+   const snapshotRoot = join(parent, "tree");
+@@ -445,7 +446,7 @@ function materializeCandidate(rootDir, candidate) {
+     return { ok: false, reason: "snapshot-materialization-failed" };
+   }
+   const observed = observeCandidate(snapshotRoot);
+-  if (!sameCandidate(candidate, observed)) {
++  if (!sameCandidate({ ...candidate, status: "clean" }, observed)) {
+     gitResult(rootDir, ["worktree", "remove", "--force", snapshotRoot]);
+     try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
+     return { ok: false, reason: "snapshot-identity-mismatch" };
+@@ -878,11 +879,15 @@ export async function runSecurityScan({
+   // Defaulting to the real imported functions keeps every production code path identical.
+   assessTrustedExecutablePath: assessTrustedExecutablePathOverride,
+   resolveTrustedSystemExecutable: resolveTrustedSystemExecutableOverride,
++  // "shared-tree" (default) refuses a dirty tree; "snapshot" scans HEAD's committed bytes from
++  // the detached worktree and tolerates a dirty caller tree (T32).
++  scanMode = "shared-tree",
+ } = {}) {
++  const allowDirty = scanMode === "snapshot";
+   const assessPath = assessTrustedExecutablePathOverride ?? assessTrustedExecutablePath;
+   const resolveSystemExec = resolveTrustedSystemExecutableOverride ?? resolveTrustedSystemExecutable;
+   const candidateBefore = observeCandidate(rootDir);
+-  const snapshot = materializeCandidate(rootDir, candidateBefore);
++  const snapshot = materializeCandidate(rootDir, candidateBefore, { allowDirty });
+   // Non-Git callers retain a diagnostic-only compatibility report. Such
+   // evidence can never satisfy an exact-candidate consumer. A Git candidate
+   // that is dirty, unsupported, or cannot be materialized is stricter: do not
+@@ -1001,8 +1006,8 @@ export async function runSecurityScan({
+   const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
+   const snapshotAfter = scanRoot ? observeCandidate(scanRoot) : null;
+   const candidateAfter = observeCandidate(rootDir);
+-  const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
+-    && sameCandidate(candidateBefore, snapshotAfter);
++  const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter, { allowDirty })
++    && sameCandidate({ ...candidateBefore, status: "clean" }, snapshotAfter);
+   const candidateUncertain = candidateBefore.status !== "unavailable" && !candidateBound;
+   const blockingClass = hasErrorClass || hasBlockingFinding || candidateUncertain;
+ 

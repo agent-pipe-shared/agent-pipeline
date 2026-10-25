@@ -1,0 +1,9 @@
+command: git diff --cached --check
+label: g30-staged-diff-check
+exitCode: 0
+head: 8ac8893456ac6ba0c1b57b6042365da85df8e2ec
+tree: f4aeaadae6344e0e4c306f3e477a82bed3d1de01
+dirty: true
+--- stdout ---
+
+--- stderr ---

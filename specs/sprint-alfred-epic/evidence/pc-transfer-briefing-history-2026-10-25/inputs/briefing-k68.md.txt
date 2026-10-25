@@ -1,0 +1,17 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k68/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; replace `<name>` with `k68`). Then read `scratch/briefing-k66.md` and `scratch/briefing-k57.md`: THIS briefing is the same kind of task (take counted results and record them in an evidence file) with the changes below; everything not changed here (method, runners, table format, forbidden list, stop conditions, commit rules, identity rule) is taken from K57/K66 with `k57`/`k66`→`k68`, task id `K68-COUNTED-RUNS-3`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K68-COUNTED-RUNS-3/2026-10-23 · Role Goldfish`
+
+## Briefing K68-COUNTED-RUNS-3: fresh serial counted runs for the suites of correction clusters K3, K4, K5 and K8, so that closure entries can cite them
+
+### 1. Goal
+Clusters K3 and K4 are closable by commit evidence only; K5 and K8 have suites with no counted result. The closure reads in the MAIN checkout (read only) name the suites: `scratch/closure-read/K3.md` (six suites), `scratch/closure-read/K4.md` (eight suites plus three extras tagged K4: guard-gate-strength, GPA001, the push-anchor suite), `scratch/closure-read/K5.md` (doc-contract-tests, pipeline-start-v3 PSV04, language-canon, phase3-sdlc-coherence, no-autoupdate-key, spec-retention-check, push-release-flow-docs-contract, license-contract-check), `scratch/closure-read/K8.md` (seven suites: guard-gate-strength, notebook-write-coverage, codex-session-start-hint, lifecycle-denial-loop incl. case RC04C001, guard-apply-patch, guard-devplan, antigravity-pretool-guard). Read these four files, resolve every suite name to its real path in the clone (`find` one directory at a time; if a name has no test file, record "no suite found"; some are checks run as `node harness/scripts/<name>.mjs` rather than test files: run those as checks and record PASS/FAIL), and run each ONCE, in the foreground, one after the other, on the clone's HEAD, with the tracked runners (`docs/operating-tools.md`). Record the table (group the rows by cluster) in a new evidence file `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-c.md` (do not read or touch the `-b` file another dispatch may write). A suite longer than the Bash timeout: wait for it via the helper `scratch/k57-run-capture.mjs` in the main checkout (read its header). A red suite: first failing case name, one retry alone, never fix. Skip duplicates already counted in `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md` (read it once) unless the suite changed since.
+
+### 2. Context files
+The four closure files, `docs/operating-tools.md`, `scripts/run-quiet.mjs` and `scripts/run-parallel.mjs` headers, `scratch/briefing-k57.md`, `scratch/briefing-k66.md`.
+
+### 3. DoD checks, forbidden, stop conditions
+As in K57/K66. Trailers: exactly `AI-Assisted: true` and `Dispatch: K68-COUNTED-RUNS-3 (goldfish)`. Tool budget: base cap 70, closing allowance +5. A hung suite is recorded TIMEOUT and skipped.
+
+### 4. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k68`. TASK_ID: K68-COUNTED-RUNS-3. Status wording per the common briefing (never "done").

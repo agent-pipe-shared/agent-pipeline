@@ -1,0 +1,206 @@
+diff --git a/backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md b/backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md
+index a54660826..224aa9da7 100644
+--- a/backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md
++++ b/backlog/items/2026-09-28-lifecycle-read-scope-blocks-host-declared-system-skill.md
+@@ -57,3 +57,15 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **DEFERRED** — Verify declared-skill admission at the installed Codex lifecycle boundary
+   The item is closed as a duplicate (2026-10-22) and merged into 2026-09-28-declared-system-skill-read-requires-human-override.md; both were deferred past the 0.7.0 candidate by PO decision of 2026-10-16 (AC-147 and AC-209 not counted; item Deferral line 2026-10-17). The pin's declared-skill cases are intentionally skipped as NATIVE_HOLD.
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- Triage "Deferral (2026-10-17) ... The item stays open": this item is not open. Its front matter is `status: closed`
++  (`closed_at: 2026-10-22`), rejected as a duplicate and merged into
++  `backlog/items/2026-09-28-declared-system-skill-read-requires-human-override.md`, whose own status is `open`. The line
++  now applies to that canonical item only; the PO deferral of 2026-10-16 (AC-147 and AC-209) is carried by it.
++- The Blocker analysis DEFERRED bullet ("Verify declared-skill admission at the installed Codex lifecycle boundary") and
++  any delivery-remeasure row listing this item as open agent work: the clauses live in the canonical item. This item
++  should be dropped from the open list; nothing is lost, its content was carried over verbatim into the canonical item.
+diff --git a/backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md b/backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md
+index 89eba8717..683ac84a3 100644
+--- a/backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md
++++ b/backlog/items/2026-09-29-first-enrollment-enters-retirement-before-consent.md
+@@ -89,3 +89,19 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **LINUX-RUN** — Run that case on Linux/WSL, where directory symlinks and mode bits exist
+   The pin's HL physical-history case skips only when symlinkSync fails (typed host-limitation, PO decision K7), which does not happen on Linux. Run `node scratch/run-in.mjs <clone> <label> plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs`; closes on 0 skip, 0 fail. The item's other open parts (OBC298 label, installed-candidate qualification) are separate host work.
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- Blocker analysis 2026-10-22, LINUX-RUN bullet ("Run that case on Linux/WSL ... closes on 0 skip, 0 fail"), and the
++  premise that the HL physical-history case is an empty skipped stub: commit `18c06f27b` replaced the stub with four
++  cases (file and directory links at retained-history paths, refused by code `KICKOFF-PATH-UNSAFE` or
++  `ER-HISTORY-UNSAFE`, link targets asserted untouched). The skip is now a typed conditional host-limitation skip taken
++  only when the host cannot create a link. Measured again in a clean clone on Linux/WSL2 on 2026-10-23:
++  `plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs` reports 9 tests, 9 pass,
++  0 fail, 0 skip (the commit message records 8 pass, 1 skip before the change). The run is done; it is not work to do.
++- Triage "2026-10-08 close-out check: not closable - OBC298 label absent": the pin case "AC6 the committed onboarding
++  suite declares OBC298 and FRB001-FRB004, and OBC298 passes" passes in the same 9-case run.
++- Still open and not agent work: qualification of the installed candidate on a host, and PO acceptance. The status stays
++  `open`; the Triage block carries no Decision field and no recorded decision settles it, so it is left as it is.
+diff --git a/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md b/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md
+index 088caef93..35e118bf2 100644
+--- a/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md
++++ b/backlog/items/2026-09-29-git-hook-runtime-snapshot-omits-protected-baseline-catalog.md
+@@ -105,3 +105,20 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **NOT-BLOCKED** — Counted Linux/WSL run of the onboarding suite
+   Already done: item section 'Counted runs 2026-10-22' records project-onboarding-v3.test.mjs 216 PASS / 0 fail in 467 s, git-hook-runtime-snapshot.test.mjs 8/8 and pre-commit-hook-install.test.mjs 59/59 on Linux/WSL2 at f3a9f02cb. Remaining item work (Full Verify, Critic, PO acceptance) is outside this clause.
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- "Intake status": "The full original184 onboarding suite and final candidate qualification remain pending": the suite
++  part is superseded by the section "Counted runs 2026-10-22" (216 PASS, 0 fail, skip, cancel or timeout; the earlier
++  149-passed attempt stopped at 900 s). Final candidate qualification (Full Verify and the candidate-bound closure checks)
++  is still pending.
++- "Intake status": "This item is not committed or registered yet because the current product commit is held at the
++  normal protected-path backstop": the correction is committed. Commit `26fef9e7d` (`feat(pipeline): integrate 0.7
++  greenfield remediation`) carries the snapshot producer and admission changes
++  (`plugins/pipeline-core/lib/git-hook-runtime-snapshot.mjs`, `lib/git-hook-snapshot-admission.mjs`,
++  `scripts/pre-commit-hook-install.mjs` and its test), and the Triage rationale below already cites it.
++- "The original hook suite passes 55/55": 59/59 in the counted run; the 55/55 figure is the count at intake time.
++- Still open and not agent work: Full Verify and the candidate-bound closure checks on the host, the independent Critic
++  read, and PO acceptance. The status stays `open`; the Triage block is already filled (2026-10-08).
+diff --git a/backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md b/backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md
+index 607c13d9a..f3117b8dc 100644
+--- a/backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md
++++ b/backlog/items/2026-09-29-greenfield-design-course-cost-and-proportionality.md
+@@ -88,6 +88,11 @@ The existing mini profile and previous cost work do not demonstrate this
+ feature-sized greenfield happy path. This is an architecture/course change;
+ measure the installed runner outcome before closing.
+ 
++- **Decision:** D125 (PO, 2026-10-22): ADR-0085 supersedes the Advisor-plus-readiness design course for this item; the telemetry clause is split out per D25 and D121. Recorded at the 2026-10-23 text sweep.
++- **Rationale:** the original acceptance (Advisor plus independent readiness before one final gate) is restated against the single-review route of ADR-0085, and the phase-time telemetry clause is tracked in its own item.
++- **Assignment (if accepted):** telemetry clause: `backlog/items/2026-10-16-design-course-telemetry-is-deferred.md`; remaining clauses: judged against the successor policy, installed-runner measurement still open.
++- **Date:** 2026-10-23
++
+ ### Blocker analysis 2026-10-22
+ 
+ Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+@@ -96,3 +101,24 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+   Requires an installed runner (Claude, Codex or Antigravity) executing the real design course with Advisor and readiness model turns and the PO's final plan approval; no agent may drive that. Observed: zero intermediate PO proofs, one final DWP proof, implementation admitted only after it.
+ - **PO-DECISION** (decided: D125) — Confirm the original Advisor-plus-readiness acceptance is replaced by the successor policy (one review, no readiness, ADR-0085) and that telemetry stays deferred
+   Question: is the item's original acceptance (Advisor plus independent readiness before one final gate, with phase-time telemetry) superseded by ADR-0085 (one review, no readiness) so the course test is judged against the successor policy?
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- Acceptance bullet 1 ("Advisor and independent readiness complete before the single final PO plan approval") and every
++  other Acceptance or Description sentence that names independent readiness: decided by D125 (PO, 2026-10-22,
++  `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`). ADR-0085 supersedes the Advisor-plus-readiness design
++  course for this item; its acceptance is restated against the single-review route, with fallback evidence going to the
++  present-plan review-receipt route. The one-final-PO-gate and no-intermediate-proof parts of the bullet are unchanged.
++- Acceptance bullet 5 ("Record phase wall time, tool time and human wait separately; report model tokens only where the
++  host supplies trustworthy counters"): leaves this item's acceptance by D25 (2026-10-18) and stays postponed for 0.7.0
++  by D121 (2026-10-22; named as open in the release note, no new schema before the test candidate). It is tracked in
++  `backlog/items/2026-10-16-design-course-telemetry-is-deferred.md`; the duplicate
++  `2026-10-19-design-course-phase-telemetry-is-not-recorded.md` is closed and merged into it.
++- Blocker analysis PO-DECISION bullet "Confirm the original Advisor-plus-readiness acceptance is replaced by the
++  successor policy ... and that telemetry stays deferred": answered, D125 and D121 (the bullet already says "decided: D125").
++- The Triage block above had no Decision, Rationale, Assignment or Date; the four fields were added from D125, D25 and
++  D121. The Triage text was not rewritten.
++- Still open and not agent work: the HOST-SESSION-NEEDED run (a fresh small-project course on an installed runner,
++  judged against the successor policy) and PO acceptance. The status stays `open`.
+diff --git a/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md b/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md
+index 966aa1bd1..8f4fa5aa7 100644
+--- a/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md
++++ b/backlog/items/2026-10-03-forensics-and-audit-evidence-not-reconstructable.md
+@@ -60,3 +60,18 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **DEFERRED** — Admitting the export to governed agents needs a signature-bound guard patch
+   Whole item deferred past the 0.7.0 candidate by PO decision 2026-10-16 (item Triage, dated 2026-10-17; AC-175 not counted). The held guard patch (signature) is only needed once the item is scheduled for the next sprint.
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- Triage "Partial groundwork already committed" sentence "Admitting the export to governed agents needs a held guard
++  patch", and the Blocker analysis DEFERRED bullet "Admitting the export to governed agents needs a signature-bound guard
++  patch" / "The held guard patch (signature) is only needed once the item is scheduled": the admission is already
++  committed. Commit `0824e528e` (`feat(pipeline-core): admit the runner transcript export to governed agents`) adds the
++  export operation to the sanctioned-arguments table in `plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs`
++  (read flag plus `--runner` codex, claude or antigravity and `--session-id`). No guard patch is held for this part.
++- Unchanged and still true: child sessions and turn boundaries are not reported by the export, Antigravity stays typed
++  unavailable, and the rest of the Acceptance list (continuity digest drift, executable Verify contract, generated audit
++  index) is not built. The whole item stays deferred past 0.7.0 by the PO decision of 2026-10-16 (Triage, dated
++  2026-10-17).
+diff --git a/backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md b/backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md
+index a1a0e5968..d9187e694 100644
+--- a/backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md
++++ b/backlog/items/2026-10-03-git-stash-list-classified-as-working-tree-write.md
+@@ -65,3 +65,25 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+ 
+ - **DEFERRED** — Triage defers the item past the 0.7.0 candidate (2026-10-17); confirm whether it counts for this delivery
+   Already answered by the recorded PO decision of 2026-10-16 (item Triage, 2026-10-17): deferred past 0.7.0, AC-181 is not counted against the candidate. No new decision is needed.
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- Triage "deferred past the 0.7.0 candidate ... The item stays open", Description ("`git stash list` is classified as a
++  working-tree write") and Proposal: both defects named here are fixed in the source tree although the item itself is
++  still `open` for acceptance. The PO deferral decision of 2026-10-16 is a statement about the candidate scope and is not
++  withdrawn; it no longer describes the state of the code.
++  - Stash reader: `git stash list`, `git stash show` and `git stash show <ref>` are classified read-only, every
++    mutating verb (pop, drop, apply, push, save, clear, branch, create, store) and every output or hostile spelling stay
++    outside the reader. Evidence: `plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs` (GSR001-GSR034, introduced
++    in the transfer checkpoint `d02409a8a`), re-run in a clean clone on 2026-10-23: 34 tests, 34 pass, 0 fail, 0 skip.
++  - sed target (the PF-16 symptom of the Observed 2026-10-18 section and the "mangled sed expression" in the
++    Description): commit `3bbdb7c12` (`fix(guard): name the real file operand of a sed -i write target (PF-16)`) makes the
++    draft-phase denial name the real file operand instead of the script, and also closes a fail-open for `sed -i.bak` and
++    `sed --in-place=.bak`. The pin `plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs`
++    was added in `b09dddc88` (33 of 73 cases fail without the fix, 73 of 73 with it; the commit message records that it
++    documents the contract and needs the protected fix).
++  - Residuals recorded by `3bbdb7c12`, still open: an `&&` chain after a writer is outside the closed grammar and still
++    reports every word as a conservative candidate; `perl -i.bak` and `ruby -i.bak` are not detected in the parsed lane.
++- The Blocker analysis DEFERRED bullet is unchanged and still true as to the decision.
+diff --git a/backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md b/backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md
+index 30a9cf6b6..6b8108578 100644
+--- a/backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md
++++ b/backlog/items/2026-10-04-parallel-work-in-one-checkout-is-unsafe.md
+@@ -101,10 +101,10 @@ Added acceptance (0.7.0, D62):
+ 
+ ## Triage (filled in by the Elephant of the next Pipeline session)
+ 
+-- **Decision:**
+-- **Rationale:**
+-- **Assignment (if accepted):**
+-- **Date:**
++- **Decision:** D25 (PO, 2026-10-18): in scope for 0.7.0, both serial packages and restart liveness are built; D62 (PO, 2026-10-20): PF-57 (2) and the parallel case of the PF-55 addendum folded into this item (AC-224); D110 (PO, 2026-10-22): the liveness signal is PID plus process start time; D63 (PO, 2026-10-20): the AGY parallel-worktree part leaves 0.7.0. Recorded at the 2026-10-23 text sweep.
++- **Rationale:** the guard-side liveness check, the Critic evidence for an earlier commit and the registry-clean pins are built; only the host-session proof and the AGY worktree route remain.
++- **Assignment (if accepted):** live parallel Critic plus Goldfish run on an installed host (host session); AGY isolated-worktree preparation after 0.7.0 (D63).
++- **Date:** 2026-10-23
+ 
+ ### Blocker analysis 2026-10-22
+ 
+@@ -118,3 +118,23 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
+   Decided: PO decision D63 lists AC-224's AGY parallel worktrees among the deferrals past 0.7.0.
+ - **HOST-SESSION-NEEDED** — A live parallel Critic plus Goldfish run on an installed host (and AGY worktree route if pulled in)
+   Needs real Critic and Goldfish dispatches (model turns) in an installed Claude or Codex session, then reading the session-authority registry (lock absent, read readable); the AGY worktree route is deferred (D63).
++
++## Reconciled 2026-10-23
++
++Text sweep K59-BACKLOG-TEXT-SWEEP-3. Superseded sentences above, kept as history:
++
++- "Observed again 2026-10-05 (round 3b)" fix direction ("a liveness readback for open dispatch records ... that the
++  dispatch guard checks before admitting a second writer") and the Blocker analysis PO-SIGNATURE bullet ("wiring it into
++  the guard-dispatch hook is a protected plugin source change that the PO applies and commits ... at the sitting"):
++  the wiring is committed. Commit `1cbd22393` (`feat(guard): refuse a second writer while an open dispatch record's owner
++  is alive`, PO decision D110) makes `plugins/pipeline-core/hooks/guard-dispatch.mjs` consult the liveness readback
++  (PID plus process start identity): an alive owner refuses with the record, its owner and a runnable repair, a gone
++  owner never blocks, an unjudgeable one admits with an advisory, and the dispatch's own record and worktree-isolated
++  dispatches are not held against it. Kernel list and threat model were extended in the same commit. The pin cases
++  PARWORK-M6a to PARWORK-M6f in `plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs` cover
++  control, alive, gone, unjudgeable, same-dispatch and isolated; the cases were located, not re-run, in this sweep.
++- Blocker analysis NOT-BLOCKED bullet (producer for an older commit, registry clean after parallel Critic and Goldfish):
++  unchanged and correct, PARWORK-M4a and PARWORK-M5a exist in the same pin file and skip only on win32.
++- The Triage block above had empty fields; they were filled from D25, D62, D63 and D110 (text not rewritten).
++- Still open and not agent work: the live parallel Critic plus Goldfish run on an installed host and PO acceptance; AGY
++  isolated-worktree preparation is outside 0.7.0 (D63). The status stays `open`.

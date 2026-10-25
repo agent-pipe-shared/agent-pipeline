@@ -1,0 +1,10 @@
+message=VERIFY-CLEANUP-REGISTRATION-REQUIRED (cause: VERIFY-RUN-RECORD-PATH)
+cause=VERIFY-RUN-RECORD-PATH
+stack=Error: VERIFY-RUN-RECORD-PATH
+    at registerVerifyRunRecord (file://<repo-root>/scratch/clones/g4/plugins/pipeline-core/lib/verify-run-record.mjs:102:66)
+    at registerRunRecordOwner (file://<repo-root>/scratch/clones/g4/plugins/pipeline-core/scripts/verify-journal.mjs:247:15)
+    at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g4/plugins/pipeline-core/lib/pins/dbg8.test.mjs:14:9)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1382:25)
+    at Test.start (node:internal/test_runner/test:1242:17)
+    at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)

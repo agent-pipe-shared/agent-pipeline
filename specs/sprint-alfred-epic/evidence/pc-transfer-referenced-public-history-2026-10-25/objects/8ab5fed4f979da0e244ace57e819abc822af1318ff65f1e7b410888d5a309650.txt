@@ -1,0 +1,16 @@
+// K132: prove the helper reproduces the committed manifest/pin format byte for byte (sources := committed mirrors). Scratch only.
+import { cpSync, mkdirSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+const clone = process.argv[2], tmp = "scratch/k132-fmt";
+rmSync(tmp, { recursive: true, force: true });
+const p = "plugins/pipeline-core";
+for (const d of [`${tmp}/docs`, `${tmp}/governance`, `${tmp}/harness`, `${tmp}/${p}/reader-inputs`, `${tmp}/${p}/lib`, `${tmp}/${p}/skills/reader-review`]) mkdirSync(d, { recursive: true });
+cpSync(`${clone}/${p}/reader-inputs`, `${tmp}/${p}/reader-inputs`, { recursive: true });
+cpSync(`${clone}/${p}/reader-inputs/product-capability-inventory.json`, `${tmp}/docs/product-capability-inventory.json`);
+cpSync(`${clone}/${p}/reader-inputs/observation-doc-governance.json`, `${tmp}/governance/observation-doc-governance.json`);
+cpSync(`${clone}/${p}/reader-inputs/reader-review-protocol.md`, `${tmp}/harness/reader-review-protocol.md`);
+cpSync(`${clone}/${p}/lib/doc-reader-documentation-snapshot.mjs`, `${tmp}/${p}/lib/doc-reader-documentation-snapshot.mjs`);
+cpSync(`${clone}/${p}/skills/reader-review/SKILL.md`, `${tmp}/${p}/skills/reader-review/SKILL.md`);
+try { console.log(execFileSync("node", ["scratch/clones/k132/scripts/sync-reader-inputs.mjs", tmp, "--check"], { encoding: "utf8" })); }
+catch (e) { console.log("FAIL", e.stderr, e.stdout); }
+rmSync(tmp, { recursive: true, force: true });

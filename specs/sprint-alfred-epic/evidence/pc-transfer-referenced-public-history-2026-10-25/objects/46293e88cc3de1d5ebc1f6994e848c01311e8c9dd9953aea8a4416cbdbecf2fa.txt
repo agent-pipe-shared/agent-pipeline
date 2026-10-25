@@ -1,0 +1,42 @@
+# Prepared repository-private Codex Advisor store
+
+This is a production-shaped source proposal and controlled fixture evidence. It is not installed or productive authority. Source target: `plugins/pipeline-core/lib/codex-advisor-private-store.mjs`. New Source patch, runtime projection, tests and evidence all remain under `scratch/codex-advisor-production-store-*`.
+
+## Constructor and authority boundary
+
+`await createCodexAdvisorProductionStore({repoRoot, repoFingerprint})` is called only by an admitted sealed controller. It independently resolves the physical Git common directory, primary checkout and registered worktree topology via canonical `resolvePoGateRepositoryTopology`. It reads the existing canonical local GUID via the separately prepared pure `readExistingLocalRepositoryFingerprint({repositoryRoot: topology.primaryRoot})` and compares it to the caller's expected repository identity. It deliberately does not use `derivePoGateRepositoryFingerprint`: that is a different path-derived hash namespace.
+
+The pure GUID accessor is a required source dependency. Calling existing `readLocalRepositoryFingerprint` would mint or migrate local identity on first use, including after a precheck race, so that writer accessor is not used by the store. Tests mint their controlled fixture identity once through that sanctioned writer before store creation. No operator repository identity was read or written by this work.
+
+The constructor registers `purpose:'advisor'` before a caller can create a process journal, derives `<common>/agent-pipeline/advisor-codex/<GUID>/processes`, and creates its sibling `receipts` directory. Directory mode is exactly 0700 and receipt mode is exactly 0600; existing permissive paths are refused and never chmod-repaired. Snapshots bind repository/common/primary and private namespace roots by physical path, device, inode, owner and mode. Every receipt read and ownership reconstruction checks current physical roots, current canonical topology and current GUID before and after the operation.
+
+This proves local physical store bindings only. The constructor and returned API cannot establish whether their caller was admitted, whether a route is registered, or whether export consent/provider/session/tool observations were genuine. These remain sealed-controller responsibilities. No externally supplied JSON callback selects filesystem discovery, identity or ownership verification. Record validation is imported from the separately owned Advisor record module, rather than copied here.
+
+## Store methods and integration contract
+
+The constructor and `read(id, expected)`, `readForBinding(id, context)` and `write(record, expected)` are asynchronous because their identity rechecks use the canonical pure accessor. A synchronous prepared binding verifier cannot consume this API unchanged: it must await the operations. A Promise is not an admitted record.
+
+`write` snapshots caller record and expectations before its first await, validates closed record and independent ownership against the exact Advisor process root, publishes through O_EXCL/O_NOFOLLOW temporary creation plus exclusive hardlink, fsyncs file and directory, then performs exact readback. A second publication cannot overwrite the original receipt. There are no signing/encryption keys or raw question/answer payloads in this store contract.
+
+`read` uses descriptor-bound regular-file, owner, mode, nlink, size and identity checks. Per-file size is checked before allocation, and actual descriptor reads use a 524,289-byte max+1 buffer. Growth after fstat is bounded and refused. Both receipt reads must agree. `readForBinding` reconstructs executable and ownership from private journals in the exact registered Advisor root; caller-injected executable or ownership context fields are rejected by the imported closed expected-key contract.
+
+## Observed execution
+
+Final recorder: `node scratch/codex-advisor-production-store-run.mjs`, handle 87403, terminal `c38ef8`, exit 0, 45,565 ms, 10 tests / 10 pass / 0 fail / 0 skip / 0 todo. All 17 input hashes remained stable. Source patch `git apply --check` exited 0. Exact TAP and binding hashes are in the evidence JSON and stdout/stderr files.
+
+Source SHA-256: `4718328a0ff7f6aedcc2b6cf3f8a35d70419d437529e643a09895aab9b862ca8`; runtime import projection: `821351db79ef845a9a89a971505ebc7efec6b036b8c320e5c397068b117ac50a`; patch: `0e25087a6aea5147d916537d29fde21c3da91021114d4b1aea19d8676c834959`. Runtime projection changes import coordinates only. It binds the generic process helpers from aggregate `563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e`, current Advisor record `d0804a55...` and pure GUID accessor `ce509d12...`.
+
+Ten cases exercise real ordinary Git topology, an actual sanctioned GUID, registered Advisor namespace and closed managed Node processes; foreign Readiness journals including aliases and private copied journals fail to qualify; candidate/request/advisory-receipt/repository/ownership drift fails; caller reference mutation cannot change admitted publication bytes; publication is immutable; modes/hardlinks/noncanonical/oversize receipts fail; receipt directory inode replacement invalidates a retained constructor; namespace privacy/root aliases fail; GUID mutation/removal does not mint replacement; actual bare Git is unavailable under the canonical ordinary identity model; declared oversize is rejected before allocation/read; and actual racing growth is bounded at max+1. The last two use isolated VM dependency observation with no productive observer or global monkeypatch.
+
+The earlier eight-case run returned seven pass/one fail because cpSync's fixture directory had mode 0755 and was rejected before the intended transplanted ownership check. Correcting only that synthetic directory to 0700 allowed the independent ownership rejection to be exercised. Its result remains separately recorded in the evidence JSON.
+
+## Explicit gaps and limits
+
+1. **Shared namespace permissions:** canonical identity mint creates `agent-pipeline/governance-events` recursively with mode 0755. The prepared process namespace helper requires the shared `agent-pipeline` directory to be private 0700. A fresh ordinary writer-created hierarchy can therefore refuse store construction. This is an integration finding, not a reason to silently chmod or accept permissive private directories. Fixture setup explicitly provisions the shared directory as 0700 before sanctioned minting. Productive provisioning/compatibility requires a deliberate fix.
+2. **Bare repository scope:** canonical ordinary GUID discovery requires a `.git` common directory and a reported physical primary checkout. A bare Git repository cannot be substituted with a fake GUID or PO path hash. The actual bare fixture is refused without creating a binding. Supported production topology currently follows the canonical ordinary checkout/worktree model.
+3. **Journal read bounds:** this store's own receipt reads are bounded. Imported generic `readHostJournal` and ownership verification currently still use their existing file read implementation. The known generic journal readFileSync growth race is not fixed by this new store; the entire ownership read chain is not claimed to be bounded.
+4. **Purpose custody:** intent remains a generic schema without a durable purpose field. Exact registered Advisor namespace and root checks distinguish this store from foreign Readiness journals; they do not invent a durable purpose attestation or original export decision.
+5. **Host/raw output evidence:** model/session/tool-control fields are synthetic fixture contracts. No real Advisor, provider, native Codex host, raw stdio custody, installed source or formal stamp is proven. A companion observed-output contract will need fresh record compatibility evidence when adopted. Tests currently bind the existing record module only.
+6. **Concurrent writers:** root and descriptor before/after checks detect tested drift but do not establish an atomic repository-wide transaction against an arbitrary noncooperating writer. Local physical observations are not provider/OS attestations.
+
+No productive source, existing modules, aggregate or loader owned by another worker was changed.

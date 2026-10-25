@@ -1,0 +1,235 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index c937507c6..4dd40bed0 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -580,6 +580,7 @@ function closedEntryStaticShape(entry) {
+   if (entry?.planCancellation !== undefined) expectedKeys.add("planCancellation");
+   if (entry?.planMixedStateRecovery !== undefined) expectedKeys.add("planMixedStateRecovery");
+   if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
++  if (entry?.architectureFitness !== undefined) expectedKeys.add("architectureFitness");
+   if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
+   if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
+   if (entry?.auditReference !== undefined) expectedKeys.add("auditReference");
+@@ -600,6 +601,24 @@ function closedEntryStaticShape(entry) {
+     || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
+     || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
+   if (!validClosedEntryRigorFields(entry)) return false;
++  if (entry.architectureFitness !== undefined) {
++    const fitness = entry.architectureFitness;
++    if (!exactKeys(fitness, new Set(["schema", "status", "rigorObservationSha256", "fitnessProjectionSha256", "candidate", "dispositions"]))
++      || fitness.schema !== "pipeline.close-architecture-fitness.v1"
++      || !["unavailable", "observed-open", "observed-pass"].includes(fitness.status)
++      || fitness.rigorObservationSha256 !== entry.rigorObservationSha256
++      || !(fitness.fitnessProjectionSha256 === null || SHA256_RE.test(fitness.fitnessProjectionSha256 ?? ""))
++      || !Array.isArray(fitness.dispositions)
++      || (fitness.status === "unavailable" && (fitness.fitnessProjectionSha256 !== null || fitness.dispositions.length !== 10))
++      || (fitness.status === "observed-open" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length === 0))
++      || (fitness.status === "observed-pass" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length !== 0))
++      || !(fitness.candidate === null || validRigorCandidate(fitness.candidate))) return false;
++    for (const row of fitness.dispositions) if (!exactKeys(row, new Set(["classId", "propertyId", "observedOutcome", "disposition", "reason"]))
++      || !Number.isSafeInteger(row.classId) || row.classId < 1
++      || typeof row.propertyId !== "string" || row.propertyId.length === 0
++      || !["finding", "unavailable", "unsupported", "unknown"].includes(row.observedOutcome)
++      || row.disposition !== "open" || typeof row.reason !== "string" || row.reason.length < 1 || row.reason.length > 1024) return false;
++  }
+   try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
+   if (entry.continuityClose !== undefined) {
+     const close = entry.continuityClose;
+@@ -4608,7 +4627,7 @@ export function replaceNextActionSection(markdown, sectionText) {
+  * than throwing, since this sync is advisory and must never gate the
+  * caller's already-committed State write.
+  */
+-export function syncStateMdNextAction(dir, state) {
++export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
+   let handoverPath = "docs/state.md";
+   try {
+     const root = physicalRoot(dir);
+@@ -4656,14 +4675,15 @@ export function syncStateMdNextAction(dir, state) {
+     return { ok: false, reason: 'no recognizable "## Next action" heading' };
+   }
+   if (updated === markdown) {
+-    return { ok: true, changed: false };
++    return { ok: true, changed: false, handoverPath };
+   }
++  if (!apply) return { ok: true, changed: true, handoverPath };
+   try {
+     writeFileSync(path, updated, "utf8");
+   } catch (error) {
+     return { ok: false, reason: `write failed: ${error?.message ?? error}` };
+   }
+-  return { ok: true, changed: true };
++  return { ok: true, changed: true, handoverPath };
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/lib/rigor-lifecycle.mjs b/plugins/pipeline-core/lib/rigor-lifecycle.mjs
+index dd5b29fa7..345368400 100644
+--- a/plugins/pipeline-core/lib/rigor-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/rigor-lifecycle.mjs
+@@ -93,6 +93,18 @@ export function validateRigorHistory(history) {
+     if (normalized.fitnessOutcomes.status === "available"
+       && (!body.fitnessProjection || hash(body.fitnessProjection) !== normalized.fitnessOutcomes.value.sourceSha256
+         || canonical(body.fitnessProjection.outcomes) !== canonical(normalized.fitnessOutcomes.value.outcomes))) throw new Error("RIGOR-HISTORY-FITNESS");
++    if (body.fitnessProjection?.dispositions !== undefined) {
++      const projection = body.fitnessProjection;
++      const expected = projection.outcomes.filter(row => row.outcome !== "pass");
++      if (!Array.isArray(projection.dispositions) || projection.dispositions.length !== expected.length
++        || !expected.every((row, index) => {
++          const disposition = projection.dispositions[index];
++          return disposition?.classId === row.classId && disposition.propertyId === row.propertyId
++            && disposition.observedOutcome === row.outcome && disposition.disposition === "open"
++            && typeof disposition.reason === "string" && disposition.reason.length > 0
++            && disposition.reason.length <= 1024;
++        })) throw new Error("RIGOR-HISTORY-FITNESS-DISPOSITION");
++    }
+     floors.set(body.featureId, { featureId: body.featureId, minProfile: checked.retainedProfile, inputDigest: checked.derivation.inputDigest });
+     preceding = row.entrySha256;
+   }
+@@ -212,8 +224,14 @@ export function collectRigorJournalEntry({ rootDir, state, boundary, selectedPro
+       // Existing ratchet exceptions alone do not establish owner-valid approval.
+       if (value.schema === "pipeline.fitness-evidence.v1" && Array.isArray(outcomes) && outcomes.length === 10
+         && !outcomes.some(row => row.outcome === "excepted") && inputs.actualPaths.status === "available") {
++        const dispositions = outcomes.filter(row => row.outcome !== "pass").map(row => {
++          const original = value.outcomes.find(entry => entry.classId === row.classId && entry.propertyId === row.propertyId);
++          return { classId: row.classId, propertyId: row.propertyId, observedOutcome: row.outcome,
++            disposition: "open", reason: typeof original?.details === "string" && original.details.trim()
++              ? original.details.slice(0, 1024) : `Evaluator reported ${row.outcome}; property remains unresolved.` };
++        });
+         fitnessProjection = { schema: "pipeline.rigor-fitness-projection.v1", candidate: observedCandidate,
+-          model: bindings.fitnessModel, baseline: bindings.architectureBaseline, map: bindings.architectureMap, boundary, outcomes };
++          model: bindings.fitnessModel, baseline: bindings.architectureBaseline, map: bindings.architectureMap, boundary, outcomes, dispositions };
+         inputs.fitnessOutcomes = envelope({ sourceSha256: hash(fitnessProjection), outcomes }, "available", "pipeline.rigor-fitness-projection.v1");
+       }
+     } catch { inputs.fitnessOutcomes = absent("pipeline.fitness-evidence.v1"); }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 54b3d799b..3e046d742 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -450,6 +450,7 @@ import {
+ import { materializeArchitectureDesign as materializeArchitectureDesignSource } from "../lib/architecture-design.mjs";
+ import { boundedCopySafeCommand, placeholder } from "../lib/copy-safe-command.mjs";
+ import { publishRuntimeNextAction as publishRuntimeNextActionSource } from "../lib/runtime-handover-projection.mjs";
++import { PROPERTY_CLASSES } from "./architecture-fitness.mjs";
+ import {
+   applyLegacyV2RevocationRecovery,
+   approveSubmittedPlan,
+@@ -738,7 +739,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+ // that exact command as the way out of a stuck approval.
+ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "materialize-architecture", "afk-project",
+-  "inspect", "rebind-approval",
++  "inspect", "sync-public-handover", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
+@@ -1182,17 +1183,19 @@ function upsertStatePhaseMarkerLine(markdown, markerLine) {
+  * lookup) -- a deliberate, disclosed simplification: this sync targets the
+  * common case, not every possible handover-path override.
+  */
+-function syncStatePhaseMarker(dir, state) {
+-  const path = join(dir, "docs/state.md");
++function syncStatePhaseMarker(dir, state, handoverPath = "docs/state.md") {
++  const path = join(dir, handoverPath);
+   let markdown;
+   try {
+     markdown = readFileSync(path, "utf8");
+   } catch {
+-    return;
++    return false;
+   }
+   const updated = upsertStatePhaseMarkerLine(markdown, statePhaseProjectionMarker(state));
+-  if (updated === null || updated === markdown) return;
++  if (updated === null) return false;
++  if (updated === markdown) return true;
+   writeFileSync(path, updated, "utf8");
++  return true;
+ }
+ 
+ /**
+@@ -1216,6 +1219,29 @@ function syncNextActionDocs(dir, state) {
+   try { syncStatePhaseMarker(dir, state); } catch {}
+ }
+ 
++function publicHandoverObservation(dir, state) {
++  const preview = syncStateMdNextAction(dir, state, { apply: false });
++  const sourceStateSha256 = sha256CanonicalJson(state);
++  const nextAction = { kind: "command", executable: process.execPath,
++    argv: [fileURLToPath(import.meta.url), "sync-public-handover"], mutation: true,
++    requiresConfirmation: false,
++    guidance: "Update the public handover from current State under explicit agent action; preserve all other prose." };
++  let status = "unavailable";
++  if (preview.ok) {
++    try {
++      const markdown = readFileSync(join(dir, preview.handoverPath), "utf8");
++      const markers = markdown.split("\n").filter(line => line.startsWith(STATE_PHASE_MARKER_PREFIX));
++      status = !preview.changed && markers.length === 1 && markers[0] === statePhaseProjectionMarker(state)
++        ? "current" : "stale";
++    } catch { /* a missing public file remains unavailable */ }
++  }
++  return { schema: "pipeline.public-handover-observation.v1", status,
++    sourceStateSha256, activeFeature: state.activeFeature?.id ?? null,
++    phase: state.activeFeature?.phase ?? null,
++    handoverPath: preview.handoverPath ?? null,
++    nextAction: status === "current" ? null : nextAction };
++}
++
+ /** Adjacent continuity lock path. It is transient and must never be committed. */
+ export function continuityLockPath(dir = projectDir()) {
+   return `${statePath(dir)}.lock`;
+@@ -12271,6 +12297,20 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         next.rigorHistory = [...(base.rigorHistory ?? []), closedRigor];
+         closedEntry.rigorObservationSha256 = closedRigor.entrySha256;
+         closedEntry.rigorVerifyRows = rigorVerifyRows(next).filter(row => row.featureId === activeFeature.id);
++        const fitness = closedRigor.body.fitnessProjection;
++        // The operator's impact classification is scoped by the report-only
++        // pre-close evidence. Open findings and unavailable coverage stay open.
++        closedEntry.architectureFitness = {
++          schema: "pipeline.close-architecture-fitness.v1",
++          status: fitness === null ? "unavailable" : fitness.dispositions.length ? "observed-open" : "observed-pass",
++          rigorObservationSha256: closedRigor.entrySha256,
++          fitnessProjectionSha256: fitness === null ? null : sha256CanonicalJson(fitness),
++          candidate: closedRigor.body.candidate,
++          dispositions: fitness?.dispositions ?? PROPERTY_CLASSES.map(row => ({
++            classId: row.classId, propertyId: row.propertyId, observedOutcome: "unavailable",
++            disposition: "open", reason: "Pre-close fitness projection unavailable; no property PASS was observed.",
++          })),
++        };
+       } catch {
+         console.error("Error: RIGOR-HISTORY-INVALID: existing floor history cannot be authenticated; zero State mutation.");
+         return 2;
+@@ -12671,6 +12711,27 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+     // the SAME pure renderer those mutating commands call before writing to
+     // `docs/state.md`, so the returned text is byte-identical to what a fresh
+     // read of that file's section would show, without a second read.
++    case "sync-public-handover": {
++      if (rest.length !== 0) {
++        console.error("sync-public-handover accepts no arguments");
++        return 2;
++      }
++      const projected = syncStateMdNextAction(dir, base);
++      if (!projected.ok || !syncStatePhaseMarker(dir, base, projected.handoverPath)) {
++        console.log(JSON.stringify({ schema: "pipeline.public-handover-update.v1", status: "unavailable",
++          code: "PUBLIC-HANDOVER-UPDATE-UNAVAILABLE", sourceStateSha256: sha256CanonicalJson(base),
++          nextAction: "Repair the configured public handover file and its ## Next action section, then rerun pipeline-state sync-public-handover." }));
++        return 2;
++      }
++      const markdown = readFileSync(join(dir, projected.handoverPath), "utf8");
++      const current = markdown.includes(statePhaseProjectionMarker(base)) && markdown.includes(nextActionSection(base));
++      console.log(JSON.stringify({ schema: "pipeline.public-handover-update.v1",
++        status: current ? "current" : "unavailable", sourceStateSha256: sha256CanonicalJson(base),
++        handoverPath: projected.handoverPath, activeFeature: base.activeFeature?.id ?? null,
++        phase: base.activeFeature?.phase ?? null, changed: projected.changed,
++        nextAction: current ? null : "Inspect the public handover and rerun pipeline-state sync-public-handover." }));
++      return current ? 0 : 2;
++    }
+     case "inspect": {
+       const lifecycle = inspectPlanLifecycle(dir, base);
+       const drift = base.continuity == null ? null : projectContinuityAuthorityDrift(base.continuity, (p) => physicalRebindFile(dir, p)?.sha256 ?? null);
+@@ -12698,6 +12759,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         nextActionText: lifecycle.nextAction === "reopen-design"
+           ? reopenDesignNextActionText(dir)
+           : nextActionSection(base),
++        publicHandover: publicHandoverObservation(dir, base),
+         continuityAuthorityDrift: drift,
+       };
+       console.log(JSON.stringify(payload, null, 2));

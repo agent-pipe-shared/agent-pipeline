@@ -1,0 +1,83 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K1C2-SESSION-BINDING","candidateCommit":"ec0999adef849a10ccce31642f58d3eaf6f62ebf","candidateTree":"76ddad098bc516b283499deebc1c85f5825c94cd","runner":"claude","role":"pipeline-core:goldfish-deep","agentType":"goldfish-deep","model":"claude-sonnet-5-5","effort":"xhigh","rulesetSha":"33ee558e72f660945d799734d0730a2576e3129951dc58225e1855425d218e7d","allowedPaths":["plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs","plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K1C2-SESSION-BINDING","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k1c2-session-binding-check","path":"plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs","dependencies":["plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs","plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K1C2-SESSION-BINDING","candidateCommit":"ec0999adef849a10ccce31642f58d3eaf6f62ebf","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K1C2-SESSION-BINDING: continue K1c: the session-cleanup binding and recovery suites bind inside a source-owned requester context (K1c2, AC-203 area)
+
+### 1. Goal
+
+Continue the stopped dispatch ALF-K1C-SESSION-BINDING. Its partial fixture is saved as `scratch/k1c-partial-session-cleanup-binding.test.mjs` (a full copy of `scripts/session-cleanup-binding.test.mjs` with its edits; the checkout file is back at HEAD). Step 1: copy that partial file's content into `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` (Read it, then Write). What it does: `fixture()` calls `prepareSessionAuthorityRegistryFixture({root, excludeFromStatus:true})`; the CLI dependencies `startSessionDescriptorFn` and `bindOnboardingSessionCleanupFn` default to helpers that create the descriptor through `createControlledMethodRuntimeFixture` (`lib/session-requester-bridge.mjs` 686, which binds a requester to exactly that descriptor) and run the REAL `bindOnboardingSessionCleanup` inside that requester's `runtime.run`; `invokePlain` keeps the plain-terminal shape. Measured state of that partial: the first case ('start binds once, resumes ...') passes the bound-context check (onboarding-continuity.mjs 9571) and the tuple check (9575) and then fails at 9584, 'continuity owning bind failed after reservation', code SDC-AUTHORITY-CAS. Step 2: diagnose that refusal by reading `continuityAuthorityExecute` (onboarding-continuity.mjs 9480 onward), the `prepareOperation` preimage check (9423-9445) and `advanceSessionAuthorityMember` (`lib/session-authority-registry.mjs`), and by printing the `executed` result's code and message once from a scratch probe (a git-ignored runner under `scratch/` with a private TMPDIR, like `scratch/run-quiet.mjs`). Name the exact check that refuses. If the fixture can satisfy it through existing builders, fix the fixture; if only a product change can, stop and name the exact change and why. Step 3: move the registry preparation out of `fixture()` into the descriptor helper (once per root, on the first bound start), so cases that never start stay fast; the full file must finish under `scratch/run-quiet.mjs`. Step 4: add one case that pins the plain-process refusal through `invokePlain` (SDC-AUTHORITY-UNAVAILABLE, no binding written). Step 5: port the same two-seam helper to `lib/session-cleanup-recovery.test.mjs` (failing near lines 260, 327, 362, 575, 673, 779). A case whose fixture cannot be satisfied stays red and is named with its product-change finding. `succeeded` means both files green, or green except named cases with a product-change finding.
+
+### 2. Context files
+
+- `scratch/k1c-partial-session-cleanup-binding.test.mjs` — the partial fixture of the stopped dispatch (start here).
+- `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` — section 'K1 measurement 1'.
+- `plugins/pipeline-core/lib/onboarding-continuity.mjs` — read only: `bindOnboardingSessionCleanup` 9566-9590, `prepareOperation` 9423-9446, `continuityAuthorityExecute` 9480 onward.
+- `plugins/pipeline-core/lib/session-authority-registry.mjs` — read only: `reserveSessionAuthorityMember`, `advanceSessionAuthorityMember`.
+- `plugins/pipeline-core/lib/session-requester-bridge.mjs` — read only: `createControlledMethodRuntimeFixture` 686, `withSourceOwnedAuthorityContext` 197.
+- `plugins/pipeline-core/scripts/session-cleanup.mjs` — read only: the `start` branches near 796-802 (WT-SESSION-UNBOUND-DESCRIPTOR) and the injectable dependencies.
+- `plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs` — the second suite (failing cases near lines 260, 327, 362, 575, 673, 779).
+
+### 3. DoD checks
+
+- Acceptance criteria: AC-203 (session-cleanup descriptor and recovery verbs), as the owning item of correction cluster K1 (`specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md`, section 'K1 measurement 1', D60 Q16).
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node scratch/run-quiet.mjs k1c-binding plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` (from 26/65)
+  - `node scratch/run-quiet.mjs k1c-recovery plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs` (from 33/39)
+  - `node scratch/run-quiet.mjs k1c-power plugins/pipeline-core/scripts/session-cleanup-power.test.mjs` (stays 2/2, not in your scope)
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`).
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs`, `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- No product code change: every file outside the write scope is read-only.
+- Do not stub `bindOnboardingSessionCleanup`, `readSourceOwnedAuthorityContext`, the registry or the requester bridge into a fake success; the cases must reach a genuinely bound context through the bridge's own builders.
+- Never leave a test run in the background when you end your turn; run the full files only in the foreground through `scratch/run-quiet.mjs`, one at a time, with the Bash tool timeout set to 600000 ms.
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020064459.a8ddf85` · content identity `33ee558e72f660945d799734d0730a2576e3129951dc58225e1855425d218e7d`.
+- Model/effort: `claude-sonnet-5-5` / xhigh (goldfish-deep; agent definition alias `sonnet`).
+- Tier: goldfish-deep. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K1C2-SESSION-BINDING
+- Write scope: plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs, plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs
+- **Tool budget (TB-09, hard cap):** ≤45 tool uses (min(tier cap 45, maxTurns 80 - 15)). 80 % checkpoint at about call 36: stop editing and end the turn with an interim report naming what remains.
+- Model justification: deep tier: continues a fixture design against the source-owned requester contract and must diagnose an undiagnosed authority CAS refusal without weakening it.
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

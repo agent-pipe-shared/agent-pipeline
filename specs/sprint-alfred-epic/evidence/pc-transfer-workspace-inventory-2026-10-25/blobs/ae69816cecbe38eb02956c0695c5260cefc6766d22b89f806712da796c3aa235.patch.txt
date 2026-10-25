@@ -1,0 +1,301 @@
+diff --git a/plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs b/plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs
+index f4bab3e0c..bc0090064 100644
+--- a/plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs
++++ b/plugins/pipeline-core/lib/pins/advisor-provenance-ancestor-check-fails-on-any-sibling-write.test.mjs
+@@ -10,8 +10,9 @@ import fs, { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync, symlinkS
+ import { syncBuiltinESMExports } from 'node:module';
+ import { dirname, join } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+-import { spawn } from 'node:child_process';
++import { spawn, spawnSync } from 'node:child_process';
+ import { readAdvisorPhysicalBytes } from '../design-advisor-provenance.mjs';
++import { readDesignWorkflowPackageV2FromRepository } from '../design-workflow-package-v2.mjs';
+ 
+ const REL = 'evidence/inner/source.json';
+ const PAYLOAD = Buffer.from('{"advisor":"source"}\n', 'utf8');
+@@ -188,6 +189,32 @@ test('a single ancestor replacement is re-observed on a fresh walk and then read
+   } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++test('the DWP2-PHYSICAL-OR-GIT relabel keeps the original ancestor-drift cause as a closed, non-authoritative diagnostic', () => {
++  const root = fixture();
++  const git = (...args) => spawnSync('git', ['-c', 'user.name=pin', '-c', 'user.email=pin@example.invalid', ...args], { cwd: root, encoding: 'utf8' });
++  assert.equal(git('init', '-q').status, 0, 'fixture repository');
++  assert.equal(git('add', '-A').status, 0);
++  assert.equal(git('commit', '-q', '-m', 'fixture').status, 0, 'fixture commit (a candidate must exist before the package read)');
++  const hook = hookTargetLstat(root, (n) => {
++    renameSync(join(root, 'evidence'), join(root, `old-evidence-${n}`));
++    mkdirSync(join(root, 'evidence'));
++    renameSync(join(root, `old-evidence-${n}`, 'inner'), join(root, 'evidence', 'inner'));
++  });
++  try {
++    const result = readDesignWorkflowPackageV2FromRepository({ repoRoot: root, packagePath: REL });
++    assert.equal(result.ok, false);
++    assert.equal(result.code, 'DWP2-PHYSICAL-OR-GIT', 'the stage code is unchanged (it is the authoritative refusal)');
++    assert.equal(hook.state.actions, 3, 'the drift really happened inside the bounded re-observation, not in git');
++    assert.equal(result.diagnostic?.schema, 'pipeline.codex-advisor-binding-diagnostic.v1');
++    assert.equal(result.diagnostic.subcheck, 'source-provenance');
++    assert.equal(result.diagnostic.cause, 'DAP-PHYSICAL-PARENT-DRIFT', 'the underlying cause is kept, not collapsed to a generic label');
++    assert.equal(result.diagnostic.repair.kind, 'repeat-bounded-read');
++    assert.equal(result.diagnostic.repair.automatic, false);
++    assert.equal(result.diagnostic.repair.authority, 'diagnostic-only', 'the cause is advisory and carries no authority');
++    assert.equal(JSON.stringify(result.diagnostic).includes(root), false, 'no path crosses the diagnostic boundary');
++  } finally { hook.restore(); rmSync(root, { recursive: true, force: true }); }
++});
++
+ test('a target with an invalid path or a missing file still fails closed with a typed error', () => {
+   const root = fixture();
+   try {
+diff --git a/plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs b/plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs
+index 36cf2def2..7d2513207 100644
+--- a/plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/approved-lifecycle-state-refuses-its-own-recovery-and-backlog-writes.test.mjs
+@@ -5,10 +5,10 @@
+ //   P1 the ready-gate yields a valid observation for every lifecycle state the writer can produce, `approved` included;
+ //   P2 the recovery command a denial names is admitted in the state that emits it;
+ //   P3 backlog/, docs/ and scratch/ writes stay admitted in every lifecycle state.
+-// Host limitation (PO decision K7): directory symlink/junction escape cases need link creation, which is unavailable
+-// on this native Windows host; the case is skipped below with owner Coordinator and due date 2026-10-19.
++// Host limitation (PO decision K7): the directory symlink/junction escape case needs link creation. It runs wherever a
++// link can be created and skips itself with a typed host-limitation reason on a host that cannot create one.
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { spawnSync } from "node:child_process";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -193,6 +193,23 @@ test("P2 the recovery command named by the PORG-INVALID-OBSERVATION denial is ad
+   }
+ });
+ 
+-test("link-escape under docs/ stays refused (junction/symlink creation)", {
+-  skip: "host-limitation: directory symlinks/junctions unavailable on this native Windows host; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7); adjacent QW04-5 covers it where links exist",
+-}, () => {});
++test("link-escape under docs/ stays refused (junction/symlink creation)", (t) => {
++  for (const [name, stateObject] of Object.entries(STATES)) {
++    const root = guardRoot(stateObject);
++    const outside = scratchDir("alf-c-p19-02-outside-");
++    try { symlinkSync(outside, join(root, "docs"), "junction"); }
++    catch (error) {
++      // Typed conditional skip: only a host that cannot create a directory link (native Windows without the privilege).
++      t.skip(`host-limitation: directory symlink/junction cannot be created on this host (${error?.code ?? "unknown"}); the escape is covered wherever links exist`);
++      return;
++    }
++    for (const tool of ["Write", "Edit"]) {
++      const r = run(root, tool, { file_path: "docs/alf-c-p19-02-escape.md" });
++      assert.equal(r.exitCode, 2, `${name}/${tool}: a write through a docs/ link that leaves the repository must be refused: ${JSON.stringify(r)}`);
++    }
++    // The same state still admits the ordinary docs/ write once the link is gone (the refusal is about the link, not the path).
++    rmSync(join(root, "docs"), { recursive: true, force: true });
++    mkdirSync(join(root, "docs"), { recursive: true });
++    assert.equal(run(root, "Write", { file_path: "docs/alf-c-p19-02-ok.md" }).exitCode, 0, `${name}: plain docs/ write`);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs b/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs
+index c2d43448b..cc9018120 100644
+--- a/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs
++++ b/plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs
+@@ -3,7 +3,8 @@
+ // PARTIAL (interim): covers the draft-time applicability predicate and the entry-readiness
+ // fall-through to the adoption disposition through the real modules. The implementation-entry
+ // inspector itself is pinned by lib/architecture-design.test.mjs (hotfix 9 cases) and is not
+-// re-pinned here; the net-new ratchet point is NOT covered (see the dispatch report).
++// re-pinned here; the net-new ratchet point is NOT covered (see the dispatch report). Sections (d) and (e) add the
++// project-onboarding-v3 consumer (reopen-design only on ok:false) and the win32-dialect plan-path case.
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+@@ -191,3 +192,62 @@ test("a deferred established project is NOT admitted, not ready, for a net-new t
+     evaluateArchitectureFitness: () => ({ overallStatus: "blocked", outcomes: tenOutcomes(true), summary: {} }) } });
+   assert.notEqual(result.status, "ready", "net-new path with a blocking finding is admitted under deferral");
+ });
++
++// ---- (d) consumer: lib/project-onboarding-v3.mjs designToImplementationHandoverAction recommends reopen-design only on ok:false ----
++// The real consumer reads a real approved-PRD state file (the same fixture shape as the foreign-worktree pin); only the
++// architecture inspection result is injected through the module's `fs.inspectArchitectureDesign` seam.
++import nodeFs from "node:fs";
++import { designToImplementationHandoverAction } from "../project-onboarding-v3.mjs";
++
++const sha64 = (c) => c.repeat(64);
++function consumerAction(inspect) {
++  const dir = join(repoRoot, "scratch", `p21-01-consumer-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
++  mkdirSync(dir, { recursive: true });
++  roots.push(dir);
++  const root = nodeFs.realpathSync(dir);
++  const authority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: sha64("a"), runtimeSha256: sha64("b"),
++    receiptSha256: sha64("c"), repositoryFingerprint: sha64("d"), planPath: "prd.md", planSha256: sha64("e"), specPath: "spec.md", specSha256: sha64("f") };
++  writeFileSync(join(root, "state.json"), JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "f1", planPath: "prd.md", phase: "design" }, planApproved: true,
++    planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "po", approvedAt: "2026-01-01T00:00:00.000Z",
++      specBoundBy: "po", specBoundAt: "2026-01-01T00:00:00.000Z", poGateAuthority: authority },
++    continuity: { authority: { prd: { path: "prd.md", sha256: authority.planSha256 }, spec: { path: "spec.md", sha256: authority.specSha256 } } } }));
++  const fs = { ...nodeFs, resolveProjectAuthorityPaths: () => ({ status: "ready", state: "state.json" }), inspectArchitectureDesign: inspect };
++  return designToImplementationHandoverAction(root, fs);
++}
++
++test("consumer: a not-required design result is never answered with reopen-design; entry moves on to set-phase", () => {
++  const action = consumerAction(() => NOT_REQUIRED);
++  assert.ok(action, "the approved state must publish a next action");
++  const text = JSON.stringify(action);
++  assert.equal(text.includes('"reopen-design"'), false, text);
++  assert.equal(text.includes("architecture-design-required"), false, text);
++  assert.ok(text.includes("set-phase"), `the next step is the implementation phase change: ${text}`);
++});
++
++test("consumer: reopen-design is offered only for an ok:false design result with a verified content-drift code", () => {
++  const drift = consumerAction(() => ({ ok: false, status: "design-required", code: "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", prdPath: PLAN }));
++  assert.ok(JSON.stringify(drift).includes('"reopen-design"'), JSON.stringify(drift));
++  const untyped = consumerAction(() => ({ ok: false, status: "design-required", code: "ARCHITECTURE-DESIGN-PATH-INVALID" }));
++  assert.equal(untyped.kind, "architecture-design-required", JSON.stringify(untyped));
++  assert.equal(JSON.stringify(untyped).includes('"reopen-design"'), false);
++});
++
++// ---- (e) win32 dialect: a backslash-spelled plan path is a typed, non-reopen refusal, never the brownfield exemption ----
++test("win32 dialect: a backslash-spelled approved plan path is refused with a typed code and is never exempted as not-required", async () => {
++  const mod = await loadStaged();
++  const root = entryFixture("none");
++  const statePath = join(root, "project", "pipeline-state.json");
++  const state = JSON.parse(readFileSync(statePath, "utf8"));
++  const win32Plan = PLAN.replaceAll("/", "\\");
++  state.activeFeature.planPath = win32Plan;
++  state.planApproval.poGateAuthority.planPath = win32Plan;
++  state.continuity.authority.prd.path = win32Plan;
++  writeFileSync(statePath, JSON.stringify(state));
++  const result = mod.inspectArchitectureDesign(root, win32Plan, {});
++  assert.equal(result.ok, false, JSON.stringify(result));
++  assert.notEqual(result.status, "not-required");
++  assert.match(String(result.code), /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/u, "a closed typed code, never exception text");
++  assert.equal(mod.ARCHITECTURE_DESIGN_REOPEN_CODES.includes(result.code), false, `${result.code} must not recommend discarding the approval`);
++  const posix = mod.inspectArchitectureDesign(entryFixture("none"), PLAN, {});
++  assert.deepEqual(posix, NOT_REQUIRED, "the POSIX spelling of the same fixture is the brownfield exemption");
++});
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 9b5ab4b00..290344ef7 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -5,7 +5,7 @@
+ // agent in the state where it is prescribed -- the real guard classifies and admits the exact
+ // emitted shape -- WITHOUT a broad grammar relaxation (tampered shapes stay refused).
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { pathToFileURL, fileURLToPath } from "node:url";
+ import { test } from "node:test";
+@@ -323,7 +323,27 @@ test("AC-123 design-course-session --run-v2: tampered shapes stay refused (no br
+   } finally { f.cleanup(); }
+ });
+ 
+-test("AC-123 receipt aliases (directory/file symlink) never gain present-plan admission", { skip: HOST_LIMITATION }, () => {});
++test("AC-123 receipt aliases (directory/file symlink) never gain present-plan admission", (t) => {
++  return withFixture("feature", f => {
++    const real = receipt(f, "real-1");
++    const fileAlias = "evidence/alias-file.json";
++    const dirAlias = "evidence-alias";
++    try {
++      symlinkSync(join(f.root, real), join(f.root, fileAlias), "file");
++      symlinkSync(join(f.root, "evidence"), join(f.root, dirAlias), "dir");
++    } catch (error) {
++      // Typed conditional skip: only a host that cannot create a link (native Windows without the privilege).
++      t.skip(`${HOST_LIMITATION} (${error?.code ?? "unknown"})`);
++      return;
++    }
++    const present = path => stateAction("present-plan", "--by", "Fixture", "--review-receipt", path);
++    assert.equal(admitted(present(real), f), true, "control: the physical receipt itself is admitted");
++    for (const [label, path] of [["file symlink", fileAlias], ["directory symlink", `${dirAlias}/real-1.json`]]) {
++      assert.equal(admitted(present(path), f), false, label);
++      assert.equal(guardCode(present(path), f), 2, label);
++    }
++  });
++});
+ 
+ test("AC-123 continuity-* writers are not catalogue-admitted lifecycle verbs of the current course", () => {
+   // Boundary pin: the current course text (skills/pipeline-start/references/design-course.md) prescribes
+diff --git a/plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs b/plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs
+index 18fd32deb..59bcbe746 100644
+--- a/plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs
++++ b/plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs
+@@ -6,7 +6,7 @@
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { test } from "node:test";
+ import { fileURLToPath } from "node:url";
+@@ -19,6 +19,7 @@ import {
+   planProjectOnboardingV3, renderProjectOnboardingAction,
+ } from "../project-onboarding-v3.mjs";
+ import { isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
++import { resolveOnboardingIntakeScope } from "../codex-onboarding-runtime.mjs";
+ 
+ const here = dirname(fileURLToPath(import.meta.url));
+ const REPO = resolve(here, "../../../..");
+@@ -228,5 +229,49 @@ test("AC6 the committed onboarding suite declares OBC298 and FRB001-FRB004, and
+   obc.run();
+ });
+ 
+-// Host limitation: needs directory mode bits / directory symlinks (Linux/WSL run).
+-test("HL physical-history refusal for symlinked history paths (ER-HISTORY-UNSAFE)", HOST_LIMITATION, () => {});
++// Physical-history refusal: a retained-history path that is a link is never read as history. The case needs link
++// creation; a host that cannot create one takes the typed conditional skip below (native Windows without the privilege).
++function linkOrSkip(t, target, linkPath, type) {
++  try { symlinkSync(target, linkPath, type); return true; }
++  catch (error) { t.skip(`${HOST_LIMITATION.skip} (${error?.code ?? "unknown"})`); return false; }
++}
++test("HL physical-history refusal for symlinked history paths (ER-HISTORY-UNSAFE)", (t) => {
++  const outside = root();
++  try {
++    const foreign = join(outside, "foreign-consent.json");
++    writeFileSync(foreign, '{"foreign":"bytes"}\n');
++    // Link inside the project tree on a path the physical-chain check covers: refused before history is read.
++    // Link at the selected intake scope's retirement history (the ER-HISTORY-UNSAFE site proper): refused by name.
++    const cases = [
++      { name: "file link at .agent-pipeline/onboarding-consent.json", code: "KICKOFF-PATH-UNSAFE", prepare: (path) => {
++        mkdirSync(join(path, ".agent-pipeline"));
++        return linkOrSkip(t, foreign, join(path, ".agent-pipeline/onboarding-consent.json"), "file");
++      } },
++      { name: "directory link at the intake runtime directory", code: "KICKOFF-PATH-UNSAFE", prepare: (path) => {
++        mkdirSync(join(path, ".claude/.runtime/agent-pipeline"), { recursive: true });
++        return linkOrSkip(t, outside, join(path, ".claude/.runtime/agent-pipeline/onboarding"), "dir");
++      } },
++      { name: "file link at the selected scope's enrollment-retirement.json", code: "ER-HISTORY-UNSAFE", prepare: (path) => {
++        assert.equal(git(path, "init", "--initial-branch=main").status, 0);
++        const scope = resolveOnboardingIntakeScope(path, "local", { create: true });
++        return linkOrSkip(t, foreign, join(scope.directory, "enrollment-retirement.json"), "file");
++      } },
++      { name: "directory link at the selected scope's enrollment-retirement-archives", code: "ER-HISTORY-UNSAFE", prepare: (path) => {
++        assert.equal(git(path, "init", "--initial-branch=main").status, 0);
++        const scope = resolveOnboardingIntakeScope(path, "local", { create: true });
++        return linkOrSkip(t, outside, join(scope.directory, "enrollment-retirement-archives"), "dir");
++      } },
++    ];
++    for (const entry of cases) {
++      const path = root();
++      try {
++        if (!entry.prepare(path)) return;
++        const before = readFileSync(foreign);
++        assert.throws(() => observeOnboardingEnrollmentHistory({ rootDir: path }), (error) => error?.code === entry.code,
++          `${entry.name}: a linked history path must be refused with ${entry.code}, not read or counted as history`);
++        assert.deepEqual(readFileSync(foreign), before, `${entry.name}: the link target is untouched`);
++        assert.equal(readdirSync(outside).includes("enrollment-retirement.json"), false, `${entry.name}: nothing is written through the link`);
++      } finally { dispose(path); }
++    }
++  } finally { dispose(outside); }
++});
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 0ff6a51a0..af49a6ac0 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -136,4 +136,10 @@ test('AC-207 point 4: the F6 recovery checker and repair map are reachable witho
+   assert.equal(admittedByClosedArgv(`node ${q(join(root, 'harness/scripts/check-observation-governance.mjs'))}`), true);
+ });
+ 
+-test('AC-207 point 5: design-course end-to-end on Git Bash reaches present-plan with zero overrides', { skip: 'held: needs the Windows Git Bash end-to-end run; owner Coordinator, due 2026-10-19 (Linux/WSL run, PO decision K7)' }, () => {});
++// Typed conditional skip: the case is the native Windows Git Bash end-to-end run, which no host has implemented yet.
++// The reason names the host class, so a reader sees what is missing instead of an empty body.
++test('AC-207 point 5: design-course end-to-end on Git Bash reaches present-plan with zero overrides', (t) => {
++  t.skip(process.platform === 'win32'
++    ? 'not implemented: the native Windows Git Bash end-to-end run still has to be written on this host class (AC-207 point 5, owner Coordinator, PO decision K7)'
++    : `host-limitation: the Git Bash end-to-end run needs a native Windows host with Git for Windows; this host is ${process.platform} (owner Coordinator, PO decision K7). The POSIX admission of every prescribed verb is pinned by catalogue-admit-prescribed-lifecycle-verbs.test.mjs.`);
++});

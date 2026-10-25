@@ -1,0 +1,14 @@
+{
+  "schema": "scratch.source-delivery-successor.v1",
+  "owner": "Root",
+  "target": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+  "preimageSha256": "f124af282ed5c991b8fe278dfe44cfa2942bb71090878a8f83f6f95a60494360",
+  "postimageSha256": "30f513854eb503d4dc692f5749ba3cad75cfe051d2fb7a9771427ea216f0d662",
+  "SourceDelivered": true,
+  "nativeApplyPatchAttemptCount": 1,
+  "nativeApplyPatchResult": "success",
+  "intentBasis": "Root read the exact terminal216 markers/stderr and original wrapper, fixture and footer. Root authored the exact native hunks; observed postimage follows this owned action with known preimage.",
+  "change": "Register assigned callbacks, then await each before PASS/END. Copy two current scanner diagnostics modules into the existing installed-plugin fixture. Replace arbitrary per-child B8 nonempty assertion with validated one-per-child IPC coverage and corpus-wide nonempty coverage; retain each real producer-to-guard assertion.",
+  "scope": {"cases": 216, "shards": 8, "timeoutMs": 900000, "productionChanges": false},
+  "qualification": {"syntaxExitCode": 0, "directedActualSource": "3/3 PASS; actual async scheduler resolve/reject controls, coverage codec, awaited original SECGATE2", "full216CurrentSource": false, "eightChildIPCFullProof": false}
+}

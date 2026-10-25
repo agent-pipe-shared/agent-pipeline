@@ -1,0 +1,18 @@
+// K144 probe: run the Codex pretool adapter on the F1 push payload in a plain fixture dir, private HOME and TMPDIR.
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+const clone = resolve(process.argv[2]);
+const base = join(homedir(), "pipeline-test-tmp"); mkdirSync(base, { recursive: true });
+const priv = mkdtempSync(join(base, "k144-cprobe-")); const home = join(priv, "home"); const tmp = join(priv, "tmp");
+mkdirSync(home); mkdirSync(tmp);
+const root = mkdtempSync(join(tmp, "codex-pretool-")); mkdirSync(join(root, ".claude"));
+const payload = { cwd: root, tool_name: "Bash", tool_input: { command: "git --git-dir=.git --work-tree=. push origin main" } };
+const inputPath = join(tmp, "in.json"); writeFileSync(inputPath, JSON.stringify(payload));
+const res = spawnSync(process.execPath, [join(clone, "plugins/pipeline-core/hooks/codex-pretool-guard.mjs")], {
+  cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: tmp, CLAUDE_PROJECT_DIR: root }, encoding: "utf8",
+  input: JSON.stringify(payload), timeout: 20000 });
+console.log("status", res.status, "signal", res.signal, "error", res.error?.message);
+console.log("stdout", (res.stdout ?? "").slice(0, 1500));
+console.log("stderr", (res.stderr ?? "").slice(0, 2500));

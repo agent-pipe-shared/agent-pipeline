@@ -1,0 +1,543 @@
+diff --git a/plugins/pipeline-core/install-agy.mjs b/plugins/pipeline-core/install-agy.mjs
+index 6b40d6590..6aa7e983a 100755
+--- a/plugins/pipeline-core/install-agy.mjs
++++ b/plugins/pipeline-core/install-agy.mjs
+@@ -9,7 +9,7 @@ import { isDirectInvocation } from "./lib/entrypoint.mjs";
+ import { writeLocalDevelopmentInstalledPluginReceipt } from "./scripts/installed-plugin-attestation-host.mjs";
+ import { homedir } from "node:os";
+ import { createAntigravityRefreshHost, resolveAntigravityCliPath } from "./lib/antigravity-topology-refresh-host.mjs";
+-import { observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
++import { ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE, antigravityWorkspaceRelativePath, observeAntigravityPluginTopology } from "./lib/antigravity-plugin-topology.mjs";
+ import { observeRunnerPublicCoreIdentity, snapshotPhysicalPluginRoot } from "./lib/public-core-observation.mjs";
+ import { installAgyFromCentralSnapshot as installAgyFromCentralSnapshotDefault } from "./lib/agy-central-refresh.mjs";
+ import { execFileSync as nodeExecFileSync, spawnSync } from "node:child_process";
+@@ -125,6 +125,10 @@ export function updatePluginRegistry({ targetFile, corePluginPath }) {
+   if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink() || realpathSync(parent) !== parent) {
+     throw new Error("Unsafe plugin registry parent");
+   }
++  // D79: `<workspace>/.agents/plugins.json` is a tracked file, so it only ever carries a repo-relative path, never a machine path.
++  const workspaceRoot = basename(parent) === ".agents" && basename(targetFile) === "plugins.json" ? dirname(parent) : null;
++  const relativeSource = workspaceRoot === null ? null : antigravityWorkspaceRelativePath(workspaceRoot, corePluginPath);
++  if (workspaceRoot !== null && relativeSource === null) throw new Error(`ATR-WORKSPACE-SOURCE-OUTSIDE. ${ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE}`);
+   if (existsSync(targetFile)) {
+     const targetInfo = lstatSync(targetFile);
+     if (!targetInfo.isFile() || targetInfo.isSymbolicLink()) throw new Error("Unsafe plugin registry target");
+@@ -141,7 +145,9 @@ export function updatePluginRegistry({ targetFile, corePluginPath }) {
+     throw new Error(`Malformed plugin registry: ${targetFile}`);
+   }
+   const retained = config.entries.filter((entry) => !isPipelineRegistration(entry.path, corePluginPath));
+-  const nextEntries = [...retained, { path: corePluginPath }];
++  // A relative entry is a tracked, path-free binding: it is retained untouched (isPipelineRegistration never claims it) and, when it already names the source, nothing is appended.
++  const tracked = workspaceRoot !== null && retained.some((entry) => !isAbsolute(entry.path) && resolve(workspaceRoot, entry.path) === corePluginPath);
++  const nextEntries = workspaceRoot === null ? [...retained, { path: corePluginPath }] : tracked ? retained : [...retained, { path: relativeSource }];
+   if (JSON.stringify(config.entries) === JSON.stringify(nextEntries)) return;
+   const temporary = join(parent, `.${basename(targetFile)}.${randomUUID()}.tmp`);
+   let descriptor;
+@@ -272,7 +278,7 @@ export function refreshAntigravityInstallation(options, dependencies = {}) {
+   const receiptWriter = dependencies.writeInstalledReceipt ?? writeLocalDevelopmentInstalledPluginReceipt;
+   const host = createAntigravityRefreshHost({ ...options, ...dependencies, writeInstalledReceipt: input => receiptWriter({ ...input, sourcePluginRoot: receiptSourceRoot }) });
+   const plan = host.prepare();
+-  if (plan.status !== "prepared") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: plan.reason, completed: [] };
++  if (plan.status !== "prepared") return { schema: "pipeline.antigravity-refresh-result.v1", status: "refused", reason: plan.reason, ...(plan.guidance ? { guidance: plan.guidance } : {}), completed: [] };
+   return host.apply(plan);
+ }
+ 
+@@ -539,7 +545,7 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
+   console.log("Antigravity may retain a managed imported copy alongside path registries; both are observed before refresh.");
+   console.log("Where would you like to install the pipeline?\n");
+   console.log("  1) Workspace-Local (Recommended for teams - writes .agents/plugins.json)");
+-  console.log("  2) Global topology refresh (updates managed copy, owned global wiring/registry and existing Pipeline registration in this workspace)\n");
++  console.log("  2) Global topology refresh (updates managed copy, owned global wiring/registry; removes a machine-path Pipeline entry from this workspace's tracked .agents/plugins.json, a relative entry stays)\n");
+ 
+   rl.question("Select option (1 or 2): ", (answer) => {
+     let targetFile;
+@@ -567,7 +573,7 @@ rl.question(`Use (1) Approved Plugin Directory (${SCRIPT_DIR}) or (2) Local Mark
+       const refreshOptions = { configRoot, workspaceRoot: process.cwd(), approvedSourceRoot: corePluginPath, attestationSourceRoot, scope: answer.trim() === "2" ? "global" : "workspace", globalChangeApproved: answer.trim() === "2", cliPath: resolveAntigravityCliPath() };
+       const result = answer.trim() === "2" ? refreshAntigravityGlobalFromRunnerView(refreshOptions) : refreshAntigravityInstallation(refreshOptions);
+       console.log(JSON.stringify(result));
+-      if (result.status !== "refreshed") throw new Error(result.reason ?? "ATR-REFRESH-UNAVAILABLE");
++      if (result.status !== "refreshed") throw new Error(describeInstallerSourceRefusal({ guidance: result.guidance, reason: result.reason ?? "ATR-REFRESH-UNAVAILABLE" }));
+     } catch (error) {
+       console.error(`Installation refused: ${error.message}`);
+       rl.close();
+diff --git a/plugins/pipeline-core/install-agy.test.mjs b/plugins/pipeline-core/install-agy.test.mjs
+index 4dfca7b88..8aa0372f3 100644
+--- a/plugins/pipeline-core/install-agy.test.mjs
++++ b/plugins/pipeline-core/install-agy.test.mjs
+@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
+ import { execFileSync, spawnSync } from "node:child_process";
+ import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { basename, dirname, join } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { installerUsageLines, postInstallGuidanceLines, refreshAntigravityInstallation, resolveAntigravityInstallerAttestationSource, selectPluginSource, updateAutonomousSettings, updatePluginRegistry, verifyAntigravityInstallerSource } from "./install-agy.mjs";
+ import * as installerModule from "./install-agy.mjs";
+@@ -330,7 +330,9 @@ test("Agy upgrade replaces the old physical root and survives its removal", (t)
+ 
+   updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
+   const bytes = readFileSync(registryFile, "utf8");
+-  assert.deepEqual(JSON.parse(bytes), { entries: [unrelated, { path: newRoot }], custom: { keep: true } });
++  // D79: the tracked workspace registry never carries a machine path. This asserted `{ path: newRoot }` (absolute); the file lives at
++  // `<workspace>/.agents/plugins.json`, so the new binding is now the repo-relative path (QG-04 justification).
++  assert.deepEqual(JSON.parse(bytes), { entries: [unrelated, { path: "new/plugins/pipeline-core" }], custom: { keep: true } });
+   rmSync(join(oldRoot, "plugin.json"));
+   rmSync(oldRoot, { recursive: true });
+   const readback = readFileSync(registryFile, "utf8");
+@@ -360,11 +362,37 @@ test("Agy upgrade refuses an unverifiable deleted Pipeline-shaped registration",
+   assert.equal(readFileSync(registryFile, "utf8"), bytes);
+   writeFileSync(join(ambiguous, "plugin.json"), JSON.stringify({ name: "different-plugin" }));
+   updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
++  // D79: same justification as above - the appended binding is the repo-relative path, not the absolute `newRoot`.
+   assert.deepEqual(JSON.parse(readFileSync(registryFile, "utf8")).entries, [
+-    { path: ambiguous }, { path: otherRoot, enabled: false }, { path: newRoot },
++    { path: ambiguous }, { path: otherRoot, enabled: false }, { path: "new/plugins/pipeline-core" },
+   ]);
+ });
+ 
++test("D79: the tracked workspace registry never gains a machine path: relative entries stay, outside sources are refused, the global file keeps the absolute root", (t) => {
++  const { oldRoot, newRoot, otherRoot, registryFile, root, configRoot } = fixture(t);
++  // A tracked relative entry that already names the source is kept as it is and nothing is appended.
++  const tracked = `${JSON.stringify({ entries: [{ path: "new/plugins/pipeline-core" }, { path: otherRoot, enabled: false }] }, null, 2)}\n`;
++  writeFileSync(registryFile, tracked);
++  updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
++  assert.equal(readFileSync(registryFile, "utf8"), tracked);
++  // A leaked absolute Pipeline entry is replaced by the relative path; the tracked relative entry is never rewritten or removed.
++  writeFileSync(registryFile, `${JSON.stringify({ entries: [{ path: oldRoot }, { path: "old/plugins/pipeline-core" }] })}\n`);
++  updatePluginRegistry({ targetFile: registryFile, corePluginPath: newRoot });
++  assert.deepEqual(JSON.parse(readFileSync(registryFile, "utf8")).entries, [{ path: "old/plugins/pipeline-core" }, { path: "new/plugins/pipeline-core" }]);
++  // A source outside the workspace has no repo-relative path: refused with the typed reason, bytes untouched.
++  const outside = join(dirname(root), `${basename(root)}-outside`, "plugins", "pipeline-core");
++  mkdirSync(outside, { recursive: true });
++  t.after(() => rmSync(dirname(dirname(outside)), { recursive: true, force: true }));
++  writeFileSync(join(outside, "plugin.json"), JSON.stringify({ name: "agent-pipeline-core", version: "0.7.0" }));
++  const before = readFileSync(registryFile);
++  assert.throws(() => updatePluginRegistry({ targetFile: registryFile, corePluginPath: outside }), /^Error: ATR-WORKSPACE-SOURCE-OUTSIDE\. Repair: use the global option/u);
++  assert.deepEqual(readFileSync(registryFile), before);
++  // The global registry (not under `.agents`) keeps binding the absolute root.
++  const globalFile = join(configRoot, "config", "plugins.json");
++  updatePluginRegistry({ targetFile: globalFile, corePluginPath: newRoot });
++  assert.deepEqual(JSON.parse(readFileSync(globalFile, "utf8")).entries, [{ path: newRoot }]);
++});
++
+ test("Agy installer refuses malformed existing registry without changing bytes", (t) => {
+   const { newRoot, registryFile } = fixture(t);
+   for (const bytes of ["{invalid", '{"entries":{}}', '{"entries":[null]}', Buffer.from([0x7b, 0x22, 0x80, 0x22, 0x3a, 0x31, 0x7d])]) {
+diff --git a/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs b/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs
+index a1ddae0f7..3b5f20057 100644
+--- a/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs
++++ b/plugins/pipeline-core/lib/antigravity-plugin-topology.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Prepared physical diagnostics, never an executing-path attestation.
+ import {openSync,closeSync,readSync,fstatSync,lstatSync,realpathSync,opendirSync,constants} from 'node:fs';
+-import {resolve,join,isAbsolute,sep} from 'node:path';
++import {resolve,join,isAbsolute,sep,relative} from 'node:path';
+ import {createHash} from 'node:crypto';
+ import {parseStrictJson,canonicalizeJson} from './governance-event.mjs';
+ 
+@@ -88,10 +88,26 @@ function registry(path,pluginName,workspaceRoot=null,managedRoot=null){
+     if(!isAbsolute(v.path)&&(workspaceRoot===null||!root.startsWith(workspaceRoot+sep)))return {index,status:'unavailable'};
+     const c=candidate(root,pluginName);
+     if(c.status==='unavailable'&&managedRoot!==null&&v.path===managedRoot&&absent(root))return {index,root,status:'dangling-managed'};
+-    return {index,...c};
++    // D79: a raw path that was relative is a tracked, path-free entry. The marker exists ONLY on those, so absolute observations keep their shape.
++    return {index,...c,...(isAbsolute(v.path)?{}:{relative:true})};
+   });
+   return {path,status:entries.some(e=>e.status==='unavailable')?'unavailable':'observed',sha256:f.sha256,entries};
+ }
++// D79: the repair named by every refusal of a workspace registration whose source lies outside the workspace (host `ATR-…`, planner `AT-…`).
++export const ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE='Repair: use the global option (option 2), which registers the plugin outside the work tree, or install the plugin inside the workspace so a repo-relative path can be registered.';
++// D79: the tracked workspace registry never carries a machine path. The Pipeline entries of one registry, split by who owns them:
++// `tracked` (observed, raw path relative: never rewritten or removed, never a second root), `pipeline` (observed, absolute: owned and
++// replaced/removed), `dangling` (the vanished managed-copy entry). Foreign and unavailable entries are in none of the three.
++export function antigravityRegistryEntries(registry){
++  const entries=registry.entries;
++  return {tracked:entries.filter(e=>e.status==='observed'&&e.relative===true),pipeline:entries.filter(e=>e.status==='observed'&&e.relative!==true),dangling:entries.filter(e=>e.status==='dangling-managed')};
++}
++// The '/'-separated repo-relative path of `root` strictly inside `workspaceRoot`, else null (the source lies outside the workspace).
++export function antigravityWorkspaceRelativePath(workspaceRoot,root){
++  const rel=relative(workspaceRoot,root);
++  if(rel===''||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel))return null;
++  return rel.split(sep).join('/');
++}
+ export function observeAntigravityPluginTopology({configRoot,workspaceRoot,approvedSourceRoot,pluginName='agent-pipeline-core'}){
+   if(!/^[a-z0-9][a-z0-9-]{0,79}$/.test(pluginName))throw Error('AT-NAME');
+   physicalDirectory(configRoot);physicalDirectory(workspaceRoot);
+@@ -120,7 +136,7 @@ export function observeAntigravityPluginTopology({configRoot,workspaceRoot,appro
+ // and subsequent independent observation remain separate trusted responsibilities.
+ export function planAntigravityTopologyRefresh({observation,scope,globalChangeApproved=false,cliVersion}){
+   const binding=snapshots.get(observation);if(!binding)throw Error('AT-NOT-PHYSICAL-OBSERVATION');
+-  const held=reason=>freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:'held',reason,observationSha256:binding.digest,actions:[]});
++  const held=(reason,guidance=null)=>freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:'held',reason,...(guidance===null?{}:{guidance}),observationSha256:binding.digest,actions:[]});
+   if(!['workspace','global'].includes(scope))return held('AT-SCOPE');
+   if(!supportsAntigravityPluginCliVersion(cliVersion))return held('AT-CLI-CAPABILITY-UNOBSERVED');
+   if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable'||Object.values(observation.registries).some(r=>r.status==='unavailable')||observation.wiring.some(w=>w.status==='unavailable'||w.status==='observed'))return held('AT-UNVERIFIABLE-SURFACE');
+@@ -128,10 +144,14 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
+   if(managed.length>1||imports.length>1||(imports.length===1&&managed.length!==1)||(managed.length===1&&imports.length!==1))return held('AT-MANAGED-IMPORT-AMBIGUOUS');
+   const desired=observation.source,old=managed[0];
+   const other=observation.registries[scope==='global'?'workspace':'global'];
+-  if(other.entries.some(e=>e.status==='observed'&&e.root!==desired.root))return held('AT-OTHER-SCOPE-PIPELINE-CONFLICT');
++  // A tracked, path-free (relative) entry is never a second root.
++  if(other.entries.some(e=>e.status==='observed'&&e.relative!==true&&e.root!==desired.root))return held('AT-OTHER-SCOPE-PIPELINE-CONFLICT');
+   const needsManaged=scope==='global'&&(!old||old.content.sha256!==desired.content.sha256);
+   // A managed copy is global. Per-project intent never silently retires it.
+   if((needsManaged||(scope==='workspace'&&old))&&!globalChangeApproved)return held('AT-GLOBAL-CHANGE-REQUIRES-EXPLICIT-SCOPE');
++  // D79: the workspace registry is tracked, so it only ever carries a repo-relative path; a source outside the workspace has none.
++  const workspacePath=scope==='workspace'?antigravityWorkspaceRelativePath(binding.workspaceRoot,desired.root):null;
++  if(scope==='workspace'&&workspacePath===null)return held('AT-WORKSPACE-SOURCE-OUTSIDE',ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE);
+   const actions=[];
+   if(needsManaged||(scope==='workspace'&&old)){
+     // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install (same order as the host prepare()).
+@@ -140,8 +160,14 @@ export function planAntigravityTopologyRefresh({observation,scope,globalChangeAp
+     if(scope==='global')actions.push({kind:'cli',argv:['plugin','validate',desired.root]},{kind:'cli',argv:['plugin','install',desired.root]});
+   }
+   const registry=observation.registries[scope];
+-  const pipeline=registry.entries.filter(e=>e.status==='observed'),dangling=registry.entries.filter(e=>e.status==='dangling-managed');
+-  if(pipeline.length!==1||pipeline[0].root!==desired.root||dangling.length)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),appendPath:desired.root,preserveOtherEntries:true});
++  const {tracked,pipeline,dangling}=antigravityRegistryEntries(registry);
++  if(scope==='global'){
++    if(pipeline.length!==1||pipeline[0].root!==desired.root||dangling.length)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),appendPath:desired.root,preserveOtherEntries:true});
++  }else{
++    // Machine-path entries are replaced by the repo-relative path; a tracked relative entry that already names the source is kept as it is.
++    const bound=tracked.some(e=>e.root===desired.root);
++    if(pipeline.length||dangling.length||!bound)actions.push({kind:'registry-rebind',scope,path:registry.path,expectedSha256:registry.sha256,removeIndexes:[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),...(bound?{}:{appendPath:workspacePath}),preserveOtherEntries:true});
++  }
+   return freeze({schema:'pipeline.antigravity-refresh-plan.v1',status:actions.length?'prepared':'metadata-current',observationSha256:binding.digest,sourceContentSha256:desired.content.sha256,actions,requiresIndependentReadback:true,executingPath:'unknown'});
+ }
+ export function reobserveAntigravityTopology(observation){const args=snapshots.get(observation);if(!args)throw Error('AT-NOT-PHYSICAL-OBSERVATION');return observeAntigravityPluginTopology(args);}
+@@ -153,7 +179,10 @@ export function observeAntigravityLoadedTopology({loadedPluginRoot,configRoot,wo
+     const loaded=candidate(loadedPluginRoot,'agent-pipeline-core');if(loaded.status!=='observed')throw Error('AT-LOADED-UNAVAILABLE');
+     const global=registry(join(configRoot,'config','plugins.json'),'agent-pipeline-core'),workspace=registry(join(workspaceRoot,'.agents','plugins.json'),'agent-pipeline-core',workspaceRoot);
+     if([global,workspace].some(r=>r.status==='unavailable'))throw Error('AT-REGISTRY-UNAVAILABLE');
+-    const roots=[...new Set([global,workspace].flatMap(r=>r.entries.filter(e=>e.status==='observed').map(e=>e.root)))];
++    // D79: a tracked, path-free workspace entry never competes with an absolute root (the global/loaded root wins); only when every observed entry is path-free do they decide.
++    const observed=r=>r.entries.filter(e=>e.status==='observed');
++    const absolute=[...new Set([global,workspace].flatMap(r=>observed(r).filter(e=>e.relative!==true).map(e=>e.root)))];
++    const roots=absolute.length>0?absolute:[...new Set(observed(workspace).map(e=>e.root))];
+     if(roots.length!==1)throw Error('AT-REGISTRY-AMBIGUOUS');
+     const observation=observeAntigravityPluginTopology({configRoot,workspaceRoot,approvedSourceRoot:roots[0]});
+     if(observation.source.status!=='observed'||observation.managed.status==='unavailable'||observation.importState.status==='unavailable')throw Error('AT-TOPOLOGY-UNAVAILABLE');
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+index d37b9274e..346c8dc06 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+@@ -5,7 +5,7 @@ import {mkdirSync,lstatSync,realpathSync,openSync,closeSync,writeFileSync,fsyncS
+ import {join,dirname,resolve,isAbsolute,relative,sep} from 'node:path';
+ import {homedir} from 'node:os';
+ import {randomUUID} from 'node:crypto';
+-import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion,antigravityManagedPluginRoot,antigravityPathAbsent} from './antigravity-plugin-topology.mjs';
++import {observeAntigravityPluginTopology,observeAntigravityLoadedTopology,readAntigravityPhysicalJson,antigravityTopologySha256,supportsAntigravityPluginCliVersion,antigravityManagedPluginRoot,antigravityPathAbsent,antigravityRegistryEntries,antigravityWorkspaceRelativePath,ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE} from './antigravity-plugin-topology.mjs';
+ import {rewriteAntigravityJsonBytes} from './antigravity-json-spans.mjs';
+ import {createHash} from 'node:crypto';
+ const NAME='agent-pipeline-core';
+@@ -66,6 +66,28 @@ function wiring(observation,configRoot,workspaceRoot){
+  }
+  return result;
+ }
++// D79: the tracked workspace registry never carries a machine path. A relative (tracked, path-free) entry is never a second root, never rewritten, never removed.
++const conflicting=(registry,root)=>registry.entries.some(e=>e.status==='observed'&&e.relative!==true&&e.root!==root);
++const refusal=(schema,e,extra={})=>{const reason=/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE';return {schema,status:'refused',reason,...(reason==='ATR-WORKSPACE-SOURCE-OUTSIDE'?{guidance:ANTIGRAVITY_WORKSPACE_SOURCE_OUTSIDE_GUIDANCE}:{}),...extra};};
++// What one registry needs, or null when it is bound. Global: exactly the source root. Workspace: no absolute Pipeline entry, plus (workspace scope only) a tracked relative entry naming the source, appended as the repo-relative path.
++function registryChange(observation,selected,scope,workspaceRoot){
++ const {tracked,pipeline,dangling}=antigravityRegistryEntries(observation.registries[selected]),source=observation.source;
++ if(selected==='global'){
++  const bound=pipeline.length===1&&pipeline[0].root===source.root,removed=(bound?dangling:[...pipeline,...dangling]).map(e=>e.index).sort((a,b)=>a-b);
++  const append=!bound&&(selected===scope||pipeline.length>0)?source.root:null;
++  return removed.length||append!==null?{removed,append}:null;
++ }
++ const removed=[...pipeline,...dangling].map(e=>e.index).sort((a,b)=>a-b),append=selected===scope&&!tracked.some(e=>e.root===source.root)?antigravityWorkspaceRelativePath(workspaceRoot,source.root):null;
++ if(selected===scope&&append===null&&!tracked.some(e=>e.root===source.root))throw Error('ATR-WORKSPACE-SOURCE-OUTSIDE');
++ return removed.length||append!==null?{removed,append}:null;
++}
++// The final readback of one registry: global holds only the source root (exactly once in its own scope); workspace holds no absolute Pipeline entry (and, in its own scope, a relative one naming the source).
++function registryBound(final,selected,scope,source){
++ const registry=final.registries[selected];if(registry.status!=='observed')return false;
++ const {tracked,pipeline}=antigravityRegistryEntries(registry);
++ if(selected==='global')return pipeline.every(e=>e.root===source.root)&&(selected!==scope||pipeline.length===1);
++ return pipeline.length===0&&(selected!==scope||tracked.some(e=>e.root===source.root));
++}
+ function physicalCli(path){if(typeof path!=='string'||!isAbsolute(path)||resolve(path)!==path||!lstatSync(path).isFile())throw Error('ATR-CLI');return realpathSync(path);}
+ export function resolveAntigravityCliPath(){const r=spawnSync(process.platform==='win32'?'where.exe':'which',['agy'],{encoding:'utf8',timeout:5000,maxBuffer:65536});if(r.status!==0||r.error)return null;try{return physicalCli(r.stdout.trim().split(/\r?\n/)[0]);}catch{return null;}}
+ export function observeAntigravityLoadedTopologyWithWiring(args){
+@@ -108,14 +130,15 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
+    // Only a stale copy requires a global lifecycle change.
+    const retire=!!copy&&copy.content.sha256!==observation.source.content.sha256,install=scope==='global'&&(!copy||retire);
+    const other=scope==='global'?'workspace':'global';
+-   if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==observation.source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
++   if(conflicting(observation.registries[other],observation.source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
+    if((retire||install||hooks.some(h=>h.scope==='global'&&h.changes)||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
++   if(scope==='workspace'&&antigravityWorkspaceRelativePath(workspaceRoot,observation.source.root)===null)throw Error('ATR-WORKSPACE-SOURCE-OUTSIDE');
+    // A replaced managed copy is retired only after the source validates, so the plan validates first and again before the install.
+    const validation=()=>({kind:'cli',argv:Object.freeze(['plugin','validate',observation.source.root])}),actions=[];if(retire&&install)actions.push(validation());if(retire)actions.push({kind:'cli',argv:Object.freeze(['plugin','uninstall',NAME])});if(install)actions.push(validation(),{kind:'cli',argv:Object.freeze(['plugin','install',observation.source.root])});
+    for(const h of hooks)if(h.changes)actions.push({kind:'owned-wiring-rebind',scope:h.scope,path:h.path,sha256:h.sha256,changes:h.changes,preserveForeignBytes:true});
+-   for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected],owned=r.entries.filter(e=>e.status==='observed'),dangling=r.entries.filter(e=>e.status==='dangling-managed');if(selected!==scope&&!owned.length&&!dangling.length)continue;if(owned.length!==1||owned[0].root!==observation.source.root||dangling.length)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
++   for(const selected of globalChangeApproved?[scope,other]:[scope]){const r=observation.registries[selected];if(registryChange(observation,selected,scope,workspaceRoot)!==null)actions.push({kind:'owned-registry-rebind',scope:selected,path:r.path,sha256:r.sha256,preserveForeignBytes:true});}
+    const plan=Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'prepared',scope,globalChangeApproved,sourceRoot:observation.source.root,sourceContentSha256:observation.source.content.sha256,observationSha256:antigravityTopologySha256(observation),actions:Object.freeze(actions.map(Object.freeze)),requiresFreshExecutingSession:true});plans.set(plan,plan.observationSha256);return plan;
+-  }catch(e){return Object.freeze({schema:'pipeline.antigravity-refresh-plan.v2',status:'refused',reason:/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE'});}
++  }catch(e){return Object.freeze(refusal('pipeline.antigravity-refresh-plan.v2',e));}
+  },apply(plan){
+   const bound=plans.get(plan);if(!bound)return {schema:'pipeline.antigravity-refresh-result.v1',status:'refused',reason:'ATR-UNOWNED-PLAN',completed:[]};
+   plans.delete(plan);try{if(antigravityTopologySha256(observeAntigravityPluginTopology(args))!==bound)return {schema:'pipeline.antigravity-refresh-result.v1',status:'refused',reason:'ATR-TOPOLOGY-DRIFT',completed:[]};}catch{return {schema:'pipeline.antigravity-refresh-result.v1',status:'refused',reason:'ATR-TOPOLOGY-DRIFT',completed:[]};}
+@@ -130,14 +153,15 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
+    if(managed.length>1||imports.length>1||(managed.length===1)!==(imports.length===1))throw Error('ATR-MANAGED-IMPORT-AMBIGUOUS');
+    const hookPlans=wiring(observation,configRoot,workspaceRoot);
+    const other=scope==='workspace'?'global':'workspace';
+-   if(observation.registries[other].entries.some(e=>e.status==='observed'&&e.root!==source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
++   if(conflicting(observation.registries[other],source.root)&&!globalChangeApproved)throw Error('ATR-OTHER-SCOPE-CONFLICT');
+    const retire=managed.length===1&&managed[0].content.sha256!==source.content.sha256;
+    const install=scope==='global'&&(managed.length===0||retire);
+    const globalWiring=hookPlans.some(p=>p.scope==='global'&&p.changes>0);
+    if((retire||install||globalWiring||scope==='global')&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');
++   if(scope==='workspace'&&antigravityWorkspaceRelativePath(workspaceRoot,source.root)===null)throw Error('ATR-WORKSPACE-SOURCE-OUTSIDE');
+    // Preserve the physically verified ownership/preimage before an authorized
+    // CLI uninstall removes a root referenced by an existing registry entry.
+-   const registryPlans=(globalChangeApproved?[scope,other]:[scope]).map(selected=>({selected,registry:observation.registries[selected],pipeline:observation.registries[selected].entries.filter(e=>e.status==='observed'),dangling:observation.registries[selected].entries.filter(e=>e.status==='dangling-managed')})).filter(p=>p.selected===scope||p.pipeline.length>0||p.dangling.length>0);
++   const registryPlans=(globalChangeApproved?[scope,other]:[scope]).map(selected=>({selected,registry:observation.registries[selected],...antigravityRegistryEntries(observation.registries[selected])})).filter(p=>p.selected===scope||p.pipeline.length>0||p.dangling.length>0).map(p=>({...p,change:registryChange(observation,p.selected,scope,workspaceRoot)}));
+    let checkpoint=antigravityTopologySha256(observation);
+    function recheck(){const fresh=observeAntigravityPluginTopology(args);if(antigravityTopologySha256(fresh)!==checkpoint)throw Error('ATR-TOPOLOGY-DRIFT');return fresh;}
+    const registryDigests=Object.fromEntries(Object.entries(observation.registries).map(([key,r])=>[key,r.sha256]));
+@@ -159,15 +183,14 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
+    // bind it after lifecycle; a stale/unknown new command cannot become success.
+    const newWiring=wiring(observation,configRoot,workspaceRoot);
+    for(const hook of newWiring)if(hook.changes){if(hook.scope==='global'&&!globalChangeApproved)throw Error('ATR-GLOBAL-SCOPE');recheck();changed=true;write(hook.path,hook.nextBytes,hook.sha256);completed.push('post-cli-wiring-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
+-   for(const {selected,registry,pipeline,dangling} of registryPlans){
+-    const bound=pipeline.length===1&&pipeline[0].root===source.root;
+-    if(!bound||dangling.length){recheck();const f=read(registry.path);const original=f.bytes??Buffer.from('{"entries":[]}\n');
+-     // A dangling managed entry (its directory is gone) is removed in the same owned rebind. Only the selected scope, or a registry already holding a Pipeline entry, gains the source root; foreign entries are never touched.
+-     const removed=(bound?dangling:[...pipeline,...dangling]).map(e=>e.index).sort((a,b)=>a-b),appends=!bound&&(selected===scope||pipeline.length>0)?[{path:['entries'],values:[{path:source.root}]}]:[];
+-     const next=rewriteAntigravityJsonBytes(original,{deletions:removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
++   for(const {selected,registry,change} of registryPlans){
++    if(change!==null){recheck();const f=read(registry.path);const original=f.bytes??Buffer.from('{"entries":[]}\n');
++     // A dangling managed entry (its directory is gone) is removed in the same owned rebind. Only the selected scope, or a registry already holding a Pipeline entry, gains the source root (the workspace registry: its repo-relative path); foreign and tracked relative entries are never touched.
++     const appends=change.append!==null?[{path:['entries'],values:[{path:change.append}]}]:[];
++     const next=rewriteAntigravityJsonBytes(original,{deletions:change.removed.map(i=>['entries',i]),...(appends.length?{appends}:{})});changed=true;write(registry.path,next,registry.sha256);completed.push(selected+'-registry-rebind');observation=observeAntigravityPluginTopology(args);checkpoint=antigravityTopologySha256(observation);}
+    }
+-   const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||final.registries[scope].status!=='observed'||final.registries[scope].entries.filter(e=>e.status==='observed').length!==1||final.registries[scope].entries.find(e=>e.status==='observed').root!==source.root)throw Error('ATR-FINAL-READBACK');
+-   if(registryPlans.some(({selected})=>final.registries[selected].entries.some(e=>e.status==='observed'&&e.root!==source.root)||final.registries[selected].status!=='observed'))throw Error('ATR-FINAL-READBACK');
++   const final=observeAntigravityPluginTopology(args);if(final.source.content?.sha256!==source.content.sha256||!registryBound(final,scope,scope,source))throw Error('ATR-FINAL-READBACK');
++   if(registryPlans.some(({selected})=>!registryBound(final,selected,scope,source)))throw Error('ATR-FINAL-READBACK');
+    if(wiring(final,configRoot,workspaceRoot).some(p=>p.changes>0))throw Error('ATR-FINAL-WIRING-READBACK');
+    if(scope==='global'&&!final.managed.candidates[0])throw Error('ATR-FINAL-READBACK');
+    if(final.managed.candidates.length){
+@@ -176,7 +199,7 @@ export function createAntigravityRefreshHost({configRoot,workspaceRoot,approvedS
+     const r=writeInstalledReceipt({provider:'antigravity',plugin:{name:'pipeline-core',version:source.version},sourcePluginRoot:source.root,installedPluginRoot:copy.root});if(r?.status!=='written')throw Error('ATR-ATTESTATION-FAILED');
+    }
+    return {schema:'pipeline.antigravity-refresh-result.v1',status:'refreshed',completed,changed,sourceContentSha256:source.content.sha256,finalTopologySha256:antigravityTopologySha256(final),requiresFreshExecutingSession:true};
+-  }catch(e){return {schema:'pipeline.antigravity-refresh-result.v1',status:changed?'partial':'refused',reason:/^ATR-[A-Z-]+$/.test(e.message)?e.message:'ATR-UNAVAILABLE',completed,requiresFreshExecutingSession:true};}
++  }catch(e){return {...refusal('pipeline.antigravity-refresh-result.v1',e,{completed,requiresFreshExecutingSession:true}),status:changed?'partial':'refused'};}
+   finally{active=false;}
+  }};return Object.freeze(host);
+ }
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+index 35885e2c6..d5ed096b4 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+@@ -37,34 +37,51 @@ test('sealed fixture refresh converges managed/import/global/workspace/wiring an
+  assert.deepEqual(f.calls.map(a=>a[1]),[undefined,'validate','uninstall','validate','install']);
+  const imported=JSON.parse(readFileSync(f.imports));assert.equal(imported.preserved,'import-key');assert(imported.imports.some(e=>e.name==='foreign-plugin'));
+  const global=JSON.parse(readFileSync(f.global));assert.deepEqual(global.custom,{keep:true});assert.deepEqual(global.entries[1],{path:f.foreign,enabled:false});
+- const local=JSON.parse(readFileSync(f.local));assert.equal(local.custom,'workspace');assert.deepEqual(local.entries,[{path:f.foreign,enabled:false},{path:f.approvedSourceRoot}]);
++ // D79: the tracked registry never carries a machine path. This used to expect the absolute source appended after the foreign entry; a global refresh now only REMOVES the absolute Pipeline entry (QG-04 justification).
++ const local=JSON.parse(readFileSync(f.local));assert.equal(local.custom,'workspace');assert.deepEqual(local.entries,[{path:f.foreign,enabled:false}]);
+  const hooks=JSON.parse(readFileSync(wire));assert.equal(hooks.hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-start-hint.mjs')+'"');assert.equal(hooks.hooks[1].command,'foreign-check --safe');
+  assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
+  const count=f.calls.length,r2=host.refresh();assert.equal(r2.status,'refreshed');assert.equal(r2.changed,false);assert.equal(f.calls.length,count+1,'only finite read-only version check on repeated converged refresh');
+ });
+ test('workspace intent refuses stale global retirement; explicit global approval enables registry-only retirement',t=>{
+  const f=fixture(t),before=readFileSync(f.global);let r=createAntigravityRefreshHost({...f.args,scope:'workspace',globalChangeApproved:false}).refresh();assert.equal(r.reason,'ATR-GLOBAL-SCOPE');assert.deepEqual(readFileSync(f.global),before);assert.equal(f.calls.length,1);
+- r=createAntigravityRefreshHost({...f.args,scope:'workspace'}).refresh();assert.equal(r.status,'refreshed');assert.equal(existsSync(f.old),false);assert.equal(JSON.parse(readFileSync(f.local)).entries.at(-1).path,f.approvedSourceRoot);
++ // D79: the tracked registry never carries a machine path. This used to refresh with the source OUTSIDE the workspace and assert the absolute source path appended to the workspace registry; that is the leak this decision closes, so the outside source is now refused (nothing changes) and the refresh is driven with the source inside the workspace, asserting the repo-relative path (QG-04 justification).
++ const localBefore=readFileSync(f.local);r=createAntigravityRefreshHost({...f.args,scope:'workspace'}).refresh();assert.equal(r.status,'refused');assert.equal(r.reason,'ATR-WORKSPACE-SOURCE-OUTSIDE');assert.match(r.guidance,/global option/);assert.equal(existsSync(f.old),true);assert.equal(f.calls.length,2,'only the two read-only version checks');assert.deepEqual(readFileSync(f.local),localBefore);assert.deepEqual(readFileSync(f.global),before);
++ const g=fixture(t),inside=join(g.workspaceRoot,'plugins','pipeline-core');cpSync(g.approvedSourceRoot,inside,{recursive:true});
++ r=createAntigravityRefreshHost({...g.args,approvedSourceRoot:inside,scope:'workspace'}).refresh();assert.equal(r.status,'refreshed',JSON.stringify(r));assert.equal(existsSync(g.old),false);assert.deepEqual(JSON.parse(readFileSync(g.local)).entries,[{path:g.foreign,enabled:false},{path:'plugins/pipeline-core'}]);assert.equal(JSON.parse(readFileSync(g.global)).entries.at(-1).path,inside,'the global registry keeps the absolute root');
+ });
+ test('empty workspace binds an existing matching managed copy and attests its exact source',t=>{
+- const f=fixture(t);rmSync(f.old,{recursive:true});cpSync(f.approvedSourceRoot,f.old,{recursive:true});
++ // D79: the tracked registry never carries a machine path. The source used to lie outside the workspace and the workspace registry received its absolute path; the source now lies inside the workspace (global registry re-pointed to it) and the registry receives the repo-relative path (QG-04 justification).
++ const f=fixture(t),inside=join(f.workspaceRoot,'plugins','pipeline-core');cpSync(f.approvedSourceRoot,inside,{recursive:true});rmSync(f.old,{recursive:true});cpSync(inside,f.old,{recursive:true});
++ f.put(f.global,{entries:[{path:inside},{path:f.foreign,enabled:false}],custom:{keep:true}});
+  rmSync(join(f.workspaceRoot,'.agents'),{recursive:true});
+  const receipts=[];
+- const host=createAntigravityRefreshHost({...f.args,scope:'workspace',globalChangeApproved:false,writeInstalledReceipt:input=>{receipts.push(input);return {status:'written'};}});
++ const host=createAntigravityRefreshHost({...f.args,approvedSourceRoot:inside,scope:'workspace',globalChangeApproved:false,writeInstalledReceipt:input=>{receipts.push(input);return {status:'written'};}});
+  const plan=host.prepare();assert.equal(plan.status,'prepared',JSON.stringify(plan));
+  assert.equal(plan.actions.some(action=>action.kind==='cli'),false);
+  const result=host.apply(plan);assert.equal(result.status,'refreshed',JSON.stringify(result));
+  assert.deepEqual(f.calls,[['--version'],['--version']]);
+  assert.equal(existsSync(f.old),true);
+- assert.equal(JSON.parse(readFileSync(f.local)).entries.at(-1).path,f.approvedSourceRoot);
+- assert.deepEqual(receipts,[{provider:'antigravity',plugin:{name:'pipeline-core',version:'0.7.0'},sourcePluginRoot:f.approvedSourceRoot,installedPluginRoot:f.old}]);
++ assert.deepEqual(JSON.parse(readFileSync(f.local)).entries,[{path:'plugins/pipeline-core'}]);
++ assert.deepEqual(receipts,[{provider:'antigravity',plugin:{name:'pipeline-core',version:'0.7.0'},sourcePluginRoot:inside,installedPluginRoot:f.old}]);
+  assert.equal(observeAntigravityLoadedTopology({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
+  assert.equal(observeAntigravityLoadedTopologyWithWiring({loadedPluginRoot:f.old,configRoot:f.configRoot,workspaceRoot:f.workspaceRoot}).status,'current');
+  const rel=fixture(t),relSource=join(rel.workspaceRoot,'plugins','pipeline-core');cpSync(rel.approvedSourceRoot,relSource,{recursive:true});rmSync(rel.old,{recursive:true});
+  const imports=JSON.parse(readFileSync(rel.imports));rel.put(rel.imports,{...imports,imports:imports.imports.filter(e=>e.name!=='agent-pipeline-core')});rel.put(rel.local,{entries:[{path:'plugins/pipeline-core'}]});
+- const observed=observeAntigravityPluginTopology(rel.args);assert.equal(observed.registries.workspace.status,'observed');assert.equal(observed.registries.workspace.entries[0].root,relSource);
+- assert.equal(planAntigravityTopologyRefresh({observation:observed,scope:'workspace',cliVersion:'1.2.14'}).status,'prepared');
+- assert.equal(createAntigravityRefreshHost({...rel.args,scope:'workspace',globalChangeApproved:false}).refresh().status,'refreshed');assert.equal(JSON.parse(readFileSync(rel.local)).entries.at(-1).path,rel.approvedSourceRoot);
++ const observed=observeAntigravityPluginTopology(rel.args);assert.equal(observed.registries.workspace.status,'observed');assert.equal(observed.registries.workspace.entries[0].root,relSource);assert.equal(observed.registries.workspace.entries[0].relative,true);
++ // D79: a relative entry is a tracked, path-free binding that is never rewritten. These two lines used to expect a 'prepared' plan and a rebind of the entry to the absolute (outside) source; the outside source is now held/refused with the file untouched, and a source that IS the relative entry's root needs no change at all (QG-04 justification).
++ const localBytes=readFileSync(rel.local);
++ const held=planAntigravityTopologyRefresh({observation:observed,scope:'workspace',cliVersion:'1.2.14'});assert.equal(held.status,'held');assert.equal(held.reason,'AT-WORKSPACE-SOURCE-OUTSIDE');assert.match(held.guidance,/global option.*inside the workspace/);assert.deepEqual(held.actions,[]);
++ assert.equal(createAntigravityRefreshHost({...rel.args,scope:'workspace',globalChangeApproved:false}).refresh().reason,'ATR-WORKSPACE-SOURCE-OUTSIDE');assert.deepEqual(readFileSync(rel.local),localBytes);
++ rel.put(rel.global,{entries:[{path:relSource},{path:rel.foreign,enabled:false}]});
++ const bound=observeAntigravityPluginTopology({...rel.args,approvedSourceRoot:relSource});
++ assert.equal(planAntigravityTopologyRefresh({observation:bound,scope:'workspace',cliVersion:'1.2.14'}).status,'metadata-current');
++ const boundResult=createAntigravityRefreshHost({...rel.args,approvedSourceRoot:relSource,scope:'workspace',globalChangeApproved:false}).refresh();assert.equal(boundResult.status,'refreshed',JSON.stringify(boundResult));assert.equal(boundResult.changed,false);assert.deepEqual(readFileSync(rel.local),localBytes);
++ // A leaked absolute entry for the same source is replaced by the repo-relative path; a foreign entry stays.
++ rel.put(rel.local,{entries:[{path:relSource},{path:rel.foreign,enabled:false}]});
++ const leaked=planAntigravityTopologyRefresh({observation:observeAntigravityPluginTopology({...rel.args,approvedSourceRoot:relSource}),scope:'workspace',cliVersion:'1.2.14'});
++ assert.equal(leaked.status,'prepared');assert.deepEqual(leaked.actions.map(a=>[a.kind,a.removeIndexes,a.appendPath]),[['registry-rebind',[0],'plugins/pipeline-core']]);
++ assert.equal(createAntigravityRefreshHost({...rel.args,approvedSourceRoot:relSource,scope:'workspace',globalChangeApproved:false}).refresh().status,'refreshed');assert.deepEqual(JSON.parse(readFileSync(rel.local)).entries,[{path:rel.foreign,enabled:false},{path:'plugins/pipeline-core'}]);
+  const globalRelative=fixture(t);globalRelative.put(globalRelative.global,{entries:[{path:'plugins/pipeline-core'}]});assert.equal(observeAntigravityPluginTopology(globalRelative.args).registries.global.status,'unavailable');
+  const escaping=fixture(t);escaping.put(escaping.local,{entries:[{path:'../source'}]});assert.equal(observeAntigravityPluginTopology(escaping.args).registries.workspace.status,'unavailable');
+  const aliased=fixture(t),alias=join(aliased.workspaceRoot,'plugins','pipeline-core');mkdirSync(join(alias,'..'),{recursive:true});symlinkSync(aliased.approvedSourceRoot,alias);aliased.put(aliased.local,{entries:[{path:'plugins/pipeline-core'}]});
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+index 8f51d87a2..d63673d71 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+@@ -307,16 +307,140 @@ test('a refused validate still changes nothing: the stale managed copy is neithe
+   assert.deepEqual(files(w.configRoot), before);
+ });
+ 
+-test('workspace scope keeps registering the shared source, never a generated view', (t) => {
++// ---- D79: the tracked workspace registry never carries a machine path ---------------------------------------------------------------
++// `<workspace>/.agents/plugins.json` is a tracked, committed file. A relative entry that resolves inside the workspace is path-free and is
++// never rewritten or removed; an absolute Pipeline entry there is a machine path that leaks to teammates, so it is removed (global scope)
++// or replaced by the repo-relative path (workspace scope, source inside the workspace). The global registry keeps the absolute view root.
++// UNVERIFIED: whether the real Antigravity host resolves a relative `entries[].path` against the workspace is not established here.
++
++const TRACKED_REGISTRY = '{"entries":[{"path":"plugins/pipeline-core"}]}\n';
++const git = (w, ...args) => execFileSync('git', ['-C', w.repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', ...args], { encoding: 'utf8' });
++// The workspace IS the source checkout; the committed `.agents/plugins.json` carries the repo-relative Pipeline entry.
++function trackedWorkspace(t, { tracked = TRACKED_REGISTRY } = {}) {
++  const base = world(t);
++  const w = { ...base, workspaceRoot: base.repo, trackedPath: join(base.repo, '.agents', 'plugins.json') };
++  if (tracked !== null) {
++    mkdirSync(dirname(w.trackedPath), { recursive: true });
++    writeFileSync(w.trackedPath, tracked);
++    git(w, 'add', '.');
++    git(w, 'commit', '-m', 'track the workspace registry');
++  }
++  writeFileSync(w.importsPath, '{"imports":null}\n');
++  return w;
++}
++function filesContaining(root, needle) {
++  const found = [];
++  const walk = (dir) => {
++    for (const entry of readdirSync(dir, { withFileTypes: true })) {
++      if (entry.name === '.git') continue;
++      const path = join(dir, entry.name);
++      if (entry.isDirectory()) walk(path); else if (readFileSync(path).includes(needle)) found.push(path);
++    }
++  };
++  walk(root);
++  return found;
++}
++const globalRegistryPaths = (w) => JSON.parse(readFileSync(w.registryPath, 'utf8')).entries.map((entry) => entry.path);
++
++test('D79: option 2 in a workspace that is the source checkout leaves the tracked path-free registry byte-identical and leaks no machine path', (t) => {
++  const w = trackedWorkspace(t);
++  const cli = fakeCli(w);
++  const first = installView(w, cli);
++  assert.equal(first.status, 'refreshed', JSON.stringify(first));
++  const viewRoot = cli.calls.find((argv) => argv[1] === 'install')[2];
++  assert.equal(readFileSync(w.trackedPath, 'utf8'), TRACKED_REGISTRY, 'the tracked registry is byte-identical');
++  assert.equal(git(w, 'status', '--porcelain'), '', 'the checkout stays clean');
++  assert.deepEqual(filesContaining(w.repo, w.home), [], 'no tracked or untracked file carries the home path');
++  assert.deepEqual(filesContaining(w.repo, w.base), [], 'no tracked or untracked file carries any fixture machine path');
++  assert.ok(globalRegistryPaths(w).includes(viewRoot), 'the global registry binds the installed runner-view root');
++  const second = installView(w, fakeCli(w));
++  assert.equal(second.status, 'refreshed', JSON.stringify(second));
++  assert.equal(second.changed, false, 'the converged state needs no further change');
++  assert.equal(readFileSync(w.trackedPath, 'utf8'), TRACKED_REGISTRY);
++  assert.equal(git(w, 'status', '--porcelain'), '');
++  assert.deepEqual(globalRegistryPaths(w).filter((path) => path === viewRoot), [viewRoot], 'the view root is bound exactly once');
++});
++
++test('D79: a legacy leaked absolute Pipeline entry in the workspace registry is removed by a global refresh, foreign bytes exact', (t) => {
+   const w = world(t);
++  const local = join(w.workspaceRoot, '.agents', 'plugins.json');
++  mkdirSync(dirname(local), { recursive: true });
++  writeFileSync(local, `{\n "entries":[\n  ${FOREIGN_ENTRY(w)},\n  {"path":${JSON.stringify(w.pluginRoot)}}\n ]\n}\n`);
++  writeFileSync(w.importsPath, '{"imports":null}\n');
++  const result = installView(w, fakeCli(w));
++  assert.equal(result.status, 'refreshed', JSON.stringify(result));
++  const raw = readFileSync(local, 'utf8');
++  assert.ok(raw.includes(FOREIGN_ENTRY(w)), 'the foreign entry bytes are kept exactly');
++  assert.deepEqual(JSON.parse(raw).entries, [{ path: w.foreign, keep: true }], 'only the machine-path Pipeline entry is gone, nothing is appended');
++  assert.equal(raw.includes(w.pluginRoot), false);
++  assert.equal(raw.includes(w.home), false);
++});
++
++test('D79: workspace scope with the source outside the workspace is refused with the typed reason and its repair, nothing is written', (t) => {
++  const w = world(t);
++  const cli = fakeCli(w);
++  const before = files(w.base);
++  const result = installer.refreshAntigravityInstallation(
++    { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: false },
++    { runCli: cli.run });
++  assert.equal(result.status, 'refused', JSON.stringify(result));
++  assert.equal(result.reason, 'ATR-WORKSPACE-SOURCE-OUTSIDE');
++  assert.match(result.guidance, /global option/u, 'the refusal names the first repair');
++  assert.match(result.guidance, /inside the workspace/u, 'the refusal names the second repair');
++  assert.match(installer.describeInstallerSourceRefusal(result), /ATR-WORKSPACE-SOURCE-OUTSIDE\. .*global option/u);
++  assert.deepEqual(result.completed, []);
++  assert.equal(existsSync(join(w.workspaceRoot, '.agents', 'plugins.json')), false, 'no workspace registry is written');
++  assert.deepEqual(files(w.base), before, 'nothing under the fixture changed');
++  assert.deepEqual(verbs(cli.calls), []);
++  // The same refusal when an explicit global approval is present: an absolute path is never the fallback.
++  const approved = installer.refreshAntigravityInstallation(
++    { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: true },
++    { runCli: fakeCli(w).run });
++  assert.equal(approved.reason, 'ATR-WORKSPACE-SOURCE-OUTSIDE');
++  assert.equal(existsSync(join(w.workspaceRoot, '.agents', 'plugins.json')), false);
++});
++
++// D79: the tracked registry never carries a machine path. This case used to assert the ABSOLUTE source path in the workspace registry
++// (`[w.pluginRoot]`); that is exactly the leak this decision closes, so the assertion now pins the repo-relative path (QG-04 justification).
++test('workspace scope keeps registering the shared source (repo-relative), never a generated view', (t) => {
++  const w = trackedWorkspace(t, { tracked: null });
+   const cli = fakeCli(w);
+   const result = installer.refreshAntigravityInstallation(
+     { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: false },
+     { runCli: cli.run });
+   assert.equal(result.status, 'refreshed', JSON.stringify(result));
+-  assert.deepEqual(JSON.parse(readFileSync(join(w.workspaceRoot, '.agents', 'plugins.json'), 'utf8')).entries.map((entry) => entry.path), [w.pluginRoot]);
++  assert.deepEqual(JSON.parse(readFileSync(w.trackedPath, 'utf8')).entries.map((entry) => entry.path), ['plugins/pipeline-core']);
++  assert.equal(readFileSync(w.trackedPath, 'utf8').includes(w.base), false, 'the workspace registry carries no machine path');
+   assert.deepEqual(verbs(cli.calls), []);
+   assert.equal(existsSync(join(w.home, '.agent-pipeline')), false, 'no view is generated for a workspace registration');
++  const again = installer.refreshAntigravityInstallation(
++    { configRoot: w.configRoot, workspaceRoot: w.workspaceRoot, approvedSourceRoot: w.pluginRoot, attestationSourceRoot: w.pluginRoot, scope: 'workspace', globalChangeApproved: false },
++    { runCli: fakeCli(w).run });
++  assert.equal(again.status, 'refreshed', JSON.stringify(again));
++  assert.equal(again.changed, false, 'a second run finds the relative entry already bound');
++});
++
++test('D79: a relative workspace entry is marked relative and does not make the loaded topology ambiguous next to the global view entry', (t) => {
++  const w = trackedWorkspace(t);
++  const view = snap.publishAgyRunnerView({ sourcePluginRoot: w.pluginRoot, deps: w.snapshotDeps });
++  writeFileSync(w.registryPath, `{"entries":[{"path":${JSON.stringify(view.root)}}]}\n`);
++  const topology = observe(w);
++  assert.equal(topology.registries.workspace.status, 'observed');
++  assert.deepEqual(topology.registries.workspace.entries.map((entry) => [entry.status, entry.root, entry.relative]), [['observed', w.pluginRoot, true]]);
++  assert.equal(Object.hasOwn(topology.registries.global.entries[0], 'relative'), false, 'an absolute observation keeps its shape');
++  const loaded = observeAntigravityLoadedTopology({ loadedPluginRoot: view.root, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot });
++  assert.notEqual(loaded.status, 'unavailable', JSON.stringify(loaded));
++  assert.equal(loaded.status, 'current', JSON.stringify(loaded));
++  assert.equal(loaded.sourcePluginRoot, view.root, 'the global/loaded root is preferred over the path-free workspace entry');
++  // Only relative entries: today's behaviour, the relative root is the source.
++  rmSync(w.registryPath);
++  const onlyRelative = observeAntigravityLoadedTopology({ loadedPluginRoot: w.pluginRoot, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot });
++  assert.equal(onlyRelative.status, 'current', JSON.stringify(onlyRelative));
++  assert.equal(onlyRelative.sourcePluginRoot, w.pluginRoot);
++  // Two different absolute roots stay ambiguous: the relaxation covers path-free entries only.
++  writeFileSync(w.registryPath, `{"entries":[{"path":${JSON.stringify(view.root)}}]}\n`);
++  writeFileSync(w.trackedPath, `{"entries":[{"path":${JSON.stringify(w.pluginRoot)}}]}\n`);
++  assert.equal(observeAntigravityLoadedTopology({ loadedPluginRoot: view.root, configRoot: w.configRoot, workspaceRoot: w.workspaceRoot }).status, 'unavailable');
+ });
+ 
+ test('the interactive installer routes option 2 through the runner view and option 1 through the shared source', () => {

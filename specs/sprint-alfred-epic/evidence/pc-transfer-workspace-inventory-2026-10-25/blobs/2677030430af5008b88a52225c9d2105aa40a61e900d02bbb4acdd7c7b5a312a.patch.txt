@@ -1,0 +1,921 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index ee60aa585..5264ae604 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -553,6 +553,8 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/darwin-native-process-observer.mjs`,
+ `plugins/pipeline-core/lib/design-decision-bindings.mjs`,
+ `plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs`,
++`plugins/pipeline-core/lib/dispatch-budget-launch-reader.mjs`,
++`plugins/pipeline-core/lib/dispatch-budget-readonly.mjs`,
+ `plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs`,
+ `plugins/pipeline-core/lib/doc-reader-plan-scope.mjs`,
+ `plugins/pipeline-core/lib/historical-fresh-review-admission.mjs`,
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index 9cbbccda4..077aa3a8a 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -213,7 +213,7 @@ import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstat
+ import { execFileSync } from "node:child_process";
+ import { createHash, randomUUID } from "node:crypto";
+ import { hostname, uptime } from "node:os";
+-import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { performance } from "node:perf_hooks";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -230,7 +230,6 @@ import {
+   INVALID_INPUT_CODE,
+   SAFETY_MARGIN,
+   appendGrant,
+-  classifyDispatchBudgetCaller,
+   decideDispatchBudgetCall,
+   describeGrantRecord,
+   dispatchCheckpointDecision,
+@@ -241,6 +240,27 @@ import {
+ } from "../lib/dispatch-budget-core.mjs";
+ import { createGovernanceScopeController, observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
++// The read-only helpers and the launch-owner registry/reader live in write-free lib modules so the read-only
++// gate-strength scripts can reach them without importing this hook (GST33). Names below are re-exported unchanged.
++import { dispatchBudgetCallerIdentity, normalizedAgentType, resolveGitCommonDir, resolveParentDispatchToolUseId } from "../lib/dispatch-budget-readonly.mjs";
++import {
++  activateLaunchOwner as launchActivate,
++  launchCanonical,
++  launchDirectoryIdentity,
++  launchError,
++  launchExact,
++  launchFailure,
++  launchHash,
++  launchIdentity,
++  launchLockAbsent,
++  launchPhysical,
++  launchSame,
++  launchSnapshot,
++  launchSync,
++  readOwnedDispatchBudgetLaunchObservation,
++  registerLaunchOwner,
++} from "../lib/dispatch-budget-launch-reader.mjs";
++export { resolveGitCommonDir, resolveParentDispatchToolUseId, readOwnedDispatchBudgetLaunchObservation };
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+ 
+@@ -442,29 +462,7 @@ export function subagentIdentity(input, dependencies = {}) {
+   return { kind: "subagent", agentId, agentType: meta.agentType, meta };
+ }
+ 
+-/** `git rev-parse --path-format=absolute --git-common-dir`, or null if it cannot be resolved. */
+-export function resolveGitCommonDir(rootDir, dependencies = {}) {
+-  const execFileSyncFn = dependencies.execFileSyncFn ?? execFileSync;
+-  try {
+-    const out = execFileSyncFn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+-      cwd: rootDir,
+-      encoding: "utf8",
+-      // Discard the child's stderr. Without this it is INHERITED, and in a
+-      // PreToolUse hook stderr is the channel the guard speaks to the agent
+-      // on -- so a non-repository cwd would print `fatal: not a git
+-      // repository` to the agent on a branch where this function has already
+-      // decided to FAIL OPEN and allow the call. A guard that prints `fatal:`
+-      // while permitting is worse than one that says nothing: it reads as a
+-      // denial or a broken tool. The failure is still reported, through the
+-      // null return and the caller's own observation line.
+-      stdio: ["ignore", "pipe", "ignore"],
+-    });
+-    const trimmed = String(out).trim();
+-    return trimmed === "" ? null : trimmed;
+-  } catch {
+-    return null;
+-  }
+-}
++// resolveGitCommonDir moved verbatim to ../lib/dispatch-budget-readonly.mjs (imported and re-exported above).
+ 
+ // The plugin this guard itself ships in (hooks/ -> plugin root). Computed defensively: a
+ // module-load throw here would take down every importer of the guard.
+@@ -1614,47 +1612,8 @@ function recordOrchestratorObservation(commonDir, record, dependencies) {
+  * that key; this differs from `transcript_path: null`, which the shared lifecycle resolver treats
+  * as absent. The budget-local classifier does not consume transcript-path identity.
+  */
+-function dispatchBudgetCallerIdentity(input) {
+-  const isObjectInput = typeof input === "object" && input !== null;
+-  const hasAgentIdKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_id");
+-  const hasAgentTypeKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_type");
+-  return classifyDispatchBudgetCaller({
+-    agentIdPresent: hasAgentIdKey,
+-    agentId: hasAgentIdKey ? input.agent_id : undefined,
+-    agentTypePresent: hasAgentTypeKey,
+-    agentType: hasAgentTypeKey ? input.agent_type : undefined,
+-  });
+-}
+-
+-function normalizedAgentType(value) {
+-  if (typeof value !== "string") return null;
+-  return value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
+-}
+-
+-export function resolveParentDispatchToolUseId(input, identity, dependencies = {}) {
+-  const transcriptPath = input?.transcript_path;
+-  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")) {
+-    return { status: "rejected", code: "parent-transcript-path-unusable" };
+-  }
+-  const agentId = identity?.agentId;
+-  if (typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) {
+-    return { status: "rejected", code: "agent-id-unusable" };
+-  }
+-  const sessionDir = transcriptPath.slice(0, -".jsonl".length);
+-  const metaPath = join(sessionDir, "subagents", `agent-${agentId}.meta.json`);
+-  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
+-  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
+-  if (!existsSyncFn(metaPath)) return { status: "rejected", code: "agent-meta-missing", metaPath };
+-  let meta;
+-  try { meta = JSON.parse(readFileSyncFn(metaPath, "utf8")); }
+-  catch { return { status: "rejected", code: "agent-meta-unparseable", metaPath }; }
+-  if (!Number.isFinite(meta?.spawnDepth) || meta.spawnDepth < 1
+-    || normalizedAgentType(meta.agentType) !== normalizedAgentType(identity.agentType)
+-    || typeof meta.toolUseId !== "string" || meta.toolUseId.trim() === "") {
+-    return { status: "rejected", code: "agent-meta-binding-invalid", metaPath };
+-  }
+-  return { status: "prepared", toolUseId: meta.toolUseId, metaPath };
+-}
++// dispatchBudgetCallerIdentity (the function the doc block above describes), normalizedAgentType and
++// resolveParentDispatchToolUseId moved verbatim to ../lib/dispatch-budget-readonly.mjs (imported above).
+ 
+ export function evaluateDispatchBudgetGuard(input, options = {}) {
+   if (!observeGovernanceScope({ rootDir: options.rootDir ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) return verdict(0);
+@@ -1835,41 +1794,8 @@ if (isDirectInvocation(import.meta.url)) {
+   });
+ }
+ 
+-// CRT035: ownership is private to the guard; descriptive evidence cannot mint it.
+-const launchOwners = new WeakMap();
+-let activeUnitLaunchOwner = null;
+-
+-function launchError(code) { const error = new Error(code); error.code = code; return error; }
+-function launchFailure(code, status = "refused") { return { ok: false, status, code }; }
+-function launchHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+-function launchCanonical(value) {
+-  if (Array.isArray(value)) return `[${value.map(launchCanonical).join(",")}]`;
+-  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${launchCanonical(value[key])}`).join(",")}}`;
+-  return JSON.stringify(value);
+-}
+-function launchExact(value, keys) {
+-  return value !== null && typeof value === "object" && !Array.isArray(value)
+-    && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
+-}
+-function launchPhysical(path, directory = false) {
+-  if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) throw launchError("DBLO-ROOT-BINDING");
+-  let cursor = parse(path).root;
+-  for (const name of path.slice(cursor.length).split(sep).filter(Boolean)) {
+-    cursor = join(cursor, name);
+-    const stat = lstatSync(cursor);
+-    if (stat.isSymbolicLink() || (cursor !== path && !stat.isDirectory())) throw launchError("DBLO-ROOT-BINDING");
+-  }
+-  const stat = lstatSync(path);
+-  if (directory ? !stat.isDirectory() : !stat.isFile()) throw launchError("DBLO-ROOT-BINDING");
+-  return stat;
+-}
+-function launchIdentity(stat) {
+-  return { dev: stat.dev, ino: stat.ino, mode: stat.mode, size: stat.size, nlink: stat.nlink, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs };
+-}
+-function launchDirectoryIdentity(stat) { return { dev: stat.dev, ino: stat.ino, mode: stat.mode }; }
+-function launchSame(a, b) {
+-  return a === null || b === null ? a === b : launchCanonical(a.identity) === launchCanonical(b.identity) && a.bytes.equals(b.bytes);
+-}
++// The hook keeps the descriptor-hardened read (explicit read-only open, fstat identity cross-check) for the Critic-notes
++// receipt and the controlled owner; the lib reader's own snapshot read is the write-free variant GST33 admits.
+ function launchRead(path, limit = 65536) {
+   let before;
+   try { before = launchPhysical(path); }
+@@ -1885,93 +1811,6 @@ function launchRead(path, limit = 65536) {
+     return { bytes, identity: launchIdentity(after) };
+   } finally { closeSync(fd); }
+ }
+-function launchLockAbsent(owner) {
+-  for (const path of [`${owner.paths.counter}.binding.lock`, `${owner.paths.counter}.binding.lock.recovery`, `${owner.paths.pending}.lock`]) {
+-    try { lstatSync(path); throw launchError("DBLO-SNAPSHOT-BUSY"); }
+-    catch (error) { if (error?.code !== "ENOENT") throw error; }
+-  }
+-}
+-function launchSnapshot(owner) {
+-  return {
+-    counter: launchRead(owner.paths.counter), pending: launchRead(owner.paths.pending),
+-    grant: launchRead(owner.paths.grant, 32768),
+-    lock: launchRead(`${owner.paths.counter}.binding.lock`), meta: launchRead(owner.paths.meta, 16384),
+-  };
+-}
+-function launchCurrent(owner, handle) {
+-  return owner !== undefined && !owner.invalid && owner.active === handle && activeUnitLaunchOwner === owner;
+-}
+-
+-/** Authenticated internal bridge. No serialized descriptor or supplied reader authorizes it. */
+-export function readOwnedDispatchBudgetLaunchObservation(input = {}) {
+-  if (!launchExact(input, ["rootDir", "hostDispatchContext"])) return launchFailure("DBLO-HANDLE-INVALID");
+-  const { rootDir, hostDispatchContext } = input;
+-  if (hostDispatchContext === null || hostDispatchContext === undefined) return launchFailure("DBLO-CURRENT-HOST-UNAVAILABLE", "unavailable");
+-  const owner = launchOwners.get(hostDispatchContext);
+-  if (!launchCurrent(owner, hostDispatchContext)) return launchFailure("DBLO-HANDLE-INVALID");
+-  try {
+-    launchPhysical(rootDir, true);
+-    if (rootDir !== owner.rootDir || resolveGitCommonDir(rootDir) !== owner.commonDir
+-      || launchCanonical(launchDirectoryIdentity(launchPhysical(rootDir, true))) !== launchCanonical(owner.rootIdentity)
+-      || launchCanonical(launchDirectoryIdentity(launchPhysical(owner.commonDir, true))) !== launchCanonical(owner.commonIdentity)) {
+-      return launchFailure("DBLO-ROOT-BINDING");
+-    }
+-    if (hostDispatchContext === owner.orchestrator) {
+-      const evidence = { schema: "pipeline.dispatch-budget-launch-observation.v1", repositoryFingerprint: owner.repositoryFingerprint,
+-        dispatchBindingSha256: owner.orchestratorBindingSha256, counterSha256: null, grantSha256: null,
+-        maxTurns: null, baseCalls: null, count: null, effectiveWorkingCap: null, decision: "not-applicable" };
+-      return { ok: true, value: { status: "not-applicable", code: "DBLO-HOST-ROUTE-NOT-APPLICABLE", evidenceSha256: launchHash(launchCanonical(evidence)) } };
+-    }
+-    launchLockAbsent(owner);
+-    const first = launchSnapshot(owner);
+-    if (owner.interleave !== null) {
+-      const interleave = owner.interleave;
+-      owner.interleave = null;
+-      const returned = interleave(owner.paths);
+-      if (returned !== null && (typeof returned === "object" || typeof returned === "function") && typeof returned.then === "function") throw launchError("DBLO-UNIT-LIFETIME");
+-    }
+-    const second = launchSnapshot(owner);
+-    launchLockAbsent(owner);
+-    if (!launchCurrent(owner, hostDispatchContext)) return launchFailure("DBLO-HANDLE-INVALID");
+-    if (!Object.keys(first).every((key) => launchSame(first[key], second[key]))) return launchFailure("DBLO-SNAPSHOT-DRIFT");
+-    if (second.counter === null) return launchFailure("DBLO-COUNTER-UNAVAILABLE", "unavailable");
+-    if (second.pending !== null) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
+-    if (!launchSame(second.meta, owner.metaSnapshot)) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
+-    const parent = resolveParentDispatchToolUseId(owner.childInput, dispatchBudgetCallerIdentity(owner.childInput));
+-    if (parent.status !== "prepared" || parent.toolUseId !== owner.toolUseId || parent.metaPath !== owner.paths.meta) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
+-    const maxTurns = readAgentMaxTurns("pipeline-core:critic", owner.pluginRoot);
+-    if (maxTurns !== owner.maxTurns) return launchFailure("DBLO-TIER-DRIFT");
+-    let counter;
+-    try { counter = JSON.parse(second.counter.bytes.toString("utf8")); } catch { return launchFailure("DBLO-COUNTER-INVALID"); }
+-    const keys = ["schema", "agentId", "agentType", "maxTurns", "baseCalls", "workingCap", "count"];
+-    if (!launchExact(counter, counter?.updatedAt === undefined ? keys : [...keys, "updatedAt"])
+-      || counter.schema !== "pipeline.dispatch-budget-counter.v1"
+-      || !Number.isSafeInteger(counter.count) || counter.count < 0 || counter.count >= Number.MAX_SAFE_INTEGER
+-      || (counter.updatedAt !== undefined && (typeof counter.updatedAt !== "string" || !Number.isFinite(Date.parse(counter.updatedAt))))) return launchFailure("DBLO-COUNTER-INVALID");
+-    if (counter.agentId !== owner.agentId || counter.agentType !== "pipeline-core:critic" || counter.maxTurns !== maxTurns
+-      || counter.baseCalls !== owner.baseCalls || counter.workingCap !== Math.min(owner.baseCalls, dispatchWorkingCap(maxTurns))) return launchFailure("DBLO-COUNTER-BINDING");
+-    let grantedCalls = 0;
+-    let grantSha256 = null;
+-    if (second.grant !== null) {
+-      try {
+-        const grant = JSON.parse(second.grant.bytes.toString("utf8"));
+-        const valid = validateGrantRecord(grant, owner.agentId);
+-        if (valid.ok) { grantedCalls = grant.totalExtra; grantSha256 = launchHash(second.grant.bytes); }
+-      } catch { /* Invalid grants contribute zero; they never widen the base cap. */ }
+-    }
+-    const decision = decideDispatchBudgetCall({ maxTurns, baseCalls: owner.baseCalls, currentCount: counter.count, grantedCalls, isClosingAct: false });
+-    if (decision.decision === "invalid-input") return launchFailure("DBLO-COUNTER-INVALID");
+-    const stopped = !decision.allowed;
+-    const evidence = { schema: "pipeline.dispatch-budget-launch-observation.v1", repositoryFingerprint: owner.repositoryFingerprint,
+-      dispatchBindingSha256: owner.dispatchBindingSha256, counterSha256: launchHash(second.counter.bytes), grantSha256,
+-      maxTurns, baseCalls: owner.baseCalls, count: counter.count,
+-      effectiveWorkingCap: effectiveDispatchWorkingCap(owner.baseCalls, maxTurns, grantedCalls), decision: decision.decision };
+-    return { ok: true, value: { status: stopped ? "stopped-budget" : "working", code: stopped ? "DISPATCH-BUDGET-EXHAUSTED" : "DBLO-WORKING", evidenceSha256: launchHash(launchCanonical(evidence)) } };
+-  } catch (error) {
+-    if (error?.code === "DBLO-UNIT-LIFETIME") throw error;
+-    return launchFailure(typeof error?.code === "string" && error.code.startsWith("DBLO-") ? error.code : "DBLO-SNAPSHOT-DRIFT");
+-  }
+-}
+ 
+ /** The current native host has no authenticated cross-process launch carrier. */
+ export function withCurrentDispatchBudgetLaunchContext(callback) {
+@@ -1979,21 +1818,6 @@ export function withCurrentDispatchBudgetLaunchContext(callback) {
+   return launchFailure("DBLO-CURRENT-HOST-UNAVAILABLE", "unavailable");
+ }
+ 
+-function launchSync(callback, argument) {
+-  if (typeof callback !== "function" || callback.constructor?.name === "AsyncFunction") throw launchError("DBLO-UNIT-LIFETIME");
+-  const value = callback(argument);
+-  if (value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function") throw launchError("DBLO-UNIT-LIFETIME");
+-  return value;
+-}
+-function launchActivate(owner, handle, callback) {
+-  if (owner.invalid) throw launchError("DBLO-HANDLE-INVALID");
+-  if (owner.active !== null || activeUnitLaunchOwner !== null) throw launchError("DBLO-UNIT-LIFETIME");
+-  owner.active = handle;
+-  activeUnitLaunchOwner = owner;
+-  try { return launchSync(callback, handle); }
+-  finally { owner.active = null; activeUnitLaunchOwner = null; }
+-}
+-
+ /** A unit-only owner: all authority premises come from genuine local producers. */
+ export function createControlledDispatchBudgetLaunchOwner(input = {}) {
+   if (!launchExact(input, ["taskRoot", "pluginRoot", "baseCalls"]) || !Number.isSafeInteger(input.baseCalls) || input.baseCalls < 1) throw launchError("DBLO-UNIT-CONSTRUCTION");
+@@ -2038,8 +1862,8 @@ export function createControlledDispatchBudgetLaunchOwner(input = {}) {
+     const hostDispatchContext = Object.freeze(Object.create(null));
+     const orchestrator = Object.freeze(Object.create(null));
+     owner.orchestrator = orchestrator;
+-    launchOwners.set(hostDispatchContext, owner);
+-    launchOwners.set(orchestrator, owner);
++    registerLaunchOwner(hostDispatchContext, owner);
++    registerLaunchOwner(orchestrator, owner);
+     const orchestratorInput = Object.freeze({ transcript_path: transcript, session_id: "controlled-unit-session", tool_name: "Read", tool_input: {} });
+     const actualOrchestrator = evaluateDispatchBudgetGuard(orchestratorInput, { rootDir, pluginRoot });
+     if (dispatchBudgetCallerIdentity(orchestratorInput).kind !== "orchestrator" || actualOrchestrator.exitCode !== 0) throw launchError("DBLO-UNIT-CONSTRUCTION");
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-binding.mjs b/plugins/pipeline-core/lib/dispatch-budget-binding.mjs
+index f1e5cfa5f..c924f7beb 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-binding.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-binding.mjs
+@@ -3,8 +3,8 @@
+ import { createHash, randomUUID } from "node:crypto";
+ import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+-import { fileURLToPath } from "node:url";
+ 
++import { readAgentMaxTurns } from "./dispatch-budget-readonly.mjs";
+ import {
+   CLOSING_ALLOWANCE,
+   SAFETY_MARGIN,
+@@ -18,51 +18,10 @@ const LABEL = /^\s*-\s*(?:\*\*)?Tool budget(?:\s*\([^\n)]*\))?\s*:\s*(?:\*\*)?\s
+ const VALUE = /^(?:≤|<=)?\s*([^\s]+)\s+tool uses\b/iu;
+ const DECIMAL = /^(?:0|[1-9][0-9]*)$/u;
+ const PENDING_SCHEMA = "pipeline.pending-dispatch-budget-binding.v1";
+-const AGENT_DEFINITION_NAME = /^[a-zA-Z0-9_-]+$/u;
+-const AGENT_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/u;
+-const AGENT_MAX_TURNS_LINE = /^maxTurns:[ \t]*(\d+)[ \t\r]*$/mu;
+-
+-// The plugin root this module itself ships in (lib/ -> plugin root). Computed lazily and
+-// defensively: a module-load throw here would take down every importer of this kernel entry.
+-function modulePluginRoot() {
+-  try { return fileURLToPath(new URL("..", import.meta.url)); }
+-  catch { return null; }
+-}
+-
+-/**
+- * The ONE reader of an agent's `maxTurns` (single source of truth: the `maxTurns:` line in the
+- * YAML frontmatter of `<pluginRoot>/agents/<name>.md`). Every consumer that needs a role's tier
+- * limit -- the budget policy, the budget guard, the calibration validator -- derives it here, so
+- * no second copy of the number can drift from the agent definition.
+- *
+- * `agentType` may carry a `<host>:` prefix (`pipeline-core:critic`) or be bare (`critic`).
+- * `pluginRoot` defaults to the plugin this module ships in -- the same plugin the budget guard
+- * ships in and resolves from; only a test seam or a hermetic fake filesystem passes its own.
+- * `dependencies.existsSyncFn` / `readFileSyncFn` are injectable for tests.
+- * Returns a positive safe integer, or null (never throws) when the definition is missing,
+- * has no frontmatter, or carries no well-formed `maxTurns:` line.
+- */
+-export function readAgentMaxTurns(agentType, pluginRoot = modulePluginRoot(), dependencies = {}) {
+-  if (typeof agentType !== "string" || typeof pluginRoot !== "string" || pluginRoot === "") return null;
+-  const name = agentType.includes(":") ? agentType.slice(agentType.indexOf(":") + 1) : agentType;
+-  if (!AGENT_DEFINITION_NAME.test(name)) return null;
+-  const existsSyncFn = dependencies?.existsSyncFn ?? existsSync;
+-  const readFileSyncFn = dependencies?.readFileSyncFn ?? readFileSync;
+-  try {
+-    const definitionPath = join(pluginRoot, "agents", `${name}.md`);
+-    if (!existsSyncFn(definitionPath)) return null;
+-    const content = readFileSyncFn(definitionPath, "utf8");
+-    if (typeof content !== "string") return null;
+-    const frontmatter = AGENT_FRONTMATTER.exec(content);
+-    if (frontmatter === null) return null;
+-    const line = AGENT_MAX_TURNS_LINE.exec(frontmatter[1]);
+-    if (line === null) return null;
+-    const value = Number(line[1]);
+-    return Number.isSafeInteger(value) && value > 0 ? value : null;
+-  } catch {
+-    return null;
+-  }
+-}
++// The ONE reader of an agent's `maxTurns` now lives in the write-free ./dispatch-budget-readonly.mjs
++// (so the read-only gate-strength scripts can reach it without this module's write APIs); it is
++// re-exported here under the same name so every existing importer is unchanged.
++export { readAgentMaxTurns };
+ 
+ function result(status, code, extra = {}) {
+   return Object.freeze({ schema: DISPATCH_BUDGET_BINDING_SCHEMA, status, code, ...extra });
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs b/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs
+index 60da5f7a2..aee2dab2d 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // The guard alone owns activation and branding. Evidence hashes are descriptive.
+-import { readOwnedDispatchBudgetLaunchObservation } from "../hooks/guard-dispatch-budget.mjs";
++import { readOwnedDispatchBudgetLaunchObservation } from "./dispatch-budget-launch-reader.mjs";
+ 
+ export function readDispatchBudgetLaunchObservation(input = {}) {
+   return readOwnedDispatchBudgetLaunchObservation(input);
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-launch-reader.mjs b/plugins/pipeline-core/lib/dispatch-budget-launch-reader.mjs
+new file mode 100644
+index 000000000..220959935
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-budget-launch-reader.mjs
+@@ -0,0 +1,197 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * dispatch-budget-launch-reader.mjs -- CRT035: the read-only owner registry and the authenticated
++ * launch-observation reader of the dispatch-budget machinery.
++ *
++ * This module used to live inside hooks/guard-dispatch-budget.mjs. It was split out so the
++ * read-only gate-strength scripts (scripts/critic-dispatch-preflight.mjs and friends, listed in
++ * GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS) can read a launch observation without importing the
++ * hook -- and with it the hook's whole write-capable import closure. GST33
++ * (hooks/guard-gate-strength.test.mjs) walks that closure and refuses any filesystem-write API in
++ * it; lib/dispatch-budget-launch-reader.test.mjs pins this module's closure to the same rule.
++ *
++ * What lives here:
++ *   - the module-private registry (`launchOwners`, `activeUnitLaunchOwner`) -- ownership stays
++ *     private to this module; descriptive evidence cannot mint it. The hook (and only the hook's
++ *     unit-only controlled owner) registers an owner through `registerLaunchOwner` and activates
++ *     it through `activateLaunchOwner`; the reader below is the only reader of the registry.
++ *   - the snapshot helpers the reader needs, which the hook's controlled owner reuses
++ *     (`launchSnapshot`, `launchPhysical`, `launchCanonical`, ...). `launchRead` stays private
++ *     here; the hook keeps its own descriptor-hardened copy for its Critic-notes receipt.
++ *   - `readOwnedDispatchBudgetLaunchObservation`, moved verbatim.
++ *
++ * Read-only by construction. One deliberate substitution: the previous `launchRead` opened the
++ * file descriptor itself with an explicit read-only open call and cross-checked the descriptor's
++ * identity against the pre-read lstat. A descriptor-level open is a forbidden API under GST33's
++ * rule (it cannot tell a read-only open from a creating one), so the read is now
++ * `readFileSync(path, { flag: O_RDONLY | O_NOFOLLOW })` -- the same no-follow, read-only open,
++ * performed inside the call -- and the same pre/post lstat identity comparison plus the exact
++ * byte-length check remain. What is lost is only the intermediate descriptor-vs-lstat identity
++ * comparison; a file swapped between the first lstat and the open still changes the post-read
++ * lstat identity and is refused as DBLO-SNAPSHOT-DRIFT.
++ */
++import { constants, lstatSync, readFileSync } from "node:fs";
++import { createHash } from "node:crypto";
++import { isAbsolute, join, parse, resolve, sep } from "node:path";
++
++import { decideDispatchBudgetCall, dispatchWorkingCap, effectiveDispatchWorkingCap, validateGrantRecord } from "./dispatch-budget-core.mjs";
++import { dispatchBudgetCallerIdentity, readAgentMaxTurns, resolveGitCommonDir, resolveParentDispatchToolUseId } from "./dispatch-budget-readonly.mjs";
++
++// CRT035: ownership is private to the guard; descriptive evidence cannot mint it.
++const launchOwners = new WeakMap();
++let activeUnitLaunchOwner = null;
++
++export function launchError(code) { const error = new Error(code); error.code = code; return error; }
++export function launchFailure(code, status = "refused") { return { ok: false, status, code }; }
++export function launchHash(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
++export function launchCanonical(value) {
++  if (Array.isArray(value)) return `[${value.map(launchCanonical).join(",")}]`;
++  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${launchCanonical(value[key])}`).join(",")}}`;
++  return JSON.stringify(value);
++}
++export function launchExact(value, keys) {
++  return value !== null && typeof value === "object" && !Array.isArray(value)
++    && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
++}
++export function launchPhysical(path, directory = false) {
++  if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) throw launchError("DBLO-ROOT-BINDING");
++  let cursor = parse(path).root;
++  for (const name of path.slice(cursor.length).split(sep).filter(Boolean)) {
++    cursor = join(cursor, name);
++    const stat = lstatSync(cursor);
++    if (stat.isSymbolicLink() || (cursor !== path && !stat.isDirectory())) throw launchError("DBLO-ROOT-BINDING");
++  }
++  const stat = lstatSync(path);
++  if (directory ? !stat.isDirectory() : !stat.isFile()) throw launchError("DBLO-ROOT-BINDING");
++  return stat;
++}
++export function launchIdentity(stat) {
++  return { dev: stat.dev, ino: stat.ino, mode: stat.mode, size: stat.size, nlink: stat.nlink, mtimeMs: stat.mtimeMs, ctimeMs: stat.ctimeMs };
++}
++export function launchDirectoryIdentity(stat) { return { dev: stat.dev, ino: stat.ino, mode: stat.mode }; }
++export function launchSame(a, b) {
++  return a === null || b === null ? a === b : launchCanonical(a.identity) === launchCanonical(b.identity) && a.bytes.equals(b.bytes);
++}
++function launchRead(path, limit = 65536) {
++  let before;
++  try { before = launchPhysical(path); }
++  catch (error) { if (error?.code === "ENOENT") return null; throw error; }
++  if (before.nlink !== 1 || before.size > limit || before.size < 0) throw launchError("DBLO-SNAPSHOT-DRIFT");
++  const bytes = readFileSync(path, { flag: constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) });
++  const after = launchPhysical(path);
++  if (bytes.length !== before.size || launchCanonical(launchIdentity(before)) !== launchCanonical(launchIdentity(after))) throw launchError("DBLO-SNAPSHOT-DRIFT");
++  return { bytes, identity: launchIdentity(after) };
++}
++export function launchLockAbsent(owner) {
++  for (const path of [`${owner.paths.counter}.binding.lock`, `${owner.paths.counter}.binding.lock.recovery`, `${owner.paths.pending}.lock`]) {
++    try { lstatSync(path); throw launchError("DBLO-SNAPSHOT-BUSY"); }
++    catch (error) { if (error?.code !== "ENOENT") throw error; }
++  }
++}
++export function launchSnapshot(owner) {
++  return {
++    counter: launchRead(owner.paths.counter), pending: launchRead(owner.paths.pending),
++    grant: launchRead(owner.paths.grant, 32768),
++    lock: launchRead(`${owner.paths.counter}.binding.lock`), meta: launchRead(owner.paths.meta, 16384),
++  };
++}
++function launchCurrent(owner, handle) {
++  return owner !== undefined && !owner.invalid && owner.active === handle && activeUnitLaunchOwner === owner;
++}
++
++/**
++ * Registers `owner` under `handle` (a frozen, prototype-less object the hook minted). The
++ * registry is write-once per handle; the reader below is its only consumer.
++ */
++export function registerLaunchOwner(handle, owner) {
++  if (handle === null || typeof handle !== "object" || owner === null || typeof owner !== "object") throw launchError("DBLO-UNIT-CONSTRUCTION");
++  if (launchOwners.has(handle)) throw launchError("DBLO-HANDLE-INVALID");
++  launchOwners.set(handle, owner);
++}
++
++export function launchSync(callback, argument) {
++  if (typeof callback !== "function" || callback.constructor?.name === "AsyncFunction") throw launchError("DBLO-UNIT-LIFETIME");
++  const value = callback(argument);
++  if (value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function") throw launchError("DBLO-UNIT-LIFETIME");
++  return value;
++}
++/** Marks `owner` as the single active unit owner for exactly the synchronous extent of `callback`. */
++export function activateLaunchOwner(owner, handle, callback) {
++  if (owner.invalid) throw launchError("DBLO-HANDLE-INVALID");
++  if (owner.active !== null || activeUnitLaunchOwner !== null) throw launchError("DBLO-UNIT-LIFETIME");
++  owner.active = handle;
++  activeUnitLaunchOwner = owner;
++  try { return launchSync(callback, handle); }
++  finally { owner.active = null; activeUnitLaunchOwner = null; }
++}
++
++/** Authenticated internal bridge. No serialized descriptor or supplied reader authorizes it. */
++export function readOwnedDispatchBudgetLaunchObservation(input = {}) {
++  if (!launchExact(input, ["rootDir", "hostDispatchContext"])) return launchFailure("DBLO-HANDLE-INVALID");
++  const { rootDir, hostDispatchContext } = input;
++  if (hostDispatchContext === null || hostDispatchContext === undefined) return launchFailure("DBLO-CURRENT-HOST-UNAVAILABLE", "unavailable");
++  const owner = launchOwners.get(hostDispatchContext);
++  if (!launchCurrent(owner, hostDispatchContext)) return launchFailure("DBLO-HANDLE-INVALID");
++  try {
++    launchPhysical(rootDir, true);
++    if (rootDir !== owner.rootDir || resolveGitCommonDir(rootDir) !== owner.commonDir
++      || launchCanonical(launchDirectoryIdentity(launchPhysical(rootDir, true))) !== launchCanonical(owner.rootIdentity)
++      || launchCanonical(launchDirectoryIdentity(launchPhysical(owner.commonDir, true))) !== launchCanonical(owner.commonIdentity)) {
++      return launchFailure("DBLO-ROOT-BINDING");
++    }
++    if (hostDispatchContext === owner.orchestrator) {
++      const evidence = { schema: "pipeline.dispatch-budget-launch-observation.v1", repositoryFingerprint: owner.repositoryFingerprint,
++        dispatchBindingSha256: owner.orchestratorBindingSha256, counterSha256: null, grantSha256: null,
++        maxTurns: null, baseCalls: null, count: null, effectiveWorkingCap: null, decision: "not-applicable" };
++      return { ok: true, value: { status: "not-applicable", code: "DBLO-HOST-ROUTE-NOT-APPLICABLE", evidenceSha256: launchHash(launchCanonical(evidence)) } };
++    }
++    launchLockAbsent(owner);
++    const first = launchSnapshot(owner);
++    if (owner.interleave !== null) {
++      const interleave = owner.interleave;
++      owner.interleave = null;
++      const returned = interleave(owner.paths);
++      if (returned !== null && (typeof returned === "object" || typeof returned === "function") && typeof returned.then === "function") throw launchError("DBLO-UNIT-LIFETIME");
++    }
++    const second = launchSnapshot(owner);
++    launchLockAbsent(owner);
++    if (!launchCurrent(owner, hostDispatchContext)) return launchFailure("DBLO-HANDLE-INVALID");
++    if (!Object.keys(first).every((key) => launchSame(first[key], second[key]))) return launchFailure("DBLO-SNAPSHOT-DRIFT");
++    if (second.counter === null) return launchFailure("DBLO-COUNTER-UNAVAILABLE", "unavailable");
++    if (second.pending !== null) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
++    if (!launchSame(second.meta, owner.metaSnapshot)) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
++    const parent = resolveParentDispatchToolUseId(owner.childInput, dispatchBudgetCallerIdentity(owner.childInput));
++    if (parent.status !== "prepared" || parent.toolUseId !== owner.toolUseId || parent.metaPath !== owner.paths.meta) return launchFailure("DBLO-BINDING-UNAVAILABLE", "unavailable");
++    const maxTurns = readAgentMaxTurns("pipeline-core:critic", owner.pluginRoot);
++    if (maxTurns !== owner.maxTurns) return launchFailure("DBLO-TIER-DRIFT");
++    let counter;
++    try { counter = JSON.parse(second.counter.bytes.toString("utf8")); } catch { return launchFailure("DBLO-COUNTER-INVALID"); }
++    const keys = ["schema", "agentId", "agentType", "maxTurns", "baseCalls", "workingCap", "count"];
++    if (!launchExact(counter, counter?.updatedAt === undefined ? keys : [...keys, "updatedAt"])
++      || counter.schema !== "pipeline.dispatch-budget-counter.v1"
++      || !Number.isSafeInteger(counter.count) || counter.count < 0 || counter.count >= Number.MAX_SAFE_INTEGER
++      || (counter.updatedAt !== undefined && (typeof counter.updatedAt !== "string" || !Number.isFinite(Date.parse(counter.updatedAt))))) return launchFailure("DBLO-COUNTER-INVALID");
++    if (counter.agentId !== owner.agentId || counter.agentType !== "pipeline-core:critic" || counter.maxTurns !== maxTurns
++      || counter.baseCalls !== owner.baseCalls || counter.workingCap !== Math.min(owner.baseCalls, dispatchWorkingCap(maxTurns))) return launchFailure("DBLO-COUNTER-BINDING");
++    let grantedCalls = 0;
++    let grantSha256 = null;
++    if (second.grant !== null) {
++      try {
++        const grant = JSON.parse(second.grant.bytes.toString("utf8"));
++        const valid = validateGrantRecord(grant, owner.agentId);
++        if (valid.ok) { grantedCalls = grant.totalExtra; grantSha256 = launchHash(second.grant.bytes); }
++      } catch { /* Invalid grants contribute zero; they never widen the base cap. */ }
++    }
++    const decision = decideDispatchBudgetCall({ maxTurns, baseCalls: owner.baseCalls, currentCount: counter.count, grantedCalls, isClosingAct: false });
++    if (decision.decision === "invalid-input") return launchFailure("DBLO-COUNTER-INVALID");
++    const stopped = !decision.allowed;
++    const evidence = { schema: "pipeline.dispatch-budget-launch-observation.v1", repositoryFingerprint: owner.repositoryFingerprint,
++      dispatchBindingSha256: owner.dispatchBindingSha256, counterSha256: launchHash(second.counter.bytes), grantSha256,
++      maxTurns, baseCalls: owner.baseCalls, count: counter.count,
++      effectiveWorkingCap: effectiveDispatchWorkingCap(owner.baseCalls, maxTurns, grantedCalls), decision: decision.decision };
++    return { ok: true, value: { status: stopped ? "stopped-budget" : "working", code: stopped ? "DISPATCH-BUDGET-EXHAUSTED" : "DBLO-WORKING", evidenceSha256: launchHash(launchCanonical(evidence)) } };
++  } catch (error) {
++    if (error?.code === "DBLO-UNIT-LIFETIME") throw error;
++    return launchFailure(typeof error?.code === "string" && error.code.startsWith("DBLO-") ? error.code : "DBLO-SNAPSHOT-DRIFT");
++  }
++}
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-launch-reader.test.mjs b/plugins/pipeline-core/lib/dispatch-budget-launch-reader.test.mjs
+new file mode 100644
+index 000000000..ddce694fa
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-budget-launch-reader.test.mjs
+@@ -0,0 +1,154 @@
++// SPDX-License-Identifier: SUL-1.0
++// Pins the write-free launch-observation reader that was split out of hooks/guard-dispatch-budget.mjs so the
++// read-only gate-strength scripts (GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS) no longer import the hook (GST33).
++import assert from "node:assert/strict";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join, relative, resolve } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++import * as binding from "./dispatch-budget-binding.mjs";
++import * as observation from "./dispatch-budget-launch-observation.mjs";
++import * as reader from "./dispatch-budget-launch-reader.mjs";
++import * as readonly from "./dispatch-budget-readonly.mjs";
++
++const LIB = dirname(fileURLToPath(import.meta.url));
++const PLUGIN_ROOT = resolve(LIB, "..");
++
++// Same rule, same lists, and the same import walker as GST33 in hooks/guard-gate-strength.test.mjs.
++const FORBIDDEN_WRITE_APIS = [
++  "writeFileSync", "appendFileSync", "mkdirSync", "rmSync", "renameSync", "unlinkSync",
++  "openSync", "createWriteStream", "cpSync", "copyFileSync", "symlinkSync", "truncateSync",
++  "chmodSync", "utimesSync",
++];
++const FORBIDDEN_PROMISE_WRITE_APIS = FORBIDDEN_WRITE_APIS
++  .filter((name) => name !== "createWriteStream")
++  .map((name) => name.replace(/Sync$/u, ""));
++
++function importsFsPromises(source) {
++  return /from\s+["']node:fs\/promises["']/u.test(source) || /from\s+["']fs\/promises["']/u.test(source);
++}
++
++function relativeImportSpecifiers(source) {
++  const specifiers = new Set();
++  const code = source.split("\n").filter((line) => !/^\s*(?:\/\/|\/\*|\*)/u.test(line)).join("\n");
++  for (const re of [/\bfrom\s+["'](\.\.?\/[^"']+)["']/gu, /\bimport\(\s*["'](\.\.?\/[^"']+)["']\s*\)/gu]) {
++    let match;
++    while ((match = re.exec(code)) !== null) specifiers.add(match[1]);
++  }
++  return [...specifiers];
++}
++
++function walkPluginLocalSource(entryAbsolutePath, visited = new Set()) {
++  if (visited.has(entryAbsolutePath)) return [];
++  visited.add(entryAbsolutePath);
++  const source = readFileSync(entryAbsolutePath, "utf8");
++  const files = [{ path: entryAbsolutePath, source }];
++  for (const specifier of relativeImportSpecifiers(source)) {
++    const resolved = resolve(dirname(entryAbsolutePath), specifier);
++    const relPath = relative(PLUGIN_ROOT, resolved);
++    if (relPath === "" || relPath.startsWith("..")) continue;
++    files.push(...walkPluginLocalSource(resolved, visited));
++  }
++  return files;
++}
++
++// The hook's public surface before the split. Nothing may disappear (or appear) because of it.
++const HOOK_EXPORTS = [
++  "CLOSING_ALLOWANCE", "COUNTER_LOCK_TIMEOUT_CODE", "COUNTER_LOCK_WAIT_BOUND_MS", "CRITIC_WRITE_CONFINED_CODE",
++  "DENIAL_CODE", "GRANT_REFUSAL_CODE", "INVALID_INPUT_CODE", "INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_ID",
++  "INVALID_TRANSCRIPT_PATH_SENTINEL_AGENT_TYPE", "SAFETY_MARGIN",
++  "acquireDispatchBudgetCounterLock", "acquireDispatchBudgetCounterLockWithWait",
++  "createControlledDispatchBudgetLaunchOwner", "evaluateDispatchBudgetGuard", "isDispatchRecordWriterClosingCommand",
++  "readOwnedDispatchBudgetLaunchObservation", "releaseDispatchBudgetCounterLock", "resolveAgentPluginRoot",
++  "resolveGitCommonDir", "resolveMaxTurns", "resolveParentDispatchToolUseId", "subagentIdentity",
++  "withCurrentDispatchBudgetLaunchContext",
++];
++
++test("DBLR01 the module exports the reader and the registry functions the hook registers owners through", () => {
++  for (const name of ["readOwnedDispatchBudgetLaunchObservation", "registerLaunchOwner", "activateLaunchOwner", "launchSnapshot", "launchSync"]) {
++    assert.equal(typeof reader[name], "function", `${name} must be exported`);
++  }
++  assert.equal(observation.readDispatchBudgetLaunchObservation({}).code, "DBLO-HANDLE-INVALID");
++});
++
++test("DBLR02 the reader's own import closure has no filesystem-write API and never reaches a hook", () => {
++  for (const entry of ["dispatch-budget-launch-reader.mjs", "dispatch-budget-launch-observation.mjs"]) {
++    const visited = walkPluginLocalSource(join(LIB, entry));
++    const paths = visited.map(({ path }) => relative(PLUGIN_ROOT, path).split("\\").join("/"));
++    assert.ok(paths.includes("lib/dispatch-budget-core.mjs") && paths.includes("lib/dispatch-budget-readonly.mjs"), `${entry}: closure is ${paths.join(", ")}`);
++    assert.deepEqual(paths.filter((path) => path.startsWith("hooks/")), [], `${entry} must not import a hook`);
++    for (const { path: filePath, source } of visited) {
++      for (const api of FORBIDDEN_WRITE_APIS) {
++        assert.doesNotMatch(source, new RegExp(`\\b${api}\\b`, "u"), `${filePath} calls forbidden write API ${api}`);
++      }
++      if (importsFsPromises(source)) {
++        for (const api of FORBIDDEN_PROMISE_WRITE_APIS) {
++          assert.doesNotMatch(source, new RegExp(`\\b${api}\\s*\\(`, "u"), `${filePath} calls forbidden fs/promises write API ${api}()`);
++        }
++      }
++    }
++  }
++});
++
++test("DBLR03 the hook keeps exactly its previous exports, and the moved names are the same functions", async () => {
++  const hook = await import("../hooks/guard-dispatch-budget.mjs");
++  assert.deepEqual(Object.keys(hook).sort(), [...HOOK_EXPORTS].sort());
++  assert.equal(hook.readOwnedDispatchBudgetLaunchObservation, reader.readOwnedDispatchBudgetLaunchObservation);
++  assert.equal(hook.resolveGitCommonDir, readonly.resolveGitCommonDir);
++  assert.equal(hook.resolveParentDispatchToolUseId, readonly.resolveParentDispatchToolUseId);
++  assert.equal(binding.readAgentMaxTurns, readonly.readAgentMaxTurns);
++});
++
++test("DBLR05 a genuine controlled owner is read through the moved reader exactly as before the split", async () => {
++  const hook = await import("../hooks/guard-dispatch-budget.mjs");
++  const scratch = join(PLUGIN_ROOT, "..", "..", "scratch");
++  mkdirSync(scratch, { recursive: true });
++  const taskRoot = mkdtempSync(join(scratch, "dblr05-"));
++  try {
++    const owner = hook.createControlledDispatchBudgetLaunchOwner({ taskRoot, pluginRoot: PLUGIN_ROOT, baseCalls: 20 });
++    // Outside an activation window the handle is not current.
++    assert.equal(owner.readObservation().code, "DBLO-HANDLE-INVALID");
++    const working = owner.withLaunchContext(() => observation.readDispatchBudgetLaunchObservation({ rootDir: owner.rootDir, hostDispatchContext: owner.hostDispatchContext }));
++    assert.equal(working.ok, true);
++    assert.deepEqual([working.value.status, working.value.code], ["working", "DBLO-WORKING"]);
++    assert.match(working.value.evidenceSha256, /^[0-9a-f]{64}$/u);
++    // The orchestrator handle observes "not-applicable"; a root that is not the bound one is refused.
++    const orchestrated = owner.withOrchestratorContext((handle) => reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: owner.rootDir, hostDispatchContext: handle }));
++    assert.deepEqual([orchestrated.ok, orchestrated.value.status, orchestrated.value.code], [true, "not-applicable", "DBLO-HOST-ROUTE-NOT-APPLICABLE"]);
++    assert.equal(owner.withLaunchContext(() => reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: taskRoot, hostDispatchContext: owner.hostDispatchContext })).code, "DBLO-ROOT-BINDING");
++    // A snapshot that moves between the two reads is refused as drift.
++    const drift = owner.withOwnedSnapshotInterleave((paths) => writeFileSync(paths.counter, `${readFileSync(paths.counter, "utf8")} `), () => owner.withLaunchContext(() => owner.readObservation()));
++    assert.deepEqual([drift.ok, drift.code], [false, "DBLO-SNAPSHOT-DRIFT"]);
++    // Running the budget out is observed as stopped-budget.
++    owner.advanceWorkingCalls(60);
++    const stopped = owner.withLaunchContext(() => owner.readObservation());
++    assert.deepEqual([stopped.ok, stopped.value?.status, stopped.value?.code], [true, "stopped-budget", "DISPATCH-BUDGET-EXHAUSTED"], JSON.stringify(stopped));
++    owner.invalidate();
++    assert.throws(() => owner.withLaunchContext(() => 0), { code: "DBLO-HANDLE-INVALID" });
++  } finally { rmSync(taskRoot, { recursive: true, force: true }); }
++});
++
++test("DBLR04 the registry stays private: unregistered, absent and duplicate handles are refused", () => {
++  assert.deepEqual(reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: PLUGIN_ROOT, hostDispatchContext: Object.freeze(Object.create(null)) }),
++    { ok: false, status: "refused", code: "DBLO-HANDLE-INVALID" });
++  assert.deepEqual(reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: PLUGIN_ROOT, hostDispatchContext: null }),
++    { ok: false, status: "unavailable", code: "DBLO-CURRENT-HOST-UNAVAILABLE" });
++  assert.equal(reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: PLUGIN_ROOT }).code, "DBLO-HANDLE-INVALID");
++  assert.equal(reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: PLUGIN_ROOT, hostDispatchContext: {}, extra: 1 }).code, "DBLO-HANDLE-INVALID");
++  const handle = Object.freeze(Object.create(null));
++  const owner = { invalid: false, active: null };
++  reader.registerLaunchOwner(handle, owner);
++  assert.throws(() => reader.registerLaunchOwner(handle, owner), { code: "DBLO-HANDLE-INVALID" });
++  assert.throws(() => reader.registerLaunchOwner("not-an-object", owner), { code: "DBLO-UNIT-CONSTRUCTION" });
++  // A registered owner is only readable inside its own synchronous activation window.
++  assert.equal(reader.readOwnedDispatchBudgetLaunchObservation({ rootDir: PLUGIN_ROOT, hostDispatchContext: handle }).code, "DBLO-HANDLE-INVALID");
++  assert.throws(() => reader.activateLaunchOwner(owner, handle, async () => {}), { code: "DBLO-UNIT-LIFETIME" });
++  assert.equal(owner.active, null, "a refused activation must not leave the owner active");
++  const seen = reader.activateLaunchOwner(owner, handle, () => {
++    assert.throws(() => reader.activateLaunchOwner(owner, handle, () => {}), { code: "DBLO-UNIT-LIFETIME" });
++    return owner.active === handle;
++  });
++  assert.equal(seen, true);
++  assert.equal(owner.active, null);
++});
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-readonly.mjs b/plugins/pipeline-core/lib/dispatch-budget-readonly.mjs
+new file mode 100644
+index 000000000..ca1fe302e
+--- /dev/null
++++ b/plugins/pipeline-core/lib/dispatch-budget-readonly.mjs
+@@ -0,0 +1,143 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * dispatch-budget-readonly.mjs -- the read-only half of the dispatch-budget machinery.
++ *
++ * Everything here only READS (the filesystem, `git rev-parse`, a dispatched agent's own
++ * definition and meta record). It deliberately imports nothing that can write, so a script
++ * that is admitted by the gate-strength shell lane as provably write-free
++ * (GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS, guarded by GST33 in guard-gate-strength.test.mjs) can
++ * depend on it without dragging the budget hook's whole write-capable import closure in.
++ *
++ * The functions moved here verbatim from their previous homes; those homes keep re-exporting
++ * the same names, so every existing importer keeps working unchanged:
++ *   - readAgentMaxTurns             (was lib/dispatch-budget-binding.mjs)
++ *   - resolveGitCommonDir           (was hooks/guard-dispatch-budget.mjs)
++ *   - resolveParentDispatchToolUseId(was hooks/guard-dispatch-budget.mjs)
++ *   - dispatchBudgetCallerIdentity  (was private to hooks/guard-dispatch-budget.mjs)
++ *   - normalizedAgentType           (was private to hooks/guard-dispatch-budget.mjs)
++ */
++import { execFileSync } from "node:child_process";
++import { existsSync, readFileSync } from "node:fs";
++import { isAbsolute, join } from "node:path";
++import { fileURLToPath } from "node:url";
++
++import { classifyDispatchBudgetCaller } from "./dispatch-budget-core.mjs";
++
++const AGENT_DEFINITION_NAME = /^[a-zA-Z0-9_-]+$/u;
++const AGENT_FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/u;
++const AGENT_MAX_TURNS_LINE = /^maxTurns:[ \t]*(\d+)[ \t\r]*$/mu;
++
++// The plugin root this module itself ships in (lib/ -> plugin root). Computed lazily and
++// defensively: a module-load throw here would take down every importer of this kernel entry.
++function modulePluginRoot() {
++  try { return fileURLToPath(new URL("..", import.meta.url)); }
++  catch { return null; }
++}
++
++/**
++ * The ONE reader of an agent's `maxTurns` (single source of truth: the `maxTurns:` line in the
++ * YAML frontmatter of `<pluginRoot>/agents/<name>.md`). Every consumer that needs a role's tier
++ * limit -- the budget policy, the budget guard, the calibration validator -- derives it here, so
++ * no second copy of the number can drift from the agent definition.
++ *
++ * `agentType` may carry a `<host>:` prefix (`pipeline-core:critic`) or be bare (`critic`).
++ * `pluginRoot` defaults to the plugin this module ships in -- the same plugin the budget guard
++ * ships in and resolves from; only a test seam or a hermetic fake filesystem passes its own.
++ * `dependencies.existsSyncFn` / `readFileSyncFn` are injectable for tests.
++ * Returns a positive safe integer, or null (never throws) when the definition is missing,
++ * has no frontmatter, or carries no well-formed `maxTurns:` line.
++ */
++export function readAgentMaxTurns(agentType, pluginRoot = modulePluginRoot(), dependencies = {}) {
++  if (typeof agentType !== "string" || typeof pluginRoot !== "string" || pluginRoot === "") return null;
++  const name = agentType.includes(":") ? agentType.slice(agentType.indexOf(":") + 1) : agentType;
++  if (!AGENT_DEFINITION_NAME.test(name)) return null;
++  const existsSyncFn = dependencies?.existsSyncFn ?? existsSync;
++  const readFileSyncFn = dependencies?.readFileSyncFn ?? readFileSync;
++  try {
++    const definitionPath = join(pluginRoot, "agents", `${name}.md`);
++    if (!existsSyncFn(definitionPath)) return null;
++    const content = readFileSyncFn(definitionPath, "utf8");
++    if (typeof content !== "string") return null;
++    const frontmatter = AGENT_FRONTMATTER.exec(content);
++    if (frontmatter === null) return null;
++    const line = AGENT_MAX_TURNS_LINE.exec(frontmatter[1]);
++    if (line === null) return null;
++    const value = Number(line[1]);
++    return Number.isSafeInteger(value) && value > 0 ? value : null;
++  } catch {
++    return null;
++  }
++}
++
++/** `git rev-parse --path-format=absolute --git-common-dir`, or null if it cannot be resolved. */
++export function resolveGitCommonDir(rootDir, dependencies = {}) {
++  const execFileSyncFn = dependencies.execFileSyncFn ?? execFileSync;
++  try {
++    const out = execFileSyncFn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
++      cwd: rootDir,
++      encoding: "utf8",
++      // Discard the child's stderr. Without this it is INHERITED, and in a
++      // PreToolUse hook stderr is the channel the guard speaks to the agent
++      // on -- so a non-repository cwd would print `fatal: not a git
++      // repository` to the agent on a branch where this function has already
++      // decided to FAIL OPEN and allow the call. A guard that prints `fatal:`
++      // while permitting is worse than one that says nothing: it reads as a
++      // denial or a broken tool. The failure is still reported, through the
++      // null return and the caller's own observation line.
++      stdio: ["ignore", "pipe", "ignore"],
++    });
++    const trimmed = String(out).trim();
++    return trimmed === "" ? null : trimmed;
++  } catch {
++    return null;
++  }
++}
++
++/**
++ * The budget-local caller classification of a PreToolUse payload (see
++ * `classifyDispatchBudgetCaller`): a payload with a usable `agent_id` is a `subagent`; a payload
++ * with neither an `agent_id` key nor an `agent_type` key is the `orchestrator`; `agent_id: null`
++ * remains malformed because the measured orchestrator shape omits that key. The budget-local
++ * classifier does not consume transcript-path identity.
++ */
++export function dispatchBudgetCallerIdentity(input) {
++  const isObjectInput = typeof input === "object" && input !== null;
++  const hasAgentIdKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_id");
++  const hasAgentTypeKey = isObjectInput && Object.prototype.hasOwnProperty.call(input, "agent_type");
++  return classifyDispatchBudgetCaller({
++    agentIdPresent: hasAgentIdKey,
++    agentId: hasAgentIdKey ? input.agent_id : undefined,
++    agentTypePresent: hasAgentTypeKey,
++    agentType: hasAgentTypeKey ? input.agent_type : undefined,
++  });
++}
++
++export function normalizedAgentType(value) {
++  if (typeof value !== "string") return null;
++  return value.startsWith("pipeline-core:") ? value.slice("pipeline-core:".length) : value;
++}
++
++export function resolveParentDispatchToolUseId(input, identity, dependencies = {}) {
++  const transcriptPath = input?.transcript_path;
++  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")) {
++    return { status: "rejected", code: "parent-transcript-path-unusable" };
++  }
++  const agentId = identity?.agentId;
++  if (typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) {
++    return { status: "rejected", code: "agent-id-unusable" };
++  }
++  const sessionDir = transcriptPath.slice(0, -".jsonl".length);
++  const metaPath = join(sessionDir, "subagents", `agent-${agentId}.meta.json`);
++  const existsSyncFn = dependencies.existsSyncFn ?? existsSync;
++  const readFileSyncFn = dependencies.readFileSyncFn ?? readFileSync;
++  if (!existsSyncFn(metaPath)) return { status: "rejected", code: "agent-meta-missing", metaPath };
++  let meta;
++  try { meta = JSON.parse(readFileSyncFn(metaPath, "utf8")); }
++  catch { return { status: "rejected", code: "agent-meta-unparseable", metaPath }; }
++  if (!Number.isFinite(meta?.spawnDepth) || meta.spawnDepth < 1
++    || normalizedAgentType(meta.agentType) !== normalizedAgentType(identity.agentType)
++    || typeof meta.toolUseId !== "string" || meta.toolUseId.trim() === "") {
++    return { status: "rejected", code: "agent-meta-binding-invalid", metaPath };
++  }
++  return { status: "prepared", toolUseId: meta.toolUseId, metaPath };
++}
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 4ecff7ef9..42383704f 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -772,6 +772,8 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/darwin-native-process-observer.mjs",
+   "plugins/pipeline-core/lib/design-decision-bindings.mjs",
+   "plugins/pipeline-core/lib/dispatch-budget-launch-observation.mjs",
++  "plugins/pipeline-core/lib/dispatch-budget-launch-reader.mjs",
++  "plugins/pipeline-core/lib/dispatch-budget-readonly.mjs",
+   "plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs",
+   "plugins/pipeline-core/lib/doc-reader-plan-scope.mjs",
+   "plugins/pipeline-core/lib/historical-fresh-review-admission.mjs",

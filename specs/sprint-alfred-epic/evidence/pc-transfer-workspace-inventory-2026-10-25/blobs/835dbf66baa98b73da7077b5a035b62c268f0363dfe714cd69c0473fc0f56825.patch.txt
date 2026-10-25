@@ -1,0 +1,228 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index d419bfbb5..423d0c08a 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -84,7 +84,7 @@ import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, parseD
+ import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
+-import { loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
++import { CANCEL_CLASS_HELP, CANCEL_CLASSES, loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
+ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+@@ -99,6 +99,12 @@ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", i
+ const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
+   ? `node ${fileURLToPath(new URL("../scripts/session-authority-repair.mjs", import.meta.url))} inspect --root ${root} names the cause and the command that clears it`
+   : null;
++// D75: the warning for a queue row a refused dispatch prepared and could not roll back. The release it names is a cancel,
++// and a cancel now carries its class, so the text gives the argument and one teaching line per class (exported for its test).
++export function queueRowKeptWarning({ sliceId, code } = {}) {
++  const classes = CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ");
++  return `WARNING (guard-dispatch): the queue row this refused dispatch prepared for ${sliceId} is kept (${code}); if it is not dispatched again, release it with: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>" --class <${CANCEL_CLASSES.join("|")}>. Pick the class that says why it ends: ${classes}.\n`;
++}
+ // Repository admission precedes hook input hardening and all governed effects.
+ if (isGovernanceHookEntry(import.meta.url) && !observeGovernanceScope({ rootDir: process.env.CLAUDE_PROJECT_DIR ?? process.cwd() }).requiresEnforcement) process.exit(0);
+ 
+@@ -833,7 +839,7 @@ if (isDirectInvocation(import.meta.url)) {
+           // Nothing refuses once the native pending state is written (Critic F4); a non-zero exit after it is a crash,
+           // and then row and state stay together, released by one cancel.
+           const rolled=nativePendingPrepared?{status:"refused",code:"native-pending-prepared"}:rollbackGovernedItemQueue(written);
+-          if(rolled.status==="refused")process.stderr.write(`WARNING (guard-dispatch): the queue row this refused dispatch prepared for ${sliceId} is kept (${rolled.code}); if it is not dispatched again, release it with: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>".\n`);
++          if(rolled.status==="refused")process.stderr.write(queueRowKeptWarning({sliceId,code:rolled.code}));
+         });
+       }
+     }
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 89f477ce3..85d704bec 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -1025,7 +1025,30 @@ manualCheck("GD65 the registration fact is one exported function: the real hooks
+   }
+ });
+ 
+-assert.equal(cases.length, 66, "the complete dispatch guard corpus must register before execution");
++// D75 S5 -- the warning a kept queue row prints names its release as a cancel WITH the class argument and teaches every class.
++// Subprocess import for the same reason as GD16: this file never imports the hook module at its own module scope.
++manualCheck("GD66 the kept-queue-row warning names the cancel with --class and one teaching line per class (D75 S5)", () => {
++  const dir = realpathSync(mkdtempSync(join(repoRoot, "scratch", "guard-dispatch-kept-row-")));
++  try {
++    const runnerPath = join(dir, "kept-row-check.mjs");
++    writeFileSync(runnerPath, [
++      "const mod = await import(process.argv[2]);",
++      "const { CANCEL_CLASSES, CANCEL_CLASS_HELP } = await import(process.argv[3]);",
++      "process.stdout.write(JSON.stringify({ text: mod.queueRowKeptWarning({ sliceId: 'ITEM-AC-9', code: 'native-pending-prepared' }), classes: CANCEL_CLASSES, help: CANCEL_CLASS_HELP }));",
++    ].join("\n"));
++    const res = spawnSync(process.execPath, [runnerPath, pathToFileURL(GUARD).href, pathToFileURL(join(dirname(GUARD), "..", "lib", "slice-queue.mjs")).href], { input: "", encoding: "utf8", timeout: 10000 });
++    assert.equal(res.status, 0, `runner exit ${res.status} -- ${(res.stderr ?? "").trim().slice(0, 300)}`);
++    const { text, classes, help } = JSON.parse(res.stdout);
++    assert.ok(text.startsWith("WARNING (guard-dispatch): the queue row this refused dispatch prepared for ITEM-AC-9 is kept (native-pending-prepared);"), text);
++    assert.match(text, /slice-queue\.mjs cancel ITEM-AC-9 --started --reason "<why>" --class <budget\|wrong-premise\|review-defect\|integrated-elsewhere\|superseded>\./u, text);
++    for (const name of classes) assert.ok(text.includes(`${name} = ${help[name]}`), `${name} is taught: ${text}`);
++    assert.ok(text.endsWith("\n"), "one stderr line");
++  } finally {
++    rmSync(dir, { recursive: true, force: true });
++  }
++});
++
++assert.equal(cases.length, 67, "the complete dispatch guard corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 2b19cf82c..2e9d749ae 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -25,12 +25,16 @@ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
+ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
+ import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
+ import { parseDispatchSlice } from "./dispatch-policy.mjs";
+-import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
++import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+ import { isSafeTaskId } from "./dispatch-record.mjs";
+ import { fileURLToPath } from "node:url";
+ 
+ // Repairs name the absolute script, so a plain terminal can run them as printed (Critic F9).
+ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url));
++// D75: every cancel names why the slice ends. The argument and the one-line teaching of each class are shared by all cancel repairs.
++// Lazy on purpose: slice-queue.mjs and this module import each other, so the vocabulary is read at call time, never at load time.
++const cancelClassArg = () => `--class <${CANCEL_CLASSES.join('|')}>`;
++const cancelClassTeaching = () => `Pick the class that says why it ends: ${CANCEL_CLASSES.map(name => `${name} = ${CANCEL_CLASS_HELP[name]}`).join('; ')}`;
+ 
+ export const NATIVE_GOLDFISH_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v1";
+ export const NATIVE_GOLDFISH_ITEM_HOST_STATE_SCHEMA = "pipeline.native-goldfish-host-state.v2";
+@@ -1075,7 +1079,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       const readiness=dependsOn.length?observeGovernedItemIntegrationReadiness({root:physical}):null;
+       const held=readiness?.status==='observed'?dependsOn.filter(id=>!readiness.integrated.includes(id)):[];
+       if(held.length>0)return {status:'refused',code:'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',reason:`${heldDependencyReason(held,raw.slices)}; the queue was not written`,
+-        repair:`a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>"; a started one needs its "Dispatch: <slice id> (goldfish)" commit`};
++        repair:`a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`};
+       // Approval, requester, candidate and preimage are checked again immediately
+       // before publishing a fresh inode. Existing linked bytes remain unchanged.
+       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});
+@@ -1137,7 +1141,7 @@ function ownerFault(reason,{repository,operation,current,sliceId}) {
+   if(!operation||!current||(current.association.state==='bound'&&nativeManagedDigest(current.association)===nativeManagedDigest(operation.association)))return fault;
+   const owner=operation.association.state==='bound'?`session ${operation.association.target.sessionId}`:'no bound session';
+   const here=current.association.state==='bound'?`this session (${current.association.target.sessionId})`:'this process, which has no bound session';
+-  fault.repair=`the item operation belongs to ${owner}, not to ${here}. Finish it from that session if it still runs. If it no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${typeof sliceId==='string'?sliceId:'<slice>'} --started --reason "<why>", then dispatch the slice again from this session; node ${REPAIR_SCRIPT} inspect --root ${repository.primaryRoot} lists every reservation`;
++  fault.repair=`the item operation belongs to ${owner}, not to ${here}. Finish it from that session if it still runs. If it no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${typeof sliceId==='string'?sliceId:'<slice>'} --started --reason "<why>" ${cancelClassArg()} (${cancelClassTeaching()}), then dispatch the slice again from this session; node ${REPAIR_SCRIPT} inspect --root ${repository.primaryRoot} lists every reservation`;
+   return fault;
+ }
+ 
+@@ -1163,10 +1167,13 @@ function agyReservationNamesSlice({repository,boundary,sliceId}) {
+  * "Dispatch: <slice> (goldfish)" commit after its base touches its write scope. Its id is removed from every
+  * dependsOn: nothing of it will be delivered, so nothing may wait on it. The shared critic and an already
+  * cancelled slice are refused. */
+-export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=false}={}) {
++export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=false,cancelClass}={}) {
+   try {
+     if(typeof sliceId!=='string'||!ID.test(sliceId))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'the slice id is not a queue slice id'};
+     if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))return {status:'refused',code:'SQ-ITEM-CANCEL-INPUT',reason:'--reason needs one line of at most 500 characters'};
++    // D75: a cancel names its class; a later re-dispatch is decided from the class, not from the free-text reason. Refused before any queue read, so nothing is written.
++    const classVerdict=checkCancelClass(cancelClass);
++    if(!classVerdict.ok)return {status:'refused',code:classVerdict.code,reason:classVerdict.reason,repair:classVerdict.repair};
+     const physical=realpathSync(resolve(root));
+     const governed=resolveGovernedItemQueue({root:physical});
+     if(governed.status!=='required')return governed.status==='refused'?governed:{status:'refused',code:'SQ-ITEM-CANCEL-NO-COURSE',reason:'no governed item queue exists for the approved feature'};
+@@ -1189,13 +1196,13 @@ export function cancelUnstartedGovernedItemSlice({root,sliceId,reason,started=fa
+       const hasAgyState=!hasNativeState&&agyReservationNamesSlice({repository,boundary,sliceId});
+       if((hasNativeState||hasAgyState)&&started!==true)
+         return {status:'refused',code:'SQ-ITEM-CANCEL-STARTED',reason:`slice ${sliceId} has ${hasNativeState?'a native dispatch state':'an unreleased AGY reservation'}, so it was started`,
+-          repair:`if its Goldfish still runs, let it finish through its own delivery. If it no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>". With --started you assert that no Goldfish runs for it; its reservation then stops blocking and its write scope is no longer protected`};
+-      row.state='cancelled';row.holdReason=reason.trim();
++          repair:`if its Goldfish still runs, let it finish through its own delivery. If it no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. With --started you assert that no Goldfish runs for it; its reservation then stops blocking and its write scope is no longer protected`};
++      row.state='cancelled';row.holdReason=reason.trim();row.cancelClass=classVerdict.cancelClass;
+       const released=[];
+       for(const other of raw.slices)if((other.dependsOn??[]).includes(sliceId)){other.dependsOn=other.dependsOn.filter(id=>id!==sliceId);released.push(other.id);}
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-cancelled-queue-invalid');
+       writeGovernedQueue(path,preimage,raw);
+-      return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,released,queuePath:governed.path,
++      return {status:'cancelled',code:'SQ-ITEM-CANCELLED',sliceId,cancelClass:classVerdict.cancelClass,released,queuePath:governed.path,
+         ...(hasNativeState||hasAgyState?{started:true,note:'a started slice was cancelled on the caller\'s word that no Goldfish runs for it; its reservation no longer blocks and its write scope is no longer protected'}:{})};
+     }));
+   }catch(error){return {status:'refused',code:error.code??'SQ-ITEM-CANCEL-UNAVAILABLE',reason:error.reason??error.message,...(typeof error.repair==='string'?{repair:error.repair}:{})};}
+@@ -1553,7 +1560,7 @@ export function readSettledItemSliceIds({repository,boundary,governed=resolveGov
+ /** The repair a reservation collision names: the slice that still holds it and the commands that release it. */
+ export function itemReservationRepair(sliceId) {
+   return typeof sliceId==='string'
+-    ?`slice ${sliceId} still holds this reservation. If it delivered, its "Dispatch: ${sliceId} (goldfish)" commit releases it. If its Goldfish no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>"`
++    ?`slice ${sliceId} still holds this reservation. If it delivered, its "Dispatch: ${sliceId} (goldfish)" commit releases it. If its Goldfish no longer runs: node ${SLICE_QUEUE_SCRIPT} cancel ${sliceId} --started --reason "<why>" ${cancelClassArg()} (${cancelClassTeaching()})`
+     :'a reservation that names no slice holds this item; report it to the PO with the refusal';
+ }
+ function reservationFault(reason,sliceId){return Object.assign(nativeManagedFault(reason),{repair:itemReservationRepair(sliceId)});}
+diff --git a/plugins/pipeline-core/lib/slice-queue.mjs b/plugins/pipeline-core/lib/slice-queue.mjs
+index ecbf8a38d..268de43ff 100644
+--- a/plugins/pipeline-core/lib/slice-queue.mjs
++++ b/plugins/pipeline-core/lib/slice-queue.mjs
+@@ -51,6 +51,29 @@ export const SLICE_STATES = Object.freeze(["ready", "hold-po", "blocked-external
+ export const SLICE_TIERS = Object.freeze(["mechanic", "implementor", "deep", "critic"]);
+ export const COMMIT_MODES = Object.freeze(["host-commit", "worktree", "diff-only", "self-commit"]);
+ export const LOAD_CLASSES = Object.freeze(["light", "test-heavy"]);
++/** D75: why a slice was cancelled. A later re-dispatch is decided from the class, never from the free-text reason. */
++export const CANCEL_CLASSES = Object.freeze(["budget", "wrong-premise", "review-defect", "integrated-elsewhere", "superseded"]);
++/** What a cancelled row without a class (cancelled before D75) is reported as; it is never an accepted input value. */
++export const UNCLASSIFIED_CANCEL = "unclassified";
++/** One line per class: what it asserts and what follows for a re-dispatch. Shown in every refusal so a fresh agent learns the vocabulary from the message alone. */
++export const CANCEL_CLASS_HELP = Object.freeze({
++  budget: "the Goldfish ran out of tool budget; the work itself is sound, so re-dispatch with a continuation card",
++  "wrong-premise": "the briefing rested on a false premise; run recon and rewrite the briefing before any re-dispatch",
++  "review-defect": "an independent review found the delivered work defective; re-dispatch with the review findings in the briefing",
++  "integrated-elsewhere": "the work already landed through another slice or commit; do not re-dispatch it",
++  superseded: "a newer slice or decision replaces it; do not re-dispatch it",
++});
++/** Validates a cancel class. A missing, empty, unknown or non-string value (including the reserved word `unclassified`) is refused SQ-CANCEL-CLASS with a repair. */
++export function checkCancelClass(value) {
++  if (typeof value === "string" && CANCEL_CLASSES.includes(value)) return { ok: true, cancelClass: value };
++  const shown = value === undefined || value === null ? "none" : JSON.stringify(value)?.slice(0, 40);
++  return {
++    ok: false,
++    code: "SQ-CANCEL-CLASS",
++    reason: `a cancel needs a reason class, one of ${CANCEL_CLASSES.join("|")}; got ${shown}`,
++    repair: `give the class that says why the slice ends: ${CANCEL_CLASSES.map((name) => `${name} (${CANCEL_CLASS_HELP[name]})`).join("; ")}`,
++  };
++}
+ export const DEFAULT_MAX_ATTEMPTS = 2;
+ /** Same value as fanout-ledger.mjs `DEFAULT_STALE_AFTER_MINUTES` (pinned by a test). */
+ export const DEFAULT_STALE_AFTER_MINUTES = 20;
+@@ -93,7 +116,7 @@ const TEST_LOOKING = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[a-z0-9]+$/iu;
+ const TOP_KEYS = new Set(["schema", "feature", "defaults", "limits", "monoliths", "slices"]);
+ const DEFAULT_KEYS = new Set(["commitMode", "tier", "loadClass"]);
+ const LIMIT_KEYS = new Set(["deadline", "maxAttemptsPerSlice"]);
+-const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls"]);
++const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls", "cancelClass"]);
+ 
+ const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ const isSliceId = (value) => isSafeTaskId(value) && value.length <= 128 && !value.includes("..");
+@@ -578,6 +601,16 @@ export function validateSliceQueue(input, options = {}) {
+     if (state !== null && state !== "ready" && holdReason === null) err("SQ-HOLD-REASON", `slice ${id}: state ${state} needs a holdReason`, { sliceId: id });
+     if (state === "ready" && raw.holdReason !== undefined && raw.holdReason !== null) err("SQ-HOLD-REASON", `slice ${id}: a ready slice must not carry a holdReason`, { sliceId: id });
+ 
++    // D75: a cancelled slice carries the class of its cancellation. A row cancelled before D75 has none and is
++    // reported `unclassified` (never as classified); any other state must not carry a class.
++    let cancelClass = null;
++    if (raw.cancelClass !== undefined) {
++      const verdict = checkCancelClass(raw.cancelClass);
++      if (!verdict.ok) err("SQ-CANCEL-CLASS", `slice ${id}: ${verdict.reason}. ${verdict.repair}`, { sliceId: id });
++      else if (state !== "cancelled") err("SQ-CANCEL-CLASS", `slice ${id}: cancelClass belongs on a cancelled slice only (its state is ${state}); a class says why a slice was cancelled, one of ${CANCEL_CLASSES.join("|")}. Remove the cancelClass or cancel the slice`, { sliceId: id });
++      else cancelClass = verdict.cancelClass;
++    } else if (state === "cancelled") cancelClass = UNCLASSIFIED_CANCEL;
++
+     let dependsOn = [];
+     if (raw.dependsOn !== undefined) {
+       if (Array.isArray(raw.dependsOn) && raw.dependsOn.every((dep) => typeof dep === "string")) dependsOn = [...new Set(raw.dependsOn)];
+@@ -646,6 +679,7 @@ export function validateSliceQueue(input, options = {}) {
+       title: typeof raw.title === "string" ? raw.title : "",
+       state,
+       holdReason,
++      cancelClass,
+       dependsOn,
+       writeScope: writeScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
+       readScope: readScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
+@@ -920,6 +954,7 @@ export function readyAndLive(input, options = {}) {
+     summaries.set(entry.id, summary);
+     if (entry.state === "cancelled") {
+       summary.status = "cancelled";
++      summary.cancelClass = entry.cancelClass;
+       continue;
+     }
+     if (doneIds.has(entry.id)) {

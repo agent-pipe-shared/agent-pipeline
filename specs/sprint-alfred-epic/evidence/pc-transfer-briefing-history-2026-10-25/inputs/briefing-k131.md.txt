@@ -1,0 +1,14 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-decided.md` and the files named in them are your ONLY input. Read `scratch/clones/k131/templates/prompts/agent-obligations.md` first, then the common file. Clone name: `k131`. BASE: main (clone of the main checkout; run `git pull --ff-only` inside it first). Tool budget: base 50, closing allowance +5. Everything is unprotected documentation; commit in the clone, trailers exactly `AI-Assisted: true` and `Dispatch: K131-AGY-GLOBAL-DEFAULT-DOC (goldfish)`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K131-AGY-GLOBAL-DEFAULT-DOC/2026-10-23 · Role Goldfish`
+
+## K131-AGY-GLOBAL-DEFAULT-DOC: make the global installer choice the documented default Antigravity route
+
+### 1. Goal
+PO decision 2026-10-23 (batch 12 follow-up): for Antigravity the documented standard route is the GLOBAL registration. Read first `scratch/agent-out/K129-notes.md` (every claim with its code source) and the current Antigravity section of `SETUP.md` (block "Choosing where to bind" and the steps around it) and `GEMINI.md` step 1. The finding: SETUP.md tells the reader to clone the release OUTSIDE the project and then choose Workspace-Local, but since D79 the installer refuses that with `ATR-WORKSPACE-SOURCE-OUTSIDE` and points to the global option; GEMINI.md step 1 inherits the same conflict; there is no way back from global to workspace-local (`ATR-OTHER-SCOPE-CONFLICT`). Change ONLY what is needed: in SETUP.md state that the release is cloned outside the project and the installer is run choosing the GLOBAL topology refresh, make Workspace-Local the documented alternative with its source-inside-the-workspace condition, keep the refusal codes and the "Not verified from the code" paragraph (extend it by: which workspaces Agy loads for a global registration is unverified and is checked by the PO's Antigravity run), keep the pinned inventory markers and heading texts of SETUP.md and the line about repositories that never opted in untouched, and fix GEMINI.md step 1 so it matches (GEMINI.md is the runner's auto-loaded entry file: keep it short; link to the SETUP section for details). No new product claims beyond K129's cited code facts. English, placeholders as in docs/README.md. Checks alone each after the last commit: `node harness/scripts/check-doc-contracts.mjs`, `node --test harness/scripts/check-doc-contracts.test.mjs`, `node harness/scripts/check-product-capability-inventory.mjs`. Notes: `scratch/agent-out/K131-notes.md`. Never "done".
+
+### 2. DoD
+SETUP.md and GEMINI.md agree on global-as-default; checks run; notes written.
+
+### 3. Task id
+TASK_ID: K131-AGY-GLOBAL-DEFAULT-DOC.

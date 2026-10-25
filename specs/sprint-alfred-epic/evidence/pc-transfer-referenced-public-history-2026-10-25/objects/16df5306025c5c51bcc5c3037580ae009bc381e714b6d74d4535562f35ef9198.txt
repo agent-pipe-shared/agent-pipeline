@@ -1,0 +1,96 @@
+# Existing repository identity: source test registration
+
+Scratch-only preparation. Only new `scratch/existing-repository-identity-registration-*`
+artifacts were written. Existing root artifacts, aggregate, canonical source,
+signatures and installed host were not changed. No model request was made.
+
+## Frozen byte bindings
+
+- Ambient aggregate: `563fbe7b923e8d1f05073a814dba5022149885085f5cc7b02a3f6c1c342ad89e`.
+- Getter source preimage: `8259659e0bb604652a98efcd0081d24347fcc3614d8be70d5a7df78843c1a41a`.
+- Final getter postimage: `ce509d12f06e0345d2c08fe5aecae7089092e157195150b5be5d6b62a045815a`.
+- Getter root patch: `e16e8021bb14f6baee53d5fb1d208aa2e12d796fa1e6ed41919653950c265a57`.
+- Test target: `plugins/pipeline-core/lib/governance-event-store.test.mjs`.
+- Exact canonical/aggregate test preimage: `311c7e5dcaf29a4f0b9b48f2a4ec9c0f53e05e29d45351100e0c10ecfa15c198`.
+- Proposed test postimage: `8815926d1248e46e439caf522fe08ec0b20458625ea2011229250e497afabf5f`.
+- Additive test patch: `581870fe9f2907c52e7701446c28c11f2e0f9be8b2497fbc032241f99955b17c`.
+
+The final getter includes the root's explicit string-type check, including the
+single-element array rejection. The earlier `107d620d...` postimage was an
+intermediate and is not used by this frozen registration.
+
+## Source shape and registration
+
+The patch adds canonical-relative getter imports and separately named synchronous
+filesystem/random/join helpers, then appends the seven root cases adapted for the
+real test surface. There are no scratch paths in the test postimage. All new
+repositories and sibling alias/worktree/bare paths are under `os.tmpdir()` and
+cleaned up. No fixture is created in the productive plugin directory.
+
+The new helper stores its fingerprint in a local fixture variable. It neither
+uses nor reassigns the existing suite's mutable global `fingerprint` or policy
+digest. Top-level test execution preserves the existing sequential defaults.
+
+`harness/scripts/verify.mjs:601` already registers this source file as
+`governance-event-store-tests`, without `caseCompletion`. No Verify edit, new
+case-ID protocol or separately counted duplicate suite is needed. After actual
+integration ordinary suite execution includes these seven cases once.
+
+## Executed result
+
+`node scratch/existing-repository-identity-registration-run.mjs` executed:
+
+1. `node --import ./scratch/existing-repository-identity-registration-loader.mjs --test --test-reporter=tap '--test-name-pattern=existing repository identity:|NVA-REPOID-1:' plugins/pipeline-core/lib/governance-event-store.test.mjs`
+   — exit 0; **9 tests, 9 pass, zero failures/skips/cancellations/todo**;
+   duration 1245.211547 ms. Seven new getter cases and the two existing identity
+   regressions ran together.
+2. `git apply --check scratch/existing-repository-identity-registration-source.patch`
+   — exit 0. No canonical write.
+
+The selected existing tests verify legacy-alias adoption and the writer's stable
+identity across two absolute access paths. They retain the writer's existing
+alias support while the new pure getter explicitly rejects aliases. The rest of
+the large store suite and full Verify were not run or claimed.
+
+The exact final stdout digest is
+`f950a0acead45409887c459d54cdf6988cd62dfbf48f9e4b6ec16cdb11f7c29c`;
+stderr is empty. `*-run.json` records hashes of the source/test preimages and
+postimages, root input cases/patch/metadata, loader, preparation and runner.
+All inputs remained unchanged during the final run.
+
+## Seven cases and stronger no-write checks
+
+- Missing binding refuses without creating the private namespace or identity.
+- Legacy v1 refuses without migration or changed file bytes/identity.
+- A real sanctioned v2 mint occurs only in explicit fixture setup; repeated pure
+  reads return its stable fingerprint without rewriting/replacing its binding.
+- Closed v2 validation rejects missing fingerprint, unknown extra field,
+  malformed fingerprint, single-element array coercion, self/duplicate aliases,
+  invalid epoch and unknown schema; rejected bytes remain unchanged.
+- Root/file symlink aliases, multiple hard links and permissive file mode refuse.
+- A physical 65537-byte oversized binding refuses with exact bytes retained.
+- A linked worktree observes the shared Gitcommon identity; bare repositories
+  remain unsupported and acquire no private namespace.
+
+For legacy, valid, malformed and oversized binding cases, the adapted assertions
+also compare dev/ino/mode/uid/nlink/size/mtime/ctime before and after. Read-induced
+atime is deliberately excluded. This detects a replacement or same-byte rewrite;
+it does not claim to audit every possible temporary syscall.
+
+Two adaptation defects were found by early focused runs: a local `path` field
+shadowed the canonical path import, and token replacement matched `linkSync`
+inside `symlinkSync`. Both were corrected in this owned preparation. Final helper
+bindings are separate and the final nine cases pass; the getter was not edited.
+
+## Execution limits
+
+The loader overlays only the exact proposed test and final getter at their
+canonical module URLs. All other dependencies and all physical Git/filesystem
+operations remain canonical/native. No filesystem provider substitution,
+production observer API, global monkeypatch or VM translation is used.
+
+This is an import-hook source-test run with synthetic temporary repositories,
+not installed-native-host acceptance, full-suite qualification, authority minting
+on a read, model execution, signing or productive integration. The registration
+patch depends on the separate getter source patch; applying only this test patch
+to unmodified HEAD would leave the new export unavailable.

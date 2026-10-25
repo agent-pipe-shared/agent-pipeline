@@ -1,0 +1,8 @@
+{
+  "schema": "pipeline.project-resource-observations.v1",
+  "candidate": {
+    "commit": "5f3bec25bbe5d4ac5ee0df51dee20d9446272047",
+    "tree": "46352f60ade814535b1b17b3cb59a5341b5b9ff0"
+  },
+  "resources": []
+}

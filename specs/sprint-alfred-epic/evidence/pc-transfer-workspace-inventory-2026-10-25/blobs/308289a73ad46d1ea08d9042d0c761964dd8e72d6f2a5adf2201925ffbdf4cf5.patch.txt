@@ -1,0 +1,14 @@
+diff --git a/GEMINI.md b/GEMINI.md
+index 6696ca15a..83149db28 100644
+--- a/GEMINI.md
++++ b/GEMINI.md
+@@ -19,7 +19,8 @@ establish it: confirm that Antigravity's own command tool can resolve and run
+ treat hook readiness as unknown; correct the host environment and fully restart
+ Antigravity before relying on its hooks. Do not use an unattended permission
+ bypass to obtain the readback. The per-platform pre-launch check is in the
+-[Agy procedure](SETUP.md#antigravity-agy-workspace-local-binding).
++[Antigravity (Agy) procedure](SETUP.md#antigravity-agy-workspace-local-binding),
++where "Agy" is defined.
+ 
+ ### Antigravity Installation (Workspace-Local)
+ 

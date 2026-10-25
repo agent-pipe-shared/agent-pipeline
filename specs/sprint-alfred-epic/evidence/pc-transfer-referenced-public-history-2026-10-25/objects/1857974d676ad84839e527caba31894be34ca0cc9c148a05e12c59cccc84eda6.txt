@@ -1,0 +1,967 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Fail-closed repository documentation contract gate.
+ *
+ * Checks tracked Markdown links/anchors plus the calibrated handover authority.
+ * It excludes the user-owned root instruction file before every source or target
+ * read. It never performs network requests or semantic prose review.
+ */
+import { spawnSync } from "node:child_process";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
+
+import { checkObservationGovernance } from "./check-observation-governance.mjs";
+import { MANIFEST_PATHS, checkEnforcementDocument } from "./generate-enforcement-doc.mjs";
+
+const decoder = new TextDecoder("utf-8", { fatal: true });
+const EXCLUDED_PATH = "AGENTS.md";
+// Archived-history directories (ADR-0073): a verbatim, never-re-edited copy of
+// a prior handover section whose internal relative links resolved correctly
+// only at its original location. Excluded the same way AGENTS.md is: never
+// scanned as a link source, and any link INTO it resolves without checking
+// against trackedPaths. Directory-prefix match, not a second exact constant.
+// Reader-review reports are immutable review evidence, not public navigation.
+// Fresh reviewers may return local absolute source links; preserving the report
+// byte-for-byte must not make those links part of the public-doc contract.
+const EXCLUDED_PREFIXES = ["docs/state-archive", "specs/sprint-alfred-epic/evidence/reader-review", "specs/sprint-nova-epic/evidence/reader-review", "specs/sprint-alfred-epic/WORK-STATUS.md", "specs/sprint-alfred-epic/plans/handover-2026-10-10-live-work-index.md", "specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12", "specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011", "specs/sprint-alfred-epic/evidence/live-item-work-index-20261010", "specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12", "specs/sprint-alfred-epic/signed-package"];
+const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
+const STATEFUL_DESIGN_OPERATIVE_HEADINGS = [
+  "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
+  "### EL-07 (MUST) — Spec-readiness check before implementation",
+];
+const STATEFUL_DESIGN_CONTRACTS = [
+  {
+    id: "authority-issuer-replay",
+    phrases: ["Authority issuer and replay rule.", "authority issuer and replay rule"],
+  },
+  {
+    id: "durable-storage-atomicity",
+    phrases: ["Durable storage and atomicity boundary.", "durable storage and atomicity"],
+  },
+  {
+    id: "crash-state-matrix",
+    phrases: ["Complete resource/phase crash-state matrix.", "complete resource/phase crash-state matrix"],
+  },
+  {
+    id: "mutation-enforcement",
+    phrases: ["Exact mutation point and kernel/controller enforcement point.", "exact mutation plus kernel/controller enforcement points"],
+  },
+  {
+    id: "bootstrap-self-update",
+    phrases: ["Bootstrap and self-update transition.", "bootstrap/self-update transition"],
+  },
+  {
+    id: "candidate-evidence-binding",
+    phrases: ["Binary candidate/evidence binding.", "binary candidate/evidence binding"],
+  },
+  {
+    id: "pre-post-bytes",
+    phrases: ["Exact pre- and post-mutation bytes.", "exact pre/post bytes"],
+  },
+  {
+    id: "sole-recovery-authority",
+    phrases: ["Sole recovery authority.", "sole recovery authority"],
+  },
+  {
+    id: "self-reference-audit",
+    phrases: ["Self-reference audit (what mutable material cannot authenticate itself).", "self-reference audit"],
+  },
+];
+const ENFORCEMENT_DOCUMENT_PATH = "docs/enforcement.md";
+const ENFORCEMENT_SOURCE_MANIFESTS = Object.values(MANIFEST_PATHS);
+// These are the operational documents an application-repository user follows.
+// Historical ADRs, state archives and explicitly labelled maintainer guides are
+// deliberately outside this list: rewriting their recorded source context would
+// weaken evidence rather than improve consumer onboarding.
+export const CONSUMER_OPERATION_DOCUMENTS = Object.freeze([
+  "GEMINI.md",
+  "README.md",
+  "SETUP.md",
+  "PIPELINE_FLOW.md",
+  "docs/README.md",
+  "docs/usage.md",
+  "docs/v3-consumer-onboarding.md",
+  "docs/runtime-boundary.md",
+  "docs/audit-and-evidence.md",
+  "docs/audit-bundles.md",
+  "docs/cost-and-measurement.md",
+  "docs/enforcement.md",
+  "docs/evidence-viewer.md",
+  "docs/artifact-topology.md",
+  "docs/change-control.md",
+  "docs/external-traceability.md",
+  "docs/github-issue-operations.md",
+  "docs/governance-event-export.md",
+  "docs/governance-events.md",
+  "docs/governance-replay.md",
+  "docs/human-authorization-inventory.md",
+  "docs/organization-policy-packs.md",
+  "docs/overview.md",
+  "docs/parallel-work.md",
+  "docs/po-approval-proof-contract.md",
+  "docs/po-human-approval.md",
+  "docs/push-release-flow.md",
+  "docs/runner-support.md",
+  "docs/security-controls.md",
+  "docs/observation-intake.md",
+  "docs/operating-model.md",
+  "docs/design/README.md",
+  "docs/deploy/README.md",
+]);
+// These two documents intentionally describe a local marketplace topology.
+// Keep that exceptional procedure visibly separated from consumer onboarding:
+// it changes a shared runner selection and is never a project-repository
+// installation route.
+export const MAINTAINER_ONLY_DOCUMENTS = Object.freeze([
+  "docs/claude-local-plugin-development.md",
+  "docs/codex-local-plugin-development.md",
+]);
+const MAINTAINER_ONLY_MARKER = /^> Maintainer-only guide\./mu;
+const SOURCE_CHECKOUT_COMMAND = /\bnode\s+(?:["']?\.?(?:\.\/)?plugins\/pipeline-core\/)/u;
+// Operational guidance is addressed to the repository that consumes the
+// installed plugin.  A source-checkout noun in that guidance is nearly always
+// a hidden maintainer assumption (and a frequent precursor to a bad command
+// example).  Historical records and the explicitly separated SETUP maintainer
+// section keep their provenance and are intentionally not scanned here.
+const SOURCE_CHECKOUT_PERSPECTIVE = /\bthis\s+(?:repository|checkout|worktree)\b/iu;
+const LOCAL_MARKETPLACE_CONSUMER_SELECTOR = /\bpipeline-core@agent-pipeline-local\b/u;
+const SETUP_MAINTAINER_SECTION = "## B. Maintain a shared pipeline source (occasional)";
+
+function consumerInstructionText(path, text) {
+  if (path !== "SETUP.md") return text;
+  const boundary = text.indexOf(SETUP_MAINTAINER_SECTION);
+  // A missing boundary is itself not an exemption: scan the complete document
+  // so a renamed heading cannot silently turn source instructions into user
+  // onboarding guidance.
+  return boundary === -1 ? text : text.slice(0, boundary);
+}
+
+/**
+ * Consumer instructions must invoke an installed plugin, never a same-named
+ * directory in a source checkout. Callers supply only the document bytes so
+ * this rule remains independently testable and cannot inspect the host.
+ */
+export function checkConsumerRepositoryExamples(documents) {
+  const findings = [];
+  for (const path of CONSUMER_OPERATION_DOCUMENTS) {
+    const text = documents[path];
+    if (typeof text !== "string") continue;
+    if (SOURCE_CHECKOUT_COMMAND.test(consumerInstructionText(path, text))) {
+      findings.push(`consumer-command: ${path}: use <plugin-root> or PIPELINE_PLUGIN_ROOT, never plugins/pipeline-core from a source checkout`);
+    }
+    if (SOURCE_CHECKOUT_PERSPECTIVE.test(consumerInstructionText(path, text))) {
+      findings.push(`consumer-perspective: ${path}: address the consuming project, not this source repository or checkout`);
+    }
+    if (LOCAL_MARKETPLACE_CONSUMER_SELECTOR.test(consumerInstructionText(path, text))) {
+      findings.push(`consumer-marketplace: ${path}: consumer instructions must use the released GitHub marketplace selector, never agent-pipeline-local`);
+    }
+  }
+  return findings;
+}
+
+/**
+ * Local-development instructions are valid source-maintainer material, but
+ * only when their audience boundary is immediately visible.  This prevents a
+ * future edit from accidentally turning the local marketplace selector into
+ * an ordinary consumer installation recommendation.
+ */
+export function checkMaintainerAudienceBoundaries(documents) {
+  const findings = [];
+  for (const path of MAINTAINER_ONLY_DOCUMENTS) {
+    const text = documents[path];
+    if (typeof text !== "string") continue;
+    if (!MAINTAINER_ONLY_MARKER.test(text)) {
+      findings.push(`maintainer-audience: ${path}: local-development instructions must begin with the Maintainer-only guide marker`);
+    }
+  }
+  return findings;
+}
+function posixPath(value) {
+  return value.split(sep).join("/");
+}
+
+export function isExcludedRepoPath(value) {
+  const normalized = posixPath(value).replace(/^\.\//, "");
+  if (normalized === EXCLUDED_PATH) return true;
+  return EXCLUDED_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
+}
+
+// --- GF-110: per-link exclusions for the byte-identical vendored canon copies
+//
+// GF-107/GF-108 (commits ae25b35e..cc192629) copied repo-root canon text --
+// guardrails/, roles/, templates/prompts/, docs/push-release-flow.md and the
+// ADRs that text cites -- verbatim into plugins/pipeline-core/ so a consumer
+// install carries them. A verbatim copy keeps its source file's relative
+// Markdown links, and those links only resolve from the SOURCE directory: the
+// vendored docs/adr/0010-session-bootstrap.md still says `../../harness/session-bootstrap.md`,
+// which is harness/session-bootstrap.md from docs/adr/ and nothing at all from
+// plugins/pipeline-core/docs/adr/ (harness/ is a confirmed self-only exclusion,
+// never vendored -- see SELF_ONLY_EXCLUSIONS in generate-vendored-canon.mjs).
+// This checker is right to call them dead; the
+// byte-identity is the deliberate part (GF-107/GF-108), so the link breakage is
+// a known, PO-accepted, EXPLICITLY TEMPORARY gap in the "quick copy now"
+// approach rather than an oversight. It is tracked by the deferred generated
+// build-step item that will rewrite these links at vendoring time:
+// backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md
+//
+// The exclusions below are deliberately one granularity TIGHTER than the
+// file-wide `filePattern` entries the sibling gate check-consumer-safe-paths.mjs
+// uses for the same files: an entry names one vendored file AND the exact link
+// destinations inherited from its origin, and suppresses only the
+// "target is not tracked" class. A new dead link in an already-listed vendored
+// file, any other finding class in it, and any not-yet-listed file all still
+// fail. Each entry carries a self-contained `reason` naming its own file, the
+// cause, and the backlog item; an entry that stops matching is itself reported
+// as a finding, because a stale exclusion is exactly where a real regression
+// would hide.
+
+const VENDOR_PREFIX = "plugins/pipeline-core/";
+
+function vendoringGapReason(origin) {
+  return (
+    `GF-110 (known-accepted vendoring gap): ${VENDOR_PREFIX}${origin} is a byte-identical vendored copy of ` +
+    `${origin} (GF-107/GF-108, commit 14ef8767). The link destinations listed on this entry are inherited ` +
+    `unchanged from that source, where they resolve to a tracked target relative to ${dirname(origin)}/; from ` +
+    `the vendored location they resolve to nothing, so this checker reports them as untracked targets. ` +
+    `Repairing them in the vendored copy would break the byte-identity GF-107/GF-108 established on purpose, ` +
+    `so only these exact destinations are exempt, and only from the "target is not tracked" class. Tracked ` +
+    `follow-up, a generated vendoring build step that will rewrite these links: ` +
+    `backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md`
+  );
+}
+
+function vendoredLinkExclusion(origin, destinations) {
+  return { source: `${VENDOR_PREFIX}${origin}`, origin, destinations, reason: vendoringGapReason(origin) };
+}
+
+export const VENDORED_LINK_EXCLUSIONS = Object.freeze([
+  vendoredLinkExclusion("docs/adr/0010-session-bootstrap.md", [
+    "0001-distribution-plugin-marketplace.md",
+    "0006-model-effort-policy.md",
+    "../../harness/session-bootstrap.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0012-handover-canonicalization.md", ["0015-self-application.md"]),
+  vendoredLinkExclusion("docs/adr/0013-git-guard-union.md", [
+    "0001-distribution-plugin-marketplace.md",
+    "0007-workflows-ultracode-opt-in.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0017-push-policy-standing-approval.md", ["0034-deploy-precedence-central-vs-project.md"]),
+  vendoredLinkExclusion("docs/adr/0027-gate-philosophy.md", ["0021-prd-po-gate.md", "0030-governance-layer.md"]),
+  vendoredLinkExclusion("docs/adr/0028-manifest-approach.md", ["0001-distribution-plugin-marketplace.md"]),
+  vendoredLinkExclusion("docs/adr/0055-critical-human-proof-waiver.md", [
+    "0054-arbitheon-authority-directory-and-precedence-chain.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0061-uniform-human-approval-ceremony.md", [
+    "0058-guard-maintenance-window.md",
+    "0059-signed-human-guard-override.md",
+    "0060-handover-placement-and-rotation.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0074-port-authorize-critical-ceremony.md", [
+    "0058-guard-maintenance-window.md",
+    "0059-signed-human-guard-override.md",
+  ]),
+  vendoredLinkExclusion("docs/operating-model.md", ["../README.md", "../PIPELINE_FLOW.md", "../SETUP.md", "adr/0021-prd-po-gate.md"]),
+]);
+
+/**
+ * True only for the exact (vendored source file, link destination) pairs listed
+ * above. Never a prefix, directory, or pattern match: an unlisted destination in
+ * a listed file is not excluded. Usage is recorded as source -> set of
+ * destinations, so no delimiter has to be invented for a composite key.
+ */
+function isVendoredExcludedLink(exclusions, source, destination, used) {
+  const matched = exclusions.some((entry) => entry.source === source && entry.destinations.includes(destination));
+  if (!matched) return false;
+  if (!used.has(source)) used.set(source, new Set());
+  used.get(source).add(destination);
+  return true;
+}
+
+/**
+ * Report every listed pair that no longer suppresses anything, so a repaired or
+ * removed link cannot leave a silent exemption behind. Scoped to files actually
+ * present in this scan: against a fixture repository that carries none of the
+ * vendored copies, the entries are simply not applicable rather than stale.
+ */
+function staleVendoredExclusionFindings(exclusions, scannedSources, used) {
+  const findings = [];
+  for (const entry of exclusions) {
+    if (!scannedSources.has(entry.source)) continue;
+    for (const destination of entry.destinations) {
+      if (used.get(entry.source)?.has(destination)) continue;
+      findings.push(
+        `vendored-link-exclusion: ${entry.source} -> ${destination}: exclusion no longer suppresses a "target is not tracked" finding -- remove it`,
+      );
+    }
+  }
+  return findings;
+}
+
+function inside(root, target) {
+  const rel = relative(root, target);
+  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+}
+
+function defaultReadText(file) {
+  return decoder.decode(readFileSync(file));
+}
+
+function extractMarkdownSection(markdown, heading) {
+  const lines = markdown.split("\n");
+  const start = lines.findIndex((line) => line.trimEnd() === heading);
+  if (start === -1) return "";
+
+  const level = heading.match(/^#+/)[0].length;
+  const end = lines.findIndex((line, index) => index > start && (line.match(/^(#{1,6})\s/)?.[1].length ?? Infinity) <= level);
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+
+/**
+ * Check the two stateful-design documentation surfaces against their distinct,
+ * equivalent checklist wording. Callers decide whether both surfaces apply.
+ */
+export function checkStatefulDesignContracts(surfaces) {
+  const findings = [];
+  for (const [surfaceIndex, surface] of STATEFUL_DESIGN_SURFACES.entries()) {
+    const text = surfaces[surface];
+    if (typeof text !== "string") continue;
+    const visibleText = stripHtmlComments(stripFencedCode(text));
+    const operativeText = extractMarkdownSection(visibleText, STATEFUL_DESIGN_OPERATIVE_HEADINGS[surfaceIndex]);
+    for (const contract of STATEFUL_DESIGN_CONTRACTS) {
+      if (!operativeText.includes(contract.phrases[surfaceIndex])) {
+        findings.push(`stateful-design-contract: ${surface}: ${contract.id}`);
+      }
+    }
+  }
+  return findings;
+}
+
+export function stripHtmlComments(value) {
+  let remaining = value;
+  let output = "";
+  while (true) {
+    const start = remaining.indexOf("<!--");
+    if (start === -1) return output + remaining;
+    output += remaining.slice(0, start);
+    const end = remaining.indexOf("-->", start + 4);
+    if (end === -1) return output;
+    remaining = remaining.slice(end + 3);
+  }
+}
+
+export function stripFencedCode(markdown) {
+  const lines = markdown.split("\n");
+  let fence = null;
+  return lines
+    .map((line) => {
+      const open = line.match(/^ {0,3}(`{3,}|~{3,})/);
+      if (!fence && open) {
+        fence = { char: open[1][0], length: open[1].length };
+        return "";
+      }
+      if (fence) {
+        const close = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+        if (close && close[1][0] === fence.char && close[1].length >= fence.length) fence = null;
+        return "";
+      }
+      return line;
+    })
+    .join("\n");
+}
+
+// A reference-style link scan (`[text][ref]`) run over a raw line false-
+// positives on inline code containing bracket-adjacent regex syntax, e.g.
+// `` `[a-z][a-z0-9-]{0,63}` `` -- strip backtick-delimited spans first so
+// character-class notation inside code never looks like a markdown link.
+//
+/**
+ * Blank inline code spans (single or multiple backticks, e.g. `text` or
+ * ``text``) so link-syntax regexes never read markdown-shaped characters
+ * that only exist as prose inside a code span. Mirrors stripFencedCode's
+ * contract: same line count preserved, only span *content* replaced with
+ * spaces (never removed), so line numbers stay accurate for callers.
+ *
+ * Deliberately line-scoped, not document-scoped: every regex this feeds
+ * (reference-definition, inline-destination, reference-link) already
+ * operates per line, and a document-wide scan risks pairing two unrelated
+ * stray backticks across paragraphs and blanking everything between them —
+ * a false negative far worse than the false positive this fixes. A code
+ * span that legitimately spans a soft line break is not handled; that is
+ * a known, accepted narrowing given the line-oriented design of the rest
+ * of this scanner.
+ */
+export function stripInlineCode(markdown) {
+  return markdown
+    .split("\n")
+    .map((line) => line.replace(/(`+)(.*?)\1/g, (match) => match.replace(/./g, " ")))
+    .join("\n");
+}
+
+function cleanHeading(value) {
+  return value
+    .replace(/[<>]/g, "")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[`*_~]/g, "")
+    .trim();
+}
+
+function baseSlug(value) {
+  return cleanHeading(value)
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}\p{M}_\-\s]/gu, "")
+    .replace(/\s/g, "-");
+}
+
+/**
+ * Bilingual-doc convention (CLAUDE.md, Language): a file that carries a
+ * DE-REFERENCE-BELOW marker line has an authoritative English half above it
+ * and a redundant full German reference translation below it that agents
+ * must not read. Anchor collection honors that same boundary: an anchor
+ * that only exists below the marker must not let a link resolve as if it
+ * pointed at the (never-consulted) English content.
+ */
+function englishHalfLines(lines) {
+  const markerIndex = lines.findIndex((line) => line.includes("DE-REFERENCE-BELOW"));
+  return markerIndex === -1 ? lines : lines.slice(0, markerIndex);
+}
+
+export function collectAnchors(markdown) {
+  const text = stripFencedCode(markdown);
+  const lines = englishHalfLines(text.split("\n"));
+  const anchors = new Set();
+  const headingSlugs = new Set();
+  const nextSuffix = new Map();
+  const addHeading = (heading) => {
+    const base = baseSlug(heading);
+    let suffix = nextSuffix.get(base) ?? 0;
+    let candidate = suffix === 0 ? base : `${base}-${suffix}`;
+    while (headingSlugs.has(candidate)) {
+      suffix += 1;
+      candidate = `${base}-${suffix}`;
+    }
+    nextSuffix.set(base, suffix);
+    headingSlugs.add(candidate);
+    anchors.add(candidate);
+  };
+  for (let i = 0; i < lines.length; i += 1) {
+    const atx = lines[i].match(/^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/);
+    if (atx) addHeading(atx[1]);
+    if (i > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(lines[i]) && lines[i - 1].trim()) addHeading(lines[i - 1]);
+    for (const match of lines[i].matchAll(/<a\s+[^>]*(?:id|name)=["']([^"']+)["'][^>]*>/gi)) {
+      anchors.add(match[1]);
+      anchors.add(match[1].toLocaleLowerCase("en-US"));
+    }
+  }
+  return anchors;
+}
+
+function normalizeReferenceId(value) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+}
+
+// This evidence snapshot intentionally preserves issue headings in the
+// `[heading][plain-tag]` form. The tags are not reference definitions: they
+// are historical issue taxonomy, so the otherwise fail-closed reference-link
+// scanner must not reinterpret these nine known occurrences as broken links.
+//
+// Keep this contract occurrence-specific. In particular, neither an identical
+// tag on a different line nor a tag in a different source is evidence that it
+// belongs to this immutable snapshot exception.
+export const IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS = Object.freeze([
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 10, referenceId: "architecture", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 229, referenceId: "security", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 304, referenceId: "lifecycle", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 377, referenceId: "telemetry", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 475, referenceId: "architecture", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 758, referenceId: "governance", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 918, referenceId: "architecture", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1187, referenceId: "integration", occurrence: 0 },
+  { source: "specs/sprint-alfred-epic/evidence/issues-snapshot-2026-08-27.md", line: 1318, referenceId: "adoption", occurrence: 0 },
+]);
+
+/**
+ * Suppress only a configured missing-reference occurrence, recording the
+ * precise entry that was used so repaired snapshot text makes its exception
+ * stale rather than silently leaving an inert allowance behind.
+ */
+export function isImmutableSnapshotMissingReferenceExcluded(exclusions, source, line, referenceId, occurrence, used) {
+  const normalizedReferenceId = normalizeReferenceId(referenceId);
+  const entry = exclusions.find(
+    (candidate) =>
+      candidate.source === source &&
+      candidate.line === line &&
+      candidate.referenceId === normalizedReferenceId &&
+      (candidate.occurrence ?? 0) === occurrence,
+  );
+  if (!entry) return false;
+  used.add(entry);
+  return true;
+}
+
+function staleImmutableSnapshotMissingReferenceExclusionFindings(exclusions, scannedSources, used) {
+  const findings = [];
+  for (const entry of exclusions) {
+    if (!scannedSources.has(entry.source) || used.has(entry)) continue;
+    findings.push(
+      `immutable-snapshot-missing-reference-exclusion: ${entry.source}:${entry.line} -> ${entry.referenceId}: exclusion no longer suppresses a "missing reference definition" finding -- remove it`,
+    );
+  }
+  return findings;
+}
+
+function unwrapDestination(value) {
+  return value.startsWith("<") && value.endsWith(">") ? value.slice(1, -1) : value;
+}
+
+function inlineDestinations(line) {
+  const closingAfterTitle = (cursor) => {
+    while (/\s/.test(line[cursor] ?? "")) cursor += 1;
+    if (line[cursor] === ")") return cursor;
+    const opener = line[cursor];
+    const closer = opener === "(" ? ")" : opener;
+    if (opener !== '"' && opener !== "'" && opener !== "(") return -1;
+    cursor += 1;
+    let escaped = false;
+    for (; cursor < line.length; cursor += 1) {
+      const char = line[cursor];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === closer) {
+        cursor += 1;
+        while (/\s/.test(line[cursor] ?? "")) cursor += 1;
+        return line[cursor] === ")" ? cursor : -1;
+      }
+    }
+    return -1;
+  };
+  const results = [];
+  for (let start = 0; start < line.length; start += 1) {
+    if (line[start] !== "[") continue;
+    const labelEnd = line.indexOf("]", start + 1);
+    if (labelEnd < 0 || line[labelEnd + 1] !== "(") continue;
+    let cursor = labelEnd + 2;
+    if (line[cursor] === "<") {
+      const close = line.indexOf(">", cursor + 1);
+      const outerClose = close > cursor ? closingAfterTitle(close + 1) : -1;
+      if (outerClose >= 0) {
+        results.push(line.slice(cursor, close + 1));
+        start = outerClose;
+      }
+      continue;
+    }
+    const destinationStart = cursor;
+    let depth = 0;
+    let escaped = false;
+    for (; cursor < line.length; cursor += 1) {
+      const char = line[cursor];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === "(") {
+        depth += 1;
+        continue;
+      }
+      if (char === ")") {
+        if (depth === 0) {
+          results.push(line.slice(destinationStart, cursor));
+          start = cursor;
+          break;
+        }
+        depth -= 1;
+        continue;
+      }
+      if (/\s/.test(char) && depth === 0) {
+        const outerClose = closingAfterTitle(cursor);
+        if (outerClose >= 0) {
+          results.push(line.slice(destinationStart, cursor));
+          start = outerClose;
+        }
+        break;
+      }
+    }
+  }
+  return results;
+}
+
+export function extractMarkdownLinks(markdown) {
+  const text = stripInlineCode(stripFencedCode(markdown));
+  const lines = text.split("\n");
+  const definitions = new Map();
+  const links = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const definition = lines[index].match(/^ {0,3}\[([^\]]+)\]:\s*(<[^>]+>|\S+)(?:\s+.*)?$/);
+    if (definition) {
+      const id = normalizeReferenceId(definition[1]);
+      definitions.set(id, { destination: unwrapDestination(definition[2]), line: index + 1 });
+      links.push({ destination: unwrapDestination(definition[2]), line: index + 1, kind: "reference-definition" });
+    }
+  }
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^ {0,3}\[([^\]]+)\]:\s*(<[^>]+>|\S+)(?:\s+.*)?$/.test(line)) continue;
+    for (const destination of inlineDestinations(line)) {
+      links.push({ destination: unwrapDestination(destination), line: index + 1, kind: "inline" });
+    }
+    for (const match of stripInlineCode(line).matchAll(/!?\[([^\]]+)\]\[([^\]]*)\]/g)) {
+      const id = normalizeReferenceId(match[2] || match[1]);
+      const target = definitions.get(id);
+      if (target) links.push({ ...target, line: index + 1, kind: "reference-use" });
+      else links.push({ destination: null, referenceId: id, line: index + 1, kind: "missing-reference" });
+    }
+  }
+  return links;
+}
+
+function gitList(root, patterns = []) {
+  const result = spawnSync("git", ["ls-files", "-z", "--", ...patterns], { cwd: root, encoding: "buffer" });
+  if (result.status !== 0) throw new Error(`git ls-files failed with exit ${result.status ?? "unknown"}`);
+  const output = decoder.decode(result.stdout);
+  return output.split("\0").filter(Boolean).map(posixPath);
+}
+
+export function enumerateTrackedMarkdown(root) {
+  return gitList(root, ["*.md"]).filter((entry) => !isExcludedRepoPath(entry)).sort();
+}
+
+function splitDestination(raw) {
+  const hash = raw.indexOf("#");
+  const beforeHash = hash < 0 ? raw : raw.slice(0, hash);
+  const fragmentRaw = hash < 0 ? null : raw.slice(hash + 1);
+  const query = beforeHash.indexOf("?");
+  return {
+    pathRaw: query < 0 ? beforeHash : beforeHash.slice(0, query),
+    fragmentRaw,
+  };
+}
+
+function decodePart(value, label) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new Error(`invalid URL encoding in ${label}`);
+  }
+}
+
+function isExternal(destination) {
+  return /^[A-Za-z][A-Za-z0-9+.-]*:/.test(destination) || destination.startsWith("//");
+}
+
+function relativeTarget(root, sourcePath, destination) {
+  if (isExternal(destination)) return { external: true };
+  const { pathRaw, fragmentRaw } = splitDestination(destination);
+  const decodedPath = decodePart(pathRaw, "path");
+  const fragment = fragmentRaw === null ? null : decodePart(fragmentRaw, "fragment");
+  if (decodedPath.startsWith("/") || isAbsolute(decodedPath)) return { error: "absolute internal path" };
+  const absolute = decodedPath === "" ? resolve(root, sourcePath) : resolve(root, dirname(sourcePath), decodedPath);
+  if (!inside(root, absolute)) return { error: "path escapes repository root" };
+  return { absolute, repoPath: posixPath(relative(root, absolute)), fragment };
+}
+
+function safeFile(root, repoPath, readText, { requireRegular = false, forbidSymlink = false } = {}) {
+  if (isAbsolute(repoPath) || repoPath.includes("\\")) throw new Error("repo path must be canonical POSIX relative");
+  const absolute = resolve(root, repoPath);
+  if (!inside(root, absolute)) throw new Error("path escapes repository root");
+  const canonicalRepoPath = posixPath(relative(root, absolute));
+  if (repoPath.replace(/^\.\//, "") !== canonicalRepoPath) throw new Error("repo path is not canonical");
+  if (isExcludedRepoPath(canonicalRepoPath)) return { excluded: true };
+  const stat = lstatSync(absolute);
+  if (forbidSymlink && stat.isSymbolicLink()) throw new Error("symlink is not allowed");
+  const real = realpathSync(absolute);
+  if (!inside(root, real)) throw new Error("symlink target escapes repository root");
+  const realRepoPath = posixPath(relative(root, real));
+  if (isExcludedRepoPath(realRepoPath)) return { excluded: true };
+  if (requireRegular && !stat.isFile()) throw new Error("target is not a regular file");
+  return { absolute, stat, text: stat.isFile() ? readText(absolute) : null };
+}
+
+function finding(source, line, destination, reason) {
+  return `${source}:${line} -> ${destination ?? "[reference]"}: ${reason}`;
+}
+
+export function checkRepository(rootInput, options = {}) {
+  const root = realpathSync(resolve(rootInput));
+  const readText = options.readText ?? defaultReadText;
+  const markdownPaths = (options.markdownPaths ?? enumerateTrackedMarkdown(root))
+    .map(posixPath)
+    .filter((entry) => !isExcludedRepoPath(entry))
+    .sort();
+  const trackedPaths = new Set((options.trackedPaths ?? gitList(root)).map(posixPath));
+  const vendoredLinkExclusions = options.vendoredLinkExclusions ?? VENDORED_LINK_EXCLUSIONS;
+  const immutableSnapshotMissingReferenceExclusions =
+    options.immutableSnapshotMissingReferenceExclusions ?? IMMUTABLE_SNAPSHOT_MISSING_REFERENCE_EXCLUSIONS;
+  const usedVendoredExclusions = new Map();
+  const usedImmutableSnapshotMissingReferenceExclusions = new Set();
+  const findings = [];
+  const cache = new Map();
+  let linksChecked = 0;
+  let anchorsChecked = 0;
+  let excludedLinks = 0;
+  let vendoredExcludedLinks = 0;
+  let enforcementDocument = "not-applicable";
+  let immutableSnapshotExcludedMissingReferences = 0;
+  const missingReferenceOccurrences = new Map();
+
+  const readRepoText = (repoPath) => {
+    if (isExcludedRepoPath(repoPath)) return null;
+    if (cache.has(repoPath)) return cache.get(repoPath);
+    const file = safeFile(root, repoPath, readText, { requireRegular: true });
+    if (file.excluded) return null;
+    cache.set(repoPath, file.text);
+    return file.text;
+  };
+
+  for (const source of markdownPaths) {
+    let text;
+    try {
+      text = readRepoText(source);
+    } catch (error) {
+      findings.push(finding(source, 1, source, `source read failed: ${error.message}`));
+      continue;
+    }
+    if (text === null) continue;
+    for (const link of extractMarkdownLinks(text)) {
+      if (link.kind === "missing-reference") {
+        const occurrenceKey = `${source}\0${link.line}\0${normalizeReferenceId(link.referenceId)}`;
+        const occurrence = missingReferenceOccurrences.get(occurrenceKey) ?? 0;
+        missingReferenceOccurrences.set(occurrenceKey, occurrence + 1);
+        if (
+          isImmutableSnapshotMissingReferenceExcluded(
+            immutableSnapshotMissingReferenceExclusions,
+            source,
+            link.line,
+            link.referenceId,
+            occurrence,
+            usedImmutableSnapshotMissingReferenceExclusions,
+          )
+        ) {
+          immutableSnapshotExcludedMissingReferences += 1;
+          continue;
+        }
+        findings.push(finding(source, link.line, link.referenceId, "missing reference definition"));
+        continue;
+      }
+      linksChecked += 1;
+      let target;
+      try {
+        target = relativeTarget(root, source, link.destination);
+      } catch (error) {
+        findings.push(finding(source, link.line, link.destination, error.message));
+        continue;
+      }
+      if (target.external) continue;
+      if (target.error) {
+        findings.push(finding(source, link.line, link.destination, target.error));
+        continue;
+      }
+      if (isExcludedRepoPath(target.repoPath)) {
+        excludedLinks += 1;
+        continue;
+      }
+      const trackedTarget = trackedPaths.has(target.repoPath);
+      const trackedDescendant = [...trackedPaths].some((entry) => entry.startsWith(`${target.repoPath.replace(/\/$/, "")}/`));
+      if (!trackedTarget && !trackedDescendant) {
+        if (isVendoredExcludedLink(vendoredLinkExclusions, source, link.destination, usedVendoredExclusions)) {
+          vendoredExcludedLinks += 1;
+          continue;
+        }
+        findings.push(finding(source, link.line, link.destination, "target is not tracked"));
+        continue;
+      }
+      let file;
+      try {
+        file = safeFile(root, target.repoPath, readText);
+      } catch (error) {
+        findings.push(finding(source, link.line, link.destination, `target unavailable: ${error.message}`));
+        continue;
+      }
+      if (file.excluded) {
+        excludedLinks += 1;
+        continue;
+      }
+      if (target.fragment === null || target.fragment === "") continue;
+      anchorsChecked += 1;
+      if (!file.stat.isFile() || !target.repoPath.toLowerCase().endsWith(".md")) {
+        findings.push(finding(source, link.line, link.destination, "fragment target is not Markdown"));
+        continue;
+      }
+      const anchors = collectAnchors(file.text);
+      const fragment = target.fragment.toLocaleLowerCase("en-US");
+      if (!anchors.has(target.fragment) && !anchors.has(fragment)) {
+        findings.push(finding(source, link.line, link.destination, "anchor not found"));
+      }
+    }
+  }
+
+  findings.push(...staleVendoredExclusionFindings(vendoredLinkExclusions, new Set(markdownPaths), usedVendoredExclusions));
+  findings.push(
+    ...staleImmutableSnapshotMissingReferenceExclusionFindings(
+      immutableSnapshotMissingReferenceExclusions,
+      new Set(markdownPaths),
+      usedImmutableSnapshotMissingReferenceExclusions,
+    ),
+  );
+
+  // Whichever tier the project's authority actually resolves to (ADR-0054).
+  const calibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: root }).relPath;
+  try {
+    const raw = readRepoText(calibrationPath);
+    const keyCount = [...raw.matchAll(/"handover"\s*:/g)].length;
+    if (keyCount !== 1) throw new Error(`expected exactly one handover key, found ${keyCount}`);
+    const calibration = JSON.parse(raw);
+    const handover = calibration?.handover;
+    if (typeof handover !== "string" || handover.trim() === "") throw new Error("handover must be a nonempty string");
+    if (handover !== posixPath(handover) || handover.includes("\\") || handover.startsWith("/") || handover.split("/").includes("..")) {
+      throw new Error("handover must be a repo-relative POSIX path without escape");
+    }
+    if (!handover.toLowerCase().endsWith(".md")) throw new Error("handover must target Markdown");
+    if (isExcludedRepoPath(handover)) throw new Error("handover targets excluded user-owned path");
+    if (!trackedPaths.has(handover)) throw new Error("handover target is not tracked");
+    safeFile(root, handover, readText, { requireRegular: true, forbidSymlink: true });
+
+    const claudeLinks = extractMarkdownLinks(readRepoText("CLAUDE.md"))
+      .filter((link) => link.destination)
+      .map((link) => ({ ...link, target: relativeTarget(root, "CLAUDE.md", link.destination) }))
+      .filter((link) => !link.target.external && !link.target.error);
+    const handoverLinks = claudeLinks.filter((link) => link.target.repoPath === handover);
+    if (handoverLinks.length === 0) throw new Error("CLAUDE.md does not link to calibrated handover");
+    const stateLinks = claudeLinks.filter((link) => link.target.repoPath.toLowerCase().endsWith("state.md"));
+    if (stateLinks.some((link) => link.target.repoPath !== handover)) throw new Error("CLAUDE.md links to a competing state.md");
+
+    const backlink = extractMarkdownLinks(readRepoText(handover))
+      .filter((link) => link.destination)
+      .map((link) => relativeTarget(root, handover, link.destination))
+      .some((target) => !target.external && !target.error && target.repoPath === calibrationPath);
+    if (!backlink) throw new Error("handover does not link back to calibration");
+  } catch (error) {
+    findings.push(`authority: ${error.message}`);
+  }
+
+  const trackedStatefulDesignSurfaces = STATEFUL_DESIGN_SURFACES.filter((path) => trackedPaths.has(path));
+  // Tier-union, not resolver-routed: this asks "does this repository carry a
+  // pipeline manifest at all", so an artifact at ANY tier answers yes (ADR-0054).
+  const pipelineRepository = Object.values(AUTHORITY_ARTIFACTS.manifest).some((path) => trackedPaths.has(path));
+  let statefulDesignContracts = "not-applicable";
+  if (pipelineRepository) {
+    statefulDesignContracts = "checked";
+    const surfaces = {};
+    for (const path of trackedStatefulDesignSurfaces) {
+      try {
+        const text = readRepoText(path);
+        if (text === null) throw new Error("surface is excluded");
+        surfaces[path] = text;
+      } catch {
+        findings.push(`stateful-design-contract: ${path}: required-surface-unavailable`);
+      }
+    }
+    for (const path of STATEFUL_DESIGN_SURFACES) {
+      if (!trackedPaths.has(path)) {
+        findings.push(`stateful-design-contract: ${path}: required-surface-missing`);
+      }
+    }
+    findings.push(...checkStatefulDesignContracts(surfaces));
+  }
+
+  const observationGovernance = checkObservationGovernance(root, { optionalWhenAbsent: true });
+  for (const item of observationGovernance.findings) findings.push(`observation-governance: ${item}`);
+
+  const consumerDocuments = {};
+  for (const path of CONSUMER_OPERATION_DOCUMENTS) {
+    if (!trackedPaths.has(path)) continue;
+    try { consumerDocuments[path] = readRepoText(path); } catch { findings.push(`consumer-command: ${path}: required operational document unavailable`); }
+  }
+  findings.push(...checkConsumerRepositoryExamples(consumerDocuments));
+  const maintainerDocuments = {};
+  for (const path of MAINTAINER_ONLY_DOCUMENTS) {
+    if (!trackedPaths.has(path)) continue;
+    try { maintainerDocuments[path] = readRepoText(path); } catch { findings.push(`maintainer-audience: ${path}: required maintainer document unavailable`); }
+  }
+  findings.push(...checkMaintainerAudienceBoundaries(maintainerDocuments));
+
+  // A tracked generated page is always pinned. The complete manifest set also
+  // identifies this source checkout, so it remains required when a deletion
+  // removes the page from the tracked set. Generic consumers and minimal
+  // fixtures with neither boundary stay outside this repository-specific
+  // contract.
+  if (trackedPaths.has(ENFORCEMENT_DOCUMENT_PATH) || ENFORCEMENT_SOURCE_MANIFESTS.every((path) => trackedPaths.has(path))) {
+    enforcementDocument = "checked";
+    if (!trackedPaths.has(ENFORCEMENT_DOCUMENT_PATH)) {
+      findings.push(
+        `generated-enforcement: ${ENFORCEMENT_DOCUMENT_PATH}: required generated page is not tracked -- run: node harness/scripts/generate-enforcement-doc.mjs --write and add the page`,
+      );
+    } else {
+      try {
+        const result = checkEnforcementDocument({ rootDir: root });
+        if (!result.ok) {
+          findings.push(
+            `generated-enforcement: ${ENFORCEMENT_DOCUMENT_PATH}: ${result.reason} -- run: node harness/scripts/generate-enforcement-doc.mjs --write`,
+          );
+        }
+      } catch (error) {
+        findings.push(`generated-enforcement: ${ENFORCEMENT_DOCUMENT_PATH}: generation failed: ${error.message}`);
+      }
+    }
+  }
+
+  findings.sort();
+  return {
+    findings,
+    stats: {
+      markdownFiles: markdownPaths.length,
+      linksChecked,
+      anchorsChecked,
+      excludedLinks,
+      vendoredExcludedLinks,
+      immutableSnapshotExcludedMissingReferences,
+      observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
+      statefulDesignContracts,
+      enforcementDocument,
+      consumerRepositoryExamples: CONSUMER_OPERATION_DOCUMENTS.filter((path) => trackedPaths.has(path)).length,
+    },
+  };
+}
+
+function runCli() {
+  const args = process.argv.slice(2);
+  const rootIndex = args.indexOf("--root");
+  if (args.length && (rootIndex < 0 || rootIndex !== 0 || args.length !== 2)) {
+    process.stderr.write("usage: check-doc-contracts.mjs [--root <repository>]\n");
+    process.exit(2);
+  }
+  const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const root = rootIndex === 0 ? args[1] : defaultRoot;
+  try {
+    const result = checkRepository(root);
+    if (result.findings.length) {
+      for (const item of result.findings) process.stderr.write(`DOC-CONTRACT ${item}\n`);
+      process.stderr.write(`Documentation contracts failed: ${result.findings.length} finding(s).\n`);
+      process.exit(2);
+    }
+    process.stdout.write(
+      `Documentation contracts valid: ${result.stats.markdownFiles} Markdown file(s), ${result.stats.linksChecked} link(s), ${result.stats.anchorsChecked} anchor check(s)` +
+        // Printed rather than silent: an accepted gap that leaves no trace in the
+        // gate's own output is indistinguishable from one nobody remembers.
+        `, ${result.stats.vendoredExcludedLinks} known vendored-copy link(s) excluded, ${result.stats.immutableSnapshotExcludedMissingReferences} immutable snapshot missing-reference exclusion(s) accepted.\n`,
+    );
+  } catch (error) {
+    process.stderr.write(`Documentation contracts unavailable: ${error.message}\n`);
+    process.exit(2);
+  }
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runCli();

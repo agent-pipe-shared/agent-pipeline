@@ -1,0 +1,41 @@
+# Full method-only Goldfish briefing — R2-WINDOWS-MAIN-ENTRY-20261025
+
+This is a new bounded task after the completed Critic-input package, not a continuation or reset of that package. You are not alone in the codebase. Preserve other workers' edits. Parent owns Main, integration and administrative evidence. No child agents, staging, commits, dispatch records, native bindings, budget grants or model/provider claims. D143 explicitly authorizes isolated method-only production authorship; ordinary native template obligations cannot manufacture native integration in this runtime. Existing completed package and cumulative costs stay intact.
+
+## 1. Goal
+
+Repair `pipeline.greenfield.r2.windows-main-entry-identity` (AC127/230): the real Phoenix authority revision CLI must recognize its own main module with normal Windows paths and URL-encoded filenames, while import-only use never executes its writer. Reproduce meaningful entry failures first, fix the smallest real cause, preserve proof and physical-path boundaries. Native Windows occurrence is reported, not measured here; portable fixtures cannot claim native Windows PASS.
+
+## 2. Context and re-entry
+
+Read AGENTS.md, architecture/map/index.md, architecture/map/pipeline-core.md and harness.md, applicable compiled project/architecture-decisions.compiled.json entries, then the installed pipeline-start skill:
+`<home>/.codex/plugins/cache/agent-pipeline-local/pipeline-core/0.7.0+codex.20261025134513.977dad8/skills/pipeline-start/SKILL.md`.
+Actual governed root remains `<repo-root>`. If already ready in the same runtime, do not repeat bootstrap for this ordinary new task. If a true runtime re-entry occurs, follow that skill's exact Goldfish preflight from Main at require_escalated before writes. Optional unavailable model-role store must remain unavailable; no borrowed parent receipt. Inert clone is not independently bootstrapped.
+
+Ruleset identity `1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe`, project agent-pipeline, calibration project/pipeline.json. Read bounded Spec AC127/230 and immutable original proof/import requirements; PRD/Spec cannot change. Exact new acceptance is the stripped copy `scratch/r2-windows-main-entry-acceptance-20261025.md`. Read fix-wave decisions D143/D145/D148/D149/D151/D152, sanitized Claude report Windows-main allegation, and only the owned module surface below. No handover, session-history or raw profile discovery.
+
+Create NEW isolated inert clone `scratch/clones/r2-windows-main-entry-20261025` from exact `2f05042e7` (resolve full SHA and physical containment). No Main working changes may enter it. Own only `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs`, `phoenix-authority-revision-installed-package.test.mjs`, and a narrow entry-identity companion/helper only if unavoidable. Read phoenix-authority-approval.mjs, relevant same-package entry helpers and import tests for existing contracts, but do not edit approval/State/registry/Model/finalizer/generic/course/other workers' modules. Parent's current four-file Main Critic proposal is unrelated and foreign.
+
+## 3. Acceptance and evidence
+
+The actual current main check is `import.meta.url.endsWith(process.argv[1])`; filename URL escaping and Windows separators cannot be authenticated by suffix matching. Exercise actual direct CLI entry in a disposable installed package, import-only behavior, spaces/escaped filenames, foreign suffix lookalike, missing/invalid argv and appropriate Windows-shaped input normalization. Preserve original PHARI001 ID and assertions. Do not invoke an actual authority writer on Main or real state. A positive CLI entry can use harmless invalid/missing arguments and assert the real usage/error rather than silent exit; import must leave the complete fixture unchanged. Missing/foreign path must give safe behavior, no realpath crash or suffix-based writer execution. Do not weaken any proof/import examiner.
+
+Write new meaningful cases and capture RED against original Source before production edit, then GREEN after the fix. Keep absolute paths in input fixtures. Native-dependent cases are typed unavailable/skipped, not emulated native success. Existing Source helper reuse is preferred, but do not broaden another owner's scope.
+
+All Node/Git/test calls use sandbox_permissions=require_escalated from first invocation. Before capture/test imports and all descendants install synthetic os.userInfo/homedir/tmpdir without resolving the actual account. D151 allows new unique ordinary public0700 /tmp fixture children physically outside Git and credential ancestry. D148 private authority/socket homes only Source-validated unique children under existing `/run/user/1000/ap-g17`. Separate these homes. Never existing profiles/keys or new broad ACL exceptions. Cleanup exact owned device/inode children only after all processes settle; retain unknown-live fixtures and report. Git uses synthetic identity and isolated configuration, no hook bypass.
+
+Machine-written captures use `plugins/pipeline-core/scripts/capture-evidence.mjs`. Record commands, actual exit/counts, source before/after hashes and original/derivative custody. Run original installed-package import regression, focused new cases and `node --test harness/scripts/check-consumer-safe-paths.test.mjs`. Add full original relevant suite only when changed behavior justifies it. No Full Verify/Reader/Critic/native model call; those remain parent-owned after the combined candidate. Project headroom remains unknown, no invented quick PASS.
+
+## 4. Forbidden
+
+Main/index, PRD/Spec, other workers' files, existing Git/profile/keys/private namespaces, installed runner/plugin configuration, provider/native calls, permission changes, reset/rebase, no-verify/hook bypass, close/stamp/push/merge/tag/release, fake dispatch/model receipts, and edits weakening physical/content/proof checks. Keep original failures and IDs. No replacing a behavioral examiner with a source marker.
+
+## 5. Stop and report
+
+After two unchanged same-cause failed actions preserve evidence and diagnose causally rather than loop. Routine diagnosis/fix within owned criteria is authorized; a materially new architecture/authority contract needs a concrete options/recommendation package. Continue safe independent checks. If a real native Windows experiment is indispensable, prepare exact minimal reviewable operator recipe rather than claiming Source emulation is native proof.
+
+## 6. Delivery and budget
+
+Initial bounded60 calls, reserve12 for a complete package; no native call-budget enforcement claim. Any D149 continuation requires a fully regenerated same-owner briefing, max50 additional calls, cumulative attempts retained. Model/effort follow the ready runtime's existing method selection, no identity override claim.
+
+Own `scratch/agent-out/r2-windows-main-entry-20261025`. Return complete cumulative patch INCLUDING new files, manifest of exact Source paths/postimage SHA256 and patch/capture hashes, actual RED/GREEN captures, fixture rationale and explicit limitations. Do not stage or commit. Parent integrates with active hooks. Verify, independent review, native manual checks and PO acceptance remain separately pending. Do not describe implementation as PO-accepted.

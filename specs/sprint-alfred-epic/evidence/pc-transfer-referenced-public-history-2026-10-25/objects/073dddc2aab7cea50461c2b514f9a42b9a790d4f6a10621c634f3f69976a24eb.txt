@@ -1,0 +1,20 @@
+// node scratch/run-detail.mjs <label> <test file> <case id>
+// Like run-quiet, but prints the failure block of one case (error and message lines only).
+import { spawnSync } from "node:child_process";
+import { mkdirSync, chmodSync } from "node:fs";
+import { join } from "node:path";
+import { homedir, userInfo } from "node:os";
+import { repairAddressRootQuietly } from "../plugins/pipeline-core/lib/session-power-address-repair.mjs";
+const [label, file, caseId] = process.argv.slice(2);
+const tmp = join(homedir(), "pipeline-test-tmp", label, "detail");
+mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+delete env.NODE_TEST_CONTEXT;
+const only = process.argv[5] === "only" ? [`--test-name-pattern=${caseId}`] : [];
+const r = spawnSync(process.execPath, [...only, file], { encoding: "utf8", env, timeout: 900000, maxBuffer: 256 * 1024 * 1024 });
+const lines = ((r.stdout ?? "") + (r.stderr ?? "")).split("\n");
+const start = lines.findIndex((l) => l.includes(`not ok`) && l.includes(caseId)) ;
+const from = start >= 0 ? start : lines.findIndex((l) => l.includes(caseId) && l.includes("✖"));
+console.log(`exit ${r.status}`);
+repairAddressRootQuietly({ home: userInfo().homedir }); // D71/D72: after each suite
+console.log(lines.slice(Math.max(0, from), Math.max(0, from) + 40).join("\n").slice(0, 6000));

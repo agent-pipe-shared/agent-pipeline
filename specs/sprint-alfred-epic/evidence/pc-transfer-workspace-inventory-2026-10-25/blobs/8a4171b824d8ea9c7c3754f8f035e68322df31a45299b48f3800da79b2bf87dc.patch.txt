@@ -1,0 +1,775 @@
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.test.mjs b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+index 96efcf135..5ae8be57c 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+@@ -1099,4 +1099,65 @@ test("a native admission without an admitNativeRequest port refuses synchronousl
+   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+ });
+ 
++// D113 (specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md): an asynchronous native producer is journalled by a
++// source-owned BEGIN ticket (the synchronous prefix of the effect, bound and inventoried under the registry lock) and closed
++// by a source-owned SETTLE step once the promise settles. The registry lock is never held across the await and is never left
++// behind. These cases are appended after the existing contract cases, so no earlier case id moves.
++test("D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable", async () => {
++  const f = fixture();
++  try {
++    activate(f);
++    const lockPath = join(f.root, "session-authority", "registry.lock");
++    const held = invoke(f, key("d113-async-launch"));
++    assert.equal(held.ok, true, held.code);
++    assert.equal(existsSync(lockPath), false, "premise: no registry lock before the launch");
++    let lockDuringAwait = "driver-not-awaited";
++    f.source.launchDriver = async () => {
++      await new Promise((resolve) => setTimeout(resolve, 15));
++      lockDuringAwait = existsSync(lockPath);
++      return { ok: true, value: { launched: true } };
++    };
++    const launched = await f.controller.launch({ invocation: held.value, packetBindingSha256: held.value.receipt.packetBindingSha256 });
++    assert.equal(launched.ok, true, launched.code);
++    assert.equal(lockDuringAwait, false, "the registry lock is released after the BEGIN ticket, not held across the await");
++    assert.equal(existsSync(lockPath), false, "the settled launch leaves no registry lock behind");
++    const next = invoke(f, key("d113-after-settle"));
++    assert.equal(next.ok, true, `a following prepare completes after the settle step: ${next.code}`);
++    assert.equal(existsSync(lockPath), false);
++  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
++});
++
++test("D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released", async () => {
++  const f = fixture();
++  try {
++    activate(f);
++    const lockPath = join(f.root, "session-authority", "registry.lock");
++    const resolved = await f.authorityLifecycle.run({ kind: "prepare" }, async () => { await new Promise((resolve) => setTimeout(resolve, 5)); return 7; });
++    assert.equal(resolved, 7, "a declared async function is a promise-returning effect like any other");
++    assert.equal(existsSync(lockPath), false);
++    await assert.rejects(() => f.authorityLifecycle.run({ kind: "prepare" }, () => Promise.reject(new Error("d113-driver-rejected"))),
++      /d113-driver-rejected/u, "the original rejection reaches the caller, not a lock error");
++    assert.equal(existsSync(lockPath), false, "a rejected asynchronous phase leaves no registry lock behind");
++    const next = invoke(f, key("d113-after-rejection"));
++    assert.equal(next.ok, true, `a following prepare completes after the rejection: ${next.code}`);
++    assert.equal(existsSync(lockPath), false);
++  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
++});
++
++test("D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock", async () => {
++  const f = fixture();
++  try {
++    activate(f);
++    const lockPath = join(f.root, "session-authority", "registry.lock");
++    const stray = join(f.root, "model-family-host", "stray-d113.json");
++    await assert.rejects(() => f.authorityLifecycle.run({ kind: "prepare" }, async () => {
++      await new Promise((resolve) => setTimeout(resolve, 5));
++      writeFileSync(stray, "{}", { mode: 0o600 });
++      return 1;
++    }), (error) => error?.name === "SessionAuthorityError" && /model-family-host:/u.test(error.reason ?? ""));
++    assert.equal(existsSync(lockPath), false, "a refused settle leaves no registry lock behind");
++    assert.equal(existsSync(stray), true, "the refused write is kept as evidence, not silently removed");
++  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs b/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs
+index 1984ee8dd..4089d1ada 100644
+--- a/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs
++++ b/plugins/pipeline-core/lib/pins/session-readiness-drops-to-partial-after-bootstrap-ready.test.mjs
+@@ -18,8 +18,10 @@
+ // on-disk state: a separate OS process owns a real session descriptor in an onboarded fixture repository and
+ // retires it at an exact point of the parent's real strict cleanup-recovery observation (AC6 starts real
+ // parallel processes over one deterministic probe state). Not covered (named, not claimed): SKILL.md prose,
+-// other concurrent writers than session descriptors, and a dense create/retire loop of sub-millisecond
+-// descriptors, which the bounded re-observation does not absorb (see the backlog item).
++// other concurrent writers than session descriptors, and a timing-dependent dense create/retire stress loop.
++// PO decision D112 closes the residual that loop exposed: a descriptor that was listed and then retired before an
++// inspector loads it is treated as already removed (AC7b-AC7d, deterministic), no longer only absorbed by the bounded
++// re-observation; a descriptor that is still present keeps its fail-closed verdict (AC7e).
+ 
+ import assert from "node:assert/strict";
+ import { spawn } from "node:child_process";
+@@ -33,7 +35,13 @@ import { ProjectOnboardingReadyError } from "../project-onboarding-ready-gate.mj
+ import { isSanctionedLifecycleCommand } from "../../hooks/guard-lifecycle-ready.mjs";
+ import { partialCleanupRecoveryResultCore } from "../project-onboarding-v3.mjs";
+ import { planSessionCleanupRecovery } from "../session-cleanup-recovery.mjs";
+-import { listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor } from "../worktree-lifecycle.mjs";
++import {
++  inspectExternallyArchivedSession,
++  inspectSessionRetirement,
++  listActiveSessionDescriptors,
++  retireSessionDescriptor,
++  startSessionDescriptor,
++} from "../worktree-lifecycle.mjs";
+ import { createLegacyLayoutFixture } from "../test-session-cleanup-requester-fixture.mjs";
+ 
+ const CWD = resolve("/projects/current");
+@@ -278,7 +286,7 @@ test("AC7a: a descriptor retired by another process between the directory read a
+   });
+ });
+ 
+-test("AC7b: a descriptor retired by another process after it was listed, before it is inspected, is absorbed by the bounded re-observation", async () => {
++test("AC7b: a descriptor retired by another process after it was listed, before it is inspected, is treated as already removed (D112): ready on the first attempt, no re-observation", async () => {
+   await withDescriptorOwnedByAnotherProcess(({ root, retireInOtherProcess }) => {
+     let raced = false;
+     const { result, planCalls } = observeStrict(root, () => ({
+@@ -291,10 +299,64 @@ test("AC7b: a descriptor retired by another process after it was listed, before
+     assert.equal(raced, true, "the race really happened: the stale listing named a descriptor its owner had already retired");
+     assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
+     assert.ok(result === null);
+-    assert.equal(planCalls, 2, "the plan was re-observed exactly once, then converged");
++    assert.equal(planCalls, 1, "the retired descriptor was skipped by the plan itself; no re-observation was needed");
+   });
+ });
+ 
++// AC7c/AC7d (PO decision D112): the same listed-then-retired race, made fully deterministic and in-process. The
++// descriptor is retired by its owner INSIDE the injected inspector seam, i.e. after the listing named it and before the
++// inspector loads it; the real inspector then throws WT-SESSION-MISSING for it. The plan treats that as already removed.
++function withDescriptorRetiredInsideInspector(inspectorSeam, run) {
++  const root = realpathSync(createLegacyLayoutFixture({ prefix: "pin-flap", name: "owner", goal: "Listed then retired pin" }));
++  try {
++    const handle = startSessionDescriptor(root, { ownerRuntime: null });
++    let retired = false;
++    const retireOnce = () => {
++      if (retired) return;
++      retired = true;
++      retireSessionDescriptor(root, { sessionId: handle.sessionId, ownerNonce: handle.ownerNonce, descriptorSha256: handle.descriptorSha256 });
++      assert.equal(existsSync(handle.path), false, "the owner retired its descriptor between listing and inspection");
++    };
++    run({ root, seam: inspectorSeam(retireOnce) });
++  } finally {
++    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
++  }
++}
++
++test("AC7c: the retirement inspector's required load of a listed-then-retired descriptor does not make the observation partial", () => {
++  withDescriptorRetiredInsideInspector((retireOnce) => ({
++    inspectSessionRetirementFn: (rootDir, sessionId, options) => { retireOnce(); return inspectSessionRetirement(rootDir, sessionId, options); },
++  }), ({ root, seam }) => {
++    const { result, planCalls } = observeStrict(root, () => seam);
++    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
++    assert.ok(result === null);
++    assert.equal(planCalls, 1, "no re-observation was needed");
++  });
++});
++
++test("AC7d: the external-archive inspector's required load of a listed-then-retired descriptor does not make the observation partial", () => {
++  withDescriptorRetiredInsideInspector((retireOnce) => ({
++    inspectExternallyArchivedSessionFn: (rootDir, sessionId, options) => { retireOnce(); return inspectExternallyArchivedSession(rootDir, sessionId, options); },
++  }), ({ root, seam }) => {
++    const { result, planCalls } = observeStrict(root, () => seam);
++    assert.equal(result?.diagnostics?.[0]?.message ?? null, null, "the observation is ready (null), not a partial");
++    assert.ok(result === null);
++    assert.equal(planCalls, 1, "no re-observation was needed");
++  });
++});
++
++test("AC7e (control): a descriptor that is present but malformed still fails closed; only a vanished name is treated as removed", () => {
++  const root = realpathSync(createLegacyLayoutFixture({ prefix: "pin-flap", name: "owner", goal: "Malformed descriptor control" }));
++  try {
++    startSessionDescriptor(root, { ownerRuntime: null });
++    const seam = { inspectSessionRetirementFn: () => { const e = new Error("session descriptor is malformed"); e.code = "WT-SESSION-DESCRIPTOR"; throw e; } };
++    const { result } = observeStrict(root, () => seam);
++    assert.ok(result !== null, "a present-but-invalid descriptor keeps the observation partial");
++  } finally {
++    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
++  }
++});
++
+ // Typed-reason cases (AC-253, ALF-C-P1-01C). The preflight result carries an additive
+ // `sessionReadiness: { reasonCode, lifecycleStatus }` when the session probe is not clean:
+ // PORG-NOT-READY + lifecycleStatus for the typed denial, `session-probe-failed` + null otherwise.
+diff --git a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+index a7157fa78..3f49efd62 100644
+--- a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
++++ b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+@@ -135,7 +135,7 @@ export function publishSourceOwnedAuthorityRoot({repository,producerId,rootPath,
+   const file=join(repo.commonDir,'agent-pipeline',producerId,'external-roots',digest(rootPath)+'.json'),value={schema:'pipeline.source-owned-authority-root.v1',repositorySha256:digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir}),rootPath,rootPathSha256:digest(rootPath),rootRecordSha256:digest(rootRecord)};
+   const publishRoot=()=>{chain(dirname(file));privateParents(repo,file);try{const actual=readAuthoritySourceFile({namespaceId:'external-root',filePath:file,semantic:({value})=>value});if(!same(actual.value,value))authorityOwnerFailure('external-root-registration-CAS');return actual.sourceFact;}catch(e){if(e.code!=='ENOENT')throw e;publish(repo,file,value,null);return readAuthoritySourceFile({namespaceId:'external-root',filePath:file,semantic:({value})=>value}).sourceFact;}};
+   const execution=transitionExecution.getStore();
+-  if(execution?.repositorySha256===digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir})&&execution.enrollment?.registrationPathSha256===digest(file)&&execution.enrollment.externalRootPathSha256===digest(rootPath))return publishRoot();
++  if(execution&&execution.closed!==true&&execution.repositorySha256===digest({primaryRoot:repo.primaryRoot,commonDir:repo.commonDir})&&execution.enrollment?.registrationPathSha256===digest(file)&&execution.enrollment.externalRootPathSha256===digest(rootPath))return publishRoot();
+   authorityOwnerFailure('external-root-source-transition-required');
+ }
+ export function classifyAuthorityLifetime({value,relativePath},producerId,namespaceId,repository){
+@@ -202,11 +202,13 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+   function reserve(identity){const handle=Object.freeze({}),binding=digest({producerId,repoSha,identity,nonce:randomBytes(32).toString('hex')}),operation={phase:'reserved',handle,identity:structuredClone(identity),binding,file:null,sha256:null,result:null,terminalFacts:null,effectFacts:[],beforeFacts:scan().memberships.flatMap(m=>m.sourceFacts)};handles.set(handle,operation);live.set(binding,operation);const reserved=withSessionAuthorityBoundary({repository:repo},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,association:{state:'unbound',target:null},operationHandle:handle}));operation.member=reserved;if(producerId==='local-worker-supervisor'&&identity?.enrollment===true){const initial=readInitialMember(operation);if(initial.sourceFact.sha256!==reserved.memberRef.sha256||initial.sourceFact.size!==reserved.memberRef.size||initial.value.phase!=='reserved'||initial.value.sourceFacts.length!==0)authorityOwnerFailure(producerId+':initial-reservation-CAS');operation.initialMember={value:structuredClone(initial.value),sourceFact:structuredClone(initial.sourceFact)};}operation.file=join(lifetimeRoot,binding+'.json');const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:binding,phase:'armed',identitySha256:digest(identity)};withSessionAuthorityBoundary({repository:repo},boundary=>{operation.sha256=publish(repo,operation.file,record,null);operation.phase='armed';if(operation.initialMember){operation.initialLifetimeFact=initialLifetimeRead(operation).sourceFact;if(initialLifetimeWindow)authorityOwnerFailure(producerId+':initial-reservation-reentrant');initialLifetimeWindow={operation};}try{operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef,operationHandle:handle})};}finally{if(initialLifetimeWindow?.operation===operation)initialLifetimeWindow=null;}});return handle;}
+   function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256);operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
+   function observeEffects(handle){const operation=handles.get(handle);if(!operation||(operation.phase!=='armed'&&!(operation.phase==='running'&&activeTransitions.has(operation))))authorityOwnerFailure(producerId+':effect-handle');return withSessionAuthorityBoundary({repository:repo},boundary=>{const current=scan().memberships.flatMap(m=>m.sourceFacts);operation.effectFacts=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));operation.phase='running';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:operation.effectFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256);operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};});}
++  const asyncPhases=new Map();
+   function effectTransition(handle,effect){
+     const writer=handles.get(handle);if(!writer||!live.has(writer.binding)||!writer.member?.memberRef||typeof effect!=='function')authorityOwnerFailure(producerId+':transition-writer');
+-    // Async native producers need their own source-owned settled journal phases.
+-    // Reject a declared async closure before any invocation or physical effect.
+-    if(effect.constructor?.name==='AsyncFunction')authorityOwnerFailure(producerId+':async-settled-phase-unavailable');
++    // D113: an asynchronous native producer gets a source-owned BEGIN ticket (this transition: the synchronous prefix of the effect
++    // is bound, inventoried and journalled under the registry lock) and a source-owned SETTLE step (settleAsyncPhase, run by run()
++    // when the promise settles). The boundary callback returns a wrapper because a boundary refuses a thenable result: the lock is
++    // released when this ticket closes and is never held across the await.
+     return withSessionAuthorityBoundary({repository:repo},boundary=>{
+       assertContext();actualAuthorityRepository(repo);
+       const before=scan(),spec=transitionScope(writer.identity),sourceContextSha256=digest({repoSha,sourceContext,processId:process.pid,writerBinding:writer.binding});
+@@ -232,11 +234,27 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+       try{
+         const result=executeSourceOwnedSessionAuthorityDomainTransition({boundary,transitionHandle:ticket});
+         if(state.observation)try{controlledModelAfterExecution(state,ticket,result);}catch{state.observation.incomplete=true;}
+-        return result;
++        if(state.asyncPhase&&state.asyncPost)asyncPhases.set(handle,state.asyncPost);
++        return {settled:result};
+       }finally{
+         state.closed=true;
+         if(state.observation)try{controlledModelAfterClose(state,ticket);}catch{state.observation.incomplete=true;}
+       }
++    }).settled;
++  }
++  // D113 SETTLE step: runs under a fresh registry boundary after the effect's promise settled (resolved or rejected). It re-reads
++  // the physical namespace and refuses any change the BEGIN ticket's write scope does not admit: an existing source may change
++  // only when its path is mutable, a new source only inside a creation pattern or as an owner lifetime record (another operation
++  // of this producer may legitimately journal while this one is pending), and nothing outside the mutable set may vanish.
++  function settleAsyncPhase(handle){
++    const phase=asyncPhases.get(handle);if(!phase)return;asyncPhases.delete(handle);
++    withSessionAuthorityBoundary({repository:repo},()=>{
++      assertContext();actualAuthorityRepository(repo);
++      const prior=entryMap(phase.entries),post=entryMap(scan().entries),mutable=new Set(phase.mutablePathSha256s);
++      const lifetime=row=>row.path.startsWith(lifetimeRoot+sep);
++      for(const [path,row] of post){const before=prior.get(path);if(before&&same(before.sourceFact,row.sourceFact))continue;
++        if(before?!mutable.has(path)&&!lifetime(row):!lifetime(row)&&!phase.creations.some(c=>c.rootPathSha256===digest(row.rootPath)&&new RegExp(c.relativePattern).test(row.relativePath)))authorityOwnerFailure(producerId+':async-settle-unscoped-change');}
++      for(const [path,row] of prior)if(!post.has(path)&&!mutable.has(path)&&!lifetime(row))authorityOwnerFailure(producerId+':async-settle-unscoped-removal');
+     });
+   }
+   function transitionExisting(handle,effect){
+@@ -286,7 +304,7 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+     });
+   }
+ 
+-  function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();if(effect.constructor?.name==='AsyncFunction')authorityOwnerFailure(producerId+':async-settled-phase-unavailable');preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(finish,error=>{observeEffects(handle);throw error;}):finish(result);});}
++  function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){asyncPhases.delete(handle);throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(value=>{settleAsyncPhase(handle);return finish(value);},error=>{try{settleAsyncPhase(handle);}catch{}observeEffects(handle);throw error;}):finish(result);});}
+   const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
+   controlledModelDomainOwners.set(owner,{port,producerId,repository:repo,assertContext});
+   return owner;
+@@ -303,8 +321,12 @@ export function executeDomainAuthorityTransition(handle){
+   if(!same(state.before, state.scan()))authorityOwnerFailure('domain-transition-before-drift');
+   state.executed=true;
+   if(state.observation)state.observation.count+=1;
+-  const result=transitionExecution.run({repositorySha256:state.plan.repositorySha256,enrollment:state.plan.writeScope.enrollment},state.effect);
+-  if(result&&typeof result.then==='function')authorityOwnerFailure('domain-transition-async-effect-held');
++  const execution={repositorySha256:state.plan.repositorySha256,enrollment:state.plan.writeScope.enrollment,closed:false};
++  let result;try{result=transitionExecution.run(execution,state.effect);}finally{execution.closed=true;}
++  // D113 BEGIN ticket: a thenable result journals only the synchronous prefix here. The continuation runs after this ticket
++  // closed (execution.closed refuses its root publication) and is settled by the owner's own settle step in run(); an enrolment
++  // transition has no asynchronous phase because its external-root registration must be bound inside this ticket.
++  if(result&&typeof result.then==='function'){if(state.plan.writeScope.enrollment!==null)authorityOwnerFailure('domain-transition-async-enrollment');state.asyncPhase=true;}
+   state.assertContext();actualAuthorityRepository(state.repository);
+   const after=state.scan(),before=entryMap([...state.before.entries,...state.externalBefore]),post=entryMap(after.entries),changedEntries=[],removedEntries=[];
+   const mutable=new Set(state.plan.writeScope.mutablePathSha256s),creations=state.plan.writeScope.creations;
+@@ -323,6 +345,7 @@ export function executeDomainAuthorityTransition(handle){
+   update(state.writer);for(const row of changedEntries)if(row.sourceFact.pathSha256!==digest(state.writer.file)&&!state.writer.effectFacts.some(f=>same(f,row.sourceFact)))state.writer.effectFacts.push(row.sourceFact);
+   const observations=[state.writer,...state.retained].map(op=>({memberRef:op.member.memberRef,operationHandle:op.handle,...state.observe(op.handle)}));
+   state.terminal={entry:state.plan.entry,repositorySha256:state.plan.repositorySha256,producerId:state.plan.producerId,producerPort:state.port,memberships:after.memberships,memberObservations:observations,changedEntries,removedEntries,result,sourceContextSha256:state.plan.sourceContextSha256};
++  if(state.asyncPhase)state.asyncPost={entries:after.entries,mutablePathSha256s:[...mutable],creations};
+   return result;
+ }
+ export function observeDomainAuthorityTransitionTerminal(handle){const state=ownedTransition(handle);if(!state.executed||!state.terminal||!same(state.terminal.memberships,state.scan().memberships))authorityOwnerFailure('domain-transition-terminal-unavailable-or-drift');return state.terminal;}
+diff --git a/plugins/pipeline-core/lib/session-authority-lock-wait.test.mjs b/plugins/pipeline-core/lib/session-authority-lock-wait.test.mjs
+new file mode 100644
+index 000000000..8ff3d7dc0
+--- /dev/null
++++ b/plugins/pipeline-core/lib/session-authority-lock-wait.test.mjs
+@@ -0,0 +1,130 @@
++// SPDX-License-Identifier: SUL-1.0
++// K12: every taker of the session-authority registry lock waits a short, bounded time for a live holder and then
++// fails typed (SDC-LOCK-HELD naming the holder, the wait spent and the retry command); a holder that is provably
++// gone is not waited on; and retired-lock directories are bounded in number (newest N kept for forensics).
++import test from "node:test";
++import assert from "node:assert/strict";
++import { spawn, spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { devNull, hostname } from "node:os";
++import { join } from "node:path";
++import { observeLinuxProcess } from "./native-platform-process-observer.mjs";
++import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
++import * as registry from "./session-authority-registry.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
++import { createGovernanceScopeController } from "./governance-scope.mjs";
++import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "./test-item-approved-course-fixture.mjs";
++
++const { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } = registry;
++const sha = (text) => createHash("sha256").update(text).digest("hex");
++
++function fixture(run) {
++  const parent = nativeContractFixtureParent();
++  mkdirSync(parent, { recursive: true, mode: 0o700 });
++  const root = mkdtempSync(join(parent, "session-authority-lock-wait-"));
++  try {
++    mkdirSync(join(root, "evidence"), { mode: 0o700 });
++    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
++    for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"], ["core.hooksPath", devNull]]) assert.equal(spawnSync("git", ["-C", root, "config", name, value]).status, 0);
++    assert.equal(spawnSync("git", ["-C", root, "commit", "--allow-empty", "-q", "-m", "fixture"]).status, 0);
++    const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") });
++    const plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit course" });
++    assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
++    prepareApprovedItemCourseFixture({ root });
++    const repository = inspectSignedDescriptorCustodyRepository(root);
++    assert.equal(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status, "initialized");
++    return run({ root, repository });
++  } finally { rmSync(root, { recursive: true, force: true }); }
++}
++
++const lockPathOf = (repository) => join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
++const abandonedOf = (repository) => join(repository.commonDir, "agent-pipeline/session-authority-abandoned");
++const own = () => observeLinuxProcess(process.pid);
++function writeLiveLock(repository) {
++  const owner = { pid: process.pid, hostSha256: sha(hostname()), process: { start: own().start, bootSha256: own().bootSha256 }, acquiredAt: new Date().toISOString() };
++  writeFileSync(lockPathOf(repository), JSON.stringify({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "d".repeat(64), owner }), { mode: 0o600, flag: "wx" });
++}
++/** A real second process that removes the lock file after `ms`; the caller blocks synchronously, as a hook does. */
++function releaseLockLater(lockPath, ms) {
++  const child = spawn(process.execPath, ["-e", `setTimeout(()=>{try{require('node:fs').unlinkSync(process.argv[1])}catch{}},${ms})`, lockPath], { stdio: "ignore", detached: true });
++  child.unref();
++  return child;
++}
++const linuxOnly = { skip: process.platform !== "linux" };
++
++test("K12-1 a registry lock held by a live holder and released within the bound is waited out", linuxOnly, () => fixture(({ repository }) => {
++  writeLiveLock(repository);
++  releaseLockLater(lockPathOf(repository), 300);
++  const started = Date.now();
++  const result = withSessionAuthorityBoundary({ repository }, () => "entered");
++  assert.equal(result, "entered");
++  assert.ok(Date.now() - started >= 200, "it did wait for the holder rather than racing past it");
++  assert.equal(existsSync(lockPathOf(repository)), false, "its own lock is released again");
++}));
++
++test("K12-2 a live holder past the bound gives SDC-LOCK-HELD naming the holder, the wait spent and the retry command", linuxOnly, () => fixture(({ root, repository }) => {
++  writeLiveLock(repository);
++  assert.ok(Number.isSafeInteger(registry.SESSION_AUTHORITY_LOCK_WAIT_MS) && registry.SESSION_AUTHORITY_LOCK_WAIT_MS > 0 && registry.SESSION_AUTHORITY_LOCK_WAIT_MS <= 3000, "the bound is a short exported constant, far below a 10 s hook timeout");
++  const started = Date.now();
++  let fault = null;
++  try { withSessionAuthorityBoundary({ repository }, () => "entered"); } catch (error) { fault = error; }
++  const spent = Date.now() - started;
++  assert.ok(fault, "the boundary must refuse");
++  assert.equal(fault.code, "SDC-LOCK-HELD");
++  assert.equal(fault.lock.pid, process.pid); assert.equal(fault.lock.owner, "live");
++  assert.ok(fault.lock.waitedMs >= registry.SESSION_AUTHORITY_LOCK_WAIT_MS - 100, `waited ${fault.lock.waitedMs}ms`);
++  assert.ok(spent < registry.SESSION_AUTHORITY_LOCK_WAIT_MS + 1500, `the wait is bounded (${spent}ms)`);
++  assert.match(fault.repair, / wait --root /u); assert.match(fault.repair, new RegExp(`pid ${process.pid}`, "u"));
++  assert.equal(existsSync(lockPathOf(repository)), true, "a live holder's lock is never touched");
++  assert.ok(root);
++}));
++
++test("K12-3 a holder that is provably gone is not waited on: its lock is retired at once", linuxOnly, () => fixture(({ repository }) => {
++  const gone = spawnSync(process.execPath, ["-e", ""]).pid;
++  const owner = { pid: gone, hostSha256: sha(hostname()), process: { start: "1", bootSha256: own().bootSha256 }, acquiredAt: new Date(Date.now() - 3600000).toISOString() };
++  writeFileSync(lockPathOf(repository), JSON.stringify({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "c".repeat(64), owner }), { mode: 0o600, flag: "wx" });
++  const started = Date.now();
++  assert.equal(withSessionAuthorityBoundary({ repository }, () => "entered"), "entered");
++  assert.ok(Date.now() - started < registry.SESSION_AUTHORITY_LOCK_WAIT_MS, "no wait for a dead owner");
++}));
++
++function seedRetired(repository, count) {
++  const dir = abandonedOf(repository);
++  mkdirSync(dir, { recursive: true, mode: 0o700 });
++  const names = [];
++  for (let index = 0; index < count; index += 1) {
++    const name = `2026010100${String(index).padStart(7, "0")}-${String(index).padStart(8, "a")}-registry-lock`;
++    mkdirSync(join(dir, name), { mode: 0o700 });
++    writeFileSync(join(dir, name, "registry.lock"), "{}", { mode: 0o600 });
++    writeFileSync(join(dir, name, "retire.json"), "{}", { mode: 0o600 });
++    names.push(name);
++  }
++  mkdirSync(join(dir, "20260101000000000-bbbbbbbb-drift-heal"), { mode: 0o700 });
++  writeFileSync(join(dir, "20260101000000000-bbbbbbbb-drift-heal", "keep.json"), "{}", { mode: 0o600 });
++  return names;
++}
++const retiredNames = (repository) => readdirSync(abandonedOf(repository)).filter((name) => name.endsWith("-registry-lock")).sort();
++
++test("K12-4 retiring a dead lock sweeps old retired-lock directories beyond the retention and nothing else", linuxOnly, () => fixture(({ repository }) => {
++  const kept = registry.SESSION_AUTHORITY_RETIRED_LOCKS_KEPT;
++  assert.ok(Number.isSafeInteger(kept) && kept >= 5 && kept <= 100);
++  const seeded = seedRetired(repository, kept + 15);
++  const gone = spawnSync(process.execPath, ["-e", ""]).pid;
++  const owner = { pid: gone, hostSha256: sha(hostname()), process: { start: "1", bootSha256: own().bootSha256 }, acquiredAt: new Date(Date.now() - 3600000).toISOString() };
++  writeFileSync(lockPathOf(repository), JSON.stringify({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "c".repeat(64), owner }), { mode: 0o600, flag: "wx" });
++  withSessionAuthorityBoundary({ repository }, () => "entered");
++  const left = retiredNames(repository);
++  assert.equal(left.length, kept, left.join(","));
++  assert.equal(left.includes(seeded[0]), false, "the oldest were swept");
++  assert.equal(left.includes(seeded[seeded.length - 1]), true, "the newest seeded one is kept");
++  assert.equal(left.some((name) => !seeded.includes(name)), true, "the directory retired just now is kept");
++  assert.equal(existsSync(join(abandonedOf(repository), "20260101000000000-bbbbbbbb-drift-heal", "keep.json")), true, "directories that hold registry content are never swept");
++}));
++
++test("K12-5 a live holder's lock and the retired directories are untouched when the wait times out", linuxOnly, () => fixture(({ repository }) => {
++  const seeded = seedRetired(repository, registry.SESSION_AUTHORITY_RETIRED_LOCKS_KEPT + 5);
++  writeLiveLock(repository);
++  assert.throws(() => withSessionAuthorityBoundary({ repository }, () => "entered"), (error) => error.code === "SDC-LOCK-HELD");
++  assert.deepEqual(retiredNames(repository), seeded.slice().sort(), "no sweep runs while a live holder keeps the lock");
++}));
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index c53ea5bb5..b87a525a4 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { AsyncLocalStorage } from 'node:async_hooks';
+ import { createHash, randomBytes } from 'node:crypto';
+-import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
++import { constants, closeSync, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import { hostname } from 'node:os';
+@@ -153,6 +153,34 @@ function observeLock(repo,judge=judgeSessionAuthorityLockOwner){
+     acquiredAt:acquiredAt??new Date(stat.mtimeMs).toISOString(),ageSeconds:Math.max(0,Math.round((Date.now()-since)/1000)),
+     sha256:hash(bytes),dev:String(stat.dev),ino:String(stat.ino)};
+ }
++// K12: a taker of the registry lock waits for a live holder, bounded. A hook runs under a 10 s host timeout
++// (hooks/hooks.json, the shortest relevant one) and still has its own work to do once it holds the lock, and
++// retryWhileSessionAuthorityLockHeld (native-goldfish-host-state.mjs) already loops around this call, so the
++// bound is short: a holder normally keeps the lock for milliseconds, 1.5 s covers a slow disk or a busy
++// machine and leaves the hook more than 8 s for its own work.
++export const SESSION_AUTHORITY_LOCK_WAIT_MS=1500;
++const SESSION_AUTHORITY_LOCK_POLL_MS=50;
++const lockSleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);
++// K12: retired registry locks (`<stamp>-<hex>-registry-lock`, holding only the lock and its retire.json) are kept
++// for forensics, newest SESSION_AUTHORITY_RETIRED_LOCKS_KEPT only. Observed 2026-10-21: ~70 in 1.5 days, one per
++// killed hook, each identical in kind; the last 20 keep roughly the latest half-day of churn, which is what a
++// forensic read of "who died holding the lock" needs, and bound the directory. Directories of any other kind
++// (drift-heal, move-aside, take-over, source-update, ...) hold registry content or decisions and are never swept.
++export const SESSION_AUTHORITY_RETIRED_LOCKS_KEPT=20;
++function sweepRetiredLocks(repo){
++  try{
++    const base='agent-pipeline/session-authority-abandoned',dir=safePath(repo,base);
++    const names=readdirSync(dir).filter(name=>/^\d{14,}-[0-9a-f]{8}-registry-lock$/.test(name)).sort();
++    for(const name of names.slice(0,Math.max(0,names.length-SESSION_AUTHORITY_RETIRED_LOCKS_KEPT))){
++      const abs=safePath(repo,`${base}/${name}`),stat=lstatSync(abs);
++      if(stat.isSymbolicLink()||!stat.isDirectory())continue;
++      const inner=readdirSync(abs);
++      if(inner.some(file=>file!=='registry.lock'&&file!=='retire.json'))continue;
++      for(const file of inner)unlinkSync(safePath(repo,`${base}/${name}/${file}`));
++      rmdirSync(abs);
++    }
++  }catch{/* best effort: a sweep that fails leaves the forensic copies, never the lock */}
++}
+ /** Moves exactly the observed lock aside. A lock created after it was observed is put back, never removed. */
+ function retireLock(repo,observed,cause){
+   const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-registry-lock`;
+@@ -166,14 +194,16 @@ function retireLock(repo,observed,cause){
+   }
+   syncDirectory(dirname(lockAbs));
+   try{writeFileSync(safePath(repo,`${dir}/retire.json`),canonical({schema:'pipeline.session-authority-lock-retirement.v1',cause,owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,retiredAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
++  sweepRetiredLocks(repo);
+   return dir;
+ }
+ function lockHeldFault(repo,observed,reason){
+   const root=repo.primaryRoot,who=observed.pid===null?'an owner it does not record':`pid ${observed.pid}`;
+   const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-LOCK-HELD';error.reason=reason;
+-  error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds});
++  const waitedMs=observed.waitedMs??0;
++  error.lock=freeze({owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,ageSeconds:observed.ageSeconds,waitedMs,waitBoundMs:SESSION_AUTHORITY_LOCK_WAIT_MS});
+   error.repair=observed.owner==='live'
+-    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s). Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
++    ?`the registry lock is held by a running Pipeline process (${who}, for ${observed.ageSeconds}s)${waitedMs>0?` and did not clear within the ${waitedMs}ms bounded wait; retry the operation, or wait longer`:''}. Wait for it: node ${REPAIR_SCRIPT} wait --root ${root} --timeout 120`
+     :`the registry lock is held by ${who} for ${observed.ageSeconds}s, and that owner cannot be confirmed alive or gone. If no Pipeline process runs for this repository: node ${REPAIR_SCRIPT} release-lock --root ${root} --no-pipeline-running --reason "<why>"`;
+   throw error;
+ }
+@@ -181,16 +211,22 @@ function lockHeldFault(repo,observed,reason){
+ function acquireRegistryLock(repo,lockSchema,heldReason){
+   privateDirectories(repo,LOCK_PATH);
+   const abs=safePath(repo,LOCK_PATH);
+-  for(let attempt=0;;attempt+=1){
++  // K12: `retired` counts retirements of a dead holder (a few at most); `races` counts lost create races; a live
++  // or unjudgeable holder is waited for until SESSION_AUTHORITY_LOCK_WAIT_MS, then refused typed. An unjudgeable
++  // holder is waited for too: a taker creates the file exclusively and writes its owner bytes a moment later, and
++  // a reader in that gap sees an owner-less file, which is not a legacy lock.
++  const started=Date.now();let retired=0,races=0;
++  for(;;){
+     const bytes=Buffer.from(canonical({schema:lockSchema,repositorySha256:repoDigest(repo),nonce:randomBytes(32).toString('hex'),owner:lockOwner()}));
+     let fd,nativeLock;
+     try{if(process.platform==='win32')nativeLock=nativeLockCreate(abs,bytes);else fd=openSync(abs,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}
+     catch(error){
+-      if(attempt>=2||(process.platform!=='win32'&&error?.code!=='EEXIST'))fail('SDC-LOCK-HELD',heldReason);
+-      const observed=observeLock(repo);
+-      if(observed.status==='absent')continue;
+-      if(observed.owner==='dead'){retireLock(repo,observed,'the recorded owner process is gone');continue;}
+-      lockHeldFault(repo,observed,heldReason);
++      if(retired>=2||races>=64||(process.platform!=='win32'&&error?.code!=='EEXIST'))fail('SDC-LOCK-HELD',heldReason);
++      const observed=observeLock(repo),waitedMs=Date.now()-started;
++      if(observed.status==='absent'){races+=1;continue;}
++      if(observed.owner==='dead'){retireLock(repo,observed,'the recorded owner process is gone');retired+=1;continue;}
++      if(waitedMs<SESSION_AUTHORITY_LOCK_WAIT_MS){lockSleep(Math.min(SESSION_AUTHORITY_LOCK_POLL_MS,SESSION_AUTHORITY_LOCK_WAIT_MS-waitedMs));continue;}
++      lockHeldFault(repo,{...observed,waitedMs},heldReason);
+     }
+     if(process.platform!=='win32'){try{writeFileSync(fd,bytes);fsyncSync(fd);}finally{closeSync(fd);}}
+     return {abs,nativeLock};
+@@ -1189,8 +1225,10 @@ export function executeSourceOwnedSessionAuthorityDomainTransition(input) {
+   let result;
+   try{
+     domainTransitionOwned(input.transitionHandle,repo,pair.port);
++    // D113: a thenable result is the BEGIN ticket of an asynchronous phase. Only its synchronous prefix is bound and journalled here
++    // (the same inventory, member and baseline checks as any transition); the owner settles the promise through its own source-owned
++    // settle step, and the registry lock is released with this boundary instead of being held across the await.
+     result=domainTransitionOwner.executeDomainAuthorityTransition(input.transitionHandle);
+-    if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-HELD','domain-transition-async-phase-needs-settled-ticket');
+     const terminal=domainTransitionOwner.observeDomainAuthorityTransitionTerminal(input.transitionHandle);
+     exact(terminal,['entry','repositorySha256','producerId','producerPort','memberships','memberObservations','changedEntries','removedEntries','result','sourceContextSha256'],'domain-transition-terminal');
+     if(terminal.entry!==plan.entry||terminal.repositorySha256!==plan.repositorySha256||terminal.producerId!==plan.producerId||terminal.producerPort!==pair.port||terminal.sourceContextSha256!==plan.sourceContextSha256||terminal.result!==result)fail('SDC-AUTHORITY-CAS','domain-transition-terminal-binding');
+diff --git a/plugins/pipeline-core/lib/session-cleanup-recovery.mjs b/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
+index bc1016e8d..cfe5468c7 100644
+--- a/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
++++ b/plugins/pipeline-core/lib/session-cleanup-recovery.mjs
+@@ -1195,6 +1195,38 @@ export function applyOrphanDescriptorArchive({
+   };
+ }
+ 
++/**
++ * D112: a descriptor LISTED a moment ago may be retired by its owner before an inspector loads it. The listing
++ * already skips such a name; the inspectors' required load reports it as WT-SESSION-MISSING. That is a
++ * descriptor that is already removed, not an observation failure: it leaves the result. Every other failure
++ * (malformed, binding or digest mismatch) still throws, so a descriptor that is still present keeps its
++ * fail-closed verdict. The result arrays are index-aligned over the descriptors that remain.
++ */
++function inspectListedDescriptors(root, listed, { inspectRetirement, inspectExternal = null }) {
++  const skipIfRetired = (inspect) => {
++    try {
++      return inspect();
++    } catch (error) {
++      if (error?.code === "WT-SESSION-MISSING") return null;
++      throw error;
++    }
++  };
++  const options = (descriptor) => ({ expectedDescriptorSha256: descriptor.descriptorSha256 });
++  const retirements = listed.map((descriptor) => skipIfRetired(
++    () => inspectRetirement(root, descriptor.sessionId, options(descriptor)),
++  ));
++  const externals = listed.map((descriptor, index) => (retirements[index] === null || inspectExternal === null
++    ? undefined
++    : skipIfRetired(() => inspectExternal(root, descriptor.sessionId, options(descriptor)))));
++  const kept = listed.map((_, index) => index)
++    .filter((index) => retirements[index] !== null && externals[index] !== null);
++  return {
++    activeDescriptors: kept.map((index) => listed[index]),
++    orphanDescriptors: kept.map((index) => retirements[index]),
++    externalRetirements: kept.map((index) => externals[index]),
++  };
++}
++
+ function planSessionCleanupRecoveryBase({
+   rootDir,
+   scriptPath = DEFAULT_SCRIPT,
+@@ -1268,21 +1300,21 @@ function planSessionCleanupRecoveryBase({
+         status: "not-needed",
+       };
+     }
+-    const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
+-      binding.root,
+-      descriptor.sessionId,
+-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+-    ));
+-    const inspectExternal = deps.inspectExternallyArchivedSessionFn
+-      ?? inspectExternallyArchivedSession;
+-    const externalRetirements = activeDescriptors.map((descriptor) => inspectExternal(
+-      binding.root,
+-      descriptor.sessionId,
+-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+-    ));
++    const inspected = inspectListedDescriptors(binding.root, activeDescriptors, {
++      inspectRetirement,
++      inspectExternal: deps.inspectExternallyArchivedSessionFn ?? inspectExternallyArchivedSession,
++    });
++    if (inspected.activeDescriptors.length === 0) {
++      return {
++        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
++        status: "not-needed",
++      };
++    }
++    const { orphanDescriptors, externalRetirements } = inspected;
++    const remainingDescriptors = inspected.activeDescriptors;
+     const plan = planExactOrphanRetirement({
+       binding,
+-      activeDescriptors,
++      activeDescriptors: remainingDescriptors,
+       orphanDescriptors,
+       externalRetirements,
+       scriptPath,
+@@ -1292,7 +1324,7 @@ function planSessionCleanupRecoveryBase({
+       return {
+         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+         status: "orphan-recovery-unavailable",
+-        activeDescriptorCount: activeDescriptors.length,
++        activeDescriptorCount: remainingDescriptors.length,
+       };
+     }
+     fail("WT-SESSION-RECOVERY-PLAN", "orphan retirement proof was not constructible");
+@@ -1375,25 +1407,27 @@ function planSessionCleanupRecoveryBase({
+     }, scriptPath);
+   }
+   if (binding.status === "unbound") {
+-    const activeDescriptors = listDescriptors(binding.root);
++    const listedDescriptors = listDescriptors(binding.root);
++    if (listedDescriptors.length === 0) {
++      return {
++        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
++        status: "not-needed",
++      };
++    }
++    const {
++      activeDescriptors,
++      orphanDescriptors,
++      externalRetirements,
++    } = inspectListedDescriptors(binding.root, listedDescriptors, {
++      inspectRetirement,
++      inspectExternal: deps.inspectExternallyArchivedSessionFn ?? inspectExternallyArchivedSession,
++    });
+     if (activeDescriptors.length === 0) {
+       return {
+         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+         status: "not-needed",
+       };
+     }
+-    const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
+-      binding.root,
+-      descriptor.sessionId,
+-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+-    ));
+-    const inspectExternal = deps.inspectExternallyArchivedSessionFn
+-      ?? inspectExternallyArchivedSession;
+-    const externalRetirements = activeDescriptors.map((descriptor) => inspectExternal(
+-      binding.root,
+-      descriptor.sessionId,
+-      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+-    ));
+     if (activeDescriptors.length > 1 || externalRetirements.some((entry) => entry.status === "ready")) {
+       const plan = planExactOrphanRetirement({
+         binding,
+@@ -1455,14 +1489,10 @@ function planSessionCleanupRecoveryBase({
+       },
+     };
+   }
+-  const activeDescriptors = listDescriptors(binding.root);
++  const inspectedBound = inspectListedDescriptors(binding.root, listDescriptors(binding.root), { inspectRetirement });
++  const activeDescriptors = inspectedBound.activeDescriptors;
+   if (activeDescriptors.length !== 0) {
+-    const orphanDescriptors = activeDescriptors
+-      .map((descriptor) => inspectRetirement(
+-        binding.root,
+-        descriptor.sessionId,
+-        { expectedDescriptorSha256: descriptor.descriptorSha256 },
+-      ))
++    const orphanDescriptors = inspectedBound.orphanDescriptors
+       .sort((left, right) => left.sessionId.localeCompare(right.sessionId));
+     if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
+       return {
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 887e3dfc1..1d7eaf009 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -59,6 +59,8 @@ import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/prote
+ import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+ import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
++import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { loadMapBundle } from "./module-inventory.mjs";
+ import { owningModules } from "./architecture-boundary-check.mjs";
+ 
+@@ -157,6 +159,15 @@ function defaultQueueRow(root, sliceId) {
+   } catch { return null; }
+ }
+ 
++/** K12: the session-authority registry lock as a reader sees it (never taken), or null when it cannot be observed. */
++function defaultRegistryLock(root) {
++  try { return sessionAuthorityRegistry.inspectSessionAuthorityLock({ repository: inspectSignedDescriptorCustodyRepository(root) }); } catch { return null; }
++}
++// The registry's own bound when it exports one (K12); a short fixed default otherwise, so this script never needs the
++// registry module and the bound to be changed in the same commit.
++const REGISTRY_LOCK_WAIT_MS = Number.isSafeInteger(sessionAuthorityRegistry.SESSION_AUTHORITY_LOCK_WAIT_MS) ? sessionAuthorityRegistry.SESSION_AUTHORITY_LOCK_WAIT_MS : 1500;
++const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
++
+ function defaultSpecPathFromState(root) {
+   try {
+     const paths = resolveProjectAuthorityPaths({ rootDir: root });
+@@ -487,11 +498,37 @@ export function generateDispatchBinding(options, deps = {}) {
+   // binding). Order: loaded, installed, content hash of the loaded plugin root. Each fallback warns.
+   let observation;
+   let observationFault = null;
+-  try { observation = observePreflight({ cwd: root }); } catch (error) { observationFault = error?.code ?? "observer-threw"; }
+-  const identity = observation?.rulesetSource?.loadedIdentity;
+-  const identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
++  const observeOnce = () => {
++    observationFault = null;
++    try { observation = observePreflight({ cwd: root }); } catch (error) { observation = undefined; observationFault = error?.code ?? "observer-threw"; }
++  };
++  observeOnce();
++  let identity = observation?.rulesetSource?.loadedIdentity;
++  let identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
+   let rulesetSha = null;
+   let rulesetFallback = null;
++  // K12: a lock-held registry is a transient state, never a reason to settle for a lesser identity. Before any
++  // fallback the lock is observed; a live or unjudgeable holder is waited for (bounded), the preflight is
++  // observed again once it clears, and a lock that stays held is refused typed, naming the holder and the retry.
++  if (!(identityStatus === "available" && typeof identity?.value === "string" && SHA.test(identity.value))) {
++    const lockOf = deps.registryLock ?? defaultRegistryLock;
++    const pause = deps.pause ?? sleepMs;
++    const now = deps.now ?? Date.now;
++    const deadline = now() + REGISTRY_LOCK_WAIT_MS;
++    let lock = lockOf(root);
++    let waited = false;
++    while ((lock?.status === "held" && lock.owner !== "dead") && now() < deadline) { pause(50); waited = true; lock = lockOf(root); }
++    if (lock?.status === "held") {
++      const holder = lock.pid === null || lock.pid === undefined ? "an owner it does not record" : `pid ${lock.pid}`;
++      refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock is held by ${holder} (${lock.owner}, for ${lock.ageSeconds}s) and no fallback ruleset identity is taken while it is (preflight status: ${identityStatus}); repair: retry this command; to wait longer run \`node <plugin-root>/scripts/session-authority-repair.mjs wait --root <repo> --timeout 120\`; if the owner is gone or cannot be judged run \`... release-lock --root <repo> --no-pipeline-running --reason "<why>"\``);
++    }
++    if (waited || observationFault === "SDC-LOCK-HELD") {
++      observeOnce();
++      identity = observation?.rulesetSource?.loadedIdentity;
++      identityStatus = observationFault ?? (identity ? String(identity.status) : "absent");
++      if (observationFault === "SDC-LOCK-HELD") refuse("DBG-RULESET-LOCK-HELD", `the session-authority registry lock was still contended when the ruleset identity was read again, so no fallback identity is taken; repair: retry this command`);
++    }
++  }
+   if (identityStatus === "available" && typeof identity?.value === "string" && SHA.test(identity.value)) rulesetSha = identity.value;
+   else {
+     const installed = observation?.rulesetSource?.installedIdentity;
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 3e16904f2..3d01b5fe7 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -302,6 +302,42 @@ for (const [name, overrides, extra, depOverrides, code, mention] of REFUSALS) {
+   });
+ }
+ 
++// K12: a transient registry lock must never degrade into a different ruleset identity.
++const heldLock = (over = {}) => ({ status: "held", owner: "live", pid: 4242, ageSeconds: 3, ...over });
++const unavailableObserver = () => ({ rulesetSource: { loadedIdentity: { status: "unavailable" } }, pluginRoot: "/fixture/plugin-root" });
++
++test("K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder instead of falling back to the plugin-root hash", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  let clock = 0;
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: unavailableObserver, snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }),
++    registryLock: () => heldLock(), now: () => clock, pause: (ms) => { clock += ms; } }));
++  assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
++  assert.match(result.message, /pid 4242/u); assert.match(result.message, /retry this command/u); assert.match(result.message, /session-authority-repair\.mjs wait/u);
++  assert.equal(result.skeleton, undefined);
++});
++
++test("K12 a lock that clears within the wait changes nothing: the identity is read again and the loaded one is used", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  let clock = 0; let reads = 0; let observed = 0;
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, {
++    observePreflight: () => { observed += 1; if (observed === 1) { const error = new Error("held"); error.code = "SDC-LOCK-HELD"; throw error; } return availableObserver(); },
++    snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }),
++    registryLock: () => { reads += 1; return reads <= 2 ? heldLock() : { status: "absent" }; }, now: () => clock, pause: (ms) => { clock += ms; } }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.equal(result.binding.rulesetSha, RULESET);
++  assert.equal(result.warnings.some((warning) => warning.code === "DBG-RULESET-FALLBACK"), false, "no fallback identity was used");
++});
++
++test("K12 a preflight that throws SDC-LOCK-HELD is refused typed, never answered with a fallback identity", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { observePreflight: () => { const error = new Error("held"); error.code = "SDC-LOCK-HELD"; throw error; },
++    snapshotPluginRoot: () => ({ contentSha256: "e".repeat(64) }), registryLock: () => ({ status: "absent" }) }));
++  assert.equal(result.ok, false); assert.equal(result.code, "DBG-RULESET-LOCK-HELD", result.message);
++});
++
+ test("refuses an unknown subcommand", async () => {
+   const { runDispatchBriefing } = await lib();
+   const fx = makeFixture();

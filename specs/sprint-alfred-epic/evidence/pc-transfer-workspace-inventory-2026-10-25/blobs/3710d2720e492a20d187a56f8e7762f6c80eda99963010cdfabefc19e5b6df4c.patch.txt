@@ -1,0 +1,30 @@
+diff --git a/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md b/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md
+index 201b6b2df..4e29fa289 100644
+--- a/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md
++++ b/specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md
+@@ -50,3 +50,25 @@ Paths are relative to `plugins/pipeline-core/`.
+ | Item | Reason |
+ |---|---|
+ | installed-design-trailer-example-is-rejected-by-git-guard | Named in the briefing of the other dispatch that edits its pin at the same time; its pin was not run here. |
++
++## Long run of the model-family host-store suite
++
++One serial run of `lib/model-family-host-store.test.mjs` alone, with a per-file cap of 60 minutes (the 20-minute cap of the row above ended before MFHS023 and MFHS028). Machine quiet, private TMPDIR outside every repository, no retry (the file finished well inside the cap and the result is not load-shaped).
++
++| Measure | Value |
++|---|---|
++| Result | RED (the process exit code is non-zero) |
++| Exit code | 1 (signal: none; not a timeout) |
++| Duration | 1864 s (about 31 minutes) |
++| Node summary | tests 32, pass 30, fail 0, cancelled 0, skipped 0, todo 2 |
++| Cases that did not pass | MFHS023, MFHS028 (both printed as `# TODO` warnings in the node summary and listed under "failing tests"; node counts them as todo, not as fail) |
++| Passing cases | all 30 others, including MFHS001 to MFHS022, MFHS024 to MFHS027 and MFHS029 to MFHS032 |
++
++First error line per case, as printed in the log (machine-specific path prefixes replaced by `<fixture>`):
++
++| Case | First error line |
++|---|---|
++| MFHS023 real competing transition and prepare serialize on the stored generation | `Error: ENOENT: no such file or directory, lstat '<fixture>/.git/agent-pipeline/model-family-host/authority-lifetimes/<digest>.json'` (the log also prints, after the test ended, an unhandled-rejection notice carrying `successor transition process failed (1)` with `SessionAuthorityError: model-family-host:unowned-retained-member`) |
++| MFHS028 real process contention serializes same-key replay and different invocation CAS generations | `Error: concurrent writer failed (1)` carrying the child's `SessionAuthorityError: model-family-host:unowned-retained-member` (`SDC-AUTHORITY-UNAVAILABLE`) |
++
++Not diagnosed here, as briefed. Both cases fail in the real-process (child process) steps, which agrees with PO list row 5 (cross-process ownership problem, after 0.7.0). The log is `scratch/agent-out/k90-model-family-host-store.test.mjs.log` in the dispatching checkout (untracked).

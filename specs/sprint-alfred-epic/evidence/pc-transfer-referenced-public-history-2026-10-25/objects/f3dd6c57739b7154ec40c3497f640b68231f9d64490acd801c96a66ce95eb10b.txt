@@ -1,0 +1,24 @@
+// Helper (untracked): static ESM import graph of a clone from an entry file; prints evaluation (post-order) position of selected modules and
+// the importer chain (first DFS path) that reaches them.
+// usage: node scratch/k104-graph.mjs <clone> <entry-rel-to-clone> <substring>...
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname, relative } from "node:path";
+const [clone, entry, ...watch] = process.argv.slice(2);
+const base = resolve("scratch/clones", clone);
+const re = /(?:^|\n)\s*(?:import|export)\s+(?:[^'"`;]*?\sfrom\s+)?["'](\.[^"']+)["']/g;
+const order = []; const seen = new Set(); const parent = new Map();
+function visit(file, from) {
+  if (seen.has(file)) return;
+  seen.add(file); parent.set(file, from);
+  let text = ""; try { text = readFileSync(file, "utf8"); } catch { return; }
+  for (const m of text.matchAll(re)) {
+    const target = resolve(dirname(file), m[1]);
+    if (existsSync(target)) visit(target, file);
+  }
+  order.push(file);
+}
+visit(resolve(base, entry), null);
+order.forEach((f, i) => { const r = relative(base, f); if (watch.some((w) => r.includes(w))) {
+  const chain = []; for (let p = f; p; p = parent.get(p)) chain.push(relative(base, p).replace("plugins/pipeline-core/", ""));
+  console.log(`${String(i).padStart(4)} ${r.replace("plugins/pipeline-core/", "")}\n       via ${chain.reverse().join(" > ")}`); } });
+console.log(`total ${order.length}`);

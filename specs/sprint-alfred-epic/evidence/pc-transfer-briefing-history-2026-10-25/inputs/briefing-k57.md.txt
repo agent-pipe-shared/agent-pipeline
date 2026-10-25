@@ -1,0 +1,33 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k57/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; replace `<name>` with `k57`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, `--glob`, multi-path rg, other pipelines and composed commands are refused. A `git commit` needs a clone identity: read `git config user.name` and `git config user.email` in the MAIN checkout and set them once with `git -C scratch/clones/k57 config user.name ...` and `... user.email ...`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K57-COUNTED-RUNS/2026-10-23 · Role Goldfish`
+
+## Briefing K57-COUNTED-RUNS: take counted GREEN results for six suites that the 2026-10-23 reader round found built but not counted
+
+### 1. Goal
+Run each suite below ONCE, in the foreground, one after the other (never two at the same time: parallel runs collide on the registry; no other agent runs heavy suites while you do), on the clone's HEAD, and record the verdict and counts in a new evidence file `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23.md` in the same table format as `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md` (read its first 14 lines for the header and table columns; header text: counted on the clone's HEAD sha, one file after the other, private TMPDIR outside every repository, machine otherwise idle except named agents). Use the tracked runners described in `docs/operating-tools.md` (`scripts/run-parallel.mjs` with one worker, or `scripts/run-quiet.mjs`; read the doc and each script's header first). Report skipped and todo cases as such; a red suite is recorded red with its first failing case name, never fixed or retried more than once alone to rule out load.
+
+Suites (all paths from the repository root):
+1. `plugins/pipeline-core/lib/pins/first-enrollment-enters-retirement-before-consent.test.mjs`
+2. `plugins/pipeline-core/scripts/dispatch-briefing.test.mjs` and `plugins/pipeline-core/lib/pins/goldfish-bugfix-module-conflicts-with-qg-04.test.mjs`
+3. `plugins/pipeline-core/lib/pins/sign-intent-bare-openssl-spawn-searches-the-working-directory-on-windows.test.mjs`
+4. `plugins/pipeline-core/lib/model-family-host-store.test.mjs`, then `plugins/pipeline-core/lib/model-family-invocation.test.mjs` (heavy; one at a time; if a case is red, name it and say whether it is MFHS002-008 or MFI012/013)
+5. `plugins/pipeline-core/lib/pins/project-resource-budget-headroom-is-not-reported.test.mjs`
+6. `node harness/scripts/check-product-capability-inventory.mjs` (a check, not a test file: record PASS/FAIL and the first finding if any; do NOT edit the inventory, it is protected; if it is red, write the exact surface line it wants into your report)
+
+If a listed path does not exist, find the real one with `find` and say so.
+
+### 2. Context files
+`docs/operating-tools.md`, `scripts/run-parallel.mjs`, `scripts/run-quiet.mjs` (headers), `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md` (format only).
+
+### 3. DoD checks
+The evidence file exists with one row per suite (`Pin file | Verdict | Cases | Pass | Fail | Skip | Todo`), a header naming the clone's HEAD sha (`git -C scratch/clones/k57 rev-parse --short HEAD`) and a one-line summary of totals; every number is copied from a run you made, never estimated. One commit by explicit pathspec; message file under the clone's `scratch/commit-msg/`; `docs(evidence): ...`; trailers exactly `AI-Assisted: true` and `Dispatch: K57-COUNTED-RUNS (goldfish)`. Because the evidence file sits under `specs/`, if the hook refuses it, report the exact refusal.
+
+### 4. Forbidden
+Product code, test, backlog, `CLAUDE.md`, `.claude/**`, `docs/state.md` edits; touching the MAIN checkout other than writing `scratch/agent-out/*`; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths or secrets in any file; Advisor; running any suite in the background or two at once.
+
+### 5. Stop conditions
+A suite that hangs past the Bash tool timeout (record it as TIMEOUT, move on); more than 2 failed attempts at one problem; tool budget at 80 percent (commit the rows you have, report the rest).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k57`. Tool budget: base cap 60, closing allowance +5. TASK_ID: K57-COUNTED-RUNS. Status wording per the common briefing (never "done").

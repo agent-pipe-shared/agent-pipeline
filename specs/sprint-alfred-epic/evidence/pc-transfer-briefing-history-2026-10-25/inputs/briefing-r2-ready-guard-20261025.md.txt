@@ -1,0 +1,37 @@
+# Full method-only Goldfish briefing — R2-READY-GUARD-20261025
+
+New disjoint Source task after completed Windows main-entry work. Preserve all previous packages and cumulative histories; no dispatch/budget reset is claimed. You are not alone. D143 method-only isolated authorship: no Main/index writes, staging, commits, native receipts, provider calls or children. Parent integrates exact checked patch with active hooks.
+
+## 1. Goal
+
+Repair current READY admission contradictions under AC239 and original meaningful TPSHELL/IR-4 requirements, and qualify the full original Linux/WSL guard course using correct public/private fixture separation. Do not weaken pre-ready restrictions or credential/protected-write checks. Existing original full run392/376pass/13fail/3native skips is preserved evidence, not a baseline to erase. This Source repair is distinct from the earlier read-only fixture owner; no other active worker owns these files.
+
+## 2. Context, entry and ownership
+
+AGENTS → architecture/map/index.md → pipeline-core.md/harness.md/governance.md → applicable compiled decisions → installed pipeline-start skill → owned Source. Actual governed Main root `<repo-root>`; installed skill `<home>/.codex/plugins/cache/agent-pipeline-local/pipeline-core/0.7.0+codex.20261025134513.977dad8/skills/pipeline-start/SKILL.md`. Same ready runtime does not bootstrap again. A true new runtime requires its own exact Goldfish preflight, never parent's receipt. Inert clone is not separately bootstrapped. All Node/Git/tests at require_escalated from first invocation. Ruleset SHA1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe, project agent-pipeline, calibration project/pipeline.json; unavailable optional model store is no native grant.
+
+Read immutable Spec21.1/22.1/AC239 bounded prerequisites; exact original READY test bodies and governing accepted decisions. Read fix-wave D143/D148/D149/D151/D152 and G23 original quoted-read tests. No handover/session history/raw profiles. Explicit prior Source recon: repeated bounded filename globs were accepted by G23; original *.test.mjs exact suffix admission is covered by lib/guard/g23-quoted-pipeline-reads.test.mjs35–45 (commit5e939278b). Thus old two expectations at original test1765/12424 conflict with accepted newer Source cases; changing ONLY those exact stale expectations requires written governing-policy rationale, not weakened negatives. Old Node-e pre-ready case7659 expects lifecycle denial but current typed global unsupported may be more precise; do not change exit/admission without contract evidence.
+
+Create NEW inert clone `scratch/clones/r2-ready-guard-20261025` from exact73afcf74241fd38627161d5a5e9956d12b7e9341. Own hooks/guard-lifecycle-ready.mjs, hooks/guard-lifecycle-ready.test.mjs and narrow test-only fixture-root/identity helper if necessary. Paths under plugins/pipeline-core/. lib/guard/shell-grammar.mjs and lib/protected-test-paths.mjs are READONLY initially: inspect for cause, propose minimal exact diff/need if hook-only repair cannot preserve security. Model/registry/State/Critic/Verify-calibration/Windows entries are foreign; no protected baseline/enrollment mutation.
+
+Prior inert fixture proposal is READONLY input at scratch/clones/original-guard-lifecycle-current-20261025/scratch/agent-out/original-guard-lifecycle-current/{fixture-package.json,attempt-report.json,fixture-only.patch}. Validate hashes before adopting only justified placement changes into your owned clone; never import its Source changes or rewrite its attempts. Its external fixture under /run is wrong for ordinary passive read tests; repoScratch tmp inherits Git and breaks inactive/unrelated repo cases. D151 now expressly allows unique public /tmp children. Private authority/socket HOME remains a separate Source-validated unique /run/user/1000/ap-g17 child under D148.
+
+## 3. Acceptance and checks
+
+Original READY positives around7724–7940 must actually admit literal unprotected write/protected-name mere mention/read-only inventory where accepted, while literal protected writes, dynamic/indirect protected target, credential reads and all pre-ready opaque execution remain refused. Do not blanket allow node-e or rename READY fixtures to pre-ready to force denials. Inspect current global unsupported return in evaluate/main before READY tail and actual protected-target classification. If an opaque script cannot be safely classified, refuse explicitly and name genuine contract conflict; do not invent a weak authenticity flag or widen arbitrary execution.
+
+Preserve original case IDs/assertions except the exact accepted stale expectations and genuine fixture prerequisites with written rationale. RED meaningful Source cases before production edit, then GREEN same examiners. Fixture identity must be synthetic userInfo/homedir/tmpdir BEFORE imports/descendants; never call original account lookup. Ordinary public file/repo fixture temp must be new unique0700 /tmp physically outside Git and credential roots. Private HOME separately Source-validated D148. No broad path/ACL exceptions. Cleanup exact own inode/device only after all children settle; unknown-live retains evidence.
+
+After meaningful focused GREEN run complete ORIGINAL node --test hooks/guard-lifecycle-ready.test.mjs unfiltered with sufficient bounded timeout and capture-evidence; all examiners must settle. Native Windows3 skips stay typed, not emulated native PASS. Capture any new failure and diagnose actual cause, not wholesale assertion flips. Consumer-safe paths required. No Full Verify/Reader/Critic/provider call; final batch parent-owned. Project resource headroom/quick route unknown is not PASS.
+
+## 4. Forbidden
+
+Main/index, PRD/Spec, foreign-owned modules, raw stores/profiles/keys, original host account resolution, arbitrary /var/tmp or existing /tmp files, weakened protected/credential/pre-ready rules, test deletions/skips, fake counts/evidence, no-verify/hook bypass, install/stamp/push/close/merge/tag, native model/dispatch/budget claims.
+
+## 5. Stops and decisions
+
+After two unchanged same-cause failures retain attempts and diagnose causally; no blind reruns. New authority/architecture contract needs concrete facts/options/recommendation. Ordinary accepted phase-aware repair and exact justified fixture corrections are authorized. Continue safe units while material contract question is prepared. Do not claim whole original suite green from a narrow pin.
+
+## 6. Delivery
+
+Bounded70 initial calls, reserve14 for complete cumulative patch/newfiles, manifest postimage hashes, original/derivative capture custody and actual unfiltered count. D149 continuation max50 only via full same-owner replacement with all costs/attempts retained, no native grant. Own scratch/agent-out/r2-ready-guard-20261025. Return exact passed/failed/unverifiable and Source/fixture rationale, native boundaries and pending final Verify/Critic/PO acceptance. Parent handles all integration and protected human operator steps if genuinely required.

@@ -1,0 +1,7 @@
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+const diff = resolve("scratch/agent-out/K120-NODE-TEST-CONTEXT-CHECK-VERDICT-k120-protected.diff");
+for (const mode of [["--check", "--cached"], ["--check", "--3way", "--cached"]]) {
+  const r = spawnSync("git", ["-C", resolve("scratch/clones/k120-check"), "apply", ...mode, diff], { encoding: "utf8" });
+  console.log(mode.join(" "), "status", r.status, (r.stderr || "").trim().split("\n").slice(0, 5).join(" | "));
+}

@@ -1,0 +1,94 @@
+diff --git a/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs b/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs
+index 46862a659..37f0a6feb 100644
+--- a/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs
++++ b/plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs
+@@ -192,3 +192,47 @@ test('PF-16 end to end: a draft-phase sed -i on an implementation file is refuse
+     assert.equal(hit.lane, 'write-command', command);
+   }
+ });
++
++// ---------------------------------------------------------------------------------------------------------------
++// Optional residuals recorded by 3bbdb7c12 (item "Reconciled 2026-10-23"): (1) an `&&` chain is outside the closed
++// grammar; (2) `perl -i.bak` / `ruby -i.bak` in-place edits. Cases marked `todo` are documented REDs: they assert the
++// contract the item states and fail on the current product (todo cases never fail the run; the reason names the fix site).
++// ---------------------------------------------------------------------------------------------------------------
++const readerChains = ['git stash list && git stash list', 'git stash list && git stash show', 'git stash show && git stash list'];
++const mutatingChains = ['git stash list && git stash pop', 'git stash pop && git stash list', 'git stash list && git stash drop',
++  'git stash list && git stash list && git stash push'];
++for (const command of readerChains) {
++  test('AC-181 residual: the read-only chain `' + command + '` is read-only, names no write target and is admitted in draft', () => {
++    assertReadOnlyStash(command, real);
++    assert.equal(devPlanShellRefusalHit(command, fixture, deps), null, command);
++  });
++}
++for (const command of mutatingChains) {
++  test('AC-181 residual: the chain `' + command + '` with one mutating stash verb is never read-only', () => {
++    assert.equal(real.readOnly(command), false, 'must not be read-only: ' + command);
++  });
++}
++test('AC-181 residual: a chain with one mutating stash verb stays in the git-working-tree-write lane and is refused in draft',
++  { todo: 'RED: an `&&` chain is outside the closed grammar, so no git-working-tree-write target is extracted and the draft lane admits it (null); the fix site is the raw-token fallback of extractShellWriteTargets in lib/protected-test-paths.mjs, not changed here' },
++  () => {
++    for (const command of mutatingChains) {
++      assert.ok(targetsOf(command).some(t => t.lane === 'git-working-tree-write'), 'must name the write lane: ' + command);
++      assert.equal(devPlanShellRefusalHit(command, fixture, deps)?.verdict, 'block', command);
++    }
++  });
++
++// perl/ruby in-place edit (-i[SUFFIX]) is the same family as `sed -i`: the real file operand must be a write candidate.
++for (const interpreter of ['perl', 'ruby']) {
++  test('AC-181 residual: `' + interpreter + ' -i -pe` (no suffix) already names the real file operand', () => {
++    assert.ok(writeCommandCandidates(`${interpreter} -i -pe 's/a/b/' ${F}`).includes(F));
++  });
++  test('AC-181 residual: `' + interpreter + ' -i.bak -pe` is refused in the draft phase on an implementation file', () => {
++    const hit = devPlanShellRefusalHit(`${interpreter} -i.bak -pe 's/a/b/' src/app.js`, fixture, deps);
++    assert.equal(hit?.verdict, 'block');
++  });
++  test('AC-181 residual: `' + interpreter + ' -i.bak -pe` names the real file operand as a write-command candidate, like `sed -i.bak`',
++    { todo: 'RED: the glued-suffix in-place spelling is not recognised in the parsed lane (extractShellWriteTargets returns no target); the fix site is the in-place option handling in lib/protected-test-paths.mjs, not changed here' },
++    () => {
++      assert.ok(writeCommandCandidates(`${interpreter} -i.bak -pe 's/a/b/' ${F}`).includes(F));
++    });
++}
+diff --git a/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs b/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs
+index 6120a6dd3..b135275a9 100644
+--- a/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs
++++ b/plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs
+@@ -30,6 +30,7 @@ import {
+ } from "../human-guard-override.mjs";
+ import * as hgo from "../human-guard-override.mjs";
+ import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../po-approval-proof.mjs";
++import { extractShellWriteTargets } from "../protected-test-paths.mjs";
+ 
+ const here = dirname(fileURLToPath(import.meta.url));
+ const PLUGIN_ROOT = resolve(here, "..", "..");
+@@ -399,3 +400,29 @@ test(`AC-201 converter: converted diffs apply with real git and produce the exac
+     for (const name of item.absent ?? []) assert.equal(existsSync(join(root, name)), false, item.name);
+   }
+ });
++
++// ---------------------------------------------------------------------------------------------
++// Optional residual of AC-201 (item "Native grammar observation", request 69cf992e...): the optional
++// whole-patch read-only command `git apply --check --reverse` was classified as mutating with unbound
++// patch targets. "Applicability preflight must recognize validation-only flags without admitting an
++// actual mutation." Inert strings only: the shell-write-target classifier runs, no git subprocess does.
++// ---------------------------------------------------------------------------------------------
++const applyTargets = (command) => extractShellWriteTargets({ command, root: PROJECT_ROOT, platform: "linux" });
++
++test("AC-201 residual: `git apply --check <patch>` (validation only) names no write target and is admitted", () => {
++  assert.deepEqual(applyTargets("git apply --check scratch/p.patch"), []);
++});
++
++test("AC-201 residual: `git apply --check --reverse <patch>` is a read-only check and is admitted in either flag order",
++  { todo: "RED: the classifier faults with 'mutating git apply has unbound patch targets' for a --check form that also carries --reverse; fix site is the git apply grammar in protected-test-paths.mjs / guard grammar (protected), not changed here" },
++  () => {
++    for (const command of ["git apply --check --reverse scratch/p.patch", "git apply --reverse --check scratch/p.patch"]) {
++      assert.deepEqual(applyTargets(command), [], command);
++    }
++  });
++
++test("AC-201 residual: plain `git apply <patch>` (and --reverse without --check) stays mutating, never admitted as a check", () => {
++  for (const command of ["git apply scratch/p.patch", "git apply --reverse scratch/p.patch"]) {
++    assert.throws(() => applyTargets(command), /mutating git apply/u, command);
++  }
++});

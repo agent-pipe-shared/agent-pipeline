@@ -1,0 +1,10 @@
+import{readFileSync}from'node:fs';import{createHash}from'node:crypto';
+const repo=process.cwd(),config='<home>/.gemini/config';
+const paths=[['approved-source',repo+'/plugins/pipeline-core/hooks.json'],['global-hooks',config+'/hooks.json'],['global-external',config+'/external-hooks.json'],['workspace-hooks',repo+'/.agents/hooks.json'],['workspace-external',repo+'/.agents/external-hooks.json']];
+for(const[label,path]of paths){let raw;try{raw=readFileSync(path);}catch(e){if(e.code==='ENOENT'){console.log(JSON.stringify({label,status:'absent'}));continue;}throw e;}
+ const value=JSON.parse(raw),groups=[];let visits=0;
+ function visit(v,loc=[]){if(++visits>4096||loc.length>32)throw Error('Diagnostic structure bound');if(!v||typeof v!=='object')return;
+  if(Array.isArray(v.hooks)){const scripts=v.hooks.map(h=>typeof h?.command==='string'?h.command.match(/antigravity-[a-z-]+\.mjs(?:\s+(?:observe|deliver))?/u)?.[0]??'foreign-or-unrecognized':'non-command');groups.push({location:loc.join('.'),hasMatcher:Object.hasOwn(v,'matcher'),matcherType:typeof v.matcher,matcher:typeof v.matcher==='string'?v.matcher.slice(0,200):null,scripts});}
+  for(const[k,x]of Object.entries(v))visit(x,[...loc,k]);
+ }visit(value);console.log(JSON.stringify({label,status:'read',sha256:createHash('sha256').update(raw).digest('hex'),groups}));
+}

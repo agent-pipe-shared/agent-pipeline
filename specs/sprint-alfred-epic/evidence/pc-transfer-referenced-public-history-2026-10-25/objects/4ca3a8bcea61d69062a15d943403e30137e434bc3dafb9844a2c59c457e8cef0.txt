@@ -1,0 +1,17 @@
+GREEN exit 0 sig null secs 67 tests 18 pass 16 fail 0 skip 1 todo 1 --test plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+GREEN exit 0 sig null secs 3 tests 12 pass 12 fail 0 skip 0 todo 0 --test plugins/pipeline-core/lib/passive-read-policy.test.mjs
+GREEN exit 0 sig null secs 3 tests 74 pass 73 fail 0 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+GREEN exit 0 sig null secs 32 tests 15 pass 14 fail 0 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+GREEN exit 0 sig null secs 3 tests 9 pass 9 fail 0 skip 0 todo 0 --test plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+RED exit 1 sig null secs 83 tests 22 pass 16 fail 5 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+RED exit 1 sig null secs 113 tests 22 pass 19 fail 2 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+GREEN exit 0 sig null secs 76 tests 8 pass 8 fail 0 skip 0 todo 0 --test plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs
+GREEN exit 0 sig null secs 2 tests 12 pass 12 fail 0 skip 0 todo 0 --test plugins/pipeline-core/lib/passive-read-policy.test.mjs
+GREEN exit 0 sig null secs 99 tests 22 pass 21 fail 0 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+GREEN exit 0 sig null secs 2 tests 5 pass 5 fail 0 skip 0 todo 0 --test plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs
+GREEN exit 0 sig null secs 2 tests 74 pass 73 fail 0 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+GREEN exit 0 sig null secs 21 tests 15 pass 14 fail 0 skip 1 todo 0 --test plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+GREEN exit 0 sig null secs 3 tests 9 pass 9 fail 0 skip 0 todo 0 --test plugins/pipeline-core/lib/read-command-diagnosis.test.mjs
+RED exit 1 sig null secs 673 tests 1 pass 0 fail 1 skip 0 todo 0 --test plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+GREEN exit 0 sig null secs 653 tests 392 pass 389 fail 0 skip 3 todo 0 --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+GREEN exit 0 sig null secs 1 tests 9 pass 9 fail 0 skip 0 todo 0 --test harness/scripts/check-consumer-safe-paths.test.mjs

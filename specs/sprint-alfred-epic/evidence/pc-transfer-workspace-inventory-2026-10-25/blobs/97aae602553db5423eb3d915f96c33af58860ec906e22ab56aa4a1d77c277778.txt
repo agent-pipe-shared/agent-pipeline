@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import test from "node:test";
+import { CURRENT_APPROVAL_SCHEMA, PLAN_SUBMISSION_SCHEMA, sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+import { resolvePublicationReviewRequirement as resolve } from "./publication-review-requirement.mjs";
+
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const bytes = new Map([["specs/feature/prd.md", Buffer.from("# PRD\n")], ["specs/feature/spec.md", Buffer.from("# Spec\n")]]);
+const readSource = path => bytes.get(path) ?? null;
+const source = { readSource };
+
+function approved(profile = "mini") {
+  const planPath = "specs/feature/prd.md", specPath = "specs/feature/spec.md";
+  const planSha256 = hash(bytes.get(planPath)), specSha256 = hash(bytes.get(specPath));
+  const profileSha256 = "a".repeat(64);
+  const submission = { schema: PLAN_SUBMISSION_SCHEMA, featureId: "feature", planPath, planSha256,
+    specPath, specSha256, profile, profileSha256, submittedBy: "fixture", submittedAt: "2026-10-24T00:00:00.000Z" };
+  const poGateAuthority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en",
+    sourceSha256: "b".repeat(64), runtimeSha256: "c".repeat(64), receiptSha256: "d".repeat(64),
+    repositoryFingerprint: "e".repeat(64), planPath, planSha256, specPath, specSha256 };
+  return { schema: "pipeline.state.v0", activeFeature: { id: "feature", planPath, phase: "implementation" },
+    planApproved: true, planSubmission: submission,
+    planApproval: { schema: CURRENT_APPROVAL_SCHEMA, approvedBy: "fixture", approvedAt: "2026-10-24T00:01:00.000Z",
+      submissionSha256: sha256CanonicalJson(submission), profileSha256, poGateAuthority,
+      priorInvalidationSha256: null, designApprovalBinding: null, designApproval: null } };
+}
+
+test("a current approved mini with exact Plan and Spec source bytes has rank zero", () => {
+  assert.deepEqual(resolve(approved(), source), { required: false, code: "REVIEW-LOW-RIGOR" });
+  assert.deepEqual(resolve(approved("feature"), source), { required: true, code: "REVIEW-PROFILE-REQUIRED" });
+});
+
+test("minimal, stale, and revoked mini submissions cannot waive review", () => {
+  const minimal = { schema: "pipeline.state.v0", activeFeature: { id: "feature" }, planSubmission: { profile: "mini" } };
+  assert.equal(resolve(minimal, source).required, true);
+  assert.equal(resolve({ ...approved(), planApproved: false }, source).required, true);
+  assert.equal(resolve(approved(), { readSource: path => path.endsWith("prd.md") ? Buffer.from("changed") : readSource(path) }).required, true);
+});
+
+test("registered package rigor is distinct from mini rank and candidate source wins", () => {
+  const manifest = Buffer.from(JSON.stringify({ feature: { id: "feature", rigor: 1 } }));
+  assert.deepEqual(resolve(approved(), { readSource: path => path.endsWith("lifecycle.json") ? manifest : readSource(path) }),
+    { required: true, code: "REVIEW-PACKAGE-REQUIRED" });
+  assert.deepEqual(resolve(approved(), source), { required: false, code: "REVIEW-LOW-RIGOR" });
+  assert.equal(resolve(approved(), { readSource: path => path.endsWith("lifecycle.json") ? Buffer.from("{") : readSource(path) }).required, true);
+});
+
+test("unavailable and malformed rigor never waive review", () => {
+  assert.equal(resolve(null, source).required, true);
+  assert.equal(resolve({ ...approved(), rigorHistory: [{}] }, source).required, true);
+  assert.equal(resolve(approved(), {}).required, true);
+});

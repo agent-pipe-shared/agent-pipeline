@@ -1,0 +1,13 @@
+variant(self env) => ADMITTED
+lit+extra => ADMITTED
+foreign script => ADMITTED
+lit x => ADMITTED
+OTHER_ROOT => ADMITTED
+lit elsewhere env => ADMITTED
+prov no apply => refused:block:opaque-script-execution
+prov extra => refused:block:opaque-script-execution
+prov foreign root => refused:block:opaque-script-execution
+prov no root => refused:block:opaque-script-execution
+refresh --apply => refused:block:opaque-script-execution
+refresh foreign => refused:block:opaque-script-execution
+refresh x => refused:block:opaque-script-execution

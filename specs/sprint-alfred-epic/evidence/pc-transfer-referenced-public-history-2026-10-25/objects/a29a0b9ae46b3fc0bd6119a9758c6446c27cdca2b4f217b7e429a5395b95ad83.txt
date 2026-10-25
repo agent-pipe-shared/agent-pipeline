@@ -1,0 +1,138 @@
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.mjs b/plugins/pipeline-core/lib/design-approval-binding.mjs
+index be0af9ab8..ed073c6f3 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.mjs
+@@ -25,7 +25,7 @@
+ import { createHash } from "node:crypto";
+ 
+ import { DesignConsistencyCheckError, reviewChainInconsistencies } from "./design-consistency-check.mjs";
+-import { summarizeDesignReviewReceipt } from "./design-review-receipt.mjs";
++import { isDesignReviewFallback, summarizeDesignReviewReceipt } from "./design-review-receipt.mjs";
+ import { PO_APPROVAL_INTENT_SCHEMA, canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+ 
+ export const DESIGN_APPROVAL_BINDING_SCHEMA = "pipeline.design-approval-binding.v1";
+@@ -109,7 +109,9 @@ function isSourceSet(value) {
+ /** One to two entries, ascending rounds 1 and 2. */
+ function isReceiptList(value) {
+   if (!Array.isArray(value) || value.length < 1 || value.length > MAX_RECEIPTS) return false;
+-  return allOf(value, (entry, index) => hasExactKeys(entry, ["path", "sha256", "round"]) && isSafePath(entry.path) && isSha(entry.sha256) && entry.round === index + 1);
++  // K128: an entry may carry the closed `fallback` record of a receipt produced on the typed fallback route; otherwise it is exactly three keys.
++  return allOf(value, (entry, index) => (hasExactKeys(entry, ["path", "sha256", "round"]) || (hasExactKeys(entry, ["path", "sha256", "round", "fallback"]) && isDesignReviewFallback(entry.fallback)))
++    && isSafePath(entry.path) && isSha(entry.sha256) && entry.round === index + 1);
+ }
+ 
+ /** The complete open set: unique, ascending by code unit, in the finding-id pattern. */
+@@ -216,7 +218,7 @@ export function createDesignApprovalBinding(input) {
+     schema: DESIGN_APPROVAL_BINDING_SCHEMA,
+     featureId,
+     sources: copySources(currentSources),
+-    reviewReceipts: summaries.map(({ path, sha256, round }) => ({ path, sha256, round })),
++    reviewReceipts: summaries.map(({ path, sha256, round, fallback }) => ({ path, sha256, round, ...(fallback === undefined ? {} : { fallback: { ...fallback } }) })),
+     verdict: latest.verdict,
+     openFindingIds: [...latest.openFindingIds],
+   };
+diff --git a/plugins/pipeline-core/lib/design-consistency-check.mjs b/plugins/pipeline-core/lib/design-consistency-check.mjs
+index 7d6197945..b1a6a3327 100644
+--- a/plugins/pipeline-core/lib/design-consistency-check.mjs
++++ b/plugins/pipeline-core/lib/design-consistency-check.mjs
+@@ -215,7 +215,11 @@ function assertSourceSet(set, label, allowNull) {
+ }
+ 
+ function assertSummary(summary) {
+-  if (!hasExactKeys(summary, SUMMARY_KEYS)) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
++  // K128: `fallback` is the one optional key (present only when the review ran on the typed fallback route).
++  const hasFallback = isObject(summary) && Object.hasOwn(summary, "fallback");
++  if (!hasExactKeys(summary, hasFallback ? [...SUMMARY_KEYS, "fallback"] : SUMMARY_KEYS)) fail("a review receipt summary must carry exactly the ReceiptSummary keys");
++  if (hasFallback && !(hasExactKeys(summary.fallback, ["observedIdentity", "reasonCode", "requestedRoute", "route"])
++    && Object.values(summary.fallback).every((value) => typeof value === "string"))) fail("a review receipt summary fallback is malformed");
+   if (typeof summary.path !== "string" || !isSha(summary.sha256)) fail("a review receipt summary path or digest is malformed");
+   if (typeof summary.featureId !== "string" || !FEATURE_ID.test(summary.featureId)) fail("a review receipt summary featureId is malformed");
+   const linkPath = summary.previousReceiptPath;
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 60c03f03d..7baa1ace2 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -42,6 +42,14 @@ const RECEIPT_KEYS = [
+   "featureId", "kind", "openFindingIds", "previousReceiptPath", "previousReceiptSha256", "report",
+   "reviewedAt", "reviewer", "round", "schema", "sources", "verdict",
+ ];
++// K128 (PO decision 2026-10-23, batch 12, row 41): one OPTIONAL, closed field. It records that the review ran on the typed
++// fallback-self-dispatch route instead of the native one, so a presented plan never passes a single-review route off as an
++// independent review. Names come from records that already exist: `route`/`reasonCode` (canonical fallback result) and
++// `requestedRoute`/`observedIdentity` (this receipt's producer). A receipt without it is valid and byte-unchanged.
++const FALLBACK_ROUTE = "fallback-self-dispatch";
++const FALLBACK_KEYS = ["observedIdentity", "reasonCode", "requestedRoute", "route"];
++const FALLBACK_REASON_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/u;
++const FALLBACK_REQUESTED_ROUTE = /^[\x21-\x7e]{1,128}$/u;
+ 
+ // Strict decoding: invalid UTF-8 is not a receipt. `ignoreBOM: true` keeps a leading BOM in the
+ // text, so a BOM-prefixed file fails JSON parsing instead of being silently normalised.
+@@ -109,6 +117,11 @@ const reportPairIsValid = (report) => !Object.hasOwn(report, "originalSha256") |
+ const isReviewer = (value) => isObject(value) && hasExactKeys(value, ["model", "runner"]) && isString(value.runner) && RUNNER.test(value.runner) && isString(value.model) && MODEL.test(value.model);
+ const isSourcesShape = (value) => isObject(value) && hasExactKeys(value, ["companions", "prd", "spec"]) && isRef(value.prd) && isRef(value.spec) && Array.isArray(value.companions) && allOf(value.companions, isRef);
+ const isStringList = (value) => Array.isArray(value) && allOf(value, isString);
++/** The closed fallback record: the fallback route, a reason code, the requested route and the observed identity (or `unknown`). */
++export const isDesignReviewFallback = (value) => isObject(value) && hasExactKeys(value, FALLBACK_KEYS) && value.route === FALLBACK_ROUTE
++  && isString(value.reasonCode) && FALLBACK_REASON_CODE.test(value.reasonCode)
++  && isString(value.requestedRoute) && FALLBACK_REQUESTED_ROUTE.test(value.requestedRoute)
++  && isString(value.observedIdentity) && MODEL.test(value.observedIdentity);
+ const isPreviousInput = (value) => isObject(value) && hasExactKeys(value, ["bytes", "path"]) && isString(value.path) && value.bytes instanceof Uint8Array;
+ 
+ // ----------------------------------------------------------------------------- semantic checks
+@@ -146,9 +159,11 @@ function findingIdsAreAcceptable(ids) {
+ 
+ /** First failing code of a decoded receipt value, in the contract order, or null. */
+ function receiptRefusal(receipt) {
+-  if (!isObject(receipt) || !hasExactKeys(receipt, RECEIPT_KEYS)) return "DRR-SHAPE";
++  const hasFallback = isObject(receipt) && Object.hasOwn(receipt, "fallback");
++  if (!isObject(receipt) || !hasExactKeys(receipt, hasFallback ? [...RECEIPT_KEYS, "fallback"] : RECEIPT_KEYS)) return "DRR-SHAPE";
+   const { sources, report, previousReceiptPath, previousReceiptSha256 } = receipt;
+   const shapeOk = receipt.schema === DESIGN_REVIEW_RECEIPT_SCHEMA
++    && (!hasFallback || isDesignReviewFallback(receipt.fallback))
+     && isFeatureId(receipt.featureId)
+     && (receipt.kind === "initial" || receipt.kind === "delta")
+     && Number.isSafeInteger(receipt.round) && receipt.round >= 1
+@@ -307,7 +322,10 @@ export function assessSpecDecisionContinuity(specBytes) {
+ export function createDesignReviewReceipt(input) {
+   if (!isObject(input)) return refuse("DRR-SHAPE");
+   const { featureId, previous, sources, reviewer, report, openFindingIds, reviewedAt } = input;
++  // `fallback` is optional; present (even null) it must be the closed fallback record.
++  const hasFallback = input.fallback !== undefined;
+   const shapeOk = isFeatureId(featureId)
++    && (!hasFallback || isDesignReviewFallback(input.fallback))
+     && (previous === null || isPreviousInput(previous))
+     && isSourcesShape(sources)
+     && isReviewer(reviewer)
+@@ -371,6 +389,7 @@ export function createDesignReviewReceipt(input) {
+     verdict: ids.length === 0 ? "pass" : "open-findings",
+     openFindingIds: ids,
+     reviewedAt,
++    ...(hasFallback ? { fallback: Object.fromEntries(FALLBACK_KEYS.map((key) => [key, input.fallback[key]])) } : {}),
+   };
+   const bytes = ENCODER.encode(`${canonical(receipt)}\n`);
+   // Self-check: what is returned is exactly what parse accepts from these bytes.
+@@ -405,6 +424,8 @@ export function summarizeDesignReviewReceipt(input) {
+       report: receipt.report,
+       verdict: receipt.verdict,
+       openFindingIds: receipt.openFindingIds,
++      // K128: present only when the review ran on the typed fallback route; a native receipt's summary is unchanged.
++      ...(Object.hasOwn(receipt, "fallback") ? { fallback: receipt.fallback } : {}),
+     },
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 1b8014085..68d38d556 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11034,6 +11034,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       syncNextActionDocs(dir, written.transition.state);
+       console.log(`Plan presentation recorded by "${by}" on ${presentedAt}; bound to submission ${submissionSha256.slice(0, 12)}....`);
+       if (approvalReview !== null) {
++        // K128 (PO decision 2026-10-23, batch 12, row 41): a receipt produced on the typed fallback route is named here, so the
++        // presented plan never passes a single-review fallback off as an independent native review.
++        for (const entry of approvalReview.reviewReceipts) {
++          if (entry.fallback !== undefined) console.log(`Review route: ${entry.path} ran on the fallback-self-dispatch route (${entry.fallback.reasonCode}; requested ${entry.fallback.requestedRoute}, observed ${entry.fallback.observedIdentity}) -- a single-review fallback, not an independent native review.`);
++        }
+         console.log("Complete bounded design-workflow review (still pending PO approval):");
+         console.log(JSON.stringify(approvalReview, null, 2));
+         console.log(`Exact PO request: ${approvalRequestPath}.`);

@@ -1,0 +1,40 @@
+# Native Semgrep offline diagnosis
+
+The first actual native run used the production adapter, the shipped local
+rules, a disposable minimal JavaScript project, private HOME and a network
+namespace with no network. It returned `ERROR` after 60075 ms. Retained child
+stderr/log already reported a completed scan with zero findings, but no JSON
+stdout or process exit was received. The separately bounded version command
+also timed out. Manifest: `353c87ae359c905eb54a5150e87170948dfdc21d2212888df4097d8b1d89ed7e`.
+
+A separate controlled run changed only the diagnostic version-check environment
+variable to `SEMGREP_ENABLE_VERSION_CHECK=0`; the same production adapter,
+native launcher digest, rules digest, argv and deadlines were retained. Version
+readback returned `1.170.0`; the scan exited zero with complete JSON, empty
+results/errors and adapter PASS in 3615 ms. Manifest:
+`7bc0847b24fb7b11ef3e9a4342a0750dd042fd36450d9ea90bfe5b93648a1a28`.
+This is an actual minimal-fixture observation, not the original PUSHSEED callback
+or a whole-candidate qualification. The launcher hash is not a hash of the
+entire installed Python distribution. The version-check control explains the
+reproduced shutdown stall; applying it to the original failure still needs its
+original callback to be qualified against the corrected Source.
+
+The [upstream Semgrep scan implementation](https://raw.githubusercontent.com/semgrep/semgrep/develop/cli/src/semgrep/commands/scan.py)
+defines version checking enabled by default and binds its switch to this
+environment variable. Current upstream source supports the proposed control;
+it is not a readback of the installed package implementation.
+
+No production Source, scanner rules, callback, timeout, installed setting or
+network policy changed in either diagnostic. Logs were copied before temporary
+cleanup through the adapter's existing injected spawn seam, which still
+executed the actual native child. Raw logs concern only the disposable fixture.
+No production diagnostic-retention feature is delivered by these helpers.
+
+Two optional local-package searches were refused by the installed outside-root
+read guard and abandoned without alternate reader, retry or authorization:
+requests `ebc6df714d8638b1b9e62fa0c93ddec8271670fc76c20464fdc1a3190a8a5f6c`
+and `b39478e6e9cc2093f247f6e58f61811643f31b32e0e6bda3fba092157cc4ee55`
+(the latter also exposed inner request
+`2851c3c2556e22d44b4f5d0d76ec3c4fcb33ec7b8044e5597d5768c394720890`).
+The installed launcher read and physical symlink readback had been admitted.
+Those refusals add no mandatory Source patch or evening-signature requirement.

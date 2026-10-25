@@ -1,0 +1,19 @@
+command: node --test plugins/pipeline-core/scripts/security-remote-identity.test.mjs
+label: g32-identity-guard-green
+exitCode: 0
+head: eac1d2dc8a4dbbf6117f4499d8cc8a23f65ffbd3
+tree: ae59ba836876caf93aa4bed681c0bd8ff093a703
+dirty: true
+--- stdout ---
+✔ security evidence follows one effective push destination across a remote rename (1369.891182ms)
+✔ push guard rejects evidence for a different effective destination (2443.878061ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4527.236786
+
+--- stderr ---

@@ -1,0 +1,46 @@
+{
+  "schema": "pipeline.codex-isolated-critic-protected-preimage.v1",
+  "baselineLabel": "nova-autonomous-critic-review-policy",
+  "files": [
+    {
+      "path": "harness/review-protocol.md",
+      "rawSha256": "4c305136a6c71dd5b02b524b37c3b5a423e1e0cee5fe984c3983853ee6c1157f"
+    },
+    {
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "rawSha256": "2cdd3d2398188a63c0564ff56992f511eb7f09fd35cc4d65051945a3890d87bd"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
+      "rawSha256": "1d447929e9f3f3c86dd8698e7bbcf7c9d8e428d3f7ddca20118a838bd4b76e3d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
+      "rawSha256": "737105cde76fb612bd68a7c1f4e0d42fb5397f4c7a099d21167113dcfe8bfb15"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+      "rawSha256": "427bd8518b2b2152558d23c65d5d0867889e5aeb6d476d1de475f376f94ba717"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
+      "rawSha256": "2194af00a47298d83bdcda8f0ac3f0069346bfd3d25a59cf567b773cccf52777"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/critic-verdict.schema.json",
+      "rawSha256": "e5d8070c0e6981d3175fd11361196b881993203c5a96be9f0a7bd2ba9e3ec302"
+    },
+    {
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "rawSha256": "60cd00b9281b4522eff1bb2f176555084d032d54598bfca22d85223e8d92efab"
+    },
+    {
+      "path": "roles/critic.md",
+      "rawSha256": "7f5406c12aa5bc21efd8283d929a88ed1ebcbc7b610834bab55d2b414113d1e2"
+    },
+    {
+      "path": "templates/prompts/critic-review.md",
+      "rawSha256": "b6c379d72929285a38b7659e2ef2ca48c17b68c028825ca49ade0b2da3f647fa"
+    }
+  ]
+}

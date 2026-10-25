@@ -1,0 +1,27 @@
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+const out='scratch/agent-out/committed-5e-cohort-adjudication/';
+const root='specs/sprint-alfred-epic/evidence/verify-fixes/';
+const wave=root+'content-wave-2026-10-24/';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const commit=execFileSync('git',['rev-parse','5e939278b'],{encoding:'utf8'}).trim();
+const show=p=>execFileSync('git',['show',commit+':'+p],{maxBuffer:10000000});
+const composed=JSON.parse(fs.readFileSync(wave+'composed-postimages.json'));
+const binding=composed.paths.map(x=>({path:x.path,expected:x.sha256,committed:hash(show(x.path)),matches:hash(show(x.path))===x.sha256}));
+const paths=['plugins/pipeline-core/lib/git-null-device-sites.test.mjs','plugins/pipeline-core/lib/worktree-lifecycle.test.mjs','plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs','plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs','plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs','plugins/pipeline-core/lib/test-private-tmp.mjs','plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs'];
+const narrow=paths.map(path=>({path,committedSha256:hash(show(path)),worktreeMatches:hash(show(path))===hash(fs.readFileSync(path)),changesSinceQualificationBase:execFileSync('git',['diff','--stat','1b7fc4f0424c617c19039903ba4f88aece3116f2',commit,'--',path],{encoding:'utf8'})}));
+const files=[...['git-null-device-sites.txt','node-null-pin.txt','gnd-r71a-ratchets.txt','calibration.txt','role-route.txt'].map(n=>wave+'original-qualification/'+n),...['p1-finalization-callsite.json','p1-finalization-onboarding-focused.json','p1-authored-parent-ipc.json','p1-authored-parent-ipc-result.json','p1-finalization-closure-consumer.json','p1-finalization-guard.json'].map(n=>wave+'p1-lifecycle/'+n),wave+'private-tmp-controlled/targeted.txt',root+'parallel-followups-2026-10-24/unsafe-options-hermetic/final-suite.txt'];
+const artifacts=files.map(path=>{const b=fs.readFileSync(path);const t=b.toString();return {path,sha256:hash(b),bytes:b.length,header:t.slice(0,650),tail:t.slice(-1300)};});
+const snapshot=JSON.parse(fs.readFileSync('specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/snapshot.json'));
+const ids=['git-for-windows-2-56-rejects-git-config-global-nul','project-calibration-retains-new-project-placeholder','role-route-preflight-with-self-dispatch-fallback','private-temp-root-not-secure-branch-has-no-test-seam','read-only-guard-admits-execution-and-output-options','greenfield.g25','greenfield.g26','greenfield.g27.design','greenfield.g29'].map(x=>'pipeline.'+x);
+const result={candidateCommit:commit,composedBinding:binding,narrow,artifacts,rows:snapshot.rows.filter(r=>ids.includes(r.itemId))};
+fs.writeFileSync(out+'binding.json',JSON.stringify(result,null,2)+'\n');
+const seen=new Set();const closure=[];
+function visit(p){if(seen.has(p))return;seen.add(p);let b;try{b=show(p);}catch{return;}const text=b.toString();let base;try{base=execFileSync('git',['show','1b7fc4f0424c617c19039903ba4f88aece3116f2:'+p],{stdio:['ignore','pipe','ignore'],maxBuffer:10000000});}catch{}const expected=composed.paths.find(x=>x.path===p);closure.push({path:p,sha256:hash(b),unchangedFromQualificationBase:!!base&&hash(base)===hash(b),composedPostimageMatch:!!expected&&expected.sha256===hash(b)});for(const m of text.matchAll(/(?:from\s*|import\s*\()\s*["'](\.[^"']+\.mjs)["']/g)){visit(path.posix.normalize(path.posix.join(path.posix.dirname(p),m[1])));}}
+paths.forEach(visit);binding.forEach(x=>{if(x.path.endsWith('.mjs'))visit(x.path);});
+result.staticClosure=closure;result.closureUnbound=closure.filter(x=>!x.unchangedFromQualificationBase&&!x.composedPostimageMatch&&x.path!==paths.at(-1));
+fs.writeFileSync(out+'binding.json',JSON.stringify(result,null,2)+'\n');
+fs.writeFileSync(out+'resource-observations.json',JSON.stringify({schema:'pipeline.project-resource-observations.v1',observations:[]})+'\n');
+console.log(JSON.stringify({candidateCommit:commit,composedPaths:binding.length,composedMismatches:binding.filter(x=>!x.matches),staticClosurePaths:closure.length,closureUnbound:result.closureUnbound,artifacts:artifacts.map(a=>({path:a.path,sha256:a.sha256,exists:true})),rows:result.rows.map(r=>({itemId:r.itemId,stage:r.stage}))},null,2));

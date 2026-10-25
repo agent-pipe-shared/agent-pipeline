@@ -1,0 +1,20 @@
+diff --git a/plugins/pipeline-core/scripts/capture-evidence.mjs b/plugins/pipeline-core/scripts/capture-evidence.mjs
+index 816d72377..24d58a70e 100644
+--- a/plugins/pipeline-core/scripts/capture-evidence.mjs
++++ b/plugins/pipeline-core/scripts/capture-evidence.mjs
+@@ -29,6 +29,15 @@
+  * Consumer authors should give functional checks and visual captures distinct schema-specific
+  * paths. Keep per-run records immutable, bind source hash and viewport when relevant, and treat
+  * any `latest` file as a replaceable pointer to a retained run, never as the sole result.
++ * `publish-evidence-run.mjs` is the explicit companion route for a consumer that has already
++ * produced a schema-bearing functional or visual artifact: pass its source file, artifact file,
++ * schema, kind, run ID and output root; visual runs also pass viewport and device scale factor.
++ * The companion copies the artifact to `runs/<run-id>/<kind>.*`, writes an immutable run record,
++ * then advances only `<kind>.latest.json` after validating its previous owned pointer. Keep
++ * different run IDs for new attempts and read the retained payload to determine success/failure.
++ * A latest pointer's payload schema is fixed for that output root and kind; choose a separate
++ * output namespace for another schema rather than replacing a functional pointer with a visual
++ * result. The preimage is rechecked immediately before the pointer replacement.
+  * This writer protects its own output path; it cannot intercept arbitrary consumer file writes.
+  *
+  * CLI: `node plugins/pipeline-core/scripts/capture-evidence.mjs --out <path> --label <label> [--format text|json] --

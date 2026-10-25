@@ -1,0 +1,47 @@
+# Durable Advisor output custody: proposed adoption boundary
+
+## Concrete gap and version decision
+
+Frozen HostRecord v2 validates an in-memory private actual host result and its parsed report. The generic process journal has intent/executable/ownership/terminal custody but no original output serialization observation. A restarted store cannot reconstruct original report/frame hashes or pipe events from those entries. Supplying the stored record as its own private host result is invalid.
+
+Keep v1 and frozen v2 APIs separate and unchanged. A future closed **HostRecord v3** should add `custodyJournalSha256` and use `validateCodexAdvisorHostRecordV3(record, publicExpected, privateVerifiedCustody)` through the sealed store. Its complete existing v2 metadata checks remain required. Replace the private parsed-payload requirement with `record.responseSha256 === custody.outputCustody.reportCanonicalSha256`; compare every custody field and actual session/control/terminal/input/ownership field against the separately read private journal. Bind `record.custodyJournalSha256` to the physical journal digest. Reconstruct public expected context from independent governed sources, never from the record. No v3 full admission validator is implemented or claimed in this slice.
+
+## Proposed immutable metadata journal
+
+Path is derived exclusively from independently registered private Git common directory, repository fingerprint and validated receipt ID:
+
+`<gitCommonDir>/agent-pipeline/advisor-codex/<repoFingerprint>/processes/codex-host-<drh_id>/advisor-output-custody.json`
+
+The existing generic journal's name allowlist remains unchanged. This is a separate fixed-name reader/writer owned by the hostcontroller. Closed schema `pipeline.codex-advisor-output-custody-journal.v1` has exactly:
+
+- `schema`, `purpose:'advisor'`, `runId`, `receiptId`, `intentSha256`;
+- `contextSha256`, `requestSha256`, `recipeSha256`, `executableSha256`;
+- `session:{threadId,turnId,model,provider,requestedEffort}`;
+- `controls:{configurationVerified,profileVerified,mcpVerified,profileIntentSha256}`;
+- `terminal:{code,signal,spawnError,turnStatus}`;
+- exact actual `inputDisposition:{contract,status,recheck,submissionCount,requestSha256,recipeSha256}`;
+- exact closed `ownership` and frozen `outputCustody` metadata.
+
+`contextSha256` binds the ordered canonical publicExpected coordinates excluding ownership/executable/request/response digests, which are obtained from actual host and independent process chain. Context contains metadata only and is not itself stored. HostRecord question/answer/evidence digests remain in this context; question, answer, evidence bytes, report payload and stdout/stderr are never written to this custody file. Digests can reveal equality and metadata is private; this is not cryptographic protection against a hostile actor with the same filesystem credentials.
+
+## Writer ordering and prototype
+
+`runPreparedAdvisorWithDurableCustody({gitCommonDir,context,hostArgs})` is a controlled host-composition prototype. It exposes no raw-result or JSON publication parameter and no standalone writer. It privately registers purpose Advisor, snapshots closed context, overwrites process root/binding/model/effort/recipe from that context, calls actual frozen `runIsolatedStructuredHost`, and proceeds only after successful managed shutdown and complete pipe finalization. It reconstructs intent/runId/executable and independently verifies all registered ownership receipts. Canonical report digest is checked while the parsed report is still transient. Only then does the private nonexported publisher persist metadata using mode0600, O_EXCL/O_NOFOLLOW temporary file, fsync, exclusive hard-link publication and directory fsync before/after temporary unlink. An existing destination is never replaced.
+
+Failed/no-child/recovery/incomplete streams do not publish a successful custody record. A custody publication failure must not create an answered receipt. Production admission must be sealed and reobserve actual host export before stdin; this prototype uses the frozen beforeTurnInput contract but does not establish export authority by itself.
+
+## Restart reader and store seam
+
+`readPreparedAdvisorDurableCustody({gitCommonDir,context,receiptId})` registers the Advisor process root in the new controller, derives a fixed path, and checks private directory identities. It opens the custody file physically with nofollow, uid/private mode/singlelink checks and a bounded **65537-byte** read buffer rejecting anything beyond65536. Device/inode/size/mode/uid/nlink/mtime/ctime are checked before/open/after/end. Canonical strict JSON parser rejects duplicates and invalid UTF8. Two equal physical reads are followed by independent intent/runId/request/executable and full closed ownership reconstruction with no surviving owned session. Context digest/route/recipe/purpose must match.
+
+`verifyPreparedRecordDurableCustody(record, privateJournal)` is deliberately a **custody-subset comparator**, not the future full v3 record validator. The production store must call the physical reader itself; accepting its second argument from modelJSON/public stdin would lose provenance. No public caller may choose a custody file path, provide its own private journal or use this boolean as a complete answered receipt. Live integration must seal the controller/store invocation and obtain GitcommonDir/current context from authoritative physical sources. Generic journal registration is local to the controller; it is not provider or OS sandbox attestation.
+
+## Source-capable coordinates and limits
+
+`codex-advisor-durable-custody-source.txt` provides proposed canonical imports for `plugins/pipeline-core/lib/codex-advisor-output-custody-store.mjs`. Its dependency coordinates are generic structured host, process journal, registered ownership verifier, governance strict parser, canonical JSON and a proposed `codex-advisor-host-record-v2.mjs` pure custody validator. The last file name is a proposed integration coordinate and is **not registered/adopted**. The runtime prototype imports exact frozen Scratch counterparts; source output is not applied.
+
+Targeted test executes one actual registered managed synthetic Node protocol, then a fresh Node process restart reader with no inherited registration Map. It checks custody metadata equality, an existing-file immutable publication boundary, eight metadata drift cases, changed independent context, hardlink/symlink/mode safety, generic intent drift and no live process. No raw durable transcript is produced. Session/provider/model and external domain digests are controlled fixtures. No genuine model/export authority/live route is claimed.
+
+Remaining product work: sealed production composition, complete v3 record validator and immutable async store adoption/readers, registered regression integration and native Codex execution evidence. Historical v1/v2, existing store, current aggregate and previous inputs remain untouched.
+
+The parent independently assembled a new aggregate while this slice ran. Runtime verification uses the previously frozen graph, whose host/helper/v1/v2 bytes remain unchanged; it is not evidence of composition against that newer aggregate. Evidence records the newer aggregate digest observed after the run without claiming aggregate before/after stability.

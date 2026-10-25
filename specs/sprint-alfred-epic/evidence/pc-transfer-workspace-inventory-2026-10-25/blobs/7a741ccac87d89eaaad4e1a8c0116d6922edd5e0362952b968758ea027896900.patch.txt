@@ -1,0 +1,77 @@
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index bd9759feb..32e196ffc 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -221,7 +221,7 @@ function refreshReadyFixtureVendorCopy(root) {
+   assert.equal(ready.status, "ready", JSON.stringify(ready));
+ }
+ 
+-function createReadyLifecycleFixture(mode = "chat", { currentDesignAuthoring = false } = {}) {
++function createReadyLifecycleFixture(mode = "chat") {
+   // TEST-ONLY fixture inputs below are explicit synthetic PO answers. The
+   // real CLI creates authority/checkpoint state; the real readback consumer
+   // verifies its ticket and digests before the native adapter probes it.
+@@ -298,14 +298,14 @@ function createReadyLifecycleFixture(mode = "chat", { currentDesignAuthoring = f
+   collect(lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "HGO fixture." }]) });
+   const generated = followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "intake-generate-plan");
+   lifecycleCommand(root, "intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "codex");
+-  // Greenfield intake now stops for an explicit, bounded architecture package
+-  // before the acknowledgement writer.  Keep this shared ready-fixture on the
+-  // public lifecycle route so every HGO consumer below exercises the current
+-  // bootstrap contract rather than an obsolete pre-design shortcut.
+-  const designStop = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+-  assert.equal(designStop.nextAction?.kind,
+-    currentDesignAuthoring ? "design-authoring-required" : "architecture-design-required",
+-    JSON.stringify(designStop));
++  // Generation publishes authored-source scaffolds first. Complete the
++  // generated PRD and Spec before asking the architecture examiner to inspect
++  // the still-missing architecture block.
++  const authoringStop = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
++  assert.equal(authoringStop.status, "bootstrap-binding-required", JSON.stringify(authoringStop));
++  assert.equal(authoringStop.nextAction?.kind, "design-authoring-required", JSON.stringify(authoringStop));
++  assert.equal(authoringStop.nextAction.prdPath, generated.targets.prd.path);
++  assert.equal(authoringStop.nextAction.specPath, generated.targets.spec.path);
+   const contract = "docs/hgo-fixture-contract.md";
+   const verification = "tests/hgo-fixture.test.mjs";
+   mkdirSync(join(root, "docs"), { recursive: true });
+@@ -348,13 +348,33 @@ function createReadyLifecycleFixture(mode = "chat", { currentDesignAuthoring = f
+       ratchetMetrics: { totalAcceptedViolations: 0, cycleCount: 0, boundaryCrossingsCount: 0 },
+     },
+   };
+-  const prdPath = join(root, designStop.nextAction.prdPath);
+-  // K144: the acknowledgement refuses a generated draft (BOOTSTRAP-ACK-PLACEHOLDER-CONTENT), so author the package and bind the spec digest via the marker route, as the Antigravity ready-fixture does.
+-  const language = readFileSync(prdPath, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+-  writeFileSync(join(root, generated.targets.spec.path), "# Completed HGO fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the HGO fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+-  writeFileSync(prdPath, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed HGO fixture design\n\n## Goal\nExercise lifecycle-guard coverage for the Codex adapter.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture, null, 2)}\n\`\`\`\n`);
+-  const markerPlan = lifecycleCommand(root, "intake-spec-marker-plan", "--root", root, "--runner", "codex");
+-  lifecycleCommand(root, "intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "codex");
++  const prdPath = join(root, authoringStop.nextAction.prdPath);
++  const specPath = join(root, authoringStop.nextAction.specPath);
++  const generatedPrd = readFileSync(prdPath, "utf8");
++  const languageMarker = generatedPrd.match(/^<!-- po-language: [a-z]{2} -->$/mu)?.[0];
++  assert.ok(languageMarker, "generated PRD retains its bound human-facing language marker");
++
++  // This first authoring pass is deliberately complete in the product and
++  // acceptance dimensions, but leaves the architecture block absent so the
++  // original architecture examiner still has a real negative case to detect.
++  writeFileSync(specPath, `# Completed HGO fixture specification\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | WHEN the HGO fixture is acknowledged, the system SHALL bind its exact final document bytes. | tests/hgo-fixture.test.mjs |\n| AC-2 | WHEN a source document changes after planning, the system SHALL refuse stale authority. | tests/hgo-fixture.test.mjs |\n\n## Traceability\n\n| Design input | Requirement | Acceptance criterion | Verification entry point |\n| --- | --- | --- | --- |\n| The synthetic HGO fixture | Bind the authored fixture package | AC-1 | tests/hgo-fixture.test.mjs |\n| The synthetic HGO fixture | Refuse stale package authority | AC-2 | tests/hgo-fixture.test.mjs |\n`);
++  writeFileSync(prdPath, `${languageMarker}\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n\n# Completed HGO fixture design\n\n## Sanitised input summary (agent-authored)\nThis synthetic fixture exercises Codex lifecycle-guard behavior using bounded, local test files.\n\n## Goal\nExercise lifecycle-guard coverage for the Codex adapter.\n\n## Why\nThe fixture needs a ready project produced through the public onboarding lifecycle.\n\n## Scope\nThe fixture serves guard cases only; it creates no production services or external effects.\n\n## Non-goals\nNo remote push or real approval is performed by the fixture.\n\n## Risks\nThe fixture must preserve the public design, marker, acknowledgement, and binding checks.\n\n## Alternatives\nA fabricated lifecycle receipt is excluded because it would bypass those checks.\n\n## Definition of done\nThe authored PRD and Spec bind through the public lifecycle actions and the original adapter checks run against the resulting ready project.\n`);
++
++  const markerPending = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
++  assert.equal(markerPending.status, "bootstrap-binding-required", JSON.stringify(markerPending));
++  assert.equal(markerPending.nextAction?.argv?.[1], "intake-spec-marker-apply", JSON.stringify(markerPending));
++  assert.equal(markerPending.nextAction.expected.schema, "pipeline.onboarding-intake-spec-marker-apply.v1");
++  const markerApplied = followLifecycleAction(root, markerPending, "intake-spec-marker-apply");
++  assert.equal(markerApplied.status, "applied", JSON.stringify(markerApplied));
++
++  // This is the original architecture examiner at its intended boundary:
++  // both documents are authored and marker-current, while the PRD still has no
++  // architecture package.
++  const designStop = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
++  assert.equal(designStop.nextAction?.kind, "architecture-design-required", JSON.stringify(designStop));
++  assert.equal(designStop.nextAction.code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", JSON.stringify(designStop));
++  assert.equal(designStop.nextAction.prdPath, authoringStop.nextAction.prdPath);
++  writeFileSync(prdPath, `${readFileSync(prdPath, "utf8")}\n\n\`\`\`pipeline-architecture-design\n${JSON.stringify(architecture, null, 2)}\n\`\`\`\n`);
+   // Even this chat-mode fixture must use the dedicated acknowledgement
+   // writer.  A generated draft is never permitted to skip directly to bind.
+   followLifecycleAction(root, lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex"), "bootstrap-acknowledge-chat-apply");

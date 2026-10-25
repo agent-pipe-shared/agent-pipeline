@@ -1,0 +1,110 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index c1cad9eee..32d911ffc 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -1,8 +1,8 @@
+ {
+   "schema": "pipeline.product-capability-inventory.v3",
+   "sourceBaseline": {
+-    "commit": "8d634b6bd4d95fbad114540971c08f7c1f060577",
+-    "tree": "05b39a1a4d22c18a6027ca48565ea71a88c13ad6"
++    "commit": "da6a48021390768841f1ab025b84862d5f146b49",
++    "tree": "fffbcc5e755969ffdeccca34dec7f476ed6364eb"
+   },
+   "criticReview": {
+     "status": "required-before-publication",
+diff --git a/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs b/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs
+index 14abc3645..b154eee58 100644
+--- a/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs
++++ b/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs
+@@ -114,6 +114,38 @@ test("control: a new terminal v3 record with one log entry is written", () => {
+   assert.equal(existsSync(join(root, target(record))), true);
+ });
+ 
++// Added acceptance (0.7.0, F-06): "a dispatch record and a design review can be started from a generated, valid skeleton
++// with the digests pre-filled; the agent fills judgment fields only". The dispatch-record half is pinned by
++// scripts/dispatch-briefing.test.mjs ("init-dispatch-record prints a valid opening v4 record ..."). The design-review half
++// is the receipt producer: it takes the review's judgment (open finding ids, an observed identity) and derives every
++// digest, the time and the runner itself. This case drives the real producer and the real receipt parser.
++test("ACCEPTANCE: a design review receipt is generated with every digest derived from disk; the caller supplies only judgment", async () => {
++  const { createReceiptFromDisk } = await import("../../scripts/design-review-receipt.mjs");
++  const { parseDesignReviewReceipt } = await import("../design-review-receipt.mjs");
++  const { createHash } = await import("node:crypto");
++  const { writeFileSync } = await import("node:fs");
++  const digest = (text) => createHash("sha256").update(text).digest("hex");
++  const repo = mkdtempSync(join(tmpdir(), "pin-log-receipt-"));
++  mkdirSync(join(repo, "specs/f/review"), { recursive: true });
++  const files = { "specs/f/prd.md": "# PRD\n", "specs/f/spec.md": "# Spec\n", "specs/f/review/report.md": "# Report\n" };
++  for (const [path, text] of Object.entries(files)) writeFileSync(join(repo, path), text);
++  const request = { repo, featureId: "feat-x", reportPath: "specs/f/review/report.md", prdPath: "specs/f/prd.md",
++    specPath: "specs/f/spec.md", outPath: "specs/f/review/receipt.json", openFindingIds: ["F-TWO", "F-ONE"] };
++  const result = createReceiptFromDisk(request, { env: { CLAUDECODE: "1" }, now: () => new Date("2026-10-18T09:30:00.000Z") });
++  assert.equal(result.ok, true, JSON.stringify(result));
++  const parsed = parseDesignReviewReceipt(readFileSync(join(repo, request.outPath)));
++  assert.equal(parsed.ok, true);
++  assert.equal(parsed.receipt.sources.prd.sha256, digest(files["specs/f/prd.md"]));
++  assert.equal(parsed.receipt.sources.spec.sha256, digest(files["specs/f/spec.md"]));
++  assert.equal(parsed.receipt.report.sha256, digest(files["specs/f/review/report.md"]));
++  assert.equal(parsed.receipt.reviewedAt, "2026-10-18T09:30:00.000Z");
++  assert.equal(parsed.receipt.reviewer.runner, "claude");
++  assert.deepEqual(parsed.receipt.openFindingIds, ["F-ONE", "F-TWO"]);
++  assert.equal(parsed.receipt.verdict, "open-findings");
++  // A digest cannot be supplied by hand: the request shape has no field for one.
++  assert.equal(Object.keys(request).some((key) => /sha|digest|hash/iu.test(key)), false);
++});
++
+ test("control: the completed-undelivered v4 observation keeps its empty-log exception at read and at write", () => {
+   const record = undelivered();
+   assert.deepEqual(validateDispatchRecord(record).log, []);
+diff --git a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs
+index 5e89b5729..a3406fb06 100644
+--- a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.mjs
+@@ -29,9 +29,13 @@ export function runGoldfishCommitCommandFlow(argv = process.argv.slice(2)) {
+   values.paths = values.paths.map((path) => {
+     try { return normalizeDispatchRecordPath(path, "commit path"); } catch { return path; }
+   }).sort();
+-  return createGoldfishCommitCommandFlow(values);
++  const result = createGoldfishCommitCommandFlow(values);
++  return !result.ok && result.code === "GF-COMMAND-INPUT" ? { ...result, hint: INPUT_HINT } : result;
+ }
+ 
++/** A refusal costs a counted tool use, so the refusal itself names the repair (backlog item commit-producer-path-order). */
++const INPUT_HINT = "Repair: pass --task-id, --type, --scope, --summary (one line, at most 120 bytes) and at least one --body (one line each, at most 4) plus one --path per file; --summary and --body are mandatory, and a value containing a newline is refused.";
++
+ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+   const result = runGoldfishCommitCommandFlow();
+   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+diff --git a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+index a804fa3cb..2fcfa004a 100644
+--- a/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
++++ b/plugins/pipeline-core/scripts/goldfish-commit-command-flow.test.mjs
+@@ -93,6 +93,28 @@ test("ALF-C-I03 AC-137: the template states that --summary and --body are mandat
+   }
+ });
+ 
++test("ALF-J3-A: a GF-COMMAND-INPUT refusal names the repair itself, so a retry needs no template lookup", () => {
++  const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope];
++  const pathArgs = input.paths.flatMap((path) => ["--path", path]);
++  const noSummary = runGoldfishCommitCommandFlow([...base, "--body", "why", ...pathArgs]);
++  const noBody = runGoldfishCommitCommandFlow([...base, "--summary", "s", ...pathArgs]);
++  for (const refused of [noSummary, noBody]) {
++    assert.equal(refused.ok, false);
++    assert.equal(refused.code, "GF-COMMAND-INPUT");
++    assert.equal(typeof refused.hint, "string");
++    assert.match(refused.hint, /--summary/u);
++    assert.match(refused.hint, /--body/u);
++    assert.match(refused.hint, /mandatory/u);
++    assert.match(refused.hint, /one line/u);
++    assert.equal(/[\r\n]/u.test(refused.hint), false, "the hint is a single physical line");
++  }
++  // The hint never rides on a success result, so the ok-path equality with the library stays exact.
++  const ok = runGoldfishCommitCommandFlow([...base, "--summary", input.summary,
++    ...input.bodyParagraphs.flatMap((body) => ["--body", body]), ...pathArgs]);
++  assert.equal(ok.ok, true);
++  assert.equal("hint" in ok, false);
++});
++
+ test("CLI normalizes unsorted --path input to the sorted output and still refuses duplicates", () => {
+   // PRODSORT: unsorted input is normalized, not refused
+   const base = ["--task-id", input.taskId, "--type", input.type, "--scope", input.scope,

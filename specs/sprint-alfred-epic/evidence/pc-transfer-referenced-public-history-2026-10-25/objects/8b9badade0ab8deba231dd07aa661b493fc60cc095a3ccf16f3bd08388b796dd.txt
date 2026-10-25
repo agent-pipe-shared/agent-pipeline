@@ -1,0 +1,37 @@
+// Purpose: for inline-registered suites of a clone's verify.mjs whose test file changed since a base commit, run the file alone
+// with the Verify completion fd and compare executed case ids with the registered caseIds. Read-only toward the clone.
+// Usage: node scratch/k79-case-scan.mjs <clonePath> [<baseCommit>] [<onlyNameSubstring>]
+import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync, mkdtempSync, openSync, closeSync, readFileSync as rf } from "node:fs";
+import { join, basename, resolve } from "node:path";
+import { homedir } from "node:os";
+const clone = resolve(process.argv[2]);
+const base = process.argv[3] ?? "c1771bc98";
+const only = process.argv[4] ?? "";
+const changed = new Set(execFileSync("git", ["-C", clone, "diff", "--name-only", base === "all" ? "HEAD" : base, "HEAD"], { encoding: "utf8" }).split("\n").filter((f) => f.endsWith(".test.mjs")).map((f) => basename(f)));
+const text = readFileSync(join(clone, "harness/scripts/verify.mjs"), "utf8");
+const priv = mkdtempSync(join(homedir(), ".cache-k79-scan-"));
+const rows = [];
+for (const line of text.split("\n")) {
+  if (!line.includes("caseIds:") || !line.includes(".test.mjs")) continue;
+  const nm = /name: "([^"]+)"/u.exec(line)?.[1];
+  const fileM = /join\((\w+), "([^"]+\.test\.mjs)"\)/u.exec(line);
+  const idsM = /caseIds:\s*(\[[^\]]*\]|Array\.from\(\{[^)]*\)\s*,\s*\([^)]*\)\s*=>\s*`[^`]*`\))/u.exec(line);
+  if (!nm || !fileM || !idsM || (base !== "all" && !changed.has(fileM[2].split("/").pop()))) continue;
+  if (only && !only.split(",").some((s) => nm.includes(s))) continue;
+  rows.push({ nm, dirVar: fileM[1], file: fileM[2], idsSrc: idsM[1] });
+}
+const dirs = { libDir: "plugins/pipeline-core/lib", hooksDir: "plugins/pipeline-core/hooks", pluginScriptsDir: "plugins/pipeline-core/scripts", scriptDir: "harness/scripts" };
+for (const r of rows) {
+  let declared;
+  try { declared = new Function(`return ${r.idsSrc}`)(); } catch { console.log(`SKIP ${r.nm}: cannot evaluate caseIds`); continue; }
+  const dir = dirs[r.dirVar];
+  if (!dir) { console.log(`SKIP ${r.nm}: unknown dir var ${r.dirVar}`); continue; }
+  const res = spawnSync(process.execPath, [join(clone, dir, r.file)], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, env: { ...process.env, TMPDIR: priv }, timeout: 240000 });
+  const raw = `${res.stdout ?? ""}`;
+  const executed = [...new Set([...raw.matchAll(/^\s*[✔✖] ([A-Za-z][A-Za-z0-9._:-]*\d) /gmu)].map((m) => m[1]))];
+  const missing = declared.filter((id) => !executed.includes(id));
+  const undeclared = executed.filter((id) => !declared.includes(id));
+  console.log(`${missing.length || undeclared.length ? "DRIFT" : "ok   "} ${r.nm} exit=${res.status} declared=${declared.length} executed=${executed.length} missing=[${missing}] undeclared=[${undeclared}]`);
+}
+console.log(`scanned ${rows.length} suites; private dir ${priv}`);

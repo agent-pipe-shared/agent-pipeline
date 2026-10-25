@@ -1,0 +1,1472 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Regression suite for `push-prepare.mjs` (NVA-PUSH-PREPARE).
+ *
+ * Fixtures live under temporary directories (`scratch/push-prepare-*`), never
+ * against the real repository state: every precondition check takes injected
+ * dependencies (`gitStatus`, `gitHead`, `readFile`, `exists`,
+ * `readCriticalHumanProofPolicy`, `parseHumanArgs`, `readState`, ...), so a
+ * fixture never has to be a real Git working tree with real evidence files.
+ *
+ * The one exception, by design, is the D3 hash-equality test at the bottom:
+ * it runs `preparePushSubject()` against THIS repository's real HEAD and
+ * separately spawns the real `pipeline-state.mjs prepare-push-subject` CLI as
+ * a subprocess, and asserts the two `subjectSha256` values are identical --
+ * proving the reuse this script's header comment promises, not merely
+ * asserting it by construction. It is read-only and does not pin an exact
+ * digest (HEAD is mutable), only equality between the two routes.
+ *
+ * Run: node --test plugins/pipeline-core/scripts/push-prepare.test.mjs
+ */
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  checkCriticalHumanProofPolicy,
+  checkEvidenceFreshness,
+  checkPushThreatModel,
+  checkWorkingTreeClean,
+  criticalArtifactPaths,
+  foldPendingPushApprovalWrite,
+  isSecurityGateActive,
+  parseArgs,
+  PIPELINE_STATE_SCRIPT_PATH,
+  preparePushSubject,
+  printReport,
+  pushPrepareReport,
+  resolveEvidenceProjectDir,
+  resolveFeatureContext,
+  resolveVerifyRemedy,
+  resolveVerifyRemedyPlan,
+} from "./push-prepare.mjs";
+import { authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
+import { resolvePoKeyDirectory } from "./po-human-approval.mjs";
+import { run as runPipelineState } from "./pipeline-state.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { planVerifySelection } from "../lib/verify-selection.mjs";
+import { classifyDirtyTree } from "../lib/pipeline-owned-files.mjs";
+import { commitPipelineOwned } from "./commit-pipeline-owned.mjs";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const SCRATCH = join(REPO_ROOT, "scratch");
+mkdirSync(SCRATCH, { recursive: true });
+const FIXTURE_DIR = mkdtempSync(join(SCRATCH, "push-prepare-"));
+after(() => rmSync(FIXTURE_DIR, { recursive: true, force: true }));
+
+const HEAD = "1a757618133eb27b62f1e427b2fb55895da42d85";
+const pushVerifyEvidence = (commit = HEAD) => ({
+  schema: "pipeline.verify-evidence.v0",
+  exitCode: 0,
+  commit,
+  selection: planVerifySelection({ mode: "push", baseCommit: "base", candidateCommit: commit, changedPaths: ["src/a.mjs"], registeredSuiteIds: ["a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] } }),
+});
+
+// ---------------------------------------------------------------------------
+// parseArgs
+// ---------------------------------------------------------------------------
+
+test("parseArgs: accepts a well-formed --by/--remote/--destination", () => {
+  const parsed = parseArgs(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"]);
+  assert.deepEqual(parsed, { by: "tester", remote: "origin", destination: "refs/heads/main" });
+});
+
+test("checkWorkingTreeClean: accepts the WSL EPERM-after-status-zero shape, but not a non-zero or missing status", () => {
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const accepted = checkWorkingTreeClean(FIXTURE_DIR, {
+    spawn: () => ({ status: 0, stdout: "", error: eperm }),
+  });
+  assert.equal(accepted.ok, true);
+
+  for (const result of [{ status: 1, stdout: "" }, { stdout: "" }]) {
+    const rejected = checkWorkingTreeClean(FIXTURE_DIR, { spawn: () => result });
+    assert.equal(rejected.ok, false);
+  }
+});
+
+test("parseArgs: refuses a missing --by", () => {
+  const parsed = parseArgs(["--remote", "origin", "--destination", "refs/heads/main"]);
+  assert.ok(parsed.error);
+});
+
+test("parseArgs: refuses an unsafe --remote", () => {
+  const parsed = parseArgs(["--by", "tester", "--remote", "o r i g i n", "--destination", "refs/heads/main"]);
+  assert.ok(parsed.error);
+});
+
+test("parseArgs: refuses a --destination that is not refs/heads/*", () => {
+  const parsed = parseArgs(["--by", "tester", "--remote", "origin", "--destination", "refs/tags/v1"]);
+  assert.ok(parsed.error);
+});
+
+// ---------------------------------------------------------------------------
+// D2 -- each precondition, met and unmet, each unmet result carrying a remedy
+// ---------------------------------------------------------------------------
+
+test("checkWorkingTreeClean: met -> ok, unmet -> ok:false with remedy", () => {
+  assert.equal(checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => "" }).ok, true);
+  const dirty = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => " M some/file.mjs\n" });
+  assert.equal(dirty.ok, false);
+  assert.ok(dirty.remedy);
+});
+
+test("checkWorkingTreeClean: git failure -> ok:false with remedy", () => {
+  const result = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => null });
+  assert.equal(result.ok, false);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: missing file -> ok:false with remedy", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => { throw new Error("ENOENT"); },
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /missing or unreadable/);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: non-zero exitCode -> ok:false with remedy", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => JSON.stringify({ exitCode: 2, commit: HEAD }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /exitCode/);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: stale commit -> ok:false with remedy", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => JSON.stringify({ exitCode: 0, commit: "deadbeef" }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /stale/);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: exitCode 0 and matching commit -> ok:true", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => JSON.stringify(pushVerifyEvidence()),
+  });
+  assert.equal(result.ok, true);
+});
+
+test("checkEvidenceFreshness: stale commit with valid promotion envelope -> ok:true", () => {
+  const releaseEvidence = {
+    schema: "pipeline.verify-evidence.v0",
+    exitCode: 0,
+    commit: "commit-S",
+    selection: planVerifySelection({
+      mode: "release",
+      candidateCommit: "commit-S",
+      changedPaths: ["src/a.mjs"],
+      registeredSuiteIds: ["a"],
+      policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] },
+    }),
+  };
+  const mockEnvelope = {
+    schema: "pipeline.release-promotion-envelope.v2",
+    source: { commit: "commit-S", tree: "tree-S" },
+    record: { commit: "commit-R", tree: "tree-R" },
+  };
+  let receivedVerifyEvidence = null;
+  let receivedSecurityEvidence = null;
+  const mockValidate = (_envelope, options) => {
+    receivedVerifyEvidence = options.verifyEvidence;
+    receivedSecurityEvidence = options.securityEvidence;
+    return { ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" };
+  };
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
+    readFile: (path) => JSON.stringify(String(path).endsWith("security-latest.json")
+      ? { schema: "pipeline.security-evidence.v1", exitCode: 0, candidate: { status: "clean", commit: "commit-S", tree: "tree-S" } }
+      : releaseEvidence),
+    promotionEnvelope: mockEnvelope,
+    validateReleasePromotionEnvelope: mockValidate,
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /promoted from commit-S/);
+  assert.deepEqual(receivedVerifyEvidence, releaseEvidence);
+  assert.equal(receivedSecurityEvidence.path, "evidence/security-latest.json");
+  assert.equal(receivedSecurityEvidence.data.candidate.commit, "commit-S");
+  assert.equal(typeof receivedSecurityEvidence.raw, "string");
+});
+
+test("checkEvidenceFreshness: Security promotion reads and binds canonical Verify evidence", () => {
+  const releaseEvidence = { exitCode: 0, commit: "commit-S", selection: planVerifySelection({ mode: "release", candidateCommit: "commit-S", registeredSuiteIds: ["a"], policy: { schema: "pipeline.verify-selection.v1", baseline: [], areas: [{ id: "source", paths: ["src/**"], suites: ["a"] }] }, changedPaths: ["src/a.mjs"] }) };
+  let receivedVerifyEvidence = null;
+  let receivedSecurityEvidence = null;
+  const result = checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", FIXTURE_DIR, "commit-R", {
+    readFile: (path) => JSON.stringify(String(path).endsWith("verify-latest.json") ? releaseEvidence : { exitCode: 0, commit: "commit-S" }),
+    promotionEnvelope: { schema: "pipeline.release-promotion-envelope.v2" },
+    validateReleasePromotionEnvelope: (_envelope, options) => {
+      receivedVerifyEvidence = options.verifyEvidence;
+      receivedSecurityEvidence = options.securityEvidence;
+      return { ok: true, sourceCommit: "commit-S", recordCommit: "commit-R" };
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(receivedVerifyEvidence, releaseEvidence);
+  assert.equal(receivedSecurityEvidence.path, "evidence/security-latest.json");
+  assert.equal(receivedSecurityEvidence.data.commit, "commit-S");
+  assert.equal(typeof receivedSecurityEvidence.raw, "string");
+});
+
+test("checkEvidenceFreshness: stale commit with invalid promotion envelope -> ok:false", () => {
+  const mockEnvelope = { schema: "pipeline.release-promotion-envelope.v2" };
+  const mockValidate = () => ({ ok: false, reason: "reverse-inclusion-forbidden" });
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, "commit-R", {
+    readFile: () => JSON.stringify({ exitCode: 0, commit: "commit-S" }),
+    promotionEnvelope: mockEnvelope,
+    validateReleasePromotionEnvelope: mockValidate,
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /stale/);
+});
+
+test("resolveEvidenceProjectDir: linked worktree reads Verify evidence from its primary checkout", () => {
+  const primary = mkdtempSync(join(SCRATCH, "push-prepare-primary-"));
+  const common = join(primary, ".git");
+  mkdirSync(common);
+  const linked = join(primary, "linked");
+  mkdirSync(linked);
+  try {
+    assert.equal(resolveEvidenceProjectDir(linked, { gitCommonDir: () => common }), primary);
+  } finally {
+    rmSync(primary, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// NVA-PP-FIX D1/D2 -- resolveVerifyRemedy reads the project's OWN calibrated
+// verify command, never a hardcoded source-only path (AC-11).
+// ---------------------------------------------------------------------------
+
+test("resolveVerifyRemedy (D1): resolves from the project's own calibration verify key", () => {
+  const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
+    resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
+    readFile: () => JSON.stringify({ verify: "node custom/verify.mjs" }),
+  });
+  assert.match(remedy, /verify-evidence-producer\.mjs.*--prepare/u);
+  assert.doesNotMatch(remedy, /node custom\/verify/u);
+  assert.match(remedy, /not executable until an explicit verified base/u);
+  const plan = resolveVerifyRemedyPlan(FIXTURE_DIR, "evidence/verify-latest.json", { verifyBase: "origin/main" });
+  assert.deepEqual(plan.produce.argv.slice(-6), ["--mode", "push", "--base", "origin/main", "--out", "evidence/verify-latest.json"]);
+  assert.equal(plan.produce.executableNow, true);
+  assert.equal(plan.prepare.argv[0], fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)));
+});
+
+test("resolveVerifyRemedy (D2): no calibration resolves -> honest degradation, never a source-only path", () => {
+  const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
+    resolveAuthorityArtifactPath: () => ({ exists: false }),
+  });
+  assert.match(remedy, /not executable until an explicit verified base/);
+  assert.doesNotMatch(remedy, /harness\//);
+});
+
+test("resolveVerifyRemedy (D2): calibration present but no verify key -> honest degradation", () => {
+  const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
+    resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
+    readFile: () => JSON.stringify({ project: "consumer-project" }),
+  });
+  assert.match(remedy, /not executable until an explicit verified base/);
+  assert.doesNotMatch(remedy, /harness\//);
+});
+
+test("resolveVerifyRemedy (D2): unreadable calibration -> honest degradation, never invents a command", () => {
+  const remedy = resolveVerifyRemedy(FIXTURE_DIR, "evidence/verify-latest.json", {
+    resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
+    readFile: () => { throw new Error("ENOENT"); },
+  });
+  assert.match(remedy, /not executable until an explicit verified base/);
+  assert.doesNotMatch(remedy, /harness\//);
+});
+
+test("checkEvidenceFreshness (D1): remedy comes from the injected calibration resolver, not a hardcoded path", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: (path) => {
+      if (String(path).endsWith("verify-latest.json")) throw new Error("ENOENT");
+      return JSON.stringify({ verify: "node custom/verify.mjs" });
+    },
+    resolveAuthorityArtifactPath: () => ({ exists: true, path: "/fixture/.claude/pipeline.json" }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.remedy, /verify-evidence-producer\.mjs.*--prepare/u);
+  assert.doesNotMatch(result.remedy, /node custom\/verify/u);
+});
+
+test("checkPushThreatModel: absent -> ok:false with materialize remedy; present -> ok:true", () => {
+  const missing = checkPushThreatModel(FIXTURE_DIR, { exists: () => false });
+  assert.equal(missing.ok, false);
+  assert.match(missing.remedy, /materialize-push-threat-model/);
+  const present = checkPushThreatModel(FIXTURE_DIR, { exists: () => true });
+  assert.equal(present.ok, true);
+});
+
+test("checkCriticalHumanProofPolicy: unrestricted posture (no trust anchors) -> ok:true", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
+    parseHumanArgs: () => ({ directory: FIXTURE_DIR }),
+    exists: () => false,
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /unrestricted/);
+});
+
+test("checkCriticalHumanProofPolicy: pinned set, local key IS a member -> ok:true", () => {
+  const anchor = { keyReference: "local-po-key", publicKeySha256: "a".repeat(64) };
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [anchor] }),
+    parseHumanArgs: () => ({ directory: FIXTURE_DIR }),
+    exists: () => true,
+    readFile: () => JSON.stringify({ ...anchor, humanName: "Test Human" }),
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /IS a member/);
+});
+
+test("checkCriticalHumanProofPolicy: pinned set, local key is NOT a member -> ok:false with remedy", () => {
+  const anchor = { keyReference: "local-po-key", publicKeySha256: "a".repeat(64) };
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [anchor] }),
+    parseHumanArgs: () => ({ directory: FIXTURE_DIR }),
+    exists: () => true,
+    readFile: () => JSON.stringify({ keyReference: "other-key", publicKeySha256: "b".repeat(64), humanName: "Someone Else" }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /NOT a member/);
+  assert.ok(result.remedy);
+});
+
+test("checkCriticalHumanProofPolicy: pinned set, directory unresolved -> ok:false with setup remedy", () => {
+  const anchor = { keyReference: "local-po-key", publicKeySha256: "a".repeat(64) };
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [anchor] }),
+    parseHumanArgs: () => ({ error: "approval directory is required" }),
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.remedy);
+});
+
+test("checkCriticalHumanProofPolicy: unreadable policy file -> ok:false", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" }),
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.remedy);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-N-PUSHDIAG (b) -- a v1/v2 document with NO trustAnchor must read as
+// "route unavailable" here, exactly as `trustAnchorsFor()`
+// (../lib/critical-action-authorization.mjs) already reads it -- never as the
+// v3-empty-set "unrestricted" posture. This was the two-readers disagreement:
+// this reader used to fold "no set concept at all" and "explicit empty v3 set"
+// into the same `[]` and report green for both.
+//
+// NARROWED (NVA-CF-TOFUAGREE, following NVA-CF-TOFUFIX's already-landed narrowing of
+// `trustAnchorsFor()`'s own open-verification window): the anchor-less case no longer reads
+// as an unconditional ok:true either -- `checkCriticalHumanProofPolicy()` now independently
+// resolves this machine's own registered operator key (`resolveLocalOperatorKeyAnchor()`,
+// `../lib/machine-plane.mjs`) and reports ok:true only when it resolves. `machinePlaneFixture()`
+// mirrors `critical-action-authorization.test.mjs`'s own fixture of the identical name: a real
+// temp home directory with a real `.agent-pipeline/machine.json` pointing at a real
+// `trust-policy.json`. `noMachineKeyFixture()` is its negative counterpart -- a temp home with
+// no `.agent-pipeline/` at all, so `readMachinePlane()` reports "absent" deterministically,
+// independent of whatever the real machine actually has configured.
+// ---------------------------------------------------------------------------
+
+function machinePlaneFixture(overrides = {}) {
+  const home = mkdtempSync(join(SCRATCH, "push-prepare-machine-home-"));
+  after(() => rmSync(home, { recursive: true, force: true }));
+  const keyDirectory = mkdtempSync(join(SCRATCH, "push-prepare-po-key-dir-"));
+  after(() => rmSync(keyDirectory, { recursive: true, force: true }));
+  writeFileSync(join(keyDirectory, "trust-policy.json"), JSON.stringify({
+    keyReference: overrides.keyReference ?? "machine-op-key",
+    publicKeySha256: overrides.publicKeySha256 ?? "c".repeat(64),
+  }));
+  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({
+    schema: "pipeline.machine-plane.v1", poKeyDirectory: keyDirectory, pushApprovalDefault: "signature",
+    routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-29T00:00:00.000Z",
+  }));
+  return { homedirFn: () => home, keyDirectory };
+}
+
+function noMachineKeyFixture() {
+  const home = mkdtempSync(join(SCRATCH, "push-prepare-machine-home-empty-"));
+  after(() => rmSync(home, { recursive: true, force: true }));
+  return { homedirFn: () => home };
+}
+
+// ---------------------------------------------------------------------------
+// R7-6j (Spec 22.6 delta item 4, PO decision AC; Elephant rulings (3) and (8) of
+// specs/sprint-alfred-epic/plans/0.7-execution-order.md): checkCriticalHumanProofPolicy resolves
+// the approval key directory exactly like the shared resolver (resolvePoKeyDirectory() of
+// po-human-approval.mjs: explicit > PIPELINE_PO_APPROVAL_DIRECTORY > machine-wide plane > legacy
+// per-repository value; a consulted-but-invalid store is a failure, never absent), and its
+// trust-on-first-use branch accepts ONLY a key the resolver proved through the machine-wide
+// default (source "machine-plane") -- the one tier the real gate (localOperatorAnchorFor) proves.
+// The expected directory/tier always comes from resolvePoKeyDirectory() called with the identical
+// fixture inputs. Three policy shapes x six rows; each of the three key directories carries a
+// DIFFERENT trust-policy.json, so membership of the pinned anchor also proves the tier. Fixture
+// homes, fixture git-common-dir and fixture key directories only; the environment variable is
+// saved and restored.
+// ---------------------------------------------------------------------------
+const R76J_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+const R76J_DIGEST = Object.freeze({ environment: "e".repeat(64), "machine-plane": "b".repeat(64), "repo-scope": "c".repeat(64) });
+const R76J_STRANGER = Object.freeze({ keyReference: "r76j-stranger", publicKeySha256: "9".repeat(64) });
+const R76J_ROWS = Object.freeze([
+  { n: 1, label: "env set, plane set, legacy set", env: true, plane: "set", legacy: true, expect: "resolved", source: "environment" },
+  { n: 2, label: "env unset, plane set, legacy set", env: false, plane: "set", legacy: true, expect: "resolved", source: "machine-plane" },
+  { n: 3, label: "env unset, plane absent, legacy set", env: false, plane: "absent", legacy: true, expect: "resolved", source: "repo-scope" },
+  { n: 4, label: "env unset, plane absent, legacy absent", env: false, plane: "absent", legacy: false, expect: "unset", source: null },
+  { n: 5, label: "env unset, plane invalid, legacy set", env: false, plane: "invalid", legacy: true, expect: "invalid", source: null },
+  { n: 6, label: "env set, plane invalid, legacy set", env: true, plane: "invalid", legacy: true, expect: "resolved", source: "environment" },
+]);
+const R76J_SHAPES = Object.freeze([
+  { id: "pinned", label: "pinned set" },
+  { id: "empty", label: "trustAnchors []" },
+  { id: "tofu", label: "TOFU (no trustAnchor, no trustAnchors)" },
+]);
+function r76jBuild(rowBase, row) {
+  const home = join(rowBase, "home");
+  const common = join(rowBase, "common");
+  const repo = join(rowBase, "repo");
+  const keys = { environment: join(rowBase, "key-env"), "machine-plane": join(rowBase, "key-plane"), "repo-scope": join(rowBase, "key-legacy") };
+  for (const directory of [home, common, repo, ...Object.values(keys)]) mkdirSync(directory, { recursive: true });
+  for (const [tier, directory] of Object.entries(keys)) {
+    writeFileSync(join(directory, "po-public.pem"), "fixture public key\n", "utf8");
+    writeFileSync(join(directory, "trust-policy.json"), JSON.stringify({ keyReference: `r76j-key-${tier}`, publicKeySha256: R76J_DIGEST[tier] }), "utf8");
+  }
+  if (row.plane !== "absent") {
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    const valid = { schema: "pipeline.machine-plane.v1", poKeyDirectory: keys["machine-plane"], pushApprovalDefault: "signature", routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-07T00:00:00.000Z" };
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), row.plane === "set" ? JSON.stringify(valid) : "{ not json", "utf8");
+  }
+  if (row.legacy) {
+    mkdirSync(join(common, "agent-pipeline"), { recursive: true });
+    writeFileSync(join(common, "agent-pipeline", "po-key-directory.json"), JSON.stringify({ schema: "pipeline.po-key-directory.v1", poKeyDirectory: keys["repo-scope"], updatedAt: "2026-10-07T00:00:00.000Z" }), "utf8");
+  }
+  return { repo, keys, seams: { homedirFn: () => home, gitCommonDirFn: () => common } };
+}
+function r76jAnchorIn(directory) {
+  const { keyReference, publicKeySha256 } = JSON.parse(readFileSync(join(directory, "trust-policy.json"), "utf8"));
+  return { keyReference, publicKeySha256 };
+}
+function r76jPolicyFor(shapeId, oracle, keys) {
+  if (shapeId === "tofu") return { ok: true, trustAnchor: null, trustAnchors: null };
+  if (shapeId === "empty") return { ok: true, trustAnchor: null, trustAnchors: [] };
+  // Resolved rows: only the anchor read from the ORACLE's directory is a member, so a result that
+  // names any other tier fails the membership check. Unset/invalid rows: a decoy set holding every
+  // fixture key, so a silent fall-through to a lower tier would read as a member.
+  const anchors = oracle.status === "resolved"
+    ? [R76J_STRANGER, r76jAnchorIn(oracle.directory)]
+    : [R76J_STRANGER, ...Object.values(keys).map(r76jAnchorIn)];
+  return { ok: true, trustAnchor: null, trustAnchors: anchors };
+}
+function r76jJudge(shapeId, oracle, result, row4Message) {
+  const problems = [];
+  const message = String(result?.message ?? "");
+  const excerpt = message.slice(0, 90);
+  const got = typeof result?.directory === "string" ? basename(result.directory) : "none";
+  // Ruling (8): TOFU accepts only source "machine-plane"; every other resolved tier is refused.
+  const refusedTier = shapeId === "tofu" && oracle.status === "resolved" && oracle.source !== "machine-plane";
+  if (oracle.status === "resolved" && !refusedTier) {
+    if (result?.ok !== true) problems.push(`ok is ${result?.ok}, expected true (${excerpt})`);
+    if (typeof result?.directory !== "string" || resolve(result.directory) !== resolve(oracle.directory)) {
+      problems.push(`directory ${got}, the resolver names ${basename(oracle.directory)} (${oracle.source})`);
+    }
+    return problems;
+  }
+  if (result?.directory !== undefined) problems.push(`a directory (${got}) was carried although no key was proved`);
+  if (refusedTier) {
+    if (result?.ok !== false) problems.push(`ok is ${result?.ok}, expected a refusal of the ${oracle.source} tier`);
+    for (const pattern of [/TRUST-ANCHOR-MISSING/, /machine-wide default/i, /only/i, /first[- ]use/i]) {
+      if (!pattern.test(message)) problems.push(`refusal message lacks ${pattern} (${excerpt})`);
+    }
+  } else if (oracle.status === "unset") {
+    if (shapeId !== "empty" && result?.ok !== false) problems.push(`ok is ${result?.ok}, expected false with no key directory`);
+    if (shapeId === "tofu" && !/TRUST-ANCHOR-MISSING/.test(message)) problems.push(`absent-key message lacks TRUST-ANCHOR-MISSING (${excerpt})`);
+  } else {
+    if (result?.ok !== false) problems.push(`ok is ${result?.ok}, an invalid store must fail (${excerpt})`);
+    if (message === row4Message) problems.push("message is identical to the absent-store row's");
+    if (!/invalid/i.test(message)) problems.push(`message does not say the store is invalid (${excerpt})`);
+  }
+  return problems;
+}
+test("R7-6j: push-prepare resolves the key directory like the shared resolver and pins first-use keys only from the machine-wide default", () => {
+  const base = mkdtempSync(join(tmpdir(), "r76j-pp-"));
+  const savedEnv = process.env[R76J_ENV];
+  const verdicts = [];
+  const row4Messages = {};
+  let red = 0;
+  try {
+    for (const row of R76J_ROWS) {
+      const fixture = r76jBuild(join(base, `row-${row.n}`), row);
+      if (row.env) process.env[R76J_ENV] = fixture.keys.environment; else delete process.env[R76J_ENV];
+      const resolution = resolvePoKeyDirectory({ explicit: undefined, repoRoot: fixture.repo, dependencies: fixture.seams });
+      const oracle = { status: resolution.status, directory: resolution.directory ?? null, source: resolution.source ?? null };
+      const expectedDirectory = row.source === null ? null : resolve(fixture.keys[row.source]);
+      const oracleProblem = oracle.status !== row.expect || oracle.source !== row.source || (oracle.directory === null ? null : resolve(oracle.directory)) !== expectedDirectory
+        ? `the oracle answered ${oracle.status}/${oracle.source}, not the table's ${row.expect}/${row.source}`
+        : null;
+      for (const shape of R76J_SHAPES) {
+        let result;
+        try {
+          result = checkCriticalHumanProofPolicy(fixture.repo, {
+            readCriticalHumanProofPolicy: () => r76jPolicyFor(shape.id, oracle, fixture.keys),
+            ...fixture.seams,
+            humanArgsDeps: { ...fixture.seams },
+          });
+        } catch (error) {
+          result = { ok: undefined, message: `threw: ${error?.message}` };
+        }
+        if (row.n === 4) row4Messages[shape.id] = String(result.message ?? "");
+        const problems = [...(oracleProblem === null ? [] : [oracleProblem]), ...r76jJudge(shape.id, oracle, result, row4Messages[shape.id])];
+        if (problems.length > 0) red += 1;
+        const verdict = `R7-6j [${shape.label}] row ${row.n} (${row.label}) oracle=${oracle.status}${oracle.source === null ? "" : `/${oracle.source}`}: ${problems.length === 0 ? "GREEN" : `RED - ${problems.join("; ")}`}`;
+        verdicts.push(verdict);
+        console.log(verdict);
+      }
+    }
+  } finally {
+    if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
+    rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+  assert.equal(red, 0, `${red} of ${R76J_ROWS.length * R76J_SHAPES.length} (shape,row) cases disagree with the shared resolver:\n${verdicts.join("\n")}`);
+});
+
+test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine HAS a resolvable operator key -> ok:true, unrestricted-once (trust-on-first-use, NVA-TOFU-1/NVA-CF-TOFUAGREE)", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+    ...machinePlaneFixture(),
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /unrestricted, once/);
+  assert.match(result.message, /trust-on-first-use/);
+});
+
+test("checkCriticalHumanProofPolicy: v1/v2 document with no trustAnchor, machine has NO resolvable operator key -> ok:false, TRUST-ANCHOR-MISSING-shaped (NVA-CF-TOFUAGREE)", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+    ...noMachineKeyFixture(),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /TRUST-ANCHOR-MISSING/);
+  assert.ok(result.remedy);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-N-PUSHDIAG (DoD 1/2) -- ONE fixture policy document, driven through BOTH
+// readers (this script's checkCriticalHumanProofPolicy and the authorization
+// path's exported authorizeRecordedPush), asserting they agree. Each reader
+// being independently correct is exactly what let them disagree before this
+// fix; a fixture-level agreement test is the point, not a detail.
+// ---------------------------------------------------------------------------
+
+const FIXED_CANDIDATE = { commit: "1".repeat(40), tree: "2".repeat(40) };
+function agreementFixtureDir(name) {
+  const dir = mkdtempSync(join(SCRATCH, `push-prepare-agree-${name}-`));
+  after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(join(dir, "project"), { recursive: true });
+  return dir;
+}
+function agreementAuthorize(dir, machinePlaneDeps = {}) {
+  // No approval is recorded at all -- irrelevant to the trust-anchor step, which
+  // `authorizeRecordedPush` checks FIRST, before it ever looks at `state.pushApproval`.
+  return authorizeRecordedPush({
+    projectDir: dir, anchorDir: dir, state: {}, candidate: FIXED_CANDIDATE,
+    remote: "origin", destination: "refs/heads/main", now: new Date().toISOString(),
+    machinePlaneDeps,
+  });
+}
+
+// NARROWED (NVA-CF-TOFUAGREE, following NVA-CF-TOFUFIX): the v1-no-anchor case is no longer
+// a single "both readers call it open" agreement -- it now depends on whether THIS machine
+// has a registered operator key, so both directions are asserted, each hermetically, with the
+// SAME `machinePlaneFixture()`/`noMachineKeyFixture()` fixture (`homedirFn`) fed to BOTH
+// readers, never to just one -- that shared fixture is what makes "agree" a real claim rather
+// than two independently-plausible results.
+test("agreement: v1 document, no trustAnchor field, machine HAS a resolvable operator key -> BOTH readers call the route open, trust-on-first-use (NVA-TOFU-1/NVA-CF-TOFUAGREE)", () => {
+  const dir = agreementFixtureDir("v1-no-anchor-with-key");
+  writeFileSync(
+    join(dir, "project", "critical-human-proof.json"),
+    JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] }),
+  );
+  const machineDeps = machinePlaneFixture();
+  const prepared = checkCriticalHumanProofPolicy(dir, { ...machineDeps });
+  const authorized = agreementAuthorize(dir, machineDeps);
+  assert.equal(prepared.ok, true, "push-prepare must call a v1 document with no trustAnchor open when this machine has a resolvable operator key");
+  assert.match(prepared.message, /unrestricted, once/);
+  // No proof is recorded at all in this fixture (agreementAuthorize's own state: {}), so the
+  // trust-anchor step no longer being what blocks this push -- confirmed by the DIFFERENT
+  // failure code below -- proves the two readers agree the route is open, without this
+  // specific unconfigured push becoming an automatic pass.
+  assert.equal(authorized.authorized, false, "an unconfigured push (no recorded proof at all) must still fail closed");
+  assert.notEqual(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must NOT be what blocks this push when a local key resolves");
+});
+
+test("agreement: v1 document, no trustAnchor field, machine has NO resolvable operator key -> BOTH readers refuse, TRUST-ANCHOR-MISSING (NVA-CF-TOFUFIX/NVA-CF-TOFUAGREE)", () => {
+  const dir = agreementFixtureDir("v1-no-anchor-no-key");
+  writeFileSync(
+    join(dir, "project", "critical-human-proof.json"),
+    JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] }),
+  );
+  const machineDeps = noMachineKeyFixture();
+  const prepared = checkCriticalHumanProofPolicy(dir, { ...machineDeps });
+  const authorized = agreementAuthorize(dir, machineDeps);
+  assert.equal(prepared.ok, false, "push-prepare must call a v1 document with no trustAnchor UNAVAILABLE when this machine has no registered operator key");
+  assert.match(prepared.message, /TRUST-ANCHOR-MISSING/);
+  // The authorization module refuses this BEFORE it ever looks at state.pushApproval (see its
+  // own doc comment) -- so on a machine with no local key, the trust-anchor step IS exactly
+  // what blocks this push, and both readers now agree on that too.
+  assert.equal(authorized.authorized, false);
+  assert.equal(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must be what blocks this push when no local key resolves");
+});
+
+test("agreement: v3 document, explicit EMPTY trustAnchors -> BOTH readers call it unrestricted, but the push still fails closed", () => {
+  const dir = agreementFixtureDir("v3-empty");
+  writeFileSync(
+    join(dir, "project", "critical-human-proof.json"),
+    JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: [] }),
+  );
+  // Hermetic like the pre-existing "unrestricted posture" test above: never touch a real
+  // local approval directory, only this fixture.
+  const prepared = checkCriticalHumanProofPolicy(dir, { parseHumanArgs: () => ({ directory: dir }), exists: () => false });
+  const authorized = agreementAuthorize(dir);
+  assert.equal(prepared.ok, true, "push-prepare must call an explicit empty v3 set unrestricted");
+  assert.match(prepared.message, /unrestricted/);
+  // The empty set must NOT become "any push is authorized": with no approval recorded at
+  // all, the route is open to any well-formed KEY, but this specific push still has nothing
+  // to verify a signature against, and must still refuse -- fails closed, not silently open.
+  assert.equal(authorized.authorized, false, "an empty v3 trustAnchors set must not become an automatic pass");
+  assert.notEqual(authorized.code, "PUSH-PROOF-TRUST-ANCHOR-MISSING", "the trust-anchor step itself must NOT be what blocks an empty v3 set");
+});
+
+// ---------------------------------------------------------------------------
+// NVA-J-PUSHPREPGATE -- isSecurityGateActive() respects gates.security
+// ---------------------------------------------------------------------------
+
+test("isSecurityGateActive: no manifest / no security gate configured -> false", () => {
+  const active = isSecurityGateActive(FIXTURE_DIR, { loadManifestSafe: () => null });
+  assert.equal(active, false);
+});
+
+test("isSecurityGateActive: gates.security.mode = 'off' -> false", () => {
+  const active = isSecurityGateActive(FIXTURE_DIR, {
+    loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
+  });
+  assert.equal(active, false);
+});
+
+test("isSecurityGateActive: gates.security.mode = 'blocking' -> true", () => {
+  const active = isSecurityGateActive(FIXTURE_DIR, {
+    loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
+  });
+  assert.equal(active, true);
+});
+
+// ---------------------------------------------------------------------------
+// resolveFeatureContext / criticalArtifactPaths
+// ---------------------------------------------------------------------------
+
+test("resolveFeatureContext: derives specPath as a sibling of planPath", () => {
+  const result = resolveFeatureContext(FIXTURE_DIR, {
+    readState: () => ({ status: "ok", state: { activeFeature: { id: "nova-x", planPath: "specs/sprint-nova-epic/plans/nova-x.md" } } }),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.specPath, "specs/sprint-nova-epic/plans/spec.md");
+});
+
+test("resolveFeatureContext: no active feature -> ok:false", () => {
+  const result = resolveFeatureContext(FIXTURE_DIR, { readState: () => ({ status: "ok", state: {} }) });
+  assert.equal(result.ok, false);
+});
+
+test("criticalArtifactPaths: agent-side push artifacts stay in repository scratch", () => {
+  const paths = criticalArtifactPaths(FIXTURE_DIR, {
+    gitCommonDir: () => "/external/po-dir/.fake-common",
+    criticalPushScratchArtifactPaths: () => ({
+      request: `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`,
+      proof: `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`,
+      authority: `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`,
+      signer: `${FIXTURE_DIR}/scratch/critical-push-signer-0123456789ab.json`,
+    }),
+  });
+  assert.equal(paths.request, `${FIXTURE_DIR}/scratch/critical-push-request-0123456789ab.json`);
+  assert.equal(paths.proof, `${FIXTURE_DIR}/scratch/critical-push-proof-0123456789ab.json`);
+  assert.equal(paths.authority, `${FIXTURE_DIR}/scratch/critical-push-authority-0123456789ab.json`);
+});
+
+// ---------------------------------------------------------------------------
+// Cross-runner human hand-off: the default output is already bounded and
+// shell-specific. There is no flat F7 command to copy first.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// pushPrepareReport -- end to end, all preconditions met vs. unmet
+// ---------------------------------------------------------------------------
+
+function readyDeps(overrides = {}) {
+  return {
+    dir: FIXTURE_DIR,
+    gitHead: () => HEAD,
+    gitStatus: () => "",
+    exists: (path) => path.endsWith("push-threat-model.md") || path.endsWith("trust-policy.json"),
+    readFile: (path) => {
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
+      if (path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      throw new Error(`unexpected read: ${path}`);
+    },
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
+    parseHumanArgs: () => ({ directory: "/external/po-dir" }),
+    readState: () => ({ status: "ok", state: { activeFeature: { id: "nova-push-prepare", planPath: "specs/sprint-nova-epic/plans/nova-push-prepare.md" }, planSubmission: { profile: "mini" } } }),
+    gitCommonDir: () => "/external/po-dir/.fake-common",
+    derivePoGateRepositoryFingerprint: () => "0123456789ab",
+    now: () => new Date("2026-08-16T20:00:00.000Z"),
+    pipelineStateRun: (argv) => {
+      console.log(JSON.stringify({
+        schema: "pipeline.push-subject-preview.v1",
+        subjectSha256: "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a",
+      }));
+      return 0;
+    },
+    authorizeCriticalPushCommand: ({ repoRoot, featureId, plan, spec, subjectSha256, expiresAt }) => ({
+      executable: "node",
+      argv: [
+        "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
+        "--repo-root", repoRoot, "--feature-id", featureId,
+        "--plan", plan, "--spec", spec, "--kind", "push",
+        "--subject-sha256", subjectSha256, "--expires-at", expiresAt,
+      ],
+    }),
+    ...overrides,
+  };
+}
+
+test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true);
+  assert.equal(result.report.subjectSha256, "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a");
+  assert.ok(result.lines.authorize.length > 0);
+  assert.ok(result.lines.approvePush.length > 0);
+  const humanText = [result.lines.authorize.join("\n"), result.lines.approvePush.join("\n"), result.lines.gitPush].join("\n");
+  assert.match(humanText, /Step: human authorize-critical\nPOSIX:/u);
+  assert.match(humanText, /authorizes only this prepared remote push/u);
+  assert.match(humanText, /configured approval directory is resolved automatically/u);
+  assert.match(humanText, /Step: agent approve-push\nPOSIX:/u);
+  assert.match(humanText, /Step: agent push\nPOSIX:/u);
+  assert.match(humanText, /PowerShell:/u);
+  assert.doesNotMatch(humanText, /--directory|\/external\/po-dir/u);
+  assert.ok(isAbsolute(PIPELINE_STATE_SCRIPT_PATH));
+  assert.match(PIPELINE_STATE_SCRIPT_PATH.replaceAll("\\", "/"), /\/plugins\/pipeline-core\/scripts\/pipeline-state\.mjs$/u);
+  const source = readFileSync(fileURLToPath(new URL("./push-prepare.mjs", import.meta.url)), "utf8");
+  assert.match(source, /PIPELINE_STATE_SCRIPT_PATH, "approve-push"/u);
+  assert.match(humanText, /cmd\.exe:/u);
+  assert.equal(humanText.split(/\r?\n/u).every((line) => line.length <= 72), true, humanText);
+  assert.doesNotMatch(humanText, /^git push origin HEAD:refs\/heads\/main$/mu);
+  assert.doesNotMatch(humanText, /render-copy-safe|available on demand/u);
+});
+
+test("rigor one publication requires candidate-bound independent Critic and Verify", () => {
+  const argv = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
+  const state = { activeFeature: { id: "reviewed", planPath: "specs/reviewed/prd.md" }, planSubmission: { profile: "feature" } };
+  const missing = pushPrepareReport(argv, readyDeps({ readState: () => ({ status: "ok", state }),
+    checkCriticBoundVerify: () => ({ ok: false, code: "private-critic-binding-unavailable" }) }));
+  assert.equal(missing.report.ready, false);
+  assert.equal(missing.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
+  const reviewed = pushPrepareReport(argv, readyDeps({ readState: () => ({ status: "ok", state }),
+    checkCriticBoundVerify: () => ({ ok: true, code: "critic-bound-verify-valid" }) }));
+  assert.equal(reviewed.report.ready, true);
+  const checkpoint = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/reviewed", "--checkpoint"],
+    readyDeps({ readState: () => ({ status: "ok", state }), loadManifestSafe: blockingSecurity }), slimOptions);
+  assert.equal(checkpoint.report.checks.some((check) => check.id === "critic-bound-verify"), false);
+});
+
+test("retained rigor after close still requires candidate review", () => {
+  const state = { closedFeatures: [{ id: "reviewed" }], rigorHistory: [{ body: {
+    featureId: "reviewed", observation: { retainedProfile: "feature" },
+  } }] };
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({ readState: () => ({ status: "ok", state }),
+      checkCriticBoundVerify: () => ({ ok: false, code: "private-critic-binding-unavailable" }) }));
+  assert.equal(result.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
+});
+
+test("pushPrepareReport: inspection mode never folds a pending approval write", () => {
+  let foldCalls = 0;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      gitStatus: () => " M project/pipeline-state.json\n",
+      foldPendingApprovalWrite: () => {
+        foldCalls += 1;
+        throw new Error("inspection mode must not invoke the mutating fold");
+      },
+    }),
+    { foldPendingApprovalWrite: false },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.report.checks.find((check) => check.id === "working-tree-clean")?.ok, false);
+  assert.equal(foldCalls, 0);
+});
+
+test("committed global chat reports chat-attributed-unattested and omits all proof/key preparation", () => {
+  const root = foldFixtureRepo({ humanApproval: "chat", pushApproval: "signature" });
+  let proofPolicyReads = 0;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      dir: root,
+      readCriticalHumanProofPolicy: () => {
+        proofPolicyReads += 1;
+        throw new Error("global chat must not resolve a key, anchor, or proof policy");
+      },
+      authorizeCriticalPushCommand: () => {
+        throw new Error("global chat must not render the signature command");
+      },
+    }),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
+  assert.equal(result.report.humanApproval, "chat-attributed-unattested");
+  assert.equal(proofPolicyReads, 0);
+  assert.deepEqual(result.lines.authorize, []);
+  const rendered = [result.lines.approvePush.join("\n"), result.lines.gitPush].join("\n");
+  assert.doesNotMatch(rendered, /authorize-critical|proof|anchor|key|directory/u);
+});
+
+test("legacy chat policy conflict is reported before pending approval folding", () => {
+  let foldCalls = 0;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    {
+      dir: FIXTURE_DIR,
+      gitHead: () => HEAD,
+      readHumanApprovalMode: () => ({ mode: "chat", source: "pipeline.user.yaml", key: "gates.push_approval", scope: "legacy" }),
+      criticalProofWaiverFor: () => ({ waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" }),
+      foldPendingApprovalWrite: () => { foldCalls += 1; },
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.report.checks.length, 1);
+  assert.equal(result.report.checks[0].id, "critical-proof-mode-conflict");
+  assert.match(result.report.checks[0].message, /CRITICAL-PROOF-MODE-CONFLICT/u);
+  assert.equal(result.lines, null);
+  assert.equal(foldCalls, 0);
+});
+
+test("printReport keeps stdout machine-readable and sends the bounded human commands to stderr", () => {
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps(),
+  );
+  let stdout = "";
+  let stderr = "";
+  printReport(result, {
+    write: (text) => { stdout += text; },
+    writeError: (text) => { stderr += text; },
+  });
+  assert.deepEqual(JSON.parse(stdout), result.report);
+  assert.match(stderr, /Step: human authorize-critical/u);
+  assert.match(stderr, /Step: agent approve-push/u);
+  assert.match(stderr, /Step: agent push/u);
+  assert.equal(stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, stderr);
+  assert.doesNotMatch(stdout, /Step:|POSIX:|PowerShell:/u);
+});
+
+test("pushPrepareReport: v1/v2 trust-on-first-use uses the registered machine key directory without exposing it in command rendering", () => {
+  const machine = machinePlaneFixture();
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      ...machine,
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+      authorizeCriticalPushCommand: () => {
+        return {
+          executable: "node",
+          argv: [
+            "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
+            "--repo-root", FIXTURE_DIR,
+          ],
+        };
+      },
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
+  assert.equal(result.report.checks.some((check) => check.id === "approval-directory"), false);
+  assert.ok(result.lines.authorize.length > 0);
+  assert.doesNotMatch(result.lines.authorize.join("\n"), new RegExp(machine.keyDirectory.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.doesNotMatch(result.lines.authorize.join("\n"), /--directory/u);
+  assert.ok(result.lines.approvePush.length > 0);
+  assert.match(result.lines.gitPush, /^Step: agent push\nPOSIX:/u);
+});
+
+test("pushPrepareReport: v1/v2 trust-on-first-use leaves private directory resolution to the human command", () => {
+  const machine = machinePlaneFixture();
+  let renderedDirectory;
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({
+      ...machine,
+      readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: null }),
+      authorizeCriticalPushCommand: ({ directory }) => {
+        renderedDirectory = directory;
+        return {
+          executable: "node",
+          argv: [
+            "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
+            "--repo-root", FIXTURE_DIR,
+          ],
+        };
+      },
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true, JSON.stringify(result.report.checks));
+  assert.equal(result.report.checks.some((check) => check.id === "approval-directory"), false);
+  assert.equal(renderedDirectory, null);
+  assert.ok(result.lines.authorize.length > 0);
+  assert.ok(result.lines.approvePush.length > 0);
+  assert.match(result.lines.gitPush, /^Step: agent push\nPOSIX:/u);
+  const humanCommands = result.lines.authorize.join("\n");
+  assert.equal(humanCommands.includes(machine.keyDirectory), false);
+  assert.doesNotMatch(humanCommands, /--directory/u);
+});
+
+test("pushPrepareReport: one unmet precondition -> ready:false, no command lines, remedy present", () => {
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({ gitStatus: () => " M dirty.mjs\n" }),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.lines, null);
+  const failing = result.report.checks.find((check) => check.id === "working-tree-clean");
+  assert.equal(failing.ok, false);
+  assert.ok(failing.remedy);
+});
+
+test("pushPrepareReport: verify-evidence check reads the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", () => {
+  const readPaths = [];
+  const deps = readyDeps({
+    readFile: (path) => {
+      readPaths.push(path);
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
+      if (path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      throw new Error(`unexpected read: ${path}`);
+    },
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  const verifyCheck = result.report.checks.find((check) => check.id === "verify-evidence");
+  assert.equal(verifyCheck.ok, true);
+  assert.ok(readPaths.some((path) => path.replaceAll("\\", "/").endsWith(VERIFY_EVIDENCE_DEFAULT_PATH)), "expected a read of the shared VERIFY_EVIDENCE_DEFAULT_PATH");
+});
+
+test("pushPrepareReport: bad argv -> {ok:false, error}", () => {
+  const result = pushPrepareReport(["--remote", "origin"], readyDeps());
+  assert.equal(result.ok, false);
+  assert.ok(result.error);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-J-PUSHPREPGATE -- pushPrepareReport() honors gates.security end to end
+// (backlog/items/2026-08-28-the-push-gate-is-unsatisfiable-in-any-installed-plugin-deployment.md)
+// ---------------------------------------------------------------------------
+
+test("pushPrepareReport: gates.security off -> no security-evidence check, ready:true even without evidence/security-latest.json", () => {
+  const deps = readyDeps({
+    loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
+    readFile: (path) => {
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
+      if (path.endsWith("security-latest.json")) throw new Error("ENOENT -- security evidence must not be read when the gate is off");
+      throw new Error(`unexpected read: ${path}`);
+    },
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true);
+  assert.equal(result.report.checks.find((check) => check.id === "security-evidence"), undefined);
+});
+
+test("pushPrepareReport: gates.security blocking, good evidence -> security-evidence check present and ok", () => {
+  const deps = readyDeps({ loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }) });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true);
+  const securityCheck = result.report.checks.find((check) => check.id === "security-evidence");
+  assert.equal(securityCheck.ok, true);
+});
+
+test("pushPrepareReport: gates.security blocking, missing evidence -> ready:false, security-evidence check present and failing", () => {
+  const deps = readyDeps({
+    loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
+    readFile: (path) => {
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json")) return JSON.stringify(pushVerifyEvidence());
+      if (path.endsWith("security-latest.json")) throw new Error("ENOENT");
+      throw new Error(`unexpected read: ${path}`);
+    },
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  const securityCheck = result.report.checks.find((check) => check.id === "security-evidence");
+  assert.equal(securityCheck.ok, false);
+  assert.match(securityCheck.message, /missing or unreadable/);
+});
+
+test("pushPrepareReport: HEAD unresolved + gates.security off -> no security-evidence failure pushed", () => {
+  const deps = readyDeps({
+    gitHead: () => null,
+    loadManifestSafe: () => ({ gates: { security: { mode: "off" } } }),
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.report.checks.find((check) => check.id === "security-evidence"), undefined);
+  const verifyCheck = result.report.checks.find((check) => check.id === "verify-evidence");
+  assert.equal(verifyCheck.ok, false);
+});
+
+test("pushPrepareReport: HEAD unresolved + gates.security blocking -> security-evidence failure still pushed", () => {
+  const deps = readyDeps({
+    gitHead: () => null,
+    loadManifestSafe: () => ({ gates: { security: { mode: "blocking" } } }),
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  const securityCheck = result.report.checks.find((check) => check.id === "security-evidence");
+  assert.equal(securityCheck.ok, false);
+});
+
+// ---------------------------------------------------------------------------
+// PUSHSIG-S4c -- slim feature-checkpoint profile
+// ---------------------------------------------------------------------------
+
+const CHECKPOINT_ARGV = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/x"];
+const slimOptions = { profile: "feature-checkpoint", sourceRef: "refs/heads/feat/x" };
+const checkpointPolicy = { schema: "pipeline.push-destination-policy.v1", checkpointNamespace: "refs/heads/feat/" };
+const blockingSecurity = () => ({ gates: { security: { mode: "blocking" } }, pushDestinationPolicy: checkpointPolicy });
+
+test("PUSHSIG-S4c: slim profile omits both evidence ids and keeps every other check id", () => {
+  const deps = readyDeps({ loadManifestSafe: blockingSecurity });
+  const slim = pushPrepareReport(CHECKPOINT_ARGV, deps, slimOptions);
+  const full = pushPrepareReport(CHECKPOINT_ARGV, deps);
+  const slimIds = slim.report.checks.map((check) => check.id);
+  const fullIds = full.report.checks.map((check) => check.id);
+  assert.equal(slim.report.profile, "feature-checkpoint");
+  assert.equal(slim.report.ready, true);
+  assert.equal(slimIds.includes("verify-evidence"), false);
+  assert.equal(slimIds.includes("security-evidence"), false);
+  assert.deepEqual(slimIds.filter((id) => id !== "checkpoint-destination"), fullIds.filter((id) => id !== "verify-evidence" && id !== "security-evidence"));
+  assert.ok(slimIds.includes("working-tree-clean") && slimIds.includes("push-threat-model") && slimIds.includes("critical-human-proof-policy"));
+  // Value-less --checkpoint on argv selects the same profile.
+  const viaFlag = pushPrepareReport([...CHECKPOINT_ARGV, "--checkpoint"], deps);
+  assert.equal(viaFlag.report.profile, "feature-checkpoint");
+  assert.equal(viaFlag.report.checks.some((check) => check.id === "verify-evidence"), false);
+});
+
+test("PUSHSIG-S4c regression: default profile still has both evidence checks and an unchanged HEAD push line", () => {
+  const result = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ loadManifestSafe: blockingSecurity }));
+  const ids = result.report.checks.map((check) => check.id);
+  assert.ok(ids.includes("verify-evidence"));
+  assert.ok(ids.includes("security-evidence"));
+  assert.equal(result.report.profile, undefined);
+  assert.match(result.lines.gitPush, /git push origin HEAD:refs\/heads\/feat\/x/u);
+  assert.doesNotMatch(result.lines.gitPush, /-C/u);
+  // Stale Verify evidence still blocks the default profile.
+  const stale = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ readFile: (path) => (path.endsWith("verify-latest.json") ? JSON.stringify({ exitCode: 0, commit: "deadbeef" }) : readyDeps().readFile(path)) }));
+  assert.equal(stale.report.ready, false);
+});
+
+test("PF-32: --checkpoint without a checkpoint policy, or to a destination the guard would not classify as one, is refused before any signing command", () => {
+  for (const [manifest, sourceRef, remedy] of [
+    [{ gates: { security: { mode: "blocking" } } }, "refs/heads/feat/x", /opt in once: add "pushDestinationPolicy: .*then approve the plan again/u],
+    [blockingSecurity(), "refs/heads/feat/other", /same name under the checkpoint namespace/u],
+  ]) {
+    const result = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ loadManifestSafe: () => manifest }), { ...slimOptions, sourceRef });
+    assert.equal(result.report.ready, false);
+    assert.equal(result.lines, null, "no signing command is printed for a push the guard would not admit as a checkpoint");
+    const check = result.report.checks.find((row) => row.id === "checkpoint-destination");
+    assert.equal(check.ok, false); assert.match(check.message, /protected publication/u); assert.match(check.remedy, remedy);
+  }
+  const admitted = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ loadManifestSafe: blockingSecurity }), slimOptions);
+  assert.equal(admitted.report.checks.find((row) => row.id === "checkpoint-destination").ok, true);
+});
+
+test("PUSHSIG-S4c: profile note and sourceRef push line appear only in the slim profile", () => {
+  const deps = readyDeps({ loadManifestSafe: blockingSecurity });
+  const slim = pushPrepareReport(CHECKPOINT_ARGV, deps, slimOptions);
+  const full = pushPrepareReport(CHECKPOINT_ARGV, deps);
+  assert.match(slim.lines.profileNote, /feature checkpoint: no Verify\/security\/Critic evidence/u);
+  assert.equal("profileNote" in full.lines, false);
+  const gitPush = slim.lines.gitPush.replaceAll("'\nCMD=${CMD}'", ""); // a deep checkout path wraps the refspec
+  assert.match(gitPush, /refs\/heads\/feat\/x:refs\/heads\/feat\/x/u); assert.doesNotMatch(gitPush, /HEAD:refs/u);
+  let stderr = "";
+  printReport(slim, { write: () => {}, writeError: (text) => { stderr += text; } });
+  assert.match(stderr, /feature checkpoint: no Verify/u);
+  stderr = "";
+  printReport(full, { write: () => {}, writeError: (text) => { stderr += text; } });
+  assert.doesNotMatch(stderr, /feature checkpoint/u);
+});
+
+test("PUSHSIG-S4c: slim profile with unresolved HEAD -> failing head-commit check", () => {
+  const result = pushPrepareReport(CHECKPOINT_ARGV, readyDeps({ gitHead: () => null }), slimOptions);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.lines, null);
+  const head = result.report.checks.find((check) => check.id === "head-commit");
+  assert.equal(head.ok, false);
+  assert.match(head.message, /HEAD commit could not be determined/u);
+  assert.equal(result.report.checks.some((check) => check.id === "verify-evidence" || check.id === "security-evidence"), false);
+});
+
+// ---------------------------------------------------------------------------
+// D3 -- subjectSha256 equality against the real pipeline-state.mjs CLI
+// ---------------------------------------------------------------------------
+
+test("D3: preparePushSubject() matches the real `pipeline-state.mjs prepare-push-subject` CLI", () => {
+  const args = { dir: REPO_ROOT, by: "nva-push-prepare-d3-check", remote: "origin", destination: "refs/heads/main" };
+  const inProcess = preparePushSubject(args);
+  assert.equal(inProcess.ok, true, `preparePushSubject failed: ${inProcess.raw}`);
+
+  const spawned = spawnSync(
+    process.execPath,
+    ["plugins/pipeline-core/scripts/pipeline-state.mjs", "prepare-push-subject",
+      "--by", args.by, "--remote", args.remote, "--destination", args.destination],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  );
+  assert.equal(spawned.status, 0, `CLI subprocess failed: ${spawned.stderr}`);
+  const cliValue = JSON.parse(spawned.stdout);
+
+  assert.equal(inProcess.value.subjectSha256, cliValue.subjectSha256);
+  assert.match(inProcess.value.subjectSha256, /^[0-9a-f]{64,}$/);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-PUSHFOLD-1 -- `approve-push` (pipeline-state.mjs) writes its trailing
+// `pushApproval.lastApproved` record strictly AFTER the signed subject was
+// computed, so that write can never be part of the commit it records
+// (backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md).
+// This section proves (1) the upfront `pendingAuditWrite` hint is present the
+// moment approve-push succeeds, on a REAL repo, via a REAL (chat-mode, no key
+// ceremony) approve-push call -- not a reproduction of pipeline-state.mjs's own
+// logic -- and (2) `foldPendingPushApprovalWrite()` folds that trailing write
+// into a commit at the start of the next push-prepare run and clears the hint,
+// never leaving it stale. `pipeline-state.test.mjs` is TP-protected (no
+// in-session edit route), so this is the only place this repo can add coverage
+// for `approve-push`'s new `pendingAuditWrite` field.
+// ---------------------------------------------------------------------------
+
+function gitAtFold(root, ...args) {
+  return spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+}
+
+/** A real git repo with a committed baseline state file and threat model, chat-mode gate. */
+function foldFixtureRepo({ humanApproval = null, pushApproval = "chat" } = {}) {
+  const root = mkdtempSync(join(SCRATCH, "push-prepare-fold-"));
+  after(() => rmSync(root, { recursive: true, force: true }));
+  gitAtFold(root, "init", "-q", "-b", "main");
+  gitAtFold(root, "config", "user.email", "po@example.invalid");
+  gitAtFold(root, "config", "user.name", "PO");
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0", planApproved: true,
+    activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
+  }, null, 2));
+  writeFileSync(join(root, "pipeline.user.yaml"), [
+    "schema: pipeline.user.v3",
+    "gates:",
+    ...(humanApproval === null ? [] : [`  human_approval: ${humanApproval}`]),
+    `  push_approval: ${pushApproval}`,
+    "",
+  ].join("\n"));
+  assert.equal(runPipelineState(["materialize-push-threat-model"], { dir: root }), 0, "fixture setup: materialize-push-threat-model must succeed");
+  gitAtFold(root, "add", "-A");
+  gitAtFold(root, "commit", "-q", "-m", "initial");
+  return root;
+}
+
+test("NVA-PUSHFOLD-1: bugfix discipline -- the CURRENT gap (red) demonstrated on a real repo, then fixed (green)", () => {
+  const root = foldFixtureRepo();
+  const deps = { dir: root };
+  const target = ["--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"];
+
+  // A real, in-process chat-mode approve-push: first call only issues the challenge.
+  const challengeCall = runPipelineState(["approve-push", ...target], deps);
+  assert.equal(challengeCall, 1, "first chat-mode call must only issue a PO-CHALLENGE");
+  const pendingState = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  const code = pendingState.pendingPushChallenge.code;
+
+  // The confirming (attended) call actually records the approval.
+  const confirmedCall = runPipelineState(["approve-push", ...target], { ...deps, isattyFn: () => true, readLineFn: () => code });
+  assert.equal(confirmedCall, 0, "an attended confirming call must succeed");
+
+  // Part 2 (upfront hint): present and readable in immediately-visible (uncommitted) state,
+  // the moment approve-push succeeds -- before anything folds it into a commit.
+  const trailing = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(trailing.pushApproval.lastApproved.pendingAuditWrite, true,
+    "approve-push must stamp the upfront pendingAuditWrite hint onto its own write");
+
+  // RED: this is the exact structural gap the backlog item names -- the trailing write
+  // leaves push-prepare's own precondition failing, with nothing folding it in yet.
+  const beforeFold = checkWorkingTreeClean(root);
+  assert.equal(beforeFold.ok, false, "before the fix runs, the trailing write leaves the tree dirty");
+
+  // NVA-CF-PUSHFOLD (DoD b): approve-push's own forCommit is bound to the CURRENT HEAD -- the
+  // push has not happened yet. Folding now would move HEAD past forCommit and void the
+  // approval (docs/push-release-flow.md: "Commit nothing between approve-push and the push").
+  // The fix refuses to fold in exactly this window.
+  const foldWhileOutstanding = foldPendingPushApprovalWrite(root);
+  assert.equal(foldWhileOutstanding.folded, false, "must not fold while the approval is still outstanding for HEAD");
+  assert.equal(foldWhileOutstanding.reason, "approval-outstanding");
+  assert.equal(checkWorkingTreeClean(root).ok, false, "the tree must remain dirty -- nothing was committed while blocked");
+  const stillPending = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(stillPending.pushApproval.lastApproved.pendingAuditWrite, true, "the hint must remain true -- untouched while blocked");
+
+  // Simulate the push having actually happened and HEAD having since moved on (a later,
+  // unrelated commit) -- this is the shape a LATER push-prepare run actually finds.
+  writeFileSync(join(root, "unrelated.txt"), "later work\n");
+  gitAtFold(root, "add", "--", "unrelated.txt");
+  gitAtFold(root, "commit", "-q", "-m", "later, unrelated work");
+
+  // GREEN: now that HEAD has moved past forCommit, foldPendingPushApprovalWrite() (this fix)
+  // folds the still-pending write in and clears the hint.
+  const fold = foldPendingPushApprovalWrite(root);
+  assert.equal(fold.folded, true, `expected a successful fold: ${JSON.stringify(fold)}`);
+  const afterFold = checkWorkingTreeClean(root);
+  assert.equal(afterFold.ok, true, "after the fix runs, the tree is clean again");
+
+  const commitSubject = gitAtFold(root, "log", "-1", "--pretty=%s");
+  assert.match(commitSubject.stdout, /fold pending push-approval record/);
+  const commitBody = gitAtFold(root, "log", "-1", "--pretty=%B");
+  assert.match(commitBody.stdout, /AI-Assisted: true/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry the AI-Assisted trailer");
+  assert.match(commitBody.stdout, /Dispatch: stage-0 \(elephant\)/, "NVA-CF-PUSHFOLD (DoD c): the auto-commit must carry a Dispatch trailer");
+  const committedState = JSON.parse(gitAtFold(root, "show", "HEAD:project/pipeline-state.json").stdout);
+  assert.equal(committedState.pushApproval.lastApproved.pendingAuditWrite, false,
+    "the hint must be cleared to false the moment it is actually committed -- never stale once folded");
+  assert.equal(committedState.pushApproval.lastApproved.criticalProofWaiver.mode, "chat",
+    "the rest of the approval record must survive the fold unchanged");
+});
+
+test("NVA-PUSHFOLD-1: pushPrepareReport folds the pending write in at the START, before working-tree-clean is evaluated", () => {
+  const root = foldFixtureRepo();
+  const priorCommit = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
+  const baseline = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  // Advance HEAD past the commit the approval is bound to -- NVA-CF-PUSHFOLD (DoD b): a fold
+  // must never run while forCommit still equals the CURRENT HEAD, so this fixture simulates
+  // the push having already happened and HEAD having since moved on (a later, unrelated
+  // commit), rather than the ambiguous still-outstanding-for-HEAD shape.
+  writeFileSync(join(root, "unrelated.txt"), "later work\n");
+  gitAtFold(root, "add", "--", "unrelated.txt");
+  gitAtFold(root, "commit", "-q", "-m", "later, unrelated work");
+  // Simulate the exact post-approve-push dirty shape directly, without re-running the
+  // whole chat-mode ceremony (already covered by the test above) -- an uncommitted
+  // pushApproval.lastApproved write with the hint still true, bound to a commit that is no
+  // longer HEAD.
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    ...baseline,
+    pushApproval: { lastApproved: { approvedBy: "PO", forCommit: priorCommit, remote: "origin", destination: "refs/heads/main", pendingAuditWrite: true } },
+  }, null, 2));
+  assert.equal(checkWorkingTreeClean(root).ok, false, "fixture must start dirty");
+
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], { dir: root });
+  const workingTreeCheck = result.report.checks.find((check) => check.id === "working-tree-clean");
+  assert.equal(workingTreeCheck.ok, true, "the fold must run before this check, so it never sees the trailing write as dirty");
+  assert.equal(checkWorkingTreeClean(root).ok, true, "the fold must have actually committed the pending write");
+});
+
+test("foldPendingPushApprovalWrite: leaves the tree alone when another file is ALSO dirty (never silently absorbs unrelated WIP)", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n M some/other/file.mjs\n",
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "other-dirty-paths");
+  assert.equal(calls.length, 0, "must never shell out to git add/commit when other files are also dirty");
+});
+
+test("foldPendingPushApprovalWrite: no-op on a clean tree (ordinary case unchanged)", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => "",
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "clean");
+  assert.equal(calls.length, 0, "must never shell out to git when there is nothing to fold");
+});
+
+test("foldPendingPushApprovalWrite: a dirty path that is NOT the state file is left alone", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M some/unrelated/file.mjs\n",
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "other-dirty-paths");
+  assert.equal(calls.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// NVA-CF-PUSHFOLD -- hermetic unit coverage (injected deps, no real git repo) for the two
+// narrower gates: the state file being the SOLE dirty path is necessary but not sufficient.
+// ---------------------------------------------------------------------------
+
+test("foldPendingPushApprovalWrite (DoD a): state file dirty for a reason OTHER than a pending fold is never auto-committed (pendingAuditWrite absent)", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "x" } }),
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "not-pending");
+  assert.equal(calls.length, 0, "must never shell out to git add/commit for an operator's own unrelated state-file edit");
+});
+
+test("foldPendingPushApprovalWrite (DoD a): pendingAuditWrite explicitly false is also never auto-committed", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: false, forCommit: "deadbeef" } } }),
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "not-pending");
+  assert.equal(calls.length, 0);
+});
+
+test("foldPendingPushApprovalWrite (DoD b): a live approval (forCommit === HEAD) blocks the fold entirely", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: HEAD } } }),
+    gitHead: () => HEAD,
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "approval-outstanding");
+  assert.equal(calls.length, 0, "must never shell out to git add/commit while the approval is still outstanding for HEAD");
+});
+
+test("foldPendingPushApprovalWrite: HEAD unavailable -> refuses to fold rather than guessing", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+    gitHead: () => null,
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, false);
+  assert.equal(result.reason, "head-unavailable");
+  assert.equal(calls.length, 0);
+});
+
+test("foldPendingPushApprovalWrite (DoD c): forCommit different from HEAD -> folds, commit message carries both AI-Assisted and Dispatch trailers", () => {
+  const calls = [];
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+    gitHead: () => HEAD,
+    writeFile: () => {},
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.equal(result.folded, true, `expected a successful fold: ${JSON.stringify(result)}`);
+  assert.equal(calls.length, 2, "expects exactly a git add call and a git commit call");
+  const commitCall = calls.find((call) => call[1].includes("commit"));
+  assert.ok(commitCall, "expected a git commit invocation");
+  const commitArgv = commitCall[1];
+  const message = commitArgv[commitArgv.indexOf("-m") + 1];
+  assert.match(message, /AI-Assisted: true/);
+  assert.match(message, /Dispatch: stage-0 \(elephant\)/);
+});
+
+test("foldPendingPushApprovalWrite: accepts EPERM only after a zero status for both git writes", () => {
+  const calls = [];
+  const eperm = Object.assign(new Error("sandbox transport completed late"), { code: "EPERM" });
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+    gitHead: () => HEAD,
+    writeFile: () => {},
+    spawn: (...args) => {
+      calls.push(args);
+      return calls.length === 1
+        ? { status: 0, stdout: " M project/pipeline-state.json\n", error: eperm }
+        : { status: 0, error: eperm };
+    },
+  });
+  assert.equal(result.folded, true);
+  assert.equal(calls.length, 3);
+});
+
+test("foldPendingPushApprovalWrite: non-zero or status-less git write remains fail-closed", () => {
+  for (const [result, reason] of [[{ status: 1 }, "add-failed"], [{}, "add-failed"]]) {
+    const outcome = foldPendingPushApprovalWrite(FIXTURE_DIR, {
+      gitStatus: () => " M project/pipeline-state.json\n",
+      readFile: () => JSON.stringify({ pushApproval: { lastApproved: { pendingAuditWrite: true, forCommit: "0".repeat(40) } } }),
+      gitHead: () => HEAD,
+      writeFile: () => {},
+      spawn: () => result,
+    });
+    assert.equal(outcome.reason, reason);
+  }
+  for (const result of [{ status: 1, stdout: "" }, { stdout: "" }]) {
+    const outcome = foldPendingPushApprovalWrite(FIXTURE_DIR, { spawn: () => result });
+    assert.equal(outcome.reason, "status-unavailable");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PF-31/PF-36/PF-40 (D56 (2)): the Pipeline's own dirty files are named with the one command that commits them
+// ---------------------------------------------------------------------------
+
+test("PF-31: a tree dirty only with the slice queue or the override log names commit-pipeline-owned; any other change keeps the plain remedy", () => {
+  const owned = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => "?? specs/unit/slice-queue.json\n M project/guard-override.log.jsonl" });
+  assert.equal(owned.ok, false);
+  assert.match(owned.remedy, /commit-pipeline-owned\.mjs --root /u);
+  assert.match(owned.remedy, /specs\/unit\/slice-queue\.json, project\/guard-override\.log\.jsonl/u);
+  const mixed = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => "?? specs/unit/slice-queue.json\n M src/app.mjs" });
+  assert.match(mixed.remedy, /commit or stash/u);
+  assert.equal(classifyDirtyTree("M project/pipeline-state.json").others[0], "project/pipeline-state.json", "a trimmed first line still yields the full path");
+});
+
+test("PF-36: commit-pipeline-owned commits exactly the Pipeline's own files and refuses when anything else is dirty", () => {
+  const root = mkdtempSync(join(tmpdir(), "commit-pipeline-owned-"));
+  const config = ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"];
+  try {
+    const git = (...args) => spawnSync("git", ["-C", root, ...config, ...args], { encoding: "utf8" });
+    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
+    assert.equal(git("commit", "--allow-empty", "-q", "-m", "base").status, 0);
+    mkdirSync(join(root, "specs/unit"), { recursive: true });
+    writeFileSync(join(root, "specs/unit/slice-queue.json"), "{}\n");
+    writeFileSync(join(root, "other.txt"), "x\n");
+    const run = (...argv) => commitPipelineOwned(argv, { spawn: (command, args, options) => spawnSync(command, [args[0], args[1], ...config, ...args.slice(2)], options) });
+    const refused = run("--root", root, "--human");
+    assert.equal(refused.code, "CPO-FOREIGN-CHANGES"); assert.deepEqual(refused.others, ["other.txt"]);
+    rmSync(join(root, "other.txt"));
+    assert.equal(run("--root", root, "--human", "--dry-run").status, "dry-run");
+    const committed = run("--root", root, "--human");
+    assert.equal(committed.status, "committed", JSON.stringify(committed)); assert.deepEqual(committed.owned, ["specs/unit/slice-queue.json"]);
+    assert.equal(git("status", "--porcelain").stdout, ""); assert.doesNotMatch(git("log", "-1", "--format=%B").stdout, /AI-Assisted|Dispatch:/u, "--human: no provenance trailers");
+    assert.equal(run("--root", root, "--agent").status, "nothing-to-commit"); writeFileSync(join(root, "specs/unit/slice-queue.json"), "{\"next\":1}\n");
+    assert.equal(run("--root", root, "--agent").status, "committed"); assert.match(git("log", "-1", "--format=%B").stdout, /\n\nAI-Assisted: true\nDispatch: stage-0 \(elephant\)\n/u);
+    for (const argv of [[], ["--root", root], ["--root", root, "--agent", "--human"], ["--root", root, "--agent", "--agent"]]) assert.equal(run(...argv).code, "CPO-ARGS", `neither flag, both or a repeat is refused: ${argv.length}`);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

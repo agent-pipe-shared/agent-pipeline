@@ -1,5 +1,12 @@
 # Restart checkpoint — exact continuation on this machine
 
+> Historical checkpoint. Current status, transfer goal and next order are in
+> [docs/state.md](../../../docs/state.md). The PO later reinstated PC/runner
+> transfer and authorized an earlier feature push. Retained local briefings,
+> specifications and required context are now in the
+> [tracked authoring archive](../evidence/pc-transfer-briefing-history-2026-10-25/README.md).
+> Do not follow old clone paths or cancellation instructions below as current.
+
 This is a state handover, not a replacement for AGENTS.md, the runtime manifest
 or Operating Model. Follow their actual re-entry order. The active feature and
 goal continue. The PO cancelled PC transfer and requested local installation,

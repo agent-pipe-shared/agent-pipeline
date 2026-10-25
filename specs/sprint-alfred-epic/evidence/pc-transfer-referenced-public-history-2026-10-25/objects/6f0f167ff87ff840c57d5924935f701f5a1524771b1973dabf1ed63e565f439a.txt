@@ -1,0 +1,24 @@
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+import { mkdtempSync, lstatSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { validatePrivateParent, validateCreatedHome } from '<repo-root>/plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs';
+
+const parent = '/run/user/1000/ap-g17';
+validatePrivateParent(parent);
+const home = mkdtempSync(join(parent, 'g8c-'));
+const original = lstatSync(home);
+if ((original.mode & 0o777) !== 0o700) throw new Error('G8-TEST-HOME-MODE');
+validateCreatedHome(home);
+process.env.HOME = home;
+process.env.TMPDIR = home;
+os.userInfo = () => ({ uid: process.getuid(), gid: process.getgid(), username: 'g8-synthetic', homedir: home, shell: '/bin/sh' });
+os.homedir = () => home;
+os.tmpdir = () => home;
+syncBuiltinESMExports();
+process.on('exit', () => {
+  try {
+    const current = lstatSync(home);
+    if (current.dev === original.dev && current.ino === original.ino && current.isDirectory()) rmSync(home, { recursive: true });
+  } catch { /* refuse cleanup on inode loss */ }
+});

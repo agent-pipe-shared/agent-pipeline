@@ -1,0 +1,119 @@
+diff --git a/harness/scripts/generate-agent-obligations.mjs b/harness/scripts/generate-agent-obligations.mjs
+index 057333abc..1442e41c8 100644
+--- a/harness/scripts/generate-agent-obligations.mjs
++++ b/harness/scripts/generate-agent-obligations.mjs
+@@ -296,6 +296,22 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
+   put("- Commit as soon as a piece is green, not at the very end. A commit that exists");
+   put("  survives a truncated run; a commit that is only planned does not.");
+   put();
++
++  put("## 7. Where a check runs (the declared test-command route)");
++  put();
++  put("<!-- hand-maintained: the route string is declared by the preflight readback");
++  put("     (plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, `roleScope.testCommands`)");
++  put("     and consumed here through the briefing, not through a guard. Pinned by");
++  put("     plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs (point 6). -->");
++  put();
++  put("When the preflight readback declares `roleScope.testCommands.route` =");
++  put("`host-boundary-from-first-call` (with `executionBoundary` `host-authorized-wsl`),");
++  put("submit EVERY DoD / targeted / quick check at that host boundary from the FIRST call:");
++  put("never sandbox first, and never probe both views to find out which one works. A");
++  put("sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge and");
++  put("spends a tool use from the budget that is also the stop condition. When the route is");
++  put("`default`, run the checks as briefed.");
++  put();
+   return `${lines.join("\n")}\n`;
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs b/plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs
+index f70bf6678..374337f44 100644
+--- a/plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs
++++ b/plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs
+@@ -21,6 +21,9 @@
+  * function only, never that a course consumes it.
+  * 5 (P1-1 bullet 3, standalone, NOT wired into a caller): lib/dispatch-recovery-state.mjs keeps one atomic recovery
+  *   state per task identity (dispatchId + role + candidate) with a bounded attempt history; see the point-5 cases.
++ * 6 (P1-1 bullet 2, briefing-side consumer of the declared route, no new guard): the agent-obligations document and the Goldfish
++ *   task template tell the owner to submit every DoD / targeted / quick check at the declared host boundary from the first call when
++ *   the preflight declares roleScope.testCommands.route = host-boundary-from-first-call; see the point-6 cases.
+  * P1-1 (role-dependent preflight, 0.7.0) is pinned in scripts/pipeline-start-preflight.test.mjs.
+  */
+ import assert from "node:assert/strict";
+@@ -462,3 +465,42 @@ test("point 5: only a real fallback result is an attempt; surfaced stderr is bou
+     assert.doesNotMatch(stderr, /example-user|\/home\/|[A-Za-z]:\\/iu);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++
++// --- Point 6: the declared host-boundary test route reaches the Goldfish through the briefing -----------------------
++const ROUTE_DECLARATION = "host-boundary-from-first-call";
++const OBLIGATION_FILES = ["templates/prompts/agent-obligations.md", "plugins/pipeline-core/templates/prompts/agent-obligations.md"];
++const TASK_TEMPLATES = ["templates/prompts/goldfish-task.md", "plugins/pipeline-core/templates/prompts/goldfish-task.md"];
++const readUnix = (rel) => readFileSync(join(repoRoot, rel), "utf8").replace(/\r\n/g, "\n");
++const flatten = (text) => text.replace(/\s+/g, " ");
++
++test("point 6: the declaration string the briefing names is exactly the one the preflight emits", () => {
++  const source = readFileSync(join(pluginRoot, "scripts", "pipeline-start-preflight.mjs"), "utf8");
++  assert.ok(source.includes(`"${ROUTE_DECLARATION}"`), "preflight declares the route string");
++});
++
++test("point 6: the obligations document (canonical and vendored) states the host-boundary-from-first-call rule", () => {
++  for (const rel of OBLIGATION_FILES) {
++    const text = flatten(readUnix(rel));
++    assert.ok(text.includes("roleScope.testCommands.route"), `${rel}: names the preflight field`);
++    assert.ok(text.includes(ROUTE_DECLARATION), `${rel}: names the declaration exactly`);
++    assert.ok(text.includes("host-authorized-wsl"), `${rel}: names the execution boundary`);
++    assert.match(text, /EVERY DoD \/ targeted \/ quick check/, rel);
++    assert.match(text, /from the FIRST call/, rel);
++    assert.match(text, /never sandbox first/, rel);
++    assert.match(text, /never probe both views/, rel);
++  }
++});
++
++test("point 6: the Goldfish task template (canonical and vendored) carries the matching line inside the targeted-checks field", () => {
++  for (const rel of TASK_TEMPLATES) {
++    const text = readUnix(rel);
++    const start = text.indexOf("- Targeted checks");
++    const end = text.indexOf("- Quick check:");
++    assert.ok(start >= 0 && start < end, rel);
++    const field = flatten(text.slice(start, end));
++    assert.ok(field.includes("roleScope.testCommands.route"), `${rel}: names the preflight field`);
++    assert.ok(field.includes(ROUTE_DECLARATION), `${rel}: names the declaration exactly`);
++    assert.match(field, /from the first call/, rel);
++    assert.match(field, /agent-obligations\.md/, rel);
++  }
++});
+diff --git a/plugins/pipeline-core/templates/prompts/agent-obligations.md b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+index e9c6e1a14..5d43d4ae3 100644
+--- a/plugins/pipeline-core/templates/prompts/agent-obligations.md
++++ b/plugins/pipeline-core/templates/prompts/agent-obligations.md
+@@ -204,3 +204,18 @@ deliberately carries no static copy of that; a second copy is the drift.
+ - Commit as soon as a piece is green, not at the very end. A commit that exists
+   survives a truncated run; a commit that is only planned does not.
+ 
++## 7. Where a check runs (the declared test-command route)
++
++<!-- hand-maintained: the route string is declared by the preflight readback
++     (plugins/pipeline-core/scripts/pipeline-start-preflight.mjs, `roleScope.testCommands`)
++     and consumed here through the briefing, not through a guard. Pinned by
++     plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs (point 6). -->
++
++When the preflight readback declares `roleScope.testCommands.route` =
++`host-boundary-from-first-call` (with `executionBoundary` `host-authorized-wsl`),
++submit EVERY DoD / targeted / quick check at that host boundary from the FIRST call:
++never sandbox first, and never probe both views to find out which one works. A
++sandbox-first attempt only buys a `spawnSync EPERM` at the default sandbox edge and
++spends a tool use from the budget that is also the stop condition. When the route is
++`default`, run the checks as briefed.
++
+diff --git a/plugins/pipeline-core/templates/prompts/goldfish-task.md b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+index 3373ff17a..2f6c83735 100644
+--- a/plugins/pipeline-core/templates/prompts/goldfish-task.md
++++ b/plugins/pipeline-core/templates/prompts/goldfish-task.md
+@@ -382,6 +382,7 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
+ - Project resource headroom — Coordinator preparation, report-only: {{PROJECT_RESOURCE_OBSERVATIONS_AND_MEASUREMENT_ROUTE: existing project PRD/Spec/config limit and criterion locator/source SHA, unit, current candidate commit/tree, actual existing measurement command and measured artifact/value/SHA; otherwise explicit unknown}}. Before the fix wave, derive these observations from the actual project criterion and measurement/check artifact, retaining the original sources. Do not substitute a dispatch budget, profile, model price or historical example for a product limit. A missing or stale measurement is unknown, never compliance permission.
+   For the report, prepare bounded factual observation JSON (`pipeline.project-resource-observations.v1`) and use `node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/resource-observations.json` from the ready project session. This read-only command reports the declared units, limit, measurement, candidate, command/artifact references and signed headroom when compatible; it does not execute the project measurement or authenticate the declared digests. Retain the actual existing check command and candidate-bound result for final compliance; report emission exit 0 is not measurement PASS. If there are no supplied project observations, report unknown rather than inventing a cap or a new check. This adds no pre-candidate Full Verify gate.
+ - Targeted checks — Goldfish owner: {{TARGETED_CHECK_COMMANDS_AND_AC_IMPACT_SCOPE: concrete meaningful commands, each with its acceptance criteria and affected behavior/files; never just "run relevant tests"}}. Run these checks for the owned change and record actual exits and machine-written evidence. A failed or missing targeted check cannot be cleared by a quick check.
++  When the preflight readback declares `roleScope.testCommands.route` = `host-boundary-from-first-call`, submit every DoD / targeted / quick check at that host boundary from the first call: never sandbox first, never probe both views (`templates/prompts/agent-obligations.md` §7).
+ - Quick check: {{QUICK_CHECK_ROUTE: actual configured command, configuration/source reference, scope and owner; otherwise "missing — unknown, no quick PASS" or "invalid — report the exact source/validation problem"}}. Do not invent a command from a lifecycle profile named `quick`, run an invalid route, or report an absent command as PASS. Missing quick configuration does not remove the targeted checks above.
+ - Required broader checks: {{BROADER_CHECKS_AND_OWNER: concrete commands and owners required by governing rigor, security or architecture scope; otherwise "none beyond the checks already listed"}}. Retain actual requirements without adding a universal pre-candidate Full Verify gate.
+ - Final integrated Verify — Coordinator owner, after the local candidate exists: {{FINAL_INTEGRATED_VERIFY_COMMAND_AND_SCOPE: actual configured command and final integrated scope; for this repository use `node harness/scripts/verify.mjs --mode candidate`, never substitute impacted work evidence for full candidate evidence}}. The Coordinator must run and capture this required check on the integrated candidate; worker targeted/quick results do not certify it. Whole Verify after local candidate preparation remains permitted. The predeclared meaningful batch gets one full Critic plus up to three correction-diff reviews, stopping on genuine PASS; no full rerun or batch reset. If corrections are needed, one fresh Correction Goldfish owns the coherent batch through targeted GREEN.

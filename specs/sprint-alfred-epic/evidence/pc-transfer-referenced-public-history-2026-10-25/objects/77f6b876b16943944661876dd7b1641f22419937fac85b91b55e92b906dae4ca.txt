@@ -1,0 +1,90 @@
+# Actual published first-answer action: bounded preparation evidence
+
+Only new `scratch/onboarding-answer-route-*` files were written. Existing loaders,
+assemblers and source files were unchanged. All generated repositories/home planes
+were disposable temporary fixtures and removed after each case. No trust-anchor
+setup, private-key creation/read, signature, override or native host change occurred.
+This does not verify the historical ready-but-exit-1 sequence.
+
+## Binding and runs
+
+- Aggregate SHA256: `5de8ddca97b83d11c218f4e8d50274e20399c05740e4f0a1bad23e6d283e2029`
+- Exact proposed guard SHA256: `4b2d976c11680639ae06e6f16665a7bb1dad4968a1646fc37cd6be2918acd224`
+- Answer test SHA256: `efe75a9298c8c07f97b35e3fa2b6219ee0348da013ffc4014626d58cce2597a2`
+- Child home-provider hook SHA256: `f33573cf4530f43be1a96caca51eebd6058672678e93f8fb07d2c39693ad3afd`
+- Answer results SHA256: `d54b05ed206dbe3d677f3b9025550a37b591de47e230bd7f7949bdef477738ea`
+
+Canonical module hashes, selected guard revisions and other artifact hashes are in
+onboarding-answer-route-metadata.json. Results retain actual returned argv and
+stdout/receipt/source digests, exclusively from synthetic fixtures.
+
+`node --import ./scratch/onboarding-answer-route-loader.mjs --test scratch/onboarding-answer-route.test.mjs`
+
+Final run: exit 0; 2 tests, 2 pass, 0 fail/cancel/skip/todo; 9154.899964 ms.
+`node scratch/onboarding-answer-route-prepare.mjs`: exit 0.
+
+Both de/en cases run the actual public onboarding-init entry as a child process.
+Its first real pendingAsks[0].applyAction is filled with synthetic PO identity,
+signature preference and explicit language. Pre-execution public inspect is
+runtime-initialization-required. Original qualifier rejects the language-bearing
+action. Exact proposed qualifier and evaluateLifecycleReadyGuard admit it; the
+gate uses the actual observed public inspection in its controlled readback seam.
+Only after admission does the actual returned executable/argv run.
+
+Execution returns exit 0 / INITIAL-ANSWERS-APPLIED / trustAnchor:not-requested.
+Readbacks establish both shared policy scalars signature, held synthetic author
+and language, machine preference signature and selected language. Real checkpoint
+reader returns absent: preferences did not manufacture intake consent. No repo key
+pointer or trust anchors exist. Re-entry remains pending-asks for separate setup;
+approval/language/author questions do not repeat. The setup action is never executed.
+
+## Exact substitutions and process boundary
+
+The parent test's own hash-checking loader substitutes only proposed guard,
+lifecycle-denial-loop, physical-scratch-boundary and onboarding-argv-shapes bytes.
+All other parent imports are source bytes. The original-qualifier comparison uses
+a query URL, bypassing the guard override while retaining selected dependencies;
+it is a qualifier comparison, not a wholly canonical graph.
+
+Child product modules are unchanged source bytes. They run with an explicit
+temporary PATH codex stub (`#!/bin/sh`, exit 0), isolated Git global/system config,
+and PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE=<owned fixture home>. NODE_OPTIONS supplies
+only the new home-provider hook. That hook replaces node:os.homedir and synchronizes
+the builtin ESM export, returning the owned fixture directory. No HOME/CODEX_HOME
+variable is repurposed. Thus these are actual publisher/driver subprocesses with a
+declared OS dependency substitution, not fully canonical/native-host runs.
+The proposed guard importhook does not propagate into child processes.
+
+## Home override seam: separately controlled counterprobe
+
+Initial answer test execution reached successful policy/language application but
+failed its no-anchor assertion for both languages: a public anchor was imported
+despite an empty explicit fixture home. No real machine/private-key contents were
+printed or retained. This prompted the explicit OS-provider isolation above.
+
+Source path explaining the fault:
+
+- scripts/project-onboarding-v3.mjs:696–698 converts the supported environment
+  override into deps.homedir only when no deps were supplied.
+- lib/project-onboarding-v3.mjs:330–337 retains the default readMachinePlane in deps.
+- observeLocalTrustAnchorPointer at :6429–6430 calls that reader without passing
+  the supplied homedir dependency.
+- lib/machine-plane.mjs:49–50 resolves home using dependencies.homedirFn or its
+  imported OS homedir; readMachinePlane at :138 uses that resolver.
+- freshCriticalHumanProofPolicyBytes at lib/project-onboarding-v3.mjs:1191 projects
+  the resulting public anchor into the newly generated portable policy.
+
+`node --test scratch/onboarding-answer-route-home-counterprobe.test.mjs`
+
+Counterprobe run: exit 0; 1 pass, 0 fail/cancel/skip/todo; 2002.46665 ms.
+It gives the hook a controlled OS home A via PIPELINE_ANSWER_ROUTE_OS_HOME while the
+supported CLI override explicitly names separate empty home B. A contains only a
+synthetic machine JSON and public trust-policy metadata, with no key files.
+Actual public driver seeds policy v3 with exactly one anchor whose digest matches
+A's synthetic digest, although B has no plane. A's plane/public metadata remain
+byte-identical. Count/type/match-only evidence is in the counterprobe result.
+
+This confirms an incomplete supported CLI home-override projection, also affecting
+fixture isolation. It does not establish a defect in ordinary native-home operation,
+authorize a fix, or create a release blocker/stamp. Exact counterprobe/source hashes
+are retained in metadata; no host identity content is used in the counterprobe.

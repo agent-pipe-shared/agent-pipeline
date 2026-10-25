@@ -1,0 +1,423 @@
+[
+ {
+  "name": "codex-critic-host-tests",
+  "exitCode": 1,
+  "durationMs": 119351,
+  "file": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+  "hits": [
+   "258:   { name: \"codex-critic-host-tests\", file: join(pluginScriptsDir, \"codex-critic-host.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: [\"CCH001\", \"CCH002\", \"C"
+  ]
+ },
+ {
+  "name": "agy-final-return-tests",
+  "exitCode": 1,
+  "durationMs": 2347,
+  "file": "plugins/pipeline-core/lib/agy-final-return.test.mjs",
+  "hits": [
+   "280:   { name: \"agy-final-return-tests\", file: join(libDir, \"agy-final-return.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 16 }, (_, inde"
+  ]
+ },
+ {
+  "name": "agy-host-commit-admission-tests",
+  "exitCode": 1,
+  "durationMs": 1700,
+  "file": "plugins/pipeline-core/lib/agy-host-commit-admission.test.mjs",
+  "hits": [
+   "281:   { name: \"agy-host-commit-admission-tests\", file: join(libDir, \"agy-host-commit-admission.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ leng"
+  ]
+ },
+ {
+  "name": "wsl-ipc-compatibility-tests",
+  "exitCode": 1,
+  "durationMs": 2569,
+  "file": "plugins/pipeline-core/lib/wsl-ipc-compatibility.test.mjs",
+  "hits": [
+   "283:   { name: \"wsl-ipc-compatibility-tests\", file: join(libDir, \"wsl-ipc-compatibility.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "codex-pretool-guard-tests",
+  "exitCode": 1,
+  "durationMs": 426579,
+  "file": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+  "hits": [
+   "304:   { name: \"codex-pretool-guard-tests\", file: join(hooksDir, \"codex-pretool-guard.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "slice-queue-tests",
+  "exitCode": 1,
+  "durationMs": 541,
+  "file": "plugins/pipeline-core/lib/slice-queue.test.mjs",
+  "hits": [
+   "317:   { name: \"slice-queue-tests\", file: join(libDir, \"slice-queue.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 34 }, (_, index) => `SQ$"
+  ]
+ },
+ {
+  "name": "slice-queue-cli-tests",
+  "exitCode": 1,
+  "durationMs": 35681,
+  "file": "plugins/pipeline-core/scripts/slice-queue.test.mjs",
+  "hits": [
+   "318:   { name: \"slice-queue-cli-tests\", file: join(pluginScriptsDir, \"slice-queue.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 14 }, (_, "
+  ]
+ },
+ {
+  "name": "stop-fanout-tests",
+  "exitCode": 1,
+  "durationMs": 26661,
+  "file": "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+  "hits": [
+   "319:   { name: \"stop-fanout-tests\", file: join(hooksDir, \"stop-fanout.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 23 }, (_, index) => `S"
+  ]
+ },
+ {
+  "name": "runner-profile-migration-v3-tests",
+  "exitCode": 1,
+  "durationMs": 269840,
+  "file": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs",
+  "hits": [
+   "336:   { name: \"runner-profile-migration-v3-tests\", file: join(libDir, \"runner-profile-migration-v3.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ "
+  ]
+ },
+ {
+  "name": "project-onboarding-v3-tests",
+  "exitCode": 1,
+  "durationMs": 991799,
+  "file": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+  "hits": [
+   "337:   { name: \"project-onboarding-v3-tests\", file: join(libDir, \"project-onboarding-v3.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: [\"POV-00ddbc796e449f17\", "
+  ]
+ },
+ {
+  "name": "onboarding-continuity-tests",
+  "exitCode": 1,
+  "durationMs": 694325,
+  "file": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+  "hits": [
+   "342:   { name: \"onboarding-continuity-tests\", file: join(libDir, \"onboarding-continuity.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 298 "
+  ]
+ },
+ {
+  "name": "project-authority-tests",
+  "exitCode": 1,
+  "durationMs": 46308,
+  "file": "plugins/pipeline-core/lib/project-authority.test.mjs",
+  "hits": [
+   "350:   { name: \"project-authority-tests\", file: join(libDir, \"project-authority.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 36 }, (_, in"
+  ]
+ },
+ {
+  "name": "guard-dispatch-tests",
+  "exitCode": 1,
+  "durationMs": 54751,
+  "file": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
+  "hits": [
+   "392:   { name: \"guard-dispatch-tests\", file: join(hooksDir, \"guard-dispatch.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 43 }, (_, index)"
+  ]
+ },
+ {
+  "name": "pipeline-start-v3-tests",
+  "exitCode": 1,
+  "durationMs": 658,
+  "file": "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
+  "hits": [
+   "410:   { name: \"pipeline-start-v3-tests\", file: join(repoRoot, \"plugins\", \"pipeline-core\", \"skills\", \"pipeline-start\", \"pipeline-start-v3.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-complet"
+  ]
+ },
+ {
+  "name": "dispatch-policy-tests",
+  "exitCode": 1,
+  "durationMs": 2219,
+  "file": "plugins/pipeline-core/lib/dispatch-policy.test.mjs",
+  "hits": [
+   "452:   { name: \"dispatch-policy-tests\", file: join(libDir, \"dispatch-policy.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: 38 }, (_, index)"
+  ]
+ },
+ {
+  "name": "install-agy-tests",
+  "exitCode": 1,
+  "durationMs": 3950,
+  "file": "plugins/pipeline-core/install-agy.test.mjs",
+  "hits": [
+   "511:   { name: \"install-agy-tests\", file: join(repoRoot, \"plugins\", \"pipeline-core\", \"install-agy.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "license-contract-check",
+  "exitCode": 1,
+  "durationMs": 283,
+  "file": "harness/scripts/check-license-contract.mjs",
+  "hits": [
+   "537:   { name: \"license-contract-check\", file: join(scriptDir, \"check-license-contract.mjs\") },"
+  ]
+ },
+ {
+  "name": "windows-assurance-verify-registration-tests",
+  "exitCode": 1,
+  "durationMs": 338,
+  "file": "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
+  "hits": [
+   "571:   { name: \"windows-assurance-verify-registration-tests\", file: join(libDir, \"windows-assurance-verify-registration.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "governance-action-artifact-tests",
+  "exitCode": 1,
+  "durationMs": 219,
+  "file": "plugins/pipeline-core/lib/governance-action-artifact.test.mjs",
+  "hits": [
+   "575:   { name: \"governance-action-artifact-tests\", file: join(libDir, \"governance-action-artifact.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ le"
+  ]
+ },
+ {
+  "name": "verify-case-completion-registry-tests",
+  "exitCode": 1,
+  "durationMs": 11190,
+  "file": "harness/scripts/check-verify-case-completion.test.mjs",
+  "hits": [
+   "615:   { name: \"verify-case-completion-registry-tests\", file: join(scriptDir, \"check-verify-case-completion.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array"
+  ]
+ },
+ {
+  "name": "po-human-approval-tests",
+  "exitCode": 1,
+  "durationMs": 76615,
+  "file": "plugins/pipeline-core/scripts/po-human-approval.test.mjs",
+  "hits": [
+   "659:   { name: \"po-human-approval-tests\", file: join(pluginScriptsDir, \"po-human-approval.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "verify-suite-registration-tests",
+  "exitCode": 1,
+  "durationMs": 636,
+  "file": "harness/scripts/check-verify-suite-registration.test.mjs",
+  "hits": [
+   "726:   { name: \"verify-suite-registration-tests\", file: join(scriptDir, \"check-verify-suite-registration.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "codex-isolated-critic-protected-preimage-tests",
+  "exitCode": 1,
+  "durationMs": 74,
+  "file": "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
+  "hits": [
+   "742:   { name: \"codex-isolated-critic-protected-preimage-tests\", file: join(pluginScriptsDir, \"codex-isolated-critic-protected-preimage.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "verify-evidence-producer-tests",
+  "exitCode": 1,
+  "durationMs": 41714,
+  "file": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+  "hits": [
+   "774:   { name: \"verify-evidence-producer-tests\", file: join(pluginScriptsDir, \"verify-evidence-producer.test.mjs\") },"
+  ]
+ },
+ {
+  "name": "antigravity-native-dispatch-pretool-tests",
+  "exitCode": 1,
+  "durationMs": 16239,
+  "file": "plugins/pipeline-core/hooks/antigravity-native-dispatch-pretool.test.mjs",
+  "hits": [
+   "810:   { name: \"antigravity-native-dispatch-pretool-tests\", file: join(hooksDir, \"antigravity-native-dispatch-pretool.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", case"
+  ]
+ },
+ {
+  "name": "dispatch-budget-binding-tests",
+  "exitCode": 1,
+  "durationMs": 148,
+  "file": "plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs",
+  "hits": [
+   "842:   { name: \"dispatch-budget-binding-tests\", file: join(libDir, \"dispatch-budget-binding.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Array.from({ length: "
+  ]
+ },
+ {
+  "name": "dispatch-record-strip-for-critic-tests",
+  "exitCode": 1,
+  "durationMs": 76,
+  "file": "plugins/pipeline-core/lib/dispatch-record-strip-for-critic.test.mjs",
+  "hits": [
+   "925:   { name: \"dispatch-record-strip-for-critic-tests\", file: join(libDir, \"dispatch-record-strip-for-critic.test.mjs\"), caseCompletion: { schema: \"pipeline.verify-case-completion-policy.v1\", caseIds: Arr"
+  ]
+ },
+ {
+  "name": "codex-advisor-execution-tests",
+  "exitCode": 1,
+  "durationMs": 85981,
+  "file": "plugins/pipeline-core/lib/codex-advisor-execution.test.mjs",
+  "hits": [
+   "929:   { name: \"codex-advisor-execution-tests\", file: join(libDir, \"codex-advisor-execution.test.mjs\"), caseCompletion: {schema:\"pipeline.verify-case-completion-policy.v1\",caseIds:[\"RC06C001\",\"RC06C002\",\"R"
+  ]
+ },
+ {
+  "name": "design-workflow-package-v2-tests",
+  "exitCode": 1,
+  "durationMs": 509927,
+  "file": "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs",
+  "hits": [
+   "938:   { name: \"design-workflow-package-v2-tests\", file: join(libDir, \"design-workflow-package-v2.test.mjs\"), caseCompletion: {schema:\"pipeline.verify-case-completion-policy.v1\",caseIds:[\"RC12C001\"],maxByt"
+  ]
+ },
+ {
+  "name": "module-inventory-tests",
+  "exitCode": 1,
+  "durationMs": 534,
+  "file": "plugins/pipeline-core/scripts/module-inventory.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "agy-session-dispatch-tests",
+  "exitCode": 1,
+  "durationMs": 352925,
+  "file": "plugins/pipeline-core/lib/agy-session-dispatch.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "verify-suite-append-history-check",
+  "exitCode": 1,
+  "durationMs": 633,
+  "file": "harness/scripts/check-verify-suite-append.mjs",
+  "hits": []
+ },
+ {
+  "name": "native-goldfish-host-state-tests",
+  "exitCode": 1,
+  "durationMs": 993444,
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "native-goldfish-host-finalizer-tests",
+  "exitCode": 1,
+  "durationMs": 529239,
+  "file": "plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "security-scanner-diagnostics-tests",
+  "exitCode": 1,
+  "durationMs": 2272,
+  "file": "plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "codex-design-advisor-host-tests",
+  "exitCode": 1,
+  "durationMs": 25169,
+  "file": "plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "guard-dispatch-native-worker-tests",
+  "exitCode": 1,
+  "durationMs": 5791,
+  "file": "plugins/pipeline-core/hooks/guard-dispatch-native-worker.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "model-family-host-store-tests",
+  "exitCode": 1,
+  "durationMs": 1744010,
+  "file": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "passive-read-credential-follow-tests",
+  "exitCode": 1,
+  "durationMs": 160,
+  "file": "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "phoenix-authority-revision-installed-package-tests",
+  "exitCode": 1,
+  "durationMs": 1240,
+  "file": "plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "git-null-device-sites-tests",
+  "exitCode": 1,
+  "durationMs": 603,
+  "file": "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "pin-declared-system-skill-read-requires-human-override-tests",
+  "exitCode": 1,
+  "durationMs": 1987,
+  "file": "plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "pin-domain-scanner-findings-need-reproduction-before-remedy-tests",
+  "exitCode": 1,
+  "durationMs": 178,
+  "file": "plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "pin-greenfield-machine-output-and-skill-budget-tests",
+  "exitCode": 1,
+  "durationMs": 62524,
+  "file": "plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "pin-lifecycle-read-scope-blocks-host-declared-system-skill-tests",
+  "exitCode": 1,
+  "durationMs": 1925,
+  "file": "plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "pin-no-uninstall-path-for-a-repository-that-once-opted-in-tests",
+  "exitCode": 1,
+  "durationMs": 87004,
+  "file": "plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "session-authority-repair-tests",
+  "exitCode": 1,
+  "durationMs": 143863,
+  "file": "plugins/pipeline-core/scripts/session-authority-repair.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "pin-claude-background-goldfish-is-host-committed-at-subagent-stop-tests",
+  "exitCode": 1,
+  "durationMs": 183965,
+  "file": "plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs",
+  "hits": []
+ },
+ {
+  "name": "scoped-verify-registration-tests",
+  "exitCode": 1,
+  "durationMs": 155,
+  "file": "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+  "hits": [
+   "187:     name: \"scoped-verify-registration-tests\","
+  ]
+ },
+ {
+  "name": "toolchain-preflight-tests",
+  "exitCode": 1,
+  "durationMs": 19240,
+  "file": "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+  "hits": [
+   "220:     name: \"toolchain-preflight-tests\","
+  ]
+ },
+ {
+  "name": "security-scan",
+  "exitCode": 2,
+  "durationMs": 39259,
+  "file": "plugins/pipeline-core/scripts/security-scan.mjs",
+  "hits": [
+   "982:         ...(manifestPresence === \"present\" ? [{ name: \"security-scan\", file: join(pluginScriptsDir, \"security-scan.mjs\") }] : []),"
+  ]
+ }
+]

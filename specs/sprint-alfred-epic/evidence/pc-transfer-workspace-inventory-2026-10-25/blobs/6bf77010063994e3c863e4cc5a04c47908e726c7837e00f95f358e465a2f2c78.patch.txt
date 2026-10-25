@@ -1,0 +1,120 @@
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+index 8c812bcfd..715500b85 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs
+@@ -26,13 +26,17 @@ function command(value){
+  const m=/^node (?:"([^"\r\n$`]+)"|'([^'\r\n$`]+)'|([^\s"';&|<>$`]+))(?: (observe|deliver))?$/.exec(value);
+  if(!m)return null;return {path:m[1]??m[2]??m[3],arg:m[4]??null};
+ }
++const HOOK_EVENTS=new Set(['PreToolUse','Stop','PreInvocation']);
++function hookEvent(location){const event=location[0]==='pipeline-core'?location[1]:null;return typeof event==='string'&&HOOK_EVENTS.has(event)?event:null;}
+ function templates(root){
+- const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();
++ const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();set.unconditional=new Set();
+  function visit(v,location=[],group=null){if(v&&typeof v==='object'){
+    if(Object.hasOwn(v,'matcher')){if(typeof v.matcher!=='string'||!v.matcher.length||!Array.isArray(v.hooks))throw Error('ATR-HOOK-MATCHER');group={event:location.filter(k=>typeof k==='string').at(-1),matcher:v.matcher};}
+    if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
+     const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');const key=c.path+'\0'+(c.arg??'');set.add(key);
+-    if(group){const binding=group.event+'\0'+key;if(set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}}
++    const event=hookEvent(location),binding=event+'\0'+key;
++    if(group){if(set.unconditional.has(binding)||set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}
++    else{if(set.matchers.has(binding))throw Error('ATR-HOOK-MATCHER');set.unconditional.add(binding);}}
+     for(const [key,value] of Object.entries(v))visit(value,[...location,Array.isArray(v)?Number(key):key],group);}}
+  visit(f.value);return set;
+ }
+@@ -57,11 +61,15 @@ function wiring(observation,configRoot,workspaceRoot){
+    if(value===null||typeof value!=='object')return value;
+    if(Array.isArray(value.hooks)){
+     const keys=value.hooks.map(ownedKey),owned=keys.filter(key=>key!==null&&desired.has(key));
+-    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),matchers=owned.map(key=>desired.matchers.get(event+'\0'+key));
++    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),bindings=owned.map(key=>event+'\0'+key),matchers=bindings.map(binding=>desired.matchers.get(binding));
+      if(!Object.hasOwn(value,'matcher')&&matchers.every(m=>m===undefined)){for(const [key,v] of Object.entries(value))transform(v,[...location,key]);return;}
+      if(!Object.hasOwn(value,'matcher'))throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
++     if(matchers.every(m=>m===undefined)&&bindings.every(binding=>desired.unconditional.has(binding))&&value.matcher==='*'){
++      if(keys.some(key=>key===null)||owned.length!==keys.length)throw Error('ATR-WIRING-MIXED-OWNERSHIP');
++     }else{
+      if(matchers.some(m=>typeof m!=='string')||new Set(matchers).size!==1)throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
+      if(value.matcher!==matchers[0]){if(keys.some(key=>key===null))throw Error('ATR-WIRING-MIXED-OWNERSHIP');changes++;replacements.push({path:[...location,'matcher'],value:matchers[0]});}
++     }
+     }
+    }
+    if(Object.hasOwn(value,'command')){
+diff --git a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+index 6e76ea5df..cd418f7e6 100644
+--- a/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
++++ b/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+@@ -15,7 +15,7 @@ import {join} from 'node:path';
+ import {createAntigravityRefreshHost,observeAntigravityLoadedTopologyWithWiring} from './antigravity-topology-refresh-host.mjs';
+ import {observeAntigravityLoadedTopology,observeAntigravityPluginTopology,planAntigravityTopologyRefresh} from './antigravity-plugin-topology.mjs';
+ function fixture(t,cliVersion='1.2.12'){
+- const base=mkdtempSync(join(tmpdir(),'agy-refresh-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
++ const scratch=join(process.cwd(),'scratch');mkdirSync(scratch,{recursive:true});const base=mkdtempSync(join(scratch,'agy-refresh-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
+  const configRoot=join(base,'gemini'),workspaceRoot=join(base,'workspace'),approvedSourceRoot=join(base,'source'),old=join(configRoot,'config','plugins','agent-pipeline-core'),foreign=join(base,'foreign');
+  const put=(path,v)=>{mkdirSync(join(path,'..'),{recursive:true});writeFileSync(path,JSON.stringify(v)+'\n');};
+  function source(path,name='agent-pipeline-core',marker='current'){mkdirSync(join(path,'hooks'),{recursive:true});put(join(path,'plugin.json'),{name,version:'0.7.0'});put(join(path,'hooks.json'),{'pipeline-core':{PreInvocation:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'}]}});writeFileSync(join(path,'hooks','antigravity-start-hint.mjs'),'// metadata fixture '+marker+'\n');return path;}
+@@ -181,6 +181,56 @@ test('prepared source, actual hook bytes and registry preimages are bound before
+  }
+ });
+ 
++test('owned unconditional PreInvocation wildcard migrates through prepare/apply with exact foreign bytes and converges',t=>{
++ const f=fixture(t),wire=join(f.configRoot,'config','hooks.json'),sourceHooks=join(f.approvedSourceRoot,'hooks.json');
++ const matcher='run_command|write_to_file|replace_file_content|write_file|edit_file|read_file|invoke_subagent';
++ f.put(sourceHooks,{'pipeline-core':{PreToolUse:[{matcher,hooks:[{type:'command',command:'node hooks/antigravity-pretool-guard.mjs'}]}],PreInvocation:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'}]}});
++ writeFileSync(join(f.approvedSourceRoot,'hooks','antigravity-pretool-guard.mjs'),'// approved pretool fixture\n');
++ writeFileSync(join(f.old,'hooks','antigravity-pretool-guard.mjs'),'// stale pretool fixture\n');
++ f.put(join(f.old,'hooks.json'),{'pipeline-core':{PreToolUse:[{matcher:'run_command',hooks:[{type:'command',command:'node hooks/antigravity-pretool-guard.mjs'}]}],PreInvocation:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'}]}});
++ const oldGuard='node "'+join(f.old,'hooks','antigravity-pretool-guard.mjs')+'"',oldStart='node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"';
++ const original=' {\n  "pipeline-core" : {\n   "PreToolUse" : [ { "matcher" : "run_command", "hooks" : [ { "type" : "command", "command" : '+JSON.stringify(oldGuard)+' } ] } ],\n   "PreInvocation" : [ { "matcher" : "*", "hooks" : [ { "type" : "command", "command" : '+JSON.stringify(oldStart)+' } ] } ]\n  },\n  "foreign" : { "custom" : "\\u00df", "enabled" : false }\n }\n';
++ writeFileSync(wire,original);
++ const host=createAntigravityRefreshHost(f.args),plan=host.prepare();assert.equal(plan.status,'prepared',JSON.stringify(plan));
++ assert(plan.actions.some(action=>action.kind==='owned-wiring-rebind'&&action.path===wire));
++ const result=host.apply(plan);assert.equal(result.status,'refreshed',JSON.stringify(result));assert(result.completed.includes('wiring-rebind'));
++ const actual=readFileSync(wire,'utf8'),json=JSON.parse(actual),tool=json['pipeline-core'].PreToolUse[0],life=json['pipeline-core'].PreInvocation[0];
++ assert.equal(tool.matcher,matcher);assert.equal(tool.hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-pretool-guard.mjs')+'"');
++ assert.equal(life.matcher,'*');assert.equal(life.hooks[0].command,'node "'+join(f.approvedSourceRoot,'hooks','antigravity-start-hint.mjs')+'"');
++ assert(actual.includes('"foreign" : { "custom" : "\\u00df", "enabled" : false }'),'foreign bytes remain exact');
++ const stable=readFileSync(wire),calls=f.calls.length,again=createAntigravityRefreshHost(f.args).refresh();
++ assert.equal(again.status,'refreshed');assert.equal(again.changed,false);assert.deepEqual(readFileSync(wire),stable);assert.equal(f.calls.length,calls+1);
++});
++
++test('unconditional lifecycle migration refuses wrong events, conditional matchers, mixed ownership, and ambiguous source events',t=>{
++ const cases=[
++  ['wrong event','Stop','*',false,'ATR-WIRING-MATCHER-UNVERIFIABLE'],
++  ['unknown matcher','PreInvocation','on_idle',false,'ATR-WIRING-MATCHER-UNVERIFIABLE'],
++  ['mixed ownership','PreInvocation','*',true,'ATR-WIRING-MIXED-OWNERSHIP'],
++  ['mixed tool matcher rewrite','PreToolUse','run_command',true,'ATR-WIRING-MIXED-OWNERSHIP'],
++  ['ambiguous source event','PreInvocation','*',false,'ATR-HOOK-MATCHER']
++ ];
++ for(const [label,event,matcher,mixed,reason] of cases){
++  const f=fixture(t),wire=join(f.configRoot,'config','hooks.json');let old='node "'+join(f.old,'hooks','antigravity-start-hint.mjs')+'"';
++  if(label==='mixed tool matcher rewrite'){
++   const expanded='run_command|write_to_file|replace_file_content|write_file|edit_file|read_file|invoke_subagent';
++   f.put(join(f.approvedSourceRoot,'hooks.json'),{'pipeline-core':{PreToolUse:[{matcher:expanded,hooks:[{type:'command',command:'node hooks/antigravity-pretool-guard.mjs'}]}],PreInvocation:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'}]}});
++   writeFileSync(join(f.approvedSourceRoot,'hooks','antigravity-pretool-guard.mjs'),'// approved pretool fixture\n');writeFileSync(join(f.old,'hooks','antigravity-pretool-guard.mjs'),'// stale pretool fixture\n');
++   f.put(join(f.old,'hooks.json'),{'pipeline-core':{PreToolUse:[{matcher:'run_command',hooks:[{type:'command',command:'node hooks/antigravity-pretool-guard.mjs'}]}],PreInvocation:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'}]}});
++   old='node "'+join(f.old,'hooks','antigravity-pretool-guard.mjs')+'"';
++  }
++  const hooks=[{type:'command',command:old},...(mixed?[{type:'command',command:'foreign-hook --safe'}]:[])];
++  f.put(wire,{'pipeline-core':{[event]:[{matcher,hooks}]}});
++  if(label==='ambiguous source event'){
++   const source=join(f.approvedSourceRoot,'hooks.json');
++   f.put(source,{'pipeline-core':{PreInvocation:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'},{matcher:'*',hooks:[{type:'command',command:'node hooks/antigravity-start-hint.mjs'}]}]}});
++  }
++  const before=readFileSync(wire),plan=createAntigravityRefreshHost(f.args).prepare();
++  assert.equal(plan.status,'refused',label+': '+JSON.stringify(plan));assert.equal(plan.reason,reason,label);
++  assert.deepEqual(readFileSync(wire),before,label+' leaves bytes unchanged');assert.deepEqual(f.calls,[['--version']],label+' makes no lifecycle call');
++ }
++});
++
+ focusedTest('G6: final matcher drift is refused after the real wiring write and before receipt',t=>{
+  const f=fixture(t),wire=join(f.configRoot,'config','hooks.json');
+  const matcher='run_command|write_file|edit_file|read_file';
+@@ -207,7 +257,7 @@ focusedTest('G6: final observer accepts only a function and cannot replace autho
+ });
+ 
+ // Each original sibling callback is registered individually; no envelope case.
+-if (completionCases.length !== 15) throw new Error("Required completion declared case count drift");
++if (completionCases.length !== 17) throw new Error("Required completion declared case count drift");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

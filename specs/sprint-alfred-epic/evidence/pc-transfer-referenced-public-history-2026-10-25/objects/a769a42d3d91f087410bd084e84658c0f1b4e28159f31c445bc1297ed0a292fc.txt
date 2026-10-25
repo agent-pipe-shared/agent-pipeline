@@ -1,0 +1,22 @@
+// Helper (untracked): run ONE test file in the k82 clone with a private TMPDIR, save output, print summary lines.
+// usage: node scratch/k82-run.mjs <label> <file-relative-to-clone> [test-name-pattern]
+import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync, chmodSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+const [label, file, pattern] = process.argv.slice(2);
+const tmp = join(homedir(), "pipeline-test-tmp", "k82-" + label, "0");
+mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+delete env.NODE_TEST_CONTEXT;
+const args = pattern ? ["--test-name-pattern", pattern, file] : [file];
+const t0 = Date.now();
+const r = spawnSync(process.execPath, args, { cwd: resolve("scratch/clones/k82"), encoding: "utf8", env, timeout: 3600000, maxBuffer: 256 * 1024 * 1024 });
+const out = (r.stdout ?? "") + (r.stderr ?? "");
+mkdirSync("scratch/agent-out", { recursive: true });
+writeFileSync(`scratch/agent-out/k82-${label}.log`, out);
+console.log(`exit ${r.status} signal ${r.signal} secs ${Math.round((Date.now() - t0) / 1000)} bytes ${out.length}`);
+for (const l of out.split("\n")) {
+  if (/^ℹ (tests|suites|pass|fail|cancelled|skipped|todo)/.test(l) || /^\s*(✖|not ok)/.test(l) || /# (TODO|SKIP)/.test(l) || /^✖|failing tests/.test(l)) console.log(l.slice(0, 260));
+  if (process.env.K82_SHOW && /^\s*(✔|✖)/.test(l)) console.log(l.slice(0, 200));
+}

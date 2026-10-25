@@ -1,0 +1,81 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K1D-E5A4-LINE-BOUND","candidateCommit":"9a0685688144ff84e042f82b3559810bc512cbf0","candidateTree":"a2bf5a32590dd41c4e1a961d338ae30d4f9b1054","runner":"claude","role":"pipeline-core:goldfish-mechanic","agentType":"goldfish-mechanic","model":"claude-haiku-5-5","effort":"medium","rulesetSha":"3d4abf7c6dfdeaa64cb4fa746d12dc0bc0d9bf33f0631af02eb8ceaa675eda6c","allowedPaths":["plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs","plugins/pipeline-core/scripts/pipeline-state.mjs","plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K1D-E5A4-LINE-BOUND","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k1d-e5a4-line-bound-check","path":"plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs","dependencies":["plugins/pipeline-core/lib/onboarding-continuity.mjs","plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs","plugins/pipeline-core/scripts/pipeline-state.mjs","plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K1D-E5A4-LINE-BOUND","candidateCommit":"9a0685688144ff84e042f82b3559810bc512cbf0","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K1D-E5A4-LINE-BOUND: bring scripts/pipeline-state.mjs back to its accepted 13810 lines after the D73 E call site
+
+### 1. Goal
+
+Step 1: `node scratch/interim-save.mjs restore k1d-e5a2 plugins/pipeline-core/lib/onboarding-continuity.mjs plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs plugins/pipeline-core/scripts/pipeline-state.mjs`. That restores the previous slice's green D73 E work (binding 66/67, recovery 39/39, discard 11/11, lost 7/7, obc 306/306); keep it exactly as it is in behaviour and do not change the first two files. After the restore `scripts/pipeline-state.mjs` is 13821 lines; bring it to at most 13810 with exactly two mechanical edits and nothing else. (1) Fold the import at ~436 (`import {resolveIntakeCheckpointPaths,...,finishOrphanSessionCleanupBindingRelease} from '../lib/onboarding-continuity.mjs';`) into the multi-line import from the same module at ~540-557, delete line ~436, and write that merged import's names several per line (lines up to 140 columns, Elephant decision: at 130 the count lands at 13811; same two-space indent, names in their existing order with the five from line 436 appended), so the file reaches 13810 or less. (2) In discard-feature (~12419-12428) shorten the three-line `// D73 (E): ...` comment to one line: `// D73 E: runs after writeState released the State lock (the continuity snapshot refuses a foreign one).` Then `wc -l plugins/pipeline-core/scripts/pipeline-state.mjs` must print 13810 or less. Do not touch any other line, do not reformat other imports, do not change any name. To revert a wrong edit, restore the save again (step 1); shell `git restore` on this file is refused.
+
+### 2. Context files
+
+- `plugins/pipeline-core/scripts/pipeline-state.mjs` — ~430-440, ~540-557, ~12415-12430.
+
+### 3. DoD checks
+
+- Acceptance criteria: PO decision D73 E (the call site already built and green, uncommitted in the checkout); the architecture line bound of `scripts/pipeline-state.mjs` (accepted 13810 in `architecture/boundary-policy.json`, never raised).
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` (pipeline-state.mjs no longer listed; the remaining findings are guard-git.test.mjs, git-cmd.test.mjs and another dispatch's guard-dispatch-budget.mjs)
+  - `node scratch/run-quiet.mjs k1d-e5a3-discard plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs` (stays 11/11)
+  - `node scratch/run-quiet.mjs k1d-e5a3-binding plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` (stays 66/67, only the B red 'neutral coordinator-close release is private, byte-stable, and replayable')
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`).
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/lib/onboarding-continuity.mjs`, `plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs`, `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- After the restore, edit only `scripts/pipeline-state.mjs`, only the two places named; never edit the two restored library files.
+- Never raise an accepted count in `architecture/boundary-policy.json`.
+- Another Goldfish edits `hooks/guard-dispatch-budget*.mjs` and `scripts/dispatch-budget-grant.mjs` in parallel: never touch or run them.
+- Run test files only in the foreground through `scratch/run-quiet.mjs`, one at a time, Bash tool timeout 600000 ms.
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+- The two edits do not reach 13810: stop and report the line count; do not compact anything else.
+- Any targeted check changes its count: stop and report it.
+- An Edit is refused with SDC-LOCK-HELD or legacy-registry-lock-held: that is a transient registry lock held by a parallel dispatch launch; wait by running one read-only command (for example wc -l on the file), then retry the identical Edit once; if it is refused again, stop and report both refusals verbatim.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020195107.231d1a0` · content identity `3d4abf7c6dfdeaa64cb4fa746d12dc0bc0d9bf33f0631af02eb8ceaa675eda6c` (fallback: content hash of the loaded plugin root (snapshotPhysicalPluginRoot, lib/public-core-observation.mjs)).
+- Model/effort: `claude-haiku-5-5` / medium (goldfish-mechanic; agent definition alias `haiku`).
+- Tier: goldfish-mechanic. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K1D-E5A4-LINE-BOUND
+- Write scope: plugins/pipeline-core/lib/onboarding-continuity.mjs, plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs
+- **Tool budget (TB-09, hard cap):** ≤35 tool uses (min(tier cap 40, maxTurns 50 - 15)). 80 % checkpoint at about call 28: stop editing and end the turn with an interim report naming what remains.
+- Model justification: a purely mechanical line compaction with the exact edits named; no behaviour change.
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

@@ -1,0 +1,10 @@
+// Runs every plugins/pipeline-core/lib/pins/*.test.mjs in another checkout (own registry lock) via run-quiet, one after the other.
+import { readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { join, resolve } from "node:path";
+const [dir, label] = process.argv.slice(2);
+const pinsDir = "plugins/pipeline-core/lib/pins";
+const files = readdirSync(join(dir, pinsDir)).filter((n) => n.endsWith(".test.mjs")).sort().map((n) => `${pinsDir}/${n}`);
+console.log(`pin files: ${files.length}`);
+const r = spawnSync(process.execPath, [resolve("scratch/run-quiet.mjs"), label, ...files], { cwd: resolve(dir), stdio: "inherit" });
+process.exit(r.status ?? 1);

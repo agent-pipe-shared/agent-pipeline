@@ -1,0 +1,23 @@
+# Proposed Advisor HostRecord v2 with output custody
+
+This is a Scratch-only, source-capable contract proposal. Historical `codex-advisor-host-record-proposal.mjs` v1 is unchanged and stays a separate validator. The v2 implementation repeats its closed validation and adds mandatory `outputCustody`; no v1 record is silently upgraded.
+
+## API and ownership boundary
+
+`validatePreparedCodexAdvisorHostRecordV2(record, publicExpected, privateHostResult)` returns boolean. The public expected keys remain exactly `ADVISOR_HOST_EXPECTED_KEYS` from the historical contract. Added `outputCustody` or `privateHostResult` keys in public expected are rejected. The third argument must be the sealed caller's actual `runIsolatedStructuredHost` result. It is never accepted from a model response or public binding context.
+
+The validator compares custody byte-for-byte through canonical metadata, verifies `ok`, private parsed report digest, actual pipe byte counters, request/recipe, receipt ID, session, selected route, controls, terminal, closed ownership and input disposition. `responseSha256` remains the parsed report canonical digest. Original `reportRawJsonSha256` and `finalMessageFrameSha256` remain separate; they must match the private observation. Original bytes are not persisted by this proposal.
+
+Complete custody requires genuine stdin finish/close and stdout/stderr end/close, no error, fatal UTF8 verification, bounded retention equal to observed bytes, verified framing/parser, at least one frame, bounded original report byte count and three valid distinct-purpose digest fields. Both channels are individually bounded to the frozen helper's 8 MiB. Digest fields need not differ numerically; their meanings remain separate. A zero-byte stream requires the empty digest.
+
+## Required async store adoption
+
+An eventual sealed async store writer must receive the actual private execution handle/result directly, verify independently registered ownership and selected executable, verify current physical candidate/consent/export and digest bindings, then call this validator before immutable persistence. Existing journal records do not reconstruct raw output custody. Public binding readers must use a store-owned private custody observation/reconstruction channel or return unavailable; they must not fill the third parameter from the record being validated or caller context. This pure API cannot authenticate provenance of arbitrary JavaScript objects. Fabricating both record and private result is not prevented by pure equality validation; sealed host/store ownership is required. No callback or JSON creates host authority here.
+
+## Targeted verification
+
+`node --test scratch/codex-advisor-host-record-custody.test.mjs`: **1 passed, 0 failed**. One actual registered managed synthetic Node protocol execution produces closed ownership and complete pipe observations. Its producer's exact original report and frame hashes match the host observation. Session/provider/model labels are controlled fixture values; no real Codex/model was invoked.
+
+The same test checks mandatory custody, rejection by historical v1, missing private observation, public context injection, changed parsed report, 16 invalid completeness/bounds/framing metadata mutations (even when copied into the private argument), and five individually changed channel/report/frame digests against the genuine private observation. It verifies no live owned process remains. Only metadata and hashes are persisted.
+
+The preparation bindings and evidence JSON record source hashes; frozen helper/host/patch hashes are verified after this run. No existing source, record/store, aggregate, historical tests or earlier evidence were changed. No broader test run or formal review stamp is claimed.

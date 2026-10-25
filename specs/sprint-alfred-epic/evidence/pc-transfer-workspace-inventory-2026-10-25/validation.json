@@ -1,0 +1,74 @@
+{
+  "schema": "pipeline.pc-transfer-workspace-validation.v1",
+  "artifacts": 1021,
+  "allHashesValid": true,
+  "byteExact": 1009,
+  "exclusions": [
+    {
+      "source": "scratch/clones/k101 (shared-base public diff)",
+      "reason": "sensitive-pattern; contents not exported",
+      "resolution": "sanitized derivative preserved; original credential-shaped value intentionally excluded",
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/c4785685536711f3d21a51de4a68f8dc33376ce32f001e887b862a5fdb925127.patch.txt"
+    }
+  ],
+  "registered": [
+    {
+      "root": ".",
+      "headInMainHistory": true,
+      "changes": 0
+    },
+    {
+      "root": "scratch/clones/expanded-po-suite-registration",
+      "headInMainHistory": true,
+      "changes": 36
+    },
+    {
+      "root": "scratch/clones/g23-original-m7-qualification",
+      "headInMainHistory": true,
+      "changes": 1
+    },
+    {
+      "root": "scratch/clones/r2-agy-original-critic-return-20261025",
+      "headInMainHistory": true,
+      "changes": 3
+    },
+    {
+      "root": "scratch/critic-cand",
+      "headInMainHistory": true,
+      "changes": 2
+    },
+    {
+      "root": "scratch/critic-ord2",
+      "headInMainHistory": true,
+      "changes": 0
+    },
+    {
+      "root": "scratch/critic-ord3",
+      "headInMainHistory": true,
+      "changes": 0
+    },
+    {
+      "root": "scratch/critic-ord4",
+      "headInMainHistory": true,
+      "changes": 0
+    },
+    {
+      "root": "scratch/verify-wt",
+      "headInMainHistory": true,
+      "changes": 0
+    },
+    {
+      "root": "scratch/wt-d02409a8a",
+      "headInMainHistory": true,
+      "changes": 0
+    }
+  ],
+  "uniqueHeadSummary": {
+    "public-commit-delta-preserved-inert; not production integration": 171,
+    "public-commit-delta-preserved-inert-sanitized; not production integration": 1
+  },
+  "maxBlobBytes": 8034795,
+  "readbackRoots": 353,
+  "statusAndHeadUnchanged": true,
+  "untrackedDirectories": []
+}

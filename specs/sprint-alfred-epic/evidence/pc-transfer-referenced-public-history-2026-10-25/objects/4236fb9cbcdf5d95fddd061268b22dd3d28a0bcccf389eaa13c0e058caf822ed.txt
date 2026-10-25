@@ -1,0 +1,341 @@
+diff --git a/plugins/pipeline-core/scripts/clone-hook-readiness.mjs b/plugins/pipeline-core/scripts/clone-hook-readiness.mjs
+index 93e13e193..cf1fe38d1 100644
+--- a/plugins/pipeline-core/scripts/clone-hook-readiness.mjs
++++ b/plugins/pipeline-core/scripts/clone-hook-readiness.mjs
+@@ -8,6 +8,7 @@ import { assessMandatoryHookReadiness, checkCloneProvisioning } from "./check-cl
+ import { applyInstall as applyPreCommit, applyRemoval as removePreCommit } from "./pre-commit-hook-install.mjs";
+ import { applyInstall as applyCommitMsg } from "./commit-msg-hook-install.mjs";
+ import { applyInstall as applyPrePush } from "./pre-push-hook-install.mjs";
++import { MANDATORY_HOOK_REFRESH_SCHEMA, refreshMandatoryHooks } from "./refresh-mandatory-hooks.mjs";
+ 
+ /** Result statuses by which an installer reports that the hook is now in place. Anything else a second
+  * install RETURNS (a `refused-*` result, or no recognisable status) is a failed install, like a throw. */
+@@ -131,7 +132,43 @@ function installNonGatingHooks({ root, observed, installPrePush }) {
+   return results;
+ }
+ 
++/** K103 (PO decision 2026-10-23, tiles batch 7 row 10): the apply ends by refreshing the mandatory hooks whose recorded
++ * plugin snapshot is stale, through the same routine the typed `hook-refresh-required` action runs
++ * (`refreshMandatoryHooks`), so the next start preflight is not `hook-refresh-required`. Idempotent: when nothing is
++ * stale the routine is not called and the result is returned unchanged. A refresh that fails (a throw, or any result
++ * other than `ready`) is a typed, non-ready `refresh-failed` result that names the repair; the install it follows is kept. */
++function refreshStaleHooks(root, result, dependencies) {
++  const stale = assessMandatoryHookReadiness(checkCloneProvisioning(root)).refreshAvailable;
++  if (!Array.isArray(stale) || stale.length === 0) return result;
++  let refresh;
++  try {
++    refresh = (dependencies.refreshMandatoryHooks ?? refreshMandatoryHooks)(root, dependencies.refreshDependencies ?? {});
++  } catch (error) {
++    refresh = {
++      schema: MANDATORY_HOOK_REFRESH_SCHEMA, root, status: "failed",
++      code: typeof error?.code === "string" ? error.code : "HOOK-READINESS-REFRESH-THREW", message: String(error?.message ?? error),
++    };
++  }
++  if (refresh?.status === "ready") {
++    const after = inspectMandatoryHookReadiness(root);
++    return { ...result, required: after.required, nextAction: after.nextAction, status: "ready", refreshResult: refresh };
++  }
++  const script = fileURLToPath(new URL("./refresh-mandatory-hooks.mjs", import.meta.url));
++  return {
++    ...result,
++    status: "refresh-failed",
++    code: "HOOK-READINESS-REFRESH-FAILED",
++    reason: `the hooks were installed, but the stale mandatory hook(s) ${stale.join(", ")} could not be refreshed (refresh status ${refresh?.status ?? "unknown"}); the next start preflight will report hook-refresh-required. Repair: node ${script} --root ${root}`,
++    refreshResult: refresh,
++  };
++}
++
+ export function applyMandatoryHookReadiness(rootDir = process.cwd(), dependencies = {}) {
++  const result = applyMandatoryHookInstalls(rootDir, dependencies);
++  return result.status === "ready" ? refreshStaleHooks(resolve(rootDir), result, dependencies) : result;
++}
++
++function applyMandatoryHookInstalls(rootDir, dependencies) {
+   const before = inspectMandatoryHookReadiness(rootDir);
+   const installPrePush = dependencies.applyPrePush ?? applyPrePush;
+   if (before.status === "ready") {
+diff --git a/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs b/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs
+index 8dc150870..e2bddc5cb 100644
+--- a/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs
++++ b/plugins/pipeline-core/scripts/clone-hook-readiness.partial.test.mjs
+@@ -223,22 +223,26 @@ test("RED F1 (g): stale pre-commit + missing commit-msg -> provisioning hop, the
+   const provisioned = applyMandatoryHookReadiness(root);
+   assert.equal(provisioned.schema, COORDINATOR_EXPECTED.schema);
+   assert.equal(provisioned.status, COORDINATOR_EXPECTED.status);
+-  assert.equal(readFileSync(markerFile, "utf8"), staleMarker, "hop 1 must not refresh the stale hook (that is hop 2's job)");
++  // K103 RE-POINT (QG-04, bounded justification): this case pinned "hop 1 must not refresh the stale hook (that is
++  // hop 2's job)". PO decision 2026-10-23 (tiles batch 7, row 10) reverses exactly that: the installer's apply refreshes
++  // the stale snapshots itself. The case keeps its precondition and the provisioning-first assertions; the former hop 2
++  // is now part of hop 1 and the explicit refresh helper afterwards must find nothing left to do.
++  assert.notEqual(readFileSync(markerFile, "utf8"), staleMarker, "K103: the apply rebound the stale hook's marker to the current plugin");
++  assert.equal(provisioned.refreshResult?.status, REFRESH_EXPECTED.status);
+ 
+-  // Hop 2: ready, with the stale hook listed for refresh.
++  // Hop 2 (formerly a separate refresh): ready, nothing stale is left for the preflight to report.
+   const between = assessMandatoryHookReadiness(checkCloneProvisioning(root));
+   assert.equal(between.status, "ready");
+-  assert.deepEqual(between.refreshAvailable, ["pre-commit-hook"]);
++  assert.equal(between.refreshAvailable, undefined);
+   const refreshed = refreshMandatoryHooks(root);
+   assert.equal(refreshed.schema, REFRESH_EXPECTED.schema);
+   assert.equal(refreshed.status, REFRESH_EXPECTED.status);
+-  assert.deepEqual(refreshed.results.find((entry) => entry.id === "pre-commit-hook"), { id: "pre-commit-hook", status: "refreshed" });
++  assert.deepEqual(refreshed.results.find((entry) => entry.id === "pre-commit-hook"), { id: "pre-commit-hook", status: "current" }, "the explicit helper is a no-op after the apply");
+ 
+   // Hop 3: nothing left to do.
+   const done = assessMandatoryHookReadiness(checkCloneProvisioning(root));
+   assert.equal(done.status, "ready");
+   assert.equal(done.refreshAvailable, undefined);
+-  assert.notEqual(readFileSync(markerFile, "utf8"), staleMarker, "the refresh rebound the marker to the current plugin");
+ }));
+ 
+ test("GREEN control F1 (h): the stale-marker fixture technique -- stale pre-commit beside a current commit-msg is ready+refreshAvailable and the helper reaches ready", () => withRepository(({ root, gitDir }) => {
+diff --git a/plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs b/plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs
+new file mode 100644
+index 000000000..b2e3662ee
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs
+@@ -0,0 +1,126 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * K103 (PO decision 2026-10-23, tiles batch 7 row 10: "the installer refreshes the hook snapshots as part of its apply").
++ *
++ * The mismatch: `clone-hook-readiness.mjs --apply` (the `hook-provisioning-required` action) installed the missing hook
++ * and then stopped, with a stale mandatory hook still stale; the next start preflight reported `hook-refresh-required`
++ * and the Elephant had to run `refresh-mandatory-hooks.mjs` as an extra hop. The apply now ends by refreshing the stale
++ * hooks through the same routine (`refreshMandatoryHooks`), idempotently, and a failed refresh is a typed, non-ready result.
++ *
++ * Fixture technique: as in clone-hook-readiness.partial.test.mjs (install for real, rewrite the marker's `pluginLibDir`),
++ * on a frozen copy of the plugin root, inside a throw-away repository.
++ */
++import assert from "node:assert/strict";
++import { execFileSync } from "node:child_process";
++import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test, { after } from "node:test";
++import { fileURLToPath, pathToFileURL } from "node:url";
++
++const LIVE_PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
++const FROZEN_PLUGIN_ROOT = mkdtempSync(join(tmpdir(), "clone-hook-readiness-refresh-plugin-"));
++after(() => { rmSync(FROZEN_PLUGIN_ROOT, { recursive: true, force: true, maxRetries: 3 }); });
++cpSync(LIVE_PLUGIN_ROOT, FROZEN_PLUGIN_ROOT, { recursive: true });
++assert.notEqual(realpathSync.native(FROZEN_PLUGIN_ROOT), realpathSync.native(LIVE_PLUGIN_ROOT), "the plugin copy must not be the live plugin root");
++const frozenModule = (name) => import(pathToFileURL(join(FROZEN_PLUGIN_ROOT, "scripts", name)).href);
++
++const { assessMandatoryHookReadiness, checkCloneProvisioning } = await frozenModule("check-clone-provisioning.mjs");
++const { applyMandatoryHookReadiness, inspectMandatoryHookReadiness } = await frozenModule("clone-hook-readiness.mjs");
++const { applyInstall: installPreCommit } = await frozenModule("pre-commit-hook-install.mjs");
++const { applyInstall: installCommitMsg } = await frozenModule("commit-msg-hook-install.mjs");
++
++const AMBIENT_GIT_VARIABLES = ["GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"];
++const STALE_PLUGIN_LIB = "stale-older-plugin-snapshot/lib";
++
++function withRepository(run) {
++  const root = mkdtempSync(join(tmpdir(), "clone-hook-readiness-refresh-"));
++  const previous = new Map(AMBIENT_GIT_VARIABLES.map((name) => [name, process.env[name]]));
++  try {
++    for (const name of AMBIENT_GIT_VARIABLES) delete process.env[name];
++    execFileSync("git", ["-C", root, "init", "-q"], { stdio: "ignore" });
++    const gitDir = join(realpathSync.native(root), ".git");
++    execFileSync("git", ["-C", root, "config", "--local", "core.hooksPath", join(gitDir, "hooks").replaceAll("\\", "/")], { stdio: "ignore" });
++    return run({ root, gitDir });
++  } finally {
++    for (const [name, value] of previous) {
++      if (value === undefined) delete process.env[name];
++      else process.env[name] = value;
++    }
++    rmSync(root, { recursive: true, force: true });
++  }
++}
++
++/** Make the really-installed pre-commit hook read as stale (`refresh`); returns the marker path. */
++function makeStale(gitDir) {
++  const markerFile = join(gitDir, "agent-pipeline", "pre-commit-hook", "install-marker.json");
++  const marker = JSON.parse(readFileSync(markerFile, "utf8"));
++  marker.pluginLibDir = STALE_PLUGIN_LIB;
++  writeFileSync(markerFile, `${JSON.stringify(marker, null, 2)}\n`);
++  return markerFile;
++}
++
++const staleList = (root) => assessMandatoryHookReadiness(checkCloneProvisioning(root)).refreshAvailable;
++
++test("K103 (a): apply installs the missing hook AND refreshes the stale one, so no refresh is left for the next preflight", () => withRepository(({ root, gitDir }) => {
++  assert.equal(installPreCommit({ rootDir: root }).status, "installed");
++  const markerFile = makeStale(gitDir);
++  const staleMarker = readFileSync(markerFile, "utf8");
++  assert.equal(inspectMandatoryHookReadiness(root).status, "provisioning-required", "precondition: stale pre-commit beside a missing commit-msg");
++
++  const applied = applyMandatoryHookReadiness(root);
++  assert.equal(applied.status, "ready");
++  assert.notEqual(readFileSync(markerFile, "utf8"), staleMarker, "the apply rebound the stale hook's marker to the current plugin");
++  assert.equal(staleList(root), undefined, "a following preflight sees no stale mandatory hook (it would otherwise be hook-refresh-required)");
++  assert.equal(applied.refreshResult?.schema, "pipeline.mandatory-hook-refresh.v1");
++  assert.equal(applied.refreshResult?.status, "ready");
++  assert.deepEqual(applied.refreshResult?.results.find((entry) => entry.id === "pre-commit-hook"), { id: "pre-commit-hook", status: "refreshed" });
++}));
++
++test("K103 (b): apply on an already-ready repository with a stale hook refreshes it, and a second apply is a no-op", () => withRepository(({ root, gitDir }) => {
++  assert.equal(installPreCommit({ rootDir: root }).status, "installed");
++  assert.equal(installCommitMsg({ rootDir: root }).status, "installed");
++  const markerFile = makeStale(gitDir);
++  const staleMarker = readFileSync(markerFile, "utf8");
++  assert.deepEqual(staleList(root), ["pre-commit-hook"], "precondition: ready, one stale mandatory hook");
++
++  const first = applyMandatoryHookReadiness(root);
++  assert.equal(first.status, "ready");
++  assert.equal(first.refreshResult?.status, "ready");
++  assert.notEqual(readFileSync(markerFile, "utf8"), staleMarker);
++  assert.equal(staleList(root), undefined);
++
++  const markerAfterFirst = readFileSync(markerFile, "utf8");
++  const second = applyMandatoryHookReadiness(root);
++  assert.equal(second.status, "ready");
++  assert.equal(second.refreshResult, undefined, "nothing stale: no refresh is run and none is reported");
++  assert.equal(readFileSync(markerFile, "utf8"), markerAfterFirst, "idempotent: the refreshed marker is byte-identical after a second apply");
++}));
++
++test("K103 (c): a refresh that fails is a typed, non-ready result naming the cause, never a silent ready", () => withRepository(({ root, gitDir }) => {
++  assert.equal(installPreCommit({ rootDir: root }).status, "installed");
++  assert.equal(installCommitMsg({ rootDir: root }).status, "installed");
++  makeStale(gitDir);
++
++  const failed = applyMandatoryHookReadiness(root, {
++    refreshMandatoryHooks: () => ({ schema: "pipeline.mandatory-hook-refresh.v1", root, status: "failed", results: [{ id: "pre-commit-hook", status: "failed", code: "HOOK-REFRESH-APPLY-FAILED" }], readiness: { status: "ready" } }),
++  });
++  assert.equal(failed.status, "refresh-failed");
++  assert.equal(failed.code, "HOOK-READINESS-REFRESH-FAILED");
++  assert.equal(failed.refreshResult?.status, "failed");
++  assert.match(failed.reason ?? "", /refresh-mandatory-hooks\.mjs --root/, "the result names the runnable repair");
++
++  const thrown = applyMandatoryHookReadiness(root, { refreshMandatoryHooks: () => { throw Object.assign(new Error("boom"), { code: "HOOK-REFRESH-PLAN-BOOM" }); } });
++  assert.equal(thrown.status, "refresh-failed");
++  assert.equal(thrown.code, "HOOK-READINESS-REFRESH-FAILED");
++  assert.equal(thrown.refreshResult?.status, "failed");
++  assert.equal(thrown.refreshResult?.code, "HOOK-REFRESH-PLAN-BOOM");
++}));
++
++test("K103 (d): control -- nothing stale means the refresh routine is never called", () => withRepository(({ root }) => {
++  assert.equal(installPreCommit({ rootDir: root }).status, "installed");
++  assert.equal(installCommitMsg({ rootDir: root }).status, "installed");
++  const applied = applyMandatoryHookReadiness(root, { refreshMandatoryHooks: () => { throw new Error("must not run"); } });
++  assert.equal(applied.status, "ready");
++  assert.equal(applied.refreshResult, undefined);
++}));
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs
+new file mode 100644
+index 000000000..dda874066
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs
+@@ -0,0 +1,111 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * K103 part D1 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74: every refusal needs a repair that can actually
++ * be run). `approve-push` under `gates.push_approval: chat` while the session-authority catalogue exists is refused by
++ * the State push producer route (a shell binds no requester). The refusal must name a concrete, runnable next step with
++ * its `--root` argument, and the command it names must not itself come back empty.
++ *
++ * Real git repository, real CLI entry (`run`), no injected dependencies; the repository, the machine plane (HOME) and the
++ * key directory live under os.tmpdir() / the native fixture parent.
++ */
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++
++import { run } from "./pipeline-state.mjs";
++import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
++import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
++import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
++import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
++import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
++
++const roots = [];
++test.after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
++
++function git(cwd, args) {
++  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
++  if (result.error || result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
++  return result.stdout.trim();
++}
++
++function captured(fn) {
++  const stdout = [];
++  const stderr = [];
++  const saved = { log: console.log, error: console.error };
++  console.log = (...args) => stdout.push(args.join(" "));
++  console.error = (...args) => stderr.push(args.join(" "));
++  let code;
++  try { code = fn(); } finally { Object.assign(console, saved); }
++  return { code, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
++}
++
++/** A governed repository in chat push-approval mode with an initialized session-authority catalogue. */
++function buildChatFixture() {
++  const parent = nativeContractFixtureParent();
++  mkdirSync(parent, { recursive: true, mode: 0o700 });
++  const dir = mkdtempSync(join(parent, "k103-approve-push-chat-"));
++  roots.push(dir);
++  const home = mkdtempSync(join(tmpdir(), "k103-approve-push-chat-home-"));
++  roots.push(home);
++  mkdirSync(join(dir, "evidence"), { mode: 0o700 });
++  git(dir, ["init", "-q", "-b", "main"]);
++  for (const [name, value] of [["user.name", "Fixture"], ["user.email", "fixture@example.invalid"], ["commit.gpgsign", "false"]]) git(dir, ["config", name, value]);
++  writeFileSync(join(dir, "README.md"), "fixture\n");
++  writeFileSync(join(dir, ".gitignore"), "scratch/\nevidence/\n.claude/\n");
++  git(dir, ["add", "README.md", ".gitignore"]);
++  git(dir, ["commit", "-q", "-m", "init"]);
++  const controller = createGovernanceScopeController({ hostStateRoot: join(dir, "fixture-host") });
++  const plan = controller.planDecision({ rootDir: dir, decision: "enroll", by: "fixture explicit course" });
++  controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
++  prepareApprovedItemCourseFixture({ root: dir });
++  writeFileSync(join(dir, "pipeline.user.yaml"), 'schema: "pipeline.user.v1"\ngates:\n  push_approval: "chat"\n');
++  mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({
++    schema: "pipeline.machine-plane.v1", poKeyDirectory: null, pushApprovalDefault: "chat",
++    routing: null, language: null, session: null, usage: null, updatedAt: "2026-10-22T00:00:00.000Z",
++  }));
++  git(dir, ["add", "pipeline.user.yaml"]);
++  git(dir, ["commit", "-q", "-m", "fixture policy"]);
++  const repository = inspectSignedDescriptorCustodyRepository(dir);
++  initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
++  return { dir, home, argv: ["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"] };
++}
++
++function callApprove(fixture) {
++  const names = ["HOME", "USERPROFILE", "PIPELINE_PO_APPROVAL_DIRECTORY"];
++  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
++  process.env.HOME = fixture.home;
++  process.env.USERPROFILE = fixture.home;
++  delete process.env.PIPELINE_PO_APPROVAL_DIRECTORY;
++  try {
++    return captured(() => run(fixture.argv, { dir: fixture.dir }));
++  } finally {
++    for (const name of names) { if (saved[name] === undefined) delete process.env[name]; else process.env[name] = saved[name]; }
++  }
++}
++
++test("K103 D1: chat-mode approve-push with a catalogue is refused with a typed reason and a runnable repair, not a pointer to an inspect that finds nothing", () => {
++  const fixture = buildChatFixture();
++  const result = callApprove(fixture);
++  assert.equal(result.code, 2, `${result.stderr}`);
++  assert.equal(result.stdout, "", "a refused approval prints no success");
++  assert.match(result.stderr, /SDC-AUTHORITY-UNAVAILABLE: state-push-source-requester/, "the typed code and reason stay");
++  // Measured on this fixture: the inspect command the old text pointed at reports a healthy registry (status "inspected", every
++  // producer ok, drifted []) and its only `next` is an unrelated scratch-binding heal -- it does not clear this refusal.
++  const repair = spawnSync(process.execPath, [new URL("./session-authority-repair.mjs", import.meta.url).pathname, "inspect", "--root", fixture.dir], { encoding: "utf8" });
++  assert.equal(repair.status, 0);
++  assert.ok(!JSON.parse(repair.stdout).registry.producers.some((producer) => producer.drifted.length > 0 || producer.inFlight > 0), "the registry is healthy: inspect cannot be the repair");
++  // The refusal therefore names the cause and the step that can actually be run.
++  assert.match(result.stderr, /chat mode/i, "names the mode");
++  assert.match(result.stderr, /requester/i, "names the cause: no requester is bound by this shell");
++  assert.match(result.stderr, /gates\.push_approval/, "names the setting that selects the route");
++  assert.match(result.stderr, /signature/, "names the route that works while a catalogue exists");
++  assert.match(result.stderr, /docs\/push-release-flow\.md/, "points at the step-by-step flow");
++  assert.match(result.stderr, /approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>/, "carries the concrete command shape");
++  assert.ok(result.stderr.includes(`session-authority-repair.mjs inspect --root ${fixture.dir}`), "the diagnostic command with its --root argument stays named");
++  assert.ok(!/names the cause and the command that clears it/.test(result.stderr), "the general sentence that is false for this reason is not repeated");
++});

@@ -1,0 +1,21 @@
+command: node --test scratch/clones/g20-publication-qualification/plugins/pipeline-core/lib/publication-review-requirement.test.mjs
+label: g20-review-requirement
+exitCode: 0
+head: 89b40fb15a6dd442dc2ff4e7063df3e89600f416
+tree: 27b5bf2b1f4249313d0c20cfb479217c83a5ab99
+dirty: true
+--- stdout ---
+✔ a current approved mini with exact Plan and Spec source bytes has rank zero (6.196884ms)
+✔ minimal, stale, and revoked mini submissions cannot waive review (0.937351ms)
+✔ registered package rigor is distinct from mini rank and candidate source wins (1.051547ms)
+✔ unavailable and malformed rigor never waive review (0.600982ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 676.240425
+
+--- stderr ---

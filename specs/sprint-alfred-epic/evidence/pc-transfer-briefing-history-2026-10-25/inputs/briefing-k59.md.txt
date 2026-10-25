@@ -1,0 +1,34 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k59/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; replace `<name>` with `k59`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, `--glob`, multi-path rg, other pipelines and composed commands are refused. A `git commit` needs a clone identity: read `git config user.name` and `git config user.email` in the MAIN checkout and set them once with `git -C scratch/clones/k59 config user.name ...` and `... user.email ...`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K59-BACKLOG-TEXT-SWEEP-3/2026-10-23 · Role Goldfish`
+
+## Briefing K59-BACKLOG-TEXT-SWEEP-3: bring the item texts of 7 backlog items in line with what is already built and decided (second round; the first round, commits 037cd7619 and aa59a94b4, set the style: read one of its '## Reconciled 2026-10-23' sections first)
+
+### 1. Goal
+A read-only reader round (2026-10-23) found that these backlog items still read as open or have an empty Triage block although the work is built or the PO decided it. Readers are fallible: for EVERY item first verify the stale sentence yourself (Read the item section, then check the cited commit with `git -C scratch/clones/k59 show --stat --format=%B <sha>`, the cited pin file, or the cited decision in `specs/sprint-alfred-epic/plans/po-decisions-*.md` / `docs/state.md`). Edit only what you verified. The reader findings are in the MAIN checkout (read only): `scratch/agent-verify/summary.md` (sections "text", "content", "evidence"; rows of the first eight readers) and the two later, more careful files `scratch/agent-verify/out-09.json` and `scratch/agent-verify/out-10.json` (JSON arrays by `itemId`; for an item present in these two files they supersede the summary). Search them per item with `rg -n "<itemId>" <file>`.
+
+Items (backlog file = `backlog/items/*-<id>.md`, find the dated filename with `find scratch/clones/k59/backlog/items -name "*<id>.md"`):
+1. first-enrollment-enters-retirement-before-consent
+2. forensics-and-audit-evidence-not-reconstructable
+3. git-hook-runtime-snapshot-omits-protected-baseline-catalog
+4. git-stash-list-classified-as-working-tree-write
+5. greenfield-design-course-cost-and-proportionality
+6. lifecycle-read-scope-blocks-host-declared-system-skill (already closed as a duplicate; only reconcile the stale 'stays open' Triage line)
+7. parallel-work-in-one-checkout-is-unsafe
+
+How to edit (append-only; history stays): add ONE dated section at the end of the item, `## Reconciled 2026-10-23`, in the item's own style and language (English), stating per superseded sentence: what it said, what is true now, and the evidence (commit SHA, test file and case, or decision id). Do not delete or rewrite earlier text. Where the item has an EMPTY Triage block (Decision/Rationale/Assignment/Date) and a PO decision that settles it exists in the repository (for example D117, D123, D125, D65, D96), fill the Triage fields with that decision's id, a one-sentence rationale and today's date; if you cannot find the decision text, leave the block empty and say so in the report. Do not change front matter `status`, do not close or merge any item, and do not decide anything the repository does not already decide.
+
+### 2. Context files
+`scratch/agent-verify/summary.md` (main checkout, read only); the 14 item files; `backlog/README.md` (process); `plugins/pipeline-core/scripts/check-backlog-state.mjs` (the check you run).
+
+### 3. DoD checks
+`node plugins/pipeline-core/scripts/check-backlog-state.mjs` against the clone (use the root option the script documents) reports no NEW finding compared with the same command before your first edit (record both outputs' counts). If the repository keeps a generated ledger or projection that the check demands after an item edit, regenerate it with the script the check names and include it in the same commit. One commit per 4-5 items by explicit pathspec; message files under the clone's `scratch/commit-msg/`; Conventional Commits `docs(backlog): ...`; trailers exactly `AI-Assisted: true` and `Dispatch: K59-BACKLOG-TEXT-SWEEP-3 (goldfish)`. If the pre-commit hook demands another trailer or route for backlog files (the project notes mention `Dispatch: administrative (elephant)` for the Elephant only), do NOT improvise: stop and report the exact refusal.
+
+### 4. Forbidden
+Product code and test changes; `CLAUDE.md`, `.claude/**`, `docs/state.md`, `specs/**` edits; front-matter status changes; closing, merging or creating items; touching the MAIN checkout other than reading `scratch/agent-verify/summary.md`; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths or secrets in any file; Advisor.
+
+### 5. Stop conditions
+A cited commit or decision that does not exist (skip that sentence, report it); a refusal by the pre-commit hook you cannot resolve with the admitted grammar; more than 2 failed attempts at one problem; tool budget at 80 percent (commit what is verified, report the rest).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k59`. Tool budget: base cap 70, closing allowance +5. TASK_ID: K59-BACKLOG-TEXT-SWEEP-3. Status wording per the common briefing (never "done").

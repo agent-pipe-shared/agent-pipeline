@@ -1,0 +1,51 @@
+# Uninstall Critic corrections — 2026-09-29
+
+Scope: disposable Source fixtures only. No real repository uninstall, host configuration mutation, staging, commit, state, backlog or release action.
+
+## Actual failed-before probe
+
+Command: `node scratch/0.7-quality-uninstall-critic-corrections-20260929/probe.mjs`
+
+Default sandbox returned `SyntaxError: Unexpected end of JSON input` from the Git-backed enrollment retirement read. The identical command with `require_escalated` returned exit 0:
+
+```
+workspace executable removed: false
+restored workspace resume: uninstalled
+re-enrolled completed resume: uninstalled
+```
+
+## Native Source write
+
+An initial native `apply_patch` attempt failed context verification on the long private-phase line and applied nothing. The corrected exact patch was preserved in `source.patch`, then a native `apply_patch` applied it successfully. There was no Source guard refusal and no alternate writer.
+
+`source.patch` SHA-256: `2742128feffb351ebe2809783de29e98d5447da0fa944b7c810642afc922e634`.
+
+The workspace helper proves a binding against a physical Pipeline plugin manifest, its hook manifest and a physical executable script. Ambiguous Pipeline-shaped commands are conflicts. Array surgery preserves foreign value/property spans exactly. Registry and workspace hooks use frozen footprint preimages/postimages and remain in the ordered workspace phase. Resume checks completed phases before progress, private archiving and terminal return. Existing shim reinstall refusal remains.
+
+## Actual failed-after sandbox and passed-after escalation
+
+Commands: `node plugins/pipeline-core/lib/project-uninstall.test.mjs` and the identical probe command above.
+
+Default sandbox suite: 0 passed, 7 failed due to subprocess Git EPERM / empty Git-backed JSON, not implementation assertions. Identical escalated suite: 7 passed, 0 failed, duration 20898.289222 ms. All seven original callback registrations remain; added assertions cover both workspace hook files, foreign exact bytes, unproved ownership, completed-key drift, workspace registry/hook restoration and re-enrollment. Existing reinstall and ordinary commit/local bare push checks pass.
+
+Identical escalated after-probe, exit 0:
+
+```
+workspace executable removed: true
+restored workspace refused: PU-WORKSPACE-DRIFT
+re-enrolled completed refused: PU-DECLINE-READBACK
+```
+
+`git diff --check -- plugins/pipeline-core/lib/project-uninstall.mjs plugins/pipeline-core/lib/project-uninstall.test.mjs plugins/pipeline-core/lib/project-uninstall.fixture.mjs` returned exit 0 with no output.
+
+## Source hashes
+
+| File | SHA-256 |
+| --- | --- |
+| project-uninstall.mjs | d48c00c3caf64bc7930e4be489b57122f65987a8300ea9046f658843e7cc9334 |
+| project-uninstall-workspace.mjs | 404e70c3317a9b023df7ae4cbca3ab508d16c70622dc1c17010f1f63216edb6b |
+| project-uninstall.test.mjs | 9ec30f980dd3b83f5a2b62836141fdded49d622b8760f4be645c2ca3773d9f6c |
+| project-uninstall.fixture.mjs | a2253acd5cba4b7b97700fbcd02a843aa38205b40a2de5618ace6ef06cc47584 |
+| probe.mjs | 4458e44e3a0a69bc7771558ab10daf11746b5376201ba786ed596db7ed9eee49 |
+
+Limits: Source fixture evidence does not prove native Antigravity executing-path qualification or Windows host behavior. Old journals lacking these workspace postimages still cannot return success with live owned workspace bindings; changed current completed-phase states require bounded recovery/a new authorized plan rather than consuming a newer enrollment.

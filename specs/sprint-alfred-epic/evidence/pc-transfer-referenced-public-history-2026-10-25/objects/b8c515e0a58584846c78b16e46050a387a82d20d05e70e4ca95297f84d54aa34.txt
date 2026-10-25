@@ -1,0 +1,38 @@
+diff --git a/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs b/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+index 2b0fb2836..5155a0c7e 100644
+--- a/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-apply-patch.test.mjs
+@@ -163,7 +163,7 @@ function runLifecycleWithObservedCaller(root, command, originalInput) {
+   assert.ok(start >= 0 && end > start);
+   const lifecycle = readFileSync(join(hookDir, "guard-lifecycle-ready.mjs"), "utf8");
+   const runnerStart = lifecycle.indexOf("function runnerFromArgv(argv)");
+-  const runnerEnd = lifecycle.indexOf("\nfunction pathInside", runnerStart);
++  const runnerEnd = lifecycle.indexOf("\nexport function main(", runnerStart);
+   assert.ok(runnerStart >= 0 && runnerEnd > runnerStart);
+   const script = `const childProcess = require("node:child_process");
+ let observed = null;
+@@ -522,14 +522,19 @@ check("a genuinely empty V3 onboarding root reaches the native Codex apply-patch
+     assert.equal(markerRepaired.status, "applied", JSON.stringify(markerRepaired));
+     const postAuthoring = runOnboarding(created.root, ["inspect", "--root", created.root, "--runner", "codex"]);
+     assert.equal(postAuthoring.status, "bootstrap-binding-required", JSON.stringify(postAuthoring));
+-    assert.equal(postAuthoring.nextAction?.kind, "architecture-design-required", JSON.stringify(postAuthoring));
+-    assert.equal(postAuthoring.nextAction.code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", JSON.stringify(postAuthoring));
+-    assert.equal(postAuthoring.nextAction.prdPath, prd, JSON.stringify(postAuthoring));
+-    assert.equal(postAuthoring.nextAction.specPath, spec, JSON.stringify(postAuthoring));
++    // This fixture uses the "feature" intake profile. Since 1bd1d7bf6 a feature/epic
++    // generated draft is not a separate early PO acknowledgement (that approval belongs to
++    // the later complete final package), so the current explicit stop after authoring is the
++    // read-only bootstrap-bind-plan action, not the early architecture-design remediation.
++    assert.equal(postAuthoring.nextAction?.kind, "command", JSON.stringify(postAuthoring));
++    assert.equal(postAuthoring.nextAction.argv[1], "bootstrap-bind-plan", JSON.stringify(postAuthoring));
++    assert.equal(postAuthoring.nextAction.mutation, false, JSON.stringify(postAuthoring));
++    assert.equal(postAuthoring.nextAction.requiresConfirmation, false, JSON.stringify(postAuthoring));
++    assert.notEqual(postAuthoring.nextAction.kind, "architecture-design-required", JSON.stringify(postAuthoring));
+     // Staging authoring is deliberately earlier than architecture design,
+     // acknowledgement, binding and plan approval. This native path must keep
+     // admitting the bounded draft writes while returning the current explicit
+-    // design stop; it never fabricates a design package or PO acknowledgement.
++    // stop; it never fabricates a design package or PO acknowledgement.
+     assert.notEqual(postAuthoring.status, "ready");
+     const markerDenial = nativeDenial(
+       runNativeCodexPatchGuard(

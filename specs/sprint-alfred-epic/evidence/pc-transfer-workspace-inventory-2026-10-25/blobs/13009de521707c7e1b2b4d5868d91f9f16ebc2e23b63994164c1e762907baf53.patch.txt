@@ -1,0 +1,790 @@
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.mjs b/plugins/pipeline-core/lib/model-family-host-store.mjs
+index 45d079fa6..ab74e8676 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.mjs
+@@ -20,6 +20,8 @@ import { dirname, join, resolve, sep } from "node:path";
+ import { canonicalizeJson, parseStrictJson } from "./governance-event.mjs";
+ import { verifyModelFamilyAuthority, verifyAggregateDesignModelFamilyAuthority, verifyModelFamilyPinDecision } from "./model-family-authority.mjs";
+ import { evaluateModelFamilySelection } from "./model-family-latest-selection.mjs";
++import { validateDesignReviewExecutionRequest } from "./design-review-execution-producer.mjs";
++import { createDesignReviewReceipt } from "./design-review-receipt.mjs";
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+ const OID = /^[a-f0-9]{40}$/u;
+@@ -205,6 +207,22 @@ function safeRead(path, limit = MAX_BYTES) {
+   } finally { closeSync(fd); }
+ }
+ 
++function readTrackedReviewBytes(root,path) {
++  if(typeof path!=='string'||!path||path.startsWith('/')||/[\\\x00-\x1f:]/u.test(path)
++    ||path.split('/').some(part=>!part||part==='.'||part==='..'))throw new Error('DRE_PATH');
++  const file=join(root,path),before=lstatSync(file);
++  if(!before.isFile()||before.isSymbolicLink()||before.size<1||before.size>MAX_BYTES
++    ||before.nlink!==1||realpathSync(file)!==file)throw new Error('DRE_FILE');
++  const fd=openSync(file,constants.O_RDONLY|constants.O_NOFOLLOW);
++  try{
++    const pinned=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),named=lstatSync(file);
++    if(pinned.dev!==before.dev||pinned.ino!==before.ino||bytes.length!==pinned.size
++      ||after.dev!==pinned.dev||after.ino!==pinned.ino||after.mtimeMs!==pinned.mtimeMs
++      ||named.dev!==pinned.dev||named.ino!==pinned.ino||named.size!==pinned.size)throw new Error('DRE_RACE');
++    return bytes;
++  }finally{closeSync(fd);}
++}
++
+ function writeNew(path, value, limit = MAX_BYTES) {
+   const bytes = Buffer.from(`${canonicalizeJson(value)}\n`, "utf8");
+   if (bytes.length > limit) throw new Error("STORE_SIZE");
+@@ -228,6 +246,24 @@ function writeNew(path, value, limit = MAX_BYTES) {
+   syncDirectory(dirname(path));
+ }
+ 
++function writeNewText(path, text, limit = MAX_BYTES) {
++  const bytes = Buffer.from(text, 'utf8');
++  if (!text || bytes.length > limit) throw new Error('STORE_SIZE');
++  const temp = join(dirname(path), `.stage-${randomBytes(16).toString('hex')}`);
++  const fd = openSync(temp, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
++    | (constants.O_NOFOLLOW ?? 0), 0o600);
++  try {
++    let offset = 0;
++    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset);
++    fsyncSync(fd);
++    linkSync(temp, path);
++  } finally {
++    closeSync(fd);
++    try { unlinkSync(temp); } catch {}
++  }
++  syncDirectory(dirname(path));
++}
++
+ function replaceAtomic(path, value) {
+   const bytes = Buffer.from(`${canonicalizeJson(value)}\n`, "utf8");
+   if (bytes.length > MAX_BYTES) throw new Error("STORE_SIZE");
+@@ -1109,6 +1145,93 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+     held.closed=true;modelControlledDrivers.get(trustedSources.launchDriver).returned.delete(invocation.receipt.receiptSha256);
+     return {ok:true,status:'closed',code:'MODEL-FAMILY-INVOCATION-CLOSED',receiptSha256:invocation.receipt.receiptSha256,assurance:'controlled-unit-method',sourceRefs:proof.sourceFacts};
+   }
++  function readReleasedInvocationMemberRef({invocation}={}) {
++    const held=modelLaunched.get(invocation);
++    if(!held?.closed||!frozenHandles.has(invocation))return fail('MODEL-FAMILY-ORIGINAL-MEMBER-UNAVAILABLE');
++    try{return {ok:true,memberRef:authorityLifecycle.releasedMemberRef(held.handle)};}
++    catch{return fail('MODEL-FAMILY-ORIGINAL-MEMBER-UNAVAILABLE');}
++  }
++  async function publishOriginalDesignReview({invocation,validatedHandle,request,receiptInput}={}) {
++    const held=modelLaunched.get(invocation),checked=validateDesignReviewExecutionRequest(request);
++    if(!held||held.closed||!held.returned||!held.native||!checked.ok
++      ||!frozenHandles.has(invocation)||!receiptInput||typeof receiptInput!=='object')return fail('DRE-NATIVE-ORIGIN-UNAVAILABLE');
++    let native;
++    try{const {readValidatedNativeCriticReturn}=await import('../scripts/codex-native-critic-host.mjs');native=readValidatedNativeCriticReturn(validatedHandle);}catch{return fail('DRE-NATIVE-ORIGIN-UNAVAILABLE');}
++    let author;
++    try{const {readOriginalAuthorModelInvocation}=await import('./design-review-original-custody.mjs');
++      author=readOriginalAuthorModelInvocation({repository:authorityLifecycle.repository.primaryRoot,
++        reference:receiptInput.originalAuthorReference,candidate:request.candidate});}
++    catch{return fail('DRE-AUTHOR-ORIGIN-UNAVAILABLE');}
++    if(!author?.ok||author.receipt.receiptSha256!==request.authorExecutionSha256
++      ||author.receipt.runner===invocation.receipt.runner&&author.receipt.sessionId===invocation.receipt.sessionId
++        &&author.receipt.invocationId===invocation.receipt.invocationId)
++      return fail('DRE-AUTHOR-ORIGIN-UNAVAILABLE');
++    const coverage=native.receipt?.sourceCoverage;
++    if(native.receipt?.status!=='reviewed'||native.receipt?.reviewScope?.kind!=='current-artifacts'
++      ||native.receipt?.dispatch?.candidateCommit!==request.candidate.commit
++      ||native.receipt?.dispatch?.candidateTree!==request.candidate.tree
++      ||invocation.receipt.candidateCommit!==request.candidate.commit
++      ||invocation.receipt.candidateTree!==request.candidate.tree
++      ||invocation.receipt.taskRoute!=='duty.critic_high_risk'||invocation.receipt.role!=='frontier'
++      ||native.receipt.route?.model!==invocation.receipt.selectedModelId
++      ||!Array.isArray(coverage)||digest([...coverage].sort((a,b)=>a.path.localeCompare(b.path)))!==digest(request.sources)
++      ||native.verdict?.pass!==true||native.verdict?.findings?.length!==0)return fail('DRE-NATIVE-SUBJECT-DRIFT');
++    const allPaths=new Map(request.sources.map(row=>[row.path,row]));
++    const {prdPath,specPath,companionPaths,reportPath,receiptPath,previousPath=null}=receiptInput;
++    if(!allPaths.has(prdPath)||specPath!==request.specPath||!allPaths.has(specPath)
++      ||!Array.isArray(companionPaths)||companionPaths.length<1||companionPaths.some(path=>!allPaths.has(path))
++      ||new Set([prdPath,specPath,...companionPaths]).size!==request.sources.length
++      ||typeof reportPath!=='string'||typeof receiptPath!=='string')return fail('DRE-RECEIPT-PATHS');
++    const root=join(authorityLifecycle.repository.commonDir,'agent-pipeline','model-family-host');
++    const report=`# Original design review\nVerdict: pass.\nNative verdict SHA256: ${digest(native.verdict)}\n`;
++    const reportSha256=createHash('sha256').update(report).digest('hex');
++    const source=path=>({path,sha256:allPaths.get(path).sha256});
++    let previous=null;
++    if(request.round===2){
++      if(typeof previousPath!=='string')return fail('DRE-PREDECESSOR-UNAVAILABLE');
++      let bytes;try{bytes=readTrackedReviewBytes(authorityLifecycle.repository.primaryRoot,previousPath);}catch{return fail('DRE-PREDECESSOR-UNAVAILABLE');}
++      if(createHash('sha256').update(bytes).digest('hex')!==request.previousReceiptSha256)return fail('DRE-PREDECESSOR-DRIFT');
++      previous={path:previousPath,bytes};
++    }
++    let specBytes;try{specBytes=readTrackedReviewBytes(authorityLifecycle.repository.primaryRoot,specPath);}catch{return fail('DRE-SPEC-UNAVAILABLE');}
++    if(createHash('sha256').update(specBytes).digest('hex')!==allPaths.get(specPath).sha256)return fail('DRE-SPEC-DRIFT');
++    const created=createDesignReviewReceipt({featureId:request.featureId,previous,
++      sources:{prd:source(prdPath),spec:source(specPath),companions:companionPaths.map(source)},
++      reviewer:{runner:invocation.receipt.runner,model:invocation.receipt.selectedModelId},
++      report:{path:reportPath,sha256:reportSha256,originalSha256:reportSha256},
++      openFindingIds:[],reviewedAt:new Date(clock()).toISOString(),specBytes});
++    if(!created.ok||created.receipt.round!==request.round)return fail('DRE-RECEIPT-UNAVAILABLE');
++    const receiptText=Buffer.from(created.bytes).toString('utf8');
++    const publication={schema:'pipeline.design-review-original-publication.v1',requestSha256:checked.requestSha256,
++      reportSha256,receiptSha256:created.sha256,receiptText,reportPath,receiptPath,
++      modelInvocationReceiptSha256:invocation.receipt.receiptSha256,modelInvocationKey:invocation.key,
++      nativeReceiptSha256:digest(native.receipt),nativeVerdictSha256:digest(native.verdict),
++      authorExecutionSha256:request.authorExecutionSha256,
++      originalAuthorReference:structuredClone(receiptInput.originalAuthorReference)};
++    const requestPath=join(root,'design-reviews','requests',checked.requestSha256+'.json');
++    const reportFile=join(root,'design-reviews','reports',reportSha256+'.md');
++    const publicationPath=join(root,'design-reviews','publications',created.sha256+'.json');
++    const token=Object.freeze({});
++    modelOriginalTerminalTokens.set(token,{repository:authorityLifecycle.repository,invocation,
++      requestSha256:checked.requestSha256,reportSha256,receiptSha256:created.sha256,
++      requestFileSha256:createHash('sha256').update(`${canonicalizeJson(request)}\n`).digest('hex')});
++    let publicationHandle;
++    try{ownedLifetime({receiptSha256:invocation.receipt.receiptSha256,kind:'design-review-publication'},()=>{
++      publicationHandle=authorityLifecycle.currentHandle();
++      for(const sub of ['design-reviews','design-reviews/requests','design-reviews/reports','design-reviews/publications'])
++        ensureDir(join(root,sub),true);
++      writeNew(requestPath,request);writeNewText(reportFile,report);writeNew(publicationPath,publication);
++      return token;
++    });}catch{return fail('DRE-PUBLICATION-UNAVAILABLE');}
++    if(!authorityLifecycle.terminal(held.handle,token))return fail('DRE-TERMINAL-UNAVAILABLE');
++    held.closed=true;
++    const modelMemberRef=authorityLifecycle.releasedMemberRef(held.handle);
++    const locator={schema:'pipeline.design-review-source-locator.v1',requestSha256:checked.requestSha256,
++      receiptSha256:created.sha256,reportSha256,originalInvocationSha256:invocation.receipt.receiptSha256,
++      sourceRevisionSha256:authorityDigest({candidate:request.candidate,sources:request.sources,criteria:request.criteria}),modelMemberRef};
++    return {ok:true,code:'DRE-MODEL-SOURCE-PUBLISHED',locator,report,receiptBytes:created.bytes,
++      publicationMemberRef:authorityLifecycle.releasedMemberRef(publicationHandle),assurance:'model-source-native-return',independentCriticPass:false};
++  }
+   function prepareControlledWriteDiagnostic(input = {}) {
+     if (!own(input, ["key", "assignment", "diagnosticHandle"]) || !validKey(input.key)) {
+       return fail("MODEL-FAMILY-WRITE-DIAGNOSTIC-REQUIRED");
+@@ -1141,7 +1264,8 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+   controller = Object.freeze({ activate() { return ownedLifetime({kind:'activation'},()=>{const loaded=loadAuthority();return loaded?.value?.authoritySha256?store.activate(loaded.value):loaded;}); },
+     transitionAuthority:(input)=>ownedLifetime({kind:'transition'},()=>transitionAuthority(input)),
+     prepare:(input)=>ownedLifetime({kind:'prepare'},()=>prepare(input)), prepareControlledWriteDiagnostic, prepareControlledTransitionObservation,
+-    prelaunch, admitNativeRequest, launch, disposeInvocation, readState:store.readState });
++    prelaunch, admitNativeRequest, launch, disposeInvocation, readReleasedInvocationMemberRef,
++    publishOriginalDesignReview, readState:store.readState });
+   modelDiagnosticControllers.set(controller, { scope: diagnosticScope, rootDir,
+     authorityLifecycle, launchDriver: trustedSources.launchDriver });
+   return controller;
+@@ -1165,7 +1289,7 @@ export const MODEL_FAMILY_HOST_STORE_LIMITS = Object.freeze({ freshMs: FRESH_MS,
+   maxBytes: MAX_BYTES, maxReceipts: MAX_RECEIPTS });
+ 
+ // AUTH-I08: actual physical model-store authority owner, no native promise.
+-const modelAuthorityOwners = new Map(), modelAuthorityPorts = new WeakMap(), modelControlledDrivers = new WeakMap(), modelTerminalTokens = new WeakMap();
++const modelAuthorityOwners = new Map(), modelAuthorityPorts = new WeakMap(), modelControlledDrivers = new WeakMap(), modelTerminalTokens = new WeakMap(), modelOriginalTerminalTokens = new WeakMap();
+ /** A bounded unit-method driver owns its completion. This never launches a host. */
+ export function createControlledModelFamilyHostDriver(){
+   const returned=new Map();
+@@ -1178,6 +1302,22 @@ function modelMethodTerminalToken(invocation,repository,launchDriver){
+   const token=Object.freeze({});modelTerminalTokens.set(token,{invocation,repository,launchDriver});return token;
+ }
+ function modelMethodTerminalRead(token,identity){
++  const original=modelOriginalTerminalTokens.get(token);
++  if(original){
++    if(identity?.receiptSha256!==original.invocation.receipt.receiptSha256||!frozenHandles.has(original.invocation))return null;
++    const root=join(original.repository.commonDir,'agent-pipeline','model-family-host');
++    const specification=[
++      ['receipts',join(root,'receipts',digest(original.invocation.key)+'.json'),({value})=>validInvocationReceipt(value)&&value.receiptSha256===identity.receiptSha256?value:null],
++      ['design-review-requests',join(root,'design-reviews','requests',original.requestSha256+'.json'),({value})=>validateDesignReviewExecutionRequest(value).ok?value:null],
++      ['design-review-reports',join(root,'design-reviews','reports',original.reportSha256+'.md'),({value})=>typeof value==='string'?{sha256:createHash('sha256').update(value).digest('hex')}:null],
++      ['design-review-publications',join(root,'design-reviews','publications',original.receiptSha256+'.json'),({value})=>value?.schema==='pipeline.design-review-original-publication.v1'?value:null],
++    ];
++    const read=specification.map(([namespaceId,filePath,semantic])=>authorityReadSource({namespaceId,filePath,semantic,...(namespaceId==='design-review-reports'?{format:'utf8'}:{})}));
++    if(read[1].sourceFact.sha256!==original.requestFileSha256||read[2].sourceFact.sha256!==original.reportSha256
++      ||read[3].value.receiptSha256!==original.receiptSha256||read[3].value.requestSha256!==original.requestSha256
++      ||read[3].value.reportSha256!==original.reportSha256||read[3].value.modelInvocationReceiptSha256!==identity.receiptSha256)return null;
++    return {terminal:'completed',sourceFacts:read.map(row=>row.sourceFact)};
++  }
+   const held=modelTerminalTokens.get(token);if(!held||!frozenHandles.has(held.invocation)||!validKey(held.invocation.key)||identity?.receiptSha256!==held.invocation.receipt.receiptSha256)return null;
+   const driver=modelControlledDrivers.get(held.launchDriver);if(!driver||driver.returned.get(identity.receiptSha256)!==digest(held.invocation.receipt))return null;
+   const read=authorityReadSource({namespaceId:'receipts',filePath:join(held.repository.commonDir,'agent-pipeline','model-family-host','receipts',digest(held.invocation.key)+'.json'),semantic:({value})=>{if(!validInvocationReceipt(value)||receiptDigest(value)!==identity.receiptSha256||digest(value)!==digest(held.invocation.receipt))authorityOwnerFailure('model-family-host:terminal-receipt-drift');return value;}});
+@@ -1186,10 +1326,26 @@ function modelMethodTerminalRead(token,identity){
+ function modelAuthorityOwner(repository) {
+   const repo=authorityActualRepository(repository),key=JSON.stringify(repo);
+   if(modelAuthorityOwners.has(key))return modelAuthorityOwners.get(key);
+-  const namespaces=['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes'];
++  const namespaces=['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes',
++    'design-review-requests','design-review-reports','design-review-publications'];
+   const scan=()=>authorityScanDomain({rootPath:join(repo.commonDir,'agent-pipeline','model-family-host'),namespaceIds:namespaces,classifyEntry(entry){
+     const {relativePath:p,value}=entry;
+     if(/^authority-lifetimes\/[a-f0-9]{64}\.json$/.test(p))return authorityClassifyLifetime(entry,'model-family-host',namespaces[5],repo);
++    if(/^design-reviews\/requests\/[a-f0-9]{64}\.json$/.test(p)
++      &&validateDesignReviewExecutionRequest(value).ok
++      &&p===`design-reviews/requests/${validateDesignReviewExecutionRequest(value).requestSha256}.json`)
++      return {namespaceId:namespaces[6],active:false,semantic:value};
++    if(/^design-reviews\/reports\/[a-f0-9]{64}\.md$/.test(p)
++      &&(() => { try { new TextDecoder('utf-8',{fatal:true}).decode(entry.bytes); return true; } catch { return false; } })()
++      &&p===`design-reviews/reports/${createHash('sha256').update(entry.bytes).digest('hex')}.md`)
++      return {namespaceId:namespaces[7],active:false,semantic:{sha256:createHash('sha256').update(entry.bytes).digest('hex')}};
++    if(/^design-reviews\/publications\/[a-f0-9]{64}\.json$/.test(p)
++      &&value?.schema==='pipeline.design-review-original-publication.v1'
++      &&SHA.test(value.receiptSha256??'')&&SHA.test(value.requestSha256??'')
++      &&SHA.test(value.reportSha256??'')&&SHA.test(value.modelInvocationReceiptSha256??'')
++      &&typeof value.receiptText==='string'&&createHash('sha256').update(value.receiptText).digest('hex')===value.receiptSha256
++      &&p===`design-reviews/publications/${value.receiptSha256}.json`)
++      return {namespaceId:namespaces[8],active:false,semantic:value};
+     if(p===MARKER&&strictObject(value,['schema','activationId','authoritySha256','createdAt'])&&value.schema==='pipeline.model-family-host-activation.v1'&&SHA.test(value.activationId??'')&&SHA.test(value.authoritySha256??'')&&validTime(value.createdAt))return {namespaceId:namespaces[0],active:true,semantic:value};
+     if(p===STATE&&strictObject(value,['schema','generation','stateFile','stateSha256'])&&value.schema==='pipeline.model-family-host-state-pointer.v1'&&Number.isSafeInteger(value.generation)&&value.generation>=0&&SHA.test(value.stateSha256??'')&&value.stateFile===`generation-${value.generation}-${value.stateSha256}.json`)return {namespaceId:namespaces[1],active:false,semantic:value};
+     if(/^generation-\d+-[a-f0-9]{64}\.json$/.test(p)&&validateState(value)&&p===`generation-${value.generation}-${digest(value)}.json`)return {namespaceId:namespaces[2],active:false,semantic:value};
+@@ -1198,7 +1354,7 @@ function modelAuthorityOwner(repository) {
+     authorityOwnerFailure('model-family-host:unknown-or-invalid-entry');
+   }});
+   // A host must explicitly prove terminal disposal; a verified result alone is insufficient.
+-  const owner=authorityCreateDomainOwner({repository:repo,producerId:'model-family-host',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(){const rootPath=join(repo.commonDir,'agent-pipeline','model-family-host');return {mutablePaths:[MARKER,STATE,LOCK].map(p=>join(rootPath,p)),creations:[{rootPath,relativePattern:'^(?:activation\\.json|current\\.json|generation-[0-9]+-[a-f0-9]{64}\\.json|receipts/[a-f0-9]{64}\\.json|\\.writer\\.lock)$'}]};},terminalObservation:modelMethodTerminalRead,sourceModulePaths:[import.meta.url,...['model-family-runtime-host.mjs','model-family-invocation.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs'].map(p=>new URL(p,import.meta.url).href)].map(authorityFileURLToPath)});
++  const owner=authorityCreateDomainOwner({repository:repo,producerId:'model-family-host',kinds:['armed-capability'],namespaceIds:namespaces,scan,transitionScope(){const rootPath=join(repo.commonDir,'agent-pipeline','model-family-host');return {mutablePaths:[MARKER,STATE,LOCK].map(p=>join(rootPath,p)),creations:[{rootPath,relativePattern:'^(?:activation\\.json|current\\.json|generation-[0-9]+-[a-f0-9]{64}\\.json|receipts/[a-f0-9]{64}\\.json|design-reviews/(?:requests|publications)/[a-f0-9]{64}\\.json|design-reviews/reports/[a-f0-9]{64}\\.md|\\.writer\\.lock)$'}]};},terminalObservation:modelMethodTerminalRead,sourceModulePaths:[import.meta.url,...['model-family-runtime-host.mjs','model-family-invocation.mjs','session-authority-domain-owner.mjs','session-authority-registry.mjs','design-review-execution-producer.mjs'].map(p=>new URL(p,import.meta.url).href),new URL('../scripts/codex-native-critic-host.mjs',import.meta.url).href].map(authorityFileURLToPath)});
+   modelAuthorityOwners.set(key,owner);modelAuthorityPorts.set(owner.port,repo);return owner;
+ }
+ export function createModelFamilyHostAuthorityProducerPort({repository}){return modelAuthorityOwner(repository).port;}
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.test.mjs b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+index 4ae725a6b..b658f99ae 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+@@ -4,20 +4,23 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
+ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync, linkSync, symlinkSync } from "node:fs";
+ import { spawn } from "node:child_process";
+ import { join, resolve } from "node:path";
++import { validatePrivateParent, validateCreatedHome } from "../scripts/codex-critic-private-parent-fixture.mjs";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ // Production-shaped fixtures: a real Git checkout whose authority lifecycle is built the way model-family-runtime-host.mjs builds it.
+ import { mkdirSync } from "node:fs";
+ import { execFileSync } from "node:child_process";
+-import { nativeContractFixtureParent } from "./test-item-approved-course-fixture.mjs";
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+-import { createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
++import { createModelFamilyHostAuthorityLifecycle, createModelFamilyHostAuthorityProducerPort } from "./model-family-host-store.mjs";
++import { readAuthoritySourceFile, authorityDomainDigest } from "./session-authority-domain-owner.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+-import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } from "./session-authority-registry.mjs";
++import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityMemberRecord } from "./session-authority-registry.mjs";
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
+ import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+-import { createModelFamilyHostController, readHeldModelFamilyInvocation,
++import { createModelFamilyHostController, readHeldModelFamilyInvocation, createControlledModelFamilyHostDriver,
+   consumeModelFamilyHostDriverContext } from "./model-family-host-store.mjs";
++import { readOriginalAuthorModelInvocation } from "./design-review-original-custody.mjs";
++import { prepareOriginalDesignReview, readPreparedOriginalDesignReview } from "../scripts/design-review-dispatch.mjs";
+ import { createModelFamilyMainPrelaunch } from "./model-family-main-prelaunch.mjs";
+ import { verifyModelFamilyAuthority } from "./model-family-authority.mjs";
+ import { MODEL_FAMILY_HOST_STORE_LIMITS } from "./model-family-host-store.mjs";
+@@ -185,7 +188,8 @@ async function actualS2Port({ modelId = "model-fixture-62", version = [6, 2] } =
+   return { host, handle: compatible.value.discovery, contractSha256: discoveryDigest(contract), context: prep().context };
+ }
+ 
+-function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute = route.taskRoute } = {}) {
++function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute = route.taskRoute,
++  reviewSources = false } = {}) {
+   const data = signedBundle({ taskRoute });
+   let authorityReads = 0;
+   let preparations = 0;
+@@ -199,10 +203,23 @@ function fixture({ preparation = null, bundleChangeOnRecheck = false, taskRoute
+     readCurrentCandidate() { return { ...currentCandidate }; },
+     launchDriver() { launched += 1; return { ok: true, value: { launched: true } }; },
+   };
+-  // The authority walk refuses any group/world-writable ancestor, so the checkout cannot live under a shared /tmp:
+-  // it is created beneath the owned checkout's scratch/ (the same convention the native-goldfish fixtures use).
+-  const repoDir = mkdtempSync(join(nativeContractFixtureParent(), "model-family-host-store-fixture-"));
++  // This Git fixture contains private Model/registry state, so each root is a
++  // unique Source-validated private child, distinct from ordinary /tmp fixtures.
++  const privateParent='/run/user/1000/ap-g17';
++  validatePrivateParent(privateParent);
++  const repoDir = mkdtempSync(join(privateParent, "g8-model-family-host-store-fixture-"));
++  validateCreatedHome(repoDir);
+   execFileSync("git", ["init", "-q"], { cwd: repoDir, stdio: "ignore" });
++  if(reviewSources){
++    mkdirSync(join(repoDir,"specs/unit"),{recursive:true,mode:0o700});
++    writeFileSync(join(repoDir,"specs/unit/prd.md"),"Fixture PRD\n");
++    writeFileSync(join(repoDir,"specs/unit/spec.md"),"## Acceptance criteria\n\n- **AC-1:** Original source is reviewed.\n");
++    execFileSync("git",["add","--","specs/unit/prd.md","specs/unit/spec.md"],{cwd:repoDir,stdio:"ignore"});
++    execFileSync("git",["-c","user.name=Fixture","-c","user.email=fixture@example.invalid",
++      "-c","core.hooksPath=/dev/null","commit","-q","-m","fixture"],{cwd:repoDir,stdio:"ignore"});
++    const git=args=>execFileSync("git",args,{cwd:repoDir,encoding:"utf8"}).trim();
++    currentCandidate={candidateCommit:git(["rev-parse","HEAD"]),candidateTree:git(["rev-parse","HEAD^{tree}"])};
++  }
+   // The session-authority registry only initializes over a repository that carries a manifest and a pipeline State
+   // with a continuity object; the host's lifetimes reserve their members in that registry (same inputs as the prelaunch fixture).
+   mkdirSync(join(repoDir, ".claude"), { recursive: true, mode: 0o700 });
+@@ -1195,4 +1212,98 @@ test("D113 the settle step refuses a write the continuation made outside the beg
+   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+ });
+ 
++test("G8 original publication rejects a controlled Model token and creates no review artifact", async () => {
++  const f = fixture();
++  try {
++    activate(f);
++    const held = invoke(f, key('g8-controlled-refusal'));
++    assert.equal(held.ok, true, held.code);
++    const launched = f.controller.launch({ invocation: held.value,
++      packetBindingSha256: held.value.receipt.packetBindingSha256 });
++    assert.equal(launched.ok, true, launched.code);
++    const refused = await f.controller.publishOriginalDesignReview({ invocation: held.value,
++      validatedHandle: Object.freeze({}), request: {}, receiptInput: {} });
++    assert.equal(refused.code, 'DRE-NATIVE-ORIGIN-UNAVAILABLE');
++    assert.equal(existsSync(join(f.root, 'model-family-host', 'design-reviews')), false);
++  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
++});
++
++test("G8 author lookup reads a genuinely released controlled Model member without granting independent review", () => {
++  const f=fixture();
++  try{
++    f.source.launchDriver=createControlledModelFamilyHostDriver().launchDriver;
++    activate(f);
++    const authorKey=key('g8-author-original'),prepared=invoke(f,authorKey);
++    assert.equal(prepared.ok,true,prepared.code);
++    const launched=f.controller.launch({invocation:prepared.value,
++      packetBindingSha256:prepared.value.receipt.packetBindingSha256});
++    assert.equal(launched.ok,true,launched.code);
++    const closed=f.controller.disposeInvocation({invocation:prepared.value});
++    assert.equal(closed.ok,true,closed.code);
++    assert.equal(closed.assurance,'controlled-unit-method');
++    const member=f.controller.readReleasedInvocationMemberRef({invocation:prepared.value});
++    assert.equal(member.ok,true,member.code);
++    const reference={modelMemberRef:member.memberRef,invocationKey:authorKey,
++      receiptSha256:prepared.value.receipt.receiptSha256};
++    const candidate={commit:prepared.value.receipt.candidateCommit,tree:prepared.value.receipt.candidateTree};
++    const read=readOriginalAuthorModelInvocation({repository:f.repoDir,reference,candidate});
++    const repo=inspectSignedDescriptorCustodyRepository(f.repoDir);
++    const producerPort=createModelFamilyHostAuthorityProducerPort({repository:repo});
++    const record=withSessionAuthorityBoundary({repository:repo},boundary=>
++      inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef:member.memberRef}));
++    const receiptFile=join(repo.commonDir,'agent-pipeline','model-family-host','receipts',
++      authorityDomainDigest(authorKey)+'.json');
++    const physical=readAuthoritySourceFile({namespaceId:'receipts',filePath:receiptFile,
++      semantic:({value})=>value});
++    const offline=readHeldModelFamilyInvocation({rootDir:f.root,key:authorKey});
++    const factMatches=record.record.sourceFacts.map(fact=>({namespaceId:fact.namespaceId,
++      path:fact.pathSha256===physical.sourceFact.pathSha256,
++      bytes:fact.sha256===physical.sourceFact.sha256,
++      identity:authorityDomainDigest(fact.identity)===authorityDomainDigest(physical.sourceFact.identity),
++      semantic:fact.semanticSha256===physical.sourceFact.semanticSha256}));
++    assert.equal(read.ok,true,JSON.stringify({code:read.code,phase:record.record.phase,
++      released:Boolean(record.releaseRecord),offline:offline.ok,
++      value:offline.ok&&authorityDomainDigest(offline.value)===authorityDomainDigest(physical.value),
++      factMatches}));
++    assert.equal(read.receipt.receiptSha256,reference.receiptSha256);
++    assert.equal(readOriginalAuthorModelInvocation({repository:f.repoDir,
++      reference:{...reference,receiptSha256:sha('forged')},candidate}).ok,false);
++    assert.equal(readOriginalAuthorModelInvocation({repository:f.repoDir,
++      reference:{...reference,modelMemberRef:{...member.memberRef,sha256:sha('forged')}},candidate}).ok,false);
++  }finally{rmSync(f.repoDir,{recursive:true,force:true});}
++});
++
++test("G8 original request preparation binds a released author member and current committed sources", () => {
++  const f=fixture({reviewSources:true});
++  try{
++    f.source.launchDriver=createControlledModelFamilyHostDriver().launchDriver;
++    activate(f);
++    const authorKey=key('g8-author-request'),prepared=invoke(f,authorKey);
++    assert.equal(prepared.ok,true,prepared.code);
++    const launched=f.controller.launch({invocation:prepared.value,
++      packetBindingSha256:prepared.value.receipt.packetBindingSha256});
++    assert.equal(launched.ok,true,launched.code);
++    const closed=f.controller.disposeInvocation({invocation:prepared.value});
++    assert.equal(closed.ok,true,closed.code);
++    assert.equal(closed.assurance,'controlled-unit-method');
++    const member=f.controller.readReleasedInvocationMemberRef({invocation:prepared.value});
++    assert.equal(member.ok,true,member.code);
++    const originalAuthorReference={modelMemberRef:member.memberRef,invocationKey:authorKey,
++      receiptSha256:prepared.value.receipt.receiptSha256};
++    const request=prepareOriginalDesignReview({repository:f.repoDir,
++      sourcePaths:['specs/unit/prd.md','specs/unit/spec.md'],specPath:'specs/unit/spec.md',
++      featureId:'unit',originalAuthorReference,round:1});
++    assert.equal(request.ok,true,request.code);
++    const read=readPreparedOriginalDesignReview(request.preparedHandle);
++    assert.equal(read.ok,true,read.code);
++    assert.equal(read.request.authorExecutionSha256,originalAuthorReference.receiptSha256);
++    assert.deepEqual(read.request.candidate,{commit:f.currentCandidate().candidateCommit,
++      tree:f.currentCandidate().candidateTree});
++    assert.deepEqual(read.request.criteria.ids,['AC-1']);
++    assert.equal(readPreparedOriginalDesignReview(Object.freeze({})).code,'DRE-PREPARED-HANDLE-REQUIRED');
++    writeFileSync(join(f.repoDir,'specs/unit/spec.md'),'Changed\n');
++    assert.equal(readPreparedOriginalDesignReview(request.preparedHandle).code,'DRE-PREPARATION-DRIFT');
++  }finally{rmSync(f.repoDir,{recursive:true,force:true});}
++});
++
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/model-family-invocation.mjs b/plugins/pipeline-core/lib/model-family-invocation.mjs
+index d5c487d04..45eb2e15f 100644
+--- a/plugins/pipeline-core/lib/model-family-invocation.mjs
++++ b/plugins/pipeline-core/lib/model-family-invocation.mjs
+@@ -227,8 +227,17 @@ export function createModelFamilyInvocationEntry({ runtimeHost = createModelFami
+     held.closed=true;for(const binding of held.bindings)bindingHandles.delete(binding);held.bindings.clear();invocationHandles.delete(invocation);
+     return immutableSnapshot(result);
+   }
++  async function publishOriginalDesignReview({invocation,validatedHandle,request,receiptInput}={}) {
++    const held=invocationHandles.get(invocation);
++    if(!held||held.closed||typeof held.store.publishOriginalDesignReview!=='function')return fail('DRE-NATIVE-ORIGIN-UNAVAILABLE');
++    try{
++      const published=await held.store.publishOriginalDesignReview({invocation:held.invocation,validatedHandle,request,receiptInput});
++      if(published?.ok)held.closed=true;
++      return published;
++    }catch{return fail('DRE-PUBLICATION-UNAVAILABLE');}
++  }
+   return Object.freeze({ observeActivation, prepareModelFamilyInvocation, prepareCurrentModelFamilyInvocation, bindModelFamilyInvocation,
+-    launchModelFamilyInvocation, disposeModelFamilyInvocation, readHeld });
++    launchModelFamilyInvocation, disposeModelFamilyInvocation, publishOriginalDesignReview, readHeld });
+ }
+ 
+ // Lazy: creating the entry at module load calls createModelFamilyRuntimeHost while
+diff --git a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+index ebb2e4b09..c1e3b274b 100644
+--- a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
++++ b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+@@ -93,8 +93,8 @@ function nativeJoinedRead(filePath,privateRecord){
+   if(before.dev!==volume||after.dev!==volume||before.ino!==inode||after.ino!==inode||before.size!==after.size||before.mtimeNs!==after.mtimeNs||before.ctimeNs!==after.ctimeNs||before.nlink!==1n||after.nlink!==1n||BigInt(native.bytes.length)!==after.size)authorityOwnerFailure('domain-native-subject-join');
+   return {...native,identity:{dev:volume.toString(),ino:inode.toString(),mode:Number(after.mode),nlink:1}};
+ }
+-function readWindowsDomainSource(namespaceId,filePath,semantic){
+-  const native=nativeJoinedRead(filePath,true),bytes=native.bytes,value=json(bytes),meaning=semantic({value,bytes});
++function readWindowsDomainSource(namespaceId,filePath,semantic,format='json'){
++  const native=nativeJoinedRead(filePath,true),bytes=native.bytes,value=format==='utf8'?new TextDecoder('utf-8',{fatal:true}).decode(bytes):json(bytes),meaning=semantic({value,bytes});
+   if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
+   const sourceFact={namespaceId,pathSha256:digest(filePath),sha256:hash(bytes),size:bytes.length,identity:native.identity,semanticSha256:digest(meaning)};
+   nativeFactCustody.set(sourceFact,native.nativeFactsSha256);return {value,bytes,sourceFact};
+@@ -116,9 +116,9 @@ function readModuleContext(filePath){
+   if(!chain(dirname(filePath))||realpathSync(filePath)!==filePath)authorityOwnerFailure('domain-source-context-path');
+   let fd;try{const before=lstatSync(filePath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o022)!==0||before.size>LIMIT.file)authorityOwnerFailure('domain-source-context-ownership');fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);if(!same(stability(before),stability(opened)))authorityOwnerFailure('domain-source-context-race');const buffer=Buffer.alloc(LIMIT.file+1);let size=0;while(size<buffer.length){const count=readSync(fd,buffer,size,buffer.length-size,size);if(!count)break;size+=count;}const after=lstatSync(filePath),final=fstatSync(fd);if(size>LIMIT.file||size!==final.size||!same(stability(opened),stability(final))||!same(stability(final),stability(after)))authorityOwnerFailure('domain-source-context-race');return {pathSha256:digest(filePath),sha256:hash(buffer.subarray(0,size)),identity:identity(final),size};}finally{if(fd!==undefined)closeSync(fd);}
+ }
+-export function readAuthoritySourceFile({namespaceId,filePath,semantic}){
+-  if(typeof namespaceId!=='string'||!namespaceId||typeof semantic!=='function'||!chain(dirname(filePath),windowsAuthorityBoundary(filePath)))authorityOwnerFailure('domain-source-input');
+-  if(process.platform==='win32')return readWindowsDomainSource(namespaceId,filePath,semantic);
++export function readAuthoritySourceFile({namespaceId,filePath,semantic,format='json'}){
++  if(typeof namespaceId!=='string'||!namespaceId||typeof semantic!=='function'||!['json','utf8'].includes(format)||!chain(dirname(filePath),windowsAuthorityBoundary(filePath)))authorityOwnerFailure('domain-source-input');
++  if(process.platform==='win32')return readWindowsDomainSource(namespaceId,filePath,semantic,format);
+   let fd;try{
+     const before=lstatSync(filePath);owned(before);if(before.size>LIMIT.file)authorityOwnerFailure('domain-source-size');
+     fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);owned(opened);
+@@ -126,7 +126,7 @@ export function readAuthoritySourceFile({namespaceId,filePath,semantic}){
+     function boundedRead(){const chunks=[];let offset=0;while(offset<=LIMIT.file){const chunk=Buffer.alloc(Math.min(65536,LIMIT.file+1-offset)),size=readSync(fd,chunk,0,chunk.length,offset);if(size===0)break;chunks.push(chunk.subarray(0,size));offset+=size;}if(offset>LIMIT.file)authorityOwnerFailure('domain-source-size');return Buffer.concat(chunks,offset);}
+     const bytes=boundedRead(),afterRead=fstatSync(fd),again=boundedRead(),final=fstatSync(fd),after=lstatSync(filePath);owned(afterRead);owned(final);owned(after);
+     if(!same(stability(opened),stability(afterRead))||!same(stability(afterRead),stability(final))||!same(stability(final),stability(after))||bytes.length!==after.size||!bytes.equals(again))authorityOwnerFailure('domain-source-race');
+-    const value=json(bytes),meaning=semantic({value,bytes});if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
++    const value=format==='utf8'?new TextDecoder('utf-8',{fatal:true}).decode(bytes):json(bytes),meaning=semantic({value,bytes});if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
+     return {value,bytes,sourceFact:{namespaceId,pathSha256:digest(filePath),sha256:hash(bytes),size:bytes.length,identity:identity(after),semanticSha256:digest(meaning)}};
+   }finally{if(fd!==undefined)closeSync(fd);}
+ }
+@@ -259,7 +259,7 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+   };
+   const port=Object.freeze(Object.fromEntries(Object.entries(methods).map(([name,method])=>[name,(...args)=>{assertContext();return method(...args);}])));
+   function reserve(identity){const handle=Object.freeze({}),binding=digest({producerId,repoSha,identity,nonce:randomBytes(32).toString('hex')}),operation={phase:'reserved',handle,identity:structuredClone(identity),binding,file:null,sha256:null,result:null,terminalFacts:null,effectFacts:[],beforeFacts:scan().memberships.flatMap(m=>m.sourceFacts)};handles.set(handle,operation);live.set(binding,operation);const reserved=withSessionAuthorityBoundary({repository:repo},boundary=>reserveSessionAuthorityMember({boundary,producerPort:port,association:{state:'unbound',target:null},operationHandle:handle}));operation.member=reserved;if(producerId==='local-worker-supervisor'&&identity?.enrollment===true){const initial=readInitialMember(operation);if(initial.sourceFact.sha256!==reserved.memberRef.sha256||initial.sourceFact.size!==reserved.memberRef.size||initial.value.phase!=='reserved'||initial.value.sourceFacts.length!==0)authorityOwnerFailure(producerId+':initial-reservation-CAS');operation.initialMember={value:structuredClone(initial.value),sourceFact:structuredClone(initial.sourceFact)};}operation.file=join(lifetimeRoot,binding+'.json');const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:binding,phase:'armed',identitySha256:digest(identity)};withSessionAuthorityBoundary({repository:repo},boundary=>{operation.sha256=publish(repo,operation.file,record,null,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.phase='armed';if(operation.initialMember){operation.initialLifetimeFact=initialLifetimeRead(operation).sourceFact;if(initialLifetimeWindow)authorityOwnerFailure(producerId+':initial-reservation-reentrant');initialLifetimeWindow={operation};}try{operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:reserved.memberHandle,expectedMemberRef:reserved.memberRef,operationHandle:handle})};}finally{if(initialLifetimeWindow?.operation===operation)initialLifetimeWindow=null;}});return handle;}
+-  function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
++  function terminal(handle,result){const operation=handles.get(handle);if(!operation)authorityOwnerFailure(producerId+':unowned-terminal');const proof=terminalObservation(result,operation.identity);if(!proof?.sourceFacts?.length)return false;return withSessionAuthorityBoundary({repository:repo},boundary=>{operation.result=result;operation.terminalFacts=proof.sourceFacts;for(const fact of proof.sourceFacts){const prior=operation.effectFacts.find(row=>row.pathSha256===fact.pathSha256);if(prior&&!same(prior,fact))authorityOwnerFailure(producerId+':terminal-source-conflict');if(!prior)operation.effectFacts.push(fact);}operation.phase='terminal-observed';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'terminal-observed',identitySha256:digest({terminal:proof.terminal,sourceFacts:proof.sourceFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};const released=releaseSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,terminalHandle:handle});operation.member={...operation.member,...released};live.delete(operation.binding);return true;});}
+   function observeEffects(handle){const operation=handles.get(handle);if(!operation||(operation.phase!=='armed'&&!(operation.phase==='running'&&activeTransitions.has(operation))))authorityOwnerFailure(producerId+':effect-handle');return withSessionAuthorityBoundary({repository:repo},boundary=>{const current=scan().memberships.flatMap(m=>m.sourceFacts);operation.effectFacts=current.filter(f=>f.pathSha256!==digest(operation.file)&&!operation.beforeFacts.some(prior=>same(prior,f)));operation.phase='running';const record={schema:'pipeline.domain-authority-lifetime.v1',producerId,repositorySha256:repoSha,bindingSha256:operation.binding,phase:'running',identitySha256:digest({identity:operation.identity,effectFacts:operation.effectFacts})};operation.sha256=publish(repo,operation.file,record,operation.sha256,{producerPort:port,operationHandle:operation.handle,memberRef:operation.member.memberRef});operation.member={...operation.member,...advanceSessionAuthorityMember({boundary,producerPort:port,memberHandle:operation.member.memberHandle,expectedMemberRef:operation.member.memberRef,operationHandle:handle})};});}
+   const asyncPhases=new Map();
+   function effectTransition(handle,effect){
+@@ -364,7 +364,9 @@ export function createDomainAuthorityOwner({repository,producerId,kinds,namespac
+   }
+ 
+   function run(identity,effect,terminalProjection=null){if(typeof effect!=='function'||(terminalProjection!==null&&typeof terminalProjection!=='function'))authorityOwnerFailure('domain-effect');const current=operationScope.getStore();if(current?.owner===port)return effect();preflightActivation(identity);const handle=reserve(identity);const finish=result=>{observeEffects(handle);terminal(handle,terminalProjection?terminalProjection(result):result);return result;};return operationScope.run({owner:port,handle},()=>{let result;try{result=effectTransition(handle,effect);}catch(error){asyncPhases.delete(handle);throw error;}return result&&typeof result.then==='function'?Promise.resolve(result).then(value=>{settleAsyncPhase(handle);return finish(value);},error=>{try{settleAsyncPhase(handle);}catch{}observeEffects(handle);throw error;}):finish(result);});}
+-  const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
++  const owner=Object.freeze({port,reserve,terminal,observeEffects,transitionExisting,run,readCurrentInitialLifetime,
++    releasedMemberRef(handle){const operation=handles.get(handle);if(!operation||operation.phase!=='terminal-observed'||!operation.member?.memberRef)authorityOwnerFailure(producerId+':released-member-unavailable');return structuredClone(operation.member.memberRef);},
++    currentHandle(){const current=operationScope.getStore();return current?.owner===port?current.handle:null;},repository:repo});
+   controlledModelDomainOwners.set(owner,{port,producerId,repository:repo,assertContext});
+   publicationOwners.set(port,{repo,handles});
+   return owner;
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index 0d5012f68..cc08256cb 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -36,7 +36,7 @@ const definitions = [
+   ['managed-codex',codex,'ManagedCodex',['dispatch'],['design-readiness-processes','advisor-processes'],['lib/codex-host-process-journal.mjs','lib/codex-host-process-supervisor.mjs','lib/native-managed-authority-support.mjs','lib/session-authority-domain-owner.mjs']],
+   ['agy-session-consent',consent,'AgySessionConsent',['armed-capability'],['agy-session-consent','agy-session-consent-revocations'],['lib/agy-session-authority.mjs']],
+   ['agy-family-dispatch',agy,'AgyFamilyDispatch',['dispatch','armed-capability'],['agy-host-observed','registered-opaque-context-lifetimes'],['lib/agy-session-dispatch.mjs','lib/agy-host-observed-store.mjs']],
+-  ['model-family-host',model,'ModelFamilyHost',['armed-capability'],['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes'],['lib/model-family-host-store.mjs','lib/model-family-runtime-host.mjs','lib/model-family-invocation.mjs','lib/session-authority-domain-owner.mjs']],
++  ['model-family-host',model,'ModelFamilyHost',['armed-capability'],['activation','generation-pointer','generations','receipts','writer-lock','registered-native-context-lifetimes','design-review-requests','design-review-reports','design-review-publications'],['lib/model-family-host-store.mjs','lib/model-family-runtime-host.mjs','lib/model-family-invocation.mjs','lib/session-authority-domain-owner.mjs','lib/design-review-execution-producer.mjs','scripts/codex-native-critic-host.mjs']],
+   ['afk-ledger',afk,'AfkLedger',['armed-capability'],['registered-activations','activation-generations','writer-recovery-locks'],['lib/afk-ledger.mjs','lib/afk-transaction-host.mjs','lib/session-authority-domain-owner.mjs']],
+   ['session-power',power,'SessionPower',['armed-capability'],['session-power-records','session-power-locks'],['lib/session-power.mjs','lib/session-authority-domain-owner.mjs']],
+   ['local-worker-supervisor',worker,'LocalWorkerSupervisor',['dispatch','armed-capability'],['registered-external-state-roots','supervisor-state','supervisor-lifecycle'],['lib/local-worker-supervisor.mjs','lib/local-supervisor-state.mjs','lib/session-authority-domain-owner.mjs']],
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.mjs b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+index aab06e5bc..ac2320961 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.mjs
+@@ -1204,6 +1204,73 @@ export function readNativeCriticCapturedReturn(context) {
+   return structuredClone(value);
+ }
+ 
++// A current-process Source inspection. Serialized custody files cannot mint
++// this handle or reconstruct the original prepared family context.
++const inspectedOriginalSessionReturns = new WeakMap();
++function originalSessionReturnFailure(code) { const error = new Error(code); error.code = code; throw error; }
++function frozenOriginalSessionReturn(value) {
++  const copy=structuredClone(value),seen=new WeakSet();
++  const freeze=item=>{if(item&&typeof item==='object'&&!seen.has(item)){seen.add(item);for(const child of Object.values(item))freeze(child);Object.freeze(item);}return item;};
++  return freeze(copy);
++}
++function inspectOriginalSessionCriticReturnValue({context,repoRoot,preparedSha256}) {
++  const held=heldPreparedFamilyContext(context);
++  if(realpathSync(repoRoot)!==held.repoRoot||held.preparedSha256!==preparedSha256)
++    originalSessionReturnFailure('CRITIC-FAMILY-PREPARED-CONTEXT-REQUIRED');
++  assertOriginalFamilyCustody(held);
++  const prepared=readJsonBounded(held.preparedPath).value;
++  validatePrepared(prepared,held.repoRoot,context);
++  const paths=familyCustodyPaths(held);
++  const invocation=readJsonBounded(paths.invocation).value;
++  const consumed=readJsonBounded(paths.consumed).value;
++  const execution=readJsonBounded(paths.execution).value;
++  const original=readHeldCriticFamilyExecution(held.route);
++  const route=recheckHeldCriticFamilyRoute(held.route);
++  if(!original.ok||!route.ok||invocation.schema!=='pipeline.critic-family-prepared-custody.v1'
++    ||invocation.preparedSha256!==preparedSha256||familyDigest(invocation.receipt)!==familyDigest(route.receipt)
++    ||consumed.schema!=='pipeline.critic-family-consumption.v1'||consumed.preparedSha256!==preparedSha256
++    ||!['pipeline.critic-family-native-custody.v1','pipeline.critic-family-native-custody.v2'].includes(execution.schema)
++    ||execution.preparedSha256!==preparedSha256
++    ||consumed.packetSha256!==familyDigest(execution.packet)
++    ||consumed.nativeRequestSha256!==familyDigest(execution.nativeRequest)
++    ||familyDigest(execution.execution)!==familyDigest(original.value)
++    ||original.value.packetSha256!==familyDigest(execution.packet)
++    ||original.value.nativeResultSha256!==familyDigest(execution.nativeResult)
++    ||!held.generatedHostReturn||familyDigest(held.generatedHostReturn)!==familyDigest(execution.hostReturn)
++    ||!held.nativeResult||familyDigest(held.nativeResult)!==familyDigest(execution.nativeResult))
++    originalSessionReturnFailure('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
++  const validated=validateHostReturn(prepared,preparedSha256,execution.hostReturn);
++  if(execution.packet?.candidate?.commit!==prepared.review.commit
++    ||execution.packet?.candidate?.tree!==prepared.review.tree
++    ||execution.nativeRequest?.candidateCommit!==prepared.review.commit
++    ||execution.nativeRequest?.candidateTree!==prepared.review.tree
++    ||validated.result.candidate_commit!==prepared.review.commit
++    ||validated.result.candidate_tree!==prepared.review.tree)
++    originalSessionReturnFailure('CRITIC-FAMILY-SUBJECT-DRIFT');
++  return frozenOriginalSessionReturn({schema:'pipeline.original-session-critic-return.v1',
++    preparedSha256,dispatchId:prepared.dispatchId,
++    candidate:{base:prepared.review.base,commit:prepared.review.commit,tree:prepared.review.tree},
++    diff:{path:prepared.review.diffReferencePath,referenceSetSha256:prepared.bindings.referenceSetSha256,
++      reviewFingerprintSha256:prepared.bindings.reviewFingerprintSha256},
++    originalInvocation:invocation.receipt,originalDispatch:execution.packet,
++    originalChild:execution.nativeResult,reviewerResult:validated.result,
++    verdict:validated.result.verdict,reviewPass:validated.reviewPass,
++    hostReturn:execution.hostReturn});
++}
++export function inspectOriginalSessionCriticReturn({context,repoRoot,preparedSha256}={}) {
++  const projection=inspectOriginalSessionCriticReturnValue({context,repoRoot,preparedSha256});
++  const handle=Object.freeze(Object.create(null));
++  inspectedOriginalSessionReturns.set(handle,{context,repoRoot,preparedSha256,projectionSha256:familyDigest(projection)});
++  return handle;
++}
++export function readInspectedOriginalSessionCriticReturn(handle) {
++  const held=inspectedOriginalSessionReturns.get(handle);
++  if(!held)originalSessionReturnFailure('CRITIC-FAMILY-ORIGINAL-SOURCE-HANDLE-REQUIRED');
++  const projection=inspectOriginalSessionCriticReturnValue(held);
++  if(familyDigest(projection)!==held.projectionSha256)originalSessionReturnFailure('CRITIC-FAMILY-NATIVE-CUSTODY-DRIFT');
++  return projection;
++}
++
+ /** Persisted JSON cannot reconstruct the original publication capture.
+  * Qualified construction ports still require a fresh preparation. */
+ export function createNativeCriticPreparedContextFactory({ familyInvocationEntry, familyRuntimeHost, familyExecutionPorts } = {}) {
+diff --git a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+index 3b6ec28be..2d4b60936 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+@@ -14,7 +14,7 @@ import { registeredModelFamilyTaskRoutes } from "../lib/model-family-route-sourc
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "../lib/model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "../lib/model-family-codex-adapter.mjs";
+ import { readHeldModelFamilyInvocation } from "../lib/model-family-host-store.mjs";
+-import { readNativeCriticPreparedContext, readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, recordNativeCriticPreparedExecution, readNativeCriticCapturedReturn } from "./codex-critic-host.mjs";
++import { readNativeCriticPreparedContext, readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, recordNativeCriticPreparedExecution, readNativeCriticCapturedReturn, inspectOriginalSessionCriticReturn, readInspectedOriginalSessionCriticReturn } from "./codex-critic-host.mjs";
+ import { launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
+ import { PassThrough } from "node:stream";
+ import { pathToFileURL } from "node:url";
+@@ -3290,6 +3290,13 @@ await checkAsync("both genuine prepared duties invoke the actual native consumer
+    const deps={familyContext:context,preparedSha256:output.preparedSha256,onCustodyError:error=>{custodyError=error;},nowMs,resolveRoute:()=>{throw new Error("must not reselect prepared family");},readFileSync:path=>path==="/proc/version"?"Linux Microsoft":path==="/proc/self/mountinfo"?`1 0 0:1 / ${review} rw - ext4 /dev/root rw\n`:"boot"};
+    const invalid=await invokeCodexNativeCriticHost(input,{...deps,familyContext:structuredClone(context)});assert.equal(invalid.status,"unavailable");assert.equal(f.launches(),0);
+    const reviewed=await invokeCodexNativeCriticHost(input,deps);if(custodyError)throw custodyError;if(reviewed.status!=="reviewed"&&f.admissionError())throw f.admissionError();assert.equal(reviewed.status,"reviewed",JSON.stringify(reviewed));assert.equal(f.launches(),1);
++   const sourceHandle=inspectOriginalSessionCriticReturn({context,repoRoot:repo,preparedSha256:output.preparedSha256});
++   const inspected=readInspectedOriginalSessionCriticReturn(sourceHandle);
++   assert.equal(inspected.candidate.commit,candidate.commit);
++   assert.equal(inspected.candidate.tree,candidate.tree);
++   assert.equal(inspected.reviewerResult.verdict.pass,true);
++   assert.equal(inspected.originalDispatch.candidate.commit,candidate.commit);
++   assert.throws(()=>readInspectedOriginalSessionCriticReturn(structuredClone(sourceHandle)),/ORIGINAL-SOURCE-HANDLE-REQUIRED/);
+    const captured=readNativeCriticCapturedReturn(context);writeJson(`${prefix}-return.json`,captured);
+    const isolated=await import(new URL(`./codex-critic-host.mjs?native-consumer=${dutyId}`,import.meta.url));const restored=await isolated.createNativeCriticPreparedContextFactory({familyInvocationEntry:f.entry,familyExecutionPorts:f.ports}).reconstruct({repoRoot:repo,preparedPath:output.preparedPath});
+    const reviewFingerprintBeforeFinalize=captureRepositoryFingerprint(review,reviewArtifacts);
+diff --git a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+index 9076eea69..2f966ee3f 100644
+--- a/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
++++ b/plugins/pipeline-core/scripts/codex-critic-session-route.mjs
+@@ -25,6 +25,13 @@ export function readHeldCriticFamilyExecution(route) {
+   const execution = heldFamilyRoutes.get(route)?.execution;
+   return execution ? { ok: true, value: structuredClone(execution) } : { ok: false, code: "CRITIC-FAMILY-EXECUTION-REQUIRED" };
+ }
++/** Only the original held route can reach its Model invocation's Source publisher. */
++export async function publishHeldCriticOriginalDesignReview({route,validatedHandle,request,receiptInput}={}) {
++  const held=heldFamilyRoutes.get(route),checked=recheckHeldCriticFamilyRoute(route);
++  if(!held||!checked.ok||!held.execution||typeof held.entry.publishOriginalDesignReview!=='function')
++    return {ok:false,code:'DRE-NATIVE-ORIGIN-UNAVAILABLE'};
++  return held.entry.publishOriginalDesignReview({invocation:held.invocation,validatedHandle,request,receiptInput});
++}
+ export function validateSessionCodexCriticRoute(route) {
+   if (route?.dutyId === "critic_high_risk") return validateCriticHighRiskRoute(route);
+   if (route?.dutyId !== "critic_normal") familyFailure("CRITIC-FAMILY-DUTY-INVALID");
+diff --git a/plugins/pipeline-core/scripts/codex-native-critic-host.mjs b/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
+index 366f154df..871d143df 100644
+--- a/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
++++ b/plugins/pipeline-core/scripts/codex-native-critic-host.mjs
+@@ -25,7 +25,7 @@ import {
+   validateNativeCriticTuple,
+ } from "../lib/codex-native-critic-policy.mjs";
+ import { NATIVE_CRITIC_PROHIBITED_FEATURES, NATIVE_CRITIC_REDUCING_CONFIG_SHA256, nativeCriticToolSurfaceConfigDigest, nativeCriticToolSurfaceObservationDigest } from "../lib/codex-native-critic-tools.mjs";
+-import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, criticFamilyExecutionPortsReady, launchHeldCriticFamilyRoute } from "./codex-critic-session-route.mjs";
++import { resolveSessionCodexCriticHighRiskRoute, isHeldCriticFamilyRoute, criticFamilyExecutionPortsReady, launchHeldCriticFamilyRoute, publishHeldCriticOriginalDesignReview } from "./codex-critic-session-route.mjs";
+ import { observeModelFamilyActivation } from "../lib/model-family-runtime-host.mjs";
+ import { readNativeCriticPreparedRoute, consumeNativeCriticPreparedContext, captureNativeCriticPreparedReturn } from "./codex-critic-host.mjs";
+ import { repositoryFingerprint } from "../lib/codex-onboarding-runtime.mjs";
+@@ -42,6 +42,18 @@ const VERDICT = "scripts/critic-verdict.schema.json";
+ const PROVIDER = "openai";
+ const MAX_BYTES = 8 * 1024 * 1024;
+ const validatedNativeReturns = new WeakMap();
++const validatedResultHandles = new WeakMap();
++const originalPublications = new WeakMap();
++export function readOriginalDesignReviewPublication(result) {
++  const value=originalPublications.get(result);
++  if(!value)throw new Error('DRE-ORIGINAL-PUBLICATION-REQUIRED');
++  return structuredClone(value);
++}
++export function readValidatedNativeCriticReturnHandle(result) {
++  const handle = validatedResultHandles.get(result);
++  if (!handle) throw new Error("CRITIC-NATIVE-ORIGINAL-RESULT-HANDLE-REQUIRED");
++  return handle;
++}
+ export function readValidatedNativeCriticReturn(handle) {
+   const value = validatedNativeReturns.get(handle);
+   if (!value) throw new Error("CRITIC-NATIVE-VALIDATED-RETURN-HANDLE-REQUIRED");
+@@ -63,6 +75,7 @@ const FAILURE_CODES = new Set([
+   "child-spawn-failed", "child-timeout", "child-stream-overflow", "child-output-invalid", "child-policy-invalid",
+   "child-lifecycle-invalid", "child-verdict-invalid", "child-write-attempt", "child-request-invalid",
+   "child-prompt-invalid", "child-protocol-error", "child-exit-error", "child-terminal-invalid",
++  "original-source-publication-unavailable",
+ ]);
+ const CHILD_FAILURE_CODE_MAP = new Map([
+   ["request-invalid", "child-request-invalid"],
+@@ -561,12 +574,24 @@ export async function invokeCodexNativeCriticHost(rawInput, dependencies = {}) {
+       }),
+     }),
+   };
++  let originalHandle = null;
++  let originalPublication = null;
+   if (familyRoute) {
+     const handle = Object.freeze(Object.create(null));
+     validatedNativeReturns.set(handle, { packet: dispatchPacket, nativeRequest: request, nativeResult: child,
+       verdict: checked.verdict, receipt, elapsedMs: Math.max(1, Date.now() - startedAt) });
+     try { captureNativeCriticPreparedReturn(dependencies.familyContext, handle); }
+     catch (error) { if (typeof dependencies.onCustodyError === "function") dependencies.onCustodyError(error); return executionFailure("child-output-invalid", terminal, checked.lifecycle); }
++    originalHandle = handle;
++    if(dependencies.originalDesignReview){
++      const requested=dependencies.originalDesignReview;
++      originalPublication=await publishHeldCriticOriginalDesignReview({route:familyRoute,validatedHandle:handle,
++        request:requested.request,receiptInput:requested.receiptInput});
++      if(!originalPublication?.ok)return executionFailure('original-source-publication-unavailable',terminal,checked.lifecycle);
++    }
+   }
+-  return { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt, exportConsent };
++  const result = { schema: "pipeline.codex-native-critic-host-result.v1", status: "reviewed", verdict: checked.verdict, receipt, exportConsent };
++  if (originalHandle) validatedResultHandles.set(result, originalHandle);
++  if (originalPublication) originalPublications.set(result, originalPublication);
++  return result;
+ }
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index debd7fbce..6689a9c2c 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -15,6 +15,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { reserveFeatureCriticReviewUnitOwnership } from "../lib/critic-generic-batch.mjs";
++import { admitOriginalCriticSource, OriginalCriticSourceAdmissionError } from "../lib/session-critic-original-source-admission.mjs";
+ import {
+   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
+   buildGovernanceReviewAction,
+@@ -514,19 +515,29 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+     || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
+   const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
+ 
++  // A claimed packet proves what was prepared, not that an independent child
++  // ran and returned this verdict. Source reopens the original invocation and
++  // terminal custody before any result, receipt or governance event is written.
++  const originalSource = admitOriginalCriticSource({ sourceContext: options.originalSourceContext,
++    root, packet, packetDigest: prepared.packetDigest, admission: admitted.admission,
++    sessionId: id, verdict: options.verdict });
++
+   let event = null;
+   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
+   validateResult(result, prepared.packet);
+   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
++  originalSource.consume();
+   const recorded = (deps.recordCandidateResultFn ?? recordCandidateResult)({ controlRoot: controlRootFor(root), packetId, result }, deps.packetDependencies);
+   const receipt = validateSessionCriticReceipt(receiptFor(recorded.record.body));
+   if (canonicalJson(receipt) !== canonicalJson(expectedReceipt)) fail("SCF-RECEIPT-BINDING");
++  originalSource.recheck();
+   const consumed = (deps.consumeCandidatePacketFn ?? consumeCandidatePacket)({ controlRoot: controlRootFor(root), packetId, receipt }, deps.packetDependencies);
+   if (consumed.replay === true) fail("SCF-FIRST-CONSUME-REPLAY");
+   const readback = (deps.consumeCandidatePacketFn ?? consumeCandidatePacket)({ controlRoot: controlRootFor(root), packetId, receipt }, deps.packetDependencies);
+   if (readback.replay !== true || canonicalJson(readback.record.body) !== canonicalJson(receipt)) fail("SCF-RECEIPT-READBACK");
+ 
+   if (eventRequested) {
++    originalSource.recheck();
+     event = (deps.buildGovernanceReviewActionFn ?? buildGovernanceReviewAction)({
+       schema: GOVERNANCE_REVIEW_SOURCE_SCHEMA,
+       receiptSha256: sha256(canonicalJson(readback.record.body)),
+@@ -749,7 +760,8 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+       output: Object.freeze({
+         schema: SESSION_CRITIC_CLI_ERROR_SCHEMA,
+         status: "rejected",
+-        code: error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
++        code: error instanceof SessionCriticFinalizerError || error instanceof OriginalCriticSourceAdmissionError
++          || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
+       }),
+     });
+   }
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index acbdb7340..e2bd8565a 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -539,7 +539,10 @@ test("receipt validation is closed and refuses provider metadata", () => {
+   } finally { cleanup(fx); }
+ });
+ 
+-test("closed CLI admits before verdict and finalizes only that durable packet", () => {
++// QG-04: the old positive expected a caller-written verdict to become a review
++// receipt. Baseline evidence is retained at scratch/r2-critic-baseline-cli.json;
++// its completion was the defect, not independent Critic evidence.
++test("closed CLI admits a packet but refuses a caller-written verdict without original Source", () => {
+   const fx = fixture({ taskId: "ALF-CLI-HISTORY-01" });
+   try {
+     // The CLI only reads physical scratch request files, and a non-feature review names its registered batch (v3).
+@@ -550,9 +553,34 @@ test("closed CLI admits before verdict and finalizes only that durable packet",
+     assert.equal(admission.output.packetId, "6".repeat(32));
+     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+     const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
+-    assert.equal(result.exitCode, 0);
+-    assert.equal(result.output.status, "completed");
+-    assert.equal(result.output.receipt.session.id, "session-cli-1");
++    assert.equal(result.exitCode, 2);
++    assert.equal(result.output.code, "SCF-ORIGINAL-SOURCE-REQUIRED");
++    assert.equal(existsSync(join(fx.root, "evidence", "review-action.json")), false);
++    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32), "result.json")), false);
++    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32), "receipt.json")), false);
++    const forgedPath = writeScratchRequest(fx, "forged-source-request.json", {
++      ...cliBatchRequest(fx), nativeReturn: { schema: "pipeline.codex-native-host-return.v1", reviewed: true },
++    });
++    const forged = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", forgedPath]);
++    assert.equal(forged.exitCode, 2);
++    assert.equal(forged.output.code, "SCF-REQUEST");
++    const replay = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
++    assert.equal(replay.exitCode, 2);
++    assert.equal(replay.output.code, "SCF-ORIGINAL-SOURCE-REQUIRED");
++    assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets", "6".repeat(32), "receipt.json")), false);
++  } finally { cleanup(fx); }
++});
++
++test("a copied or caller-created Source context cannot finalize a claimed packet", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "d".repeat(32) });
++    const forged = { context: { native: true, reviewed: true }, preparedSha256: "a".repeat(64) };
++    assert.throws(() => finalizeSessionCriticReview({ ...request, originalSourceContext: forged }),
++      (error) => error.code === "SCF-ORIGINAL-SOURCE-UNAVAILABLE");
++    const packetDir = join(fx.root, ".git", "agent-pipeline", "critic-packets", request.packetId);
++    assert.equal(existsSync(join(packetDir, "result.json")), false);
++    assert.equal(existsSync(join(packetDir, "receipt.json")), false);
+   } finally { cleanup(fx); }
+ });
+ 

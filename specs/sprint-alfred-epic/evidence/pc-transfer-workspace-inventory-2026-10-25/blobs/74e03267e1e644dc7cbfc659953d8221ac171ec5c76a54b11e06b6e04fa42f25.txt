@@ -1,0 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+const mode = readFileSync(".diag-revert-mode", "utf8").trim();
+if (mode === "save") copyFileSync("harness/verify-suites.json", ".diag-vs-patched.json");
+if (mode === "head") writeFileSync("harness/verify-suites.json", execFileSync("git", ["show", "HEAD:harness/verify-suites.json"], { maxBuffer: 1 << 28 }));
+if (mode === "restore") copyFileSync(".diag-vs-patched.json", "harness/verify-suites.json");
+console.log("done", mode);

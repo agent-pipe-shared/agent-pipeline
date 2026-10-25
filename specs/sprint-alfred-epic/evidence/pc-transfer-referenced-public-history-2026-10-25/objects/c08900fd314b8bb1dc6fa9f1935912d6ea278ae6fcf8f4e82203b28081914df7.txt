@@ -1,0 +1,31 @@
+command: node scratch/agent-out/g20-qualification/run-close-pin.mjs
+label: g20-close-pin-final
+exitCode: 0
+head: 1d721e5d9e534618c123481fb5eaa6561fcb310c
+tree: 10978bb1bd41e57abf0af8e4d4fab1a8c51f281f
+dirty: false
+--- stdout ---
+✔ the fixture delivery course is a valid slice queue (8.188076ms)
+✔ (a) this feature's course slice with a required record and no evidence refuses the close with zero mutation (3282.621631ms)
+✔ (a) the apply step re-checks: a required record that appears after planning refuses the transition (4006.280778ms)
+✔ (a) only the uncovered course slice is named (3838.180926ms)
+✔ (b) the same record with matching Critic evidence plans (3944.134804ms)
+✔ (c) a required record without evidence whose id is not in this feature's course plans (3294.993536ms)
+✔ (d) a feature with no delivery course plans, whatever other records exist (3279.384028ms)
+✔ rigor one close without a delivery course still needs the independent Critic/Verify audit (3379.905011ms)
+✔ (e) an invalid delivery course fails closed with a typed code and zero mutation (3330.800532ms)
+✔ (f) a delivery course that belongs to another feature fails closed rather than scoping the gate (3353.568069ms)
+✔ (g) the item course fixture is a valid slice queue (2.326119ms)
+✔ (g) a course slice recorded only by its orchestrator commit refuses the close off the audit route, naming it and the repair (3457.406446ms)
+✔ (g) on the audit route the commit-only slice is accepted and the audit route's own checks decide (3569.373446ms)
+✔ (g) a slice whose commit carries no Dispatch trailer is not commit-recorded and plans as before (4336.948566ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43782.507652
+
+--- stderr ---

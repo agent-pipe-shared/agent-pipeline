@@ -1,0 +1,19 @@
+command: node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/resource-observations.json
+label: g18-resource-report
+exitCode: 0
+head: 5f3bec25bbe5d4ac5ee0df51dee20d9446272047
+tree: 46352f60ade814535b1b17b3cb59a5341b5b9ff0
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.project-resource-headroom-report.v1",
+  "candidate": {
+    "commit": "5f3bec25bbe5d4ac5ee0df51dee20d9446272047",
+    "tree": "46352f60ade814535b1b17b3cb59a5341b5b9ff0"
+  },
+  "assurance": "declared-observations",
+  "compliance": "not-certified",
+  "resources": []
+}
+
+--- stderr ---

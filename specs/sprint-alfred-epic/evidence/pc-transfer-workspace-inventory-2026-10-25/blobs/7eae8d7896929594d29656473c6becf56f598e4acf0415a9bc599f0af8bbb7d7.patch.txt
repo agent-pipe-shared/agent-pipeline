@@ -1,0 +1,189 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+index c4bf07475..b47751144 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs
+@@ -45,12 +45,23 @@ register("D84 block a Claude dispatch that names no model, typed and naming the
+     assert.ok(stderr.includes("`model`"), `${tool_name}: stderr does not name the \`model\` parameter`);
+   }
+ });
+-register("D84 allow a Claude dispatch that names a configured model, with no model finding", () => {
++// K146 / PO decision batch 17: the old GDM02 allowed general-purpose because the prompt said
++// "find". That carrier can write; prompt wording cannot grant a read-only exemption. Preserve
++// D84's model-route observation and add a real read-only carrier as the positive control.
++register("D84 configured model passes its route check while K146 blocks a write-capable research prompt", () => {
+   for (const tool_name of ["Task", "Agent"]) {
+     const { code, stderr } = run({ tool_name, tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: "find where X is defined" } });
+-    assert.equal(code, ALLOW, `${tool_name}: exit ${code} (expected ${ALLOW}) -- ${stderr.trim().slice(0, 200)}`);
++    assert.equal(code, BLOCK, `${tool_name}: exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 200)}`);
+     assert.ok(!stderr.includes("DISPATCH-MODEL"), `${tool_name}: unexpected model finding -- ${stderr.trim().slice(0, 200)}`);
++    assert.ok(stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), `${tool_name}: missing carrier refusal -- ${stderr.trim().slice(0, 200)}`);
+   }
++  const research = run({ tool_name: "spawn_agent", tool_input: { agent_type: "explorer", message: "find where X is defined" } });
++  assert.equal(research.code, ALLOW, `read-only explorer must remain available: ${research.stderr.trim().slice(0, 200)}`);
++  const advisor = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "inspect input.txt" }] } });
++  assert.equal(advisor.code, ALLOW, `read-only Antigravity Advisor must reach its native preparation gate: ${advisor.stderr.trim().slice(0, 200)}`);
++  const unknown = run({ tool_name: "Task", tool_input: { Subagents: [{ TypeName: "customer-researcher", Role: "Researcher", Prompt: "inspect input.txt" }] } });
++  assert.equal(unknown.code, BLOCK, `unknown Antigravity carrier must not gain a prompt exemption: ${unknown.stderr.trim().slice(0, 200)}`);
++  assert.ok(unknown.stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), `missing unknown-carrier refusal: ${unknown.stderr.trim().slice(0, 200)}`);
+ });
+ register("D84 block a Claude dispatch that names a model no configured duty route selects, typed and naming the configured selectors", () => {
+   const { code, stderr } = run({ tool_name: "Agent", tool_input: { subagent_type: "general-purpose", model: "not-a-configured-model", prompt: "find where X is defined" } });
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 8a86b3032..e2de52483 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -78,7 +78,7 @@ import {
+   prepareAdvisorProhibitionBindings,
+ } from "../lib/advisor-prohibition-binding.mjs";
+ import { persistPendingDispatchBudgetBindings } from "../lib/dispatch-budget-binding.mjs";
+-import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
++import { dispatchBudgetBinding, dispatchFindings, fanoutDispatchFindings, isShippedPipelineAgentType, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
+ // Circular by design: the producer imports this module's route exports, and this module calls the producer only at hook
+ // run time (recordAdmittedBriefingRoutes), never while either module is evaluating. Function declarations are hoisted.
+ import { recordDispatchBriefingRoute } from "../lib/dispatch-briefing-route-record.mjs";
+@@ -202,6 +202,19 @@ export function requiresGovernedItemAdmission(policy) {
+   return policy?.role === "goldfish";
+ }
+ 
++// Capability comes from the selected carrier, never from a prompt's claim to be read-only.
++// A shipped read-only Pipeline role can arrive bare (Antigravity TypeName) or namespaced.
++// Runner-native explorers have separate, transport-specific names; general workers can write.
++export function writeCapableCarrierAdmission({ subagentType, transport = "direct" } = {}) {
++  const type = typeof subagentType === "string" ? subagentType : "";
++  const bareType = type.startsWith("pipeline-core:") ? type.slice("pipeline-core:".length) : type;
++  if (isShippedPipelineAgentType(type) && ["consult-advisor", "critic", "plan-verifier", "readiness-reviewer"].includes(bareType)) return null;
++  if (transport === "codex" && type === "explorer") return null;
++  if (transport === "direct" && type === "Explore") return null;
++  if (["pipeline-core:goldfish-deep", "pipeline-core:goldfish-implementor", "pipeline-core:goldfish-mechanic"].includes(type)) return null;
++  return { code: "DISPATCH-WRITE-CARRIER-REQUIRED", message: `a write-capable dispatch requires a pipeline-core Goldfish or Critic carrier; repair: select a shipped pipeline-core:goldfish-* or pipeline-core:critic role and dispatch its generated or required role briefing` };
++}
++
+ // ---------------------------------------------------------------------------------------------
+ // Completion-route registration fact for a background Claude Goldfish launch (ALF-G2C2A-BACKGROUND-PENDING-GATE).
+ // A background pending state is only worth writing while something will complete it, and that is the Claude
+@@ -789,6 +802,13 @@ if (isDirectInvocation(import.meta.url)) {
+     policy: dispatchFindings(dispatch),
+     budget: dispatchBudgetBinding(dispatch),
+   }));
++  for (const { dispatch } of evaluated) {
++    const carrier = writeCapableCarrierAdmission(dispatch);
++    if (carrier) {
++      process.stderr.write(`BLOCKED (guard-dispatch): ${carrier.code}: ${carrier.message}\n`);
++      process.exit(2);
++    }
++  }
+   const blocked = evaluated.map(({ policy }) => policy).filter((result) => result.findings.length > 0);
+   const routeRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+   if (blocked.length === 0) {
+@@ -835,11 +855,13 @@ if (isDirectInvocation(import.meta.url)) {
+     process.stderr.write(scopes.stderr || (scopes.status === 0 ? "" : "WARNING (guard-dispatch): GUARD-DISPATCH-SCOPE-UNJUDGED: the write-scope overlap check could not run; this call is admitted without it.\n"));
+     if (scopes.status === 2) process.exit(2);
+   }
+-  // D78: a governed Goldfish briefing should be the unedited generator output. QG-06 warn state: reason transition
+-  // to generated briefings, owner PO, expires with 0.7.1 (PO 2026-10-21); then this becomes the refusal.
++  // D78/K146: enforce generated Goldfish briefings before queue and native pending effects.
+   for (const { dispatch } of productive) {
+-    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`);
+-    if (finding) process.stderr.write(`WARNING (guard-dispatch): ${finding.code}: ${finding.message}\n`);
++    const finding = generatedBriefingAdmission(dispatch.prompt, `node ${BRIEFING_GENERATOR_SCRIPT}`, { requireGenerated: true });
++    if (finding) {
++      process.stderr.write(`BLOCKED (guard-dispatch): ${finding.code}: ${finding.message}\n`);
++      process.exit(2);
++    }
+   }
+   let itemGovernanceRequired = false;
+   // Once a native pending state names the queue row, a later refusal keeps the row with it.
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index e4b631fce..4524aac4c 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -190,15 +190,20 @@ export function verifyGeneratedBriefing(text) {
+  * and a governed item briefing (a native binding with itemDelivery) must carry the marker. Returns null
+  * when the prompt is admitted, else `{ code, message }` whose message names the generator command.
+  */
+-export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs") {
++export function generatedBriefingAdmission(prompt, generatorCommand = "node <plugin-root>/scripts/dispatch-briefing.mjs", { requireGenerated = false } = {}) {
+   if (typeof prompt !== "string") return null;
+   const repair = `repair: write the package (${BRIEFING_PACKAGE_SCHEMA}), run \`${generatorCommand} build --package <package.json> --out scratch/briefing-<dispatch-id>.md\`, and dispatch that file's text unchanged`;
+   if (prompt.includes("<!-- pipeline-briefing-generator:")) {
+     const verified = verifyGeneratedBriefing(prompt);
+-    return verified.ok ? null : { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
++    if (!verified.ok) return { code: verified.code, message: `the Goldfish briefing was changed after the generator rendered it; ${repair}` };
++    const parsed = parseNativeGoldfishBriefing(prompt);
++    if (requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) {
++      return { code: "DBG-GENERATED-BINDING-REQUIRED", message: `a generated Goldfish briefing must carry a valid item-delivery binding; ${repair}` };
++    }
++    return null;
+   }
+   const parsed = parseNativeGoldfishBriefing(prompt);
+-  if (!parsed.ok || parsed.binding.itemDelivery === undefined) return null;
++  if (!requireGenerated && (!parsed.ok || parsed.binding.itemDelivery === undefined)) return null;
+   return { code: "DBG-GENERATED-BRIEFING-REQUIRED", message: `a governed Goldfish item briefing must come from the briefing generator, not be assembled by hand; ${repair}` };
+ }
+ 
+@@ -241,6 +246,7 @@ ${arch === "" ? "" : `${arch}\n`}${bullets(pkg.context)}${reconContextLine(pkg)}
+ ### 3. DoD checks
+ 
+ - Acceptance criteria: ${pkg.ac}.
++- Source binding: ${pkg.criterion === undefined ? "the accepted original-item row" : `existing accepted criterion ${pkg.criterion} (fresh bounded attempt under its unchanged Spec text)`}; candidate ${b.candidateCommit}, write scope ${b.allowedPaths.join(", ")}, check ${pkg.check}. Report the targeted outcome and leave integrated review and PO acceptance to the Coordinator.
+ - Project resource headroom: unknown — no project resource limit applies to this change.
+ - Targeted checks — Goldfish owner:
+ ${pkg.targeted.map((command) => `  - ${command}`).join("\n")}
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index c849916d3..5301c70ec 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -526,7 +526,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     const needle = `Original Alfred item ${item} is delivered`;
+     let rows;
+     try { rows = findCriterionRows(specBytes, needle); } catch { refuse("DBG-SPEC-UNREADABLE", `spec ${specPath} is not valid UTF-8`); }
+-    if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item})`);
++    if (rows.length === 0) refuse("DBG-AC-ROW-MISSING", `no 3-column acceptance row in ${specPath} names "${needle}" (item ${item}); repair: if this is a fresh fix-wave attempt covered by an existing accepted criterion, bind that actual criterion with --criterion AC-<n> and keep its approved Spec text unchanged; otherwise obtain the missing acceptance authority through the normal design route`);
+     if (rows.length > 1) refuse("DBG-AC-ROW-AMBIGUOUS", `${rows.length} acceptance rows in ${specPath} name "${needle}" (item ${item})`);
+     const [idCell, criterionCell, evidenceCell] = rows[0];
+     if (!isCriterionId(idCell.value)) refuse("DBG-AC-ROW-ID", `the row naming item ${item} has id cell ${JSON.stringify(idCell.value)}, not ${CRITERION_ID_FORMS}`);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 7515f26b7..056a6346c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -684,6 +684,40 @@ test("the dispatch admission (D78) admits a generated briefing and refuses an ed
+   assert.equal(generatedBriefingAdmission("A plain research prompt with no binding."), null);
+ });
+ 
++test("a fresh fix wave uses an existing accepted criterion and a missing original row names that route", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const missing = runDispatchBriefing(argvOf(fx, { "--item": "fresh-fix-wave" }), depsOf(fx));
++  assert.equal(missing.code, "DBG-AC-ROW-MISSING");
++  assert.match(missing.message, /--criterion AC-<n>/u);
++  const bound = runDispatchBriefing(argvOf(fx, { "--item": "fresh-fix-wave" }, ["--criterion", "AC-1"]), depsOf(fx));
++  assert.equal(bound.ok, true, JSON.stringify(bound));
++  assert.equal(bound.binding.itemDelivery.criterionLocator.criterionId, "AC-1");
++  assert.equal(bound.binding.itemDelivery.itemId, "feat-x.fresh-fix-wave");
++});
++
++test("writable dispatch carrier and generated briefing admission retain a read-only research route", async () => {
++  const { writeCapableCarrierAdmission } = await import("../hooks/guard-dispatch.mjs");
++  const { generatedBriefingAdmission } = await buildLib();
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const text = runDispatchBriefing(argv, depsOf(fx)).text;
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "pipeline-core:goldfish-deep", transport: "direct", prompt: text }), null);
++  assert.equal(generatedBriefingAdmission(text), null);
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "worker", transport: "codex", prompt: "write the fix" }).code, "DISPATCH-WRITE-CARRIER-REQUIRED");
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "explorer", transport: "codex", prompt: "inspect the code" }), null);
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "Explore", transport: "direct", prompt: "inspect the code" }), null);
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "consult-advisor", transport: "antigravity", prompt: "input.txt" }), null);
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "customer-researcher", transport: "antigravity", prompt: "input.txt" }).code, "DISPATCH-WRITE-CARRIER-REQUIRED");
++  assert.equal(writeCapableCarrierAdmission({ subagentType: "pipeline-core:critic", transport: "direct", prompt: "review the diff" }), null);
++  const skeleton = runDispatchBriefing(argvOf(fx), depsOf(fx)).skeleton;
++  assert.equal(generatedBriefingAdmission(skeleton).code, "DBG-GENERATED-BRIEFING-REQUIRED");
++  assert.equal(generatedBriefingAdmission("A hand-written Goldfish briefing.", "node gen.mjs", { requireGenerated: true }).code, "DBG-GENERATED-BRIEFING-REQUIRED");
++  const emptyBindingBody = "A hand-written Goldfish briefing.\n";
++  const markedWithoutBinding = `${emptyBindingBody}<!-- pipeline-briefing-generator:v1 sha256=${sha(emptyBindingBody)} -->\n`;
++  assert.equal(generatedBriefingAdmission(markedWithoutBinding, "node gen.mjs", { requireGenerated: true }).code, "DBG-GENERATED-BINDING-REQUIRED");
++});
++
+ test("init-dispatch-record prints a valid opening v4 record whose digests come from the generated briefing (AC-163)", async () => {
+   const { runDispatchBriefing } = await lib();
+   const { runInitDispatchRecord } = await import("./init-dispatch-record.mjs");

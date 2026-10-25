@@ -1,0 +1,41 @@
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {readFileSync,mkdirSync,mkdtempSync,lstatSync,rmSync,writeFileSync} from 'node:fs';
+import {resolve,join} from 'node:path';
+import {validatePrivateParent,validateCreatedHome} from '../plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs';
+const label=process.argv[2];
+const suites={
+ g24:['plugins/pipeline-core/scripts/capture-evidence.test.mjs','plugins/pipeline-core/scripts/publish-evidence-run.test.mjs','plugins/pipeline-core/lib/critic-capture-header.test.mjs','plugins/pipeline-core/lib/pins/evidence-artifacts-carry-no-commit-identity.test.mjs','plugins/pipeline-core/lib/pins/capture-evidence-does-not-normalize-windows-npm-launch.test.mjs'],
+ r3:['plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs','plugins/pipeline-core/scripts/gitleaks-reproduction-gate.cli.test.mjs','plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs','plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs','plugins/pipeline-core/scripts/gitleaks-repair-ignore.value-binding.test.mjs','plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs','plugins/pipeline-core/scripts/security-adapters/gitleaks.windows-suppression.test.mjs','plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs'],
+ g27:['plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs','plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs','plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs'],
+ consumer:['harness/scripts/check-consumer-safe-paths.test.mjs'],
+ r2:['plugins/pipeline-core/lib/critic-generic-batch.test.mjs','plugins/pipeline-core/lib/critic-course-admission.test.mjs','plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs','plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs','plugins/pipeline-core/lib/critic-packet-governance.test.mjs','harness/scripts/check-consumer-safe-paths.test.mjs'],
+ winmain:['plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs','harness/scripts/check-consumer-safe-paths.test.mjs'],
+ agyhelp:[],
+ checkout:['plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs','plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs','plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs','harness/scripts/check-consumer-safe-paths.test.mjs'],
+ ready:['plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs','plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs','harness/scripts/check-consumer-safe-paths.test.mjs'],
+ help:['plugins/pipeline-core/scripts/dispatch-briefing.test.mjs','harness/scripts/check-consumer-safe-paths.test.mjs'],
+ g9a:['plugins/pipeline-core/lib/guard/signing-help-delegation-qualification.test.mjs'],
+};
+if(!Object.hasOwn(suites,label))throw new Error('unknown qualification');
+const hash=x=>createHash('sha256').update(x).digest('hex'),out='scratch/agent-out/main-candidate-qualification-20261025';mkdirSync(out,{recursive:true});
+const manifests=[JSON.parse(readFileSync('scratch/agent-out/g24-immutable-run-completion/manifest.json','utf8')),JSON.parse(readFileSync('scratch/r3-scanner-inert/scratch/r3-scanner-manifest.json','utf8'))];
+const files=[...Object.entries(manifests[0].paths).map(([path,sha256])=>({path,sha256})),...manifests[1].changedFiles,{path:'plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs',sha256:'34f45b91ba1838eb02d36fbe6e3498a74bf630aa6c68488b86378abd812ca711'}];
+if(label==='r2')files.push(...JSON.parse(readFileSync('scratch/agent-out/r2-critic-close-inputs/manifest.json','utf8')).paths);
+if(label==='winmain')files.push(...JSON.parse(readFileSync('scratch/agent-out/r2-windows-main-entry-20261025/manifest.json','utf8')).paths.map(x=>({path:x.path,sha256:x.afterSha256})));
+if(label==='checkout')files.push(...JSON.parse(readFileSync('scratch/agent-out/r2-checkout-identity-20261025/manifest.json','utf8')).files.map(x=>({path:x.path,sha256:x.postimageSha256})));
+if(label==='ready')files.push(...JSON.parse(readFileSync('scratch/agent-out/r2-ready-guard-20261025/manifest.json','utf8')).source.map(x=>({path:x.path,sha256:x.afterSha256})));
+if(label==='help')files.push(...JSON.parse(readFileSync('scratch/agent-out/r2-dispatch-help-20261025/manifest.json','utf8')).files.map(x=>({path:x.path,sha256:x.postimageSha256})));
+for(const f of files)if(hash(readFileSync(f.path))!==f.sha256)throw new Error(`checked Source postimage changed: ${f.path}`);
+const privateParent='/run/user/1000/ap-g17';validatePrivateParent(privateParent);
+const home=mkdtempSync(join(privateParent,'g17c-'));validateCreatedHome(home);
+const temporary=mkdtempSync('/tmp/ap-pipeline-qual-'),homeIdentity=lstatSync(home),tempIdentity=lstatSync(temporary);
+const preload=resolve('scratch/main-candidate-synthetic-preload-20261025.mjs');
+const env={...process.env,PIPELINE_QUALIFICATION_HOME:home,PIPELINE_QUALIFICATION_TEMP:temporary,NODE_OPTIONS:`--import=${preload}`,HOME:home,USERPROFILE:home,TMPDIR:temporary,TMP:temporary,TEMP:temporary,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:join(home,'gitconfig'),GIT_CONFIG_SYSTEM:join(home,'system-gitconfig')};
+const target=label==='agyhelp'?['agy','--help']:[process.execPath,'--import',preload,'--test',...suites[label]];
+const args=['--import',preload,'plugins/pipeline-core/scripts/capture-evidence.mjs','--out',`${out}/${label}.log`,'--label',`MAIN-CANDIDATE-${label}`,'--',...target];
+const result=spawnSync(process.execPath,args,{env,encoding:'utf8',timeout:600000,maxBuffer:32*1024*1024});
+const settled=!result.error&&!result.signal&&Number.isInteger(result.status);
+if(settled)for(const [path,identity] of [[home,homeIdentity],[temporary,tempIdentity]]){const now=lstatSync(path,{throwIfNoEntry:false});if(now?.isDirectory()&&!now.isSymbolicLink()&&now.dev===identity.dev&&now.ino===identity.ino)rmSync(path,{recursive:true,force:true});}
+writeFileSync(`${out}/${label}-custody.json`,JSON.stringify({schema:'pipeline.main-focused-qualification.v1',subjectFiles:files,preloadSha256:hash(readFileSync(preload)),suiteFiles:suites[label],settled,status:result.status,signal:result.signal,error:result.error?.code??null,ownedRootsCleaned:settled},null,2)+'\n');
+process.stdout.write(result.stdout??'');process.stderr.write(result.stderr??'');if(!settled)throw new Error('qualification did not settle; own roots retained');process.exitCode=result.status;

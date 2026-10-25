@@ -1,0 +1,11 @@
+docs(audit): use one feature placeholder, state the policy-pack prerequisite and link the Terms
+
+Reader round 20261023b findings 16, 39 and 45 in audit-bundles.md and
+audit-and-evidence.md: use <feature-id> everywhere and resolve it and
+<plugin-root> before use, name the approved policy-pack prerequisite in
+audit-and-evidence.md, link the Terms section once per document and use the
+Agent-Pipeline spelling. Finding 49 (a repair route for a missing pack) is
+not settled by organization-policy-packs.md and is recorded owner-needed.
+
+AI-Assisted: true
+Dispatch: K124-READER-FIX2-GROUP-D (goldfish)

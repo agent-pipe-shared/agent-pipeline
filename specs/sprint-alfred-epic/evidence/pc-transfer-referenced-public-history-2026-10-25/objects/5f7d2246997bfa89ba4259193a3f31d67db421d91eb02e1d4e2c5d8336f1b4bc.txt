@@ -1,0 +1,17 @@
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+
+const root = process.cwd();
+const clone = join(root, "scratch/clones/g20-qualification");
+const env = { ...process.env, TMPDIR: join(clone, "scratch") };
+if (process.argv[2] === "--original") env.G20_CLOSE_CLI = join(root, "plugins/pipeline-core/scripts/close-coordinator.mjs");
+const argv = ["--test"];
+if (process.argv[2] === "--original") argv.push("--test-name-pattern", "rigor one close without a delivery course");
+argv.push(join(clone, process.argv[2] === "--lifecycle"
+  ? "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
+  : "plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs"));
+const result = spawnSync(process.execPath,
+  argv,
+  { cwd: clone, env,
+    stdio: "inherit", shell: false, timeout: 60000 });
+process.exitCode = result.status ?? 1;

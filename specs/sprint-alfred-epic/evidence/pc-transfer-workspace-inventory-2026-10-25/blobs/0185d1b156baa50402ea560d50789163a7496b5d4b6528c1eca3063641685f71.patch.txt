@@ -1,0 +1,2014 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index 3b897b502..3e886abd7 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -12,6 +12,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Run the project-onboarding orchestrator suite and read only its failures | `scripts/run-onboarding-full.mjs` | `scratch/onboarding-full.log` |
+ | The capability inventory gate went red after a suite, hook or skill was added | `scripts/rebaseline-inventory.mjs` | the `sourceBaseline` block of the inventory (protected file) |
+ | Re-measure the delivery matrix and run the gap rounds | `scripts/delivery-owners.mjs`, `scripts/delivery-agent-items.mjs`, `scripts/matrix-gaps.mjs`, `scripts/gap-inputs.mjs`, `scripts/gap-summary.mjs`, `scripts/gap-collect.mjs`, `scripts/gap-evidence.mjs`, `scripts/delivery-remeasure-inputs.mjs` | see below |
++| Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
+ | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
+ 
+ ## Candidate stamp
+@@ -44,6 +45,12 @@ A gap round runs in this order. `gap-inputs.mjs` cuts the agent-owned clauses in
+ 
+ Per item, `mappedCommits` holds the commits in `<base>..<head>` whose message names the item id (without the `pipeline.` prefix) or that changed `backlog/items/*-<id>.md`; `unmappedCommits` holds every other commit with its `Dispatch` trailer value, identical in all six files. The script prints the commit counts and the item-count check (174 items, six batches of 29, every previous item exactly once) and exits 1 when the check fails; `--check --previous-inputs <method-dir> --out <dir>` repeats the check on existing files. Run against the previous round's base and head it reproduces the previous inputs' commit lists. The generated inputs are scratch (`scratch/remeasure<N>/`); the reader prompt of the previous round (`method/reader-prompt.md`) is the template for the next one.
+ 
++## Serial count pass
++
++`node scripts/sitting-count-pass.mjs --list <suites.json> --out <evidence.md> [--root <dir>] [--only <id>...] [--resume] [--timeout-ms N]` runs every suite of the list alone, one after the other, with a private TMPDIR under `<home>/pipeline-test-tmp/count-pass-<run>/<n>` (mode 0700, outside every repository), `NODE_TEST_CONTEXT` removed and a per-suite cap (default 30 minutes; a timed-out child is killed with its process group). An entry is `{ id, items, command, expect, heavy, why }`: `command` is the argument list after `node` (`["--test", "<file>"]`), `command: null` with an `unresolved` reason marks an item with no identified suite (listed in the evidence, never run), `expect.minPass` makes a run GREEN only at or above that many passes, and `heavy` is a note for the operator (run those last, alone). The shipped list is `specs/sprint-alfred-epic/plans/count-pass-suites.json`; its page `count-pass-suites.md` names the heavy and the unresolved entries.
++
++Results are GREEN, RED or TIMEOUT, with tests, pass, fail, skip and todo copied from the node `ℹ` summary lines (or the `N/N cases passed` / `N passed, N failed` / `project-onboarding-v3: N cases across ... M shards failed` line of a suite that prints its own, marked `custom`). A failure that is a killed child or a `null !== 0` process failure is retried once and marked `(retried)`; a plain red and a timeout are not. Each finished suite is appended to `<evidence.md>.state.jsonl` and the evidence is rewritten after every suite, so an interrupted pass loses nothing: run again with `--resume` to skip the finished ids. Without `--resume` an existing state file is refused, never overwritten. The evidence has the shape of the `pin-counted-results-*` files (header with HEAD, date, host, node and the runner note; a Red section with the first failing cases; the counted table; a Skipped typed section) and holds repository-relative text only. `node --test scripts/sitting-count-pass.test.mjs` pins the behaviour on fixture suites. A counted pass is evidence for the delivery matrix only when it runs on the tree and host the matrix row names, and nothing else heavy runs at the same time.
++
+ ## Held-commit rehearsal
+ 
+ `node scripts/rehearse-held.mjs <scratch/clones/<rehearsal> | .> [--only k1,k5]` fetches the head of each build clone named in its `ORDER` table and replays the unprotected, post-sitting commits into the target in that fixed order. `scripts/import-held.mjs` 3-way merges a file where main moved and stops at the first conflict. The `ORDER` table and its skip SHAs are per-run data of the 0.7.0 sprint; edit them when the held set changes. Rehearse in a clone first: with target `.` the commits land in the main checkout.
+diff --git a/scripts/sitting-count-pass.mjs b/scripts/sitting-count-pass.mjs
+new file mode 100644
+index 000000000..23906f362
+--- /dev/null
++++ b/scripts/sitting-count-pass.mjs
+@@ -0,0 +1,283 @@
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: run a list of suites ONE AFTER THE OTHER on a real tree, each with a private TMPDIR outside every repository, and write the counted results the delivery matrix reads.
++// Usage:   node scripts/sitting-count-pass.mjs --list <suites.json> --out <evidence.md> [--root <dir>] [--only <id>...] [--resume] [--timeout-ms N]
++//          Run from the repository root. --root addresses another checkout (a clone); the suite files in the list are relative to it.
++// Inputs:  --list  JSON (an array, or { "suites": [...] }) of { id, items, command, expect, heavy, why, unresolved? }. command is the argument
++//          list after "node" (["--test", "<repo-relative file>"] or a check script and its arguments); command null = unresolved, never run.
++//          expect { minPass } makes a run GREEN only when pass >= minPass. An optional timeoutMs per entry replaces the default cap.
++//          --only restricts the run to the named ids; --resume skips ids already finished in the state file; --timeout-ms is the per-suite cap (default 1800000).
++// Output:  <evidence.md> (header with HEAD, date, host, node, runner note; one table row per suite; Red and Skipped typed sections) and the
++//          JSONL state file <evidence.md>.state.jsonl next to it. One line per suite on stdout. Exit 0 when every suite that ran is GREEN, 1 otherwise, 2 on bad usage.
++// Data:    private TMPDIRs live under <home>/pipeline-test-tmp/count-pass-<run>/<n> (mode 0700) and are removed after a GREEN suite. The written evidence
++//          holds repository-relative paths only. Read-only toward tracked files (the suites themselves write under their own TMPDIR).
++import { spawn as nodeSpawn, execFileSync } from "node:child_process";
++import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { homedir, release, arch, platform } from "node:os";
++import { basename, join, resolve } from "node:path";
++import { pathToFileURL } from "node:url";
++
++export const DEFAULT_TIMEOUT_MS = 1800000;
++const OUTPUT_CAP = 128 * 1024 * 1024;
++
++// Default spawn: serial child in its own process group so a timeout also stops the grandchildren that `node --test` starts.
++export function defaultSpawn(command, args, options) {
++  return new Promise((resolvePromise) => {
++    const detached = process.platform !== "win32";
++    const child = nodeSpawn(command, args, { cwd: options.cwd, env: options.env, detached, stdio: ["ignore", "pipe", "pipe"] });
++    let chunks = [];
++    let size = 0;
++    let timedOut = false;
++    const take = (c) => {
++      chunks.push(c);
++      size += c.length;
++      while (size > OUTPUT_CAP && chunks.length > 1) size -= chunks.shift().length;
++    };
++    child.stdout.on("data", take);
++    child.stderr.on("data", take);
++    const killTree = () => {
++      try {
++        if (detached) process.kill(-child.pid, "SIGKILL");
++        else child.kill("SIGKILL");
++      } catch {
++        try { child.kill("SIGKILL"); } catch { /* already gone */ }
++      }
++    };
++    const timer = setTimeout(() => { timedOut = true; killTree(); }, options.timeout);
++    child.on("error", (error) => { clearTimeout(timer); resolvePromise({ status: null, signal: null, error, stdout: Buffer.concat(chunks).toString("utf8"), stderr: "" }); });
++    child.on("close", (status, signal) => {
++      clearTimeout(timer);
++      if (detached) { try { process.kill(-child.pid, "SIGKILL"); } catch { /* group already empty */ } }
++      const result = { status, signal, stdout: Buffer.concat(chunks).toString("utf8"), stderr: "" };
++      if (timedOut) result.error = Object.assign(new Error("timed out"), { code: "ETIMEDOUT" });
++      resolvePromise(result);
++    });
++  });
++}
++
++// Counts from the node test runner summary lines; falls back to the two custom summaries some suites print.
++export function parseCounts(out) {
++  const num = (k) => {
++    const m = new RegExp(`^ℹ ${k} (\\d+)`, "m").exec(out);
++    return m ? Number(m[1]) : null;
++  };
++  let counts = { tests: num("tests"), pass: num("pass"), fail: num("fail"), skipped: num("skipped"), todo: num("todo"), custom: false };
++  if (counts.tests === null) {
++    const slash = /(\d+)\/(\d+) cases passed/.exec(out);
++    const word = /(\d+) passed, (\d+) failed/.exec(out);
++    const shards = /project-onboarding-v3: (\d+) cases across .*?, (\d+) shards failed/.exec(out);
++    if (shards) {
++      const declared = Number(shards[1]);
++      const failedShards = Number(shards[2]);
++      counts = { tests: declared, pass: failedShards === 0 ? declared : (out.match(/^PASS /gm) ?? []).length, fail: failedShards, skipped: 0, todo: 0, custom: true };
++    } else if (slash) counts = { tests: Number(slash[2]), pass: Number(slash[1]), fail: Number(slash[2]) - Number(slash[1]), skipped: 0, todo: 0, custom: true };
++    else if (word) counts = { tests: Number(word[1]) + Number(word[2]), pass: Number(word[1]), fail: Number(word[2]), skipped: 0, todo: 0, custom: true };
++  }
++  return counts;
++}
++
++export function failingCases(out) {
++  const names = [...out.matchAll(/^\s*✖ (.+?) \(\d/gm)].map((m) => m[1]).filter((t) => t !== "failing tests:");
++  return [...new Set(names)];
++}
++
++// Evidence must hold repository-relative text only: scrub the root, the home directory, the user name and any /home/<x> or C:\Users\<x> shape.
++export function makeScrubber({ root, home, user }) {
++  const literals = [resolve(root), home, user].filter((s) => typeof s === "string" && s.length > 2).sort((a, b) => b.length - a.length);
++  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
++  return (text) => {
++    let t = String(text);
++    for (const lit of literals) t = t.replace(new RegExp(esc(lit), "g"), lit === user ? "<user>" : "<path>");
++    return t.replace(/\/(?:home|Users)\/[^\s/'"`)]+/g, "<path>").replace(/[A-Za-z]:\\Users\\[^\s\\'"`)]+/g, "<path>");
++  };
++}
++
++const isRetryable = (r, out) => !(r.error && r.error.code === "ETIMEDOUT") && (r.status === null || r.signal != null || /null !== 0/.test(out));
++
++function classify(r, counts, entry, timedOut) {
++  if (timedOut) return "TIMEOUT";
++  if (r.status !== 0) return "RED";
++  if (entry.expect && typeof entry.expect.minPass === "number" && (counts.pass ?? 0) < entry.expect.minPass) return "RED";
++  return "GREEN";
++}
++
++async function runOne({ entry, index, root, tmpBase, timeoutMs, spawn, execPath, log }) {
++  const tmp = join(tmpBase, String(index));
++  const prepare = () => {
++    rmSync(tmp, { recursive: true, force: true });
++    mkdirSync(tmp, { recursive: true, mode: 0o700 });
++    chmodSync(tmp, 0o700);
++  };
++  const attempt = async () => {
++    prepare();
++    const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
++    delete env.NODE_TEST_CONTEXT;
++    const t0 = Date.now();
++    const r = await spawn(execPath, entry.command, { cwd: root, env, timeout: timeoutMs });
++    const secs = Math.round((Date.now() - t0) / 1000);
++    const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
++    const timedOut = !!(r.error && r.error.code === "ETIMEDOUT");
++    const counts = parseCounts(out);
++    return { r, out, secs, timedOut, counts, result: classify(r, counts, entry, timedOut) };
++  };
++  let a = await attempt();
++  let retried = false;
++  let firstAttempt = null;
++  if (a.result !== "GREEN" && isRetryable(a.r, a.out)) {
++    retried = true;
++    firstAttempt = `${a.result} (${a.r.signal ? `killed by ${a.r.signal}` : a.r.status === null ? "child killed" : `exit ${a.r.status}, null !== 0`})`;
++    log(`   retrying once: ${entry.id} first attempt ${firstAttempt}`);
++    a = await attempt();
++  }
++  if (a.result === "GREEN") rmSync(tmp, { recursive: true, force: true });
++  return {
++    id: entry.id, result: a.result, tests: a.counts.tests, pass: a.counts.pass, fail: a.counts.fail, skipped: a.counts.skipped, todo: a.counts.todo,
++    custom: a.counts.custom, seconds: a.secs, exit: a.r.status, signal: a.r.signal ?? null, retried, firstAttempt,
++    failing: a.result === "GREEN" ? [] : failingCases(a.out).slice(0, 8),
++    tail: a.counts.tests === null && a.result !== "GREEN" ? a.out.trim().split("\n").slice(-4).join(" | ").slice(0, 400) : "",
++    at: new Date().toISOString(),
++  };
++}
++
++const cell = (v) => (v === null || v === undefined ? "?" : String(v));
++const mdText = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
++
++export function renderEvidence({ suites, records, head, date, host, nodeVersion, timeoutMs, scrub }) {
++  const byId = new Map(records.map((r) => [r.id, r]));
++  const ran = suites.filter((s) => byId.has(s.id));
++  const unresolved = suites.filter((s) => s.command === null || s.command === undefined);
++  const pending = suites.filter((s) => s.command && !byId.has(s.id));
++  const count = (res) => ran.filter((s) => byId.get(s.id).result === res).length;
++  const file = (s) => (s.command ? s.command.filter((a) => !a.startsWith("--")).join(" ") : "-");
++  const lines = [];
++  lines.push(`# Counted results, ${date} (count pass)`, "");
++  lines.push(`Measured on commit \`${head}\`. Host: ${host}; node ${nodeVersion}. Runner: \`scripts/sitting-count-pass.mjs\`, one suite after the other (never two at the same time), each with its own private TMPDIR outside every repository, \`NODE_TEST_CONTEXT\` removed, a ${Math.round(timeoutMs / 60000)} minute default cap per suite, and one retry for a killed child or a \`null !== 0\` process failure (marked in the Result column). Counts are copied from the node summary line of each run; a suite with its own summary is marked \`custom\`.`, "");
++  lines.push(`Summary: ${ran.length} suites run. ${count("GREEN")} green, ${count("RED")} red, ${count("TIMEOUT")} timeout. ${unresolved.length} unresolved (no suite identified, not run). ${pending.length} pending (not run yet).`, "");
++  lines.push("A skipped or todo case is not a pass. A green row with skips or todos is counted green for the cases that ran.", "");
++  const red = ran.filter((s) => byId.get(s.id).result !== "GREEN");
++  lines.push(`## Red (${red.length})`, "");
++  if (red.length === 0) lines.push("None.", "");
++  else {
++    lines.push("| Suite | Result | Cases | Pass | Fail | First failing cases | Note |", "|---|---|---|---|---|---|---|");
++    for (const s of red) {
++      const r = byId.get(s.id);
++      const note = [r.retried ? `retried once, first attempt ${r.firstAttempt}` : "", r.tail ? `no summary line, tail: ${r.tail}` : "", r.result === "TIMEOUT" ? "cap reached" : ""].filter(Boolean).join("; ");
++      lines.push(`| \`${s.id}\` (\`${file(s)}\`) | ${r.result} | ${cell(r.tests)} | ${cell(r.pass)} | ${cell(r.fail)} | ${mdText(scrub(r.failing.slice(0, 3).join("; ") || "-"))} | ${mdText(scrub(note || "-"))} |`);
++    }
++    lines.push("");
++  }
++  lines.push("## Counted suites", "", "| Id | File | Tests | Pass | Fail | Skip | Todo | Seconds | Result |", "|---|---|---|---|---|---|---|---|---|");
++  for (const s of ran) {
++    const r = byId.get(s.id);
++    const result = `${r.result}${r.retried ? " (retried)" : ""}${r.custom ? " (custom)" : ""}`;
++    lines.push(`| \`${s.id}\` | \`${file(s)}\` | ${cell(r.tests)} | ${cell(r.pass)} | ${cell(r.fail)} | ${cell(r.skipped)} | ${cell(r.todo)} | ${r.seconds} | ${result} |`);
++  }
++  lines.push("", "## Skipped typed", "");
++  const typed = ran.filter((s) => (byId.get(s.id).skipped ?? 0) > 0 || (byId.get(s.id).todo ?? 0) > 0);
++  if (typed.length === 0) lines.push("None.");
++  else {
++    lines.push("| Id | Skip | Todo | Pass |", "|---|---|---|---|");
++    for (const s of typed) { const r = byId.get(s.id); lines.push(`| \`${s.id}\` | ${cell(r.skipped)} | ${cell(r.todo)} | ${cell(r.pass)} |`); }
++  }
++  if (unresolved.length > 0) {
++    lines.push("", "## Unresolved (not run)", "");
++    for (const s of unresolved) lines.push(`- \`${s.id}\`: ${mdText(scrub(s.unresolved ?? "no suite identified"))}`);
++  }
++  if (pending.length > 0) {
++    lines.push("", "## Pending (not run yet)", "");
++    for (const s of pending) lines.push(`- \`${s.id}\``);
++  }
++  return `${lines.join("\n")}\n`;
++}
++
++function readList(path) {
++  const data = JSON.parse(readFileSync(path, "utf8"));
++  const suites = Array.isArray(data) ? data : data.suites;
++  if (!Array.isArray(suites)) throw new Error(`${path}: expected an array or { "suites": [...] }`);
++  const seen = new Set();
++  for (const s of suites) {
++    if (typeof s.id !== "string" || s.id === "") throw new Error(`${path}: an entry has no id`);
++    if (seen.has(s.id)) throw new Error(`${path}: duplicate id ${s.id}`);
++    seen.add(s.id);
++    if (s.command !== null && s.command !== undefined && (!Array.isArray(s.command) || s.command.length === 0)) throw new Error(`${path}: ${s.id}: command must be a non-empty array or null`);
++  }
++  return suites;
++}
++
++function readState(path) {
++  if (!existsSync(path)) return [];
++  return readFileSync(path, "utf8").split("\n").filter((l) => l.trim() !== "").map((l) => JSON.parse(l));
++}
++
++// Programmatic entry point (the unit test uses it with an injected spawn and home).
++export async function runCountPass(options) {
++  const { list, out, root = ".", only = [], resume = false, timeoutMs, spawn = defaultSpawn, home = homedir(), log = console.log, execPath = process.execPath, now = () => new Date() } = options;
++  const suites = readList(list);
++  const statePath = `${out}.state.jsonl`;
++  const absRoot = resolve(root);
++  let records = readState(statePath);
++  if (records.length > 0 && !resume) {
++    throw Object.assign(new Error(`${statePath} already holds ${records.length} finished suite(s); pass --resume to continue that pass or delete the state file to start a new one`), { usage: true });
++  }
++  for (const id of only) if (!suites.some((s) => s.id === id)) throw Object.assign(new Error(`--only names an id that is not in the list: ${id}`), { usage: true });
++  mkdirSync(resolve(out, ".."), { recursive: true });
++  let head = "unknown";
++  try { head = execFileSync("git", ["-C", absRoot, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { /* not a repository */ }
++  const wsl = /microsoft/i.test(release()) ? " (WSL)" : "";
++  const host = `${platform()} ${arch()}${wsl}`;
++  let user = "";
++  try { user = process.env.USER || process.env.USERNAME || ""; } catch { /* unknown */ }
++  const scrub = makeScrubber({ root: absRoot, home, user });
++  const runLabel = basename(out).replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9._-]/g, "-");
++  const tmpBase = join(home, "pipeline-test-tmp", `count-pass-${runLabel}`);
++  const write = () => writeFileSync(out, renderEvidence({ suites, records, head, date: now().toISOString().slice(0, 10), host, nodeVersion: process.version, timeoutMs: timeoutMs ?? DEFAULT_TIMEOUT_MS, scrub }));
++  const finished = new Set(records.map((r) => r.id));
++  const todo = suites.map((s, index) => ({ s, index })).filter(({ s }) => s.command && (only.length === 0 || only.includes(s.id)));
++  let n = 0;
++  for (const { s, index } of todo) {
++    n += 1;
++    if (finished.has(s.id)) { log(`SKIP-DONE ${s.id} (already in the state file)`); continue; }
++    const rec = await runOne({ entry: s, index, root: absRoot, tmpBase, timeoutMs: timeoutMs ?? s.timeoutMs ?? DEFAULT_TIMEOUT_MS, spawn, execPath, log });
++    rec.at = now().toISOString();
++    records.push(rec);
++    appendFileSync(statePath, `${JSON.stringify(rec)}\n`);
++    write();
++    log(`${rec.result} [${n}/${todo.length}] ${s.id} tests ${cell(rec.tests)} pass ${cell(rec.pass)} fail ${cell(rec.fail)} skip ${cell(rec.skipped)} todo ${cell(rec.todo)} secs ${rec.seconds}${rec.retried ? " (retried)" : ""}`);
++    for (const f of rec.failing.slice(0, 3)) log(`   FAILING: ${scrub(f).slice(0, 200)}`);
++    if (rec.tail) log(`   tail: ${scrub(rec.tail)}`);
++  }
++  write();
++  const selected = new Set(todo.map(({ s }) => s.id));
++  const considered = records.filter((r) => selected.has(r.id));
++  return { records, ok: considered.every((r) => r.result === "GREEN"), unresolved: suites.filter((s) => !s.command).map((s) => s.id) };
++}
++
++function parseArgs(argv) {
++  const o = { only: [], resume: false };
++  for (let i = 0; i < argv.length; i++) {
++    const a = argv[i];
++    if (a === "--resume") o.resume = true;
++    else if (a === "--list" || a === "--out" || a === "--root" || a === "--timeout-ms") {
++      if (i + 1 >= argv.length) throw Object.assign(new Error(`${a} needs a value`), { usage: true });
++      const v = argv[++i];
++      if (a === "--timeout-ms") { o.timeoutMs = Number(v); if (!Number.isFinite(o.timeoutMs) || o.timeoutMs <= 0) throw Object.assign(new Error("--timeout-ms needs a positive number"), { usage: true }); }
++      else o[a.slice(2)] = v;
++    } else if (a === "--only") {
++      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) o.only.push(argv[++i]);
++      if (o.only.length === 0) throw Object.assign(new Error("--only needs at least one id"), { usage: true });
++    } else throw Object.assign(new Error(`unknown argument ${a}`), { usage: true });
++  }
++  if (!o.list || !o.out) throw Object.assign(new Error("--list and --out are required"), { usage: true });
++  return o;
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
++  try {
++    const o = parseArgs(process.argv.slice(2));
++    const result = await runCountPass(o);
++    console.log(`evidence written: ${o.out} (${result.records.length} suites recorded, ${result.unresolved.length} unresolved)`);
++    process.exit(result.ok ? 0 : 1);
++  } catch (e) {
++    console.error(`${e.message}\nusage: node scripts/sitting-count-pass.mjs --list <suites.json> --out <evidence.md> [--root <dir>] [--only <id>...] [--resume] [--timeout-ms N]`);
++    process.exit(e.usage ? 2 : 1);
++  }
++}
+diff --git a/scripts/sitting-count-pass.test.mjs b/scripts/sitting-count-pass.test.mjs
+new file mode 100644
+index 000000000..0f001628c
+--- /dev/null
++++ b/scripts/sitting-count-pass.test.mjs
+@@ -0,0 +1,160 @@
++// SPDX-License-Identifier: SUL-1.0
++// Purpose: pin scripts/sitting-count-pass.mjs on tiny fixture suites written to a private temp directory (no repository test is run).
++// Usage:   node --test scripts/sitting-count-pass.test.mjs
++import assert from "node:assert/strict";
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { after, before, describe, test } from "node:test";
++import { runCountPass, defaultSpawn, parseCounts, makeScrubber } from "./sitting-count-pass.mjs";
++
++let base;
++let root;
++const quiet = () => {};
++
++before(() => {
++  base = mkdtempSync(join(tmpdir(), "count-pass-test-"));
++  root = join(base, "tree");
++  mkdirSync(root, { recursive: true });
++  const t = (name, body) => writeFileSync(join(root, name), `import { test } from "node:test";\n${body}\n`);
++  t("green.test.mjs", 'test("one", () => {});\ntest("two", () => {});');
++  t("red.test.mjs", 'test("good case", () => {});\ntest("broken case alpha", () => { throw new Error("boom"); });');
++  t("todo.test.mjs", 'test("ok", () => {});\ntest("later", { todo: true }, () => { throw new Error("not yet"); });\ntest("typed skip", { skip: "windows only" }, () => {});');
++  t("slow.test.mjs", 'test("never ends", async () => { await new Promise((r) => setTimeout(r, 60000)); });');
++});
++
++after(() => rmSync(base, { recursive: true, force: true }));
++
++const writeList = (name, suites) => {
++  const p = join(base, name);
++  writeFileSync(p, JSON.stringify({ suites }));
++  return p;
++};
++const entry = (id, file, extra = {}) => ({ id, items: [`pipeline.${id}`], command: ["--test", file], expect: null, heavy: false, why: "fixture", ...extra });
++
++describe("sitting-count-pass", () => {
++  test("SCP01 counts green, red and todo/skip suites and writes repository-relative evidence", async () => {
++    const list = writeList("l1.json", [entry("green", "green.test.mjs"), entry("red", "red.test.mjs"), entry("todo", "todo.test.mjs"), { id: "nosuite", items: [], command: null, unresolved: "no suite found for the fixture", why: "fixture" }]);
++    const out = join(base, "e1.md");
++    const lines = [];
++    const res = await runCountPass({ list, out, root, home: join(base, "home1"), log: (l) => lines.push(l) });
++    assert.equal(res.ok, false);
++    const byId = Object.fromEntries(res.records.map((r) => [r.id, r]));
++    assert.equal(byId.green.result, "GREEN");
++    assert.deepEqual([byId.green.tests, byId.green.pass, byId.green.fail], [2, 2, 0]);
++    assert.equal(byId.red.result, "RED");
++    assert.equal(byId.red.fail, 1);
++    assert.ok(byId.red.failing.some((n) => n.includes("broken case alpha")));
++    assert.equal(byId.todo.result, "GREEN");
++    assert.equal(byId.todo.todo, 1);
++    assert.equal(byId.todo.skipped, 1);
++    assert.equal(lines.filter((l) => /^(GREEN|RED|TIMEOUT) /.test(l)).length, 3, "one line per suite");
++    const md = readFileSync(out, "utf8");
++    assert.match(md, /## Red \(1\)/);
++    assert.match(md, /broken case alpha/);
++    assert.match(md, /## Skipped typed[\s\S]*`todo`/);
++    assert.match(md, /## Unresolved \(not run\)[\s\S]*`nosuite`/);
++    assert.match(md, /\| Id \| File \| Tests \| Pass \| Fail \| Skip \| Todo \| Seconds \| Result \|/);
++    assert.ok(!md.includes(root), "no absolute root path in the evidence");
++    assert.ok(!md.includes(base), "no absolute temp path in the evidence");
++    assert.ok(!/\/(home|Users)\//.test(md), "no home path in the evidence");
++    assert.ok(existsSync(`${out}.state.jsonl`));
++  });
++
++  test("SCP02 a suite that exceeds the cap is TIMEOUT and its process group is stopped", async () => {
++    const list = writeList("l2.json", [entry("slow", "slow.test.mjs")]);
++    const out = join(base, "e2.md");
++    const t0 = Date.now();
++    const res = await runCountPass({ list, out, root, home: join(base, "home2"), timeoutMs: 2000, log: quiet });
++    assert.equal(res.records[0].result, "TIMEOUT");
++    assert.equal(res.records[0].retried, false, "a timeout is not retried");
++    assert.ok(Date.now() - t0 < 30000, "the child was stopped near the cap");
++    assert.match(readFileSync(out, "utf8"), /TIMEOUT/);
++  });
++
++  test("SCP03 --resume skips a finished suite and a second run without it is refused", async () => {
++    const list = writeList("l3.json", [entry("green", "green.test.mjs"), entry("todo", "todo.test.mjs")]);
++    const out = join(base, "e3.md");
++    await runCountPass({ list, out, root, home: join(base, "home3"), only: ["green"], log: quiet });
++    const spawned = [];
++    const spy = (cmd, args, opts) => { spawned.push(args.join(" ")); return defaultSpawn(cmd, args, opts); };
++    await assert.rejects(() => runCountPass({ list, out, root, home: join(base, "home3"), spawn: spy, log: quiet }), /--resume/);
++    assert.equal(spawned.length, 0);
++    const lines = [];
++    const res = await runCountPass({ list, out, root, home: join(base, "home3"), resume: true, spawn: spy, log: (l) => lines.push(l) });
++    assert.deepEqual(spawned, ["--test todo.test.mjs"], "only the unfinished suite ran");
++    assert.ok(lines.some((l) => l.startsWith("SKIP-DONE green")));
++    assert.equal(res.records.length, 2);
++    assert.match(readFileSync(out, "utf8"), /2 suites run/);
++  });
++
++  test("SCP04 a null !== 0 process failure is retried once and recorded as retried", async () => {
++    const list = writeList("l4.json", [entry("flaky", "green.test.mjs")]);
++    const calls = [];
++    const spawn = async (_cmd, _args, opts) => {
++      calls.push(opts.env.TMPDIR);
++      if (calls.length === 1) return { status: 1, signal: null, stdout: "not ok 1\n  Process failed: null !== 0\nℹ tests 1\nℹ pass 0\nℹ fail 1\nℹ skipped 0\nℹ todo 0\n", stderr: "" };
++      return { status: 0, signal: null, stdout: "ℹ tests 1\nℹ pass 1\nℹ fail 0\nℹ skipped 0\nℹ todo 0\n", stderr: "" };
++    };
++    const out = join(base, "e4.md");
++    const res = await runCountPass({ list, out, root, home: join(base, "home4"), spawn, log: quiet });
++    assert.equal(calls.length, 2);
++    assert.equal(res.records[0].result, "GREEN");
++    assert.equal(res.records[0].retried, true);
++    assert.match(res.records[0].firstAttempt, /null !== 0/);
++    assert.match(readFileSync(out, "utf8"), /GREEN \(retried\)/);
++    assert.ok(calls[0].includes("pipeline-test-tmp"), "private TMPDIR under the injected home");
++  });
++
++  test("SCP05 a killed child is retried once, a plain red is not, and the child env has no NODE_TEST_CONTEXT", async () => {
++    const list = writeList("l5.json", [entry("killed", "green.test.mjs"), entry("plain", "red.test.mjs")]);
++    let killedCalls = 0;
++    let plainCalls = 0;
++    let sawContext = false;
++    const prev = process.env.NODE_TEST_CONTEXT;
++    process.env.NODE_TEST_CONTEXT = "child-v8";
++    const spawn = async (_cmd, args, opts) => {
++      if ("NODE_TEST_CONTEXT" in opts.env) sawContext = true;
++      if (args.includes("green.test.mjs")) { killedCalls += 1; return killedCalls === 1 ? { status: null, signal: "SIGKILL", stdout: "", stderr: "" } : { status: 0, signal: null, stdout: "ℹ tests 2\nℹ pass 2\nℹ fail 0\nℹ skipped 0\nℹ todo 0\n", stderr: "" }; }
++      plainCalls += 1;
++      return { status: 1, signal: null, stdout: "ℹ tests 2\nℹ pass 1\nℹ fail 1\nℹ skipped 0\nℹ todo 0\n", stderr: "" };
++    };
++    try {
++      const res = await runCountPass({ list, out: join(base, "e5.md"), root, home: join(base, "home5"), spawn, log: quiet });
++      assert.equal(killedCalls, 2);
++      assert.equal(plainCalls, 1);
++      assert.equal(res.records[0].result, "GREEN");
++      assert.equal(res.records[1].result, "RED");
++      assert.equal(res.records[1].retried, false);
++      assert.equal(sawContext, false);
++    } finally {
++      if (prev === undefined) delete process.env.NODE_TEST_CONTEXT;
++      else process.env.NODE_TEST_CONTEXT = prev;
++    }
++  });
++
++  test("SCP06 expect.minPass turns a thin green into RED, and suites never overlap", async () => {
++    const list = writeList("l6.json", [entry("thin", "green.test.mjs", { expect: { minPass: 5 } }), entry("second", "todo.test.mjs")]);
++    let running = 0;
++    let maxRunning = 0;
++    const spawn = async (cmd, args, opts) => {
++      running += 1;
++      maxRunning = Math.max(maxRunning, running);
++      try { return await defaultSpawn(cmd, args, opts); } finally { running -= 1; }
++    };
++    const res = await runCountPass({ list, out: join(base, "e6.md"), root, home: join(base, "home6"), spawn, log: quiet });
++    assert.equal(res.records[0].result, "RED");
++    assert.equal(maxRunning, 1);
++  });
++
++  test("SCP07 only counts and path scrubbing helpers behave", () => {
++    assert.deepEqual(parseCounts("ℹ tests 3\nℹ pass 2\nℹ fail 0\nℹ skipped 1\nℹ todo 0\n"), { tests: 3, pass: 2, fail: 0, skipped: 1, todo: 0, custom: false });
++    assert.equal(parseCounts("161/161 cases passed").tests, 161);
++    assert.equal(parseCounts("24 passed, 0 failed").pass, 24);
++    assert.equal(parseCounts("nothing").tests, null);
++    const ctl = parseCounts("PASS  a\nproject-onboarding-v3: 216 cases across 3 sequential chunks of 4 shards, 0 shards failed\n");
++    assert.deepEqual([ctl.tests, ctl.pass, ctl.fail, ctl.custom], [216, 216, 0, true]);
++    const scrub = makeScrubber({ root: "/work/some/tree", home: "/home/alice", user: "alice" });
++    assert.equal(scrub("at /work/some/tree/x.mjs and /home/alice/y and /home/bob/z"), "at <path>/x.mjs and <path>/y and <path>/z");
++  });
++});
+diff --git a/specs/sprint-alfred-epic/plans/count-pass-suites.json b/specs/sprint-alfred-epic/plans/count-pass-suites.json
+new file mode 100644
+index 000000000..d8f9378d3
+--- /dev/null
++++ b/specs/sprint-alfred-epic/plans/count-pass-suites.json
+@@ -0,0 +1,1485 @@
++{
++ "schema": "pipeline.count-pass-suites.v1",
++ "note": "Input of scripts/sitting-count-pass.mjs. Order: cheap suites first, heavy ones last, unresolved entries at the end (never run).",
++ "suites": [
++  {
++   "id": "gitleaks",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k98-refusal-texts",
++   "knownSeconds": 1
++  },
++  {
++   "id": "node-v24-on-windows-creates-a-real-nul-file",
++   "items": [
++    "pipeline.node-v24-on-windows-creates-a-real-nul-file"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount git-null-device-sites after 109ce619f added GND009 (the counted 8/8 predates it).",
++   "knownSeconds": 1
++  },
++  {
++   "id": "advertised-git-to-head-pipeline-is-refused",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k97-ap11-git-show-pipe"
++  },
++  {
++   "id": "agy-driver-dispatch-and-design-routes-incomplete",
++   "items": [
++    "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/agy-driver-dispatch-and-design-routes-incomplete.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] A counted serial run of the pin after d80719e5f is only stated in the item text, not in committed evidence."
++  },
++  {
++   "id": "agy-el01-write-authorization-gap",
++   "items": [
++    "pipeline.agy-el01-write-authorization-gap"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/agy-el01-write-authorization-gap.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Three fail-open conditions are reported open and unchanged: unparseable hook input, a spec with no Risk class row, an open dispatch record not bound to the caller."
++  },
++  {
++   "id": "antigravity-native-read-credential-roots",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/antigravity-native-read-credential-roots.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k96-read-credential-target"
++  },
++  {
++   "id": "antigravity-pretool-guard",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k73-k8-three-reds, held-patches/k76-k8-followup, held-patches/k91-sitting-rehearsal, held-patches/k92-gs1-signature-route, held-patches/k96-read-credential-target"
++  },
++  {
++   "id": "antigravity-topology-refresh-host",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "approval-bound-design-package-lives-in-an-ignored-directory",
++   "items": [
++    "pipeline.approval-bound-design-package-lives-in-an-ignored-directory"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] One todo case in rebind-approval.test.mjs (inspect of an unverifiable approval lists rebind-approval) still fails on the fixture clone."
++  },
++  {
++   "id": "architecture-design",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/architecture-design.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k73-k8-three-reds"
++  },
++  {
++   "id": "bounded-reader-terminal-binding",
++   "items": [
++    "pipeline.bounded-reader-terminal-binding"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Run the planned 2+1 Reader course on the content-frozen state and write the terminal record with the adjudicated form."
++  },
++  {
++   "id": "brownfield-implementation-entry-demands-a-greenfield-design-block",
++   "items": [
++    "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/brownfield-implementation-entry-demands-a-greenfield-design-block.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Confirm that the established-with-ratchet state of D66 is covered by the signed AC-9 adoption or pin it; no committed test names it."
++  },
++  {
++   "id": "budget-checkpoint-fires-below-the-briefed-cap",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
++  },
++  {
++   "id": "check-verify-case-completion",
++   "items": [],
++   "command": [
++    "--test",
++    "harness/scripts/check-verify-case-completion.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "check-verify-case-completion-augmentation-policy",
++   "items": [],
++   "command": [
++    "--test",
++    "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "clone-hook-readiness.refresh",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair"
++  },
++  {
++   "id": "codex-bootstrap-in-the-typed-next-action",
++   "items": [
++    "pipeline.codex-bootstrap-in-the-typed-next-action"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Run the retargeted refuted-premise pin once, serially, and record the counted result."
++  },
++  {
++   "id": "codex-critic-packet-host",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/codex-critic-packet-host.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "codex-isolated-critic-protected-preimage",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "codex-readiness-private-receipt-omits-output-custody",
++   "items": [
++    "pipeline.codex-readiness-private-receipt-omits-output-custody"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/codex-readiness-private-receipt-omits-output-custody.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Run the receipt-custody pin serially on the current HEAD and record the counted result including 99d477455's three cases."
++  },
++  {
++   "id": "commit-pipeline-owned",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k98-refusal-texts"
++  },
++  {
++   "id": "critic-course-admission",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/critic-course-admission.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "critic-dispatch-preflight",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "critic-packet-preflight",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "critic-review-lineage",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/critic-review-lineage.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "critic-scratch-notes-write-is-refused-again",
++   "items": [
++    "pipeline.critic-scratch-name-randomness-has-no-admitted-command",
++    "pipeline.critic-scratch-notes-write-is-refused-again"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/critic-scratch-notes-write-is-refused-again.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Re-run the Critic notes pin once serially after the e454442ca text change and record the count. // [agent] Re-run the notes pin once serially after e454442ca and record the count."
++  },
++  {
++   "id": "critic-verify-lifecycle",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "declared-system-skill-read-requires-human-override",
++   "items": [
++    "pipeline.declared-system-skill-read-requires-human-override"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/declared-system-skill-read-requires-human-override.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Restate the item pin to the D96 premise so its counted result stops resting on native-hold skips."
++  },
++  {
++   "id": "design-bootstrap-verify-state-contradicts-deferred-contract",
++   "items": [
++    "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/design-bootstrap-verify-state-contradicts-deferred-contract.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Restate the A2-literal pin case to D124 (the deferred state is rejected at implementation entry and at release Verify) and count it."
++  },
++  {
++   "id": "design-course-run-v2-refuses-its-own-documented-routes",
++   "items": [
++    "pipeline.design-course-run-v2-refuses-its-own-documented-routes"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Judge the revision path under the restated single-review acceptance (e144dc3c8 walks the prescribed lifecycle with zero overrides) and pin it if it is not already covered."
++  },
++  {
++   "id": "design-course-session",
++   "items": [
++    "pipeline.design-course-run-v2-refuses-its-own-documented-routes"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/design-course-session.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Judge the revision path under the restated single-review acceptance (e144dc3c8 walks the prescribed lifecycle with zero overrides) and pin it if it is not already covered. | named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
++   "items": [
++    "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/design-phase-runs-critic-advisor-and-readiness-instead-of-one-review.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Run the AC-155 fitness-model qualification pin serially on the current HEAD and record the counted result."
++  },
++  {
++   "id": "design-workflow-package",
++   "items": [
++    "pipeline.readiness-input-omits-current-advisor-observation"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/design-workflow-package.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the extended pin and of the two cited design-workflow-package suites on the current HEAD."
++  },
++  {
++   "id": "design-workflow-package-v2",
++   "items": [
++    "pipeline.readiness-input-omits-current-advisor-observation"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/design-workflow-package-v2.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the extended pin and of the two cited design-workflow-package suites on the current HEAD."
++  },
++  {
++   "id": "dispatch-authorship-verify",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "dispatch-briefing",
++   "items": [
++    "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/dispatch-briefing.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Build the consumer coverage (quick consumer qualification) with a counted green. | named as counted in held-patches/k104-fanout-guard-enforce, held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
++  },
++  {
++   "id": "dispatch-briefing-route-record",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/dispatch-briefing-route-record.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
++  },
++  {
++   "id": "dispatch-record-liveness",
++   "items": [
++    "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/dispatch-record-liveness.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] The 31/31 pin count was measured in an agent clone and predates the liveness second-writer guard 1cbd22393; recount the pin serially on current HEAD. | named as counted in held-patches/k104-fanout-guard-enforce"
++  },
++  {
++   "id": "dispatch-record-log-stays-empty-despite-mandatory-phase-entries",
++   "items": [
++    "pipeline.dispatch-record-log-stays-empty-despite-mandatory-phase-entries"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs"
++   ],
++   "expect": {
++    "minPass": 31
++   },
++   "heavy": false,
++   "why": "[verify-wsl] The 31/31 pin count was measured in an agent clone and predates the liveness second-writer guard 1cbd22393; recount the pin serially on current HEAD."
++  },
++  {
++   "id": "dispatch-record-ownership-binds-an-attempted-creation",
++   "items": [
++    "pipeline.dispatch-record-ownership-binds-an-attempted-creation"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/dispatch-record-ownership-binds-an-attempted-creation.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Recount the AC-164 pin on current HEAD, because the same guard lane changed after the last count."
++  },
++  {
++   "id": "dispatch-recovery",
++   "items": [
++    "pipeline.role-route-preflight-with-self-dispatch-fallback"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/dispatch-recovery.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
++  },
++  {
++   "id": "dispatch-recovery-admission",
++   "items": [
++    "pipeline.role-route-preflight-with-self-dispatch-fallback"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/dispatch-recovery-admission.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
++  },
++  {
++   "id": "domain-scanner-findings-need-reproduction-before-remedy",
++   "items": [
++    "pipeline.domain-scanner-findings-need-reproduction-before-remedy"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Restore the missing backlog item file with its acceptance text so the pin can be checked against it. / [verify-wsl] Run the real gitleaks historical reproduction (the pin only uses a fake scanner binary)."
++  },
++  {
++   "id": "elephant-main-context-spent-on-wake-ups-and-inline-reads",
++   "items": [
++    "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/elephant-main-context-spent-on-wake-ups-and-inline-reads.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Build one enforcement measure per measured cause and record before/after numbers."
++  },
++  {
++   "id": "existing-signing-key-reuse-deadlocks-onboarding",
++   "items": [
++    "pipeline.existing-signing-key-reuse-deadlocks-onboarding"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/existing-signing-key-reuse-deadlocks-onboarding.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Recount the pin on current HEAD, because the attended recovery (A6) code changed in 98a53938e after the last count."
++  },
++  {
++   "id": "feature-branch-push-admitted-without-signature-approval",
++   "items": [
++    "pipeline.feature-branch-push-admitted-without-signature-approval"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/feature-branch-push-admitted-without-signature-approval.test.mjs"
++   ],
++   "expect": {
++    "minPass": 16
++   },
++   "heavy": false,
++   "why": "[verify-wsl] Recount the 16-case pin on current HEAD after the approve-push route change ec1c22db2."
++  },
++  {
++   "id": "foreign-worktree-closes-the-implementation-gate",
++   "items": [
++    "pipeline.foreign-worktree-closes-the-implementation-gate"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Count the new WSL /mnt foreign-worktree case on a WSL host with a writable DrvFs mount (b041fb39b states no count)."
++  },
++  {
++   "id": "git-hook-runtime-snapshot",
++   "items": [
++    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/git-hook-runtime-snapshot.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host."
++  },
++  {
++   "id": "git-null-device-sites",
++   "items": [
++    "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
++    "pipeline.node-v24-on-windows-creates-a-real-nul-file"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/git-null-device-sites.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Count git-null-device-sites.test.mjs serially including GND009 (109ce619f states no count). // [agent] Recount git-null-device-sites after 109ce619f added GND009 (the counted 8/8 predates it)."
++  },
++  {
++   "id": "git-stash-list-classified-as-working-tree-write",
++   "items": [
++    "pipeline.git-stash-list-classified-as-working-tree-write"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Recount the 87-case pin serially on current HEAD (277a1756d counts were taken in an agent clone). / [agent] Optional residuals pinned as todo: an && chain after a writer and perl/ruby -i.bak are not handled. | named as counted in held-patches/k75-classifier-chain-inplace-reverse"
++  },
++  {
++   "id": "git-stash-readonly",
++   "items": [
++    "pipeline.git-stash-list-classified-as-working-tree-write"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Recount the 87-case pin serially on current HEAD (277a1756d counts were taken in an agent clone). / [agent] Optional residuals pinned as todo: an && chain after a writer and perl/ruby -i.bak are not handled."
++  },
++  {
++   "id": "gitleaks-scratch-clones-exclusion",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k98-refusal-texts"
++  },
++  {
++   "id": "goldfish-budgets-omit-the-closing-ceremony",
++   "items": [
++    "pipeline.goldfish-budgets-omit-the-closing-ceremony"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/goldfish-budgets-omit-the-closing-ceremony.test.mjs"
++   ],
++   "expect": {
++    "minPass": 7
++   },
++   "heavy": false,
++   "why": "[verify-wsl] Recount the 7-case pin on current HEAD after the goldfish template and role edits."
++  },
++  {
++   "id": "goldfish-test-briefs-lack-targeted-and-quick-command-routes",
++   "items": [
++    "pipeline.goldfish-test-briefs-lack-targeted-and-quick-command-routes"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Build the consumer coverage (quick consumer qualification) with a counted green."
++  },
++  {
++   "id": "greenfield-design-course-cost-and-proportionality",
++   "items": [
++    "pipeline.greenfield-design-course-cost-and-proportionality"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/greenfield-design-course-cost-and-proportionality.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Restate the pin header against the ADR-0085 single-review route and the shortened acceptance."
++  },
++  {
++   "id": "greenfield-machine-output-and-skill-budget",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/greenfield-machine-output-and-skill-budget.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k106-recon-duty-ends-at-delivery, held-patches/k95-d75a-recon-gate"
++  },
++  {
++   "id": "guard-apply-patch",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/guard-apply-patch.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k73-k8-three-reds, held-patches/k75-classifier-chain-inplace-reverse, held-patches/k91-sitting-rehearsal"
++  },
++  {
++   "id": "guard-dispatch",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k104-fanout-guard-enforce, held-patches/k76-k8-followup, held-patches/k91-sitting-rehearsal"
++  },
++  {
++   "id": "guard-dispatch-fanout",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/guard-dispatch-fanout.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k104-fanout-guard-enforce"
++  },
++  {
++   "id": "guard-lifecycle-ready",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k55-guard-lifecycle-ready-test-posix-command-paths, held-patches/k76-k8-followup, held-patches/k91-sitting-rehearsal, held-patches/k96-read-credential-target, held-patches/k97-ap11-git-show-pipe"
++  },
++  {
++   "id": "guard-maintenance-window",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "guard-maintenance-window-kernel-closure",
++   "items": [
++    "pipeline.kernel-closure-check-masks-violations-after-the-first"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Re-count the pin after the GMWKC01 fixes so the live-repository case is measured on current HEAD. | named as counted in held-patches/k104-fanout-guard-enforce, held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "guard-override-request-digest-drifts-after-arming",
++   "items": [
++    "pipeline.guard-override-request-digest-drifts-after-arming"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/guard-override-request-digest-drifts-after-arming.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Re-count this pin on a HEAD that includes f76a3eb42."
++  },
++  {
++   "id": "guard-split-contract",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/guard/guard-split-contract.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k105-claude-native-read-credential-code"
++  },
++  {
++   "id": "guard-testpath",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/guard-testpath.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k97-ap11-git-show-pipe"
++  },
++  {
++   "id": "hgo-patch-preflight-before-signature",
++   "items": [
++    "pipeline.hgo-patch-preflight-before-signature"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/hgo-patch-preflight-before-signature.test.mjs"
++   ],
++   "expect": {
++    "minPass": 12
++   },
++   "heavy": false,
++   "why": "[agent] Re-count the pin file now that it carries 13 tests with 1 todo (277a1756d). | named as counted in held-patches/k75-classifier-chain-inplace-reverse"
++  },
++  {
++   "id": "hgo-stale-capability-shadows-current-authorization",
++   "items": [
++    "pipeline.hgo-stale-capability-shadows-current-authorization"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/hgo-stale-capability-shadows-current-authorization.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Re-count this pin on a HEAD that includes f76a3eb42."
++  },
++  {
++   "id": "host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear",
++   "items": [
++    "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] The red K1D session-cleanup-binding case (neutral coordinator-close release) is open in the same cluster."
++  },
++  {
++   "id": "human-guard-override",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/human-guard-override.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k92-gs1-signature-route"
++  },
++  {
++   "id": "human-guard-override-disjoint",
++   "items": [
++    "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Recount human-guard-override-disjoint(.isolation) suites serially on current HEAD; neither is in the 2026-10-23 counted sets and the suite is sensitive to plugin drift. / [agent] Two documented diagnostic gaps in the isolation suite are todo cases (expired action reads HGO-DRIFT; audit rows against non-matching siblings); optional."
++  },
++  {
++   "id": "human-guard-override-disjoint-isolation",
++   "items": [
++    "pipeline.disjoint-signed-hgo-actions-invalidate-one-another"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/human-guard-override-disjoint-isolation.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Recount human-guard-override-disjoint(.isolation) suites serially on current HEAD; neither is in the 2026-10-23 counted sets and the suite is sensitive to plugin drift. / [agent] Two documented diagnostic gaps in the isolation suite are todo cases (expired action reads HGO-DRIFT; audit rows against non-matching siblings); optional."
++  },
++  {
++   "id": "implementation-without-dispatch-escapes-review-coverage",
++   "items": [
++    "pipeline.implementation-without-dispatch-escapes-review-coverage"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/implementation-without-dispatch-escapes-review-coverage.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Create the public backlog item text with an acceptance section and map the pin cases to it."
++  },
++  {
++   "id": "installed-design-trailer-example-is-rejected-by-git-guard",
++   "items": [
++    "pipeline.installed-design-trailer-example-is-rejected-by-git-guard"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Write the D129 evidence note listing the stage-0-labelled design commits and make bullet 4 an asserting case. | named as counted in held-patches/k91-sitting-rehearsal"
++  },
++  {
++   "id": "interruption-receipts",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/interruption-receipts.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "kernel-closure-check-masks-violations-after-the-first",
++   "items": [
++    "pipeline.kernel-closure-check-masks-violations-after-the-first"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/kernel-closure-check-masks-violations-after-the-first.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Re-count the pin after the GMWKC01 fixes so the live-repository case is measured on current HEAD."
++  },
++  {
++   "id": "lifecycle-denial-loop-guard",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/hooks/lifecycle-denial-loop-guard.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k73-k8-three-reds"
++  },
++  {
++   "id": "lifecycle-read-scope-blocks-host-declared-system-skill",
++   "items": [
++    "pipeline.lifecycle-read-scope-blocks-host-declared-system-skill"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/lifecycle-read-scope-blocks-host-declared-system-skill.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Declared-skill admission is not implemented; the work and its 7 held cases ride with the canonical open item, deferred past 0.7.0."
++  },
++  {
++   "id": "model-family-approval-with-automatic-version-upgrades",
++   "items": [
++    "pipeline.model-family-approval-with-automatic-version-upgrades"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/model-family-approval-with-automatic-version-upgrades.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Fix or restate the red model-family-host-store cases MFHS023 and MFHS028 (real-process contention)."
++  },
++  {
++   "id": "model-family-host-store",
++   "items": [
++    "pipeline.model-family-approval-with-automatic-version-upgrades"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/model-family-host-store.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Fix or restate the red model-family-host-store cases MFHS023 and MFHS028 (real-process contention)."
++  },
++  {
++   "id": "model-family-runtime-host",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/model-family-runtime-host.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "native-goldfish-host-return",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "nongit-retirement-reader-calls-inaccessible-controller-helper",
++   "items": [
++    "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/nongit-retirement-reader-calls-inaccessible-controller-helper.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Run the complete original onboarding controller (184 cases, four shards) and the Source corpus serially on Linux/WSL with a private TMPDIR and reconcile any remaining failures."
++  },
++  {
++   "id": "onboarding-test-runner-reports-async-pass-before-settlement",
++   "items": [
++    "pipeline.onboarding-test-runner-reports-async-pass-before-settlement"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/onboarding-test-runner-reports-async-pass-before-settlement.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Complete the full onboarding suite (216 cases, eight workers) serially on Linux/WSL with a private TMPDIR and capture consistent PASS and END counts, all child completions and exit 0."
++  },
++  {
++   "id": "opus-critic-only-batched-for-architecture-and-security",
++   "items": [
++    "pipeline.opus-critic-only-batched-for-architecture-and-security"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the pin once on the current HEAD, because the critic template and role copy changed after the 15/15 run."
++  },
++  {
++   "id": "outside-root-read-label-skips-option-value-file-tokens",
++   "items": [
++    "pipeline.outside-root-read-label-skips-option-value-file-tokens"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/outside-root-read-label-skips-option-value-file-tokens.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the pin once after 5b3990a37 changed the passive-read policy that the label function belongs to."
++  },
++  {
++   "id": "passive-read-policy",
++   "items": [
++    "pipeline.declared-system-skill-read-requires-human-override",
++    "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/passive-read-policy.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Restate the item pin to the D96 premise so its counted result stops resting on native-hold skips. // [agent] Recount the restated pin on the current HEAD; 5b3990a37 changed the pin and the implementation without a stated count and says native Windows and macOS branches were not run. | named as counted in held-patches/k105-claude-native-read-credential-code, held-patches/k96-read-credential-target"
++  },
++  {
++   "id": "passive-read-policy-admits-uncovered-credential-files-and-rg-follow",
++   "items": [
++    "pipeline.passive-read-policy-admits-uncovered-credential-files-and-rg-follow"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/passive-read-policy-admits-uncovered-credential-files-and-rg-follow.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the restated pin on the current HEAD; 5b3990a37 changed the pin and the implementation without a stated count and says native Windows and macOS branches were not run."
++  },
++  {
++   "id": "pipeline-state-discard-feature",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/pipeline-state-discard-feature.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
++  },
++  {
++   "id": "pipeline-state-push-anchor",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/pipeline-state-push-anchor.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k103-hook-refresh-and-approve-push-repair"
++  },
++  {
++   "id": "plan-submission-must-not-require-separate-po-approval",
++   "items": [
++    "pipeline.plan-submission-must-not-require-separate-po-approval"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/plan-submission-must-not-require-separate-po-approval.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the pin once after 37060e4b4 and afee1a33d changed submit-plan and present-plan."
++  },
++  {
++   "id": "powershell-bypasses-onboarding-read-boundary",
++   "items": [
++    "pipeline.powershell-bypasses-onboarding-read-boundary"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/powershell-bypasses-onboarding-read-boundary.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the pin after 5b3990a37; its outside-root refusal assertions (Get-ChildItem, Grep and Glob on the outside directory) must still hold or be restated under QG-04."
++  },
++  {
++   "id": "pre-commit-hook-install",
++   "items": [
++    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/pre-commit-hook-install.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host."
++  },
++  {
++   "id": "project-uninstall",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/project-uninstall.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "protected-test-paths",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/protected-test-paths.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k75-classifier-chain-inplace-reverse"
++  },
++  {
++   "id": "read-blocks-and-misleading-denial-texts-across-runners",
++   "items": [
++    "pipeline.read-blocks-and-misleading-denial-texts-across-runners"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the pin once with M5 and M6 strict, after 5b3990a37 and 1874da3ac changed the read policy."
++  },
++  {
++   "id": "read-only-guard-admits-execution-and-output-options",
++   "items": [
++    "pipeline.read-only-guard-admits-execution-and-output-options"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Recount the pin after the grammar extensions of d3bc82194, 29b18d9e0 and 888518eaa. | named as counted in held-patches/k105-claude-native-read-credential-code"
++  },
++  {
++   "id": "readiness-input-omits-current-advisor-observation",
++   "items": [
++    "pipeline.readiness-input-omits-current-advisor-observation"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/readiness-input-omits-current-advisor-observation.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the extended pin and of the two cited design-workflow-package suites on the current HEAD."
++  },
++  {
++   "id": "rebind-approval",
++   "items": [
++    "pipeline.approval-bound-design-package-lives-in-an-ignored-directory"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/rebind-approval.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] One todo case in rebind-approval.test.mjs (inspect of an unverifiable approval lists rebind-approval) still fails on the fixture clone."
++  },
++  {
++   "id": "retirement-reader-masks-typed-unsafe-layout-inspection",
++   "items": [
++    "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/retirement-reader-masks-typed-unsafe-layout-inspection.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Run the complete original onboarding controller and the preserved unsafe-layout callback serially on Linux/WSL with a raised timeout and a private TMPDIR."
++  },
++  {
++   "id": "review-economy",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/review-economy.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k81-adapter-purity"
++  },
++  {
++   "id": "revised-native-design-cannot-reach-a-new-advisor-course",
++   "items": [
++    "pipeline.revised-native-design-cannot-reach-a-new-advisor-course"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the pin extended by b02abaa78 (baseline 7/7 predates it) and correction of the item text, which still says the route pin is not located."
++  },
++  {
++   "id": "role-route-preflight-with-self-dispatch-fallback",
++   "items": [
++    "pipeline.role-route-preflight-with-self-dispatch-fallback"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Counted green run of the role-route pin and dispatch-recovery suites on the current HEAD, after dd8845e39 and aa9b85443. / [agent] Pin the fallback evidence on the single-review (present-plan review-receipt) route; D125 restated the retired end-to-end course acceptance there."
++  },
++  {
++   "id": "run-parallel",
++   "items": [],
++   "command": [
++    "--test",
++    "scripts/run-parallel.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k79-c15-c16-registration-dropins, held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "session-cleanup-binding",
++   "items": [
++    "pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] The red K1D session-cleanup-binding case (neutral coordinator-close release) is open in the same cluster. | named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
++  },
++  {
++   "id": "session-cleanup-lost-binding",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/session-cleanup-lost-binding.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
++  },
++  {
++   "id": "session-cleanup-recovery",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/session-cleanup-recovery.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k67-discard-feature-finish-orphan-release, held-patches/k80-closed-release-member-step"
++  },
++  {
++   "id": "shell-grammar-file-is-a-kernel-path-without-capability-placement",
++   "items": [
++    "pipeline.shell-grammar-file-is-a-kernel-path-without-capability-placement"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Re-count the AC-255 pin once on the current HEAD, since the kernel-path list changed after the 8 of 8."
++  },
++  {
++   "id": "signature-ceremony-requires-operator-work-and-breaks",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k92-gs1-signature-route"
++  },
++  {
++   "id": "verify-case-completion-augmentation",
++   "items": [],
++   "command": [
++    "--test",
++    "harness/scripts/verify-case-completion-augmentation.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k82-k6-k7-closing-steps"
++  },
++  {
++   "id": "security-scan",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/security-scan.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k98-refusal-texts",
++   "knownSeconds": 7
++  },
++  {
++   "id": "claude-windows-guard-refuses-every-in-repo-read",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "named as counted in held-patches/k97-ap11-git-show-pipe",
++   "knownSeconds": 27
++  },
++  {
++   "id": "claude-windows-greenfield-lifecycle-not-walkable",
++   "items": [
++    "pipeline.claude-windows-greenfield-lifecycle-not-walkable"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs"
++   ],
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Update the stale V-10 header text in the pin (still says open, owner Coordinator).",
++   "knownSeconds": 85
++  },
++  {
++   "id": "onboarding-init",
++   "items": [
++    "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/scripts/onboarding-init.test.mjs"
++   ],
++   "expect": null,
++   "heavy": true,
++   "why": "[verify-wsl] Time the split greenfield cases serially on Linux/WSL against the 368.5 s baseline and replace the measurement-hold skip with a counted result. | named as counted in held-patches/k98-refusal-texts | HEAVY: the unsplit onboarding-init greenfield matrix: 4/4 pass in 368.5 s on 2026-09-29 (item text); the baseline for the timing comparison"
++  },
++  {
++   "id": "onboarding-init-greenfield-matrix-is-serial-and-slow",
++   "items": [
++    "pipeline.onboarding-init-greenfield-matrix-is-serial-and-slow"
++   ],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/pins/onboarding-init-greenfield-matrix-is-serial-and-slow.test.mjs"
++   ],
++   "expect": null,
++   "heavy": true,
++   "why": "[verify-wsl] Time the split greenfield cases serially on Linux/WSL against the 368.5 s baseline and replace the measurement-hold skip with a counted result. | HEAVY: greenfield matrix timing (the split cases); compare the wall time with the 368.5 s baseline of the item text"
++  },
++  {
++   "id": "onboarding-continuity",
++   "items": [],
++   "command": [
++    "--test",
++    "plugins/pipeline-core/lib/onboarding-continuity.test.mjs"
++   ],
++   "expect": null,
++   "heavy": true,
++   "why": "named as counted in held-patches/k80-closed-release-member-step | HEAVY: long suite, about 640 s in an earlier counted run",
++   "knownSeconds": 642
++  },
++  {
++   "id": "project-onboarding-v3",
++   "items": [
++    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog",
++    "pipeline.nongit-retirement-reader-calls-inaccessible-controller-helper",
++    "pipeline.onboarding-test-runner-reports-async-pass-before-settlement",
++    "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection"
++   ],
++   "command": [
++    "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
++   ],
++   "expect": {
++    "minPass": 216
++   },
++   "heavy": true,
++   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host. // [verify-wsl] Run the complete original onboarding controller (184 cases, four shards) and the Source corpus serially on Linux/WSL with a private TMPDIR and reconcile any remaining failures. // [verify-wsl] Complete the full onboarding suite (216 cases, eight workers) serially on Linux/WSL with a private TMPDIR and capture consistent PASS and END counts, all child completions and exit 0. // [verify-wsl] Run the complete original onboarding controller and the preserved unsafe-layout callback serially on Linux/WSL with a raised timeout and a private TMPDIR. | HEAVY: original onboarding controller: 184 cases in four shards, 216 cases with eight workers; about 15 to 30 minutes; run `node <file>` (not `--test`), own summary line; run alone with a raised cap"
++  },
++  {
++   "id": "forensics-and-audit-evidence-not-reconstructable",
++   "items": [
++    "pipeline.forensics-and-audit-evidence-not-reconstructable"
++   ],
++   "command": null,
++   "unresolved": "the open clause asks to BUILD continuity digest drift, the executable Verify contract and the generated audit index with a pin; no pin or suite exists yet (item text: only the runner transcript export admission is committed)",
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Build continuity digest drift, the executable Verify contract and the generated audit index, with a pin."
++  },
++  {
++   "id": "greenfield-comparisons-need-reproducible-public-evidence",
++   "items": [
++    "pipeline.greenfield-comparisons-need-reproducible-public-evidence"
++   ],
++   "command": null,
++   "unresolved": "the open clause says implementation and pin do not exist and are deferred past 0.7.0; no suite to count",
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Implementation and a pin for reproducible public comparison evidence do not exist; deferred past 0.7.0."
++  },
++  {
++   "id": "git-hook-runtime-snapshot-full-verify",
++   "items": [
++    "pipeline.git-hook-runtime-snapshot-omits-protected-baseline-catalog"
++   ],
++   "command": null,
++   "unresolved": "Full Verify and the candidate-bound closure checks are an operator step on the Linux/WSL host, not a suite file",
++   "expect": null,
++   "heavy": false,
++   "why": "[verify-wsl] Full Verify and the candidate-bound closure checks on the Linux/WSL host."
++  },
++  {
++   "id": "domain-scanner-real-gitleaks-reproduction",
++   "items": [
++    "pipeline.domain-scanner-findings-need-reproduction-before-remedy"
++   ],
++   "command": null,
++   "unresolved": "the real gitleaks historical reproduction is a manual run on a WSL host with the real binary; the pin only uses a fake scanner binary",
++   "expect": null,
++   "heavy": false,
++   "why": "[agent] Restore the missing backlog item file with its acceptance text so the pin can be checked against it. / [verify-wsl] Run the real gitleaks historical reproduction (the pin only uses a fake scanner binary)."
++  }
++ ]
++}
+diff --git a/specs/sprint-alfred-epic/plans/count-pass-suites.md b/specs/sprint-alfred-epic/plans/count-pass-suites.md
+new file mode 100644
+index 000000000..b5b30f2df
+--- /dev/null
++++ b/specs/sprint-alfred-epic/plans/count-pass-suites.md
+@@ -0,0 +1,37 @@
++# Count-pass suite list (K110)
++
++`count-pass-suites.json` is the input of `scripts/sitting-count-pass.mjs` (see `docs/operating-tools.md`, "Serial count pass"). It covers the 55 rows of `evidence/delivery-remeasure-2026-10-23/snapshot.json` that carry an open entry owned by `agent` or `verify-wsl`, plus the suites that the notes in `evidence/held-patches/` name as counted.
++
++120 entries: 69 serve at least one of the 55 rows (`items`), 47 are held-patch suites only (empty `items`, `why` names the notes), 4 are unresolved (`command: null`, never run). Entries are de-duplicated by suite file; the id is the file name without `.test.mjs`. Order: cheap suites first (by the seconds of an earlier counted run where one is on record, otherwise by name), the four heavy suites last, the unresolved entries at the end.
++
++Resolution rule for a row: its own pin `plugins/pipeline-core/lib/pins/<slug>.test.mjs` (all pins named by a row exist under the full slug), plus the suites its `open.what` or backlog text names. `why` carries the open sentence(s) verbatim, tagged `[agent]` or `[verify-wsl]`. Read `why` before trusting a green: for rows whose open clause asks to build, restate or document something, a counted pin run is the evidence gap only if that work is committed first.
++
++## Heavy suites (run alone, last)
++
++| Id | Known runtime | Note |
++|---|---|---|
++| `onboarding-continuity` | 642 s | long suite |
++| `onboarding-init` (`scripts/onboarding-init.test.mjs`) | 368.5 s (item text, 2026-09-29) | unsplit greenfield matrix, the baseline of `onboarding-init-greenfield-matrix-is-serial-and-slow` |
++| `onboarding-init-greenfield-matrix-is-serial-and-slow` (pin) | unknown | split cases; compare the wall time with the 368.5 s baseline |
++| `project-onboarding-v3` | 15 to 30 min | the original onboarding controller (184 cases in four shards, 216 cases with eight workers); run as `node <file>` (not `--test`), `expect.minPass` 216; serves `nongit-retirement-reader-calls-inaccessible-controller-helper`, `retirement-reader-masks-typed-unsafe-layout-inspection`, `onboarding-test-runner-reports-async-pass-before-settlement` and `git-hook-runtime-snapshot-omits-protected-baseline-catalog`; give it `--timeout-ms 3600000` |
++
++Other suites may be slow without a recorded runtime (guard-lifecycle-ready, guard-dispatch, antigravity-pretool-guard, slice-queue); the runner's per-suite cap and `--resume` cover that.
++
++## Unresolved (command null)
++
++| Id | Row | Reason |
++|---|---|---|
++| `forensics-and-audit-evidence-not-reconstructable` | same | the open clause asks to BUILD the continuity digest drift, Verify contract and audit index with a pin; no pin or suite exists |
++| `greenfield-comparisons-need-reproducible-public-evidence` | same | implementation and pin do not exist; deferred past 0.7.0 |
++| `git-hook-runtime-snapshot-full-verify` | `git-hook-runtime-snapshot-omits-protected-baseline-catalog` | Full Verify and the candidate-bound closure checks are an operator step, not a suite file (its three suites are in the list) |
++| `domain-scanner-real-gitleaks-reproduction` | `domain-scanner-findings-need-reproduction-before-remedy` | the real gitleaks historical reproduction is a manual WSL run with the real binary; the pin uses a fake scanner (the pin is in the list) |
++
++## Not suite counts (the list cannot close these)
++
++Several rows ask for work, not a count: `bounded-reader-terminal-binding` (the 2+1 Reader course), `elephant-main-context-spent-on-wake-ups-and-inline-reads`, `implementation-without-dispatch-escapes-review-coverage` (write the item text), `model-family-approval-with-automatic-version-upgrades` (fix or restate MFHS023 and MFHS028), `lifecycle-read-scope-blocks-host-declared-system-skill` (deferred, closed duplicate), `foreign-worktree-closes-the-implementation-gate` (needs a WSL host with a writable DrvFs mount). Their entries count the pin so a result exists once the work is done; a green run alone does not satisfy the open clause.
++
++## Counts the open entries state
++
++`expect.minPass` is set only where an open entry states the count: `goldfish-budgets-omit-the-closing-ceremony` 7, `feature-branch-push-admitted-without-signature-approval` 16, `dispatch-record-log-stays-empty-despite-mandatory-phase-entries` 31, `hgo-patch-preflight-before-signature` 12 (13 cases, 1 todo), `project-onboarding-v3` 216. Everything else is `null`.
++
++The list was not run; the runner was smoke-run on its fixture suites and on one cheap real suite (`node-v24-on-windows-creates-a-real-nul-file`, 14 of 14).

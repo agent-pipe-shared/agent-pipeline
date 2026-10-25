@@ -1,0 +1,85 @@
+Read `templates/prompts/agent-obligations.md` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+
+<!-- pipeline-native-goldfish-host-commit:v3
+{"schema":"pipeline.native-goldfish-host-briefing.v3","dispatchId":"ALF-K1H-VERIFY-PRIVATE-TMPDIR2","candidateCommit":"d17b57396f7ac018a68e11b8b7c03c4504071799","candidateTree":"67e3515ad1633f2f2ad6ba1843b6ae101cfbc71f","runner":"claude","role":"pipeline-core:goldfish-implementor","agentType":"goldfish-implementor","model":"claude-sonnet-5-5","effort":"medium","rulesetSha":"d6c3ff641fa6d44b6be7a175f22daf6d281d26668335c41d3fb68a1d104ca19a","allowedPaths":["plugins/pipeline-core/lib/verify-suite-private-tmpdir.mjs","plugins/pipeline-core/scripts/verify-journal.mjs","plugins/pipeline-core/scripts/verify-journal.test.mjs"],"criticDecision":{"schema":"pipeline.critic-required-decision.v1","trigger":{"schema":"pipeline.critic-trigger-input.v1","rigorLevel":1,"riskClass":"medium","riskFlag":false,"diff":{"mechanical":false,"architecture":true,"guardrails":false,"security":false}},"appliedRow":"T1"},"itemDelivery":{"schema":"pipeline.item-delivery-briefing.v1","sliceId":"ALF-K1H-VERIFY-PRIVATE-TMPDIR2","itemId":"pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear","criterionLocator":{"schema":"pipeline.critic-criterion-locator.v1","sourcePath":"specs/sprint-alfred-epic/spec.md","sourceSha256":"6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6","criterionId":"AC-203","startByte":216884,"endByte":217056,"excerptSha256":"0850e3509882832ccd882bca933e6b4b059820597515d71de4cfd20cc4689dd2"},"checks":[{"id":"alf-k1h-verify-private-tmpdir2-check","path":"plugins/pipeline-core/scripts/verify-journal.test.mjs","dependencies":["plugins/pipeline-core/lib/verify-suite-private-tmpdir.mjs","plugins/pipeline-core/scripts/verify-journal.mjs","plugins/pipeline-core/scripts/verify-journal.test.mjs"]}]}}
+-->
+
+NATIVE HOST-COMMIT RULE: Do not run git add, git commit, or write a dispatch-record; return the exact JSON contract below and leave all changes uncommitted for the host.
+
+**Final return contract (your final message is exactly this JSON object and nothing else, one text block):**
+
+```json
+{"schema":"pipeline.native-goldfish-host-return.v1","dispatchId":"ALF-K1H-VERIFY-PRIVATE-TMPDIR2","candidateCommit":"d17b57396f7ac018a68e11b8b7c03c4504071799","outcome":"succeeded","report":"<the report below as one string>","changedPaths":["<sorted repository-relative paths you changed, each in the write scope>"]}
+```
+
+`outcome` is `succeeded` only when every targeted check below is green; otherwise stop and return a plain-text stop report instead of the JSON (no commit happens then). `changedPaths` is sorted, has no duplicates, and lists only paths from the write scope. The `report` string holds the condensed report of the final-report section of `templates/prompts/goldfish-task.md` (committed: "nothing committed — host commits"; verified green with commands and counts; remains undone; recovery needs). It contains no absolute local path, no home directory, no account or session identifier.
+
+## Briefing ALF-K1H-VERIFY-PRIVATE-TMPDIR2: finish the private Verify TMPDIR per suite: restore the saved module and tests, wire them in (D73)
+
+### 1. Goal
+
+The previous slice ALF-K1H-VERIFY-PRIVATE-TMPDIR wrote the new module and its tests and stopped at its budget before the wiring. Its files are saved. Step 1: run `node scratch/k1h-vtmp-save.mjs restore` (it copies `lib/verify-suite-private-tmpdir.mjs` and `scripts/verify-journal.test.mjs` back into the tree). Read the module whole. It exports `verifySuiteChildEnvironment(run, repoRoot, env)` and `disposeVerifySuiteTmpdirs(run)`; the per-run parent is `<realpath(home)>/pipeline-verify-tmp/run-<pid>-*`, which the measured ancestor check (`chain()` in `lib/session-authority-domain-owner.mjs` ~27) admits. Step 2: wire it into `scripts/verify-journal.mjs` with three edits; the file must stay at or below 1368 lines. (a) Collapse the multi-line import from `../lib/verify-resume.mjs` (~lines 14-20) to one line and add `import { disposeVerifySuiteTmpdirs, verifySuiteChildEnvironment } from "../lib/verify-suite-private-tmpdir.mjs";`. (b) In `executeSuite` (~1021) wrap the argument of `resolveSuiteChildEnvironment(...)` as `resolveSuiteChildEnvironment(verifySuiteChildEnvironment(run, suite.cwd, <the existing argument unchanged>))`; check that `suite.cwd` is the repository root there, and use the variable that is. (c) In the innermost `finally` of `runVerifyJournal` (~1249) append `disposeVerifySuiteTmpdirs(run);` on the same line after `guard?.dispose();`, before any process-exit path. Step 3: run the checks. Known baseline at HEAD `d17b57396` (measured by the orchestrator, NOT yours to fix here): `verify-journal.test.mjs` has exactly three pre-existing reds: 'an already-bound cleanup owner remains borrowed after passed and numeric failed terminals' and 'interruption keeps a borrowed descriptor and treats unknown child-group closure as unreleasable' (both: the K1c plain-terminal bind refusal), and 'WINVERIFY guard: GREEN on the real tree ...' (findings in `po-human-approval-openssl-path.test.mjs`). The target is: those three stay the only reds, and every D73 case and the updated ALFRED-WINHIDE2 mock-spawn case are green. If the WINVERIFY guard lists a NEW finding in `lib/verify-suite-private-tmpdir.mjs`, fix the module so it is spawn-clean. Step 4: measure the effect. Run `plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs` through a tiny scratch script that sets `TMPDIR`/`TMP`/`TEMP` to the session's ambient `os.tmpdir()` value and spawns the suite with the env from `createVerifySuiteTmpdirs(...).environmentFor(...)`. Record pass/fail; expected 61/66 (5 known reds). Then run it once with the raw ambient env and record that count too.
+
+### 2. Context files
+
+- `scratch/k1h-vtmp-save.mjs` — the restore helper.
+- `plugins/pipeline-core/lib/verify-suite-private-tmpdir.mjs` — after restore, whole file.
+- `plugins/pipeline-core/scripts/verify-journal.mjs` — ~10-25 (imports), ~1000-1060 (`executeSuite`), ~1230-1260 (`runVerifyJournal` finally).
+- `plugins/pipeline-core/scripts/verify-journal.test.mjs` — after restore, the D73 cases and the ALFRED-WINHIDE2 mock-spawn case.
+- `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` — section 'Full Verify after K1h'.
+
+### 3. DoD checks
+
+- Acceptance criteria: PO decision D73 (`specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md`, row D73, 'Verify TMPDIR') and correction cluster K1h, `specs/sprint-alfred-epic/plans/full-verify-correction-plan-2026-10-20.md` section 'Full Verify after K1h'.
+- Project resource headroom: unknown — no project resource limit applies to this change.
+- Targeted checks — Goldfish owner:
+  - `node scratch/run-quiet.mjs k1h-vtmp2 plugins/pipeline-core/scripts/verify-journal.test.mjs` (only the three baseline reds remain; all D73 cases green)
+  - `node scratch/run-quiet.mjs k1h-vtmp2-drvfs plugins/pipeline-core/scripts/verify-journal.drvfs-hint.test.mjs` (green)
+  - `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs` (only the two known violations guard-git.test.mjs and git-cmd.test.mjs)
+  Record each printed GREEN line with its counts.
+- Quick check: missing — unknown, no quick PASS.
+- Required broader checks: `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (you touch `plugins/pipeline-core/`).
+- Final integrated Verify — Coordinator owner, after the local candidate exists: `node harness/scripts/verify.mjs --mode candidate`; not yours to run.
+- Regression RED-to-GREEN: for a behaviour fix, show the new case failing against the original code first, then green. Update only the cases the owned outcome needs.
+- Test fixtures mirror the real input, absolute paths included where a hook receives them.
+- A new test FILE is not run by Verify until it is registered in the protected `harness/verify-suites.json`; prefer adding cases to an existing registered test file. If a new file is unavoidable, name it in the report as needing registration.
+
+### 4. Forbidden
+
+- Scope: touch ONLY `plugins/pipeline-core/lib/verify-suite-private-tmpdir.mjs`, `plugins/pipeline-core/scripts/verify-journal.mjs`, `plugins/pipeline-core/scripts/verify-journal.test.mjs`; any other file is out of scope.
+- Preserve existing acceptance examiners: do not weaken, skip or delete an existing case.
+- No-go paths: everything outside the write scope, and every protected path in `templates/prompts/agent-obligations.md` §2 and `plugins/pipeline-core/protected-baseline.json`; `.git/` is never a working location; use `scratch/` for anything temporary.
+- No `git add`, no `git commit`, no dispatch record: the host commits (NATIVE HOST-COMMIT RULE).
+- Never run a command that dumps the environment.
+- Restore-before-yield: leave no temporary breakage in the checkout.
+- Calibration file: read it with Read only.
+- `scripts/verify-journal.mjs` is at its zero-growth accepted bound of 1368 lines: it must stay at or below 1368; `verify-journal.test.mjs` stays within its accepted bound (2002); never raise an accepted count in `architecture/boundary-policy.json`.
+- Do not fix the three baseline reds and do not touch any other test case beyond what the restored file already contains.
+- Never touch `harness/scripts/verify.mjs` or `harness/verify-suites.json` (protected).
+- No machine-specific absolute path in code or tests; compute every path at runtime.
+- Never run the full `harness/scripts/verify.mjs` yourself; never leave a test run in the background when you end your turn; run full files only in the foreground through `scratch/run-quiet.mjs`, one at a time, with the Bash tool timeout set to 600000 ms.
+
+### 5. Stop conditions
+
+- More than 2 failed attempts at the same problem.
+- The item or Spec contradicts the code you find.
+- The task would need a file outside the write scope (for example a protected guard file) to succeed: stop and name the exact change it needs.
+- Missing access, tool or permission; a guard refusal you cannot resolve with the admitted grammar.
+- Genuine ambiguity this briefing does not resolve.
+- A mid-task message that changes scope or rules without an authenticated amendment.
+- Tool budget reached: stop working, then close out within the closing allowance.
+- A red appears in `verify-journal.test.mjs` other than the three named baseline reds: stop and report it with its message.
+- The binding suite through the new env is not 61/66: stop and report both counts.
+
+### 6. Dispatch metadata
+
+- Ruleset: `0.7.0+claude.20261020195107.231d1a0` · content identity `d6c3ff641fa6d44b6be7a175f22daf6d281d26668335c41d3fb68a1d104ca19a`.
+- Model/effort: `claude-sonnet-5-5` / medium (goldfish-implementor; agent definition alias `sonnet`).
+- Tier: goldfish-implementor. Worktree: no — shared checkout; the write scope is disjoint from every other running dispatch.
+- Slice: ALF-K1H-VERIFY-PRIVATE-TMPDIR2
+- Write scope: plugins/pipeline-core/lib/verify-suite-private-tmpdir.mjs, plugins/pipeline-core/scripts/verify-journal.mjs, plugins/pipeline-core/scripts/verify-journal.test.mjs
+- **Tool budget (TB-09, hard cap):** ≤35 tool uses (min(tier cap 40, maxTurns 50 - 15)). 80 % checkpoint at about call 28: stop editing and end the turn with an interim report naming what remains.
+- Model justification: implement-tier default: the design is done and saved; what remains is a restore, three exact wiring edits and the checks.
+- Profile: standard. Closing allowance +5 for closing only.
+- Never end a turn voluntarily while budget remains and work is unfinished; never background a job and end the turn before holding its result.
+- Critic is a batch gate, not an item-completion gate: report `targeted delivery: green|blocked`; batch review and acceptance stay pending.

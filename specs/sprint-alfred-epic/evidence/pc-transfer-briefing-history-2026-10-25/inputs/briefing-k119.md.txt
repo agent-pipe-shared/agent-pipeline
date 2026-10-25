@@ -1,0 +1,14 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-decided.md` and the files named in them are your ONLY input. Read `scratch/clones/k119/templates/prompts/agent-obligations.md` first, then the common file. Clone name: `k119`. BASE: main (clone of the main checkout; run `git pull --ff-only` inside it first). Unprotected parts COMMITTED in the clone; protected parts (check `plugins/pipeline-core/protected-baseline.json` and `NEVER_LIFTABLE_KERNEL_PATHS` in `plugins/pipeline-core/lib/guard-maintenance-window.mjs`) become diffs. Tool budget: base 70, closing allowance +5.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K119-NGHS-TWO-RED-CASES/2026-10-23 · Role Goldfish`
+
+## K119-NGHS-TWO-RED-CASES: diagnose and repair the two failing cases NGHS09 and NGHS13 of native-goldfish-host-state
+
+### 1. Goal
+`plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs` runs 37 of 39 on the current main: NGHS09 and NGHS13 fail (K108 measured 0 of 2 on main WITHOUT the bundle too, cause not investigated). Earlier counted sets (`specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23*.md`: `rg -n "native-goldfish-host-state" <file>` per file) may show it green: find out when it turned red (bisect with `git log --oneline -15 -- plugins/pipeline-core/lib/native-goldfish-host-state.mjs plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs` and, if needed, a few `git stash`-free checks by running the single file at an older commit in a throwaway clone: `git clone --quiet . scratch/clones/k119-old` then a Node execFileSync `git checkout <sha>` inside it; run the file alone with a private TMPDIR outside every repository (copy a runner like `scratch/k94-run.mjs`)). Read both failing cases and the failure text. Decide the cause: a product regression (fix the product, smallest change, RED first), a stale fixture or an expectation that changed by a PO decision (restate under QG-04 with a bounded justification citing the decision), or an environment cause such as machine load or a changed git behaviour (prove it with two lone retries and say so). Do not weaken or skip an assertion. Count the file alone before/after. If the fix is in a protected file, export a protected diff `scratch/agent-out/K119-NGHS-TWO-RED-CASES-k119-protected.diff`; unprotected fixes are committed (conventional subject, trailers exactly `AI-Assisted: true` and `Dispatch: K119-NGHS-TWO-RED-CASES (goldfish)`). Also run once, alone: `node --test harness/scripts/check-consumer-safe-paths.test.mjs`. Notes: `scratch/agent-out/K119-notes.md` (cause, bisect result with the commit that turned it red, change, counts). Never "done".
+
+### 2. DoD
+Cause named with evidence; 39/39 or an honest report; commit or diff.
+
+### 3. Task id
+TASK_ID: K119-NGHS-TWO-RED-CASES.

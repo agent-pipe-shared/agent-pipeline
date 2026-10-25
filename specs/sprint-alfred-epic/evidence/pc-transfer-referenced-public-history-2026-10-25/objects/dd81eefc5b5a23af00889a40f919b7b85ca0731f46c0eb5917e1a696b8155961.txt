@@ -1,0 +1,10 @@
+command: node <repo-root>/harness/scripts/check-verify-suite-append.mjs
+label: expanded-po-suite-registration-append-final
+exitCode: 0
+head: 5f3bec25bbe5d4ac5ee0df51dee20d9446272047
+tree: 46352f60ade814535b1b17b3cb59a5341b5b9ff0
+dirty: true
+--- stdout ---
+{"ok":true,"code":"VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION","checked":32}
+
+--- stderr ---

@@ -1,0 +1,1684 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+import assert from "node:assert/strict";
+import {
+  closeSync,
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  mkdirSync,
+  openSync,
+  realpathSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+
+import { inspectScratchShellScript, normalizeAntigravityToolInput } from "./antigravity-pretool-guard.mjs";
+import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
+import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
+import { ROLE_DISPATCH_REQUEST_SCHEMA } from "../lib/role-dispatch-preflight.mjs";
+import { consumeRuntimeReadback, issueLaunchTicket, readRestartBarrier, sha256 } from "../lib/codex-onboarding-runtime.mjs";
+import { statePath as pipelineStatePath } from "../scripts/pipeline-state.mjs";
+
+const hookDir = dirname(fileURLToPath(import.meta.url));
+const pluginRoot = join(hookDir, "..");
+const adapter = join(hookDir, "antigravity-pretool-guard.mjs");
+const startHint = join(hookDir, "antigravity-start-hint.mjs");
+const onboardingScript = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
+let passed = 0;
+
+function unregisteredFixture() {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
+    project: "test", verify: "node verify.mjs",
+  }));
+  return root;
+}
+
+// The first-run hint must be tested in a non-Git path outside any ancestor
+// checkout. On some hosts os.tmpdir() itself is beneath an unrelated .git
+// control directory, which governance correctly classifies as unavailable
+// rather than as an optional inactive folder.
+function uninitializedTempRoot() {
+  const candidates = [...new Set([
+    tmpdir(),
+    ...(process.platform === "win32" ? [] : ["/var/tmp", "/dev/shm"]),
+  ])];
+  for (const candidate of candidates) {
+    try {
+      const base = realpathSync(candidate);
+      let containsGitAncestor = false;
+      for (let ancestor = base; ; ancestor = dirname(ancestor)) {
+        try {
+          lstatSync(join(ancestor, ".git"));
+          containsGitAncestor = true;
+          break;
+        } catch (error) {
+          if (error.code !== "ENOENT") { containsGitAncestor = true; break; }
+        }
+        const parent = dirname(ancestor);
+        if (parent === ancestor) break;
+      }
+      if (containsGitAncestor) continue;
+      return mkdtempSync(join(base, "agy-start-hint-fresh-"));
+    } catch {
+      // Try the next host-provided temporary parent; never fall back to a
+      // workspace whose scope cannot be observed as safely inactive.
+    }
+  }
+  throw new Error("No writable temporary parent is free of ancestor Git control paths");
+}
+
+// Most guard cases must actually enroll their temporary project. A lone
+// calibration JSON is not governance authority; the exact consent marker is
+// the smallest recognized positive enrollment for these incomplete fixtures.
+function fixture() {
+  const root = unregisteredFixture();
+  mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-10-02T00:00:00.000Z",
+  }));
+  return root;
+}
+
+// The Cwd-selection cases need a workspace that is governed but has not
+// completed onboarding. A legacy calibration file alone is not an enrollment
+// authority, so use the canonical incomplete-consent marker for that state.
+function unreadyGovernedFixture() {
+  const root = unregisteredFixture();
+  mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
+  writeFileSync(join(root, ".agent-pipeline", "onboarding-consent.json"), JSON.stringify({
+    schema: "pipeline.onboarding-consent-marker.v1",
+    status: "consent-given-onboarding-incomplete",
+    consentGivenAt: "2026-10-02T00:00:00.000Z",
+  }));
+  return root;
+}
+
+function nativeFixture() {
+  const root = fixture();
+  writeFileSync(join(root, "input.txt"), "input\n");
+  for (const args of [
+    ["init", "-q"],
+    ["config", "user.name", "Fixture"],
+    ["config", "user.email", "fixture@example.invalid"],
+    ["add", ".claude/pipeline.json", ".agent-pipeline/onboarding-consent.json", "input.txt"],
+    ["commit", "-q", "-m", "fixture"],
+  ]) execFileSync("git", args, { cwd: root, encoding: "utf8" });
+  return root;
+}
+
+function prepareNative(root, nativeSubagents) {
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
+  const digest = createHash("sha256").update("input\n").digest("hex");
+  const packets = nativeSubagents.map((entry, index) => ({
+    schema: ROLE_DISPATCH_REQUEST_SCHEMA,
+    dispatchId: `agy-pretool-${index}`,
+    transport: "antigravity",
+    role: entry.TypeName,
+    prompt: entry.Prompt,
+    candidate: { commit, tree },
+    requiredPaths: ["input.txt"],
+    requiredPathSha256: { "input.txt": digest },
+    resultDestination: { kind: "return" },
+  }));
+  const prepared = prepareAntigravityNativeDispatch({ root, packets, nativeSubagents });
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
+}
+
+function lifecycleCommand(root, ...args) {
+  const result = spawnSync(process.execPath, [onboardingScript, ...args], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  return JSON.parse(result.stdout);
+}
+
+function followLifecycleAction(root, result, name) {
+  assert.equal(result.nextAction?.argv?.[1], name, JSON.stringify(result));
+  return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
+}
+
+// A greenfield staging PRD must carry one complete pipeline-architecture-design
+// block before the single PO acknowledgement is offered (the onboarding
+// ARCHITECTURE-DESIGN-PACKAGE-REQUIRED stop, collectPrdAcknowledgementAction).
+// This minimal closed package serves adapter routing only, not design semantics.
+function agyArchitectureDesignBlock() {
+  const module = { id: "application", responsibility: "Local application", nonResponsibilities: ["Network"],
+    ownedPaths: ["src/**", "tests/**"], publicContracts: ["docs/contract.md"],
+    allowedDependencies: [], authorityEffects: [], verificationEntryPoints: ["tests/application.test.mjs"], adrReferences: [] };
+  const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
+    disposition: { decision: "approved-scoped", scope: ["src/", "tests/", "docs/contract.md", "architecture/", "specs/"], rationale: "Explicit design scope" },
+    modules: [module], implementationSurface: ["src/application.mjs"],
+    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "local", revision: 1,
+      allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true } } };
+  return "\n```pipeline-architecture-design\n" + JSON.stringify(design) + "\n```\n";
+}
+
+// MP-29 / D84: the nested guard-dispatch refuses a Task-shaped dispatch that carries no tool-layer `model`
+// (DISPATCH-MODEL-MISSING). The Antigravity adapter spreads the invoke_subagent `args` into the dispatch
+// tool input, so a top-level `model` argument is the tool-layer model; "sonnet" is the configured
+// duty.implement selector, as in the neighbouring guard-dispatch.test.mjs fixtures. The cases that
+// assert a later or different verdict must not be cut short by the missing-model refusal.
+const AGY_TOOL_LAYER_MODEL = "sonnet";
+
+function readyLifecycleFixture(mode = "chat") {
+  const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
+  const home = join(root, "fixture-home");
+  mkdirSync(home, { recursive: true });
+  if (mode === "signature") {
+    const keyDirectory = join(home, "po-key-directory");
+    mkdirSync(keyDirectory, { recursive: true });
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    const publicKeySha256 = createHash("sha256").update("agy-signature-fixture-key").digest("hex");
+    writeFileSync(join(keyDirectory, "trust-policy.json"), JSON.stringify({
+      keyReference: "agy-signature-fixture-key",
+      publicKeySha256,
+      humanName: "Antigravity Signature Fixture PO",
+    }, null, 2) + "\n");
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), JSON.stringify({
+      schema: "pipeline.machine-plane.v1",
+      poKeyDirectory: keyDirectory,
+      pushApprovalDefault: "signature",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    }, null, 2) + "\n");
+  }
+  const env = { ...process.env, HOME: home, USERPROFILE: home, PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home };
+  const invoke = (...args) => {
+    const result = spawnSync(process.execPath, [onboardingScript, ...args], { cwd: root, env, encoding: "utf8", shell: false });
+    assert.equal(result.status, 0, String(result.stderr) + "\n" + String(result.stdout));
+    return JSON.parse(result.stdout);
+  };
+  const follow = (result, name) => {
+    assert.equal(result.nextAction?.argv?.[1], name, JSON.stringify(result));
+    return invoke(...result.nextAction.argv.slice(1));
+  };
+  follow(invoke("plan", "--root", root, "--runner", "antigravity"), "apply-portable-seed");
+  // Build the shared lifecycle through its explicit chat-only fixture route.
+  // Individual guard cases select the policy under test after this fixture is
+  // ready, so this helper does not duplicate the detached-proof E2E ceremony.
+  const initialized = spawnSync(process.execPath, [join(pluginRoot, "scripts", "onboarding-init.mjs"), "--root", root, "--runner", "antigravity", "--git-author-name", "Test Fixture", "--git-author-email", "fixture@example.invalid", "--human-approval", "chat", "--advisor-export-consent", "declined", "--language", "en"], { cwd: root, env, encoding: "utf8", shell: false });
+  assert.equal(initialized.status, 0, `${initialized.stderr}\n${initialized.stdout}`);
+  for (const args of [["config", "user.name", "Test Fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "pipeline.user.yaml"], ["commit", "-m", "test fixture policy", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)"]]) {
+    const git = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+    assert.equal(git.status, 0, git.stderr);
+  }
+  const barrier = readRestartBarrier({ rootDir: root });
+  if (barrier.status === "present") {
+    const issued = issueLaunchTicket({ rootDir: root, barrierSha256: barrier.rawSha256 });
+    consumeRuntimeReadback({ rootDir: root, ticketId: issued.ticketId, token: issued.token, receipt: { schema: "pipeline.codex-project-runtime-readback.v1", barrierSha256: barrier.rawSha256, repositoryFingerprint: barrier.barrier.repositoryFingerprint, sourceSha256: barrier.barrier.sourceSha256, runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256, readerGenerationSha256: sha256("test-agy-readback"), effectiveConfigSha256: sha256("test-agy-config"), validatedAgentsSha256: sha256("test-agy-agents"), ticketId: issued.ticketId, observedAtEpochMs: Date.now() } });
+  }
+  const collect = (result, values, material = null) => { assert.equal(result.nextAction?.kind, "collect-input", JSON.stringify(result)); assert.ok(result.nextAction.applyAction, JSON.stringify(result)); const argv = result.nextAction.applyAction.argv.map((value) => values[value] ?? value); const index = argv.indexOf("--text-file"); if (material !== null && index >= 0) { const path = join(root, argv[index + 1]); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, material); } return invoke(...argv.slice(1)); };
+  // This shared fixture serves adapter routing, repository binding and HGO
+  // policy assertions; none of its consumers asserts Feature design semantics.
+  // Explicitly select mini at the first intake, with no later profile switch.
+  // Feature-specific guard cases below keep their own Feature state fixtures.
+  collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_GIT_AUTHOR_NAME>": "Test Fixture", "<PO_INTAKE_GIT_AUTHOR_EMAIL>": "fixture@example.invalid", "<PO_INTAKE_LANGUAGE>": "en", "<PO_INTAKE_PROFILE>": "mini" }, "AGY test fixture material.\n");
+  collect(invoke("inspect", "--root", root, "--runner", "antigravity"), { "<PO_INTAKE_DESIGN_ANSWERS_JSON>": JSON.stringify([{ question: "Scope?", answer: "AGY fixture." }]) });
+  const generated = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "intake-generate-plan");
+  invoke("intake-generate-apply", "--root", root, "--plan-sha256", generated.planSha256, "--activate", "--runner", "antigravity");
+  // The acknowledgement refuses a generated draft (BOOTSTRAP-ACK-PLACEHOLDER-CONTENT),
+  // so author a completed staging package and bind its spec digest through the
+  // public marker route, as the production walk does before the PO decision.
+  const prdFile = join(root, generated.targets.prd.path);
+  const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+  writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n${agyArchitectureDesignBlock()}`);
+  const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
+  invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
+  // Mini staging still requires the canonical chat acknowledgement before
+  // bind planning. Execute its returned action and re-inspect for the bind.
+  follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-acknowledge-chat-apply");
+  const bind = follow(invoke("inspect", "--root", root, "--runner", "antigravity"), "bootstrap-bind-plan");
+  follow(bind, "bootstrap-bind-apply");
+  const permissionsDrift = invoke("inspect", "--root", root, "--runner", "antigravity");
+  if (permissionsDrift.status === "projection-drift") {
+    assert.equal(permissionsDrift.runnerPermissions.status, "pending-runtime-initialization");
+    // The adapter must admit the exact returned repair before it is applied;
+    // otherwise a fresh install loops forever at projection-drift.
+    const repairCommand = [permissionsDrift.nextAction.executable, ...permissionsDrift.nextAction.argv]
+      .map((value) => JSON.stringify(value)).join(" ");
+    const repairGuard = run({ toolCall: { name: "run_command", args: { CommandLine: repairCommand } } }, root);
+    assert.equal(repairGuard.status, 0, `${repairGuard.stderr}\n${repairGuard.stdout}`);
+    const permissionsApplied = spawnSync(permissionsDrift.nextAction.executable, permissionsDrift.nextAction.argv, {
+      cwd: root, env, encoding: "utf8", shell: false,
+    });
+    assert.equal(permissionsApplied.status, 0, `${permissionsApplied.stderr}\n${permissionsApplied.stdout}`);
+    assert.equal(JSON.parse(permissionsApplied.stdout).status, "ready");
+  } else {
+    // A host whose runtime projection was initialized during portable setup
+    // reaches ready directly.  The fixture validates the same terminal state
+    // without fabricating drift merely to exercise the repair branch.
+    assert.equal(permissionsDrift.status, "ready", JSON.stringify(permissionsDrift));
+  }
+  const ready = invoke("inspect", "--root", root, "--runner", "antigravity");
+  assert.equal(ready.status, "ready", JSON.stringify(ready));
+  assert.equal(ready.root, root);
+  assert.equal(ready.runner, "antigravity");
+  if (mode === "signature") {
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const signatureSource = readFileSync(sourcePath, "utf8")
+      .replace('push_approval: "chat"', 'push_approval: "signature"')
+      .replace('human_approval: "chat"', 'human_approval: "signature"');
+    writeFileSync(sourcePath, signatureSource);
+  }
+  return root;
+}
+
+function run(input, root = fixture(), {
+  claudeProjectDir = root,
+  hookCwd = root,
+  timeoutMs = 8_000,
+} = {}) {
+  const envelope = typeof input === "string" ? input : {
+    workspacePaths: [root],
+    ...input,
+  };
+  const inputRoot = mkdtempSync(join(tmpdir(), "agy-pretool-input-"));
+  const inputPath = join(inputRoot, "input.json");
+  writeFileSync(inputPath, typeof envelope === "string" ? envelope : JSON.stringify(envelope));
+  const inputFd = openSync(inputPath, "r");
+  try {
+    return spawnSync(process.execPath, [adapter], {
+      cwd: hookCwd,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
+      encoding: "utf8",
+      stdio: [inputFd, "pipe", "pipe"],
+      timeout: timeoutMs,
+    });
+  } finally {
+    closeSync(inputFd);
+    rmSync(inputRoot, { recursive: true, force: true });
+  }
+}
+
+function check(name, fn) {
+  try {
+    fn();
+    passed++;
+    process.stdout.write(`ok ${passed} - ${name}\n`);
+  } catch (error) {
+    process.stderr.write(`not ok - ${name}\n${error.stack}\n`);
+    process.exitCode = 1;
+  }
+}
+
+function decision(result) {
+  if (result.status === 2) {
+    return { decision: "deny", reason: result.stderr };
+  }
+  assert.equal(result.status, 0, `Process failed: ${result.stderr}`);
+  const trimmed = result.stdout.trim();
+  assert.ok(trimmed !== "", `guard produced no decision output on stdout (stderr: ${result.stderr})`);
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    assert.fail(`guard produced unparseable decision output: ${trimmed}\n${error.message}`);
+  }
+}
+
+// Controlled lifecycle/readback/chat inputs qualify Source composition only.
+// No nested guard result is mocked and no native or human authority is claimed.
+if (process.argv.includes("--g6-aggregate")) {
+  let root;
+  try {
+    root = readyLifecycleFixture();
+    const stateFile = pipelineStatePath(root);
+    const originalState = readFileSync(stateFile, "utf8");
+    const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
+    put(join(root, "specs", "g6", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
+    put(join(root, ".claude", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
+    const manifestPath = join(root, ".claude", "pipeline.yaml");
+    const manifest = readFileSync(manifestPath, "utf8");
+    for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
+      for (const boundary of ["role", "plan", "test"]) {
+        const state = JSON.parse(originalState);
+        state.planApproved = boundary !== "plan";
+        state.activeFeature = { id: "g6", phase: boundary === "plan" ? "draft" : "implementation", planPath: "specs/g6/prd.md" };
+        delete state.continuity;
+        put(stateFile, state);
+        // Role is high-risk; plan/test need no role denial to establish their result.
+        put(join(root, "specs", "g6", "spec.md"), `| Risk class | ${boundary === "role" ? "high" : "low"} |\n| Rigor level | 2 |\n`);
+        put(manifestPath, manifest + "\ngates:\n  dev-plan:\n    mode: blocking\n");
+        const relativePath = boundary === "test" ? "protected.test.mjs" : "src/g6.mjs";
+        const path = absolute ? join(root, relativePath) : relativePath;
+        const result = decision(run({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } }, root, { timeoutMs: 60000 }));
+        assert.equal(result.decision, "deny", `${tool}/${absolute}/${boundary}`);
+        assert.match(result.reason, boundary === "role" ? /guard-el01-tripwire/ : boundary === "plan" ? /guard-devplan/ : /TP-G6/);
+        assert.doesNotMatch(result.reason, /requires-bootstrap|BOOTSTRAP-REQUIRED/);
+        console.log(`G6 aggregate ${tool} ${absolute ? "absolute" : "relative"} ${boundary}: intended denial`);
+      }
+    }
+  } catch (error) { console.error(error.stack); process.exitCode = 1; }
+  finally { if (root) rmSync(root, { recursive: true, force: true }); }
+  process.exit(process.exitCode ?? 0);
+}
+
+// Bounded G6 qualification avoids the lifecycle/native-dispatch fixture graph.
+if (process.argv.includes("--g6-bounded")) {
+  const scratch = join(process.cwd(), "scratch"); mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "g6-native-boundaries-"));
+  const home = join(root, "fixture-home"); mkdirSync(home);
+  const env = { ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: root };
+  const put = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, typeof value === "string" ? value : JSON.stringify(value)); };
+  const guard = (name, input) => spawnSync(process.execPath, [join(hookDir, name)], { cwd: root, env, encoding: "utf8", input: JSON.stringify(input), timeout: 10000 });
+  try {
+    put(join(root, ".agent-pipeline", "onboarding-consent.json"), { schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: "2026-10-02T00:00:00.000Z" });
+    put(join(root, ".claude", "pipeline.json"), { project: "test", verify: "node verify.mjs" });
+    put(join(root, ".claude", "guard-config.json"), { protectedTestPaths: [{ id: "TP-G6", pattern: "protected\\.test\\.mjs$", reason: "fixture examiner" }] });
+    put(join(root, ".claude", "pipeline.yaml"), "gates:\n  dev-plan:\n    mode: blocking\n");
+    put(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
+    for (const tool of ["write_file", "edit_file"]) for (const absolute of [false, true]) {
+      const path = absolute ? join(root, "src", "code.mjs") : "src/code.mjs";
+      const normalized = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: path, Content: "x", Target: "a", Replacement: "b" } } });
+      assert.equal(normalized.toolName, tool === "write_file" ? "Write" : "Edit");
+      assert.equal(normalized.toolInput.file_path, path);
+      const input = { tool_name: normalized.toolName, tool_input: normalized.toolInput, cwd: root };
+      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: true, activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" } });
+      const role = guard("guard-el01-tripwire.mjs", input); assert.equal(role.status, 2, JSON.stringify(role)); assert.match(role.stderr, /guard-el01-tripwire/);
+      put(join(root, ".claude", "pipeline-state.json"), { schema: "pipeline.state.v0", planApproved: false, activeFeature: { id: "feat-1", phase: "draft", planPath: "specs/feat-1/prd.md" } });
+      const plan = guard("guard-devplan.mjs", input); assert.equal(plan.status, 2, JSON.stringify(plan)); assert.match(plan.stderr, /guard-devplan/);
+      const protectedPath = absolute ? join(root, "protected.test.mjs") : "protected.test.mjs";
+      const testInput = normalizeAntigravityToolInput({ toolCall: { name: tool, args: { Path: protectedPath, Content: "x", Target: "a", Replacement: "b" } } });
+      const test = guard("guard-testpath.mjs", { tool_name: testInput.toolName, tool_input: testInput.toolInput, cwd: root });
+      assert.equal(test.status, 2, JSON.stringify(test)); assert.match(test.stderr, /TP-G6/);
+    }
+    put(join(root, "README.md"), "readme\n"); put(join(root, "vault", "id_rsa"), "inert credential fixture\n");
+    for (const target of ["README.md", join(root, "README.md"), "vault/id_rsa", join(root, "vault", "id_rsa"), "missing.md", join(root, "missing.md")]) {
+      const read = guard("antigravity-pretool-guard.mjs", { workspacePaths: [root], toolCall: { name: "read_file", args: { Path: target } } });
+      const expected = target.endsWith("README.md") ? "allow" : "deny";
+      const result = read.status === 2 ? { decision: "deny", reason: read.stderr } : JSON.parse(read.stdout);
+      assert.equal(result.decision, expected, target);
+      if (target.endsWith("id_rsa")) assert.match(result.reason, /GUARD-READ-CREDENTIAL-TARGET/);
+      if (target.endsWith("missing.md")) assert.match(result.reason, /GUARD-READ-TARGET-MISSING/);
+    }
+    console.log("G6 bounded native normalization -> actual role/plan/test guards: 12 refusals; native read adapter: 6 decisions passed.");
+  } catch (error) { console.error(error.stack); process.exitCode = 1; }
+  finally { rmSync(root, { recursive: true, force: true }); }
+  process.exit(process.exitCode ?? 0);
+}
+
+// 1. Normalization tests
+check("normalizeAntigravityToolInput: translates run_command", () => {
+  const res = normalizeAntigravityToolInput({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node harness/scripts/verify.mjs", Cwd: "/tmp" },
+    },
+  });
+  assert.equal(res.toolName, "Bash");
+  assert.equal(res.command, "node harness/scripts/verify.mjs");
+  assert.equal(res.toolInput.command, "node harness/scripts/verify.mjs");
+  assert.equal(res.isReadOnly, false);
+});
+
+check("normalizeAntigravityToolInput: translates write_to_file", () => {
+  const res = normalizeAntigravityToolInput({
+    toolCall: {
+      name: "write_to_file",
+      args: { TargetFile: "/foo/bar.js", CodeContent: "console.log('hi');" },
+    },
+  });
+  assert.equal(res.toolName, "Write");
+  assert.equal(res.filePath, "/foo/bar.js");
+  assert.equal(res.toolInput.file_path, "/foo/bar.js");
+  assert.equal(res.toolInput.content, "console.log('hi');");
+  assert.equal(res.isReadOnly, false);
+});
+
+check("normalizeAntigravityToolInput: translates replace_file_content", () => {
+  const res = normalizeAntigravityToolInput({
+    toolCall: {
+      name: "replace_file_content",
+      args: { TargetFile: "/foo/bar.js", TargetContent: "old", ReplacementContent: "new" },
+    },
+  });
+  assert.equal(res.toolName, "Edit");
+  assert.equal(res.filePath, "/foo/bar.js");
+  assert.equal(res.toolInput.file_path, "/foo/bar.js");
+  assert.equal(res.toolInput.old_string, "old");
+  assert.equal(res.toolInput.new_string, "new");
+  assert.equal(res.isReadOnly, false);
+});
+
+check("normalizeAntigravityToolInput: identifies read-only tools", () => {
+  for (const name of ["view_file", "list_dir", "find_by_name", "grep_search", "read_url_content", "ask_question"]) {
+    const res = normalizeAntigravityToolInput({ toolCall: { name, args: {} } });
+    assert.equal(res.isReadOnly, true);
+  }
+});
+
+// 2. Direct Guard Decisions
+// QG-04 restatement (PO decision D87). This case used to pin "every read-only native tool is allowed
+// immediately". Its original criterion was that a read-only tool needs no heavyweight guard run (no
+// lifecycle, git or dispatch spawn) and must not block ordinary reading. That criterion still holds and
+// is asserted below: an ordinary project file is allowed at once. What changed is the premise that
+// ALL native reads are harmless: acceptance 1 of backlog item
+// read-blocks-and-misleading-denial-texts-across-runners requires credential roots to stay denied on
+// every runner, so a native read of a credential file is now refused with the Claude typed code
+// GUARD-READ-TARGET. The un-enrolled folder keeps its unconditional allow (no governance applies there).
+// The behavioural matrix lives in antigravity-native-read-credential-roots.test.mjs.
+check("Antigravity pretool guard allows ordinary read-only tools immediately and refuses credential-root reads", () => {
+  const unenrolled = unregisteredFixture();
+  const free = decision(run({
+    toolCall: {
+      name: "view_file",
+      args: { AbsolutePath: join(unenrolled, "README.md") },
+    },
+  }, unenrolled));
+  assert.equal(free.decision, "allow");
+  rmSync(unenrolled, { recursive: true, force: true });
+
+  const root = fixture();
+  mkdirSync(join(root, "vault"), { recursive: true });
+  writeFileSync(join(root, "README.md"), "readme\n");
+  writeFileSync(join(root, "vault", "id_rsa"), "private\n");
+  for (const path of [join(root, "README.md"), "README.md"]) {
+    const ordinary = decision(run({ toolCall: { name: "view_file", args: { AbsolutePath: path } } }, root));
+    assert.equal(ordinary.decision, "allow", path);
+  }
+  for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
+    const secret = decision(run({ toolCall: { name: "view_file", args: { AbsolutePath: path } } }, root));
+    assert.equal(secret.decision, "deny", path);
+    // QG-04 restatement (K96, PO decision 2026-10-23, rows 6/16, M5 with M7): the credential target now carries the typed code.
+    assert.match(secret.reason, /GUARD-READ-CREDENTIAL-TARGET/u, path);
+  }
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard rejects invalid JSON", () => {
+  const root = readyLifecycleFixture();
+  const res = decision(run("not-json", root));
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /not valid JSON/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks chained commands (&&, ;, pipes)", () => {
+  const root = readyLifecycleFixture();
+
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "npm test && git status" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /GUARD-OPERATOR-UNAPPROVED|GUARD-PARSE-UNSUPPORTED|guard-command-grammar|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// Reuse the real ready fixture across Cwd-selection cases. Each unready
+// workspace is fresh; the case that can record a denial on the ready root is
+// deliberately last, before cleanup.
+const cwdReadyRoot = readyLifecycleFixture();
+check("Antigravity run_command uses its absolute Cwd instead of the first workspace", () => {
+  const readyRoot = cwdReadyRoot;
+  const unreadyRoot = unreadyGovernedFixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: "node verify.mjs", Cwd: unreadyRoot },
+      },
+    }, readyRoot, { hookCwd: readyRoot }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/);
+  } finally {
+    rmSync(unreadyRoot, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity run_command resolves a relative Cwd from the adapter working directory", () => {
+  const readyRoot = cwdReadyRoot;
+  const unreadyRoot = unreadyGovernedFixture();
+  try {
+    const res = decision(run({
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: "node verify.mjs", Cwd: relative(readyRoot, unreadyRoot) },
+      },
+    }, readyRoot, { hookCwd: readyRoot }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/);
+  } finally {
+    rmSync(unreadyRoot, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity run_command falls back to workspacePaths when Cwd is missing", () => {
+  const readyRoot = cwdReadyRoot;
+  const unreadyRoot = unreadyGovernedFixture();
+  const inactiveRoot = unregisteredFixture();
+  try {
+    // Configure an actual passive Verify test for this consumer fixture. The
+    // existing classifier admits bounded .test.mjs execution; node verify.mjs
+    // remains opaque and must still be refused while this plan is Draft.
+    const verifyCommand = "node checks/verify.test.mjs";
+    const calibrationPath = join(readyRoot, "project", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    writeFileSync(calibrationPath, JSON.stringify({ ...calibration, verify: verifyCommand }, null, 2) + "\n");
+    const stateBefore = readFileSync(pipelineStatePath(readyRoot), "utf8");
+    mkdirSync(join(readyRoot, "checks"), { recursive: true });
+    writeFileSync(join(readyRoot, "checks", "verify.test.mjs"), [
+      'import assert from "node:assert/strict";',
+      'import { existsSync, readFileSync, realpathSync } from "node:fs";',
+      'import { join } from "node:path";',
+      'const root = realpathSync(process.cwd());',
+      'const calibration = JSON.parse(readFileSync(join(root, "project", "pipeline.json"), "utf8"));',
+      `assert.equal(calibration.verify, ${JSON.stringify(verifyCommand)});`,
+      `const state = JSON.parse(readFileSync(${JSON.stringify(pipelineStatePath(readyRoot))}, "utf8"));`,
+      'assert.equal(state.planApproved, false);',
+      'assert.equal(typeof state.activeFeature?.planPath, "string");',
+      'assert.ok(existsSync(join(root, state.activeFeature.planPath)), "the bound plan must exist in the selected project");',
+      'console.log(JSON.stringify({ root, verify: calibration.verify, planApproved: state.planApproved }));',
+      "",
+    ].join("\n"));
+
+    // The real start hint owns this competing root's session barrier. Even a
+    // passive Verify must be denied there, so an allow proves that missing Cwd
+    // selected workspacePaths[0] instead of the daemon cwd or inherited root.
+    const sessionId = "agy-cwd-contract";
+    const fixtureEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+    execFileSync("git", ["init", "-q", unreadyRoot], { env: fixtureEnv });
+    const bootstrap = spawnSync(process.execPath, [startHint], {
+      cwd: unreadyRoot, env: { ...fixtureEnv, CLAUDE_PROJECT_DIR: unreadyRoot },
+      input: JSON.stringify({ invocationNum: 1, sessionId, workspacePaths: [unreadyRoot] }), encoding: "utf8", shell: false,
+    });
+    assert.equal(bootstrap.status, 0, bootstrap.stderr);
+    const bootstrapMarker = join(unreadyRoot, ".git", "agent-pipeline", "run", `session-${sessionId}`, "requires-bootstrap.pending");
+    assert.equal(existsSync(bootstrapMarker), true, `${bootstrap.stderr}\n${bootstrap.stdout}`);
+    const res = decision(run({
+      sessionId,
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: verifyCommand } },
+    }, readyRoot, { hookCwd: unreadyRoot, claudeProjectDir: unreadyRoot }));
+    assert.equal(res.decision, "allow", JSON.stringify(res));
+    const verified = spawnSync(process.execPath, ["checks/verify.test.mjs"], { cwd: readyRoot, encoding: "utf8", shell: false });
+    assert.equal(verified.status, 0, verified.stderr);
+    assert.deepEqual(JSON.parse(verified.stdout), { root: realpathSync(readyRoot), verify: verifyCommand, planApproved: false });
+    for (const Cwd of [unreadyRoot, relative(readyRoot, unreadyRoot)]) {
+      const blocked = decision(run({
+        sessionId,
+        workspacePaths: [readyRoot, unreadyRoot],
+        toolCall: { name: "run_command", args: { CommandLine: verifyCommand, Cwd } },
+      }, readyRoot, { hookCwd: readyRoot }));
+      assert.equal(blocked.decision, "deny");
+      assert.match(blocked.reason, /Mandatory Session Bootstrap/);
+    }
+    assert.equal(existsSync(bootstrapMarker), true);
+    const opaque = decision(run({
+      sessionId,
+      workspacePaths: [readyRoot, unreadyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
+    }, readyRoot, { hookCwd: unreadyRoot, claudeProjectDir: unreadyRoot }));
+    assert.equal(opaque.decision, "deny");
+    assert.match(opaque.reason, /GUARD-DEVPLAN-SHELL/);
+    assert.match(opaque.reason, /opaque-script-execution/);
+    assert.equal(readFileSync(pipelineStatePath(readyRoot), "utf8"), stateBefore);
+
+    const admission = (runner, input) => nativeHookGovernanceAdmission({ runner, rawInput: JSON.stringify(input) });
+    assert.equal(admission("antigravity", {
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: 42 } },
+    }).requiresEnforcement, true);
+    assert.equal(admission("antigravity", {
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: inactiveRoot } },
+    }).requiresEnforcement, false);
+    assert.equal(admission("antigravity", {
+      workspacePaths: [readyRoot],
+      toolCall: { name: "write_to_file", args: { TargetFile: "file.txt", CodeContent: "x", Cwd: inactiveRoot } },
+    }).requiresEnforcement, true);
+    assert.equal(admission("antigravity", {
+      workspacePaths: { 0: inactiveRoot },
+      cwd: readyRoot,
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
+    }).requiresEnforcement, true);
+    assert.equal(admission("antigravity", {
+      workspacePaths: [inactiveRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs" } },
+    }).requiresEnforcement, false);
+    assert.equal(admission("codex", {
+      cwd: inactiveRoot,
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd: readyRoot } },
+    }).requiresEnforcement, false);
+  } finally {
+    rmSync(inactiveRoot, { recursive: true, force: true });
+    rmSync(unreadyRoot, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity run_command fails closed for a malformed explicit Cwd", () => {
+  const readyRoot = cwdReadyRoot;
+  for (const Cwd of [42, "", null]) {
+    const res = decision(run({
+      workspacePaths: [readyRoot],
+      toolCall: { name: "run_command", args: { CommandLine: "node verify.mjs", Cwd } },
+    }, readyRoot));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /project root is unavailable/);
+  }
+});
+
+check("Antigravity run_command admits a relative passive read outside the selected project root", () => {
+  const firstWorkspace = cwdReadyRoot;
+  const executedWorkspace = readyLifecycleFixture();
+  const reportRoot = mkdtempSync(join(tmpdir(), "agy-passive-report-"));
+  const reportPath = join(reportRoot, "greenfield-review.md");
+  writeFileSync(reportPath, "# report\n");
+  try {
+    const res = decision(run({
+      workspacePaths: [firstWorkspace, executedWorkspace],
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: `cat ${reportPath}`, Cwd: executedWorkspace },
+      },
+    }, firstWorkspace, { hookCwd: firstWorkspace }));
+    assert.notEqual(res.decision, "deny");
+  } finally {
+    rmSync(executedWorkspace, { recursive: true, force: true });
+    rmSync(reportRoot, { recursive: true, force: true });
+  }
+});
+rmSync(cwdReadyRoot, { recursive: true, force: true });
+
+check("Antigravity pretool guard blocks writes outside project root (GUARD-CROSS-REPO-MUTATION)", () => {
+  const root = fixture();
+  const outsidePath = "/tmp/outside_repo_file.txt";
+
+  const res = decision(run({
+    toolCall: {
+      name: "write_to_file",
+      args: { TargetFile: outsidePath, CodeContent: "test" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /GUARD-CROSS-REPO-MUTATION|outside this repository|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks write when Dev-Plan is not approved", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
+    project: "test", verify: "node verify.mjs",
+  }));
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "gates:\n  dev_plan:\n    mode: blocking\n");
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    activeFeature: { id: "feat-1", phase: "draft", planPath: "specs/feat-1/prd.md" },
+  }));
+
+  const res = decision(run({
+    toolCall: {
+      name: "write_to_file",
+      args: { TargetFile: join(root, "src", "code.js"), CodeContent: "const a = 1;" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-devplan|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// EL-01 write-time tripwire (AC-109): the Antigravity Edit/Write route runs the
+// same guard-el01-tripwire the Claude route runs. Role source is the open
+// dispatch record, never a prompt-asserted role.
+function el01RiskFixture(openDispatch) {
+  const root = fixture();
+  mkdirSync(join(root, "specs", "feat-1"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" },
+  }));
+  writeFileSync(join(root, "specs", "feat-1", "spec.md"), "| Risk class | high |\n| Rigor level | 2 |\n");
+  if (openDispatch) {
+    writeFileSync(join(root, "dispatch-record.json"), JSON.stringify({
+      taskId: "T-1", model: "m", rulesetSha: "a".repeat(64), dispatcher: "elephant", outcome: "in-progress", log: [],
+    }));
+  }
+  return root;
+}
+
+check("Antigravity pretool guard refuses an Elephant-role production write via the EL-01 tripwire", () => {
+  const root = el01RiskFixture(false);
+  try {
+    const res = decision(run({
+      toolCall: { name: "write_to_file", args: { TargetFile: join(root, "src", "code.js"), CodeContent: "x" } },
+    }, root, { timeoutMs: 60_000 }));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /guard-el01-tripwire/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity pretool guard does not refuse an admitted (open-dispatch) write via the EL-01 tripwire", () => {
+  const root = el01RiskFixture(true);
+  try {
+    const res = decision(run({
+      toolCall: { name: "write_to_file", args: { TargetFile: join(root, "src", "code.js"), CodeContent: "x" } },
+    }, root, { timeoutMs: 60_000 }));
+    assert.doesNotMatch(String(res.reason ?? ""), /guard-el01-tripwire/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity pretool guard blocks unapproved git push", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
+    project: "test", verify: "node verify.mjs",
+  }));
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "gates:\n  push:\n    mode: blocking\n");
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" },
+  }));
+
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "git push origin main" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-push|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks invoke_subagent missing mandatory template fields", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "goldfish",
+            Role: "Goldfish Implementor",
+            Prompt: "Just fix the bug please",
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-dispatch|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity native implementation dispatch is refused even when candidate-bound", () => {
+  const root = nativeFixture();
+  // A productive Goldfish dispatch is refused SQ-AUTHORITY-UNAVAILABLE (resolveGovernedItemQueue, the shipped
+  // productive-course default) in a governed project that carries no project authority files, before the
+  // adapter's own native-implementation refusal is reached. Same enrolled-but-not-item-governed shape as the
+  // shared fixture of guard-dispatch.test.mjs: the two authority files, no active feature, no slice queue.
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+  const nativeSubagents = [{
+    TypeName: "goldfish-implementor",
+    Role: "Goldfish Implementor",
+    Prompt: [
+      "## 1. Goal\nImplement the bounded change.",
+      "## 2. Context files\n- input.txt",
+      "## 3. DoD checks\n- bounded output",
+      "## 4. Forbidden\n- unrelated changes",
+      "## 5. Stop conditions\n- missing input",
+      "## 6. Dispatch-Metadata\nModel: gemini-3.8-flash-high; Ruleset-SHA: fixture.",
+      "- **Tool budget (hard cap, first-class field):** <=40 tool uses.",
+    ].join("\n"),
+  }];
+  prepareNative(root, nativeSubagents);
+  const res = decision(run({ tool_use_id: "agy-native-implementation-refused", toolCall: { name: "invoke_subagent", args: { model: AGY_TOOL_LAYER_MODEL, Subagents: nativeSubagents } } }, root));
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks direct writes to pipeline-state.json", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
+    project: "test", verify: "node verify.mjs",
+  }));
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    activeFeature: { id: "feat-1", phase: "implementation", planPath: "specs/feat-1/prd.md" },
+  }));
+
+  const res = decision(run({
+    toolCall: {
+      name: "write_to_file",
+      args: { TargetFile: join(root, "project", "pipeline-state.json"), CodeContent: "{}" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /protected-state-writer-only|guard-lifecycle-ready|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks replace_file_content outside project root", () => {
+  const root = fixture();
+  const outsidePath = "/tmp/outside_repo_file.txt";
+
+  const res = decision(run({
+    toolCall: {
+      name: "replace_file_content",
+      args: { TargetFile: outsidePath, TargetContent: "old", ReplacementContent: "new" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /GUARD-CROSS-REPO-MUTATION|outside this repository|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks shell redirects (> and >>)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "echo 'hello' > test.txt" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /GUARD-REDIRECT-UNAPPROVED|GUARD-PARSE-UNSUPPORTED|guard-command-grammar|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks replace_file_content to pipeline.user.yaml (GS-1)", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+
+  const res = decision(run({
+    toolCall: {
+      name: "replace_file_content",
+      args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "signature", ReplacementContent: "chat" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
+  assert.match(res.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+  assert.doesNotMatch(res.reason, /Human override available|authorize-by-signature|verify-audit/u);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity GS-1 is liftable through its ordinary HGO path only after real lifecycle readiness", () => {
+  const root = readyLifecycleFixture();
+  try {
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "chat", ReplacementContent: "signature" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
+    assert.match(res.reason, /Human override available for this exact action/u);
+    assert.doesNotMatch(res.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(res.reason, /sign-intent|human-held Ed25519 key|authorize-by-signature/u,
+      "chat mode must not advertise a signature ceremony");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity signature guidance assigns only sign-intent to the external PO/operator", () => {
+  const root = readyLifecycleFixture("signature");
+  try {
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "signature", ReplacementContent: "chat" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(
+      res.reason,
+      /emit-signature-digest --repo[^\n]*\n[^\n]*PO\/operator[^\n]*intentSha256[^\n]*\n[^\n]*sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>[^\n]*\n[^\n]*back in this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+    );
+    assert.match(res.reason, /PO\/operator[^\n]*human-held Ed25519 key/u);
+    assert.match(res.reason, /back in this session[^\n]*proof path, not the private key/u);
+    assert.match(res.reason, /--proof <proof-path-from-sign-intent>/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// PO decision 2026-10-23 (row 29): the signed-override route for pipeline.user.yaml must not become
+// an admission. Without an armed capability an agent widening (signature -> chat) is still denied
+// and nothing is written; the route only names the human ceremony that could authorize it.
+check("Antigravity GS-1 widening of pipeline.user.yaml stays denied without an armed capability (k92 negative control)", () => {
+  const root = readyLifecycleFixture("signature");
+  try {
+    const sourcePath = join(root, "pipeline.user.yaml");
+    const before = readFileSync(sourcePath, "utf8");
+    assert.match(before, /push_approval: "signature"/u);
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: sourcePath, TargetContent: 'push_approval: "signature"', ReplacementContent: 'push_approval: "chat"' },
+      },
+    }, root));
+    assert.equal(res.decision, "deny", "a widening without a capability must not be admitted");
+    assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
+    assert.match(res.reason, /authorize-by-signature --repo/u, "the repair is a human signature, not an agent action");
+    assert.equal(readFileSync(sourcePath, "utf8"), before, "the denied edit left pipeline.user.yaml untouched");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity pretool guard blocks agent self-approval for approve-push", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by 'Agent' --remote origin --destination refs/heads/main" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /'approve-push' is an explicit Human\/PO decision/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard admits approve-push when external cryptographic --proof is provided", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-bare-"));
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by 'PO' --remote origin --destination refs/heads/main --proof evidence/proof-1.json --proof-request evidence/req-1.json --proof-authority evidence/auth-1.json" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+// K153 / G9 (a): the shared lifecycle admission already lets the agent run `approve-plan` on the proof-bearing
+// `--design-approval-request` route (the PO signs the request out of band; pipeline-state.mjs verifies the proof, the bound
+// commit/tree/intent and the policy). Antigravity must reach the same decision by delegating to that admission, and must keep
+// refusing every other spelling. Each case mirrors a real-harness absolute script path plus a repository-relative request.
+function designApprovalFixture() {
+  const root = readyLifecycleFixture("signature");
+  const digest = "a".repeat(64);
+  const requestPath = `scratch/design-approval-request-${digest}.json`;
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  writeFileSync(join(root, requestPath), "{}\n");
+  const cli = realpathSync(join(pluginRoot, "scripts", "pipeline-state.mjs"));
+  const prefix = ["node", cli].map((value) => JSON.stringify(value)).join(" ");
+  return { root, requestPath, prefix, digest };
+}
+
+check("Antigravity admits approve-plan on the proof-bearing design-approval-request route (K153 G9a)", () => {
+  const { root, requestPath, prefix } = designApprovalFixture();
+  try {
+    for (const command of [
+      `${prefix} approve-plan --design-approval-request ${requestPath}`,
+      `${prefix} approve-plan --by 'PO' --design-approval-request ${requestPath}`,
+    ]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "allow", `${command}: ${JSON.stringify(res)}`);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity still refuses approve-plan without a proof-bearing request or with an unsanctioned spelling (K153 G9a)", () => {
+  const { root, requestPath, prefix, digest } = designApprovalFixture();
+  try {
+    writeFileSync(join(root, `scratch/design-approval-request-${"b".repeat(64)}.json`), "{}\n");
+    mkdirSync(join(root, "reviews"), { recursive: true });
+    writeFileSync(join(root, `reviews/design-approval-request-${digest}.json`), "{}\n");
+    writeFileSync(join(root, "pipeline-state.mjs"), "// foreign script\n");
+    for (const command of [
+      `${prefix} approve-plan --by 'Agent'`,
+      `${prefix} approve-plan`,
+      `${prefix} approve-plan --design-approval-request scratch/design-approval-request-${"c".repeat(64)}.json`,
+      `${prefix} approve-plan --design-approval-request reviews/design-approval-request-${digest}.json`,
+      `${prefix} approve-plan --design-approval-request=${requestPath}`,
+      `${prefix} approve-plan --design-approval-request ${requestPath} --design-approval-request ${requestPath}`,
+      `${prefix} approve-plan --design-approval-request ${requestPath} --root /elsewhere`,
+      `node ${JSON.stringify(join(root, "pipeline-state.mjs"))} approve-plan --design-approval-request ${requestPath}`,
+    ]) {
+      const res = decision(run({ toolCall: { name: "run_command", args: { CommandLine: command } } }, root));
+      assert.equal(res.decision, "deny", `${command}: ${JSON.stringify(res)}`);
+      assert.match(res.reason, /'approve-plan' is an explicit Human\/PO decision/u, command);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity honors the explicit global chat attribution route for plan and push approval", () => {
+  const root = readyLifecycleFixture("chat");
+  try {
+    // The consumer fixture has no local CLI. Use the adapter's physical
+    // installed script so this tests the sanctioned global-chat route.
+    const pipelineStateCli = realpathSync(join(pluginRoot, "scripts", "pipeline-state.mjs"));
+    const commandPrefix = ["node", pipelineStateCli].map((value) => JSON.stringify(value)).join(" ");
+    for (const command of [
+      `${commandPrefix} approve-plan --by 'PO chat acknowledgement'`,
+      `${commandPrefix} approve-push --by 'PO chat acknowledgement' --remote origin --destination refs/heads/main`,
+    ]) {
+      const res = decision(run({
+        toolCall: { name: "run_command", args: { CommandLine: command } },
+      }, root));
+      assert.equal(res.decision, "allow", `${command}: ${JSON.stringify(res)}`);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("Antigravity keeps legacy action-local chat approval terminal-gated", () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+    const res = decision(run({
+      toolCall: {
+        name: "run_command",
+        args: { CommandLine: "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by 'PO' --remote origin --destination refs/heads/main" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(res.reason, /Agent self-approval prohibited/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// 3. Restored Antigravity Hardening Layer (ADR-0014 read-only Critic contract)
+
+check("Antigravity pretool guard blocks a critic subagent defined with write tools enabled", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "define_subagent",
+      args: { name: "critic-reviewer", enable_write_tools: true },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /enable_write_tools: false/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a non-critic subagent defined with write tools enabled (neighbour case)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "define_subagent",
+      args: { name: "goldfish-implementor", enable_write_tools: true },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a critic subagent correctly defined with enable_write_tools: false", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "define_subagent",
+      args: { name: "critic-reviewer", enable_write_tools: false },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks a critic dispatch prompt carrying prose (Contamination Rule)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: "Please examine this file and review it.",
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// Fixture: a minimal but guard-dispatch-compliant Critic briefing (paths + the ruleset-sha
+// and model tokens dispatch-policy.mjs requires of every critic-type dispatch) that also names
+// the canonical CLAUDE.md-mandated template path -- used to prove the D2 collision at the
+// decision level (deny pre-fix, allow post-fix) rather than only at the reason-text level.
+const CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT = [
+  "templates/prompts/critic-review.md",
+  "specs/feat-1/prd.md",
+  "docs/adr/0014-critic-contract.md",
+  "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+  "model: sonnet",
+  "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
+].join("\n");
+
+const ROOT_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "..", "..", "templates", "prompts", "critic-review.md"), "utf8");
+const VENDORED_CRITIC_TEMPLATE = readFileSync(join(pluginRoot, "templates", "prompts", "critic-review.md"), "utf8");
+const AGY_ENVELOPE_START = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:START -->";
+const AGY_ENVELOPE_END = "<!-- AGY-CRITIC-PROMPT-ENVELOPE:END -->";
+const agyEnvelopeRegion = ROOT_CRITIC_TEMPLATE.split(AGY_ENVELOPE_START)[1]?.split(AGY_ENVELOPE_END)[0];
+assert.ok(agyEnvelopeRegion, "canonical Critic template must carry an Antigravity Prompt envelope");
+const AGY_ENVELOPE = agyEnvelopeRegion.split("```text")[1]?.split("```")[0]?.trim();
+assert.ok(AGY_ENVELOPE, "canonical Critic template envelope must contain a text code block");
+const RENDERED_AGY_CRITIC_ENVELOPE = AGY_ENVELOPE
+  .replace("{{SPEC_PATH}}", "specs/feat-1/prd.md")
+  .replace("{{COMMIT_SHA}}", "0123456789abcdef0123456789abcdef01234567")
+  .replace("{{GUARDRAIL_PATH}}", "guardrails/security.md")
+  .replace("{{EVIDENCE_PATH}}", "evidence/verify-latest.json")
+  .replace("{{TRIGGER_ROW}}", "T1")
+  .replace("{{RULESET_SHA}}", "b6e2db657d078f023773853e8571a941bb29c2a5")
+  .replace("{{MODEL}}", "gemini-3.7");
+
+check("Antigravity Critic template carries a guard-admissible native envelope", () => {
+  assert.equal(ROOT_CRITIC_TEMPLATE, VENDORED_CRITIC_TEMPLATE);
+  assert.match(ROOT_CRITIC_TEMPLATE, /Antigravity native dispatch has a deliberately different carrier/);
+  assert.ok(RENDERED_AGY_CRITIC_ENVELOPE.startsWith("templates/prompts/critic-review.md\n"));
+  assert.doesNotMatch(RENDERED_AGY_CRITIC_ENVELOPE, /(?<![\w-])(you are|please|examine|look at|review)\b/i);
+});
+
+check("Antigravity pretool guard admits the actual rendered Critic envelope", () => {
+  const root = nativeFixture();
+  const nativeSubagents = [{ TypeName: "critic", Role: "Critic", Prompt: RENDERED_AGY_CRITIC_ENVELOPE }];
+  prepareNative(root, nativeSubagents);
+  const res = decision(run({
+    tool_use_id: "agy-rendered-critic-envelope",
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        model: AGY_TOOL_LAYER_MODEL,
+        Subagents: nativeSubagents,
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard still rejects copying the full canonical Critic body into Prompt", () => {
+  const root = fixture();
+  const bodyStart = ROOT_CRITIC_TEMPLATE.indexOf("You are the **Critic**");
+  assert.ok(bodyStart > 0, "canonical Critic body marker must remain present");
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [{ TypeName: "critic", Role: "Critic", Prompt: ROOT_CRITIC_TEMPLATE.slice(bodyStart) }],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard does not treat a paths-only critic dispatch as prose (neighbour case)", () => {
+  const root = nativeFixture();
+  const nativeSubagents = [
+    {
+      TypeName: "critic",
+      Role: "Critic",
+      Prompt: [
+        "specs/feat-1/prd.md",
+        "docs/adr/0014-critic-contract.md",
+        "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+        "model: sonnet",
+        "- **Tool budget (hard cap, first-class field):** ≤24 tool uses.",
+      ].join("\n"),
+    },
+  ];
+  prepareNative(root, nativeSubagents);
+  const res = decision(run({
+    tool_use_id: "agy-paths-only-critic-envelope",
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        model: AGY_TOOL_LAYER_MODEL,
+        Subagents: nativeSubagents,
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a Critic dispatch naming the canonical templates/prompts/critic-review.md path (D2)", () => {
+  const root = nativeFixture();
+  const nativeSubagents = [{ TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT }];
+  prepareNative(root, nativeSubagents);
+  const res = decision(run({
+    tool_use_id: "agy-canonical-critic-envelope",
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        model: AGY_TOOL_LAYER_MODEL,
+        Subagents: nativeSubagents,
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard still blocks genuine prose 'please review the code' after the D2 regex tightening", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: "please review the code",
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// F1: the D2 regex tightening over-corrected -- it also stopped matching a trigger word
+// preceded by markdown emphasis or a quote. These prompts carry a ruleset-sha and a model
+// token (dispatch-policy.mjs's own, separate requirements for a critic-type dispatch) so that
+// the ONLY thing that can produce a denial is the local Contamination Rule regex under test --
+// pre-fix these are wrongly ALLOWED (the actual F1 bug); post-fix they must be DENIED with a
+// Contamination Rule reason.
+const F1_RULESET_AND_MODEL = [
+  "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+  "model: sonnet",
+].join("\n");
+
+check("Antigravity pretool guard blocks a critic prompt with the trigger word inside markdown bold emphasis (F1)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: `- **review** the tests\n${F1_RULESET_AND_MODEL}`,
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks a critic prompt with the trigger word inside quotes (F1)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: `"Review the diff."\n${F1_RULESET_AND_MODEL}`,
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// 4. Multi-subagent envelope inspection (D3)
+
+check("Antigravity pretool guard blocks a critic dispatch carrying prose at index 1 of a multi-subagent envelope (D3)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          { TypeName: "goldfish", Role: "Goldfish Implementor", Prompt: "some other subagent, not the critic" },
+          { TypeName: "critic", Role: "Critic", Prompt: "Please examine this file and review it." },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)", () => {
+  const root = nativeFixture();
+  const nativeSubagents = [
+    { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
+    { TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
+  ];
+  prepareNative(root, nativeSubagents);
+  const res = decision(run({
+    tool_use_id: "agy-multi-critic-envelope",
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        model: AGY_TOOL_LAYER_MODEL,
+        Subagents: nativeSubagents,
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+// F2: guard-dispatch.mjs (the SEPARATE nested guard spawned via canonicalPayload) previously
+// only ever saw Subagents[0]'s shape, even after D3 fixed the LOCAL regex check to loop every
+// entry. This prompt deliberately carries none of the LOCAL check's trigger words ("you are",
+// "please", "examine", "look at", "review") -- so a denial here cannot come from the local
+// regex (D3's own test already covers that path) -- but it does carry "pay attention to",
+// which guard-dispatch.mjs's own contamination policy (dispatch-policy.mjs HUNT-LIST) flags
+// independently of the local check. A ruleset-sha and model token are included so the only
+// finding guard-dispatch.mjs can raise is HUNT-LIST, isolating the nested-guard coverage gap
+// this test is about.
+check("Antigravity pretool guard denies a multi-subagent envelope when guard-dispatch.mjs's own check (not the local regex) flags the critic entry at index 1 (F2)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: [
+              "specs/feat-1/prd.md",
+              "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+              "model: sonnet",
+              "Pay attention to the auth module changes in this diff.",
+            ].join("\n"),
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-dispatch|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node -e execution (containment)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node -e \"console.log(1)\"" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline python -c execution (containment)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "python -c \"print(1)\"" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows running a node script file, not inline code (neighbour case)", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-bare-"));
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node scratch/script.mjs" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity start hint never creates .git before Git initialization", () => {
+  const root = uninitializedTempRoot();
+  try {
+    const input = JSON.stringify({ invocationNum: 1, workspacePaths: [root], conversationId: "fresh" });
+    const result = spawnSync(process.execPath, [startHint], { cwd: root, input, encoding: "utf8", timeout: 8_000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(existsSync(join(root, ".git")), false, "the pre-init hint must not manufacture a Git control directory");
+    assert.match(result.stdout, /Agent Pipeline is available as an optional project workflow/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// 5. Broadened inline-execution containment (D6)
+
+check("Antigravity pretool guard blocks inline sh -c execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "sh -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline bash -c execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node --eval execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "node --eval \"console.log(1)\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node -p execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "node -p \"1+1\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node -pe execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "node -pe \"1+1\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline env node -e execution (containment, already covered pre-D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "env node -e \"console.log(1)\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// F6: D6's `sh|bash` alternative matched a bare `-c` only, missing combined single-dash flag
+// clusters ending in `c` and two shell names entirely.
+
+check("Antigravity pretool guard blocks inline bash -lc execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash -lc \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline sh -ec execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "sh -ec \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline zsh -c execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "zsh -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline dash -c execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "dash -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a plain bash script invocation, not inline exec (neighbour case, F6)", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-bare-"));
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash script.sh" } },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity scratch script inspection blocks Git indirection and keeps safe scripts usable", () => {
+  // The fixture root lives under the working directory's own scratch/ (untracked, gitignored), which a fresh
+  // clone or CI checkout does not have; create it so the case does not depend on a pre-existing directory.
+  mkdirSync(join(process.cwd(), "scratch"), { recursive: true });
+  const root = mkdtempSync(join(process.cwd(), "scratch/agy-report-hotfixes-20261003-script-check-"));
+  const scratch = join(root, "scratch");
+  mkdirSync(scratch, { recursive: true });
+  writeFileSync(join(scratch, "unsafe.sh"), "#!/bin/sh\ngit reset --hard\n");
+  writeFileSync(join(scratch, "safe.sh"), "#!/bin/sh\nprintf 'hello\\n'\n");
+  mkdirSync(join(scratch, "nested"), { recursive: true });
+  writeFileSync(join(scratch, "nested", "unsafe.sh"), "#!/bin/sh\ngit push --force\n");
+  try {
+    assert.equal(inspectScratchShellScript("bash scratch/unsafe.sh", root).status, "contains-git");
+    assert.equal(inspectScratchShellScript("bash scratch/nested/unsafe.sh", root).status, "contains-git");
+    assert.equal(inspectScratchShellScript("bash scratch/safe.sh", root).status, "safe-script");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+check("Antigravity pretool guard blocks inline bash --login -c execution, a flag before -c (containment, delta-4 F4)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash --login -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline bash -o pipefail -c execution, an option+argument before -c (containment, delta-4 F4)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash -o pipefail -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("lifecycle-not-ready denial does not advertise a human override ceremony", () => {
+  const root = fixture();
+  try {
+    for (const target of ["notes.md", join(root, "absolute-notes.md")]) {
+      const denied = decision(run({ toolCall: { name: "replace_file_content", args: { TargetFile: target, TargetContent: "", ReplacementContent: "x" } } }, root));
+      assert.equal(denied.decision, "deny");
+      assert.match(denied.reason, /GUARD-LIFECYCLE-NOT-READY/u);
+      assert.match(denied.reason, /Technical repair is required before retrying/u);
+      assert.doesNotMatch(denied.reason, /Re-run the typed project-onboarding-v3 inspection/u);
+      assert.doesNotMatch(
+        denied.reason,
+        /Human override available|sign-intent|human-held Ed25519 key|authorize-by-signature|verify-audit/u,
+      );
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);

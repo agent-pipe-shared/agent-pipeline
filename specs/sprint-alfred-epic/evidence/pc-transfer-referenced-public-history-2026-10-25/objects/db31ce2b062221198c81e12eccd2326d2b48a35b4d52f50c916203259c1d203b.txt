@@ -1,0 +1,154 @@
+diff --git a/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs b/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+index dba074f5f..492c91ac0 100644
+--- a/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
++++ b/plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+@@ -5,7 +5,17 @@ import { spawnSync } from 'node:child_process';
+ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+ import { dirname, join, resolve } from 'node:path';
+ import { fileURLToPath, pathToFileURL } from 'node:url';
+-import test from 'node:test';
++import { after } from 'node:test';
++import { registerTestCaseCompletion } from '../test-case-completion.mjs';
++
++const cases = [];
++function test(name, options, run) {
++  if (typeof options === 'function') { run = options; options = {}; }
++  cases.push({ id: name.split(' ')[0], name: name.slice(8), run(context) {
++    if (options.skip) { context.skip(options.skip); return; }
++    return run(context);
++  } });
++}
+ 
+ const self = fileURLToPath(import.meta.url);
+ const hooks = resolve(dirname(self), '../../hooks');
+@@ -31,7 +41,9 @@ if (worker) {
+     const { evaluateLifecycleReadyGuard } = await import('../../hooks/guard-lifecycle-ready.mjs');
+     process.stdout.write(JSON.stringify(evaluateLifecycleReadyGuard(request.input, { projectDir: request.root })));
+   }
+-} else {
++  process.exit(0);
++}
++
+   const base = resolve('scratch/agent-out/g23-cross-runner-passive-matrix');
+   mkdirSync(base, { recursive: true });
+   const area = realpathSync(mkdtempSync(join(base, 'fixture-')));
+@@ -98,27 +110,27 @@ if (worker) {
+     const init = spawnSync('git', ['init', '-q', root], { cwd: root, env: cleanEnv, encoding: 'utf8' });
+     assert.equal(init.status, 0, init.stderr);
+     assert.equal(inspect(undefined, true).state, 'active');
+-    await test('G23PM01 supported fixture enrollment survives fresh-process readback', () => {
++    test('G23PM01 supported fixture enrollment survives fresh-process readback', () => {
+       assert.deepEqual(inspect(), { state: 'active', provenance: 'explicit-local-decision' });
+     });
+-    await test('G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes', () => {
++    test('G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes', () => {
+       for (const route of routes) for (const path of ['docs/note.md', join(root, 'docs/note.md'), 'scratch/note.md']) allow(route, path);
+       for (const route of ['claude-shell', 'codex-shell']) for (const family of ['head', 'rg']) {
+         const decision = decide(route, join(root, 'docs/note.md'), family);
+         assert.equal(decision.allowed, true, decision.text);
+       }
+       // Execute only the admitted, owned synthetic file, never a refusal target.
+-      const consumed = spawnSync('cat', [join(root, 'docs/note.md')], { cwd: root, env: cleanEnv, encoding: 'utf8' });
++      const consumed = spawnSync(process.execPath, ['--input-type=module', '-e', 'import { readFileSync } from "node:fs"; process.stdout.write(readFileSync(process.argv[1]));', join(root, 'docs/note.md')], { cwd: root, env: cleanEnv, encoding: 'utf8' });
+       assert.equal(consumed.status, 0, consumed.stderr);
+       assert.equal(consumed.stdout, marker);
+     });
+-    await test('G23PM03 genuinely missing in-root exact file stays denied as missing on every route', () => {
++    test('G23PM03 genuinely missing in-root exact file stays denied as missing on every route', () => {
+       for (const route of routes) for (const path of ['docs/absent.md', join(root, 'docs/absent.md')]) deny(route, path, 'GUARD-READ-TARGET-MISSING');
+     });
+-    await test('G23PM04 nonexistent credential names stay denied for credentials, never absence', () => {
++    test('G23PM04 nonexistent credential names stay denied for credentials, never absence', () => {
+       for (const route of routes) for (const path of ['vault/id_rsa', credential]) deny(route, path, 'GUARD-READ-CREDENTIAL-TARGET');
+     });
+-    await test('G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart', () => {
++    test('G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart', () => {
+       // D96 supplies ordinary exact-path admission; there is no synthetic JSON
+       // allowlist. Every call starts a new consumer process and rechecks policy.
+       for (let restart = 0; restart < 2; restart++) {
+@@ -126,7 +138,7 @@ if (worker) {
+         for (const route of routes) allow(route, external);
+       }
+     });
+-    await test('G23PM06 symlink physical credential boundary and safe local alias', { skip: process.platform === 'win32' ? 'G23-PM-SYMLINK: native Windows link privilege qualification remains pending' : false }, () => {
++    test('G23PM06 symlink physical credential boundary and safe local alias', { skip: process.platform === 'win32' ? 'G23-PM-SYMLINK: native Windows link privilege qualification remains pending' : false }, () => {
+       symlinkSync(join(root, 'docs/note.md'), join(root, 'docs/local-link.md'));
+       // Empty inert fixture makes realpath meaningful; contains no key bytes.
+       writeFileSync(credential, '');
+@@ -138,7 +150,7 @@ if (worker) {
+       rmSync(join(root, 'docs/local-link.md'));
+       rmSync(join(root, 'docs/credential-link.md'));
+     });
+-    await test('G23PM07 native exact Grep and bounded listing controls retain SEC-11', () => {
++    test('G23PM07 native exact Grep and bounded listing controls retain SEC-11', () => {
+       for (const tool_input of [{ pattern: 'synthetic', path: 'docs/note.md' }, { pattern: 'synthetic', path: join(root, 'docs/note.md'), glob: '*.md' }, { pattern: 'synthetic', path: 'docs/note.md', type: 'md' }]) {
+         const verdict = inspect({ tool_name: 'Grep', tool_input });
+         assert.equal(verdict.exitCode, 0, verdict.stderr);
+@@ -155,5 +167,7 @@ if (worker) {
+       const read = inspect({ tool_name: 'Read', tool_input: { file_path: external } });
+       assert.equal(read.exitCode, 0, read.stderr);
+     });
+-  } finally { rmSync(area, { recursive: true, force: true }); }
+-}
++  } catch (error) { rmSync(area, { recursive: true, force: true }); throw error; }
++  after(() => rmSync(area, { recursive: true, force: true }));
++
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index cb812df88..177dff663 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4042,6 +4042,25 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "g23-cross-runner-passive-matrix-tests",
++      "file": "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs",
++      "invariantPinned": "G23 passive exact reads retain credential and missing-target boundaries across supported runner envelopes and fresh processes.",
++      "nonOverlapNote": "Seven bounded cross-runner passive-read cases complement the quoted-pipeline and original option examiners.",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "G23PM01",
++          "G23PM02",
++          "G23PM03",
++          "G23PM04",
++          "G23PM05",
++          "G23PM06",
++          "G23PM07"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index d7db3c8a4..0411d4917 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -683,6 +683,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "g23-cross-runner-passive-matrix-tests",
++      "path": "plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "g23-quoted-pipeline-reads-tests",
+       "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 1eaf8e61e..c81d40192 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -446,6 +446,7 @@
+         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+         "verify-phase:harness/scripts/verify.mjs:finish-feature-tests",
+         "verify-phase:harness/scripts/verify.mjs:fs-durability-tests",
++        "verify-phase:harness/scripts/verify.mjs:g23-cross-runner-passive-matrix-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-quoted-pipeline-reads-tests",
+         "verify-phase:harness/scripts/verify.mjs:g23-read-help-tests",
+         "verify-phase:harness/scripts/verify.mjs:g29-public-handover-admission-tests",

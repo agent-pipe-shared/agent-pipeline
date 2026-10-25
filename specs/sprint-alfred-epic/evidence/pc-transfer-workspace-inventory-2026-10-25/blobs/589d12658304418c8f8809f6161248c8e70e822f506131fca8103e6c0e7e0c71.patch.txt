@@ -1,0 +1,91 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index aca84cf4b..17936c706 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -113,6 +113,7 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/po-gate-profile-publisher.mjs`, `lib/private-boundary.mjs`,
+   `lib/project-authority.mjs`,
+   `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
++  `lib/project-onboarding-v3-author-identity.mjs`,
+   `lib/protected-test-paths.mjs`, `lib/publication-authority.mjs`,
+   `lib/publication-bundle.mjs`, `lib/publication-bundle-v2.mjs`,
+   `lib/publication-capability-preflight.mjs`, `lib/rebase-authority.mjs`,
+@@ -644,6 +645,12 @@ orphan-member step of the onboarding continuity), and
+ `plugins/pipeline-core/lib/session-cleanup-lost-binding.mjs` (releases a lost
+ or archived session-cleanup binding for `lib/session-cleanup-recovery.mjs`).
+ 
++ALF-K15 (2026-10-22) adds one more first-party module that a kernel file imports:
++`plugins/pipeline-core/lib/onboarding-driver-output.mjs` (the wire shape of the
++onboarding driver result that `scripts/onboarding-init.mjs` prints: each published
++ask and the primary collect-input action are printed once, with a resolver for
++consumers; it imports nothing and executes with kernel authority).
++
+ This source closure does not establish protected-source delivery, independent
+ review, native qualification or activation.
+ 
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 8724cf75a..0342abbd7 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -1968,6 +1968,12 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/project-onboarding-v3-answers-file.test.mjs"
+     },
++    {
++      "name": "onboarding-init-intake-author-tests",
++      "file": "plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs",
++      "invariantPinned": "D98: a Git author the intake record holds is not asked again and the first-answers receipt takes it from the record; explicit flags win; a one-sided record is still asked",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs"
++    },
+     {
+       "name": "role-route-preflight-tests",
+       "file": "plugins/pipeline-core/lib/role-route-preflight.test.mjs",
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 2c6fe0e80..1b83fb5ab 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -797,7 +797,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
+   "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
+   "plugins/pipeline-core/lib/dispatch-budget-notice.mjs",
+-  "plugins/pipeline-core/lib/node-sandbox-probe.mjs",
++  "plugins/pipeline-core/lib/node-sandbox-probe.mjs", "plugins/pipeline-core/lib/onboarding-driver-output.mjs",
+   "plugins/pipeline-core/lib/pipeline-owned-files.mjs",
+   "plugins/pipeline-core/lib/session-authority-observers.mjs",
+   "plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs",
+@@ -834,7 +834,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/advisor-prohibition-binding.mjs",
+   "plugins/pipeline-core/lib/dispatch-briefing-route-record.mjs",
+   "plugins/pipeline-core/lib/fanout-ledger.mjs",
+-  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs",
++  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index 15395a6c2..b6e4145ae 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -112,6 +112,7 @@ import { fileURLToPath } from "node:url";
+ 
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
++import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
+ import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+ import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
+ import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
+@@ -1781,13 +1782,7 @@ export function main(args = process.argv.slice(2), {
+   });
+   if (bootstrap) result.bootstrap = bootstrap;
+   if (initialAnswers) result.initialAnswers = initialAnswers;
+-  const printed = result.outcome === "pending-asks" && Array.isArray(result.pendingAsks)
+-    && result.final?.nextAction && Array.isArray(result.final.nextAction.pendingAsks)
+-    ? { ...result, final: { ...result.final,
+-        nextAction: Object.fromEntries(Object.entries(result.final.nextAction)
+-          .filter(([key]) => key !== "pendingAsks")) } }
+-    : result;
+-  write(`${JSON.stringify(printed)}\n`);
++  write(`${JSON.stringify(printOnboardingInitResult(result))}\n`);
+   return result.outcome === "ready"
+     || result.outcome === "collect-input"
+     || result.outcome === "external-operator"

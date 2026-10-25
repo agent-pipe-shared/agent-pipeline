@@ -1,0 +1,207 @@
+{
+  "schema": "scratch.actual-source-complete-project-onboarding-qualification.v1",
+  "taskId": "actual-source-complete-project-onboarding-qualification-20260929",
+  "head": "a590d21ea7d68b441dd4f0b66817bca865e919c0",
+  "actualSource": true,
+  "caseFiltered": false,
+  "manualFourShardController": true,
+  "SourceStable": true,
+  "fullQualification": false,
+  "result": {
+    "exitCode": 1,
+    "signal": null,
+    "timedOut": false,
+    "elapsedMs": 237118,
+    "declaredCaseCount": 184,
+    "shardCount": 4,
+    "failedShards": 4,
+    "shardCounts": [
+      {
+        "shard": 3,
+        "pass": 17,
+        "fail": 29
+      },
+      {
+        "shard": 2,
+        "pass": 14,
+        "fail": 32
+      }
+    ],
+    "shardExits": [
+      {
+        "shard": 0,
+        "exitCode": 1,
+        "observation": "explicit canonical controller stderr"
+      },
+      {
+        "shard": 1,
+        "exitCode": 1,
+        "observation": "explicit canonical controller stderr"
+      },
+      {
+        "shard": 2,
+        "exitCode": 1,
+        "observation": "explicit canonical controller stderr"
+      },
+      {
+        "shard": 3,
+        "exitCode": 1,
+        "observation": "explicit canonical controller stderr"
+      }
+    ],
+    "passLines": 54,
+    "failLines": 130,
+    "firstFailure": "FAIL  repository capability failures map exactly and stop before source/runtime inspection -- inspect is not defined"
+  },
+  "SourceBindingsBefore": [
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "ff2f7ac45ee7044c974b78e95ec3cb341b20f382688f4c1c4bc0f37853e64c23"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "fde466fa00f43892c2ff22f24ac44b26bfbb6244e63867439d90ab692949a248"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "801e50e82a23a48ea99473a70782005eec844a604b22d3c0d02da5a7d20d3f2f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "sha256": "865584a995bf2d19c38f09ffe96cdf7ee221c9a19bd18956f0340cc937cfbeb9"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "sha256": "e885c4b764a9889f7b553c3d0a10267b307b1d32bb08cf33d219d2f422f9ca6d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "88f4ac97a20bb77228417836320df5c8916ed8ec5bb4130f4888b6c4ffdc7c70"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "8dc05229943d816b03463649143eddfd51cae74bd1be40a796ffd28032d60554"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+      "sha256": "a2bddc0027cd30f0ed9f55460bce46b2306ff03b6ed9d677f85ad02c4cca8d56"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "sha256": "f043bd008bad87e6d033ad797579afe1ad76d9429384e6b9da7a079de735579c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/enrollment-retirement-coordinator.mjs",
+      "sha256": "1cc5c9ae6e65e8ce0244dc00e7afae56dfac4e68135d08d7f7cee744b8d85174"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+      "sha256": "44cf3f6d9ed811afd53b93483d4550fe264d75ed2e1f2cf92da6ec52108c3fe5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "50246313d2e0a722bf1840dd8fd2d43556c1cc279b1ac71441f5b39500d13cc0"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.test.mjs",
+      "sha256": "a9c7e5d7a7901cd65ef068afcaf980eabc0df646fa95c40642703e8e9ea341a7"
+    }
+  ],
+  "SourceBindingsAfter": [
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+      "sha256": "ff2f7ac45ee7044c974b78e95ec3cb341b20f382688f4c1c4bc0f37853e64c23"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "fde466fa00f43892c2ff22f24ac44b26bfbb6244e63867439d90ab692949a248"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "sha256": "801e50e82a23a48ea99473a70782005eec844a604b22d3c0d02da5a7d20d3f2f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "sha256": "865584a995bf2d19c38f09ffe96cdf7ee221c9a19bd18956f0340cc937cfbeb9"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+      "sha256": "e885c4b764a9889f7b553c3d0a10267b307b1d32bb08cf33d219d2f422f9ca6d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "88f4ac97a20bb77228417836320df5c8916ed8ec5bb4130f4888b6c4ffdc7c70"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/governance-scope.mjs",
+      "sha256": "8dc05229943d816b03463649143eddfd51cae74bd1be40a796ffd28032d60554"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+      "sha256": "a2bddc0027cd30f0ed9f55460bce46b2306ff03b6ed9d677f85ad02c4cca8d56"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+      "sha256": "f043bd008bad87e6d033ad797579afe1ad76d9429384e6b9da7a079de735579c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/enrollment-retirement-coordinator.mjs",
+      "sha256": "1cc5c9ae6e65e8ce0244dc00e7afae56dfac4e68135d08d7f7cee744b8d85174"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+      "sha256": "44cf3f6d9ed811afd53b93483d4550fe264d75ed2e1f2cf92da6ec52108c3fe5"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.mjs",
+      "sha256": "50246313d2e0a722bf1840dd8fd2d43556c1cc279b1ac71441f5b39500d13cc0"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/protected-baseline.test.mjs",
+      "sha256": "a9c7e5d7a7901cd65ef068afcaf980eabc0df646fa95c40642703e8e9ea341a7"
+    }
+  ],
+  "completionProtocol": "legacy-processOnly original manual four-shard controller; no FD3 claimed",
+  "artifacts": [
+    {
+      "path": "before.json",
+      "sha256": "abc435a0247c81fdab36e0488cdeb6a94a9bdf88b2209411ef9eb3081b8e087e"
+    },
+    {
+      "path": "closing-report.md",
+      "sha256": "b4999dbe008f0067646bf0122b601c050e7def38f2c9c64e67f0ea5b3aa6fa2d"
+    },
+    {
+      "path": "dispatch-record.json",
+      "sha256": "831d42f547438b7024294c289616b68a901779f6d81d9510d94fc100eeea13c7"
+    },
+    {
+      "path": "failure-lines.json",
+      "sha256": "55a278371b2899fbd06ecd49eeb8533bb5b3a7277f501ab5e24ca41220d06fae"
+    },
+    {
+      "path": "first-finding.json",
+      "sha256": "cb820c0cd11521c459a942969c3f27977f4a195af63003e1461b70213ddd2115"
+    },
+    {
+      "path": "freeze.py",
+      "sha256": "584413ca89d552ab06624d1f9aca945b86abedd12cb6e52a8df5102f57dd8360"
+    },
+    {
+      "path": "receipt.json",
+      "sha256": "316ad058ce8bb7985ed1cdd0124d44607340b640fbd513c1f1b9f375a1d68b41"
+    },
+    {
+      "path": "run.mjs",
+      "sha256": "b8e90610835e3b2dd2f7387cbbb1e9da43f052e028f704d666d16967f10b46fe"
+    },
+    {
+      "path": "stderr.txt",
+      "sha256": "920614f84def876116e955b143230c0e6cb4d80436808a28025d5fc71480e27c"
+    },
+    {
+      "path": "stdout.txt",
+      "sha256": "089d24d543be304dbf1cce492307ea68a3d88c7eb1a9d4ca17aa8b27eca0a8c8"
+    }
+  ]
+}

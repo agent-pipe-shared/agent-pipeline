@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {chmodSync,mkdirSync,readFileSync,renameSync,symlinkSync,writeFileSync,existsSync,rmSync} from 'node:fs';
+import {join} from 'node:path';
+import {fixture} from '../project-uninstall.fixture.mjs';
+const options=plan=>({activate:true,planSha256:plan.planSha256});
+const log=[];
+const code=fn=>{try{fn();return 'NO-THROW';}catch(e){return String(e.code)+':'+String(e.message).slice(0,80);}};
+for (const rel of ['.agents/plugins.json','.agents/hooks.json','.claude/pipeline.json','pipeline.user.yaml','.codex/agents/critic.toml']) {
+test('alias on '+rel+' after plan',t=>{
+  const f=fixture(t),plan=f.controller.plan({rootDir:f.root});
+  const p=join(f.root,rel);
+  renameSync(p,p+'.real');symlinkSync(p+'.real',p);
+  log.push('after-plan '+rel+' => '+code(()=>f.controller.apply(plan,options(plan))));
+});
+test('alias on '+rel+' before plan',t=>{
+  const f=fixture(t);
+  const p=join(f.root,rel);
+  renameSync(p,p+'.real');symlinkSync(p+'.real',p);
+  log.push('before-plan '+rel+' => '+code(()=>{const plan=f.controller.plan({rootDir:f.root});log.push('  conflicts='+JSON.stringify(plan.conflicts.map(c=>c.code)));f.controller.apply(plan,options(plan));}));
+});
+}
+test.after(()=>writeFileSync(new URL('../../../../dbg7-out.txt',import.meta.url),log.join('\n')));

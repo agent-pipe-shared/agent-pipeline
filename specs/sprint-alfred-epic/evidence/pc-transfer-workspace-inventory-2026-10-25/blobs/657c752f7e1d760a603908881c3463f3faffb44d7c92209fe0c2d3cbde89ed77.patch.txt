@@ -1,0 +1,17 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index bde7a88af..09a424612 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -42,7 +42,11 @@ const NUMERIC_VALUE = new Set([
+ const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
+ 
+ function isBoundedFilenameFilter(value) {
+-  return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
++  // Test-module suffixes are filename data too: the observed `*.test.mjs`
++  // read has the same traversal boundary as `*.mjs`. Keep the extension
++  // bound and optional literal test marker, rather than admitting arbitrary
++  // dotted/glob/path expressions (including the existing *.tar.gz negative).
++  return typeof value === "string" && /^\*\.(?:test\.)?[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
+ }
+ 
+ function denied(code = "GUARD-PARSE-UNSUPPORTED") {

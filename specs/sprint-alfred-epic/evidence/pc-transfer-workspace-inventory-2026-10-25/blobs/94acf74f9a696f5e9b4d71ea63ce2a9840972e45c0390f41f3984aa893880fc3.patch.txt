@@ -1,0 +1,258 @@
+diff --git a/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs b/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
+index 482c2cc43..c023231f8 100644
+--- a/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
++++ b/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
+@@ -45,7 +45,8 @@ export function fixture(profile = 'feature') {
+   writeFileSync(join(root, '.agent-pipeline/onboarding-consent.json'), JSON.stringify({
+     schema: 'pipeline.onboarding-consent-marker.v1', status: 'consent-given-onboarding-incomplete', consentGivenAt: now,
+   }));
+-  const spec = '# Technical Spec\nGuard admission regression.\n';
++  // AC-264 / D85: a governed root's submit-plan also needs a Spec whose delivery hand-off is ready (one admitted criterion row).
++  const spec = '# Technical Spec\nGuard admission regression.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Guard admission regression. |\n';
+   const plan = `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${digest(spec)} -->\n# PRD\n${featureId}\n`;
+   const sourcePaths = { input: `specs/${featureId}/design-input.md`, prd: planPath, spec: specPath,
+     design: `specs/${featureId}/design.md`, traceability: `specs/${featureId}/traceability.md` };
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index a923599d8..c0be345e5 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -59,7 +59,8 @@ function fixture(profile = "feature") {
+   writeFileSync(join(root, ".agent-pipeline/onboarding-consent.json"), JSON.stringify({
+     schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: now,
+   }));
+-  const spec = "# Technical Spec\nGuard admission regression.\n";
++  // AC-264 / D85: this root is governed (consent marker), so submit-plan also needs a Spec whose delivery hand-off is ready: one admitted criterion row.
++  const spec = "# Technical Spec\nGuard admission regression.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Guard admission regression. |\n";
+   const plan = `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${digest(spec)} -->\n# PRD\n${featureId}\n`;
+   const sourcePaths = { input: `specs/${featureId}/design-input.md`, prd: planPath, spec: specPath,
+     design: `specs/${featureId}/design.md`, traceability: `specs/${featureId}/traceability.md` };
+diff --git a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+index 1879cf161..3283400b7 100644
+--- a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+@@ -100,7 +100,7 @@ function capture(fn) {
+   finally { console.log = beforeLog; console.error = beforeError; }
+ }
+ /** A submitted feature-profile root whose Spec is `spec`; the PRD carries the matching marker. */
+-function submittedRoot(spec) {
++function submittedRoot(spec, { governed = true } = {}) {
+   const scratch = resolve(pluginRoot, "../../scratch");
+   mkdirSync(scratch, { recursive: true });
+   const root = mkdtempSync(join(scratch, "alf-k11-d64-"));
+@@ -113,7 +113,8 @@ function submittedRoot(spec) {
+   mkdirSync(join(root, "project"), { recursive: true });
+   mkdirSync(join(root, `specs/${FEATURE}`), { recursive: true });
+   mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
+-  writeFileSync(join(root, ".agent-pipeline/onboarding-consent.json"), JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: now }));
++  // The consent marker is what makes this disposable root a governed project (AC-264 / D85: a governed project's submit-plan also checks the delivery hand-off).
++  if (governed) writeFileSync(join(root, ".agent-pipeline/onboarding-consent.json"), JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: now }));
+   const plan = `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${sha(spec)} -->\n# PRD\n${FEATURE}\n`;
+   writeFileSync(join(root, planPath), plan);
+   writeFileSync(join(root, specPath), spec);
+@@ -134,8 +135,8 @@ function submittedRoot(spec) {
+   writeFileSync(join(root, "evidence/review-1.json"), "{}\n");
+   return { root, deps, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+ }
+-function presentPlan(spec) {
+-  const f = submittedRoot(spec);
++function presentPlan(spec, options) {
++  const f = submittedRoot(spec, options);
+   try { return capture(() => run(["present-plan", "--by", "Fixture", "--review-receipt", "evidence/review-1.json"], f.deps)); }
+   finally { f.cleanup(); }
+ }
+@@ -143,7 +144,7 @@ const SUPPORTED_SHAPE_NAMES = [/\| # \| Criterion \| Evidence \|/u, /AC-<n>/u, /
+ 
+ test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", () => {
+   for (const [label, spec, id] of [["four-column table", FOUR_COLUMN, "AC-1"], ["leading-zero id", LEADING_ZERO, "AC-01"]]) {
+-    const refused = presentPlan(spec);
++    const refused = presentPlan(spec, { governed: false });
+     assert.equal(refused.code, 2, label);
+     assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, `${label}: ${refused.stderr}`);
+     assert.ok(refused.stderr.includes(id), `${label}: names the offending id`);
+@@ -153,13 +154,25 @@ test("D64 present-plan: an unsupported criterion shape or id is refused before p
+ 
+ test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and a Spec with no criterion rows are not refused by it", () => {
+   for (const [label, spec] of [["supported three-column", THREE_COLUMN], ["supported two-column", TWO_COLUMN], ["no criterion rows at all", "# Technical Spec\nGuard admission regression.\n"]]) {
+-    const result = presentPlan(spec);
++    const result = presentPlan(spec, { governed: false });
+     assert.equal(result.code, 2, `${label}: the later receipt check still stops the bare fixture`);
+     assert.doesNotMatch(result.stderr, /CAC-CRITERION-UNSUPPORTED/u, `${label}: ${result.stderr}`);
+     assert.match(result.stderr, /present-plan refused \(DRR-/u, `${label}: ${result.stderr}`);
+   }
+ });
+ 
++// AC-264 / D85 (PO decision 2026-10-22): a GOVERNED project's submit-plan also checks the delivery hand-off, so a Spec with no admitted row never reaches
++// present-plan there (the cases above run an ungoverned root, with the Spec bytes and assertions unchanged). D64 stays reachable in a governed root when
++// the Spec has at least one admitted row beside the unsupported one, and an unready hand-off is refused at submit-plan with its typed code.
++test("D64 present-plan with the delivery hand-off wired: governed root, one admitted row beside an unsupported one is still refused by D64; a Spec with no admitted row is refused at submit-plan", () => {
++  const mixed = `${LEADING_ZERO}\n| # | Criterion |\n| --- | --- |\n| 1 | A supported row beside the unsupported AC-01 |\n`;
++  assert.deepEqual(scanAcceptedCriterionRows(mixed).map((row) => row.id), ["AC-1"], "control: exactly one row is admitted, AC-01 is not");
++  const refused = presentPlan(mixed);
++  assert.equal(refused.code, 2);
++  assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, refused.stderr);
++  assert.throws(() => presentPlan(FOUR_COLUMN), /PLR-HANDOFF-NO-CRITERION/u, "submit-plan stops a governed Spec with no admitted row, before present-plan");
++});
++
+ test("D64 criterion inspection: the located and the unsupported rows come from the parser's own scan", () => {
+   assert.equal(typeof contract.inspectSpecCriterionRows, "function");
+   const ok = contract.inspectSpecCriterionRows(THREE_COLUMN);
+diff --git a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+index 2c9538405..1297fa00f 100644
+--- a/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
++++ b/plugins/pipeline-core/lib/pins/three-runner-happy-path-with-two-po-approvals.test.mjs
+@@ -39,7 +39,9 @@ import { applyOnboardingIntakeConsent, readOnboardingIntakeCheckpoint } from "..
+ import { scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
+ import { validateItemDeliveryBriefing } from "../native-goldfish-host-return.mjs";
+ import { resolveGovernedItemQueue } from "../native-goldfish-host-state.mjs";
+-import { inspectPlanDeliveryHandoff } from "../plan-handoff-readiness.mjs";
++import * as planHandoffModule from "../plan-handoff-readiness.mjs";
++// Namespace import: a missing export fails its own case with a typed message instead of aborting the loading of this whole file.
++const { inspectPlanDeliveryHandoff, PLAN_HANDOFF_CODES, planHandoffRefusal } = planHandoffModule;
+ import { applyProjectOnboardingV3, inspectProjectOnboardingV3, planProjectOnboardingLifecycleV4, planProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { fakeDeps as machineDeps } from "../project-onboarding-v3.test.mjs";
+ import { nativeContractFixtureParent } from "../test-item-approved-course-fixture.mjs";
+@@ -490,14 +492,35 @@ function lifecycleHandler(source, verb) {
+   return source.slice(start, next < 0 ? source.length : next);
+ }
+ const pipelineStateSource = readFileSync(join(PLUGIN, "scripts", "pipeline-state.mjs"), "utf8");
+-const handoffWired = ["submit-plan", "present-plan"].every((verb) => lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"));
+-test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", {
+-  todo: handoffWired ? false : "deferred to 0.7.x by PO decision D85 (owner Coordinator, due 2026-10-31): the call sites in scripts/pipeline-state.mjs (protected) are not built; lib/plan-handoff-readiness.mjs is delivered and covered above but has no caller, so plan readiness does not yet enforce the hand-off.",
+-}, () => {
++// Strict since PO decision 2026-10-22 pulled the formerly deferred D85 clause into 0.7.0 (it was a typed todo before).
++test("AC-264 added (P0-1): submit-plan and present-plan call the plan-readiness hand-off inspection, so the failure cannot first appear after approval", () => {
+   for (const verb of ["submit-plan", "present-plan"]) {
+-    assert.ok(lifecycleHandler(pipelineStateSource, verb).includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
++    const handler = lifecycleHandler(pipelineStateSource, verb);
++    assert.ok(handler.includes("inspectPlanDeliveryHandoff"), `${verb} must call inspectPlanDeliveryHandoff before the PO is asked to sign`);
++    assert.ok(handler.includes("planHandoffRefusal"), `${verb} must refuse through the typed, self-describing refusal text`);
+   }
+   assert.equal(lifecycleHandler(pipelineStateSource, "approve-plan").includes("inspectPlanDeliveryHandoff"), false, "never at approval: a refusal there would burn the signature");
++  const submit = lifecycleHandler(pipelineStateSource, "submit-plan");
++  assert.ok(submit.indexOf("inspectPlanDeliveryHandoff") < submit.indexOf("writeState("), "submit-plan inspects BEFORE any state write, so a refusal leaves no state");
++  const present = lifecycleHandler(pipelineStateSource, "present-plan");
++  assert.ok(present.indexOf("inspectPlanDeliveryHandoff") < present.indexOf("writeDesignWorkflowApprovalRequest("), "present-plan inspects BEFORE the approval request file is written");
++});
++
++test("AC-264 added (P0-1): the hand-off refusal text names the cause and one runnable repair per typed code, and a ready or skipped verdict is silent", () => {
++  assert.equal(typeof planHandoffRefusal, "function", "lib/plan-handoff-readiness.mjs must export planHandoffRefusal");
++  assert.equal(planHandoffRefusal("submit-plan", { ok: true, skipped: true, code: "PLR-NO-GOVERNANCE" }), null, "an ungoverned project is never refused");
++  assert.equal(planHandoffRefusal("present-plan", { ok: true, code: "PLR-HANDOFF-READY", admittedCriteria: ["AC-1"], checks: [] }), null);
++  for (const code of PLAN_HANDOFF_CODES.filter((entry) => !["PLR-NO-GOVERNANCE", "PLR-HANDOFF-READY"].includes(entry))) {
++    for (const verb of ["submit-plan", "present-plan"]) {
++      const text = planHandoffRefusal(verb, { ok: false, code, message: "cause text", path: "tests/x.test.js" });
++      assert.match(text, new RegExp(`^Error: ${verb} refused \\(${code}\\); cause text`, "u"), `${code}: names verb, code and cause`);
++      assert.match(text, /Repair: /u, `${code}: carries a repair`);
++      assert.match(text, /submit-plan/u);
++    }
++  }
++  assert.match(planHandoffRefusal("present-plan", { ok: false, code: "PLR-HANDOFF-NO-CRITERION", message: "m" }), /cancel-submitted-plan/u, "after submission the repair includes withdrawing the bound submission");
++  assert.equal(/cancel-submitted-plan/u.test(planHandoffRefusal("submit-plan", { ok: false, code: "PLR-HANDOFF-NO-CRITERION", message: "m" })), false, "before submission there is nothing to withdraw");
++  assert.match(planHandoffRefusal("submit-plan", { ok: false, code: "PLR-HANDOFF-UNKNOWN-CODE", message: "m" }), /Repair: /u, "an unknown code still gets a repair (fail closed)");
+ });
+ 
+ /** A fresh Codex onboarding root through the real portable apply (the shared fakeDeps answers only the machine facts). */
+diff --git a/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs b/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
+index a725aec1a..b06180f1f 100644
+--- a/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
++++ b/plugins/pipeline-core/lib/plan-authority-staging-guard.test.mjs
+@@ -370,7 +370,8 @@ test("set-feature initializes revision-0 continuity so submit-plan succeeds with
+ 
+     mkdirSync(join(root, "specs", featureId), { recursive: true });
+     const prdText = "# PRD\nRequirements here.\n";
+-    const specText = "# Spec\nSpecification details.\n";
++    // AC-264 / D85: a governed root's submit-plan also needs a Spec with one admitted criterion row.
++    const specText = "# Spec\nSpecification details.\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | Continuity is initialized by set-feature. |\n";
+     writeFileSync(join(root, planPath), prdText, "utf8");
+     writeFileSync(join(root, specPath), specText, "utf8");
+ 
+diff --git a/plugins/pipeline-core/lib/plan-handoff-readiness.mjs b/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
+index 2f8be570d..5af738df6 100644
+--- a/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
++++ b/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
+@@ -88,6 +88,35 @@ function checkState(root, path) {
+   return 'present';
+ }
+ 
++// One runnable repair per not-ready code. Every repair is an edit the author can make plus the command to re-run.
++const HANDOFF_REPAIRS = Object.freeze({
++  'PLR-HANDOFF-NO-CRITERION': 'add a normative acceptance-criterion table to the Spec (header row, then rows such as `| AC-1 | WHEN <trigger>, THE system <behaviour> | <test file> |`, or numbered `1` / `R-2` rows under an acceptance-criteria heading), commit it',
++  'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
++  'PLR-HANDOFF-CHECK-UNADMITTED': 'correct the named test path in the Spec to a normalized repository-relative .test.mjs/.test.cjs/.test.js path, or remove the mention if it is not a deliverable test of this project, commit it',
++  'PLR-HANDOFF-CHECK-NOT-TRACKABLE': 'move the named test path to a location git does not ignore (`git check-ignore -v <path>` names the rule), or edit the Spec to name a trackable path, commit it',
++  'PLR-HANDOFF-UNAVAILABLE': 'confirm `git --version` and `git status` succeed in the project root and the governance observation is readable, then retry; this check fails closed on any fault',
++});
++
++/**
++ * Self-describing refusal text for a not-ready hand-off verdict at submit-plan / present-plan, or null when the plan may proceed
++ * (ready, or skipped because the project is not governed). Names the verb, typed code and cause, then one runnable repair.
++ * After submission the Spec bytes are bound to the submission, so the repair also withdraws it (`cancel-submitted-plan`).
++ * @param {'submit-plan'|'present-plan'} verb
++ * @param {ReturnType<typeof inspectPlanDeliveryHandoff>} verdict
++ * @returns {string|null}
++ */
++export function planHandoffRefusal(verb, verdict) {
++  if (verdict?.ok === true) return null;
++  const code = typeof verdict?.code === 'string' ? verdict.code : 'PLR-HANDOFF-UNAVAILABLE';
++  const cause = typeof verdict?.message === 'string' ? verdict.message : 'the plan hand-off could not be inspected; fail closed';
++  const where = typeof verdict?.path === 'string' ? ` (${verdict.path})` : '';
++  const repair = HANDOFF_REPAIRS[code] ?? HANDOFF_REPAIRS['PLR-HANDOFF-UNAVAILABLE'];
++  const rerun = verb === 'present-plan' && code !== 'PLR-HANDOFF-UNAVAILABLE'
++    ? 'then withdraw the bound submission with `cancel-submitted-plan` and run `submit-plan` and `present-plan` again'
++    : `then run ${verb === 'present-plan' ? 'present-plan' : 'submit-plan'} again`;
++  return `Error: ${verb} refused (${code}); ${cause}${where}. No state was written and no signature was requested. Repair: ${repair}, ${rerun}. (submit-plan, present-plan and the delivery briefing read the same hand-off; approve-plan never re-checks it.)`;
++}
++
+ /**
+  * @param {{rootDir: string, specPath: string, expectedSpecSha256: string}} input
+  * @param {{observeScope?: (options: {rootDir: string}) => {requiresEnforcement: boolean}}} [deps]
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 54fcf1423..c71b5eb55 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -453,7 +453,8 @@ async function buildSubmittedFeature(prefix) {
+   // Initialize the actual neutral authority tier before State/owner capture.
+   writeFileIn(dir, "project/pipeline.yaml", readFileSync(join(dir, ".claude/pipeline.yaml"), "utf8"));
+ 
+-  const specBytes = Buffer.from("# Test Spec\n", "utf8");
++  // AC-264 / D85: submit-plan also checks the delivery hand-off of a governed root, so the Spec carries one admitted criterion row.
++  const specBytes = Buffer.from("# Test Spec\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | The e2e fixture feature works. |\n", "utf8");
+   const specSha256 = sha256(specBytes);
+   writeFileIn(dir, SPEC_PATH, specBytes.toString("utf8"));
+   const prdText = `${poGate.PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${poGate.PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${specSha256} -->\n# Test PRD\nImplementation surface: \`src/index.mjs\`.\n`;
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs
+index b9ec37c1c..e01a00f4c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs
+@@ -200,7 +200,8 @@ function generatorSubmitFixture(name, { exempt }) {
+   const specPath = `specs/${featureId}/spec.md`;
+   mkdirSync(join(dir, `specs/${featureId}`), { recursive: true });
+   mkdirSync(dirname(statePath(dir)), { recursive: true });
+-  writeFileSync(join(dir, specPath), "# Generated specification\n");
++  // AC-264 / D85: this root is enrolled (governed), so submit-plan also needs a Spec with one admitted criterion row.
++  writeFileSync(join(dir, specPath), "# Generated specification\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | The generated feature works. |\n");
+   const specSha256 = hash(readFileSync(join(dir, specPath)));
+   writeFileSync(join(dir, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${specSha256} -->\n# Generated plan\n`);
+   const planSha256 = hash(readFileSync(join(dir, planPath)));
+diff --git a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+index 8e7d7e808..ec5543c41 100644
+--- a/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/project-onboarding-e2e.test.mjs
+@@ -1315,6 +1315,17 @@ test("in-process driver follows returned actions and preserves the Codex legacy-
+       assert.doesNotMatch(authoredPrd, /DRAFT TEMPLATE|REPLACE:/u,
+         `${runner}: final authoring removes the reserved template markers before approval`);
+       assert.equal(authoredPrd.match(/technical-spec-sha256\s*:\s*([a-f0-9]{64})/iu)?.[1], generatedSpecDigest);
++      // AC-264 / D85 (PO decision 2026-10-22): the generated Spec is a staging draft that says its acceptance criteria "must be authored ...
++      // before the plan is submitted", and a governed project's submit-plan now refuses a Spec with no admitted criterion row. The agent's
++      // authoring step therefore replaces the skeleton's placeholder criterion (AC-01, a leading-zero id the criterion parser cannot locate)
++      // with a supported one and moves the PRD's Spec binding to the authored bytes (a real digest, not a constant). Everything asserted
++      // about the GENERATED bytes above is unchanged.
++      const authoredSpecFile = join(path, dirname(prdPath), "spec.md");
++      const generatedSpecText = readFileSync(authoredSpecFile, "utf8");
++      const skeletonCriterion = "- AC-01: WHEN <trigger>, the system SHALL <observable result>.";
++      assert.ok(generatedSpecText.includes(skeletonCriterion), `${runner}: the generated Spec carries the skeleton criterion placeholder`);
++      writeFileSync(authoredSpecFile, generatedSpecText.replace(skeletonCriterion, "- **AC-1:** WHEN the player presses a key, the game exports playable=true."));
++      writeFileSync(prdFile, authoredPrd.replace(generatedSpecDigest, sha256(readFileSync(authoredSpecFile))));
+       const sourceBase = dirname(prdPath);
+       const featureId = beforeArchitectureSubmission.activeFeature.id;
+       const fixtureSources = [

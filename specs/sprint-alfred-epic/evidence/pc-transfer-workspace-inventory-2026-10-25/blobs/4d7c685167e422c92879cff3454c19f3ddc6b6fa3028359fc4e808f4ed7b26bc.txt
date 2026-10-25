@@ -1,0 +1,35 @@
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+const { devPlanShellRefusalHit } = await import(new URL('./plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs', import.meta.url));
+const root = fileURLToPath(new URL('./', import.meta.url)).replace(/[\\/]$/u, '');
+const pluginRoot = fileURLToPath(new URL('./plugins/pipeline-core/', import.meta.url)).replace(/[\\/]$/u, '');
+const pluginScripts = pluginRoot + '/scripts/';
+const out = [];
+function hit(command, extra = {}) {
+  const calls = [];
+  const deps = { ...extra, calls, devPlanGateVerdictFn(i) { calls.push(i.filePath); return { verdict: 'block', reason: 'fx', lifecycleStatus: 'draft' }; }, inspectProjectOnboardingV3Fn() { throw new Error('no'); } };
+  const r = devPlanShellRefusalHit(command, root, deps);
+  return r === null ? 'ADMITTED' : `refused:${r.verdict}:${r.lane}`;
+}
+const q = (v) => `"${v}"`;
+const lit = '${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs';
+const elsewhere = { env: { PIPELINE_PLUGIN_ROOT: join(root, 'no-such-plugin-root') } };
+const self = { env: { PIPELINE_PLUGIN_ROOT: pluginRoot } };
+const cases = [
+  ['variant(self env)', `node ${q('${pipeline_plugin_root}/SCRIPTS/Pipeline-Start-Preflight.mjs')}`, self],
+  ['lit+extra', `node ${q(lit)} --extra`, {}],
+  ['foreign script', `node ${q('${PIPELINE_PLUGIN_ROOT}/scripts/other.mjs')}`, {}],
+  ['lit x', `node ${q(lit + 'x')}`, {}],
+  ['OTHER_ROOT', `node ${q('${OTHER_ROOT}/scripts/pipeline-start-preflight.mjs')}`, {}],
+  ['lit elsewhere env', `node ${q(lit)}`, elsewhere],
+  ['prov no apply', `node ${q(pluginScripts + 'clone-hook-readiness.mjs')} --root ${q(root)}`, {}],
+  ['prov extra', `node ${q(pluginScripts + 'clone-hook-readiness.mjs')} --root ${q(root)} --apply --extra`, {}],
+  ['prov foreign root', `node ${q(pluginScripts + 'clone-hook-readiness.mjs')} --root ${q(join(root, 'other'))} --apply`, {}],
+  ['prov no root', `node ${q(pluginScripts + 'clone-hook-readiness.mjs')} --apply`, {}],
+  ['refresh --apply', `node ${q(pluginScripts + 'refresh-mandatory-hooks.mjs')} --root ${q(root)} --apply`, {}],
+  ['refresh foreign', `node ${q(pluginScripts + 'refresh-mandatory-hooks.mjs')} --root ${q(join(root, 'other'))}`, {}],
+  ['refresh x', `node ${q(pluginScripts + 'refresh-mandatory-hooks.mjs' + 'x')} --root ${q(root)}`, {}],
+];
+for (const [name, cmd, extra] of cases) out.push(`${name} => ${hit(cmd, extra)}`);
+writeFileSync(new URL('./dbg4b-out.txt', import.meta.url), out.join('\n'));

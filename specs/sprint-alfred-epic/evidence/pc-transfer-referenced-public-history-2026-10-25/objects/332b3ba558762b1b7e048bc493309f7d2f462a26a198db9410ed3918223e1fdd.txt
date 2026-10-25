@@ -1,0 +1,11 @@
+command: node scripts/run-in.mjs scratch/clones/k152 k152-green3 plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+label: k152-green-part3
+exitCode: 0
+head: 4c23b0dea42b560250fa6de2d1d41a4f3ed3e3ad
+tree: bbb0eb3f0d5f08e4e93bd7611be4b6a530db68b1
+dirty: false
+--- stdout ---
+GREEN exit 0 tests 5 pass 5 fail 0 skip 0 todo 0  plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+   address-root repair: repaired ARR-OK moved 1
+
+--- stderr ---

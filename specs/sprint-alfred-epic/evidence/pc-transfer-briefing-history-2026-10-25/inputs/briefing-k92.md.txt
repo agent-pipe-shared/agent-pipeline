@@ -1,0 +1,18 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-decided.md` and the files named in them are your ONLY input. Read `scratch/clones/k92/templates/prompts/agent-obligations.md` first, then the common file. Clone name: `k92`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K92-GS1-SIGNATURE-ROUTE/2026-10-23 · Role Goldfish`
+
+## K92-GS1-SIGNATURE-ROUTE: GS-1 on `pipeline.user.yaml` stays repairable by signature
+
+### 1. Goal
+PO rule (decisions file, row 29): "every deadlock must stay repairable by signature in the user repo". Today an edit of `pipeline.user.yaml` through the Antigravity pretool guard is answered `HGO-NARROWER-USER-CONFIG-REFUSED` ("typed recovery: a human edit committed to the repo, no signed override"), while the two cases `antigravity-pretool-guard.test.mjs` (about lines 846 to 870 in the bundle state; the GS-1 liftable case and the signature-guidance case) expect "Human override available" and the `emit-signature-digest` guidance. Find where the refusal is produced (`rg -n "HGO-NARROWER-USER-CONFIG-REFUSED" <file>` in `plugins/pipeline-core/lib`, `hooks`, `scripts`: one directory at a time with `find` to list candidate files first), read the decision that introduced it (`git log --oneline -5 -S"HGO-NARROWER-USER-CONFIG-REFUSED" -- <file>` is a composed form: instead `git log --oneline -8 -- <file>` and read the likely commit with `git show --stat --format=%B <sha>`), and make the refusal offer the signed-override route for the deadlock case while KEEPING what the narrower-config rule protects: an agent-side widening of `pipeline.user.yaml` must stay refused unless a human signature (HGO capability bound to the exact tool input, as all HGO routes) authorizes it; a narrowing edit needs nothing. The refusal text must name the exact repair (the HGO plan/prepare/emit-signature-digest/authorize steps for this exact request, as the other HGO refusals do; copy their shape from `lib/guard` or the hook that emits "Human override available"). Do not restate the two antigravity cases: they must turn green by the product change (they are the RED proof: record the RED run first, 61 ok / 2 not ok in the bundle clone, then the GREEN run). Also check there is no other case in the repo that pins "no signed override for narrower-config" (`rg -n "NARROWER-USER-CONFIG" <test file>`; list the test files from the `find` step): if one does, it encodes the opposite of the PO rule: report it and restate it with a bounded justification citing row 29.
+Suites to count (each ONCE alone, before and after): `plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs` (about 7 minutes; custom runner: whole file each time), every test file that mentions the refusal code, the human-guard-override suites that cover capability binding for the touched module (`find plugins/pipeline-core/hooks -name "*human-guard-override*"` and `lib`), `hooks/guard-lifecycle-ready.test.mjs` only if you touched `lib/guard/*` (about 8 minutes; expect 392 / 389 pass / 3 skipped).
+
+### 2. Context files
+Decisions file rows 29 and 19; `scratch/agent-out/k76-notes.md` and `k73-notes.md` (main, read only: the GS-1 observations); the antigravity test and adapter; `docs/human-authorization-inventory.md` (`rg -n "user.yaml" <file> | head`).
+
+### 3. DoD
+Both GS-1 cases green with the product change; no narrower-config widening admitted without a signature (add one negative control case: an agent widening WITHOUT a capability is still refused); counts before/after; protected diff exported.
+
+### 4. Task id
+TASK_ID: K92-GS1-SIGNATURE-ROUTE.

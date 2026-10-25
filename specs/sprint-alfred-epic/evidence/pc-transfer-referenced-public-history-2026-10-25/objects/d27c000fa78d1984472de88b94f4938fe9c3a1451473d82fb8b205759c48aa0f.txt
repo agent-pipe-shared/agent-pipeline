@@ -1,0 +1,18 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+label: ac168-grep-max-count-green
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+✔ bounded max-count grep admits an exact passive file and retains denials (23.659054ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 371.034763
+
+--- stderr ---

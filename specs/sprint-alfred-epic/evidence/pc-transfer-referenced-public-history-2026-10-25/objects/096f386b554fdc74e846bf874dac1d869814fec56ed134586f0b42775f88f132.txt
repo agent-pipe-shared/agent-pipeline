@@ -1,0 +1,12 @@
+command: node scripts/run-in.mjs scratch/clones/k147 k147-cadh plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs
+label: base-cadh
+exitCode: 1
+head: 138d018ff085f6ba3ee653eaf3a8a491b988dbe4
+tree: 66264467a99514c4eab283e1a37931e179505eea
+dirty: false
+--- stdout ---
+RED   exit 1 tests 1 pass 0 fail 1 skip 0 todo 0  plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs
+   ✖ CADH001 active Advisor keeps its signed S4/S2 selection through metadata rechecks and one S5/S6 native launch
+   address-root repair: repaired ARR-OK moved 26
+
+--- stderr ---

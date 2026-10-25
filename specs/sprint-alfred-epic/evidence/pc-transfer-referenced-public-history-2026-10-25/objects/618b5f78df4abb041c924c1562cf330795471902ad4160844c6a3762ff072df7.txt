@@ -1,0 +1,70 @@
+command: node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/agent-out/generator-integrated-13-qualification/resource-observations.json
+label: generator-resource-headroom
+exitCode: 0
+head: 5017a7287485783fa2d4ff17d3f3240f2a719e13
+tree: c972b2a380287b5091626ffd40db40eede589883
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.project-resource-headroom-report.v1",
+  "candidate": {
+    "commit": "5017a7287485783fa2d4ff17d3f3240f2a719e13",
+    "tree": "c972b2a380287b5091626ffd40db40eede589883"
+  },
+  "assurance": "declared-observations",
+  "compliance": "not-certified",
+  "resources": [
+    {
+      "id": "fixture-summary",
+      "status": "within-limit",
+      "unit": "utf8-bytes",
+      "limit": 8192,
+      "measured": 2620,
+      "headroom": 5572,
+      "limitSourceRef": {
+        "path": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+        "sha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+        "locator": "assertCompact(summary.out, 8192); COLLECT_INPUT_REFERENCE_BOUND = 15_000"
+      },
+      "measurementRef": {
+        "path": "scratch/agent-out/generator-integrated-13-qualification/measurement.log",
+        "sha256": "fc09fc8caed655ebef14221b0a515faba6a461fc6e080ce560c49c0c57fea8e2"
+      },
+      "measurementCommand": "node scratch/agent-out/generator-integrated-13-qualification/run.mjs measure",
+      "measurementExitCode": 0
+    },
+    {
+      "id": "fixture-driver-primary-reference",
+      "status": "exceeded",
+      "unit": "utf8-bytes",
+      "limit": 15000,
+      "measured": 15230,
+      "headroom": -230,
+      "limitSourceRef": {
+        "path": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+        "sha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+        "locator": "assertCompact(summary.out, 8192); COLLECT_INPUT_REFERENCE_BOUND = 15_000"
+      },
+      "measurementRef": {
+        "path": "scratch/agent-out/generator-integrated-13-qualification/measurement.log",
+        "sha256": "fc09fc8caed655ebef14221b0a515faba6a461fc6e080ce560c49c0c57fea8e2"
+      },
+      "measurementCommand": "node scratch/agent-out/generator-integrated-13-qualification/run.mjs measure",
+      "measurementExitCode": 0
+    },
+    {
+      "id": "native-host-output-budget",
+      "status": "unknown",
+      "unit": null,
+      "limit": null,
+      "measured": null,
+      "headroom": null,
+      "limitSourceRef": null,
+      "measurementRef": null,
+      "measurementCommand": null,
+      "measurementExitCode": null
+    }
+  ]
+}
+
+--- stderr ---

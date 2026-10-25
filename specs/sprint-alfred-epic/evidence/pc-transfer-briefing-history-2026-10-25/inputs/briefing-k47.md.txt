@@ -1,0 +1,29 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k47/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, protected-path delivery, quality rules, report shape; replace `<name>` with `k47`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, multi-path rg, other pipelines and composed commands are refused. A `git commit` needs a clone identity: read `git config user.name` and `git config user.email` in the MAIN checkout and set them once with `git -C scratch/clones/k47 config user.name ...` and `... user.email ...` (the clone's own local config, allowed for this task; the `-c` form is refused by guard-push).
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261020195107.231d1a0 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K47-FOREIGN-WORKTREE-BODY/2026-10-22 · Role Goldfish`
+
+## Briefing K47-FOREIGN-WORKTREE-BODY: give the real WSL-registered /mnt foreign-worktree case a body
+
+### 1. Goal
+`plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs` line ~205 holds an unconditional skip with an empty body for the real WSL-registered `/mnt` foreign-worktree fixture (the counted run is 17 pass, 1 skip). Replace it with a real case: on a Linux/WSL host where a DrvFs mount path under `/mnt/<drive>` is writable by the test, register a foreign git worktree whose gitdir lives under that mount (git worktree add from WSL git), evaluate the implementation gate and the onboarding inspect, and assert the typed environment condition and that NO `reopen-design` action is offered. The case is skipped with a TYPED host-limitation reason (naming the owner, the due date 2026-10-31 and the host that runs it) ONLY when no writable `/mnt/<drive>` DrvFs mount exists or the platform is not Linux/WSL; on this machine a writable `/mnt` mount is expected, so the case must really run here. Read the neighbouring passing cases first and reuse their helpers and fixtures; do not invent a new mechanism.
+
+### 2. Context files
+- plugins/pipeline-core/lib/pins/foreign-worktree-closes-the-implementation-gate.test.mjs (whole file; the skip near line 205)
+- the backlog item, STRIPPED copy only: run `node plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs --item backlog/items/2026-10-09-foreign-worktree-closes-the-implementation-gate.md --out scratch/k47-item-stripped.md` from the MAIN checkout
+- plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs (how that pin detects a /mnt DrvFs mount and skips with a typed reason; reuse its detection)
+
+### 3. DoD checks
+- RED first for the intended reason: show the new case fails (not errors on fixture setup) against a scratch mirror of the production gate function that treats a foreign worktree as closing the gate (never edit production; if the test as written cannot fail meaningfully, say so and keep the case honest instead). Then GREEN.
+- The case must clean up everything it creates under `/mnt` (worktree registration and directory) in a finally block, restore-before-yield; it must never leave a registered worktree in the clone or in the main repository.
+- Targeted checks, one at a time, TMPDIR default: the pin file alone (expect 0 skip, 0 fail on this machine, or exactly the typed host-limit skip if no writable mount); `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (in the clone); `node plugins/pipeline-core/scripts/architecture-boundary-check.mjs --root scratch/clones/k47`.
+- Quick check: none configured, unknown (no quick PASS). Final integrated Verify: Coordinator owns it.
+- This is a test-only change under plugins/pipeline-core/lib/pins/ (not a protected prefix); commit in the clone as soon as green with explicit pathspec, message file under the clone's `scratch/commit-msg/`, QG-04 justification in the message for replacing the empty skip, trailers exactly `AI-Assisted: true` and `Dispatch: K47-FOREIGN-WORKTREE-BODY (goldfish)`.
+
+### 4. Forbidden
+Production code changes; Spec/PRD; weakening, skipping or deleting any other examiner; signing; override ceremonies; network; push/reset/stash/checkout/rebase in the repositories; no-go paths `.claude/**`, `docs/state.md`, `specs/**`, `backlog/**`; no absolute home/repo-root paths or secrets in files or commit messages (derive the mount path at run time, never hard-code a drive letter); do not invoke or reuse the Advisor.
+
+### 5. Stop conditions
+More than 2 failed attempts at one problem; the case needs a production change to pass (report which); no writable /mnt mount can be created from the test without touching files outside scratch and the mount's own temp area; a suite red BEFORE your change for an unrelated reason (record, do not fix); tool budget at 80 percent.
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261020195107.231d1a0`. Model/effort: Sonnet 5.5 (general-purpose carrier; goldfish-* types are refused at the dispatch guard for lack of native item admission). Profile standard. Worktree: no, own clone `scratch/clones/k47` at the current main HEAD. Tool budget: base cap 35, closing allowance +5 on closing acts only, structured closing handover. TASK_ID: K47-FOREIGN-WORKTREE-BODY. Status wording per the common briefing (never "done").

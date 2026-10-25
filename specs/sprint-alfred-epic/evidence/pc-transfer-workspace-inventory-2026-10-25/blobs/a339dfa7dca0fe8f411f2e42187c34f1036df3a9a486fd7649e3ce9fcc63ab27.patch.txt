@@ -1,0 +1,248 @@
+diff --git a/docs/admin-steps-inventory.md b/docs/admin-steps-inventory.md
+index e51c09480..ac960e499 100644
+--- a/docs/admin-steps-inventory.md
++++ b/docs/admin-steps-inventory.md
+@@ -41,8 +41,8 @@ Agent-executable layers (1b reconcile, `push-init`, `push-prepare`, `approve-pus
+ | Marketplace/plugin update plus `/reload-plugins` when update is recommended | per session (when notified) | PO | automatable (the helper deliberately never updates; a typed next action could offer it) | `harness/session-bootstrap.md:211`, `:181` |
+ | Run `git restore` etc. in own terminal when the auto-mode classifier refuses | per push (when refused) | PO terminal | required because the classifier is a harness layer outside the Pipeline | `docs/push-release-flow.md:516-554` |
+ | Edit `.claude/settings.json` guard/permission surfaces | on demand | PO | required because the self-sealing surface rejects agent edits | `docs/push-release-flow.md:544-554` |
+-| Do not use Desktop WSL sessions for a governed repository | per session | PO | required because those sessions load no plugins, so no guard runs | `docs/runner-support.md:33` |
+-| Run signing and `!` commands in the integrated or an external terminal (Desktop) | per push | PO terminal | required because of C8 | `docs/runner-support.md:35` |
++| Do not use Desktop WSL sessions for a governed repository | per session | PO | required because those sessions load no plugins, so no guard runs | `docs/runner-support.md:48` |
++| Run signing and `!` commands in the integrated or an external terminal (Desktop) | per push | PO terminal | required because of C8 | `docs/runner-support.md:50` |
+ 
+ ## Codex
+ 
+diff --git a/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs b/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
+index d596f7f19..26adabd59 100644
+--- a/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
++++ b/plugins/pipeline-core/lib/pins/approval-bound-design-package-lives-in-an-ignored-directory.test.mjs
+@@ -11,7 +11,7 @@ import test from "node:test";
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -190,6 +190,7 @@ async function routeFixture(t, { ignored = null } = {}) {
+     }
+   }
+   writeFileSync(receiptPath, gate.serializePoGateProfileReceipt(receipt));
++  chmodSync(receiptPath, 0o600);
+   const topology = { repoRoot: primary, gitCommonDir: common, primaryRoot: primary, registeredWorktreeRoots: [primary] };
+   const authority = gate.validatePoGateAuthority(topology);
+   assert.equal(authority.ok, true, JSON.stringify(authority));
+diff --git a/plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs b/plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs
+index fde1bd838..aade79ecc 100644
+--- a/plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs
++++ b/plugins/pipeline-core/lib/pins/desktop-app-support-is-unverified.test.mjs
+@@ -77,11 +77,11 @@ describe("AC-159 desktop-app-support-is-unverified", () => {
+     const flat = adminInventory.replace(/\s+/g, " ");
+     assert.match(flat, /Do not use Desktop WSL sessions for a governed repository \| per session \| PO \|/);
+     assert.match(flat, /Run signing and `!` commands in the integrated or an external terminal \(Desktop\) \| per push \| PO terminal \|/);
+-    assert.match(flat, /docs\/runner-support\.md:33/);
+-    assert.match(flat, /docs\/runner-support\.md:35/);
++    assert.match(flat, /docs\/runner-support\.md:48/);
++    assert.match(flat, /docs\/runner-support\.md:50/);
+     const lines = runnerSupport.split("\n");
+-    assert.match(lines[32], /Desktop WSL sessions load no plugins/);
+-    assert.match(lines[34], /PO\/human commands/);
++    assert.match(lines[47], /Desktop WSL sessions load no plugins/);
++    assert.match(lines[49], /PO\/human commands/);
+   });
+ 
+   describe("RED: the examiner fails on a scratch mutation of the real text", () => {
+diff --git a/plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs b/plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs
+index 370e53245..dd4b9c57c 100644
+--- a/plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs
++++ b/plugins/pipeline-core/lib/pins/draft-phase-guard-blocks-mandatory-bootstrap-preflight.test.mjs
+@@ -112,7 +112,10 @@ test('AC-167 point 5: the preflight-published hook-provisioning action is execut
+ const pluginRoot = fileURLToPath(new URL('../../', import.meta.url)).replace(/[\\/]$/u, '');
+ const literalPreflight = '${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs';
+ 
+-test('AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity', () => {
++// Host dialect: only the native-Windows guard dialect accepts a `${VAR}` word; the POSIX dialect refuses it
++// in parseGuardCommand (GUARD-PARSE-UNSUPPORTED) before the lane classifies anything, so the lane unit returns null.
++const literalNeedsWin32 = process.platform === 'win32' ? false : 'host-limitation: the POSIX guard dialect refuses ${VAR} words at parse time';
++test('AC-167 point 4b: the literal spelling is admitted when PIPELINE_PLUGIN_ROOT designates this plugin, and its case variant follows host path identity', { skip: literalNeedsWin32 }, () => {
+   const env = { PIPELINE_PLUGIN_ROOT: pluginRoot };
+   assertAdmitted(`node ${quote(literalPreflight)}`, 'literal preflight with the variable set to this plugin', { env });
+   const variant = '${pipeline_plugin_root}/SCRIPTS/Pipeline-Start-Preflight.mjs';
+@@ -126,15 +129,18 @@ test('AC-167 point 5b: the exact published provisioning action, clone-hook-readi
+   assertAdmitted(`node ${quote(forwardSlash(provision))} --root ${quote(root)} --apply`, 'forward-slash clone-hook-readiness nextAction');
+ });
+ 
+-test('AC-167 control: the literal-variable and hook-action admissions are closed -- every other shape stays refused', () => {
+-  const provision = join(pluginScripts, 'clone-hook-readiness.mjs');
+-  const refresh = join(pluginScripts, 'refresh-mandatory-hooks.mjs');
++test('AC-167 control (literal variable): every other literal-variable shape stays refused', { skip: literalNeedsWin32 }, () => {
+   const elsewhere = { PIPELINE_PLUGIN_ROOT: join(root, 'no-such-plugin-root') };
+   assertRefusedAsOpaque(`node ${quote(literalPreflight)} --extra`, 'literal preflight with an extra argument');
+   assertRefusedAsOpaque(`node ${quote('${PIPELINE_PLUGIN_ROOT}/scripts/other.mjs')}`, 'literal variable with a foreign script');
+   assertRefusedAsOpaque(`node ${quote(literalPreflight + 'x')}`, 'literal look-alike script name');
+   assertRefusedAsOpaque(`node ${quote('${OTHER_ROOT}/scripts/pipeline-start-preflight.mjs')}`, 'a different variable');
+   assertRefusedAsOpaque(`node ${quote(literalPreflight)}`, 'literal preflight with the variable set to another directory', { env: elsewhere });
++});
++
++test('AC-167 control: the hook-action admissions are closed -- every other shape stays refused', () => {
++  const provision = join(pluginScripts, 'clone-hook-readiness.mjs');
++  const refresh = join(pluginScripts, 'refresh-mandatory-hooks.mjs');
+   assertRefusedAsOpaque(`node ${quote(provision)} --root ${quote(root)}`, 'provisioning without --apply');
+   assertRefusedAsOpaque(`node ${quote(provision)} --root ${quote(root)} --apply --extra`, 'provisioning with an extra argument');
+   assertRefusedAsOpaque(`node ${quote(provision)} --root ${quote(join(root, 'other'))} --apply`, 'provisioning for a foreign root');
+diff --git a/plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs b/plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs
+index e6adea0af..409d2c3a1 100644
+--- a/plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs
++++ b/plugins/pipeline-core/lib/pins/model-role-bootstrap-is-always-unavailable-on-native-windows.test.mjs
+@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
+ import test from "node:test";
+ import { createHash } from "node:crypto";
+ import { execFileSync, spawnSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import path from "node:path";
+ import { fileURLToPath } from "node:url";
+ // Import order matters (see the todo case "runtime-host cannot be entered first"): the invocation
+@@ -121,7 +121,8 @@ test("P3 real git repository: activation observation reports inactive, not the g
+ });
+ 
+ test("P3 platform drive-rooted common dir with a real activation marker reports active", (t) => {
+-  const commonDir = makeScratch("alfp501-active");
++  const repoDir = makeRealRepo("alfp501-active");
++  const commonDir = path.join(repoDir, ".git");
+   try {
+     const authoritySha256 = "a".repeat(64);
+     const familyDir = path.join(commonDir, "agent-pipeline", "model-family-host");
+@@ -136,7 +137,11 @@ test("P3 platform drive-rooted common dir with a real activation marker reports
+     writeFileSync(path.join(familyDir, "activation.json"), JSON.stringify(marker));
+     writeFileSync(path.join(familyDir, stateFile), JSON.stringify(state));
+     writeFileSync(path.join(familyDir, "current.json"), JSON.stringify(pointer));
+-    const host = createModelFamilyRuntimeHost({ cwd: commonDir, resolveCommonDir: () => commonDir,
++    if (process.platform !== "win32") { // the store refuses group/other-accessible entries; mkdirSync/writeFileSync honour the umask
++      for (const dir of [path.join(commonDir, "agent-pipeline"), familyDir, path.join(familyDir, "receipts")]) chmodSync(dir, 0o700);
++      for (const file of ["activation.json", stateFile, "current.json"]) chmodSync(path.join(familyDir, file), 0o600);
++    }
++    const host = createModelFamilyRuntimeHost({ cwd: repoDir, resolveCommonDir: () => commonDir,
+       trustedSources: { readAuthorityInputs: () => ({ ok: false }), readPinInputs: () => [],
+         readFreshDiscovery: () => ({ ok: false }), readCurrentCandidate: () => ({ ok: false }),
+         launchDriver: () => ({ ok: false }) } });
+@@ -156,7 +161,7 @@ test("P3 platform drive-rooted common dir with a real activation marker reports
+     assert.equal(result.ok, true, result.code);
+     assert.equal(result.status, "active");
+     assert.equal(result.authoritySha256, authoritySha256);
+-  } finally { rmSync(commonDir, { recursive: true, force: true }); }
++  } finally { rmSync(repoDir, { recursive: true, force: true }); }
+ });
+ 
+ test("P3 CLI: bootstrap on a real repository never returns the git-common-dir-unavailable code", () => {
+diff --git a/plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs b/plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs
+index 930e8ed69..6758b0ae9 100644
+--- a/plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs
++++ b/plugins/pipeline-core/lib/pins/no-uninstall-path-for-a-repository-that-once-opted-in.test.mjs
+@@ -7,7 +7,7 @@ import test from 'node:test';
+ import assert from 'node:assert/strict';
+ import {spawnSync} from 'node:child_process';
+ import {createHash} from 'node:crypto';
+-import {appendFileSync,cpSync,existsSync,mkdirSync,readdirSync,readFileSync,rmSync,statSync,writeFileSync} from 'node:fs';
++import {appendFileSync,chmodSync,cpSync,existsSync,lstatSync,mkdirSync,readdirSync,readFileSync,renameSync,rmSync,statSync,symlinkSync,writeFileSync} from 'node:fs';
+ import {basename,dirname,join,relative} from 'node:path';
+ import {fileURLToPath} from 'node:url';
+ import {createProjectUninstallController,PROJECT_UNINSTALL_FAULT_STAGES} from '../project-uninstall.mjs';
+@@ -277,10 +277,18 @@ for(const runners of [['claude'],['codex'],['antigravity']])test('per-runner fix
+ });
+ 
+ test('alias and private-directory mode refusals (PU-ALIAS, PU-PRIVATE-MODE) need symlinks and mode bits',{skip:process.platform==='win32'?'host-limitation: directory symlinks and POSIX directory mode bits are unavailable on native Windows; owner Coordinator, due 2026-10-19, Linux/WSL run (PO decision K7)':false},t=>{
+- const f=fixture(t),plan=f.controller.plan({rootDir:f.root}),link=join(f.root,'alias-dir');
+- spawnSync('ln',['-s',join(f.root,'docs'),link]);
+- assert(existsSync(link));
+- assert.throws(()=>f.controller.apply(plan,options(plan)),e=>['PU-PREIMAGE-DRIFT','PU-ALIAS'].includes(e.code));
++ // An alias is refused only where it sits on a path the uninstall owns (an unrelated symlink beside the footprint is none of its business).
++ const f=fixture(t),plan=f.controller.plan({rootDir:f.root}),owned=join(f.root,'.claude/pipeline.json');
++ renameSync(owned,owned+'.real');symlinkSync(owned+'.real',owned);
++ assert(lstatSync(owned).isSymbolicLink());
++ assert.throws(()=>f.controller.apply(plan,options(plan)),e=>e.code==='PU-ALIAS');
++ assert(!existsSync(join(plan.controls,plan.planSha256,'journal.json')),'a refused apply leaves no journal');
++ // PU-PRIVATE-MODE: the per-plan controls directory must be owner-only.
++ const g=fixture(t),planG=g.controller.plan({rootDir:g.root}),controls=join(planG.controls,planG.planSha256);
++ mkdirSync(controls,{recursive:true});chmodSync(controls,0o755);
++ assert.throws(()=>g.controller.apply(planG,options(planG)),e=>e.code==='PU-PRIVATE-MODE');
++ assert(!existsSync(join(controls,'journal.json')),'a refused apply leaves no journal');
++ assert.equal(g.scope.observe({rootDir:g.root}).state,'active');
+ });
+ 
+ test('SETUP.md documents the uninstall path with exactly the verbs, flags and refusal codes the CLI really has',()=>{
+diff --git a/plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs b/plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs
+index a92b94a31..bbb36d988 100644
+--- a/plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs
++++ b/plugins/pipeline-core/lib/pins/verify-on-a-wsl-mnt-drive-checkout-hides-its-reason.test.mjs
+@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
+ import { test } from "node:test";
+ import { VERIFY_PRIVATE_DIRECTORY_HINT, registerRunRecordOwner } from "../../scripts/verify-journal.mjs";
+ 
++import { verifyRunDirectory } from "../verify-run-record.mjs";
+ import { observeNativeWindowsProcess } from "../windows-native-process-observer.mjs";
+ 
+ // registerRunRecordOwner reads the own process start identity BEFORE it calls the injected seam; on native
+@@ -122,7 +123,7 @@ test("P5: real directory path with permissive modes reaches the operator as type
+     const pipeline = join(common, "agent-pipeline");
+     mkdirSync(pipeline, { mode: 0o700 });
+     chmodSync(pipeline, 0o777); // what DrvFs reports for every path
+-    const thrown = capture(() => registerRunRecordOwner({ gitCommonDir: common, runId: "verify-p5", runPath: join(common, "run") }));
++    const thrown = capture(() => registerRunRecordOwner({ gitCommonDir: common, runId: "verify-p5", runPath: verifyRunDirectory(common, "verify-p5") }));
+     assert.ok(thrown instanceof Error);
+     assert.match(thrown.message, /^VERIFY-CLEANUP-REGISTRATION-REQUIRED/u);
+     assert.match(thrown.message, /VERIFY-JOURNAL-DIRECTORY-NOT-PRIVATE/u);
+diff --git a/plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs b/plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs
+index 5b6557f49..fddfcbcd2 100644
+--- a/plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs
++++ b/plugins/pipeline-core/lib/pins/windows-greenfield-scratch-write-denied.test.mjs
+@@ -114,7 +114,11 @@ test("W1: a physical root alias is resolved before containment (alias root and r
+     // session started through an alias spelling decides exactly like the physical root.
+     const deps = depsFor(alias, "bootstrap-binding-required");
+     assert.equal(ps("Set-Content -LiteralPath scratch/nested/a.md -Value x", deps).exitCode, 0, "alias project dir, relative target");
+-    assert.equal(ps(`Set-Content -LiteralPath '${join(alias, "scratch", "nested", "a.md")}' -Value x`, deps).exitCode, 0, "alias project dir, alias-spelled target");
++    // powershell-dialect.mjs powerShellScratchPath: off win32 an absolute (win32-rooted) PowerShell target is refused outright,
++    // so the alias-spelled absolute target is admitted only on a native Windows host and fails closed everywhere else.
++    const aliasAbs = ps(`Set-Content -LiteralPath '${join(alias, "scratch", "nested", "a.md")}' -Value x`, deps);
++    if (WIN) assert.equal(aliasAbs.exitCode, 0, "alias project dir, alias-spelled target");
++    else assert.match(aliasAbs.stderr, GRAMMAR, "alias project dir, alias-spelled absolute target is refused off win32");
+     assert.match(ps("Set-Content -LiteralPath src/a.md -Value x", deps).stderr, GRAMMAR, "alias project dir, non-scratch target");
+     // The bare predicate stays fail-closed on an unresolved alias root: it never widens scope.
+     assert.equal(isPhysicalIntakeScratchPath("scratch/nested/a.md", alias), false, "unresolved alias root is refused by the predicate itself");
+@@ -211,9 +215,17 @@ test("W3: the guard admits PowerShell New-Item and Set-Content/Add-Content for s
+         "Set-Content -LiteralPath scratch/nested/report.md -Value report",
+         "Set-Content -Path scratch/nested/report.md -Value report -Encoding utf8",
+         "Add-Content -LiteralPath scratch/nested/report.md -Value more",
++      ]) assert.equal(ps(command, deps).exitCode, 0, `${status}: ${command}`);
++      // Absolute spellings: powerShellScratchPath admits them only on a native Windows host (off win32 any win32-rooted
++      // target, which includes every POSIX absolute path, is refused -- fail closed).
++      for (const command of [
+         `New-Item -Path '${abs("nested", "abs.md")}' -ItemType File`,
+         `Set-Content -LiteralPath '${abs("nested", "abs.md")}' -Value x`,
+-      ]) assert.equal(ps(command, deps).exitCode, 0, `${status}: ${command}`);
++      ]) {
++        const result = ps(command, deps);
++        if (WIN) assert.equal(result.exitCode, 0, `${status}: ${command}`);
++        else { assert.equal(result.exitCode, 2, `${status}: ${command}`); assert.match(result.stderr, GRAMMAR, `${status}: ${command}`); }
++      }
+       if (WIN) {
+         const native = abs("nested", "native.md");
+         const lowerDrive = native[0].toLowerCase() + native.slice(1);
+diff --git a/plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs b/plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs
+index d5b711256..fa93d61d1 100644
+--- a/plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs
++++ b/plugins/pipeline-core/lib/pins/worktrees-share-onboarding-private-state-with-root-bound-intake.test.mjs
+@@ -337,6 +337,11 @@ test("AC-274 first enrollment follows the repository-capability route and unveri
+     assert.deepEqual(checkpointBytes(fixture.root), rootBytes);
+ 
+     // A plain folder with retained history: no invented capability or private storage root, a concrete route instead.
++    // The plain folder is not a repository, so the ceiling that keeps the git-init'd fixtures away from this checkout
++    // must not apply to it: with it, git reports "not a repository" while the governance scope's own ancestor walk still
++    // finds this checkout's .git and refuses (GS-GIT-UNAVAILABLE). The sibling pin first-enrollment-enters-retirement-before-consent
++    // runs the same plain-folder scenario without a ceiling.
++    delete process.env.GIT_CEILING_DIRECTORIES;
+     mkdirSync(join(plain, ".agent-pipeline"));
+     const retained = join(plain, ".agent-pipeline", "onboarding-consent.json");
+     const retainedBytes = Buffer.from('{"retained":"fixture"}\n');

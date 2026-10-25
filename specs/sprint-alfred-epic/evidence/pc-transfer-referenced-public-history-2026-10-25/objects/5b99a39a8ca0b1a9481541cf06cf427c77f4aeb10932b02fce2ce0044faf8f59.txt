@@ -1,0 +1,89 @@
+{
+  "schema": "scratch.summary-and-advisor-binding-preparation.v1",
+  "observedAt": "2026-09-28T03:53:06.049Z",
+  "sourceCommit": "3089f0d65976d150340d53ef3b8536a41a83e83b",
+  "aggregatePatchSha256": "5de8ddca97b83d11c218f4e8d50274e20399c05740e4f0a1bad23e6d283e2029",
+  "aggregateMetadataSha256": "9f95be3e117288cf48adeb16141c0fbab36d2d1dd96c14fd00909ad583fc0b42",
+  "sourceHashes": {
+    "scratch/codex-advisor-binding-proposal.mjs": "7508bd642825cc2792cef636b23cfef8fceac5a7ff439353ad2a663509713631",
+    "scratch/codex-advisor-binding-proposal.test.mjs": "bf45e0b8b71ff8c4a5913c96c4e1c603e05e0b3ccf467ade7ee21e54dbb6aca3",
+    "scratch/codex-advisor-request-proposal.mjs": "573710a95b9bad0f52e913956362a884857669879932d7c095965bdc272ddc15",
+    "scratch/codex-advisor-host-record-proposal.mjs": "d0804a55b6ed60483a7329af873eee9f06f2812cf595830f2ddaebb15feef684",
+    "scratch/codex-advisor-private-store-proposal.mjs": "10efb9af59dc66eec20bbe5f453ab2d61985c26cac919ae7bba28f0ef10f3324",
+    "scratch/codex-advisor-host-record-fixture.mjs": "2279ceee3cd2a15c72c3e2d463964d6a550748a21ac31cdde8c6670d7b425d7d",
+    "scratch/codex-host-process-supervisor.mjs": "0de111f35532aae35b370b34ef77e70ba2c902bdce384b8e7f1bfe0b6b87b94b",
+    "scratch/codex-host-process-journal.mjs": "b003be62571f0db442fe81a9bef61341067409c99c6134bd0d2752985b6df1bf",
+    "scratch/codex-host-process-launcher.mjs": "78efae3d7110f4522f903d41faaaaeb1dbb5abbdbdbba0361738cfabb876d977",
+    "scratch/codex-host-process-exec-worker.mjs": "23884f90c6315d32d0b17e1e0ea9597017611bc96f0e6ce8dde6cff23cfb65fa",
+    "scratch/codex-readiness-ownership-verifier.mjs": "544d17cda04c64e2b6a306c475ee86861bbfb3e373206b174e4abd010d72858e",
+    "scratch/load-proposed-onboarding-for-tests.mjs": "39aa752372366a7a5fb2f77e20e8614f8f00e7b21b38b17fed6b076d1009d169",
+    "plugins/pipeline-core/lib/advisory-receipt.mjs": "9034df7cb646da00efcb30c04b3f880e238124d78e2f9041c29d4884b904ebc7",
+    "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs": "1e08dc5f974f3e1899e918d088c1bcdb8789782eba0fe2343532a0fbd5b8231d",
+    "plugins/pipeline-core/lib/governance-event.mjs": "bacdef30154cb0c30561bd7e056503ec20f0af3a647f3036a91e58d684d5a06e",
+    "plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs": "dcb780ca80725313668bc114e1cb5e44558c2fbba870fb0b29876b8b72b7827c",
+    "plugins/pipeline-core/scripts/advisory-receipt.schema.json": "f6ef2eb1d69d9e63503824265f941bb97d73b8afa4a70e241cfb819e0ea45c43"
+  },
+  "stableInputs": true,
+  "runs": [
+    {
+      "name": "summary-admission-current-aggregate",
+      "args": [
+        "--import",
+        "./scratch/load-proposed-onboarding-for-tests.mjs",
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=SUMMARYADMIT-1",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+      ],
+      "executable": "<home>/.local/lib/node-v24.15.0/bin/node",
+      "exitCode": 0,
+      "signal": null,
+      "errorCode": null,
+      "elapsedMs": 594,
+      "stdoutSha256": "533bde8713e4df2a20f5d652bd5123a54c9c2087d0f30a17465c60d3507b4bf5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "# tests 1",
+        "# suites 0",
+        "# pass 1",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 521.203394"
+      ]
+    },
+    {
+      "name": "advisor-independent-binding",
+      "args": [
+        "--test",
+        "--test-reporter=tap",
+        "scratch/codex-advisor-binding-proposal.test.mjs"
+      ],
+      "executable": "<home>/.local/lib/node-v24.15.0/bin/node",
+      "exitCode": 0,
+      "signal": null,
+      "errorCode": null,
+      "elapsedMs": 9204,
+      "stdoutSha256": "c30a2dcd493e1b7cdf2d44cb31f8990d2125c9b41f3ba5c5eec0127d857509a7",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "# tests 7",
+        "# suites 0",
+        "# pass 7",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 9132.493942"
+      ]
+    }
+  ],
+  "passed": true,
+  "canonicalWrites": false,
+  "canonicalVerify": false,
+  "productiveIntegration": false,
+  "formalStamp": false,
+  "candidateQualification": false,
+  "limitation": "Summary uses selected exact proposed imports, canonical artifact reads/subprocesses. Advisor has actual Git/current-source and registered Node fixture ownership with synthetic session/model controls, no model call. Private governed caller still supplies question/package/demand/route; live admission/resolver/adapter wiring remains pending."
+}

@@ -1,0 +1,17 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-decided.md` and the files named in them are your ONLY input. Read `scratch/clones/k97/templates/prompts/agent-obligations.md` first, then the common file. Clone name: `k97`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K97-AP11-GIT-SHOW-PIPE/2026-10-23 · Role Goldfish`
+
+## K97-AP11-GIT-SHOW-PIPE: admit the bounded `git show <rev>:<path> [--format=] -- | head -N` form in the closed shell grammar
+
+### 1. Goal (decisions file, row 15: "Widen the grammar")
+Item `advertised-git-to-head-pipeline-is-refused` (`find backlog/items -name "*advertised-git-to-head*"`; read it: it records that AP11 refuses `git show HEAD:<path> --format= -- | head` although other texts advertise it). PO decision: widen the grammar so the bounded form is admitted; every other pipe stays refused. Find the pipe grammar (`plugins/pipeline-core/hooks/guard-command-grammar.mjs`, `lib/guard/shell-grammar.mjs`, the AP11 contract tests: `rg -n "AP11" <file>` over files you list with `find` one directory at a time) and admit exactly: `git show <revision>:<repo-relative path>` with optional `--format=` / `--format=<fmt>` and optional `--` before the pipe, then ONE `| head -n <1..500>` or `| head -<1..500>` (the same bounds the other admitted `| head` diagnostics have: `rg -n "head -n" skills/pipeline-start/SKILL.md | head -3`), no expansions, no redirects, no second pipe; the revision and path are single plain tokens (no `$`, backtick, `;`). A read-only classification: it names no write target. Also check the advertised text sites (`rg -n "git show HEAD" <file>` over `templates/prompts/agent-obligations.md`, `skills/pipeline-start/SKILL.md`, `plugins/pipeline-core/guardrails` etc. you find): after the widening they are true; if one advertises a wider form than you admit, correct the TEXT (unprotected, vendored copies via `node scripts/generate-vendored-canon.mjs` if needed). RED first: cases that the form is admitted (several spellings), and negative controls that these stay REFUSED: `git show HEAD:x | grep y`, `git show HEAD:x | head -n 1000`, `git show HEAD:x | head -n 5 | cat`, `git show HEAD:x > f`, `git show $(...)`, `git show HEAD:x; rm y`, `git log | head`. Suites to count ONCE alone before/after: the grammar suites you find (`hooks/guard-command-grammar.test.mjs`, `lib/guard/*grammar*.test.mjs`, the AP11 pin file), `hooks/guard-lifecycle-ready.test.mjs` (about 8 minutes; 392 / 389 / 3), `hooks/guard-testpath.test.mjs`, and the classifier pins C23 changed (`lib/pins/git-stash-list-classified-as-working-tree-write.test.mjs` 88/88, `hgo-patch-preflight-before-signature` 14/14). Protected (grammar files): diffs; the item stays untouched (backlog is not yours).
+
+### 2. Context files
+The item; the grammar files; the AP11 pin; decisions file row 15; `docs/operating-tools.md` for the vendored-canon step.
+
+### 3. DoD
+Admitted forms green; negative controls RED-first-then-green (they pass already: show they fail if the widening is too wide by a deliberate local mutation test in the notes, no commit); counts; diffs.
+
+### 4. Task id
+TASK_ID: K97-AP11-GIT-SHOW-PIPE.

@@ -1,0 +1,12 @@
+// usage via run-in: node .diag-run.mjs reads target from .diag-target (one line, repo-relative) and writes .diag-run.out
+import { spawnSync } from "node:child_process";
+import { mkdirSync, chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+const target = readFileSync(".diag-target", "utf8").trim();
+const tmp = join(homedir(), "pipeline-test-tmp", "g2raw");
+mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+delete env.NODE_TEST_CONTEXT;
+const r = spawnSync(process.execPath, [target], { encoding: "utf8", env, timeout: 3600000, maxBuffer: 256 * 1024 * 1024 });
+writeFileSync(".diag-run.out", `exit ${r.status}\n--- stdout\n${r.stdout}\n--- stderr\n${r.stderr}\n`);

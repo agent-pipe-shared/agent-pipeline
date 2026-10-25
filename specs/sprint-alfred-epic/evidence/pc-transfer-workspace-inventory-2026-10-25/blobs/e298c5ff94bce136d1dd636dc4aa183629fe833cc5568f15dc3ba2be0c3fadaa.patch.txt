@@ -1,0 +1,292 @@
+diff --git a/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs b/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
+index ead2ca2c3..4eaaf5028 100644
+--- a/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
++++ b/plugins/pipeline-core/lib/pins/advertised-git-to-head-pipeline-is-refused.test.mjs
+@@ -11,7 +11,7 @@
+ //   P3 the admitted shape stays closed: bounds, sink, write subcommands, root containment
+ //   P4 meaningful: a mirror of the module without the git-pipeline lane fails P1/P2 (RED)
+ import assert from "node:assert/strict";
+-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+@@ -93,7 +93,9 @@ for (const command of [
+   "git log | head -501",
+   "git log | cat",
+   "git log | head -n 5 | head -n 2",
+-  "git log | tail -n 5",
++  // QG-04: the entry "git log | tail -n 5" was removed from this refusal list and restated as an admitted case in the D114 tail
++  // section below (PO tile decision 2026-10-22: admit `tail` in the bounded git read pipeline in addition to `head`, D114 as written).
++  // Every other sink stays refused here and in the tail section (cat, wc, sort, tee, xargs, redirects, doubled sinks).
+   "git log | head -n 5 > out.txt",
+   "git commit -m x | head -n 5",
+   "git push | head -n 5",
+@@ -136,9 +138,161 @@ for (const command of [
+     () => { assert.equal(guard(command), true); });
+ }
+ 
+-test("P5 addendum shape (needs a guard-owner decision): git -C <repo> show <rev>:<path> | head",
+-  { todo: "decision: isBoundedGitPipeline excludes -C on purpose (cross-repository reach); admitting -C <project dir> in the pipeline is a security trade, not made here" },
+-  () => { assert.equal(guard("git -C . show HEAD:docs/state.md | head -n 3"), true); });
++// QG-04 justification (PO decision D114, 2026-10-22, specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md): this case was a `todo`
++// because admitting `git -C <repo>` in the pipeline was an open product question ("a security trade, not made here"). D114 resolved it:
++// the READ forms of `git -C <repo> show|log|diff|ls-files|cat-file ... | head -n N` are admitted, with the -C target and every
++// path/revision-path operand cleared by the same passive-read credential screen as any other read; writing git forms stay refused.
++// The case below keeps its original intent and assertion; only the `todo` marker is removed because the decision now exists.
++test("P5 addendum shape (decided by D114): git -C <repo> show <rev>:<path> | head", () => {
++  assert.equal(guard("git -C . show HEAD:docs/state.md | head -n 3"), true);
++});
++
++// D114 admitted siblings (same repository root, read subcommands only) and negative controls. Fixtures live under scratch/.
++const repo = join(fixture, "repo");
++mkdirSync(join(repo, ".git"), { recursive: true });
++mkdirSync(join(repo, "docs"), { recursive: true });
++mkdirSync(join(repo, "sub"), { recursive: true });
++mkdirSync(join(repo, "other", ".git"), { recursive: true });
++mkdirSync(join(repo, ".env", ".git"), { recursive: true });
++mkdirSync(join(repo, "other", "docs"), { recursive: true });
++writeFileSync(join(repo, "docs", "state.md"), "state\n");
++writeFileSync(join(repo, "other", "docs", "state.md"), "other state\n");
++writeFileSync(join(repo, ".env", "config"), "x\n");
++const inRepo = (command) => isReadOnlyDiagnosticCommand(command, repo);
++
++for (const command of [
++  "git -C . show HEAD:docs/state.md | head -n 3",
++  "git -C . show HEAD:docs/state.md | head -3 2>/dev/null",
++  "git -C other show HEAD:docs/state.md | head -n 3",
++  "git -C . --no-pager log -n 3 | head -n 5",
++  "git --no-pager -C . log --oneline | head -n 5",
++  "git -C . diff --stat | head -n 20",
++  "git -C . diff HEAD~1 -- docs/state.md | head -n 20",
++  "git -C . ls-files docs | head -n 20",
++  "git -C . ls-files | head -n 20",
++  "git -C . cat-file -p HEAD:docs/state.md | head -n 3",
++  "git -C . cat-file -t HEAD | head -n 1",
++]) {
++  test(`D114 admitted: ${command}`, () => { assert.equal(inRepo(command), true); });
++}
++
++for (const command of [
++  // the -C target: escaping, credential-named, missing, not a repository, doubled, flag-shaped, glob or expansion
++  "git -C .. show HEAD:docs/state.md | head -n 3",
++  "git -C /etc show HEAD:docs/state.md | head -n 3",
++  "git -C .env show HEAD:docs/state.md | head -n 3",
++  "git -C missing show HEAD:docs/state.md | head -n 3",
++  "git -C sub show HEAD:docs/state.md | head -n 3",
++  "git -C . -C other show HEAD:docs/state.md | head -n 3",
++  "git -C -p show HEAD:docs/state.md | head -n 3",
++  "git -C 'ot*' show HEAD:docs/state.md | head -n 3",
++  "git -C $HOME show HEAD:docs/state.md | head -n 3",
++  "git -C ~/.ssh log | head -n 3",
++  // operands: credential names, hidden parts, traversal, absolute paths, metacharacters
++  "git -C . show HEAD:.env | head -n 3",
++  "git -C . show HEAD:.env/config | head -n 3",
++  "git -C . show HEAD:../outside.txt | head -n 3",
++  "git -C . show HEAD:/etc/hostname | head -n 3",
++  "git -C . log -- .env | head -n 3",
++  "git -C . log -- ../outside.txt | head -n 3",
++  "git -C other log -- ../docs/state.md | head -n 3",
++  "git -C . ls-files .env | head -n 3",
++  "git -C . ls-files ../outside | head -n 3",
++  "git -C . ls-files 'docs/*' | head -n 3",
++  "git -C . cat-file -p HEAD:.env | head -n 3",
++  "git -C . cat-file -p HEAD:../outside.txt | head -n 3",
++  "git -C . show HEAD:docs/state.md$(id) | head -n 3",
++  "git -C . show `id` | head -n 3",
++  "git -C . show HEAD:docs/state.md;id | head -n 3",
++  // cat-file is a closed -p/-t/-s/-e form: batch modes, filters and bare forms stay refused
++  "git -C . cat-file --batch | head -n 3",
++  "git -C . cat-file --textconv HEAD:docs/state.md | head -n 3",
++  "git -C . cat-file -p | head -n 3",
++  "git -C . cat-file -p HEAD HEAD | head -n 3",
++  // execution/output options of the admitted subcommands
++  "git -C . log --output=out.txt | head -n 3",
++  "git -C . diff --ext-diff | head -n 3",
++  "git -C . diff --no-index a b | head -n 3",
++  // sink bounds and shape are the existing ones
++  "git -C . log | head -n 501",
++  "git -C . log | cat",
++  "git -C . log | head -n 3 > out.txt",
++  "git -C . log ; head -n 3",
++  // writing and unlisted git forms with -C stay refused
++  "git -C . commit -m x | head -n 3",
++  "git -C . add -- docs/state.md | head -n 3",
++  "git -C . rm docs/state.md | head -n 3",
++  "git -C . checkout main | head -n 3",
++  "git -C . reset --hard | head -n 3",
++  "git -C . stash | head -n 3",
++  "git -C . config user.name x | head -n 3",
++  "git -C . push | head -n 3",
++  "git -C . status | head -n 3",
++  "git -C . rev-parse HEAD | head -n 3",
++]) {
++  test(`D114 stays refused: ${command}`, () => { assert.equal(inRepo(command), false); });
++}
++
++// ------------------------------------------------------------------ D114 tail sink (PO tile decision 2026-10-22)
++// `tail` is admitted as the second sink of the bounded git read pipeline, with the same 1..500 bound, the same optional trailing
++// `2>/dev/null` and exactly the same containment / credential / -C rules as the head form. No other sink is added.
++test("D114 tail: the advertised git pipeline shape names tail with its bound and both spellings", () => {
++  const shape = ADMITTED_GRAMMAR_SHAPES.find((s) => s.spelling.includes("git-to-head"));
++  assert.ok(shape);
++  assert.match(shape.spelling, /tail -n N/u);
++  assert.match(shape.spelling, /tail -N/u);
++});
++
++for (const command of [
++  "git log | tail -n 5",
++  "git log | tail -5",
++  "git log | tail -n 5 2>/dev/null",
++  "git diff --stat | tail -n 20",
++  "git show HEAD:docs/state.md | tail -n 5",
++  "git log -n 5 -- docs/state.md | tail -500",
++]) {
++  test(`D114 tail admitted: ${command}`, () => { assert.equal(guard(command), true); });
++}
++
++for (const command of [
++  "git -C . log | tail -n 3",
++  "git -C . show HEAD:docs/state.md | tail -3 2>/dev/null",
++  "git -C . ls-files docs | tail -n 20",
++  "git -C . cat-file -p HEAD:docs/state.md | tail -n 3",
++  "git -C other diff --stat | tail -n 3",
++]) {
++  test(`D114 tail admitted with -C: ${command}`, () => { assert.equal(inRepo(command), true); });
++}
++
++for (const command of [
++  "git log | tail -n 0", "git log | tail -n 501", "git log | tail -501", "git log | tail", "git log | tail -n", "git log | tail -f",
++  "git log | tail -n +5", "git log | tail -c 5", "git log | tail -n 5 -f", "git log | tail -n 5 docs/state.md",
++  "git log | tail -n 5 | tail -n 2", "git log | head -n 5 | tail -n 2", "git log | tail -n 5 > out.txt", "git log | tail -n 5 2>&1",
++  "git log | cat", "git log | wc -l", "git log | sort", "git log | tee out.txt", "git log | xargs echo", "git log | sh",
++  "git log | rg x", "git log | grep x", "git log | less", "git log | tail -n 5 ; head -n 2",
++  "git commit -m x | tail -n 5", "git push | tail -n 5", "git add -- a.md | tail -n 5",
++  "git show HEAD:../outside.txt | tail -n 5", "git show HEAD:/etc/hostname | tail -n 5", "git show HEAD:.env | tail -n 5",
++  "git log -- ../outside.txt | tail -n 5", "git log ../outside.txt | tail -n 5", "git log -- .env | tail -n 5",
++]) {
++  test(`D114 tail stays refused: ${command}`, () => { assert.equal(guard(command), false); });
++}
++
++for (const command of [
++  "git -C .. log | tail -n 3", "git -C /etc log | tail -n 3", "git -C .env show HEAD:docs/state.md | tail -n 3",
++  "git -C sub log | tail -n 3", "git -C . -C other log | tail -n 3", "git -C . show HEAD:.env | tail -n 3",
++  "git -C . cat-file --batch | tail -n 3", "git -C . commit -m x | tail -n 3", "git -C . push | tail -n 3",
++  "git -C . checkout main | tail -n 3", "git -C . status | tail -n 3", "git -C . log | tail -n 501", "git -C . log | wc -l",
++  "git -C . log | cat", "git -C . log | tee out.txt", "git -C . log | xargs echo", "git -C . log | sort", "git -C . log | tail -n 3 > out.txt",
++]) {
++  test(`D114 tail with -C stays refused: ${command}`, () => { assert.equal(inRepo(command), false); });
++}
++
++test("D114 a symlinked -C target is refused even when it resolves inside the project; the real directory is admitted", (t) => {
++  try { symlinkSync(join(repo, "other"), join(repo, "other-link"), "dir"); }
++  catch (error) { t.skip(`host-limitation: cannot create directory symlinks (${error?.code ?? "unknown"})`); return; }
++  assert.equal(inRepo("git -C other show HEAD:docs/state.md | head -n 3"), true, "control: the real directory");
++  assert.equal(inRepo("git -C other-link show HEAD:docs/state.md | head -n 3"), false);
++});
+ 
+ test("P5 control: the other refused addendum rg flags and an escaping -C target stay refused", () => {
+   for (const command of ["rg --hidden needle README.md", "rg --pre cat needle README.md", "rg -c -c needle README.md",
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 8cbc1c64b..a923599d8 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -481,7 +481,10 @@ test("D64 architecture baseline diagnosis: the read-only assessment forms and --
+     bothAdmit(scriptAction(baselineScript, "--help"), f, "--help");
+     bothAdmit(scriptAction(baselineScript, "-h"), f, "-h");
+     for (const [label, action] of [
+-      ["compile-summary writes project/architecture-decisions.compiled.json", base("--compile-summary")],
++      // QG-04 justification (PO decision D115, 2026-10-22): the case "compile-summary writes
++      // project/architecture-decisions.compiled.json" was pinned refused as an open product question. D115 admitted exactly
++      // `--root <root> --compile-summary` (one fixed output path) and nothing else on the command; that exact form moved to the
++      // D115 test below, which also pins every near-miss as refused. Everything else in this list is unchanged.
+       ["validate reads an arbitrary path", scriptAction(baselineScript, "--validate", "docs/adr/0001.md")],
+       ["foreign root", scriptAction(baselineScript, "--root", join(f.root, ".."))],
+       ["unknown format", base("--format", "yaml")],
+@@ -494,6 +497,53 @@ test("D64 architecture baseline diagnosis: the read-only assessment forms and --
+   });
+ });
+ 
++// ---- D115 (PO decision 2026-10-22): `architecture-baseline --compile-summary` in its exact documented form, one fixed output ----
++// skills/architecture-decision/SKILL.md step 6 prescribes `architecture-baseline.mjs --root "$PWD" --compile-summary`; the script writes
++// exactly project/architecture-decisions.compiled.json (it has no output flag). Only that argv is admitted, and only while that one
++// output path is physically sound (no linked `project` directory, no linked or non-file target). Every other flag stays refused.
++test("D115 architecture baseline --compile-summary: the exact documented form is admitted, near-misses and unsafe outputs are not", (t) => {
++  withFixture("feature", f => {
++    const base = (...rest) => scriptAction(baselineScript, ...rest);
++    bothAdmit(base("--root", f.root, "--compile-summary"), f, "compile-summary");
++    // an already compiled summary (a regular file) is overwritten in place: still the same one output path
++    writeFileSync(join(f.root, "project", "architecture-decisions.compiled.json"), "{}\n");
++    bothAdmit(base("--root", f.root, "--compile-summary"), f, "compile-summary over an existing regular file");
++    for (const [label, action] of [
++      ["flag before the root", base("--compile-summary", "--root", f.root)],
++      ["no root", base("--compile-summary")],
++      ["foreign root", base("--root", join(f.root, ".."), "--compile-summary")],
++      ["relative root", base("--root", ".", "--compile-summary")],
++      ["with a format", base("--root", f.root, "--compile-summary", "--format", "json")],
++      ["format before the flag", base("--root", f.root, "--format", "json", "--compile-summary")],
++      ["with a diff", base("--root", f.root, "--compile-summary", "--diff", "HEAD")],
++      ["with a range", base("--root", f.root, "--compile-summary", "--from", "a".repeat(40), "--through", "b".repeat(40))],
++      ["with validate", base("--root", f.root, "--compile-summary", "--validate", "docs/adr/0001.md")],
++      ["with an output flag", base("--root", f.root, "--compile-summary", "--out", "docs/x.json")],
++      ["with an output path argument", base("--root", f.root, "--compile-summary", "project/other.json")],
++      ["repeated flag", base("--root", f.root, "--compile-summary", "--compile-summary")],
++      ["with help", base("--root", f.root, "--compile-summary", "--help")],
++      ["without the root value", base("--root", "--compile-summary")],
++    ]) bothRefuse(action, f, label);
++  });
++  // (model-role-bootstrap stays refused: pinned by the D64 bootstrap test below, unchanged.)
++  return withFixture("feature", f => {
++    const out = join(f.root, "project", "architecture-decisions.compiled.json");
++    const base = () => scriptAction(baselineScript, "--root", f.root, "--compile-summary");
++    mkdirSync(join(f.root, "elsewhere"), { recursive: true });
++    try {
++      symlinkSync(join(f.root, "elsewhere", "target.json"), out, "file");
++    } catch (error) { t.skip(`${HOST_LIMITATION} (${error?.code ?? "unknown"})`); return; }
++    bothRefuse(base(), f, "output is a linked file");
++    rmSync(out, { force: true });
++    mkdirSync(out);
++    bothRefuse(base(), f, "output is a directory");
++    rmSync(out, { recursive: true, force: true });
++    rmSync(join(f.root, "project"), { recursive: true, force: true });
++    symlinkSync(join(f.root, "elsewhere"), join(f.root, "project"), "dir");
++    bothRefuse(base(), f, "project is a linked directory");
++  });
++});
++
+ test("D64 model-role bootstrap admits a host session and is a decision, not an admission: it stays refused here", () => {
+   withFixture("feature", f => {
+     // model-role-bootstrap.mjs ADMITS the session's role receipt into the host store after readback; whether the
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+index 81f53c08b..a9ae66918 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-guard-refuses-every-in-repo-read.test.mjs
+@@ -276,8 +276,11 @@ test("AP10 git show <HEAD|hex>:<path> | head -N of a contained in-repo path is a
+ 
+ test("AP11 the git-show lane fails closed: other sinks, no sink, hidden/dash/traversal/backslash/aliased/credential paths, extra operands, other revisions", () => withLaneFixture((path, { aliased }) => {
+   // The sink and the line bound do not depend on how a host reads `<rev>:<path>`: refused at the guard entry on every host.
++  // QG-04 (PO tile decision 2026-10-22, D114 as written: `tail` admitted in the bounded git read pipeline): the entry
++  // "git show HEAD:docs/state.md | tail -5" is no longer refused at the guard entry; it moved to `tailAdmitted` below. The dedicated
++  // git-show LANE stays head-only (its predicate assertion is kept: `tail` is not this lane), so the admission comes from the
++  // generic git-pipeline lane. Every other sink and bound in this list is unchanged.
+   const sinkOrBound = [
+-    "git show HEAD:docs/state.md | tail -5",
+     "git show HEAD:docs/state.md | sort",
+     "git show HEAD:docs/state.md | rg apply",
+     "git show HEAD:docs/state.md | head -501",
+@@ -304,9 +307,14 @@ test("AP11 the git-show lane fails closed: other sinks, no sink, hidden/dash/tra
+   ];
+   // Lane-only: the pre-existing generic git-pipeline lane judges the `..` spelling itself, so only the lane predicate is pinned.
+   const laneOnly = ["git show HEAD:docs/../docs/state.md | head -5", "git show HEAD:docs/state.md"];
+-  for (const command of [...sinkOrBound, ...pathOrOperand, ...laneOnly]) {
++  const tailAdmitted = ["git show HEAD:docs/state.md | tail -5"];
++  for (const command of [...sinkOrBound, ...pathOrOperand, ...laneOnly, ...tailAdmitted]) {
+     assert.equal(gitShowLane(command, path), false, `lane: ${command}`);
+   }
++  for (const command of tailAdmitted) {
++    const r = verdict(bash(command), path);
++    assert.equal(r.exitCode, 0, `${command}\n${r.text}`);
++  }
+   for (const command of sinkOrBound) {
+     const r = verdict(bash(command), path);
+     assert.equal(r.exitCode, 2, `${command}\n${r.text}`);

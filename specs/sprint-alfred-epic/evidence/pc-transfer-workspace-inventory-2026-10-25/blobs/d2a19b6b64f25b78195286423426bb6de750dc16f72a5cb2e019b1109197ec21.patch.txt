@@ -1,0 +1,119 @@
+diff --git a/SETUP.md b/SETUP.md
+index c04eceeba..2e2a3347c 100644
+--- a/SETUP.md
++++ b/SETUP.md
+@@ -164,7 +164,7 @@ changed. Do not hand-edit Codex marketplace or cache files. Update channels
+ #### Antigravity (Agy)
+ 
+ Antigravity binds through the
+-[workspace-local procedure](#antigravity-agy-workspace-local-binding),
++[Agy binding procedure](#antigravity-agy-workspace-local-binding),
+ which follows step 5 so that Claude Code and Codex readers reach step 1
+ without scrolling past it. Follow that procedure, then continue at step 1.
+ 
+@@ -418,7 +418,9 @@ irreversible action. Background for maintainers, not a required step:
+ 
+ ### Antigravity (Agy): workspace-local binding
+ 
+-Bind the plugin in the consumer workspace, then fully restart Agy before the
++Bind the plugin with the installer's **Global** topology refresh (the
++documented default route; Workspace-Local is the documented alternative, see
++*Choosing where to bind* below), then fully restart Agy before the
+ common [step 1](#1-after-consent-let-pipeline-start-classify-the-consumer-root).
+ The pinned `v0.7.0` example applies only after that tag is published on the
+ [official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline);
+@@ -426,7 +428,8 @@ what *approved* means is stated in [step 0](#0-bind-the-supported-runner-integra
+ 
+ After the tag is published, run these commands with your shell in the
+ **consumer project root**. The clone lives in a durable physical directory
+-outside the governed project and any temporary or runner cache directory.
++outside the governed project and any temporary or runner cache directory; the
++Global choice below is the one that accepts a source outside the project.
+ Choose a different durable location if `$HOME/.local/share` is unsuitable:
+ 
+ ```sh
+@@ -478,13 +481,16 @@ node (Join-Path $pipelineReleaseDir 'plugins/pipeline-core/install-agy.mjs')
+ At the first prompt choose **Approved Plugin Directory** (the default). Choose
+ **Local Marketplace** only for an explicitly validated pre-release developer
+ copy; if that development copy is unavailable, the installer refuses the
+-selection instead of silently switching sources. Then choose
+-**Workspace-Local** when the installer asks where to bind
+-the plugin, or **Global** as described under *Choosing where to bind* below.
+-Workspace-Local registers the plugin directory in the consumer project's
++selection instead of silently switching sources. Then, when the installer
++asks where to install, choose **Global topology refresh** (prompt choice `2`),
++the documented default route, as described under *Choosing where to bind*
++below. **Workspace-Local** (prompt choice `1`) is the documented alternative:
++it registers the plugin directory in the consumer project's
+ `.agents/plugins.json` as a path relative to the project and refuses a plugin
+-directory that lies outside the project; keep the clone at the same path
+-while it is registered. Do not hand-edit Agy registry or plugin files. The
++directory that lies outside the project, so it requires the release clone to
++lie inside the workspace. Once a global registration exists the installer
++refuses Workspace-Local and has no way back (see below). Keep the clone at the
++same path while the plugin is registered. Do not hand-edit Agy registry or plugin files. The
+ installer may offer a runner-local autonomous tool policy, but that option
+ grants no plan, release, remote, or human authority.
+ If its existing runner settings are malformed or linked through an alias, the
+@@ -494,10 +500,13 @@ settings deliberately before retrying that optional step.
+ 
+ To upgrade after a newer final release tag is published, clone that tag into
+ a **different** durable directory and run its `install-agy.mjs` from each
+-consumer project root. Choose Approved Plugin Directory and Workspace-Local
+-again. Read back each project's `.agents/plugins.json`: it must contain the
+-new exact plugin path and no previous Pipeline registration, while unrelated
+-entries remain. Keep the old checkout until that readback succeeds, then
++consumer project root. Choose Approved Plugin Directory and the same
++installation choice as before (Global topology refresh by default) again. Read
++back the registry the choice writes: for Global, `$HOME/.gemini/config/plugins.json`
++must hold exactly one Pipeline entry naming the new generated view; for
++Workspace-Local, each project's `.agents/plugins.json` must contain the new
++exact plugin path and no previous Pipeline registration. Unrelated entries
++remain in both cases. Keep the old checkout until that readback succeeds, then
+ retire it and fully restart Agy. A developer checkout is only for an explicit
+ pre-release test.
+ 
+@@ -536,17 +545,20 @@ code it calls; nothing here is a claim about what Agy itself does.
+ 1. *Plugin source:* `1` Approved Plugin Directory (the default), `2` Local
+    Marketplace (refused unless the development marketplace directory exists),
+    or `3` Central agy snapshot (global, per-user).
+-2. *Where to install* (asked only for source `1` or `2`):
++2. *Where to install* (asked only for source `1` or `2`). The documented
++   default is `2`, Global topology refresh; `1`, Workspace-Local, is the
++   alternative and needs the plugin directory inside the project:
+    - `1` **Workspace-Local.** Writes `<project-root>/.agents/plugins.json`: one
+      Pipeline entry, the plugin directory as a path relative to the project,
+      and no absolute Pipeline entry. The plugin directory must lie inside the
+      project. A directory outside it, such as the clone location in the
+      procedure above, is refused with `ATR-WORKSPACE-SOURCE-OUTSIDE` and the
+-     repair "use the global option". A stale Agy-managed copy or stale global
++     repair "use the global option", which is why Global is the documented
++     default. A stale Agy-managed copy or stale global
+      hook wiring also makes this choice refuse (`ATR-GLOBAL-SCOPE`); those
+      changes are made only by the global choice. The optional autonomous tool policy goes to
+      `<project-root>/.agents/settings.json`.
+-   - `2` **Global topology refresh.** User-wide, not tied to one project. It
++   - `2` **Global topology refresh** (documented default). User-wide, not tied to one project. It
+      generates a runner view of the approved source in a per-user Pipeline
+      directory and, when Agy has no managed copy or a stale one, runs
+      `agy plugin validate` and `agy plugin install` on that view. Afterwards
+@@ -571,7 +583,9 @@ unrecognised version). The workspace choice is also refused with
+ `ATR-OTHER-SCOPE-CONFLICT` while the global registry holds a Pipeline entry for
+ a different root, which is the case after a global install. The installer has
+ no mode for going from global back to workspace, and the code does not show
+-a repair for it (unverified).
++a repair for it (unverified). Choose Workspace-Local only deliberately, with
++the source inside the workspace, because the global default cannot be undone
++through the installer.
+ 
+ *Refreshing or switching.* To pick up a newer release, rerun the installer
+ from the new approved directory with the same choice, or use `--refresh`
+@@ -580,7 +594,7 @@ the installer again and choose global. After any of these, fully restart Agy
+ and read the session lock.
+ 
+ *Not verified from the code:* which workspaces Agy loads a global registration
+-for, how Agy treats `.agents/plugins.json` in a project that never ran the
++for (the PO's Antigravity run checks this), how Agy treats `.agents/plugins.json` in a project that never ran the
+ installer, and whether the installer's `--refresh` can be used by a consumer
+ (its help calls it a developer entry).
+ 

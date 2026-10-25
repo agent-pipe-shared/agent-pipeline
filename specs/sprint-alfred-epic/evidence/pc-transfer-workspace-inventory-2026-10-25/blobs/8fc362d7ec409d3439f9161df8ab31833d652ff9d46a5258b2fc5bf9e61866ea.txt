@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { PROPERTY_CLASSES } from "../scripts/architecture-fitness.mjs";
+import { collectRigorJournalEntry, closeArchitectureFitnessDisposition, readCurrentArchitectureFitnessBindings } from "./rigor-lifecycle.mjs";
+
+const root = fileURLToPath(new URL("../../..", import.meta.url));
+const [commit, tree] = execFileSync("git", ["-C", root, "rev-parse", "HEAD", "HEAD^{tree}"], { encoding: "utf8" }).trim().split("\n");
+const candidate = { commit, tree };
+const state = { activeFeature: { id: "fixture-feature", planPath: "specs/fixture/plan.md" }, rigorHistory: [] };
+const available = value => ({ value, status: "available", sourceContract: "fixture" });
+const deps = {
+  currentCandidate: () => candidate,
+  inferInputs: () => ({ actualPaths: available([]) }),
+  planningSurface: () => ({ planPath: state.activeFeature.planPath, paths: [] }),
+  protectedBaseline: () => ({ status: "unavailable" }),
+  interruptionReport: () => ({ ok: false }),
+  evaluateFitness: () => ({ schema: "pipeline.fitness-evidence.v1", outcomes: PROPERTY_CLASSES.map(row => ({
+    classId: row.classId, propertyId: row.propertyId, outcome: row.classId === 7 ? "finding" : row.classId === 10 ? "unavailable" : "pass",
+    details: `Fixture detail ${row.classId}` })) }),
+};
+
+test("pre-close producer retains each nonpass property and close consumer qualifies exact source", () => {
+  const entry = collectRigorJournalEntry({ rootDir: root, state, boundary: "pre-close", selectedProfile: "epic",
+    observedAt: "2026-10-24T00:00:00.000Z" }, deps);
+  assert.equal(entry.body.fitnessProjection.dispositions.length, 2);
+  const projection = entry.body.fitnessProjection;
+  const bindings = readCurrentArchitectureFitnessBindings(root);
+  assert.deepEqual(bindings, { model: projection.model, baseline: projection.baseline, map: projection.map });
+  const close = closeArchitectureFitnessDisposition([entry], state.activeFeature.id, { candidate, bindings });
+  assert.equal(close.status, "observed-open");
+  assert.deepEqual(close.dispositions.map(row => [row.classId, row.observedOutcome, row.disposition]),
+    [[7, "finding", "open"], [10, "unavailable", "open"]]);
+  assert.equal(close.rigorObservationSha256, entry.entrySha256);
+  assert.equal(closeArchitectureFitnessDisposition([entry], state.activeFeature.id,
+    { candidate: { ...candidate, tree: "0".repeat(40) }, bindings }).status, "source-drift");
+  assert.equal(closeArchitectureFitnessDisposition([entry], state.activeFeature.id,
+    { candidate, bindings: { ...bindings, map: [] } }).dispositions.length, 10);
+});
+
+test("missing evaluator evidence stays unavailable with all ten open properties", () => {
+  const entry = collectRigorJournalEntry({ rootDir: root, state, boundary: "pre-close", selectedProfile: "epic",
+    observedAt: "2026-10-24T00:00:00.000Z" }, { ...deps, evaluateFitness: () => { throw new Error("fixture unavailable"); } });
+  const close = closeArchitectureFitnessDisposition([entry], state.activeFeature.id, { candidate });
+  assert.equal(close.status, "unavailable");
+  assert.equal(close.fitnessProjectionSha256, null);
+  assert.equal(close.dispositions.length, 10);
+  assert.ok(close.dispositions.every(row => row.observedOutcome === "unavailable" && row.disposition === "open"));
+});

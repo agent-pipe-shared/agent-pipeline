@@ -1,0 +1,51 @@
+command: node scratch/agent-out/generator-integrated-13-qualification/bind.mjs
+label: generator-source-binding
+exitCode: 0
+head: 5017a7287485783fa2d4ff17d3f3240f2a719e13
+tree: c972b2a380287b5091626ffd40db40eede589883
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.generator-qualification-source-binding.v1",
+  "candidate": {
+    "commit": "5017a7287485783fa2d4ff17d3f3240f2a719e13",
+    "tree": "c972b2a380287b5091626ffd40db40eede589883"
+  },
+  "cloneTrackedStatus": "",
+  "sources": {
+    "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4",
+    "plugins/pipeline-core/scripts/project-onboarding-v3.mjs": "56277f2730e83b41b063be495b32dff4800f278cc3bf5c23de025c202d525ed5",
+    "plugins/pipeline-core/lib/project-onboarding-v3.mjs": "bc5cadfd2abd256d6e112bc900b6ac360efccdccd4a1d744781cb0cafec07f80",
+    "plugins/pipeline-core/lib/onboarding-continuity.mjs": "c5a5f4896193deefceec24c7e916e5bee5131f19d293b1f9dbecd819a2ec6a72",
+    "plugins/pipeline-core/lib/onboarding-driver-output.mjs": "8c48b83ffff49523207e20a654bd5ef8e1c112ba61b37c975855b8dd80c288d2",
+    "plugins/pipeline-core/lib/test-tmpdir.mjs": "34d697714d3504b7a6ee7a3018398dd5884230d4686d0bdc46231455d1680173",
+    "plugins/pipeline-core/scripts/onboarding-init.mjs": "6514423e61a1a2894ff623db3187554f6a5fd2c9f1a8ad0b7beed1376b34f77d",
+    "plugins/pipeline-core/lib/governance-scope.mjs": "131c0d7e100fa3f19b43fa18297c23833d2fa6061331a44d96e1060185f92419",
+    "plugins/pipeline-core/lib/machine-plane.mjs": "ae74bdf6e2eea0333143aee45e77d1dee91243f1cf15bf23b3405f48e34baafb"
+  },
+  "captures": {
+    "original13.log": "894ba1f00c7ebc03ca1e0db9a9cd371c548f45bba4cb0b9032ed39d7730081c1",
+    "measurement.log": "fc09fc8caed655ebef14221b0a515faba6a461fc6e080ce560c49c0c57fea8e2"
+  },
+  "originalPinChanged": false,
+  "fixtureCorrection": false,
+  "testCounts": {
+    "tests": 13,
+    "pass": 12,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "suiteExit": 1,
+  "measurementExit": 0,
+  "remainingFailure": {
+    "assertion": "bytes(stdout) <= COLLECT_INPUT_REFERENCE_BOUND",
+    "originalLimit": 15000,
+    "measuredBytes": 15230,
+    "headroom": -230
+  },
+  "qualification": "red"
+}
+
+--- stderr ---

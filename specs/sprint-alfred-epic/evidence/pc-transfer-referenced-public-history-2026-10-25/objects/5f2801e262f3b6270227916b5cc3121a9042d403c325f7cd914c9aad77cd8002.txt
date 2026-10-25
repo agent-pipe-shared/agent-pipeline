@@ -1,0 +1,9 @@
+command: git -C scratch/clones/g20-publication-qualification diff --cached --check
+label: g20-diff-check
+exitCode: 0
+head: 89b40fb15a6dd442dc2ff4e7063df3e89600f416
+tree: 27b5bf2b1f4249313d0c20cfb479217c83a5ab99
+dirty: true
+--- stdout ---
+
+--- stderr ---

@@ -1,0 +1,23 @@
+command: node --test plugins/pipeline-core/scripts/audit-pack.test.mjs
+label: g28-audit-pack-windows
+exitCode: 0
+head: 16c9e1936c623de9b2e8ea2b384b7b93c1cb7ee5
+tree: f62bb2f9560e7724327c6e6b8f6602a5f84752c2
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ AUDPK001 completed candidate audit pack is candidate-bound, partial on missing review proofs, and offline tamper-evident (316.707532ms)
+✔ AUDPK002 populated Critic summary loses local packet correlation in the public projection (152.623734ms)
+✔ AUDPK003 public archive preserves signed bytes and reports historical integrity after a fresh clone (1199.870815ms)
+✔ AUDPK004 audit pack refuses public-proof references outside the candidate evidence boundary (148.878964ms)
+✔ AUDPK005 audit pack verifies and copies exact public PO intent and proof bytes without exporting local authority metadata (308.827938ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2792.588928
+
+--- stderr ---

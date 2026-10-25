@@ -1,0 +1,118 @@
+command: node scratch/agent-out/generator-integrated-13-qualification/run.mjs measure
+label: generator-original-measurement
+exitCode: 0
+head: 5017a7287485783fa2d4ff17d3f3240f2a719e13
+tree: c972b2a380287b5091626ffd40db40eede589883
+dirty: true
+--- stdout ---
+{
+  "schema": "pipeline.generator-integrated-measurement.v1",
+  "candidate": "5017a7287",
+  "fixture": "original pin helpers, original 14030/56000 requests",
+  "measurements": [
+    {
+      "target": 14030,
+      "sourceBytes": 14047,
+      "sourceSha256": "be027219a6c43204d68ca6e54dd9245cec3a8806690bdb1c9c9fcad89edc9622",
+      "verboseBytes": 8181,
+      "summaryBytes": 2620,
+      "defaultBytes": 2620,
+      "inspectBytes": 3004,
+      "exits": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "defaultEqualsSummary": true,
+      "sourceCopies": {
+        "designInput": 0,
+        "prd": 0,
+        "spec": 0
+      },
+      "targets": {
+        "designInput": {
+          "bytes": 1145,
+          "sha256": "d8e21cfadd0a298785c194fe741c00cd14d624504d6ab20e461a53b23caac133"
+        },
+        "prd": {
+          "bytes": 3296,
+          "sha256": "23d6d0909d7e478ae9d086c86beed4ca06973c7c4172543ecd30135e410d1dc8"
+        },
+        "spec": {
+          "bytes": 1593,
+          "sha256": "5c8339c25f03948c05392d789925c34f905adc4a1f4dd5c4219dfb6eab9b598f"
+        }
+      },
+      "outputSha256": {
+        "verbose": "0867bcd992c665d1b933ec4b0fa9a2fe3c83894c7d6c586acb3b72cb7be5c618",
+        "summary": "11659b9532b54b64c380513d71d136d83174bc2e7b0c1d814f448f66c431b5b1",
+        "inspect": "3b7aa0eb0033e2c12aa74f116f3eb1419398c983fcb781fea5aa69b0af881df0"
+      }
+    },
+    {
+      "target": 56000,
+      "sourceBytes": 56045,
+      "sourceSha256": "2092308ba546ecaeec01ce35127be4814a1f031c5f5d0711325513ee04d1f47e",
+      "verboseBytes": 8181,
+      "summaryBytes": 2620,
+      "defaultBytes": 2620,
+      "inspectBytes": 3004,
+      "exits": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "defaultEqualsSummary": true,
+      "sourceCopies": {
+        "designInput": 0,
+        "prd": 0,
+        "spec": 0
+      },
+      "targets": {
+        "designInput": {
+          "bytes": 1145,
+          "sha256": "e4c319e1ee9d00c6dccc6fd80c131660ac96a3dbc9daacec884d9c4d71894821"
+        },
+        "prd": {
+          "bytes": 3296,
+          "sha256": "e2056203ca076c9f8cbbfdb430b239ed694c1e461c47cb49762c15f7d6cf7956"
+        },
+        "spec": {
+          "bytes": 1593,
+          "sha256": "3e7769ac1c39fe07612dbba6ba0d6c83f788a956fa8e2b6daae17adde804326a"
+        }
+      },
+      "outputSha256": {
+        "verbose": "c85aa0108de56ace91d9a959e63608f943630567a191db8d7d0b23b175578e47",
+        "summary": "817e52447d8cea769ca635a89e5790d59b918313e43c7921be731c6fdb1615e0",
+        "inspect": "73bde0ab15f8fc22a0737ed36eca88c707983a284ea0c8775cae916cb5f13ac0"
+      }
+    }
+  ],
+  "drivers": {
+    "codex": {
+      "bytes": 15230,
+      "outcome": "collect-input",
+      "asks": 1,
+      "askCopies": [
+        1
+      ],
+      "primaryCopies": 1,
+      "sha256": "13addc155245609f9f11542f44c322ec1c5a15e2cbb222885a66043fc22335d2"
+    },
+    "claude": {
+      "bytes": 12181,
+      "outcome": "pending-asks",
+      "asks": 1,
+      "askCopies": [
+        1
+      ],
+      "primaryCopies": null,
+      "sha256": "8e28e65503f7884ce8afb43ebc5f517b06560fe73a7d08c3c5de2b6a4d57bdd1"
+    }
+  }
+}
+
+--- stderr ---

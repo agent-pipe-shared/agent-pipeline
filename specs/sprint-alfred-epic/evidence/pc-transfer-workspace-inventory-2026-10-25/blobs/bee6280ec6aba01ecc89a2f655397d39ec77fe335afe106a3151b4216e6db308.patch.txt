@@ -1,0 +1,599 @@
+diff --git a/SETUP.md b/SETUP.md
+index a96c8485f..6e506f70b 100644
+--- a/SETUP.md
++++ b/SETUP.md
+@@ -42,8 +42,13 @@ terminology, continue with this setup guide, then read the operator-facing
+ ## A. Activate the pipeline in one project repository
+ 
+ Repeat this routine path for every application or service repository. It uses
+-the public onboarding Driver. In a folder without Pipeline governance, first
+-explain the proposed installation and ask for explicit consent; stop before
++the public onboarding
++[Driver](docs/README.md#terms-used-across-these-documents). Who does what: the
++agent explains the installation, asks for consent, invokes `pipeline-start` and
++follows the Driver's returned actions; the human gives the consent, fully
++restarts the host and supplies the named inputs. In a folder without Pipeline
++governance, the agent first
++explains the proposed installation and asks for explicit consent; it stops before
+ installing, invoking `pipeline-start`, or writing project files until the user
+ agrees. Then bind the supported runner integration, start a new session in the
+ project root, invoke `/pipeline-core:pipeline-start`, and follow its returned
+@@ -61,14 +66,12 @@ choices through the normal reviewed workflow.
+ 
+ The per-runner binding commands and the restart rule are in
+ [step 0](#0-bind-the-supported-runner-integration-and-fully-restart-its-host).
+-For a runner without a command there, use only its supported integration; do
+-not copy another runner's commands or claim its hooks are installed.
+ 
+ The resulting Verify receipt and delivery records can be inspected with the
+ candidate's other evidence. They do not certify compliance or replace a human
+ decision. [Audit and evidence](docs/audit-and-evidence.md) gives the artifact
+-boundary; [the detailed consumer procedures](#consumer-onboarding-details)
+-retain exact commands and migration cases for operators who need them.
++boundary; the [consumer onboarding guide](docs/v3-consumer-onboarding.md)
++retains the exact commands and the migration cases for operators who need them.
+ 
+ ### Runner support, stated precisely
+ 
+@@ -99,8 +102,14 @@ first binding, **fully end that host process and start a new session in the
+ project root before invoking `pipeline-start` or classifying the root**. A
+ refresh inside the existing host is insufficient for the first binding. Until
+ `0.7.0` is released, bind only the approved GitHub-distributed version; a local
+-candidate is not an installation source (see the
+-[release status](docs/overview.md)). This applies to every bind step below.
++[candidate](docs/README.md#terms-used-across-these-documents) is not an
++installation source (see the [release status](docs/overview.md)). This applies
++to every bind step below. "Approved" means, for Claude Code and Codex, the
++version the official marketplace source delivers from its `main` branch (the
++published release branch); for Antigravity it is a final release tag of the
++official repository, such as `v0.7.0`. Before such a tag exists there is no
++approved Antigravity route, because a developer checkout is only for an
++explicit pre-release test.
+ 
+ #### Claude Code: project-scoped binding
+ 
+@@ -152,147 +161,35 @@ changed. Do not hand-edit Codex marketplace or cache files. Update channels
+ (`alpha`, `beta`, `stable`) are described under
+ [Update channels](#update-channels).
+ 
+-#### Antigravity (Agy): workspace-local binding
++#### Antigravity (Agy)
+ 
+-Bind the plugin in the consumer workspace, then fully restart Agy before the
+-common step 1 below. The pinned `v0.7.0` example applies only after that tag is
+-published on the [official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline);
+-until then see the [release status](docs/overview.md).
+-
+-After the tag is published, run these commands with your shell in the
+-**consumer project root**. The clone lives in a durable physical directory
+-outside the governed project and any temporary or runner cache directory.
+-Choose a different durable location if `$HOME/.local/share` is unsuitable:
+-
+-```sh
+-mkdir -p "$HOME/.local/share"
+-pipeline_release_tag="v0.7.0"
+-pipeline_source_url="https://github.com/agent-pipe-shared/agent-pipeline.git"
+-pipeline_release_dir="$HOME/.local/share/agent-pipeline-$pipeline_release_tag"
+-git clone --branch "$pipeline_release_tag" --depth 1 \
+-  "$pipeline_source_url" "$pipeline_release_dir"
+-git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
+-git -C "$pipeline_release_dir" remote get-url origin
+-git -C "$pipeline_release_dir" describe --tags --exact-match
+-```
+-
+-On Windows, use PowerShell from the consumer project root. The following
+-directory is durable and outside the project; choose another durable path if
+-`$env:LOCALAPPDATA` is unsuitable:
+-
+-```powershell
+-$pipelineReleaseTag = 'v0.7.0'
+-$pipelineSourceUrl = 'https://github.com/agent-pipe-shared/agent-pipeline.git'
+-$pipelineReleaseDir = Join-Path $env:LOCALAPPDATA "AgentPipeline\agent-pipeline-$pipelineReleaseTag"
+-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pipelineReleaseDir) | Out-Null
+-git clone --branch $pipelineReleaseTag --depth 1 $pipelineSourceUrl $pipelineReleaseDir
+-git -C $pipelineReleaseDir switch -c pipeline-release-v0.7.0
+-git -C $pipelineReleaseDir remote get-url origin
+-git -C $pipelineReleaseDir describe --tags --exact-match
+-```
+-
+-Confirm the two Git readbacks show the official URL above and `v0.7.0` before
+-running the installer from the same consumer project root. The local branch is
+-required because cloning a tag otherwise leaves a detached HEAD, which the
+-plugin's clean-source observer refuses; creating the branch does not move the
+-checked-out release commit. The installer validates physical plugin files and
+-the registry binding; it does not independently authenticate the GitHub source
+-or a release signature. Treat those readbacks and your approved release channel
+-as operator checks, not as proof supplied by the installer.
+-
+-```sh
+-node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
+-```
++Antigravity binds through the
++[workspace-local procedure](#antigravity-agy-workspace-local-binding),
++which follows step 5 so that Claude Code and Codex readers reach step 1
++without scrolling past it. Follow that procedure, then continue at step 1.
+ 
+-On Windows, run the same installer from the consumer project root with:
++#### Missing prerequisite guidance in a consumer project
+ 
+-```powershell
+-node (Join-Path $pipelineReleaseDir 'plugins/pipeline-core/install-agy.mjs')
+-```
+-
+-At the first prompt choose **Approved Plugin Directory** (the default). Choose
+-**Local Marketplace** only for an explicitly validated pre-release developer
+-copy; if that development copy is unavailable, the installer refuses the
+-selection instead of silently switching sources. Then choose
+-**Workspace-Local** when the installer asks where to bind
+-the plugin. The installer registers that exact physical plugin directory in
+-the consumer project's `.agents/plugins.json`; keep the clone at the same path
+-while it is registered. Do not hand-edit Agy registry or plugin files. The
+-installer may offer a runner-local autonomous tool policy, but that option
+-grants no plan, release, remote, or human authority.
+-If its existing runner settings are malformed or linked through an alias, the
+-optional policy update fails without replacing those bytes. Plugin registration
+-may already have succeeded; inspect `.agents/plugins.json` and repair the
+-settings deliberately before retrying that optional step.
+-
+-To upgrade after a newer final release tag is published, clone that tag into
+-a **different** durable directory and run its `install-agy.mjs` from each
+-consumer project root. Choose Approved Plugin Directory and Workspace-Local
+-again. Read back each project's `.agents/plugins.json`: it must contain the
+-new exact plugin path and no previous Pipeline registration, while unrelated
+-entries remain. Keep the old checkout until that readback succeeds, then
+-retire it and fully restart Agy. A developer checkout is only for an explicit
+-pre-release test.
+-
+-If the old checkout was already deleted while its registry entry remains,
+-restore that exact approved plugin directory first and rerun the installer.
+-The installer refuses an unverifiable, Pipeline-shaped stale path instead of
+-deleting an entry it cannot prove it owns; do not work around this by editing
+-the registry by hand.
+-
+-**Agy's managed plugin directory and import manifest.** Besides the path
+-registries (`.agents/plugins.json` and the global `plugins.json`), Agy keeps a
+-managed copy of an imported plugin in its own config directory
+-(`plugins/agent-pipeline-core`) and lists it in `import_manifest.json`. That
+-managed copy can be stale while the registered path is current, and a stale
+-same-version copy can shadow the registered plugin. Keep a **single source**:
+-one approved plugin directory per scope, and no hand-edited copy beside it. The
+-refresh command is:
+-
+-```sh
+-node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs" --refresh
+-```
+-
+-It prints the exact plan (sync of the local marketplace copy, the Agy
+-lifecycle steps, a readback) before it changes anything and asks for
+-confirmation. `--yes` skips only that question and is accepted only together
+-with `--refresh`; on its own it is refused with a repair. After the refresh,
+-**fully restart Agy and read the session lock** (the first
+-`/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
+-list` and `plugins.json` are not proof of what is loaded, and neither is the
+-installer's readback, which is a physical diagnostic only.
+-
+-**Inert outside opted-in repositories.** A global install acts only in
+-repositories that opted in. Outside them the hooks are inert: no blocking, no
+-injected instructions, no writes. The one exception is the destructive-git
+-protection, which stays active everywhere.
+-
+-**Node.js on the host's PATH.** The pipeline hooks need the Agy host to resolve
+-`node`; a desktop or service launcher may have a different PATH from an
+-interactive shell. If launching Agy from this same terminal, check Node.js
+-immediately before launching it. On macOS/Linux use:
++The installed plugin's read-only toolchain preflight reports each configured
++tool, observed version, blocked claim and a copyable platform command. In this
++guide `<plugin-root>` is the installed Pipeline plugin directory and
++`<project-root>` the governed repository root (see the
++[command convention](docs/README.md)). From the governed project root, run:
+ 
+ ```sh
+-command -v node
+-```
+-
+-On Windows, use PowerShell or Command Prompt:
+-
+-```powershell
+-where.exe node
++node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
+ ```
+ 
+-For a desktop or service launch, either shell result does **not** prove the Agy
+-host's PATH. Inspect that launcher/service environment and confirm that Agy's
+-own command tool can resolve and run `node --version` in a new session. If
+-that readback is unavailable or denied, treat hook readiness as unknown;
+-correct the host environment and fully restart Agy before relying on hooks.
+-Then open a new workspace session in the project root and invoke
+-`/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
+-unattended permission-bypass mode as an installation or recovery shortcut.
++Review any offered installer command under your host/package-management
++policy, then repeat the preflight. npm is never substituted for non-npm
++scanners; bounded Semgrep settings avoid treating ordinary home-directory
++writes as a missing installation.
+ 
+ ### 1. After consent, let `pipeline-start` classify the consumer root
+ 
++The agent runs this step; the human's part is the consent and, for a fresh
++root, the explicit request to create or initialize the project.
++
+ Do not copy `setup.mjs` into a consumer project or start a blank directory by
+ manually creating Git/V3 runtime files. After completing the binding and full
+ host restart in step 0, invoke `/pipeline-core:pipeline-start` as the first
+@@ -317,7 +214,8 @@ or V3 authority checks and has these outcomes:
+   adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
+   and preserves project files plus valid Git metadata; it is neither a legacy
+   migration nor permission to overwrite an existing `.claude`, `.codex`, or
+-  `.agents` path.
++  `.agents` path. The [existing repository checklist](#existing-repository-checklist)
++  in step 2 lists the adoption steps.
+ - A V0/V1/V2 authority uses the official migration inspect → plan → explicit
+   apply workflow ([consumer procedure](docs/v3-consumer-onboarding.md#legacy-consumer-with-no-projections)),
+   never the fresh initializer. A partial, invalid, unsafe, or
+@@ -370,11 +268,40 @@ Put hard project denies and permission boundaries in committed
+ `pipeline.json`. Start conservatively: read and plan first, then grant only the
+ autonomy your team is prepared to supervise.
+ 
++<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
++
++#### Existing repository checklist
++
++The same Driver path applies to an existing repository. Adopt one control at a
++time on a normal change branch:
++
++1. Identify the existing test/build commands, branch policy, sensitive paths,
++   and current documentation location.
++2. Bind the supported runner integration and add calibration plus project
++   guidance through the additive adoption plan, preserving existing settings
++   and instructions.
++3. Create or consolidate the one `verify` command and run it successfully
++   before treating it as the delivery gate.
++4. Name one handover file in calibration and move current state there instead
++   of maintaining competing status copies.
++5. Add project-specific denies, risk zones, and constraints. Enable governance
++   policies only after their paths and checks are real.
++6. Pilot the workflow read-mostly with a small spec, deterministic checks, and
++   independent review. Expand autonomy only when its evidence and operating
++   cost are understood.
++
++Migration changes the project's process, so review it like any architectural
++change. Do not paste a pipeline source's `pipeline.user.yaml` into an
++application repository or make a legacy authority look current by copying
++generated runtime files.
++
+ ### 3. Declare the Git lifecycle before delivery
+ 
+ An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
+-the project calibration (see the authority-tier note in step 2): onboarding creates a repository but no initial commit,
+-remote, or credential binding. Make the initial commit before normal work.
++the project calibration: onboarding creates a repository but no initial commit,
++remote, or credential binding (the authority-tier note in
++[step 2](#2-complete-project-calibration-after-onboarding) says where that
++calibration file is read from). Make the initial commit before normal work.
+ When the project is intentionally connected to a shared remote, change the
+ committed calibration to `repositoryMode: "remote-tracked"`; the session
+ freshness check then requires an upstream and blocks writes when it is stale or
+@@ -442,65 +369,20 @@ rules before writable work. A reminder hook is not a substitute for the
+ bootstrap itself.
+ 
+ If the bootstrap reports `hook-refresh-required`, see
+-[Troubleshooting](#troubleshooting).
+-
+-<a id="c-bring-an-existing-repository-under-the-pipeline"></a>
++[Troubleshooting](#troubleshooting). In the default `signature` approval mode,
++create the [human-approval key](#human-approval-key-one-time-setup) before the
++first human decision gate.
+ 
+-### Existing repository checklist
++### Human-approval key (one-time setup)
+ 
+-The same Driver path applies to an existing repository. Adopt one control at a
+-time on a normal change branch:
+-
+-1. Identify the existing test/build commands, branch policy, sensitive paths,
+-   and current documentation location.
+-2. Bind the supported runner integration and add calibration plus project
+-   guidance through the additive adoption plan, preserving existing settings
+-   and instructions.
+-3. Create or consolidate the one `verify` command and run it successfully
+-   before treating it as the delivery gate.
+-4. Name one handover file in calibration and move current state there instead
+-   of maintaining competing status copies.
+-5. Add project-specific denies, risk zones, and constraints. Enable governance
+-   policies only after their paths and checks are real.
+-6. Pilot the workflow read-mostly with a small spec, deterministic checks, and
+-   independent review. Expand autonomy only when its evidence and operating
+-   cost are understood.
+-
+-Migration changes the project's process, so review it like any architectural
+-change. Do not paste a pipeline source's `pipeline.user.yaml` into an
+-application repository or make a legacy authority look current by copying
+-generated runtime files.
+-
+-### Missing prerequisite guidance in a consumer project
+-
+-The installed plugin's read-only toolchain preflight reports each configured
+-tool, observed version, blocked claim and a copyable platform command. From
+-the governed project root, run:
+-
+-```sh
+-node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
+-```
+-
+-`<plugin-root>` is the installed Pipeline plugin directory (see the
+-[command convention](docs/README.md)). Review any offered installer command under your host/package-management
+-policy, then repeat the preflight. npm is never substituted for non-npm
+-scanners; bounded Semgrep settings avoid treating ordinary home-directory
+-writes as a missing installation.
+-
+-### Optional advanced setup
+-
+-The slim private overlay and update channels below are not part of routine
+-onboarding; use them only when the project's declared operating model requires
+-them. The human-approval key is required or not depending on the approval mode.
+-
+-#### Human-approval key (one-time setup)
+-
+-**When the key is required.** The human-approval key is needed whenever the
+-project's approval mode is `signature`, which is the default (the
++**When the key is required.** The human-approval key is required in the
++default approval mode, `signature` (the
+ [approval-strength selector](docs/usage.md#choose-the-human-approval-strength-deliberately)
+-explains the choice). The Driver asks for the mode in its initial round
+-(`signature` or `chat`); choosing `signature` makes it surface the separate
+-trust-anchor step. Under `signature`, a human decision gate (for example PRD
++explains the choice), and not needed under `chat`. The approval mode is a
++routine onboarding question: the Driver asks for it (`signature` or `chat`) in
++its initial round, alongside the Git author, language and Advisor-consent
++inputs; choosing `signature` makes it surface the separate
++[trust anchor](docs/README.md#terms-used-across-these-documents) step. Under `signature`, a human decision gate (for example PRD
+ approval, which [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) makes mandatory for
+ rigor 1 or 2 and for high risk, or a push) needs a detached proof, so create
+ the key once before the first such gate. Under `chat` no key is needed, but
+@@ -531,7 +413,154 @@ node "<plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REP
+ Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
+ future adapter work, not current CLI features. A code pasted into the same agent
+ chat is visible to that agent and cannot replace final local proof for an
+-irreversible action. See [PO approval](docs/po-human-approval.md).
++irreversible action. Background for maintainers, not a required step:
++[PO approval](docs/po-human-approval.md).
++
++### Antigravity (Agy): workspace-local binding
++
++Bind the plugin in the consumer workspace, then fully restart Agy before the
++common [step 1](#1-after-consent-let-pipeline-start-classify-the-consumer-root).
++The pinned `v0.7.0` example applies only after that tag is published on the
++[official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline);
++what *approved* means is stated in [step 0](#0-bind-the-supported-runner-integration-and-fully-restart-its-host).
++
++After the tag is published, run these commands with your shell in the
++**consumer project root**. The clone lives in a durable physical directory
++outside the governed project and any temporary or runner cache directory.
++Choose a different durable location if `$HOME/.local/share` is unsuitable:
++
++```sh
++mkdir -p "$HOME/.local/share"
++pipeline_release_tag="v0.7.0"
++pipeline_source_url="https://github.com/agent-pipe-shared/agent-pipeline.git"
++pipeline_release_dir="$HOME/.local/share/agent-pipeline-$pipeline_release_tag"
++git clone --branch "$pipeline_release_tag" --depth 1 \
++  "$pipeline_source_url" "$pipeline_release_dir"
++git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
++git -C "$pipeline_release_dir" remote get-url origin
++git -C "$pipeline_release_dir" describe --tags --exact-match
++```
++
++On Windows, use PowerShell from the consumer project root. The following
++directory is durable and outside the project; choose another durable path if
++`$env:LOCALAPPDATA` is unsuitable:
++
++```powershell
++$pipelineReleaseTag = 'v0.7.0'
++$pipelineSourceUrl = 'https://github.com/agent-pipe-shared/agent-pipeline.git'
++$pipelineReleaseDir = Join-Path $env:LOCALAPPDATA "AgentPipeline\agent-pipeline-$pipelineReleaseTag"
++New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pipelineReleaseDir) | Out-Null
++git clone --branch $pipelineReleaseTag --depth 1 $pipelineSourceUrl $pipelineReleaseDir
++git -C $pipelineReleaseDir switch -c pipeline-release-v0.7.0
++git -C $pipelineReleaseDir remote get-url origin
++git -C $pipelineReleaseDir describe --tags --exact-match
++```
++
++Confirm the two Git readbacks show the official URL above and `v0.7.0` before
++running the installer from the same consumer project root. The local branch is
++required because cloning a tag otherwise leaves a detached HEAD, which the
++plugin's clean-source observer refuses; creating the branch does not move the
++checked-out release commit. The installer validates physical plugin files and
++the registry binding; it does not independently authenticate the GitHub source
++or a release signature. Treat those readbacks and your approved release channel
++as operator checks, not as proof supplied by the installer.
++
++```sh
++node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
++```
++
++On Windows, run the same installer from the consumer project root with:
++
++```powershell
++node (Join-Path $pipelineReleaseDir 'plugins/pipeline-core/install-agy.mjs')
++```
++
++At the first prompt choose **Approved Plugin Directory** (the default). Choose
++**Local Marketplace** only for an explicitly validated pre-release developer
++copy; if that development copy is unavailable, the installer refuses the
++selection instead of silently switching sources. Then choose
++**Workspace-Local** when the installer asks where to bind
++the plugin. The installer registers that exact physical plugin directory in
++the consumer project's `.agents/plugins.json`; keep the clone at the same path
++while it is registered. Do not hand-edit Agy registry or plugin files. The
++installer may offer a runner-local autonomous tool policy, but that option
++grants no plan, release, remote, or human authority.
++If its existing runner settings are malformed or linked through an alias, the
++optional policy update fails without replacing those bytes. Plugin registration
++may already have succeeded; inspect `.agents/plugins.json` and repair the
++settings deliberately before retrying that optional step.
++
++To upgrade after a newer final release tag is published, clone that tag into
++a **different** durable directory and run its `install-agy.mjs` from each
++consumer project root. Choose Approved Plugin Directory and Workspace-Local
++again. Read back each project's `.agents/plugins.json`: it must contain the
++new exact plugin path and no previous Pipeline registration, while unrelated
++entries remain. Keep the old checkout until that readback succeeds, then
++retire it and fully restart Agy. A developer checkout is only for an explicit
++pre-release test.
++
++If the old checkout was already deleted while its registry entry remains,
++restore that exact approved plugin directory first and rerun the installer.
++The installer refuses an unverifiable, Pipeline-shaped stale path instead of
++deleting an entry it cannot prove it owns; do not work around this by editing
++the registry by hand.
++
++**Agy's managed plugin directory and import manifest.** Besides the path
++registries (`.agents/plugins.json` and the global `plugins.json`), Agy keeps a
++managed copy of an imported plugin in its own config directory
++(`plugins/agent-pipeline-core`) and lists it in `import_manifest.json`. That
++managed copy can be stale while the registered path is current, and a stale
++same-version copy can shadow the registered plugin. Keep a **single source**:
++one approved plugin directory per scope, and no hand-edited copy beside it. The
++refresh command is:
++
++```sh
++node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs" --refresh
++```
++
++It prints the exact plan (sync of the local marketplace copy, the Agy
++lifecycle steps, a readback) before it changes anything and asks for
++confirmation. `--yes` skips only that question and is accepted only together
++with `--refresh`; on its own it is refused with a repair. After the refresh,
++**fully restart Agy and read the session lock** (the first
++`/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
++list` and `plugins.json` are not proof of what is loaded, and neither is the
++installer's readback, which is a physical diagnostic only.
++
++**Inert outside opted-in repositories.** A global install acts only in
++repositories that opted in. Outside them the hooks are inert: no blocking, no
++injected instructions, no writes. The one exception is the destructive-git
++protection, which stays active everywhere.
++
++**Node.js on the host's PATH.** The pipeline hooks need the Agy host to resolve
++`node`; a desktop or service launcher may have a different PATH from an
++interactive shell. If launching Agy from this same terminal, check Node.js
++immediately before launching it. On macOS/Linux use:
++
++```sh
++command -v node
++```
++
++On Windows, use PowerShell or Command Prompt:
++
++```powershell
++where.exe node
++```
++
++For a desktop or service launch, either shell result does **not** prove the Agy
++host's PATH. Inspect that launcher/service environment and confirm that Agy's
++own command tool can resolve and run `node --version` in a new session. If
++that readback is unavailable or denied, treat hook readiness as unknown;
++correct the host environment and fully restart Agy before relying on hooks.
++Then open a new workspace session in the project root and invoke
++`/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
++unattended permission-bypass mode as an installation or recovery shortcut.
++
++### Optional advanced setup
++
++The slim private overlay and update channels below are not part of routine
++onboarding; use them only when the project's declared operating model requires
++them.
+ 
+ #### Activate a slim private overlay
+ 
+@@ -671,10 +700,11 @@ write.
+ 
+ Whether the Advisor may receive repository data is decided by the recorded
+ `advisor_export.consent` (`approved` or `declined`) in `pipeline.user.yaml`;
+-the onboarding Driver asks for it explicitly, and `declined` creates no advisor
+-export, child launch, or receipt. This guide does not state a default for a
+-missing field: read the recorded value instead of assuming one. To review that
+-boundary, run:
++the onboarding Driver asks for it explicitly, nothing is exported without a
++recorded consent, and `declined` creates no advisor
++export, child launch, or receipt (see
++[Advisor export consent](docs/v3-consumer-onboarding.md#advisor-export-consent)
++for a missing field). To review that boundary, run:
+ 
+ ```sh
+ node setup.mjs --configure-advisor-export
+diff --git a/docs/v3-consumer-onboarding.md b/docs/v3-consumer-onboarding.md
+index d61bd6df6..2b5703af9 100644
+--- a/docs/v3-consumer-onboarding.md
++++ b/docs/v3-consumer-onboarding.md
+@@ -1,7 +1,7 @@
+ # V3 consumer onboarding and Codex lifecycle V4
+ 
+-This guide covers runner installation, fresh Codex lifecycle V4 onboarding,
+-and preview-first migration of a consumer project with a valid legacy
++This guide covers fresh Codex lifecycle V4 onboarding and preview-first
++migration of a consumer project with a valid legacy
+ (`pipeline.user.v0`/`pipeline.user.v1`/V2) `pipeline.user.yaml` and no generated
+ `.claude/**` or `.codex/**` projections. Migration uses the Public Core
+ authority; do not hand-author runtime files, an authority lock, or a
+@@ -27,7 +27,14 @@ this guide does not repeat them. After binding and the restart, invoke
+ `/pipeline-core:pipeline-start` as the first Pipeline action: its preflight
+ supplies the exact onboarding action for the observed project state. Do not
+ repeat the Codex lifecycle V4 steps below for Antigravity; follow the installed
+-Agy Driver's returned classification action.
++Agy [Driver](README.md#terms-used-across-these-documents)'s returned
++classification action.
++
++For Claude Code the plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`; Claude
++resolves the quoted plugin-root command on Windows, and lifecycle commands
++remain Node argv rather than shell-specific scripts. Update as in SETUP step 0.
++Accept the update only after a new `pipeline-start` identity line names
++the expected version and root.
+ 
+ ## Fresh Codex lifecycle V4
+ 
+@@ -40,8 +47,10 @@ classification and progression. Read the result as
+ 
+ The installed integration exposes a session-entry hint where the runner host
+ supports it; the three runner integrations do not have identical host hooks.
+-In a folder without Pipeline governance, the first assistant response must briefly explain
+-that Agent Pipeline provides a structured, verifiable delivery workflow and ask
++The next two paragraphs describe the agent's behavior; the human only answers
++the consent question. In a folder without Pipeline governance, the first assistant
++response must briefly explain
++that Agent-Pipeline provides a structured, verifiable delivery workflow and ask
+ whether the user wants to install it. It must then stop. Before an affirmative
+ answer it does not invoke `pipeline-start`, inspect onboarding, initialize Git,
+ or write project files. In an already governed project, `pipeline-start`
+@@ -55,7 +64,6 @@ cache version heuristically.
+ | Runner | Linux and macOS | Windows | Update/readback requirement |
+ | --- | --- | --- | --- |
+ | Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | Install, update, and restart as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
+-| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Update as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
+ 
+ The lifecycle planner returns an executable plus an argv array. Agents must
+ render that exact action for the current shell when an operator has to execute
+@@ -86,7 +94,7 @@ over existing project files.
+ | `intake-required` | Follow the returned consent/capture action to record the project brief and required local identity fields. | The private intake checkpoint contains consent and the captured material input; it is not yet a generated specification. |
+ | `intake-design-questions-required` | Answer the one bundled question round, correct wrong answers before generation when needed, then run the returned read-only generation plan and its digest-bound apply. | The complete input is durable and staging generation is bound to its digest. |
+ | `bootstrap-binding-required` | Review the generated PRD/Spec, add the requested acknowledgement, then run the returned bind plan/apply. | The generated package becomes the initial project authority only after its own validation and binding readback. |
+-| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan (see the [kickoff apply contract](#kickoff-apply-contract), at the end of this guide). | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
++| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan (see the [kickoff apply contract](#kickoff-apply-contract) under *Recovery and exceptional migrations*). | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+ | `host-repository-init-required` | For a Codex host-managed root with valid continuity, follow the exact host-repository-init plan and confirmed action described below. It can follow either the fresh binding path or the earlier kickoff route; it is not a second kickoff. | The host initializes local Git without a commit. A fresh readback is still required, and dispatch remains blocked until the first commit. |
+ | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
+ | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
+@@ -155,11 +163,14 @@ publish, merge, close an Issue, or create a release. Those actions remain
+ separate, explicitly accepted gates after same-candidate verification and the
+ operator's live onboarding acceptance.
+ 
++### Advisor export consent
++
+ Advisor and Critic export consent is not an onboarding precondition; see
+ [private review export](usage.md#private-review-export). Whether the Advisor may
+ receive repository data depends on the recorded `advisor_export.consent`
+ (`approved` or `declined`), which the onboarding Driver asks for explicitly;
+-this guide does not state a default for a missing field. Do not run a
++nothing is exported without a recorded consent, and this guide does not state a
++default for a missing field. Do not run a
+ consultation merely to activate or bootstrap.
+ 
+ ## Legacy consumer with no projections

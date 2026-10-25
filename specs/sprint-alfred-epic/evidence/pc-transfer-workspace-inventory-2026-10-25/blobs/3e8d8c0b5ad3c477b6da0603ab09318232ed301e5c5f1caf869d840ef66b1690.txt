@@ -1,0 +1,93 @@
+exit 1 null
+ORIGINAL184 CALLBACK START shard=3 index=3 pid=1388155 mono_ns=89249154637197
+PASS  host-bound dispatch smoke observes and rolls back real session/worktree capability in a spaced root
+ORIGINAL184 CALLBACK END shard=3 index=3 pid=1388155 mono_ns=89250532487345 elapsed_ms=1377.850 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=15 pid=1388155 mono_ns=89250532643482
+PASS  runner-permission drift is repaired before a neutral PO authority decision, then exposes that decision again
+ORIGINAL184 CALLBACK END shard=3 index=15 pid=1388155 mono_ns=89270084993978 elapsed_ms=19552.350 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=27 pid=1388155 mono_ns=89270085496242
+PASS  an unknown runner keeps the Codex-strength barrier and a manual action, never the Codex launcher
+ORIGINAL184 CALLBACK END shard=3 index=27 pid=1388155 mono_ns=89288665437163 elapsed_ms=18579.941 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=39 pid=1388155 mono_ns=89288665647081
+PASS  apply-portable-seed --activate surfaces the push-approval-setup ask-step for every repository, pre-filled from the machine default
+ORIGINAL184 CALLBACK END shard=3 index=39 pid=1388155 mono_ns=89319215617116 elapsed_ms=30549.970 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=51 pid=1388155 mono_ns=89319215789444
+PASS  NVA-R24-TRUSTANCHOR: a pre-existing key directory is reused byte-for-byte, never written to, by the onboarding transaction
+ORIGINAL184 CALLBACK END shard=3 index=51 pid=1388155 mono_ns=89336159337553 elapsed_ms=16943.548 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=63 pid=1388155 mono_ns=89336159587398
+PASS  runtime target preflight maps every reversible probe permission failure without residue EACCES/close
+ORIGINAL184 CALLBACK END shard=3 index=63 pid=1388155 mono_ns=89350817696709 elapsed_ms=14658.109 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=75 pid=1388155 mono_ns=89350817796017
+PASS  runtime target preflight maps every reversible probe permission failure without residue EROFS/write
+ORIGINAL184 CALLBACK END shard=3 index=75 pid=1388155 mono_ns=89352046807664 elapsed_ms=1229.012 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=87 pid=1388155 mono_ns=89352046904027
+PASS  a local kickoff provisions its PO profile inside the confirmed kickoff action
+ORIGINAL184 CALLBACK END shard=3 index=87 pid=1388155 mono_ns=89370118639002 elapsed_ms=18071.735 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=99 pid=1388155 mono_ns=89370118741908
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "po" for commit 1986da5d40f299fa8eeebfeb982d06860a35d4dd (2026-10-21T21:28:19.447Z).
+PASS  the seeded push gate refuses an unapproved push and admits it after the shipped commands
+ORIGINAL184 CALLBACK END shard=3 index=99 pid=1388155 mono_ns=89428753618595 elapsed_ms=58634.877 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=111 pid=1388155 mono_ns=89428753791173
+PASS  once an owned .gitignore's ask is fulfilled with ordinary tools, the evidence-circle can never reopen
+ORIGINAL184 CALLBACK END shard=3 index=111 pid=1388155 mono_ns=89451975184745 elapsed_ms=23221.394 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=123 pid=1388155 mono_ns=89451975336803
+PASS  a promotion plan produced for one runner does not validate an apply for another
+ORIGINAL184 CALLBACK END shard=3 index=123 pid=1388155 mono_ns=89471906655018 elapsed_ms=19931.318 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=135 pid=1388155 mono_ns=89471906799412
+FAIL  a recognized read-only host control layout receives portable onboarding without an overwrite attempt -- Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'architecture/map/index.md',
+    'architecture/map/inventory.json',
+    'AGENTS.md',
+    '.gitignore',
++   'docs/adr/README.txt',
++   'docs/adr/templates/adr-template.md',
+    'pipeline.user.yaml',
+    'project/consumer-verify.mjs',
+    'project/critical-human-proof.json',
+    'project/pipeline.json',
+    'project/pipeline.yaml'
+
+ORIGINAL184 CALLBACK END shard=3 index=135 pid=1388155 mono_ns=89472018621741 elapsed_ms=111.822 outcome=throw
+ORIGINAL184 CALLBACK START shard=3 index=147 pid=1388155 mono_ns=89472018714648
+PASS  validateManifest never offers a repair when a second, unrelated defect survives adding schema
+ORIGINAL184 CALLBACK END shard=3 index=147 pid=1388155 mono_ns=89472021464951 elapsed_ms=2.750 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=159 pid=1388155 mono_ns=89472021512000
+PASS  manifest repair admits a Claude-default, Claude-invoked V3 source (NVA-MANIFESTRUNNER-1)
+ORIGINAL184 CALLBACK END shard=3 index=159 pid=1388155 mono_ns=89489800362953 elapsed_ms=17778.851 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=171 pid=1388155 mono_ns=89489800455439
+PASS  H3 manifest repair rolls back owned output on publication race
+ORIGINAL184 CALLBACK END shard=3 index=171 pid=1388155 mono_ns=89510876556427 elapsed_ms=21076.101 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=183 pid=1388155 mono_ns=89510876673088
+PASS  remote adoption rolls back the checked-out branch when its owned upstream bind fails
+ORIGINAL184 CALLBACK END shard=3 index=183 pid=1388155 mono_ns=89510897171116 elapsed_ms=20.498 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=195 pid=1388155 mono_ns=89510897247080
+PASS  all three runners execute the exact returned consent and design-question actions without repeating durable Git identity claude
+ORIGINAL184 CALLBACK END shard=3 index=195 pid=1388155 mono_ns=89533519012057 elapsed_ms=22621.765 outcome=pass
+ORIGINAL184 CALLBACK START shard=3 index=207 pid=1388155 mono_ns=89533519081269
+PASS  F4 runtime probe cleanup preserves foreign content when the probe inode number is reused
+ORIGINAL184 CALLBACK END shard=3 index=207 pid=1388155 mono_ns=89568583794706 elapsed_ms=35064.713 outcome=pass
+
+IPC {"schema":"pipeline.onboarding-test-case-results.v1","shard":3,"chunk":0,"declaredCount":216,"assignedIndices":[3,15,27,39,51,63,75,87,99,111,123,135,147,159,171,183,195,207],"results":[{"index":3,"id":"POV-42887e4088661553","disposition":"pass"},{"index":15,"id":"POV-35e8c78d54ee4321","disposition":"pass"},{"index":27,"id":"POV-f8ffc2fbd9030218","disposition":"pass"},{"index":39,"id":"POV-e7c3b37e6e29c20c","disposition":"pass"},{"index":51,"id":"POV-74508137addc92c8","disposition":"pass"},{"index":63,"id":"POV-e67d403f0a1de295","disposition":"pass"},{"index":75,"id":"POV-4c55c2f7de51781c","disposition":"pass"},{"index":87,"id":"POV-dffae61eec0c7881","disposition":"pass"},{"index":99,"id":"POV-0715659135c026ec","disposition":"pass"},{"index":111,"id":"POV-055eafcff81b4dda","disposition":"pass"},{"index":123,"id":"POV-bdac72aca0ec56ec","disposition":"pass"},{"index":135,"id":"POV-107ff4bc450f915d","disposition":"fail"},{"index":147,"id":"POV-236fff164061d288","disposition":"pass"},{"index":159,"id":"POV-ebf73112679cb62f","disposition":"pass"},{"index":171,"id":"POV-0b661179261503d9","disposition":"pass"},{"index":183,"id":"POV-b039c9431f677416","disposition":"pass"},{"index":195,"id":"POV-9f3c2272d6bcaa9b","disposition":"pass"},{"index":207,"id":"POV-b0b71e067d2c084e","disposition":"pass"}],"classes":["partial:po-authority-decision-plan"]}
+B8 producer/guard command classes in shard: 1
+
+project-onboarding-v3 chunk 1/2 shard 4/6: 17 passed, 1 failed
+a recognized read-only host control layout receives portable onboarding without an overwrite attempt: Expected values to be strictly deep-equal:
++ actual - expected
+
+  [
+    'architecture/map/index.md',
+    'architecture/map/inventory.json',
+    'AGENTS.md',
+    '.gitignore',
++   'docs/adr/README.txt',
++   'docs/adr/templates/adr-template.md',
+    'pipeline.user.yaml',
+    'project/consumer-verify.mjs',
+    'project/critical-human-proof.json',
+    'project/pipeline.json',
+    'project/pipeline.yaml'
+

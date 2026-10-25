@@ -1,0 +1,31 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k86/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; here the clone name is `k86`: replace `<name>` with `k86`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; `grep -E`, `rg -o`, `rg -A/-B/-C`, `--glob`, multi-path rg, alternation with `|` in a quoted pattern, other pipelines and composed commands are refused.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K86-PIN-RESTATEMENTS/2026-10-23 · Role Goldfish`
+
+## Briefing K86-PIN-RESTATEMENTS: restate five stale pins to the decided premise and write the D129 evidence note
+
+### 1. Goal
+The 2026-10-23 delivery remeasure (`specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-23/snapshot.json`; find a row with `rg -n "<id>" <file> | head -3`, read its `open` entries) lists agent work that is a pin restatement. For each, read the item file `backlog/items/*-<id>.md` (find it with `find backlog/items -name "*<id>*"`), the pin, the decision it names (`rg -n "<D-number>" specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md | head -5`), restate the pin so it proves its ORIGINAL claim under the DECIDED premise, and count it before/after (each pin file ONCE alone with `node --test`, private TMPDIR outside every repository and outside /tmp: `scratch/k72-run.mjs` and `scratch/k76-run.mjs` in the MAIN checkout are working runners, read a header). QG-04 for every hunk: no assertion removed or weakened without a bounded justification citing the decision in a comment above the hunk; no skip added; a case that is wrong under the decision is restated, not deleted.
+1. `claude-windows-greenfield-lifecycle-not-walkable`: update the stale V-10 header text in the pin (it still says open, owner Coordinator); read the pin header and the item's Triage/decision text for the current status (header text only, no assertion change).
+2. `declared-system-skill-read-requires-human-override`: restate the item pin to the D96 premise (commit `5b3990a37` changed the passive-read policy) so that its counted result no longer rests on native-hold skips.
+3. `design-bootstrap-verify-state-contradicts-deferred-contract`: the A2-literal case asserts that the implementation transition admits baseline-only, which contradicts D124 (contract A2 stays: the deferred state is rejected at implementation entry and at release Verify); restate that case to D124 and make it a passing case.
+4. `greenfield-design-course-cost-and-proportionality`: restate the pin header and cases against the ADR-0085 single-review route and the shortened acceptance (read ADR-0085 in `docs/adr/`: `find docs/adr -name "0085*"`).
+5. `installed-design-trailer-example-is-rejected-by-git-guard`: write the D129 evidence note listing the stage-0-labelled design commits (read the item and D129 for what the note must contain; put it in `specs/sprint-alfred-epic/evidence/` with a descriptive name, English, no absolute paths or emails) and make bullet 4 of the item an asserting case in the item's pin.
+Protection: before editing each pin, check `plugins/pipeline-core/protected-baseline.json` and `NEVER_LIFTABLE_KERNEL_PATHS` in `plugins/pipeline-core/lib/guard-maintenance-window.mjs` and the rule "guard-*.mjs and tests, lib/guard/*, pipeline-state.mjs, verify.mjs, verify-suites.json, kernel paths are protected". Unprotected pins (lib/pins/ is unprotected): commit in the clone, one commit per pin (explicit pathspec, message file under the clone's `scratch/commit-msg/`, trailers exactly `AI-Assisted: true` and `Dispatch: K86-PIN-RESTATEMENTS (goldfish)`, `node --test scratch/clones/k86/harness/scripts/check-consumer-safe-paths.test.mjs` passes; a new file under `specs/` may meet a pre-commit refusal: report the text). A protected target: do NOT commit; build and prove in the clone, export `git diff --output=scratch/agent-out/k86-<pin>-protected.diff <paths>`, revert the clone edit by hand with the Edit tool, and describe it in the notes.
+Do not edit `backlog/**`. Do not create backlog items. If the item text and the pin disagree about the decided premise in a way that needs a PO decision, stop that item and report it (do not guess).
+Write `scratch/agent-out/k86-notes.md` (MAIN checkout): per pin before/after counts with the exact command, the decision cited, the commit hash or the diff name, anything stopped.
+
+### 2. Context files
+The snapshot rows, the five item files and pins, `specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md` (D96, D124, D129), `docs/adr/` ADR-0085, `guardrails/quality-gates.md`.
+
+### 3. DoD checks
+Each of the five handled or explicitly stopped with the reason; counts before/after; commits in the clone.
+
+### 4. Forbidden
+Weakening or removing an assertion without the bounded justification; skips; any protected or kernel-path commit; `CLAUDE.md`, `.claude/**`, `docs/state.md`, `backlog/**` edits; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths, emails or secrets in any file; Advisor. Another dispatch (K85) runs counted recounts of OTHER pins at the same time; you only run the pins you edit, one at a time. Your only main-checkout writes: `scratch/agent-out/k86-*`.
+
+### 5. Stop conditions
+A restatement that needs a PO decision (report); more than 2 failed attempts at one problem; tool budget at 80 percent (commit what is green, report the rest).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k86`. Tool budget: base cap 70, closing allowance +5. TASK_ID: K86-PIN-RESTATEMENTS. Status wording per the common briefing (never "done"). Final report max 30 lines.

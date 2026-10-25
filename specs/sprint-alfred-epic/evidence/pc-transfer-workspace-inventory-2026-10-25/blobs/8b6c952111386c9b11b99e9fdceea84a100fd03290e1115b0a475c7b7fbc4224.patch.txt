@@ -1,0 +1,73 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+index a248ba31b..62e6d70a2 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs
+@@ -9,6 +9,7 @@ import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, sym
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { run } from "./pipeline-state.mjs";
++import { planFeaturePackageReconcile, validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+ 
+ const roots = [];
+ const NOW = "2026-07-31T12:00:00.000Z";
+@@ -70,6 +71,25 @@ function plan(f) {
+   assert.equal(value.status, 0, value.err); assert.deepEqual(readFileSync(f.statePath), before); return JSON.parse(value.out);
+ }
+ 
++function registerPackage(f) {
++  for (const name of ["acceptance.md", "candidate-evidence.md"]) writeFileSync(join(f.root, "specs/feature", name), `${name}\n`);
++  const artifact = (kind, path, authority, mutability) => ({ class: kind, path, sha256: hash(readFileSync(join(f.root, path))), authority, mutability, retention: "active" });
++  const manifest = {
++    schema: "pipeline.feature-package.v1", feature: { id: "feature", rigor: 1 }, state: "implementing",
++    artifacts: [
++      artifact("prd", "specs/feature/prd_feature.md", true, "mutable"),
++      artifact("spec", "specs/feature/spec.md", true, "immutable"),
++      artifact("acceptance", "specs/feature/acceptance.md", true, "mutable"),
++      artifact("result", "specs/feature/result.md", true, "append-only"),
++      artifact("candidate-evidence", "specs/feature/candidate-evidence.md", false, "immutable"),
++    ], candidate: null, supersedes: null,
++  };
++  const manifestPath = "specs/feature/lifecycle.json";
++  writeFileSync(join(f.root, manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, true);
++  return { manifestPath, manifest };
++}
++
+ // Windows: Node synthesizes `.mode` on native Windows from the read-only
+ // attribute alone, so the bare `(info.mode & 0o077)` comparison in
+ // ensureBootstrapPrivateDirectory/readPrivateBootstrap failed closed
+@@ -99,7 +119,7 @@ test("win32: an insecure DACL assessment on the private result-bootstrap directo
+ 
+ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence", () => {
+   const f = fixture("success"); const p = plan(f);
+-  const fence = Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
++  const fence = Buffer.from("\n<!-- pipeline.result-reconciliation-fence.v1 -->\n```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");
+   assert.equal(p.schema, "pipeline.continuity-result-bootstrap-plan.v1"); assert.equal(p.preimage.result.path, "specs/feature/result.md"); assert.equal(p.preimage.result.sha256, hash(f.historical));
+   assert.deepEqual(Buffer.from(p.preimage.historicalMarkdown.bytesBase64, "base64"), f.historical); assert.deepEqual(Buffer.from(p.append.bytesBase64, "base64"), fence);
+   assert.deepEqual(Buffer.from(p.result.bytesBase64, "base64"), Buffer.concat([f.historical, fence])); assert.equal(existsSync(f.journalPath), false);
+@@ -115,6 +135,25 @@ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result p
+   assert.equal(existsSync(join(f.root, ".claude", ".pipeline-result-bootstrap-private")), false); assert.equal(existsSync(f.journalPath), false);
+ });
+ 
++test("registered Result bootstrap preserves stale manifest authority and yields a provable signed reconciliation preview", () => {
++  const f = fixture("registered"); const { manifestPath } = registerPackage(f);
++  const manifestBytes = readFileSync(join(f.root, manifestPath));
++  const p = plan(f);
++  assert.equal(p.preimage.package.path, manifestPath);
++  const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
++  const completion = JSON.parse(applied.out).completion;
++  assert.equal(completion.state, "reconciliation-pending");
++  assert.equal(completion.preview.status, "reconcile-preview");
++  assert.equal(completion.preview.changes.length, 1);
++  assert.equal(completion.preview.changes[0].class, "result");
++  assert.equal(completion.preview.changes[0].from, hash(f.historical));
++  assert.deepEqual(readFileSync(join(f.root, manifestPath)), manifestBytes);
++  assert.equal(validateFeaturePackage(f.root, manifestPath).ok, false);
++  assert.equal(planFeaturePackageReconcile(f.root, manifestPath, JSON.parse(readFileSync(f.statePath)).continuity.authority.result).status, "reconcile-preview");
++  const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err);
++  assert.equal(JSON.parse(replay.out).completion.planSha256, completion.planSha256);
++});
++
+ test("AC-047-147: journal and Result-before-State interruptions resume once and exact replay is zero-mutation", () => {
+   const beforeResult = fixture("journal-before-result"); const beforeResultPlan = plan(beforeResult);
+   const stoppedBeforeResult = invoke(beforeResult.root, beforeResultPlan.applyAction.argv.slice(1), { afterResultBootstrapJournal: () => false });

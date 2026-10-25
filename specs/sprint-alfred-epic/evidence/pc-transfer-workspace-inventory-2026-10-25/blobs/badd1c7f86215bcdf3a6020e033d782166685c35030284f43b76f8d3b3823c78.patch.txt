@@ -1,0 +1,116 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index e1899aa2a..e9412f6bf 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -1548,4 +1548,111 @@ check("lifecycle-not-ready denial does not advertise a human override ceremony",
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// ---------------------------------------------------------------------------------------------
++// K152 part 1 (greenfield finding G6): the Antigravity CLI names its native file tools write_file
++// (Path, Content), edit_file (Path, Target, Replacement) and read_file (Path), not the IDE names
++// write_to_file / replace_file_content / view_file. Before K152 the hook matcher and the adapter
++// knew only the IDE names, so a CLI file write never reached guard-devplan, guard-testpath or the
++// EL-01 tripwire. Each CLI tool must be judged exactly like its IDE twin.
++// ---------------------------------------------------------------------------------------------
++check("K152: normalizeAntigravityToolInput maps write_file (Path, Content) like write_to_file", () => {
++  for (const path of ["/foo/bar.js", "src/bar.js"]) {
++    const res = normalizeAntigravityToolInput({ toolCall: { name: "write_file", args: { Path: path, Content: "console.log('hi');" } } });
++    assert.equal(res.toolName, "Write", path);
++    assert.equal(res.filePath, path);
++    assert.equal(res.toolInput.file_path, path);
++    assert.equal(res.toolInput.content, "console.log('hi');");
++    assert.equal(res.isReadOnly, false);
++  }
++});
++
++check("K152: normalizeAntigravityToolInput maps edit_file (Path, Target, Replacement) like replace_file_content", () => {
++  for (const path of ["/foo/bar.js", "src/bar.js"]) {
++    const res = normalizeAntigravityToolInput({ toolCall: { name: "edit_file", args: { Path: path, Target: "old", Replacement: "new" } } });
++    assert.equal(res.toolName, "Edit", path);
++    assert.equal(res.filePath, path);
++    assert.equal(res.toolInput.file_path, path);
++    assert.equal(res.toolInput.old_string, "old");
++    assert.equal(res.toolInput.new_string, "new");
++    assert.equal(res.isReadOnly, false);
++  }
++});
++
++check("K152: normalizeAntigravityToolInput treats read_file as a read-only native read", () => {
++  const res = normalizeAntigravityToolInput({ toolCall: { name: "read_file", args: { Path: "README.md" } } });
++  assert.equal(res.isReadOnly, true);
++});
++
++check("K152: write_file / edit_file to a protected path are refused like their IDE twins", () => {
++  const root = fixture();
++  try {
++    writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
++    for (const target of [join(root, "pipeline.user.yaml"), "pipeline.user.yaml"]) {
++      const written = decision(run({ toolCall: { name: "write_file", args: { Path: target, Content: "gates: {}\n" } } }, root));
++      assert.equal(written.decision, "deny", `write_file ${target}`);
++      assert.match(written.reason, /guard-gate-strength|Rule ID: GS-1\b/u, `write_file ${target}`);
++      assert.doesNotMatch(written.reason, /Unsupported or missing Antigravity tool_name/u);
++      const edited = decision(run({ toolCall: { name: "edit_file", args: { Path: target, Target: "signature", Replacement: "chat" } } }, root));
++      assert.equal(edited.decision, "deny", `edit_file ${target}`);
++      assert.match(edited.reason, /guard-gate-strength|Rule ID: GS-1\b/u, `edit_file ${target}`);
++      assert.doesNotMatch(edited.reason, /Unsupported or missing Antigravity tool_name/u);
++    }
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("K152: write_file / edit_file outside the project root are refused like their IDE twins", () => {
++  const root = fixture();
++  try {
++    const written = decision(run({ toolCall: { name: "write_file", args: { Path: "/tmp/outside_repo_file.txt", Content: "x" } } }, root));
++    assert.equal(written.decision, "deny");
++    assert.match(written.reason, /GUARD-CROSS-REPO-MUTATION|outside this repository/u);
++    const edited = decision(run({ toolCall: { name: "edit_file", args: { Path: "/tmp/outside_repo_file.txt", Target: "a", Replacement: "b" } } }, root));
++    assert.equal(edited.decision, "deny");
++    assert.match(edited.reason, /GUARD-CROSS-REPO-MUTATION|outside this repository/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("K152: a legal write_file / edit_file target gets the same verdict as write_to_file / replace_file_content", () => {
++  const root = readyLifecycleFixture();
++  try {
++    const target = join(root, "src", "legal-target.js");
++    const ide = decision(run({ toolCall: { name: "write_to_file", args: { TargetFile: target, CodeContent: "x" } } }, root));
++    const cli = decision(run({ toolCall: { name: "write_file", args: { Path: target, Content: "x" } } }, root));
++    assert.equal(cli.decision, ide.decision);
++    assert.doesNotMatch(String(cli.reason ?? ""), /Unsupported or missing Antigravity tool_name/u);
++    const ideEdit = decision(run({ toolCall: { name: "replace_file_content", args: { TargetFile: target, TargetContent: "a", ReplacementContent: "b" } } }, root));
++    const cliEdit = decision(run({ toolCall: { name: "edit_file", args: { Path: target, Target: "a", Replacement: "b" } } }, root));
++    assert.equal(cliEdit.decision, ideEdit.decision);
++    assert.doesNotMatch(String(cliEdit.reason ?? ""), /Unsupported or missing Antigravity tool_name/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("K152: read_file is judged like view_file (credential target refused, ordinary file allowed)", () => {
++  const root = fixture();
++  try {
++    mkdirSync(join(root, "vault"), { recursive: true });
++    writeFileSync(join(root, "README.md"), "readme\n");
++    writeFileSync(join(root, "vault", "id_rsa"), "private\n");
++    for (const path of [join(root, "README.md"), "README.md"]) {
++      assert.equal(decision(run({ toolCall: { name: "read_file", args: { Path: path } } }, root)).decision, "allow", path);
++    }
++    for (const path of [join(root, "vault", "id_rsa"), "vault/id_rsa"]) {
++      const secret = decision(run({ toolCall: { name: "read_file", args: { Path: path } } }, root));
++      assert.equal(secret.decision, "deny", path);
++      assert.match(secret.reason, /GUARD-READ-CREDENTIAL-TARGET/u, path);
++    }
++    // a read_file without a usable Path is malformed and fails closed, as view_file does
++    assert.equal(decision(run({ toolCall: { name: "read_file", args: {} } }, root)).decision, "deny");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("K152: the hook matcher names every guarded Antigravity file tool (IDE and CLI names)", () => {
++  const manifest = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "hooks.json"), "utf8"));
++  const matcher = manifest["pipeline-core"].PreToolUse[0].matcher;
++  const names = matcher.split("|");
++  for (const name of ["run_command", "invoke_subagent", "write_to_file", "replace_file_content", "view_file", "write_file", "edit_file", "read_file"]) {
++    assert.ok(names.includes(name), `hooks.json PreToolUse matcher is missing ${name}: ${matcher}`);
++  }
++});
++
+ console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);

@@ -1,0 +1,50 @@
+command: node scratch/agent-out/generator-integrated-13-qualification/run.mjs suite
+label: generator-original13
+exitCode: 1
+head: 5017a7287485783fa2d4ff17d3f3240f2a719e13
+tree: c972b2a380287b5091626ffd40db40eede589883
+dirty: true
+--- stdout ---
+✔ measured before/after: no tracked target and no plan output carries the source material (281.194681ms)
+✔ provenance coverage: summary references bind the full plan's exact bytes; design-input records the source digest, not the text (255.829485ms)
+✔ a fresh reviewer can reach the source: apply writes provenance only; the authoring copy and the private store hold the material (356.80526ms)
+✔ without an ignore rule for scratch/ no authoring copy is written and the plan and apply result say so with a typed code (375.62082ms)
+✔ output budget: summary and full plan sizes are independent of the input size (438.06966ms)
+✔ argument contract: --summary/--verbose are exclusive and plan-only (126.64811ms)
+✔ RED mirror: the no-source-material assertion fails against a mutant that embeds the request in a target (141.113432ms)
+✔ [pendingAsks compaction] routine inspect repeats no request text and is size-independent (1041.001238ms)
+✔ [pendingAsks compaction] the driver prints each published ask once for the collect-input outcome and stays within its size bound (23776.502445ms)
+✖ [pendingAsks compaction] the collect-input primary action is printed once; final.nextAction is a resolvable reference (11653.191032ms)
+✔ printed shape round-trips to the library shape for collect-input and pending-asks, and ignores other outcomes (1.148452ms)
+✔ RED mirror: the once-only assertion fails for an output that repeats an ask in collectInput (0.384741ms)
+✔ [generated banner] the staging banner permits the elaboration the design flow requires and still says the draft is not project authority (157.076411ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38979.231883
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs:304:1
+✖ [pendingAsks compaction] the collect-input primary action is printed once; final.nextAction is a resolvable reference (11653.191032ms)
+  AssertionError [ERR_ASSERTION]: driver output 15230 exceeds 15000
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/generator-integrated-13-qualification/plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs:310:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+--- stderr ---

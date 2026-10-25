@@ -1,0 +1,14 @@
+import os from "node:os";
+import { fileURLToPath } from "node:url";
+
+const syntheticFallback = fileURLToPath(new URL("./codex-push-test-home", import.meta.url));
+process.env.HOME ??= syntheticFallback;
+process.env.USERPROFILE ??= process.env.HOME;
+process.env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE ??= process.env.HOME;
+os.userInfo = () => ({
+  uid: 65000,
+  gid: 65000,
+  username: "pipeline-fixture",
+  homedir: process.env.HOME,
+  shell: "",
+});

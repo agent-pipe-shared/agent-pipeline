@@ -1,0 +1,201 @@
+diff --git a/plugins/pipeline-core/lib/design-authoring.mjs b/plugins/pipeline-core/lib/design-authoring.mjs
+index b6d0aa488..73459cf9f 100644
+--- a/plugins/pipeline-core/lib/design-authoring.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.mjs
+@@ -1,5 +1,6 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Draft authoring aids. These create no receipt, approval or implementation. */
++import { scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
+ export function renderArchitectureDesignSkeleton() {
+   const module = { id: "application", responsibility: "REPLACE: application responsibility",
+     nonResponsibilities: ["REPLACE: excluded responsibility"], ownedPaths: ["src/**", "tests/**", "docs/contracts/application.md"],
+@@ -17,9 +18,22 @@ export function renderArchitectureDesignSkeleton() {
+ 
+ export function renderDesignTraceabilitySkeleton() {
+   return "## Acceptance criteria\n\n"
+-    + "- AC-01: WHEN <trigger>, the system SHALL <observable result>.\n\n"
++    + "| # | Criterion | Evidence |\n"
++    + "|---|---|---|\n"
++    + "| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | REPLACE: test path and case |\n\n"
+     + "## Traceability\n\n| Design input | Requirement | Acceptance criterion | Verification entry point |\n"
+-    + "|---|---|---|---|\n| REPLACE: input reference | REPLACE: requirement | AC-01 | REPLACE: test path and case |\n";
++    + "|---|---|---|---|\n| REPLACE: input reference | REPLACE: requirement | AC-1 | REPLACE: test path and case |\n";
++}
++
++/** Use the accepted parser's section context; normalize only the legacy unsupported bullet shape. */
++export function hasGeneratedCriterionPlaceholder(text) {
++  if (typeof text !== "string") return false;
++  const placeholder = "WHEN <trigger>, the system SHALL <observable result>.";
++  const matches = source => scanAcceptedCriterionRows(source).some(row => row.normative && row.valid !== false
++    && row.id === "AC-1" && row.text === placeholder);
++  if (matches(text)) return true;
++  const legacy = /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.[ \t]*$/gmu;
++  return matches(text.replace(legacy, `- **AC-1:** ${placeholder}`));
+ }
+ 
+ /** Keep full evidence on disk; avoid repeating document payloads in the action readback. */
+diff --git a/plugins/pipeline-core/lib/design-authoring.test.mjs b/plugins/pipeline-core/lib/design-authoring.test.mjs
+index 09e15283a..5a98b94ea 100644
+--- a/plugins/pipeline-core/lib/design-authoring.test.mjs
++++ b/plugins/pipeline-core/lib/design-authoring.test.mjs
+@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { openSync as openCompletionDescriptor } from "node:fs";
+ import { parseArchitectureDesign } from "./architecture-design.mjs";
+-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, compactActionReadback } from "./design-authoring.mjs";
++import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, compactActionReadback } from "./design-authoring.mjs";
++import { createHash } from "node:crypto";
++import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
+ import { devNull } from "node:os";
+ const completionCases = [];
+ function test(name, optionsOrRun, possibleRun) {
+@@ -38,7 +40,54 @@ test("compact readback retains executable recovery and digests without copying d
+   assert.equal(Object.hasOwn(result,"plan"), false);
+ });
+ 
+-if (completionCases.length !== 2) throw new Error("case completion count drift: expected 2, got " + completionCases.length);
++test("generated criterion uses the accepted parser shape while draft and legacy ids remain unapproved", () => {
++  const draft = renderDesignTraceabilitySkeleton();
++  assert.equal(hasGeneratedCriterionPlaceholder(draft), true);
++  assert.equal(hasGeneratedCriterionPlaceholder("## Acceptance criteria\n- AC-01: WHEN <trigger>, the system SHALL <observable result>.\n"), true);
++  assert.equal(hasGeneratedCriterionPlaceholder("## Notes\n\nThe example says WHEN <trigger>, the system SHALL <observable result>.\n"), false);
++  assert.equal(hasGeneratedCriterionPlaceholder("## Acceptance criteria\n\n> - AC-01: WHEN <trigger>, the system SHALL <observable result>.\n"), false);
++  assert.equal(hasGeneratedCriterionPlaceholder("## Notes\n\n| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | quoted example |\n"), false);
++  for (const heading of ["## Acceptance requirements — project", "## Abnahmeanforderungen"]) {
++    const variant = draft.replace("## Acceptance criteria", heading);
++    assert.deepEqual(scanAcceptedCriterionRows(variant).filter(row => row.normative).map(row => row.id), ["AC-1"]);
++    assert.equal(hasGeneratedCriterionPlaceholder(variant), true, heading);
++  }
++  const nested = draft.replace("## Acceptance criteria\n", "## Acceptance criteria\n\n### Delivery flow\n");
++  assert.deepEqual(scanAcceptedCriterionRows(nested).filter(row => row.normative).map(row => row.id), ["AC-1"]);
++  assert.equal(hasGeneratedCriterionPlaceholder(nested), true);
++  const excluded = draft.replace("## Acceptance criteria\n", "## Acceptance criteria\n\n### Notes\n");
++  assert.deepEqual(scanAcceptedCriterionRows(excluded).filter(row => row.normative).map(row => row.id), []);
++  assert.equal(hasGeneratedCriterionPlaceholder(excluded), false);
++  const legacyNested = "## Acceptance requirements — project\n\n### Delivery flow\n- AC-01: WHEN <trigger>, the system SHALL <observable result>.\n";
++  assert.equal(hasGeneratedCriterionPlaceholder(legacyNested), true);
++  assert.deepEqual(inspectSpecCriterionRows(draft), { ok: true, located: ["AC-1"] });
++  const rows = scanAcceptedCriterionRows(draft).filter(row => row.normative);
++  assert.equal(rows.length, 1);
++  assert.equal(rows[0].id, "AC-1");
++  assert.equal(rows[0].text, "WHEN <trigger>, the system SHALL <observable result>.");
++  const malformed = draft.replace("| AC-1 |", "| AC-01 |");
++  assert.equal(inspectSpecCriterionRows(malformed).code, "CAC-CRITERION-UNSUPPORTED");
++  const badHeader = draft.replace("| # | Criterion | Evidence |", "| ID | Criterion | Evidence |");
++  assert.equal(inspectSpecCriterionRows(badHeader).code, "CAC-CRITERION-UNSUPPORTED");
++
++  const authored = draft.replace("WHEN <trigger>, the system SHALL <observable result>.",
++    "The package must receive a PASS verdict from an independent Critic before acceptance.")
++    .replaceAll("REPLACE: ", "Authored: ");
++  assert.equal(hasGeneratedCriterionPlaceholder(authored), false);
++  assert.deepEqual(inspectSpecCriterionRows(authored), { ok: true, located: ["AC-1"] });
++  const row = scanAcceptedCriterionRows(authored).find(item => item.id === "AC-1");
++  const bytes = Buffer.from(authored);
++  const hash = value => createHash("sha256").update(value).digest("hex");
++  const sourcePath = "specs/synthetic/spec.md";
++  const sourceSha256 = hash(bytes);
++  const result = parseAcceptedCriticCriterion({ sourceBytes: bytes,
++    locator: { schema: "pipeline.critic-criterion-locator.v1", sourcePath, sourceSha256, criterionId: "AC-1",
++      startByte: row.startByte, endByte: row.endByte, excerptSha256: hash(bytes.subarray(row.startByte, row.endByte)) },
++    packageContext: { featureId: "synthetic", sourceBindings: [{ path: sourcePath, sha256: sourceSha256, role: "spec" }] } });
++  assert.equal(result.status, "explicit-actual-independent-pass");
++});
++
++if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openCompletionDescriptor(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index c937507c6..bb81e2b1b 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -71,7 +71,7 @@ import {validateRetirementJournal} from "./enrollment-retirement-coordinator.mjs
+ import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
+ import { applyBoundDesignLineEndings, planBoundDesignLineEndings } from "./bound-design-line-endings.mjs";
+ import { parseArchitectureDesign } from "./architecture-design.mjs";
+-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton } from "./design-authoring.mjs";
++import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder } from "./design-authoring.mjs";
+ import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
+ import {
+   LEGACY_CALIBRATION,
+@@ -7744,7 +7744,7 @@ function bootstrapAcknowledgementPlan({ rootDir, repositoryCapability = "local",
+   const unfinished = (text) => text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
+     || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
+     || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
+-    || /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.$/mu.test(text);
++    || hasGeneratedCriterionPlaceholder(text);
+   if (unfinished(prdText) || unfinished(specText)) {
+     fail("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", "complete the generated PRD and specification before acknowledgement");
+   }
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index 39286a059..fcb03148c 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -5169,7 +5169,7 @@ check("planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding g
+   const spec = readFileSync(join(root, generatePlan.targets.spec.path), "utf8");
+   assert.match(prd, /<!-- DRAFT TEMPLATE: replace every REPLACE value/u, "fixture PRD must hold the DRAFT TEMPLATE comment");
+   assert.match(prd, /REPLACE/u, "fixture PRD must hold a REPLACE value");
+-  assert.match(spec, /AC-01: WHEN <trigger>, the system SHALL <observable result>\./u, "fixture spec must hold the AC-01 template line");
++  assert.match(spec, /\| AC-1 \| WHEN <trigger>, the system SHALL <observable result>\. \|/u, "fixture spec must hold the current parseable criterion placeholder");
+   let refusal = null;
+   try { planOnboardingBootstrapAcknowledgementChat({ rootDir: root }); } catch (error) { refusal = error; }
+   assert.equal(refusal?.code, "BOOTSTRAP-ACK-PLACEHOLDER-CONTENT",
+@@ -5311,7 +5311,28 @@ check("a malformed top-level rigorHistory journal is damaged", () => {
+   }
+ });
+ 
+-assert.equal(cases.length, 306, "the complete onboarding continuity corpus must be registered before execution begins");
++check("planOnboardingBootstrapAcknowledgementChat accepts an authored spec quoting the criterion example only in Notes", () => {
++  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("quoted-criterion-example", { profile: "mini" });
++  finishPositiveAcknowledgementFixture(root, generatePlan);
++  const specPath = join(root, generatePlan.targets.spec.path);
++  writeFileSync(specPath, `${readFileSync(specPath, "utf8")}\n## Notes\nThe discarded example says WHEN <trigger>, the system SHALL <observable result>.\n`);
++  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
++  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
++  const plan = planOnboardingBootstrapAcknowledgementChat({ rootDir: root });
++  assert.equal(plan.nextAction?.kind, "command");
++});
++
++check("planOnboardingBootstrapAcknowledgementChat refuses a placeholder under titled nested acceptance requirements", () => {
++  const { root, generatePlan } = bootstrapBindPureGeneratorRoot("nested-placeholder", { profile: "mini" });
++  finishPositiveAcknowledgementFixture(root, generatePlan);
++  const specPath = join(root, generatePlan.targets.spec.path);
++  writeFileSync(specPath, "# Authored specification\n\n## Acceptance requirements — project\n\n### Delivery flow\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN <trigger>, the system SHALL <observable result>. | Authored test path |\n");
++  const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
++  applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
++  expectKickoffError("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", () => planOnboardingBootstrapAcknowledgementChat({ rootDir: root }));
++});
++
++assert.equal(cases.length, 308, "the complete onboarding continuity corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 71c784666..256bd34f2 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -5886,6 +5886,7 @@ test("the fixture's own security-scan.mjs call graph, deployed with no repo root
+       ["./trusted-tool-resolution.mjs", ["plugins", "pipeline-core", "lib", "trusted-tool-resolution.mjs"]],
+       ["./security-scanner-diagnostics.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics.mjs"]],
+       ["./security-scanner-diagnostics-publication.mjs", ["plugins", "pipeline-core", "lib", "security-scanner-diagnostics-publication.mjs"]],
++      ["./security-remote-identity.mjs", ["plugins", "pipeline-core", "lib", "security-remote-identity.mjs"]],
+       ["../scripts/security-adapters/gitleaks.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "gitleaks.mjs"]],
+       ["../scripts/security-adapters/osv-scanner.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "osv-scanner.mjs"]],
+       ["../scripts/security-adapters/semgrep.mjs", ["plugins", "pipeline-core", "scripts", "security-adapters", "semgrep.mjs"]],
+@@ -9522,14 +9523,14 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+ // mechanical repair the final-package re-entry case above drives is applied so
+ // the package stays valid.
+ const GENERATED_DRAFT_BANNER = "<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.";
+-const GENERATED_DRAFT_AC_LINE = /^- AC-01: WHEN <trigger>, the system SHALL <observable result>\.$/gmu;
++const GENERATED_DRAFT_AC_LINE = /^(?:- AC-01: WHEN <trigger>, the system SHALL <observable result>\.|\| AC-1 \| WHEN <trigger>, the system SHALL <observable result>\. \| REPLACE: test path and case \|)$/gmu;
+ const generatedDraftIsUnfinished = (text) => text.includes(GENERATED_DRAFT_BANNER)
+   || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
+   || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
+   || new RegExp(GENERATED_DRAFT_AC_LINE.source, "mu").test(text);
+ const completeGeneratedDraftText = (text) => text
+   .replaceAll(GENERATED_DRAFT_BANNER, "<!-- Reviewed draft: every value and all example paths were completed.")
+-  .replaceAll(GENERATED_DRAFT_AC_LINE, "- AC-01: WHEN the PO reviews the staging package, the system SHALL bind exactly the reviewed bytes.")
++  .replaceAll(GENERATED_DRAFT_AC_LINE, "| AC-1 | WHEN the PO reviews the staging package, the system SHALL bind exactly the reviewed bytes. | Reviewed: test path and case |")
+   .replaceAll("REPLACE: ", "Reviewed: ");
+ function completeGeneratedStagingDraft({ path, observation, intakeDeps }) {
+   for (const relativePath of [observation.prd.path, observation.spec.path]) {

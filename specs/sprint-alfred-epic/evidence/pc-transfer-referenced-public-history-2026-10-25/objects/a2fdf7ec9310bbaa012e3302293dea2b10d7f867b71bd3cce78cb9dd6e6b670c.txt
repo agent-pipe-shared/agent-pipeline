@@ -1,0 +1,34 @@
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index a91d42e1a..90b61251b 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -3,7 +3,8 @@
+ 
+ import { lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
+ import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
+-import { isAllowedPassiveReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
++import { isAllowedPassiveReadTarget, isCredentialReadTarget, PASSIVE_READ_CREDENTIAL_ROOTS } from "../passive-read-policy.mjs";
++import { nativeReadCredentialTargetDenialText } from "./grammar-denials.mjs";
+ import { readClaudeTaskOutputReadScope } from "../claude-task-output-read-scope.mjs";
+ import { isBoundedReadOnlyPipeline, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { BOUNDED_PIPELINE_ADDITIONAL_ROOTS, CLAUDE_BASH_SHELL_DIALECT_PLATFORM, MAX_CLAUDE_TASK_OUTPUT_READ_BYTES } from "./constants.mjs";
+@@ -636,5 +637,19 @@ export function readToolScopeVerdict(input, root, dependencies) {
+   if (toolName === "Read" && qp4MissingInRootTarget(path, root)) {
+     return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n");
+   }
++  // K105 (PO decision 2026-10-23, asked after K96): a credential TARGET is refused with the typed code and repair the shell lane and the
++  // Antigravity native tools print (one builder, grammar-denials.mjs; one classifier, passive-read-policy.mjs). Label selection only: the
++  // read was already refused above, this decides the text. Every other refusal keeps GUARD-READ-TARGET.
++  if (nativeReadTargetIsCredential(toolName, path, selector, root)) return verdict(2, nativeReadCredentialTargetDenialText());
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
+ }
++
++// The operand(s) of a native Read/Grep/Glob that name the path itself: the file or search path, plus the joined path of a Glob with a literal
++// (wildcard-free) selector. A directory that merely contains a credential is not a credential target.
++function nativeReadTargetIsCredential(toolName, path, selector, root) {
++  const operands = [path];
++  if (toolName === "Glob" && typeof selector === "string" && selector !== "" && !/[?*]/u.test(selector)) {
++    operands.push(join(typeof path === "string" && path !== "" ? path : ".", selector));
++  }
++  return operands.some((operand) => typeof operand === "string" && isCredentialReadTarget(operand, { rootDir: root, recursive: true }));
++}

@@ -1,0 +1,15 @@
+// Helper (untracked): re-measure the Critic-contract digests in the k108 clone and rewrite the preimage JSON data lines.
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+const clone = "scratch/clones/k108";
+const jf = `${clone}/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json`;
+let text = readFileSync(jf, "utf8");
+const doc = JSON.parse(text);
+const report = [];
+for (const f of doc.files) {
+  const actual = createHash("sha256").update(readFileSync(`${clone}/${f.path}`)).digest("hex");
+  if (actual !== f.rawSha256) { text = text.replace(f.rawSha256, actual); report.push(`${f.path} ${f.rawSha256.slice(0, 12)} -> ${actual.slice(0, 12)}`); }
+  else report.push(`${f.path} unchanged`);
+}
+writeFileSync(jf, text);
+console.log(report.join("\n"));

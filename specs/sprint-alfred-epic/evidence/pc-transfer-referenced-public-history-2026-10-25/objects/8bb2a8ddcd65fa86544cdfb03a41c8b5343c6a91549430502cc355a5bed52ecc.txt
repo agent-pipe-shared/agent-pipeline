@@ -1,0 +1,13 @@
+// K125 helper: `git apply --check` of the three K125 diffs against a clone (never mutates).
+import { execFileSync } from "node:child_process";
+const diffs = ["K125-governance-reclass", "K125-inventory-architecture-capability", "K125-governance-test-assertion"];
+for (const clone of process.argv.slice(2)) {
+  for (const name of diffs) {
+    try {
+      execFileSync("git", ["-C", `scratch/clones/${clone}`, "apply", "--check", `${process.cwd()}/scratch/agent-out/${name}.diff`], { stdio: "pipe" });
+      console.log(`${clone}: ${name}: applies cleanly`);
+    } catch (error) {
+      console.log(`${clone}: ${name}: REFUSED ${String(error.stderr).trim().split("\n")[0]}`);
+    }
+  }
+}

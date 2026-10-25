@@ -1,0 +1,180 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 2e5010231..ea284dadc 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -3262,6 +3262,59 @@ export function quarantineClosedPrivateCleanupReleaseReceipt({
+   }
+ }
+ 
++/**
++ * K80 (extends D73 E to the private closed release): the second half, run after the State lock is released (the continuity
++ * snapshot refuses a foreign State lock). One registry boundary rechecks the receipt and the binding bytes against it,
++ * releases the registry member FIRST (only a member that names the binding's own session tuple whose descriptor is gone),
++ * deletes the private binding under the State lock taken inside, then heals and reads the registry back strictly. A crash
++ * before the delete leaves the binding present: the rerun finds the receipt, the member step returns `none`.
++ */
++function finishPrivateClosedCleanupRelease({
++  root, statePath, target, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn, deps,
++}) {
++  const replay = () => privateClosedReleaseReplay(
++    root, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn,
++  );
++  const bound = () => {
++    const receipt = observePrivateCleanupReleaseReceipt(root, { spawn });
++    const binding = readPrivateCleanupBinding(root, { spawn });
++    if (receipt.status !== "valid" || receipt.receipt.schema !== PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA
++      || receipt.receipt.stateSha256 !== expectedStateSha256 || receipt.receipt.closureReceiptSha256 !== closureReceiptSha256
++      || receipt.receipt.recoveryPlanSha256 !== recoveryPlanSha256 || receipt.receipt.coordinatorCloseSha256 !== coordinatorCloseSha256
++      || (binding.binding !== null && canonicalSha256(binding.binding) !== receipt.receipt.bindingSha256)) {
++      fail("SESSION-CLEANUP-PRIVATE-RELEASE-CAS", "private closed cleanup receipt or binding changed before the release finished", { committed: true });
++    }
++    return binding.binding;
++  };
++  const releaseBinding = () => {
++    deps.beforeBindingDelete?.({ root });
++    const lock = acquireLock(`${statePath}.lock`, "pipeline.continuity-lock.v0",
++      `session-cleanup-private-closed-release-${expectedStateSha256.slice(0, 32)}`, { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 });
++    try {
++      const current = observeSessionCleanupState(root, spawn);
++      if (current.stateSha256 !== expectedStateSha256) fail("SESSION-CLEANUP-PRIVATE-RELEASE-CAS", "private closed cleanup release preimage changed", { committed: true });
++      if (bound() === null) return;
++      deletePrivateCleanupBinding(root, current.privateBinding.sessionCleanup, { spawn });
++      deps.afterBindingUnlink?.({ root });
++    } finally { releaseLock(lock); }
++  };
++  try {
++    runOrphanSessionAuthorityMemberStep({ repository: () => continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(root)),
++      target, recheck: bound, releaseBinding, codePrefix: "SESSION-CLEANUP-PRIVATE-RELEASE", rerun: "apply-recovery" });
++    const readback = replay();
++    if (readback === null) fail("SESSION-CLEANUP-PRIVATE-RELEASE-READBACK", "private closed cleanup release readback is invalid", { committed: true });
++    fsyncDirectory(readPrivateCleanupReleaseReceipt(root, { spawn }).paths.directory);
++    return {
++      schema: SESSION_CLEANUP_BIND_SCHEMA, status: "closed-unbound", root: readback.root, stateSha256: readback.stateSha256,
++      revision: readback.revision, sessionCleanup: null, mutated: true, storage: "private-runtime",
++    };
++  } catch (error) {
++    if (error instanceof OrphanMemberStepError) fail(error.code, `${error.message}; repair: ${error.repair}`, { committed: true });
++    if (error instanceof KickoffError) throw error;
++    fail("SESSION-CLEANUP-PRIVATE-RELEASE-WRITE", "private closed cleanup release failed", { committed: true });
++  }
++}
++
+ /**
+  * Record that one exact historical close binding has a matching durable
+  * closure receipt. This does not recreate continuity or authorize a new
+@@ -3311,6 +3364,7 @@ export function recordClosedOnboardingSessionCleanupRelease({
+       fail("SESSION-CLEANUP-PRIVATE-RELEASE-CAS", "private closed cleanup release preimage changed");
+     }
+     const token = `session-cleanup-private-closed-release-${expectedStateSha256.slice(0, 32)}`;
++    let target = null, root = null;
+     const lock = acquireLock(`${initial.path}.lock`, "pipeline.continuity-lock.v0", token, {
+       nowMs: deps.nowMs ?? Date.now,
+       lockStaleMs: deps.lockStaleMs ?? 30_000,
+@@ -3355,26 +3409,19 @@ export function recordClosedOnboardingSessionCleanupRelease({
+       }, { spawn });
+       committed = true;
+       deps.afterReceiptWrite?.({ root: current.root, receipt: structuredClone(receipt) });
+-      deletePrivateCleanupBinding(current.root, current.privateBinding.sessionCleanup, { spawn });
+-      deps.afterBindingUnlink?.({ root: current.root });
+-      fsyncDirectory(readPrivateCleanupReleaseReceipt(current.root, { spawn }).paths.directory);
+-      const readback = privateClosedReleaseReplay(
+-        current.root, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn,
+-      );
+-      if (readback === null || receipt.bindingSha256.length !== 64) {
+-        fail("SESSION-CLEANUP-PRIVATE-RELEASE-READBACK", "private closed cleanup release readback is invalid", { committed: true });
+-      }
+-      return {
+-        schema: SESSION_CLEANUP_BIND_SCHEMA, status: "closed-unbound", root: readback.root,
+-        stateSha256: readback.stateSha256, revision: readback.revision, sessionCleanup: null,
+-        mutated: true, storage: "private-runtime",
+-      };
++      // K80: the binding delete and the read-back belong to `finishPrivateClosedCleanupRelease`, after the lock.
++      target = current.privateBinding.sessionCleanup;
++      root = current.root;
+     } catch (error) {
+       if (error instanceof KickoffError) throw error;
+       fail("SESSION-CLEANUP-PRIVATE-RELEASE-WRITE", "private closed cleanup release failed", { committed });
+     } finally {
+       releaseLock(lock);
+     }
++    return finishPrivateClosedCleanupRelease({
++      root, statePath: initial.path, target, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256,
++      coordinatorCloseSha256, spawn, deps,
++    });
+   }
+   if (!isObject(releaseProof) || releaseProof.schema !== SESSION_CLEANUP_RELEASE_PROOF_SCHEMA) {
+     fail("SESSION-CLEANUP-CLOSED-RELEASE-REQUEST", "closed cleanup release request is invalid");
+@@ -9267,11 +9314,13 @@ function continuityAuthoritySnapshot(repository) {
+   const selected = [continuityAuthorityFact(observed.path,'selected-state',observed.state)];
+   const cleanup = [], released = [];
+   const allowed = new Set([basename(paths.binding),basename(paths.key),basename(paths.releaseReceipt)]);
++  const attestedPlans = continuityAuthorityAttestedPlans(paths, first);
+   for (const name of first) {
+     const ownJournal = /^continuity-authority-(execution|terminal)-[a-f0-9]{32}\.json$/.test(name);
+     const privatization = name.startsWith(SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME+'.')
+       || name.startsWith(SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME+'.');
+-    // D73 (E): the rotated release-receipt archive (`archiveObservedPrivateCleanupReleaseReceipt`) is named by its own byte digest.
++    // D73 (E): the rotated release-receipt archive (`archiveObservedPrivateCleanupReleaseReceipt`) is named by its own byte digest;
++    // K80: a rotated coordinator (private-closed) receipt is named by its own `recoveryPlanSha256` (`archivePrivateCleanupReleaseReceipt`).
+     const archive = /^session-cleanup-release-receipt\.([a-f0-9]{64})\.json$/.exec(name);
+     if (!allowed.has(name) && !ownJournal && !privatization && !archive) {
+       if (name.startsWith('session-cleanup-') || name.startsWith('continuity-authority-'))
+@@ -9280,7 +9329,7 @@ function continuityAuthoritySnapshot(repository) {
+     }
+     const path = join(paths.directory,name);
+     const bytes = assertPrivateCleanupFile(path,'continuity namespace entry');
+-    if (archive && createHash('sha256').update(bytes).digest('hex') !== archive[1])
++    if (archive && !continuityAuthorityArchiveNamed(bytes, archive[1], attestedPlans))
+       fail('SDC-AUTHORITY-UNAVAILABLE','unknown continuity private namespace entry');
+     let semantic;
+     if (path === paths.key) semantic = {kind:'private-mac-key',sha256:createHash('sha256').update(bytes).digest('hex')};
+@@ -9306,6 +9355,28 @@ function continuityAuthoritySnapshot(repository) {
+       entrySetSha256:canonicalSha256(facts),entryCount:facts.length,sourceFacts:Object.freeze(facts)}));
+   return {observed,binding,release,paths,memberships,namespaceWitness,sourceFacts:memberships.flatMap(m=>m.sourceFacts)};
+ }
++// K80: recovery-plan hashes that the current receipt/marker and the rotated archives themselves carry. A rotated receipt is named
++// by its own byte digest (orphan), by its own `recoveryPlanSha256` (coordinator receipt), or by a hash over one of these plan
++// hashes and its byte digest (quarantined / conflicting archives, `quarantineClosedPrivateCleanupReleaseReceipt` and the
++// `privateReceiptRecoverySha256` rotation of `recordClosedOnboardingSessionCleanupRelease`).
++function continuityAuthorityAttestedPlans(paths, names) {
++  const plans = new Set();
++  for (const name of names) {
++    if (name !== basename(paths.releaseReceipt) && !/^session-cleanup-release-receipt\.[a-f0-9]{64}\.json$/.test(name)) continue;
++    try { const plan = JSON.parse(assertPrivateCleanupFile(join(paths.directory,name),'continuity namespace entry').toString('utf8'))?.recoveryPlanSha256; if (SHA256_RE.test(plan ?? '')) plans.add(plan); }
++    catch { /* an unreadable entry is refused by the admission loop with its own typed code */ }
++  }
++  return plans;
++}
++function continuityAuthorityArchiveNamed(bytes, name, attestedPlans) {
++  const byteSha = createHash('sha256').update(bytes).digest('hex');
++  if (byteSha === name) return true;
++  let parsed;
++  try { parsed = JSON.parse(bytes.toString('utf8')); } catch { return false; }
++  if (parsed?.schema === PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA && parsed.recoveryPlanSha256 === name) return true;
++  return ['quarantined-private-release-receipt','conflicting-private-release-receipt']
++    .some(kind => [...attestedPlans].some(recoveryPlanSha256 => canonicalSha256({kind,recoveryPlanSha256,receiptSha256:byteSha}) === name));
++}
+ function continuityAuthorityCurrent(data,requesterHandle) {
+   const terminal=continuityRetiredOwnerScope.getStore();
+   if(terminal){
+diff --git a/plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs b/plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs
+index ffeaf54dd..a6aa4f070 100644
+--- a/plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs
++++ b/plugins/pipeline-core/lib/session-authority-orphan-member-step.mjs
+@@ -55,6 +55,7 @@ export function runOrphanSessionAuthorityMemberStep({
+   recheck = () => {},
+   releaseBinding = () => {},
+   codePrefix = "SESSION-CLEANUP-ORPHAN-RELEASE",
++  rerun = "the same orphan release",
+   deps = {},
+ } = {}) {
+   const api = {
+@@ -71,7 +72,7 @@ export function runOrphanSessionAuthorityMemberStep({
+   let root = "<repository root>";
+   let stage = boundary === null ? "open" : "inside";
+   const repairFor = (error) => (typeof error?.repair === "string" ? error.repair
+-    : `node ${REPAIR_SCRIPT} inspect --root ${root}, then rerun the same orphan release (it is replay-safe once its receipt exists)`);
++    : `node ${REPAIR_SCRIPT} inspect --root ${root}, then rerun ${rerun} (it is replay-safe once its receipt exists)`);
+   const refuse = (suffix, message, error) => {
+     throw new OrphanMemberStepError(`${codePrefix}-${suffix}`, message, repairFor(error));
+   };

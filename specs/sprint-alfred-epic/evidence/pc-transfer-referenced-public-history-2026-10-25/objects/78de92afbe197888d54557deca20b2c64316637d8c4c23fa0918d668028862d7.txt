@@ -1,0 +1,30 @@
+# G8 original producer contract — proposed delivery
+
+Targeted delivery: green for the reviewable proposal and inert preparation slice; G8 production provenance remains unqualified. Nothing committed. No Main production edits, canonical ADR/Spec/PRD mutation, design-open, model/Critic invocation, new principal/ledger/key or independent PASS.
+
+`proposed-contract.md`, `decision.proposed.json`, `request.schema.json`, `origin-locator.schema.json` and `proposed-integration.diff` provide the material choices, five-axis architecture assessment, inherited authority, exact API/schema and both active presentation callsites. Recommendation: original publication readback through existing Source/Model registry. Alternative: a same-process transaction with explicit cross-command limitations. All metadata remains proposed. No PO question was asked before this concrete package existed.
+
+The three-file inert prototype prepares actual tracked disk/Git bytes, candidate tree, full Spec digest and located criteria, an unresolved author reference, review duty and the max-two-round relation. A real Source snapshot prepared 174 located criterion IDs. This is preparation only. It cannot launch, issue a review receipt, authenticate authorship, admit an original review or consume State. No active consumer imports it. Export: `prototype.patch`; exact hashes and frozen primitive dependencies: `binding.json`.
+
+Checks below ran through `node plugins/pipeline-core/scripts/capture-evidence.mjs --out <artifact> --label <label> -- <command>` at the host boundary. Artifact paths are relative to this report directory unless stated otherwise.
+
+| Result | Exact wrapped command | Exit | Machine artifact |
+|---|---|---:|---|
+| Expected original RED: API absent | `node plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs --baseline-root <repo-root>` | 1 | `red-preparation.json` |
+| Passed: 5/5 preparation behavior | `node --test plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs` | 0 | `prototype-tests.json` |
+| Passed: 119/119 original U2/U3/consumer | `node --test plugins/pipeline-core/lib/design-review-receipt.test.mjs plugins/pipeline-core/lib/design-approval-binding.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs` | 0 | `compatibility-tests.json` |
+| Passed: 32/32 original CLI/K128 | `node --test plugins/pipeline-core/scripts/design-review-receipt.test.mjs` | 0 | `receipt-cli-tests.json` |
+| Read-only assessment emitted | `node plugins/pipeline-core/scripts/architecture-baseline.mjs --root <clone> --format json` | 0 | `architecture-baseline.json` |
+| Passed: export, 30 frozen paths, record schema, actual source preparation | `node scratch/agent-out/g8-native-producer-contract-draft/export-proposal.mjs <main> <clone>` | 0 | `export-check.json` |
+| Passed: exact patch postimage | `git apply --reverse --check <main>/scratch/agent-out/g8-native-producer-contract-draft/prototype.patch` | 0 | `<clone>/scratch/agent-out/g8-native-producer-contract-draft/patch-check.json` |
+| Unknown resources; report emitted, no supplied measurement/limit | `node plugins/pipeline-core/scripts/report-resource-headroom.mjs --input scratch/agent-out/g8-native-producer-contract-draft/resource-observations.json` | 0 | `resource-report.json` |
+
+Here `<main>` is the repository root and `<clone>` is `<main>/scratch/clones/g8-native-producer-contract-draft`; exact sanitized command readbacks are in each artifact. No configured quick command exists. No resource compliance is claimed.
+
+Changed files, uncommitted in the clone: `lib/design-review-execution-producer.mjs` (pure proposed subject contract), `scripts/design-review-dispatch.mjs` (inert physical preparation), `lib/g8-native-design-producer-contract.test.mjs` (new behavioral coverage), all under `plugins/pipeline-core/`. Own ignored scratch proposal/export/captures are under this report directory and clone scratch. Frozen thirty-path input patch SHA-256 `2805e293a48721796f1294f5160fd2ad1ae401a8fe62529f3e6e4ac50e333ecd` reconstructed exactly from base `5f3bec25bbe5d4ac5ee0df51dee20d9446272047` and rechecked unchanged.
+
+Deliberately not changed: receipt/binding kernels and original examiners; native host/Model/registry primitives; actual present-plan and companion writer; architecture map/registration/decision estate; K128 fallback. The integration diff is an explicitly non-applyable review sketch, not a claimed implemented repair.
+
+Remaining: material choice/common aggregate approval; Source-owned design current-artifacts preparation and original capture/readback; genuine original producer positive and report/receipt/author/reviewer separation; cross-process provenance/replay reservation refusals; both real present-plan behavior checks and signature revalidation. Pure preparation drift controls do not satisfy those. Integrated Verify/security, independent batch Critic and PO acceptance remain parent-owned/pending. Native/manual qualification remains pending. The earlier G8 audit/costs remain retained; this is the new authorized proposal stage, not audit progress.
+
+Two read refusals occurred (unsupported wildcard and missing guessed schema path); each exact read-only verify-audit recovery returned valid. No denial was counted as a successful read. The architecture scanner's default no-material result does not certify this untracked proposed public contract; the skill's manual significance assessment remains material/proposed. Methodological entry returned ready with model-role identity unavailable; no native worker or full bootstrap attestation was fabricated.

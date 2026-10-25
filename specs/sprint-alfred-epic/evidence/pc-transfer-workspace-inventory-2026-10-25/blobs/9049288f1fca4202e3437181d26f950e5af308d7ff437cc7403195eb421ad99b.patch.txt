@@ -1,0 +1,248 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 1c289ed52..c34a56628 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -98,6 +98,9 @@ import { materializeArchitectureDesignFixture } from "./architecture-design-test
+ import { inspectArchitectureEntryReadiness } from "./architecture-entry-readiness.mjs";
+ import { createDesignReviewReceipt } from "./design-review-receipt.mjs";
+ import { createTestCaseCompletionRecorder } from "./test-case-completion.mjs";
++import { authorOriginalCoordinatorLanguageFixture } from "./original-onboarding-controller-fixture.mjs";
++import { inspectCommittedCalibrationVerifyLayout, inspectCurrentCalibrationVerifyReady, inspectCalibrationVerifyCommitTransition } from "./calibration-verify-commit-transition.mjs";
++import { runRegisterFeaturePackage } from "../scripts/register-feature-package.mjs";
+ 
+ // B8 producer-to-guard property: exercise the real guard against every direct
+ // session command action reached by this onboarding fixture corpus. The guard
+@@ -345,7 +348,9 @@ async function runShards(recorder) {
+   const suitePath = fileURLToPath(import.meta.url);
+   const results = [];
+   for (let selectedChunk = 0; selectedChunk < CHUNK_COUNT; selectedChunk += 1) {
+-    const children = Array.from({ length: SHARD_COUNT }, (_, index) => new Promise((resolvePromise) => {
++    const chunkResults = [];
++    for (let index = 0; index < SHARD_COUNT; index += 1) {
++    const childResult = await new Promise((resolvePromise) => {
+     const expectedCases = ONBOARDING_TEST_CASES.filter((entry) => assignedToChunk(entry.index, index, selectedChunk));
+     assert.equal(expectedCases.length, CASES_PER_CHILD);
+     const receiver = createShardReceiptReceiver(index, selectedChunk, expectedCases);
+@@ -383,10 +388,10 @@ async function runShards(recorder) {
+       console.log(`ORIGINAL184 CHILD END chunk=${selectedChunk} shard=${index} index=${index} pid=${childPid} mono_ns=${childEndedAtNs.toString()} elapsed_ms=${elapsedMs.toFixed(3)} outcome=${outcome}`);
+       resolvePromise({ index, chunk: selectedChunk, code, signal, error, coverage });
+     });
+-    }));
+-    const chunkResults = await Promise.all(children);
++    });
++    chunkResults.push(childResult);
++    }
+     results.push(...chunkResults);
+-    if (failedShardResults(chunkResults).length > 0) break;
+   }
+   return results;
+ }
+@@ -471,6 +476,54 @@ function hostGit(rootDir, args) {
+   assert.equal(result.status, 0, result.stderr || `git ${args[0]} failed`);
+   return String(result.stdout).trim();
+ }
++// The five retained implementation-transition callbacks require an actual
++// committed calibration preimage. The Source reader below proves that the
++// fixture commit carries the real baseline before State may configure it.
++function commitOriginalControllerCalibrationBaseline(rootDir) {
++  const paths = ["project/pipeline.json", ".claude/pipeline.json"].filter((path) => existsSync(join(rootDir, path)));
++  assert.ok(paths.length > 0, "onboarding must produce a calibration tier");
++  assert.equal(existsSync(join(rootDir, "pipeline.user.yaml")), true, "the approved policy source must exist");
++  const sourcePaths = [...paths, "pipeline.user.yaml"];
++  hostGit(rootDir, ["add", "--", ...sourcePaths]);
++  hostGit(rootDir, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit",
++    "-m", "fixture committed calibration and policy source", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)", "--", ...sourcePaths]);
++  const committed = inspectCommittedCalibrationVerifyLayout({ rootDir });
++  assert.equal(committed.status, "baseline-only", JSON.stringify(committed));
++  assert.deepEqual(committed.paths, paths);
++}
++// The configured transition is admitted by Source only after its own State
++// writer has published the commit-ready journal. Never stage or seal a guessed
++// verify delta; the public producer must approve these exact staged paths.
++function commitOriginalControllerConfiguredCalibration(rootDir, verifyCommand) {
++  const current = inspectCurrentCalibrationVerifyReady({ rootDir, verifyCommand });
++  assert.equal(current.code, "CVCT-COMMIT-READY", JSON.stringify(current));
++  const paths = current.paths;
++  hostGit(rootDir, ["add", "--", ...paths]);
++  const ready = inspectCalibrationVerifyCommitTransition({ rootDir, stagedPaths: paths });
++  assert.equal(ready.code, "CVCT-COMMIT-READY", JSON.stringify(ready));
++  hostGit(rootDir, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit",
++    "-m", "fixture configured calibration transition", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)", "--", ...paths]);
++  assert.equal(inspectCommittedCalibrationVerifyLayout({ rootDir }).status, "configured");
++}
++// An approved plan's accepted contract is real Source authority only after
++// registration through the public writer and a commit of its exact paths.
++function registerOriginalControllerAcceptedPackage(rootDir) {
++  let output = "";
++  const code = runRegisterFeaturePackage(["--root", rootDir], (chunk) => { output += chunk; });
++  assert.equal(code, 0, output);
++  const registered = JSON.parse(output);
++  assert.ok(["registered", "already-registered"].includes(registered.status), output);
++  if (registered.status === "registered") {
++    const paths = registered.commitPaths;
++    assert.ok(Array.isArray(paths) && paths.length >= 2);
++    if (registered.envelopeIgnored && !registered.envelopeTracked) {
++      hostGit(rootDir, ["add", "-f", "--", registered.envelopePath]);
++    }
++    hostGit(rootDir, ["add", "--", ...paths.filter((path) => path !== registered.envelopePath || !(registered.envelopeIgnored && !registered.envelopeTracked))]);
++    hostGit(rootDir, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit",
++      "-m", "fixture accepted package registration", "-m", "AI-Assisted: true\nDispatch: stage-0 (elephant)", "--", ...paths]);
++  }
++}
+ function fakeCapabilities({ rootDir, intent, willInitializeGit = false }) {
+   const hasGit = existsSync(join(rootDir, ".git"));
+   return {
+@@ -5024,6 +5077,8 @@ test("a coordinator-sourced bind whose generated PRD's po-language marker is edi
+     });
+     assert.equal(genApplied.checkpoint.transactionState, "generated");
+ 
++    authorOriginalCoordinatorLanguageFixture(path, genApplied);
++
+     // Deliberately mismatch: the generated PRD's own po-language marker
+     // (set from intake-consent's --language en above) is overwritten to
+     // "de" -- NVA-BL-70's identical technique, applied to the
+@@ -5141,6 +5196,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+     const barrier = initializeRestartRequiredRoot(path, localDeps);
+     clearRuntimeBarrier(path, barrier);
+     completeKickoff(path, "Ship one gated feature", localDeps);
++    commitOriginalControllerCalibrationBaseline(path);
+ 
+     // A realistic design package: the PRD declares the repository PO language
+     // once and binds the neighbouring spec.md digest once -- the two markers the
+@@ -5161,7 +5217,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+     ].join("\n"));
+     writeFileSync(join(path, designInputPath), "# Gated design input\n");
+     const promotion = {
+-      rootDir: path, profile: "feature", featureId: "gated-work", planPath: prdPath,
++      rootDir: path, profile: "feature", featureId: "gated", planPath: prdPath,
+       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
+     };
+     materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN", admitSpecCriterion: true });
+@@ -5189,16 +5245,17 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+ 
+     const state = (argv) => {
+       const stderr = [];
++      const sourceOnly = argv[0] === "set-phase";
+       const code = pipelineStateRun(argv, {
+         dir: path,
+         now: () => "2026-08-01T12:00:00.000Z",
+-        writeError: (value) => stderr.push(String(value)),
++        ...(sourceOnly ? {} : { writeError: (value) => stderr.push(String(value)) }),
+         // This dev-plan regression exercises the phase gate, not the shared
+         // acknowledgement ceremony; the approval below runs on the live
+         // review-receipt / design-approval-request route with the repository's
+         // real approval mode and real HEAD candidate (see the QG-04 note above
+         // materializeDesignReviewReceiptFixture).
+-        designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
++        ...(sourceOnly ? {} : { designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }) }),
+       });
+       return { code, stderr: stderr.join("") };
+     };
+@@ -5207,7 +5264,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+     // (GUARD-DEVPLAN-LIFECYCLE on the staged path), so the review commit cannot
+     // follow submission without reopening the design. The route only needs the
+     // receipt tracked and clean by present-plan, which still runs after submit.
+-    const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "gated-work", planPath: prdPath, specPath });
++    const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "gated", planPath: prdPath, specPath });
+     const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
+     assert.equal(submitted.code, 0, submitted.stderr);
+     assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
+@@ -5215,6 +5272,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+     assert.equal(presented.code, 0, presented.stderr);
+     const approved = state(designApprovalRequestArgv(path));
+     assert.equal(approved.code, 0, approved.stderr);
++    registerOriginalControllerAcceptedPackage(path);
+     const phased = state(["set-phase", "--phase", "implementation", "--verify-command", `${process.execPath} -e "process.exit(0)"`]);
+     assert.equal(phased.code, 0, phased.stderr);
+ 
+@@ -5254,6 +5312,7 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+       if (initialized.status === "restart-required") clearRuntimeBarrier(path, readRestartBarrier({ rootDir: path, spawn: fakeGit }));
+       else assert.ok(["kickoff-required", "intake-required"].includes(initialized.status), `${runner}: ${initialized.status}`);
+       completeKickoff(path, `Ship one ${runner} handover feature`, localDeps, "ready", runner);
++      commitOriginalControllerCalibrationBaseline(path);
+ 
+       mkdirSync(join(path, "specs", `handover-${runner}`), { recursive: true });
+       const prdPath = `specs/handover-${runner}/prd_handover.md`;
+@@ -5289,16 +5348,18 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+       });
+ 
+       let tick = 0;
++      let registeredCourse = false;
+       const state = (argv) => {
+         const stderr = [];
+         tick += 1;
++        const sourceOnly = registeredCourse || argv[0] === "set-phase";
+         const code = pipelineStateRun(argv, {
+           dir: path,
+           now: () => `2026-08-30T12:00:${String(tick).padStart(2, "0")}.000Z`,
+-          writeError: (value) => stderr.push(String(value)),
++          ...(sourceOnly ? {} : { writeError: (value) => stderr.push(String(value)) }),
+           // Keep this handover test's concern to public lifecycle handoff.
+           // The signature/global receipt contract has its own all-runner test.
+-          designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
++          ...(sourceOnly ? {} : { designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }) }),
+         });
+         return { code, stderr: stderr.join("") };
+       };
+@@ -5393,8 +5454,11 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+       // fixture receipt.
+       materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}-CONFIGURED` });
+       approve();
++      registerOriginalControllerAcceptedPackage(path);
++      registeredCourse = true;
+       const configuredPhase = state(["set-phase", "--phase", "implementation", "--verify-command", verifyCommand]);
+       assert.equal(configuredPhase.code, 0, `${runner}: configure verify: ${configuredPhase.stderr}`);
++      commitOriginalControllerConfiguredCalibration(path, verifyCommand);
+       assert.equal(state(["reopen-design", "--by", "po"]).code, 0);
+       materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}-REENTRY` });
+       approve();
+@@ -5459,6 +5523,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause
+     const barrier = initializeRestartRequiredRoot(path, localDeps, runner);
+     clearRuntimeBarrier(path, barrier);
+     completeKickoff(path, "Ship one probe feature", localDeps, "ready", runner);
++    commitOriginalControllerCalibrationBaseline(path);
+ 
+     mkdirSync(join(path, "specs", "projdrift"), { recursive: true });
+     const prdPath = "specs/projdrift/prd_projdrift.md";
+@@ -5476,7 +5541,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause
+     ].join("\n"));
+     writeFileSync(join(path, designInputPath), "# Projdrift design input\n");
+     const promotion = {
+-      rootDir: path, profile: "feature", featureId: "projdrift-work", planPath: prdPath,
++      rootDir: path, profile: "feature", featureId: "projdrift", planPath: prdPath,
+       prdPath, specPath, designInputPath, runner, deps: localDeps,
+     };
+     materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN", admitSpecCriterion: true });
+@@ -5486,27 +5551,29 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause
+ 
+     const state = (argv) => {
+       const stderr = [];
++      const sourceOnly = argv[0] === "set-phase";
+       const code = pipelineStateRun(argv, {
+         dir: path,
+         now: () => "2026-08-01T12:00:00.000Z",
+-        writeError: (v) => stderr.push(String(v)),
++        ...(sourceOnly ? {} : { writeError: (v) => stderr.push(String(v)) }),
+         // Projection drift is independent from the global acknowledgement
+         // policy; the plan is approved on the live review-receipt route with the
+         // repository's real approval mode (see the QG-04 note above
+         // materializeDesignReviewReceiptFixture), so pipeline.user.yaml stays
+         // untouched until the edit this case exists to examine.
+-        designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }),
++        ...(sourceOnly ? {} : { designAdvisoryAdmission: () => ({ ok: true, id: "0".repeat(64), mode: "direct" }) }),
+       });
+       return { code, stderr: stderr.join("") };
+     };
+     // Review commit while still a draft (see the dev-plan case above): the
+     // submitted PRD/spec are immutable to the staged lifecycle policy.
+-    const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "projdrift-work", planPath: prdPath, specPath });
++    const reviewReceiptPath = materializeDesignReviewReceiptFixture({ rootDir: path, featureId: "projdrift", planPath: prdPath, specPath });
+     assert.equal(state(["submit-plan", "--by", "po", "--profile", "feature"]).code, 0);
+     const presentedProjdrift = state(["present-plan", "--by", "po", "--review-receipt", reviewReceiptPath]);
+     assert.equal(presentedProjdrift.code, 0, presentedProjdrift.stderr);
+     const approvedProjdrift = state(designApprovalRequestArgv(path));
+     assert.equal(approvedProjdrift.code, 0, approvedProjdrift.stderr);
++    registerOriginalControllerAcceptedPackage(path);
+ 
+     const inspect = () => inspectProjectOnboardingV3({ runner, rootDir: path, intent: "bootstrap", deps: localDeps });
+ 

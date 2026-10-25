@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.pc-transfer-dependency-closure.v1",
+  "date": "2026-10-25",
+  "assurance": "historical-capture-preservation-not-rerun",
+  "artifacts": [
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/targeted-final.json",
+      "sourceSha256": "42998ca508e26822a85f69b862d031c5e7c9bc3636a9c2edf3eede14a2e16b64",
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/targeted-final.json.txt",
+      "transportSha256": "42998ca508e26822a85f69b862d031c5e7c9bc3636a9c2edf3eede14a2e16b64",
+      "byteExact": true,
+      "classification": "public-byte-exact"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/source-catalogue-suite.json",
+      "sourceSha256": "cf58df94ad000d05c20f06e4c5ebfef17542041e127fc1576907f35c8f3686d5",
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/source-catalogue-suite.json.txt",
+      "transportSha256": "cf58df94ad000d05c20f06e4c5ebfef17542041e127fc1576907f35c8f3686d5",
+      "byteExact": true,
+      "classification": "public-byte-exact"
+    },
+    {
+      "source": "scratch/clones/state-result-recovery-integration/scratch/agent-out/state-result-recovery-integration/close-gate-kernel-final.json",
+      "sourceSha256": "b4f9908faef842b0c9cb86849bb661b43ff13871a5d48925413e26ac72e6e634",
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/close-gate-kernel-final.json.txt",
+      "transportSha256": "b4f9908faef842b0c9cb86849bb661b43ff13871a5d48925413e26ac72e6e634",
+      "byteExact": true,
+      "classification": "public-byte-exact"
+    },
+    {
+      "source": "scratch/main-candidate-synthetic-preload-20261025.mjs",
+      "sourceSha256": "578630e1315fd099b5b7d179af22f9da5132755cace3912e4dd1ffcc34c0ed0e",
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/main-candidate-synthetic-preload-20261025.mjs.txt",
+      "transportSha256": "578630e1315fd099b5b7d179af22f9da5132755cace3912e4dd1ffcc34c0ed0e",
+      "byteExact": true,
+      "classification": "public-byte-exact"
+    },
+    {
+      "source": "scratch/run-main-candidate-focused-20261025.mjs",
+      "sourceSha256": "9c8fe785bf4273682e9a362d5e703c6dc53c04a0cd6ed7988e07a9dd64ee8b88",
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/run-main-candidate-focused-20261025.mjs.txt",
+      "transportSha256": "9c8fe785bf4273682e9a362d5e703c6dc53c04a0cd6ed7988e07a9dd64ee8b88",
+      "byteExact": true,
+      "classification": "public-byte-exact"
+    }
+  ]
+}

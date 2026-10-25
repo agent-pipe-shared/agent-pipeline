@@ -1,0 +1,9 @@
+fix(verify): resolve all failing suites across onboarding, lifecycle, and verify registration
+
+- fix empty git repository classification as fresh in project-onboarding-v3
+- handle architecture-design-required in measure-fresh-repo-onboarding-turns
+- fix pipeline-state set-phase refusal output stream
+- update suite registration and case completion checks
+
+AI-Assisted: true
+Dispatch: stage-0 (elephant)

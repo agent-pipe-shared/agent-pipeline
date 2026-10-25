@@ -1,0 +1,12 @@
+{
+  "schema": "scratch.worktree-process-start-parser-probe.v1",
+  "sourceCommit": "200014e939cfab9b8dcf0a82d9030955fb6c599b",
+  "sourcePath": "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+  "sourceSha256": "17639f3a42acc17dc041c50c205db281058e4cadfe12acfa5d9bf5645897dc73",
+  "observedAt": "2026-09-28T00:06:59.139Z",
+  "syntheticProcessTitle": "host worker (x)",
+  "robustStart": "2100258",
+  "currentSourceResult": "7",
+  "mismatch": true,
+  "limitation": "Real synthetic Linux process; reproduces the exact current source expression, not a production cleanup or PID reuse."
+}

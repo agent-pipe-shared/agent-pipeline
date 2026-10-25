@@ -1,0 +1,78 @@
+{
+  "schema": "scratch.spec-marker-preparation-evidence.v1",
+  "observedAt": "2026-09-28T02:05:50.060Z",
+  "sourceCommit": "9cc0114b44282a11b6d0534dba4758608d928531",
+  "files": {
+    "scratch/onboarding-spec-marker-functions.txt": "541babbcea81bd9e47d0e214cbeac1edf2f2bbb51ea737cc0d766abd6e06f3a1",
+    "scratch/onboarding-spec-marker-cases.txt": "23f0e834980b0704c58701eaef0d59b0e7f2da7d667e1393fc8ea2674fbaeca0",
+    "scratch/prepare-onboarding-spec-marker.mjs": "d929d15de692f31ddbd85334f77c23366e1dce1ae8422f4ce6819c150d5cb035",
+    "scratch/onboarding-spec-marker-core.patch": "343cc4cf1e52e4522bb8a7c2125a23bc081a2d2ed0fb0ac1f70cbec45875873f",
+    "scratch/onboarding-spec-marker-integration-contract.md": "b4bf4b03e7aeb5b6fb78b36a3e900529a8e326634f3bf9b2f24a82ff0bb96f3d",
+    "scratch/load-proposed-onboarding-for-tests.mjs": "01bb3b57f6c6c2ca56a0ef4fa3c0800561279745b18466855139b27cb98675a1",
+    "scratch/0.7-virtual-integration.patch": "dc04a562317c6595a3fe1aaa0ed38a6475b2021e2be980a16122467424621e5f",
+    "scratch/0.7-virtual-integration.metadata.json": "06b2c9fdcba0ec4e42690542fc540344168b3294e0af5d9d5e69f1fa80b85afe"
+  },
+  "proposedMembers": [
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "beforeSha256": "55100fb351cb70729968cafee948d8bf7dea4411a87196ab1815a3321f73d3f2",
+      "sha256": "b0af7efd7df615aa79de60404f9d143cedc276b83dbbc2e1004d4eb8be96ef6e",
+      "patches": [
+        "scratch/onboarding-zero-design-questions.patch",
+        "scratch/onboarding-handover-truth.patch",
+        "scratch/onboarding-spec-marker-core.patch"
+      ]
+    },
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.test.mjs",
+      "beforeSha256": "c415517dce914a203e561eadefeb485716f3618a6828bbaf57bd04d9655a1d9e",
+      "sha256": "026e2584bcbb710f37c3788d78d548837d4947e138da6f7568272b50e36262e3",
+      "patches": [
+        "scratch/onboarding-zero-design-questions.patch",
+        "scratch/onboarding-handover-truth.patch",
+        "scratch/onboarding-case-completion-parity.patch",
+        "scratch/onboarding-spec-marker-core.patch"
+      ]
+    },
+    {
+      "path": "harness/scripts/verify.mjs",
+      "beforeSha256": "07230cf62f41942e050106a5d42abc170778368a73244875b0e0450bc96418a3",
+      "sha256": "948d2ef1cfae1d4a54bf24f0211c6acbb993fd5cc3efab9cbb231cfc0f11865e",
+      "patches": [
+        "scratch/codex-tool-free-readiness-source.patch",
+        "scratch/reader-terminal-source.patch",
+        "scratch/browser-preflight-source.patch",
+        "scratch/onboarding-case-completion-parity.patch",
+        "scratch/onboarding-spec-marker-core.patch",
+        "aggregate-test-registration"
+      ]
+    }
+  ],
+  "observedTests": {
+    "terminalExecSession": 57267,
+    "exitCode": 0,
+    "passed": 8,
+    "failed": 0,
+    "durationMs": 3740.318713,
+    "caseIds": [
+      "OBC288",
+      "OBC289",
+      "OBC290",
+      "OBC291",
+      "OBC292",
+      "OBC293",
+      "OBC294",
+      "OBC295"
+    ],
+    "fullStdoutRetained": false,
+    "scope": "Exact proposed continuity modules over real generated staging fixture packages; no host route or content approval claimed."
+  },
+  "fullCorpusExecuted": false,
+  "typedHostRoutePrepared": false,
+  "canonicalWrites": false,
+  "productiveIntegration": false,
+  "actualConsumerReplay": false,
+  "formalCriticStamp": false,
+  "candidateQualification": false,
+  "signatureRequested": false
+}

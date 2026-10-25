@@ -1,0 +1,73 @@
+# Prepared summary admission parity
+
+Only new `scratch/onboarding-summary-admission-*` files were written. Canonical
+modules, existing importhooks and assemblers were not modified. No signing,
+override, native Codex restart or denied Driver replay was performed.
+
+## Additive root-assembly patch
+
+`onboarding-summary-admission.patch` adds one exact-context line to
+`sanctionedOnboardingArgs`'s derived read-only lifecycle branch:
+
+`optional: args[0] === "intake-generate-plan" ? { "--summary": true } : {},`
+
+The existing closed matcher rejects duplicates and value operands. Every other
+subcommand keeps its existing flag set. Legacy bare generator plans still work.
+The same context occurs exactly once in canonical source and aggregate guard.
+
+- Canonical source SHA256: `e5629b80a205ff3b02818855eb7c9a145ff9e8f7ba1071e953225308c59af9e8`
+- Base aggregate guard SHA256: `c9641c48c4eda4c48c104dde5ef2fbfe4e924375359840a3b98ba1c7a92a645c`
+- Full proposed guard SHA256: `4b2d976c11680639ae06e6f16665a7bb1dad4968a1646fc37cd6be2918acd224`
+- Additive patch SHA256: `555ccbd7a2200a1436e55229c60eaa4fe62438131f617d2e0c79c2e1d8384be9`
+- Test SHA256: `cae62fdb686683e4ebe8868557e4d7923fb20e18ba41970ee2d3b4169fb55a34`
+- Loader SHA256: `ec288eefaef6454b342f8d72e6afc62502e8485c7051f5eea792e4beaf34ace8`
+
+## Exact-byte execution
+
+`node scratch/onboarding-summary-admission-prepare.mjs`: exit 0.
+
+`node --import ./scratch/onboarding-summary-admission-loader.mjs --test scratch/onboarding-summary-admission-route.test.mjs`
+
+Final run: exit 0; 2 tests, 2 pass, 0 fail/cancel/skip/todo; 3505.251144 ms.
+First exploratory run failed before tests because the new test named a nonexistent
+guard export; corrected to the actual evaluateLifecycleReadyGuard export.
+
+The new own importhook uses the existing C importhook's hash-checking pattern,
+validates canonical preimages, selected proposed bytes, aggregate/metadata, slice
+patch and fixture hashes, and loads exact full proposed guard bytes at its canonical
+URL. The canonical comparison imports guard with a distinct query URL so its
+original source is loaded; its relative dependencies still use selected proposal
+bytes. Therefore this comparison proves the original guard qualifier lacks summary
+admission; it is not an independently canonical full dependency graph.
+
+## Meaningful regressions
+
+Fixture imports the existing proposed fixture helpers without registering their
+whole suite. It initializes a disposable local runtime fixture, consumes its
+fixture restart barrier, records explicit synthetic consent/material/profile/language,
+and applies a complete design-question answer round with the real checkpoint writer.
+Checkpoint reads ready-to-generate. Real inspectProjectOnboardingV3 publishes:
+
+`project-onboarding-v3.mjs intake-generate-plan --root <physical temporary root with spaces> --summary --runner codex --intent session`
+
+The returned argv is tested directly, not reconstructed from a handwritten happy
+path. Original guard qualifier rejects it; proposed qualifier and actual
+evaluateLifecycleReadyGuard admit it under the actual producer status
+intake-design-questions-required. The readiness seam throws that observation's
+PORG-NOT-READY; this is a controlled admission test, not native-hook replay.
+
+Negative variants derived from the returned argv reject duplicate summary,
+`--summary true`, `--summary false`, `--summary=true`, stray values, unknown flag,
+different root and summary on plan/plan-runtime/plan-readback/bootstrap-bind-plan/
+inspect/intake-generate-apply. Bare legacy generator action and reordered valid flags
+remain admitted.
+
+## Process and integration boundary
+
+All proposed JavaScript proof runs inside the named Node test process. Importhooks
+do not automatically transfer to subprocesses: no canonical generator CLI subprocess
+or installed Codex/Claude hook was executed for this admission proof. Existing test
+helpers use synthetic Git/runtime observations and temporary files; no NativeHostPASS
+is claimed. Root still needs to assemble this additive patch, retain canonical
+regression coverage in the candidate, and qualify the combined producer/guard route.
+PendingAsks compaction remains a design proposal and is not implemented here.

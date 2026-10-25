@@ -1,0 +1,1088 @@
+diff --git a/SETUP.md b/SETUP.md
+index 38c490ba0..a96c8485f 100644
+--- a/SETUP.md
++++ b/SETUP.md
+@@ -20,17 +20,18 @@ terminology, continue with this setup guide, then read the operator-facing
+ <a id="capability-plugin-distribution-and-publication"></a>
+ 
+ - Node.js 24 or newer and Git are required for the included scripts.
+-- Three scanners back the security gates: `gitleaks` (secrets), `osv-scanner`
+-  (dependency vulnerabilities), and `semgrep` (static analysis). Install them
+-  before running Verify. **A missing scanner makes its gate report `skipped`,
+-  not `pass`.** `skipped` means the gate checked nothing for that category —
+-  it is not a substitute for a passing scan, and a green Verify result built
+-  on a skipped gate does not mean that category was actually scanned. Run
+-  `node "<absolute-plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"`
+-  to see every configured tool with its observed version, or a copyable
+-  platform-appropriate install command for whatever is missing. After binding
+-  the plugin, replace `<absolute-plugin-root>` with its installed directory
+-  and run this from the governed project root.
++- Four categories back the security gates: secrets (`gitleaks`), dependency
++  vulnerabilities (`osv-scanner`), static analysis (`semgrep`), and licenses.
++  The license check is a built-in `license-check` control that reads a license
++  allowlist and `third-party-licenses.json` from the project; it needs no
++  separately installed tool. Install the three scanners before running Verify.
++  **A missing scanner makes its gate report `skipped`, not `pass`.** `skipped`
++  means the gate checked nothing for that category — it is not a substitute for
++  a passing scan, and a green Verify result built on a skipped gate does not
++  mean that category was actually scanned. After binding the plugin, the
++  [toolchain preflight](#missing-prerequisite-guidance-in-a-consumer-project)
++  shows every configured tool with its observed version, or a copyable
++  platform-appropriate install command for whatever is missing.
+ - Keep each governed repository under version control. The pipeline itself is
+   obtained from its approved GitHub distribution; do not copy a maintainer
+   checkout or its generated files into the governed repository.
+@@ -38,11 +39,6 @@ terminology, continue with this setup guide, then read the operator-facing
+   details as machine-local configuration. Do not commit them into the pipeline
+   source, a generated projection, or a project calibration.
+ 
+-- **Measurement boundary.** There is no time, token, or administration-cost
+-  estimate for your project yet. The historical observations in [measurement
+-  guidance](docs/cost-and-measurement.md) are transparency material, not an
+-  adoption forecast.
+-
+ ## A. Activate the pipeline in one project repository
+ 
+ Repeat this routine path for every application or service repository. It uses
+@@ -63,13 +59,10 @@ partial or malformed roots fail closed. After bootstrap readback, record the
+ project's one Verify command, calibration, handover, and project-owned policy
+ choices through the normal reviewed workflow.
+ 
+-For Claude Code, bind the project-scoped `pipeline-core` plugin, then fully
+-restart the host before the first bootstrap. For Codex, use its approved
+-marketplace/add commands, fully end the Codex host process, then start a new
+-thread after binding or refresh. For another runner, use only its supported
+-integration and the manual controls
+-stated in [runtime boundary](docs/runtime-boundary.md). Do not copy Claude
+-commands or claim its hooks are installed elsewhere.
++The per-runner binding commands and the restart rule are in
++[step 0](#0-bind-the-supported-runner-integration-and-fully-restart-its-host).
++For a runner without a command there, use only its supported integration; do
++not copy another runner's commands or claim its hooks are installed.
+ 
+ The resulting Verify receipt and delivery records can be inspected with the
+ candidate's other evidence. They do not certify compliance or replace a human
+@@ -97,8 +90,6 @@ the runner's supported integration and follow its setup path. See
+ [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for exact controls,
+ prerequisites, and manual responsibilities.
+ 
+-## Consumer onboarding details
+-
+ <a id="consumer-onboarding-details"></a>
+ 
+ ### 0. Bind the supported runner integration and fully restart its host
+@@ -106,7 +97,10 @@ prerequisites, and manual responsibilities.
+ Bind the integration for the runner that will govern the project. After the
+ first binding, **fully end that host process and start a new session in the
+ project root before invoking `pipeline-start` or classifying the root**. A
+-refresh inside the existing host is insufficient for the first binding.
++refresh inside the existing host is insufficient for the first binding. Until
++`0.7.0` is released, bind only the approved GitHub-distributed version; a local
++candidate is not an installation source (see the
++[release status](docs/overview.md)). This applies to every bind step below.
+ 
+ #### Claude Code: project-scoped binding
+ 
+@@ -119,12 +113,11 @@ claude plugin install pipeline-core@agent-pipeline --scope project
+ ```
+ 
+ `--scope project` keeps the binding with the repository rather than with one
+-developer's user profile. The installed CLI's `claude plugin marketplace add
+---help` does not document a `--ref` option for pinning a Git branch; this
+-marketplace binding therefore follows the source repository's default branch.
+-Confirm the installation with `claude plugin list
+---json`. To update a Claude Code binding later, update the marketplace, update
+-the same project-scoped plugin, then reload the running host session:
++developer's user profile. This marketplace binding follows the source
++repository's default branch. Confirm the installation with
++`claude plugin list --json`. To update a Claude Code binding later, update the
++marketplace, update the same project-scoped plugin, then reload the running
++host session:
+ 
+ ```sh
+ claude plugin marketplace update agent-pipeline
+@@ -132,23 +125,15 @@ claude plugin update pipeline-core@agent-pipeline --scope project
+ /reload-plugins
+ ```
+ 
+-After the first project-scoped Claude binding, fully close Claude Code and
+-start a new Claude session in the project root before invoking
+-`/pipeline-core:pipeline-start`. Do not substitute `/reload-plugins` for this
+-first-bind restart. For a non-Claude runtime, do not copy these commands or
+-claim that its hooks are installed. Use that runtime's supported integration,
+-then follow the methodology and manual controls described in the
+-runtime-boundary document.
++Do not substitute `/reload-plugins` for the first-bind restart described above;
++use a full restart before invoking `/pipeline-core:pipeline-start`.
+ 
+ #### Codex: bind or refresh the plugin
+ 
+ Codex uses its own marketplace and install commands. Add the approved Git
+ source once, refresh its snapshot when the approved ref advances, and install
+-the plugin from the marketplace name declared by that source. `main` is the
+-only published branch — development happens locally and on feature branches,
+-and `main` carries releases (ADR-0078 D1) — so pin the marketplace snapshot to
+-`main` (`--ref` is the same flag already verified in
+-[`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md)):
++the plugin from the marketplace name declared by that source. Pin the
++marketplace snapshot to `main`, the published release branch:
+ 
+ ```sh
+ codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref main
+@@ -157,25 +142,154 @@ codex plugin add pipeline-core@agent-pipeline
+ codex plugin list --marketplace agent-pipeline --json
+ ```
+ 
+-The Pipeline's update channels resolve separately from Codex's marketplace
+-snapshot: `alpha` is the current `main` tip, `beta` is the highest
+-`vX.Y.Z-beta.N` tag on `main`, and `stable` is the highest final `vX.Y.Z`
+-release tag on `main`. Changing a channel selects a ref for freshness checks;
+-it does not install a different plugin by itself.
+-
+ The final command must report exactly one installed and enabled
+ `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running
+ plugin: after the first binding or any later refresh, fully end the Codex
+-host process and start a new thread in the project root before invoking
+-`/pipeline-core:pipeline-start`. A fresh thread in the old process or a plugin
+-reload alone does not prove that the cached skill snapshot changed. Do not hand-edit Codex
+-marketplace or cache files.
++host process and start a new thread in the project root, inspect `/hooks`,
++and only then invoke `/pipeline-core:pipeline-start`. A fresh thread in the old
++process or a plugin reload alone does not prove that the cached skill snapshot
++changed. Do not hand-edit Codex marketplace or cache files. Update channels
++(`alpha`, `beta`, `stable`) are described under
++[Update channels](#update-channels).
+ 
+ #### Antigravity (Agy): workspace-local binding
+ 
+ Bind the plugin in the consumer workspace, then fully restart Agy before the
+-common step 1 below. The [step-0 Antigravity details](#antigravity-installation-details-for-step-0)
+-cover the published-tag installer, upgrade readback, and host Node check.
++common step 1 below. The pinned `v0.7.0` example applies only after that tag is
++published on the [official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline);
++until then see the [release status](docs/overview.md).
++
++After the tag is published, run these commands with your shell in the
++**consumer project root**. The clone lives in a durable physical directory
++outside the governed project and any temporary or runner cache directory.
++Choose a different durable location if `$HOME/.local/share` is unsuitable:
++
++```sh
++mkdir -p "$HOME/.local/share"
++pipeline_release_tag="v0.7.0"
++pipeline_source_url="https://github.com/agent-pipe-shared/agent-pipeline.git"
++pipeline_release_dir="$HOME/.local/share/agent-pipeline-$pipeline_release_tag"
++git clone --branch "$pipeline_release_tag" --depth 1 \
++  "$pipeline_source_url" "$pipeline_release_dir"
++git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
++git -C "$pipeline_release_dir" remote get-url origin
++git -C "$pipeline_release_dir" describe --tags --exact-match
++```
++
++On Windows, use PowerShell from the consumer project root. The following
++directory is durable and outside the project; choose another durable path if
++`$env:LOCALAPPDATA` is unsuitable:
++
++```powershell
++$pipelineReleaseTag = 'v0.7.0'
++$pipelineSourceUrl = 'https://github.com/agent-pipe-shared/agent-pipeline.git'
++$pipelineReleaseDir = Join-Path $env:LOCALAPPDATA "AgentPipeline\agent-pipeline-$pipelineReleaseTag"
++New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pipelineReleaseDir) | Out-Null
++git clone --branch $pipelineReleaseTag --depth 1 $pipelineSourceUrl $pipelineReleaseDir
++git -C $pipelineReleaseDir switch -c pipeline-release-v0.7.0
++git -C $pipelineReleaseDir remote get-url origin
++git -C $pipelineReleaseDir describe --tags --exact-match
++```
++
++Confirm the two Git readbacks show the official URL above and `v0.7.0` before
++running the installer from the same consumer project root. The local branch is
++required because cloning a tag otherwise leaves a detached HEAD, which the
++plugin's clean-source observer refuses; creating the branch does not move the
++checked-out release commit. The installer validates physical plugin files and
++the registry binding; it does not independently authenticate the GitHub source
++or a release signature. Treat those readbacks and your approved release channel
++as operator checks, not as proof supplied by the installer.
++
++```sh
++node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
++```
++
++On Windows, run the same installer from the consumer project root with:
++
++```powershell
++node (Join-Path $pipelineReleaseDir 'plugins/pipeline-core/install-agy.mjs')
++```
++
++At the first prompt choose **Approved Plugin Directory** (the default). Choose
++**Local Marketplace** only for an explicitly validated pre-release developer
++copy; if that development copy is unavailable, the installer refuses the
++selection instead of silently switching sources. Then choose
++**Workspace-Local** when the installer asks where to bind
++the plugin. The installer registers that exact physical plugin directory in
++the consumer project's `.agents/plugins.json`; keep the clone at the same path
++while it is registered. Do not hand-edit Agy registry or plugin files. The
++installer may offer a runner-local autonomous tool policy, but that option
++grants no plan, release, remote, or human authority.
++If its existing runner settings are malformed or linked through an alias, the
++optional policy update fails without replacing those bytes. Plugin registration
++may already have succeeded; inspect `.agents/plugins.json` and repair the
++settings deliberately before retrying that optional step.
++
++To upgrade after a newer final release tag is published, clone that tag into
++a **different** durable directory and run its `install-agy.mjs` from each
++consumer project root. Choose Approved Plugin Directory and Workspace-Local
++again. Read back each project's `.agents/plugins.json`: it must contain the
++new exact plugin path and no previous Pipeline registration, while unrelated
++entries remain. Keep the old checkout until that readback succeeds, then
++retire it and fully restart Agy. A developer checkout is only for an explicit
++pre-release test.
++
++If the old checkout was already deleted while its registry entry remains,
++restore that exact approved plugin directory first and rerun the installer.
++The installer refuses an unverifiable, Pipeline-shaped stale path instead of
++deleting an entry it cannot prove it owns; do not work around this by editing
++the registry by hand.
++
++**Agy's managed plugin directory and import manifest.** Besides the path
++registries (`.agents/plugins.json` and the global `plugins.json`), Agy keeps a
++managed copy of an imported plugin in its own config directory
++(`plugins/agent-pipeline-core`) and lists it in `import_manifest.json`. That
++managed copy can be stale while the registered path is current, and a stale
++same-version copy can shadow the registered plugin. Keep a **single source**:
++one approved plugin directory per scope, and no hand-edited copy beside it. The
++refresh command is:
++
++```sh
++node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs" --refresh
++```
++
++It prints the exact plan (sync of the local marketplace copy, the Agy
++lifecycle steps, a readback) before it changes anything and asks for
++confirmation. `--yes` skips only that question and is accepted only together
++with `--refresh`; on its own it is refused with a repair. After the refresh,
++**fully restart Agy and read the session lock** (the first
++`/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
++list` and `plugins.json` are not proof of what is loaded, and neither is the
++installer's readback, which is a physical diagnostic only.
++
++**Inert outside opted-in repositories.** A global install acts only in
++repositories that opted in. Outside them the hooks are inert: no blocking, no
++injected instructions, no writes. The one exception is the destructive-git
++protection, which stays active everywhere.
++
++**Node.js on the host's PATH.** The pipeline hooks need the Agy host to resolve
++`node`; a desktop or service launcher may have a different PATH from an
++interactive shell. If launching Agy from this same terminal, check Node.js
++immediately before launching it. On macOS/Linux use:
++
++```sh
++command -v node
++```
++
++On Windows, use PowerShell or Command Prompt:
++
++```powershell
++where.exe node
++```
++
++For a desktop or service launch, either shell result does **not** prove the Agy
++host's PATH. Inspect that launcher/service environment and confirm that Agy's
++own command tool can resolve and run `node --version` in a new session. If
++that readback is unavailable or denied, treat hook readiness as unknown;
++correct the host environment and fully restart Agy before relying on hooks.
++Then open a new workspace session in the project root and invoke
++`/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
++unattended permission-bypass mode as an installation or recovery shortcut.
+ 
+ ### 1. After consent, let `pipeline-start` classify the consumer root
+ 
+@@ -205,7 +319,8 @@ or V3 authority checks and has these outcomes:
+   migration nor permission to overwrite an existing `.claude`, `.codex`, or
+   `.agents` path.
+ - A V0/V1/V2 authority uses the official migration inspect → plan → explicit
+-  apply workflow, never the fresh initializer. A partial, invalid, unsafe, or
++  apply workflow ([consumer procedure](docs/v3-consumer-onboarding.md#legacy-consumer-with-no-projections)),
++  never the fresh initializer. A partial, invalid, unsafe, or
+   malformed root fails closed with no overwrite. A root consisting solely of
+   host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
+   present) is the supported `fresh-host-managed` variant; never delete,
+@@ -258,8 +373,7 @@ autonomy your team is prepared to supervise.
+ ### 3. Declare the Git lifecycle before delivery
+ 
+ An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
+-the project calibration at its resolved authority tier (`project/pipeline.json`,
+-else `.claude/pipeline.json`): onboarding creates a repository but no initial commit,
++the project calibration (see the authority-tier note in step 2): onboarding creates a repository but no initial commit,
+ remote, or credential binding. Make the initial commit before normal work.
+ When the project is intentionally connected to a shared remote, change the
+ committed calibration to `repositoryMode: "remote-tracked"`; the session
+@@ -327,12 +441,8 @@ begins. For a material feature, it also follows the V3 profile and advisory
+ rules before writable work. A reminder hook is not a substitute for the
+ bootstrap itself.
+ 
+-If the bootstrap reports `hook-refresh-required`, a mandatory git hook snapshot
+-in the repository is stale. `node <plugin-root>/scripts/clone-hook-readiness.mjs
+---root <project-root> --apply` installs missing mandatory hooks and also
+-refreshes stale ones. If a refresh fails, it reports
+-`HOOK-READINESS-REFRESH-FAILED` and names the command to repair it,
+-`refresh-mandatory-hooks.mjs --root <project-root>`.
++If the bootstrap reports `hook-refresh-required`, see
++[Troubleshooting](#troubleshooting).
+ 
+ <a id="c-bring-an-existing-repository-under-the-pipeline"></a>
+ 
+@@ -361,74 +471,6 @@ change. Do not paste a pipeline source's `pipeline.user.yaml` into an
+ application repository or make a legacy authority look current by copying
+ generated runtime files.
+ 
+-### Uninstalling from a repository
+-
+-A repository that once opted in can be released again. The plugin ships a
+-journaled, resumable uninstall controller that removes the Pipeline's own
+-mechanics and keeps everything you wrote. Replace `<absolute-plugin-root>` with
+-the installed Pipeline plugin directory and `<repo>` with the repository root.
+-
+-1. **Plan** (read-only; changes no byte). It prints one JSON document that
+-   includes `planSha256` and the list of `conflicts`:
+-
+-   ```sh
+-   node "<absolute-plugin-root>/scripts/project-uninstall.mjs" plan --root "<repo>"
+-   ```
+-
+-   Resolve every entry in `conflicts` before you continue. A plan with
+-   conflicts is refused by `apply` and nothing is changed.
+-
+-2. **Apply** the exact plan you reviewed by passing its digest back:
+-
+-   ```sh
+-   node "<absolute-plugin-root>/scripts/project-uninstall.mjs" apply --root "<repo>" --plan-sha256 "<planSha256>" --activate
+-   ```
+-
+-3. **Resume** after an interruption with the same flags. Each stage is journaled,
+-   so the run continues from the last completed stage to the same end state:
+-
+-   ```sh
+-   node "<absolute-plugin-root>/scripts/project-uninstall.mjs" resume --root "<repo>" --plan-sha256 "<planSha256>" --activate
+-   ```
+-
+-The controller accepts only `--root`, `--plan-sha256` and `--activate`; there
+-are no archive or retention flags. A refusal is a JSON document with the schema
+-`pipeline.project-uninstall-error.v1`, a `code`, and exit status 1. Common codes:
+-
+-- `PU-FOREIGN-HOOK-CONFLICT`: a `pre-commit`, `commit-msg` or `pre-push` hook is
+-  present that the Pipeline did not install. It is never touched; remove or
+-  relocate it, then plan again.
+-- `PU-SHARED-ACTIVE-WORKTREE`: another worktree of the same repository is still
+-  governed. Release or decline that worktree first.
+-- `PU-OWNERSHIP-CONFLICT`: a file the Pipeline owns was changed by someone
+-  else, so the plan carries conflicts and `apply` changes nothing.
+-- `PU-PLAN`: the digest or `--activate` flag does not match a current plan.
+-- `PU-CLI`: an unknown verb or flag, a missing `--root`, or a malformed digest.
+-
+-What `apply` does, in order:
+-
+-- removes the owned `pre-commit`, `commit-msg` and `pre-push` shims first, so no
+-  commit or push can reach a hook whose private state is being retired;
+-- strips only the Pipeline-owned keys from projection files such as
+-  `.claude/pipeline.json` and `.claude/pipeline.yaml`; unowned bytes stay
+-  exactly as they were;
+-- moves retained metadata, including the private hook state, under
+-  `<git-common-dir>/pipeline-uninstall/<scopeKey>/<planSha256>/retained/`
+-  instead of deleting it;
+-- removes the owned Antigravity entries from `.agents/plugins.json`,
+-  `.agents/hooks.json` and `.agents/external-hooks.json`;
+-- writes the durable declined scope marker, so the repository is reported as
+-  declined and not as an unevaluated candidate.
+-
+-What it keeps: `AGENTS.md`, `CLAUDE.md`, `architecture/`, `docs/`, `specs/`,
+-`backlog/`, the whole Git history, user-scope stores, and `pipeline.user.yaml`.
+-Ordinary `git commit` and `git push` keep working throughout.
+-
+-Re-onboarding later is an ordinary enrollment of the same repository; the
+-retained records stay intact. Removing the plugin from a runner globally
+-(Claude Code, Codex or Antigravity) is a separate step in that runner's own
+-plugin manager. This controller releases one repository only.
+-
+ ### Missing prerequisite guidance in a consumer project
+ 
+ The installed plugin's read-only toolchain preflight reports each configured
+@@ -436,40 +478,36 @@ tool, observed version, blocked claim and a copyable platform command. From
+ the governed project root, run:
+ 
+ ```sh
+-node "<absolute-plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
++node "<plugin-root>/scripts/toolchain-preflight.mjs" --root "$PWD"
+ ```
+ 
+-Replace `<absolute-plugin-root>` with the installed Pipeline plugin directory.
+-Review any offered installer command under your host/package-management
++`<plugin-root>` is the installed Pipeline plugin directory (see the
++[command convention](docs/README.md)). Review any offered installer command under your host/package-management
+ policy, then repeat the preflight. npm is never substituted for non-npm
+ scanners; bounded Semgrep settings avoid treating ordinary home-directory
+ writes as a missing installation.
+ 
+-## Where to go next
+-
+-- [README](README.md) — why the pipeline exists and its core capabilities.
+-- [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
+-- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
+-- [Operating Model](docs/operating-model.md) — normative roles, gates, and
+-  lifecycle rules.
+-- [Runtime boundary](docs/runtime-boundary.md) — exact controls, prerequisites,
+-  and manual responsibilities for each supported runner integration.
+-- [Documentation map](docs/README.md) — focused reference links.
+-
+-## Optional advanced setup
++### Optional advanced setup
+ 
+-These additions are not part of routine onboarding. Use them only when the
+-project’s declared operating model requires them.
++The slim private overlay and update channels below are not part of routine
++onboarding; use them only when the project's declared operating model requires
++them. The human-approval key is required or not depending on the approval mode.
+ 
+-### Human-approval key (one-time setup)
++#### Human-approval key (one-time setup)
+ 
+-Routine onboarding does not require a key: project and author details,
+-project/intake answers, and any required plan decision are sufficient. Routine
+-implementation, tests, and Critic review remain agent work after the approved
+-plan. Create the portable external Ed25519 key once only when a project
+-configures a real human decision gate that uses the signature path. The
+-[onboarding guide](docs/usage.md#start-or-adopt-a-project) distinguishes this
+-optional setup from ordinary onboarding:
++**When the key is required.** The human-approval key is needed whenever the
++project's approval mode is `signature`, which is the default (the
++[approval-strength selector](docs/usage.md#choose-the-human-approval-strength-deliberately)
++explains the choice). The Driver asks for the mode in its initial round
++(`signature` or `chat`); choosing `signature` makes it surface the separate
++trust-anchor step. Under `signature`, a human decision gate (for example PRD
++approval, which [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) makes mandatory for
++rigor 1 or 2 and for high risk, or a push) needs a detached proof, so create
++the key once before the first such gate. Under `chat` no key is needed, but
++the approval is only an unattested chat attribution. No other onboarding input
++(project and author details, project/intake answers, a plan decision) involves
++a key, and routine implementation, tests, and Critic review remain agent work
++after the approved plan. To create the portable external Ed25519 key:
+ 
+ Run the following commands from the governed project root, first defining
+ `REPO` as that exact root:
+@@ -479,7 +517,7 @@ REPO="$PWD"
+ ```
+ 
+ ```sh
+-node "<absolute-plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
++node "<plugin-root>/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+ ```
+ 
+ The directory stays outside the repository. OpenSSL asks for the passphrase
+@@ -487,7 +525,7 @@ locally; the agent never receives the key or passphrase. The agent prepares
+ and refreshes public candidate-bound requests. The regular human action is:
+ 
+ ```sh
+-node "<absolute-plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
++node "<plugin-root>/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+ ```
+ 
+ Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
+@@ -495,7 +533,7 @@ future adapter work, not current CLI features. A code pasted into the same agent
+ chat is visible to that agent and cannot replace final local proof for an
+ irreversible action. See [PO approval](docs/po-human-approval.md).
+ 
+-### Activate a slim private overlay
++#### Activate a slim private overlay
+ 
+ A slim private overlay contains project configuration and allowlisted inputs,
+ not a copied setup program or verification harness. Its project root must have:
+@@ -526,15 +564,33 @@ explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
+ handover, Verify, and feature-state checks remain separate and may still fail
+ closed even when the overlay bridge is activated.
+ 
+-## Troubleshooting: Codex local agent activity
++#### Update channels
++
++The Pipeline's update channels resolve separately from a runner's marketplace
++snapshot: `alpha` is the current `main` tip, `beta` is the highest
++`vX.Y.Z-beta.N` tag on `main`, and `stable` is the highest final `vX.Y.Z`
++release tag on `main`. Changing a channel selects a ref for freshness checks;
++it does not install a different plugin by itself. See also the update-boundary
++paragraph in [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md).
++
++### Troubleshooting
++
++#### Bootstrap reports `hook-refresh-required` (all runners)
++
++A mandatory git hook snapshot in the repository is stale. Run
++`node <plugin-root>/scripts/clone-hook-readiness.mjs --root <project-root> --apply`:
++it installs missing mandatory hooks and also refreshes stale ones. If a refresh
++fails, it reports `HOOK-READINESS-REFRESH-FAILED` and names the command to
++repair it, `refresh-mandatory-hooks.mjs --root <project-root>`.
++
++#### Codex: local agent activity
+ 
+ If Codex agent threads no longer appear after adoption, inspect its persistent
+ local app-server daemon before changing a plan or treating the incident as a
+-repository failure. Replace `<absolute-plugin-root>` with the installed
+-Pipeline plugin directory and run from the governed project root:
++repository failure. Run from the governed project root:
+ 
+ ```sh
+-node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs"
++node "<plugin-root>/scripts/codex-app-server-health.mjs"
+ ```
+ 
+ `CAS-READY` is a current daemon-version observation. It does not prove a model
+@@ -542,12 +598,28 @@ child launched or a host background wakeup. For another `CAS-*` result, the
+ bounded attended recovery is:
+ 
+ ```sh
+-node "<absolute-plugin-root>/scripts/codex-app-server-health.mjs" --recover
++node "<plugin-root>/scripts/codex-app-server-health.mjs" --recover
+ ```
+ 
+ It never loops or changes repository state. If it fails, run `codex doctor` in
+ an attended local Codex session and retain the result in the handover.
+ 
++### Where to go next
++
++- [README](README.md) — why the pipeline exists and its core capabilities.
++- [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
++- [Usage guide](docs/usage.md) — operator-facing commands and routine work.
++- [Operating Model](docs/operating-model.md) — normative roles, gates, and
++  lifecycle rules.
++- [Runtime boundary](docs/runtime-boundary.md) — exact controls, prerequisites,
++  and manual responsibilities for each supported runner integration.
++- [Documentation map](docs/README.md) — focused reference links.
++- [Cost and measurement](docs/cost-and-measurement.md) — there is no time,
++  token, or administration-cost estimate for your project yet; the historical
++  observations there are transparency material, not an adoption forecast.
++- [Uninstall reference](#appendix-uninstall-reference) — releasing a repository
++  from the Pipeline again (appendix at the end of this guide).
++
+ ## B. Maintain a shared pipeline source (occasional)
+ 
+ > Maintainer path, not consumer onboarding. A project using Agent-Pipeline
+@@ -563,10 +635,14 @@ to it rather than copy its rules into every repository.
+ 
+ ### Activate or upgrade the V3 authority
+ 
+-Run these commands **only in a pipeline source checkout that contains
+-`pipeline.user.yaml`**. They are for an existing V0/V1/V2 authority or a V3
+-projection that needs explicit reconciliation; they are not a setup command for
+-an arbitrary application repository.
++`runner-profile-migration-v3` is one CLI with two audiences. A consumer project
++whose Driver reports a legacy V0/V1/V2 authority runs it from the installed
++plugin, as in the [consumer procedure](docs/v3-consumer-onboarding.md#legacy-consumer-with-no-projections).
++The repository-relative commands below are the maintainer form: run them
++**only in a pipeline source checkout that contains `pipeline.user.yaml`**, for
++an existing V0/V1/V2 authority or a V3 projection that needs explicit
++reconciliation. They are not a setup command for an arbitrary application
++repository.
+ 
+ ```sh
+ node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+@@ -593,9 +669,12 @@ write.
+ 
+ ### Choose advisor export consent explicitly
+ 
+-Advisory is optional and off until a repository owner records consent. A
+-missing field or `consent: declined` creates no advisor export, child launch,
+-or receipt. To review that boundary, run:
++Whether the Advisor may receive repository data is decided by the recorded
++`advisor_export.consent` (`approved` or `declined`) in `pipeline.user.yaml`;
++the onboarding Driver asks for it explicitly, and `declined` creates no advisor
++export, child launch, or receipt. This guide does not state a default for a
++missing field: read the recorded value instead of assuming one. To review that
++boundary, run:
+ 
+ ```sh
+ node setup.mjs --configure-advisor-export
+@@ -615,143 +694,72 @@ hand. This is not a general revert: change completed authority in a reviewed
+ working copy, then run a new inspect → plan → explicit activation cycle and
+ read it back with `node setup.mjs`.
+ 
+-## Antigravity installation details for step 0
+-
+-Before `v0.7.0` is published, use the installation instructions at the
+-already-approved release tag in the
+-[official GitHub repository](https://github.com/agent-pipe-shared/agent-pipeline).
+-Do not use an unpublished `v0.7.0` tag or treat a local developer checkout as
+-a released plugin. The pinned example below applies only after that tag
+-actually exists; it is not a pre-release installation command.
+-
+-After the `v0.7.0` release tag is published on the official GitHub repository,
+-run these commands with your shell in the **consumer project root**. The tag
+-must be available on GitHub before this released-version example can be used.
+-The clone lives in a durable physical directory outside the governed project
+-and any temporary or runner cache directory. Choose a different durable
+-location if `$HOME/.local/share` is unsuitable:
+-
+-```sh
+-mkdir -p "$HOME/.local/share"
+-pipeline_release_tag="v0.7.0"
+-pipeline_source_url="https://github.com/agent-pipe-shared/agent-pipeline.git"
+-pipeline_release_dir="$HOME/.local/share/agent-pipeline-$pipeline_release_tag"
+-git clone --branch "$pipeline_release_tag" --depth 1 \
+-  "$pipeline_source_url" "$pipeline_release_dir"
+-git -C "$pipeline_release_dir" switch -c pipeline-release-v0.7.0
+-git -C "$pipeline_release_dir" remote get-url origin
+-git -C "$pipeline_release_dir" describe --tags --exact-match
+-```
+-
+-On Windows, use PowerShell from the consumer project root. The following
+-directory is durable and outside the project; choose another durable path if
+-`$env:LOCALAPPDATA` is unsuitable:
+-
+-```powershell
+-$pipelineReleaseTag = 'v0.7.0'
+-$pipelineSourceUrl = 'https://github.com/agent-pipe-shared/agent-pipeline.git'
+-$pipelineReleaseDir = Join-Path $env:LOCALAPPDATA "AgentPipeline\agent-pipeline-$pipelineReleaseTag"
+-New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pipelineReleaseDir) | Out-Null
+-git clone --branch $pipelineReleaseTag --depth 1 $pipelineSourceUrl $pipelineReleaseDir
+-git -C $pipelineReleaseDir switch -c pipeline-release-v0.7.0
+-git -C $pipelineReleaseDir remote get-url origin
+-git -C $pipelineReleaseDir describe --tags --exact-match
+-```
+-
+-Confirm the two Git readbacks show the official URL above and `v0.7.0` before
+-running the installer from the same consumer project root. The local branch is
+-required because cloning a tag otherwise leaves a detached HEAD, which the
+-plugin's clean-source observer refuses; creating the branch does not move the
+-checked-out release commit. The installer validates physical plugin files and
+-the registry binding; it does not independently authenticate the GitHub source
+-or a release signature. Treat those readbacks and your approved release channel
+-as operator checks, not as proof supplied by the installer.
++## Appendix: uninstall reference
+ 
+-```sh
+-node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs"
+-```
++### Uninstalling from a repository
+ 
+-On Windows, run the same installer from the consumer project root with:
++A repository that once opted in can be released again. The plugin ships a
++journaled, resumable uninstall controller that removes the Pipeline's own
++mechanics and keeps everything you wrote. `<plugin-root>` is the installed
++Pipeline plugin directory and `<project-root>` the repository root.
+ 
+-```powershell
+-node (Join-Path $pipelineReleaseDir 'plugins/pipeline-core/install-agy.mjs')
+-```
++1. **Plan** (read-only; changes no byte). It prints one JSON document that
++   includes `planSha256` and the list of `conflicts`:
+ 
+-At the first prompt choose **Approved Plugin Directory** (the default). Choose
+-**Local Marketplace** only for an explicitly validated pre-release developer
+-copy; if that development copy is unavailable, the installer refuses the
+-selection instead of silently switching sources. Then choose
+-**Workspace-Local** when the installer asks where to bind
+-the plugin. The installer registers that exact physical plugin directory in
+-the consumer project's `.agents/plugins.json`; keep the clone at the same path
+-while it is registered. Do not hand-edit Agy registry or plugin files. The
+-installer may offer a runner-local autonomous tool policy, but that option
+-grants no plan, release, remote, or human authority.
+-If its existing runner settings are malformed or linked through an alias, the
+-optional policy update fails without replacing those bytes. Plugin registration
+-may already have succeeded; inspect `.agents/plugins.json` and repair the
+-settings deliberately before retrying that optional step.
++   ```sh
++   node "<plugin-root>/scripts/project-uninstall.mjs" plan --root "<project-root>"
++   ```
+ 
+-To upgrade after a newer final release tag is published, clone that tag into
+-a **different** durable directory and run its `install-agy.mjs` from each
+-consumer project root. Choose Approved Plugin Directory and Workspace-Local
+-again. Read back each project's `.agents/plugins.json`: it must contain the
+-new exact plugin path and no previous Pipeline registration, while unrelated
+-entries remain. Keep the old checkout until that readback succeeds, then
+-retire it and fully restart Agy. A developer checkout is only for an explicit
+-pre-release test.
++   Resolve every entry in `conflicts` before you continue. A plan with
++   conflicts is refused by `apply` and nothing is changed.
+ 
+-If the old checkout was already deleted while its registry entry remains,
+-restore that exact approved plugin directory first and rerun the installer.
+-The installer refuses an unverifiable, Pipeline-shaped stale path instead of
+-deleting an entry it cannot prove it owns; do not work around this by editing
+-the registry by hand.
++2. **Apply** the exact plan you reviewed by passing its digest back:
+ 
+-**Agy's managed plugin directory and import manifest.** Besides the path
+-registries (`.agents/plugins.json` and the global `plugins.json`), Agy keeps a
+-managed copy of an imported plugin in its own config directory
+-(`plugins/agent-pipeline-core`) and lists it in `import_manifest.json`. That
+-managed copy can be stale while the registered path is current, and a stale
+-same-version copy can shadow the registered plugin. Keep a **single source**:
+-one approved plugin directory per scope, and no hand-edited copy beside it. The
+-developer refresh command is:
++   ```sh
++   node "<plugin-root>/scripts/project-uninstall.mjs" apply --root "<project-root>" --plan-sha256 "<planSha256>" --activate
++   ```
+ 
+-```sh
+-node "$pipeline_release_dir/plugins/pipeline-core/install-agy.mjs" --refresh
+-```
++3. **Resume** after an interruption with the same flags. Each stage is journaled,
++   so the run continues from the last completed stage to the same end state:
+ 
+-It prints the exact plan (sync of the local marketplace copy, the Agy
+-lifecycle steps, a readback) before it changes anything and asks for
+-confirmation. `--yes` skips only that question and is accepted only together
+-with `--refresh`; on its own it is refused with a repair. After the refresh,
+-**fully restart Agy and read the session lock** (the first
+-`/pipeline-core:pipeline-start` of the new session reports it). `agy plugin
+-list` and `plugins.json` are not proof of what is loaded, and neither is the
+-installer's readback, which is a physical diagnostic only.
++   ```sh
++   node "<plugin-root>/scripts/project-uninstall.mjs" resume --root "<project-root>" --plan-sha256 "<planSha256>" --activate
++   ```
+ 
+-**Inert outside opted-in repositories.** A global install acts only in
+-repositories that opted in. Outside them the hooks are inert: no blocking, no
+-injected instructions, no writes. The one exception is the destructive-git
+-protection, which stays active everywhere.
++The controller accepts only `--root`, `--plan-sha256` and `--activate`; there
++are no archive or retention flags. A refusal is a JSON document with the schema
++`pipeline.project-uninstall-error.v1`, a `code`, and exit status 1. Common codes:
+ 
+-If launching Agy from this same terminal, check Node.js immediately before
+-launching it. On macOS/Linux use:
++- `PU-FOREIGN-HOOK-CONFLICT`: a `pre-commit`, `commit-msg` or `pre-push` hook is
++  present that the Pipeline did not install. It is never touched; remove or
++  relocate it, then plan again.
++- `PU-SHARED-ACTIVE-WORKTREE`: another worktree of the same repository is still
++  governed. Release or decline that worktree first.
++- `PU-OWNERSHIP-CONFLICT`: a file the Pipeline owns was changed by someone
++  else, so the plan carries conflicts and `apply` changes nothing.
++- `PU-PLAN`: the digest or `--activate` flag does not match a current plan.
++- `PU-CLI`: an unknown verb or flag, a missing `--root`, or a malformed digest.
+ 
+-```sh
+-command -v node
+-```
++What `apply` does, in order:
+ 
+-On Windows, use PowerShell or Command Prompt:
++- removes the owned `pre-commit`, `commit-msg` and `pre-push` shims first, so no
++  commit or push can reach a hook whose private state is being retired;
++- strips only the Pipeline-owned keys from projection files such as
++  `.claude/pipeline.json` and `.claude/pipeline.yaml`; unowned bytes stay
++  exactly as they were;
++- moves retained metadata, including the private hook state, under
++  `<git-common-dir>/pipeline-uninstall/<scopeKey>/<planSha256>/retained/`
++  instead of deleting it;
++- removes the owned Antigravity entries from `.agents/plugins.json`,
++  `.agents/hooks.json` and `.agents/external-hooks.json`;
++- writes the durable declined scope marker, so the repository is reported as
++  declined and not as an unevaluated candidate.
+ 
+-```powershell
+-where.exe node
+-```
++What it keeps: `AGENTS.md`, `CLAUDE.md`, `architecture/`, `docs/`, `specs/`,
++`backlog/`, the whole Git history, user-scope stores, and `pipeline.user.yaml`.
++Ordinary `git commit` and `git push` keep working throughout.
+ 
+-For a desktop or service launch, either shell result does **not** prove the Agy
+-host's PATH. Inspect that launcher/service environment and confirm that Agy's
+-own command tool can resolve and run `node --version` in a new session. If
+-that readback is unavailable or denied, treat hook readiness as unknown;
+-correct the host environment and fully restart Agy before relying on hooks.
+-Then open a new workspace session in the project root and invoke
+-`/pipeline-core:pipeline-start` as the first Pipeline action. Do not use an
+-unattended permission-bypass mode as an installation or recovery shortcut.
++Re-onboarding later is an ordinary enrollment of the same repository; the
++retained records stay intact. Removing the plugin from a runner globally
++(Claude Code, Codex or Antigravity) is a separate step in that runner's own
++plugin manager. This controller releases one repository only.
+diff --git a/docs/v3-consumer-onboarding.md b/docs/v3-consumer-onboarding.md
+index 8325f3262..d61bd6df6 100644
+--- a/docs/v3-consumer-onboarding.md
++++ b/docs/v3-consumer-onboarding.md
+@@ -11,69 +11,23 @@ projection plan.
+ 
+ - Resolve `<plugin-root>` to the installed directory of the approved
+   GitHub-distributed Public Core; do not use a maintainer checkout.
+-- Supply one real consumer project root. Legacy migration additionally requires
+-  its existing `pipeline.user.yaml`.
++- Supply one real consumer project root, written `<project-root>` below.
++  Legacy migration additionally requires its existing `pipeline.user.yaml`.
+ - For legacy migration, keep the project writable only for the final, explicit
+   activation. `inspect` and `plan` are read-only.
+-- Critic export is always limited to the configured allowlist: the bounded
+-  candidate packet, listed providers, and listed assurance classes. The fresh
+-  default records repository-scoped Advisor-export consent as `approved`, so a
+-  matching consultation does not ask again for every export. A different data
+-  class, provider, or packet boundary is not covered and remains blocked until
+-  it is explicitly configured. Do not perform a consultation merely to
+-  activate or bootstrap; Advisor capability preflight is model-free and
+-  consultation is on demand. A migration preview is not an approval, push, or
+-  release authorization.
+ 
+ ## After installation consent, bind the runner integration
+ 
+ In an ungoverned folder, ask for and receive explicit installation consent
+-before installing, invoking `pipeline-start`, or writing project files. For an
+-already-governed project, continue with its configured update path. Bind the
+-approved GitHub-distributed plugin for the runner that will govern the
+-consumer project. The commands differ by runner; run them from the project
+-root, then follow that runner's restart or reload requirement below and start
+-a new session in that root.
+-After consent, invoke `/pipeline-core:pipeline-start` as the first Pipeline action. Its
+-preflight supplies the exact onboarding action for the observed project state.
+-
+-### Claude Code
+-
+-Add the official GitHub marketplace and install the plugin at project scope:
+-
+-```sh
+-claude plugin marketplace add agent-pipe-shared/agent-pipeline --scope project
+-claude plugin install pipeline-core@agent-pipeline --scope project
+-```
+-
+-Confirm the binding with `claude plugin list --json`. The first binding needs
+-a full Claude Code restart before `/pipeline-core:pipeline-start`; a plugin
+-reload within the old process is not that first restart. The project scope
+-keeps the binding with the governed project.
+-
+-### Codex
+-
+-Use Codex's own Git marketplace and plugin commands:
+-
+-```sh
+-codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref main
+-codex plugin marketplace upgrade agent-pipeline
+-codex plugin add pipeline-core@agent-pipeline
+-codex plugin list --marketplace agent-pipeline --json
+-```
+-
+-The final command must show exactly one installed and enabled
+-`pipeline-core@agent-pipeline`. Fully end the Codex host process, start a new
+-thread in the project root, and invoke `/pipeline-core:pipeline-start`.
+-Codex's binding does not use Claude's `--scope project` commands.
+-
+-### Antigravity (Agy)
+-
+-Use the one maintained [Agy workspace-local installation and upgrade
+-procedure](../SETUP.md#antigravity-agy-workspace-local-binding). It covers
+-the approved GitHub distribution, exact path readback, restart, and stale
+-registration recovery. Do not repeat the Codex lifecycle V4 steps below for
+-Antigravity; follow the installed Agy Driver's returned classification action.
++before installing, invoking `pipeline-start`, or writing project files. The
++install, update, and restart commands for Claude Code, Codex, and Antigravity
++(Agy) are maintained in one place,
++[SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host);
++this guide does not repeat them. After binding and the restart, invoke
++`/pipeline-core:pipeline-start` as the first Pipeline action: its preflight
++supplies the exact onboarding action for the observed project state. Do not
++repeat the Codex lifecycle V4 steps below for Antigravity; follow the installed
++Agy Driver's returned classification action.
+ 
+ ## Fresh Codex lifecycle V4
+ 
+@@ -100,8 +54,8 @@ cache version heuristically.
+ 
+ | Runner | Linux and macOS | Windows | Update/readback requirement |
+ | --- | --- | --- | --- |
+-| Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | After installing or updating, fully end the Codex host process, then start a new thread in the project root and inspect `/hooks`. A fresh thread or reload inside the old process does not prove its cached skill snapshot changed; accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
+-| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Run `claude plugin marketplace update agent-pipeline`, then `claude plugin update pipeline-core@agent-pipeline --scope project`, then `/reload-plugins`. Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
++| Codex CLI | The plugin hook uses `node` and `${PLUGIN_ROOT}`. | The manifest's `commandWindows` uses the same Node entry point and resolved plugin root; no POSIX-only shell syntax is required. | Install, update, and restart as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only when the `pipeline-start` identity line names the expected version and an existing root. |
++| Claude Code | The plugin hook uses `node` and `${CLAUDE_PLUGIN_ROOT}`. | Claude resolves the quoted plugin-root command on Windows; lifecycle commands remain Node argv rather than shell-specific scripts. | Update as in [SETUP step 0](../SETUP.md#0-bind-the-supported-runner-integration-and-fully-restart-its-host). Accept the update only after a new `pipeline-start` identity line names the expected version and root. |
+ 
+ The lifecycle planner returns an executable plus an argv array. Agents must
+ render that exact action for the current shell when an operator has to execute
+@@ -110,7 +64,7 @@ Windows. The digest and individual argv elements must not be reconstructed,
+ split, or translated.
+ 
+ ```sh
+-node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root /absolute/consumer/root --intent onboarding
++node <plugin-root>/scripts/project-onboarding-v3.mjs inspect --root <project-root> --intent onboarding
+ ```
+ 
+ The normal progress sequence is ordered and fail-closed:
+@@ -132,7 +86,7 @@ over existing project files.
+ | `intake-required` | Follow the returned consent/capture action to record the project brief and required local identity fields. | The private intake checkpoint contains consent and the captured material input; it is not yet a generated specification. |
+ | `intake-design-questions-required` | Answer the one bundled question round, correct wrong answers before generation when needed, then run the returned read-only generation plan and its digest-bound apply. | The complete input is durable and staging generation is bound to its digest. |
+ | `bootstrap-binding-required` | Review the generated PRD/Spec, add the requested acknowledgement, then run the returned bind plan/apply. | The generated package becomes the initial project authority only after its own validation and binding readback. |
+-| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan. | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
++| `kickoff-required` | Continue a repository already recognized as using the earlier kickoff sequence; collect and validate the project goal, then produce the read-only sanctioned kickoff plan (see the [kickoff apply contract](#kickoff-apply-contract), at the end of this guide). | The compatibility plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+ | `host-repository-init-required` | For a Codex host-managed root with valid continuity, follow the exact host-repository-init plan and confirmed action described below. It can follow either the fresh binding path or the earlier kickoff route; it is not a second kickoff. | The host initializes local Git without a commit. A fresh readback is still required, and dispatch remains blocked until the first commit. |
+ | `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
+ | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
+@@ -141,11 +95,11 @@ For the first two write stages, execute the complete `argv` returned by the
+ plan rather than reconstructing flags:
+ 
+ ```sh
+-node <plugin-root>/scripts/project-onboarding-v3.mjs plan --root /absolute/consumer/root
+-node <plugin-root>/scripts/project-onboarding-v3.mjs apply-portable-seed --root /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
++node <plugin-root>/scripts/project-onboarding-v3.mjs plan --root <project-root>
++node <plugin-root>/scripts/project-onboarding-v3.mjs apply-portable-seed --root <project-root> --plan-sha256 <digest-from-plan> --activate
+ 
+-node <plugin-root>/scripts/project-onboarding-v3.mjs plan-runtime --root /absolute/consumer/root
+-node <plugin-root>/scripts/project-onboarding-v3.mjs initialize-runtime --root /absolute/consumer/root --plan-sha256 <digest-from-plan-runtime> --activate
++node <plugin-root>/scripts/project-onboarding-v3.mjs plan-runtime --root <project-root>
++node <plugin-root>/scripts/project-onboarding-v3.mjs initialize-runtime --root <project-root> --plan-sha256 <digest-from-plan-runtime> --activate
+ ```
+ 
+ Every plan is read-only. Every apply requires explicit activation, authenticates
+@@ -160,7 +114,7 @@ without deleting or hand-editing the checkpoint. Re-submit the complete answer
+ array through the separately named command:
+ 
+ ```sh
+-node <plugin-root>/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root /absolute/consumer/root --answers-json '<complete JSON array>' --activate
++node <plugin-root>/scripts/project-onboarding-v3.mjs intake-design-questions-replace --root <project-root> --answers-json '<complete JSON array>' --activate
+ ```
+ 
+ The ordinary `intake-design-questions-apply` remains idempotent and refuses
+@@ -168,28 +122,6 @@ changed content. Replacement increments the checkpoint revision and is refused
+ after staging has been generated or bound; later corrections use the normal
+ specification-amendment path.
+ 
+-### Kickoff apply contract
+-
+-Supply the validated goal to `kickoff plan` as one argv element. The command
+-trims and validates 1–8192 bytes of NUL-free UTF-8 text and remains read-only:
+-
+-```sh
+-node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff plan --root /absolute/consumer/root --goal '<project goal>'
+-```
+-
+-The returned plan contains the exact digest-bound apply `argv`:
+-
+-```sh
+-node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff apply --root /absolute/consumer/root --goal '<same validated project goal>' --plan-sha256 <digest-from-kickoff-plan> --activate
+-```
+-
+-Execute the returned argument array without splitting or reinterpreting the
+-goal. Apply validates the goal again, deterministically reconstructs the same
+-closed plan, verifies the supplied plan SHA-256, and binds both goal and plan
+-before writing. It never recovers a goal from a digest and uses no cache,
+-environment variable, or file payload fallback. A matching completed replay is
+-byte-null; a changed goal, digest, calibration, preimage, or target fails closed.
+-
+ ### Host-managed Codex handoff
+ 
+ Codex may present host-owned `.git` and `.codex` controls that the project
+@@ -223,42 +155,25 @@ publish, merge, close an Issue, or create a release. Those actions remain
+ separate, explicitly accepted gates after same-candidate verification and the
+ operator's live onboarding acceptance.
+ 
+-## Claude Code permission readback reference
+-
+-Claude Code's own command permission layer is separate from Pipeline guards.
+-Fresh runtime initialization writes `.claude/settings.json` with the exact
+-`Bash(node "<plugin-scripts>/*")` and
+-`PowerShell(node "<plugin-scripts>/*")` entries needed for Pipeline commands.
+-For a path whose forward-slash and backslash forms differ, both spellings are
+-included. This runner setting allows the command to reach the Pipeline; it does
+-not weaken or bypass any lifecycle, Git, push, plan, or path guard.
+-
+-Every V4 lifecycle result exposes the readback as `runnerPermissions`:
+-
+-- `target` names `.claude/settings.json`.
+-- `status` is `pending-runtime-initialization`, `current`, `drifted`,
+-  `unavailable`, `not-observed`, or `not-applicable`.
+-- `lanes` lists the covered command lanes (`Bash` and `PowerShell`).
+-- `exactEntries` lists the entries onboarding requires and has verified when
+-  the status is `current`.
+-
+-A fresh Claude project needs no separate manual permission edit: continue the
+-returned runtime-initialization action and require the later readback to report
+-`current`. If an otherwise-ready existing consumer has only part of the exact
+-set, inspection reports `projection-drift` and returns a digest-bound merge
+-action. That action preserves unrelated settings and existing allow entries;
+-run the returned command unchanged and require the next inspection to read back
+-`current`. A host-managed Codex project does not use this project-owned Claude
+-permission layer, so its result explicitly reports `not-applicable` with empty
+-lanes and entries.
++Advisor and Critic export consent is not an onboarding precondition; see
++[private review export](usage.md#private-review-export). Whether the Advisor may
++receive repository data depends on the recorded `advisor_export.consent`
++(`approved` or `declined`), which the onboarding Driver asks for explicitly;
++this guide does not state a default for a missing field. Do not run a
++consultation merely to activate or bootstrap.
+ 
+ ## Legacy consumer with no projections
+ 
++This is the consumer procedure for a legacy root, run from the installed
++plugin. The same CLI run inside a pipeline source checkout is the maintainer
++form described in
++[SETUP section B](../SETUP.md#activate-or-upgrade-the-v3-authority).
++
+ First inspect and preview the exact migration:
+ 
+ ```sh
+-node <plugin-root>/scripts/runner-profile-migration-v3.mjs inspect --root /absolute/consumer/root
+-node <plugin-root>/scripts/runner-profile-migration-v3.mjs plan --root /absolute/consumer/root
++node <plugin-root>/scripts/runner-profile-migration-v3.mjs inspect --root <project-root>
++node <plugin-root>/scripts/runner-profile-migration-v3.mjs plan --root <project-root>
+ ```
+ 
+ For an accepted V0/V1/V2 source, the plan deterministically lists the
+@@ -269,7 +184,7 @@ interrupted operation cannot present a converted source with old projections.
+ Only after reviewing the emitted target list and hashes, activate it:
+ 
+ ```sh
+-node <plugin-root>/scripts/runner-profile-migration-v3.mjs apply --root /absolute/consumer/root --activate
++node <plugin-root>/scripts/runner-profile-migration-v3.mjs apply --root <project-root> --activate
+ ```
+ 
+ Before the first write the command emits a sanitized pre-write preview to
+@@ -286,3 +201,56 @@ Use only the named, preview-first recovery action. The separate
+ [onboarding recovery reference](onboarding-recovery.md) covers Slim Overlay
+ authority updates, neutral authority migration, and externally archived
+ worktree recovery; these are not routine steps after `ready`.
++
++### Kickoff apply contract
++
++This belongs to the earlier compatibility route (the `kickoff-required` row
++above), not to the V4 path. Supply the validated goal to `kickoff plan` as one
++argv element. The command trims and validates 1–8192 bytes of NUL-free UTF-8
++text and remains read-only:
++
++```sh
++node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff plan --root <project-root> --goal '<project goal>'
++```
++
++The returned plan contains the exact digest-bound apply `argv`:
++
++```sh
++node <plugin-root>/scripts/project-onboarding-v3.mjs kickoff apply --root <project-root> --goal '<same validated project goal>' --plan-sha256 <digest-from-kickoff-plan> --activate
++```
++
++Execute the returned argument array without splitting or reinterpreting the
++goal. Apply validates the goal again, deterministically reconstructs the same
++closed plan, verifies the supplied plan SHA-256, and binds both goal and plan
++before writing. It never recovers a goal from a digest and uses no cache,
++environment variable, or file payload fallback. A matching completed replay is
++byte-null; a changed goal, digest, calibration, preimage, or target fails closed.
++
++## Claude Code permission readback reference
++
++Claude Code's own command permission layer is separate from Pipeline guards.
++Fresh runtime initialization writes `.claude/settings.json` with the exact
++`Bash(node "<plugin-scripts>/*")` and
++`PowerShell(node "<plugin-scripts>/*")` entries needed for Pipeline commands.
++For a path whose forward-slash and backslash forms differ, both spellings are
++included. This runner setting allows the command to reach the Pipeline; it does
++not weaken or bypass any lifecycle, Git, push, plan, or path guard.
++
++Every V4 lifecycle result exposes the readback as `runnerPermissions`:
++
++- `target` names `.claude/settings.json`.
++- `status` is `pending-runtime-initialization`, `current`, `drifted`,
++  `unavailable`, `not-observed`, or `not-applicable`.
++- `lanes` lists the covered command lanes (`Bash` and `PowerShell`).
++- `exactEntries` lists the entries onboarding requires and has verified when
++  the status is `current`.
++
++A fresh Claude project needs no separate manual permission edit: continue the
++returned runtime-initialization action and require the later readback to report
++`current`. If an otherwise-ready existing consumer has only part of the exact
++set, inspection reports `projection-drift` and returns a digest-bound merge
++action. That action preserves unrelated settings and existing allow entries;
++run the returned command unchanged and require the next inspection to read back
++`current`. A host-managed Codex project does not use this project-owned Claude
++permission layer, so its result explicitly reports `not-applicable` with empty
++lanes and entries.

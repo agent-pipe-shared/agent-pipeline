@@ -1,0 +1,24 @@
+# G13 PO decision — 2026-09-29
+
+The PO was asked whether to include scanner diagnostic provenance in the next
+local 0.7 candidate under the proposed architecture and its completion
+conditions, or defer it. The PO replied verbatim:
+
+> G13 aufnehmen gemäß Vorschlag
+
+This is a genuine chat authorization for the additional G13 implementation
+scope and proposed architecture. It is not a cryptographic signature,
+protected-write capability, new lifecycle plan approval, effective module
+mapping, trunk ADR allocation, implementation qualification or release approval.
+
+The exact reviewed package is
+`scratch/0.7-scanner-diagnostics-scope-proposal-20260929/architecture-decision-proposal/manifest.json`,
+SHA `4e31e11bcd6e683b82dd86165440d122062e90d0686fd63739e9612667edd06e`.
+The earlier inert patch is not approved as conformant implementation. The
+package's bounded closed schema, privacy, verdict independence and safe
+publication requirements remain completion conditions. Preserve the approved
+original feature package and its five normative files.
+
+Formal architecture record continuity follows the existing rules, including
+ADR-0069's ordinal allocation at trunk acceptance. This note records the PO's
+actual decision and grants no agent self-approval or key access.

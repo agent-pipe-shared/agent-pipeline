@@ -1,0 +1,24 @@
+command: node scratch/agent-out/g20-qualification/run-close-pin.mjs --lifecycle
+label: g20-lifecycle
+exitCode: 0
+head: 1d721e5d9e534618c123481fb5eaa6561fcb310c
+tree: 10978bb1bd41e57abf0af8e4d4fab1a8c51f281f
+dirty: false
+--- stdout ---
+✔ records a consumed passing Critic receipt and rebinds exact Verify bytes (9.333522ms)
+✔ refuses failed, stale, or forged Critic/Verify bindings (6.085522ms)
+✔ readback refuses missing consumed review and forged private lifecycle fields (6.992855ms)
+✔ refuses a valid-looking receipt whose packet digest or diff is not the consumed packet (2.059092ms)
+✔ final readiness requires the exact clean producer evidence and its consumed Critic binding (6.334484ms)
+✔ the installed read-only checker refuses a green diagnostic receipt without private Critic binding (119.901343ms)
+✔ a consumed Critic carries only across exact immutable evidence registration, never mixed source changes (784.075553ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1607.939457
+
+--- stderr ---

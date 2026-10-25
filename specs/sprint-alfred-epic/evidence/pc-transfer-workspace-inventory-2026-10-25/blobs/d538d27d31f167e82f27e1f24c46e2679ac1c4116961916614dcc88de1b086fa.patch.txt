@@ -1,0 +1,68 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 49e7c01bc..691125853 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -622,9 +622,9 @@ session model); the module imports only kernel paths and is itself one.
+ `lib/guard/evaluate.mjs` imports it (it re-asks the closed shell grammar and names the one flag
+ whose removal makes a refused read admitted, so it shapes the text of a guard refusal); it
+ imports only modules that are already kernel paths. `plugins/pipeline-core/lib/plan-handoff-readiness.mjs`
+-(decides whether a plan's delivery hand-off is ready) would join it if `scripts/pipeline-state.mjs`
+-were to call it at `submit-plan` and `present-plan`; that wiring is deferred, so the module is
+-not a kernel path today.
++(decides whether a plan's delivery hand-off is ready, and words the refusal) is a kernel path
++because `scripts/pipeline-state.mjs` calls it at `submit-plan` and `present-plan` (PO decision
++D85, pulled into 0.7.0 on 2026-10-22); it imports only modules that are already kernel paths.
+ 
+ Closure repair GMWKC01/GMWKC03 (2026-10-21) adds eight first-party modules that kernel
+ files import and that were never listed; each executes with kernel authority:
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index a74f19083..ec6974c9b 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -836,7 +836,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/fanout-ledger.mjs",
+   // ALF-K39 (GMWKC01): guard-dispatch.mjs spawns the liveness script, which imports the readback module.
+   "plugins/pipeline-core/lib/dispatch-record-liveness.mjs", "plugins/pipeline-core/scripts/dispatch-record-liveness.mjs",
+-  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs",
++  "plugins/pipeline-core/lib/plan-approval-device-rebind.mjs", "plugins/pipeline-core/lib/project-onboarding-v3-author-identity.mjs", "plugins/pipeline-core/lib/plan-handoff-readiness.mjs",
+ ]);
+ 
+ // The "plugins/pipeline-core/..." entries above are written against whatever
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 25f0376e0..ff5818f8c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -432,6 +432,7 @@ import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+ import {parse} from 'node:path';
+ import {resolveOnboardingIntakeScope} from '../lib/codex-onboarding-runtime.mjs';
+ import {withGovernanceRetirementScopeLock} from '../lib/governance-scope.mjs';
++import { inspectPlanDeliveryHandoff, planHandoffRefusal } from "../lib/plan-handoff-readiness.mjs";
+ import { projectContinuityAuthorityDrift } from '../lib/continuity-authority-drift.mjs';
+ import {resolveIntakeCheckpointPaths,observeEnrollmentRetirementIntake,retireEnrollmentIntake,withEnrollmentRetirementIntakeLock} from '../lib/onboarding-continuity.mjs';
+ import {observeEnrollmentRetirementConsent,retireEnrollmentConsent} from '../lib/onboarding-consent-marker.mjs';
+@@ -10763,6 +10764,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           return 2;
+         }
+       }
++      const submitHandoff = planHandoffRefusal("submit-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 })); if (submitHandoff) { console.error(submitHandoff); return 2; } // AC-264/D30/D85: refused before any write
+       const profileSha256 = sha256CanonicalJson(profile.value);
+       const expectedPlanSha256 = authority.value.planSha256;
+       const expectedSpecSha256 = authority.value.specSha256;
+@@ -10975,15 +10977,13 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+       let approvalRequestPath = null, approvalReview = null;
+       if (requiresWorkflowPackage) {
+-        // D64: every acceptance-criterion row the Spec states must be one the registration/dispatch parser locates; an unsupported
+-        // shape or id is refused HERE, before the PO is asked to sign, not first at dispatch preparation. Scoped to Specs that carry
+-        // such rows (a Spec with none is the deferred delivery hand-off concern, D85) and fail-open on an unreadable Spec, which the
+-        // input check below refuses with its own typed code.
++        // D64: every criterion row the Spec states must be one the dispatch parser locates, refused HERE before the PO signs (a Spec with none, or an unready hand-off, is the AC-264 check below); fail-open on an unreadable Spec (typed below).
+         const specFile = physicalRebindFile(dir, submitted.specPath);
+         let specText = null;
+         try { specText = specFile ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(specFile.bytes) : null; } catch { specText = null; }
+         const criteria = specText === null ? { ok: true } : inspectSpecCriterionRows(specText);
+         if (!criteria.ok) { console.error(`Error: present-plan refused (${criteria.code}); ${criteria.message}`); return 2; }
++        const presentHandoff = planHandoffRefusal("present-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: submitted.specPath, expectedSpecSha256: submitted.specSha256 })); if (presentHandoff) { console.error(presentHandoff); return 2; }
+         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
+         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
+         const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});

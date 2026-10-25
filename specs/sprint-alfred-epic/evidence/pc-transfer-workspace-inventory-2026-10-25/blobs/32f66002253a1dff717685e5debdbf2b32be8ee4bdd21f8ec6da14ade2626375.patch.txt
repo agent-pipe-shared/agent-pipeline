@@ -1,0 +1,106 @@
+diff --git a/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs b/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs
+index b0ddaa48b..8af373773 100644
+--- a/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs
++++ b/plugins/pipeline-core/lib/architecture-design-test-fixture.mjs
+@@ -86,6 +86,27 @@ function addEphemeralSignatureAnchor(root, decisionRef) {
+   return { keyReference, publicKeyPem, privateKey };
+ }
+ 
++/**
++ * AC-264 / D85: a governed project's submit-plan also checks the delivery hand-off, which needs a Spec with one normative acceptance-criterion
++ * row the host parser admits. This does what a real agent does when it authors the generated Spec: it replaces the skeleton's placeholder
++ * criterion (a leading-zero id the parser cannot locate) with a supported one, or appends a criterion table to a hand-written Spec, and moves
++ * the PRD's `technical-spec-sha256` binding to the authored bytes. Idempotent: a Spec that already carries the authored row is left as is.
++ */
++function authorAdmittedSpecCriterion(root, planPath) {
++  const specFile = resolve(root, dirname(planPath), "spec.md");
++  const prdFile = resolve(root, planPath);
++  const spec = readFileSync(specFile, "utf8");
++  const skeleton = "- AC-01: WHEN <trigger>, the system SHALL <observable result>.";
++  const authored = "WHEN the PO reviews the fixture, the system SHALL show it.";
++  if (spec.includes(authored)) return;
++  const next = spec.includes(skeleton)
++    ? spec.replace(skeleton, `- **AC-1:** ${authored}`)
++    : `${spec.trimEnd()}\n\n## Acceptance criteria\n\n| # | Criterion |\n| --- | --- |\n| 1 | ${authored} |\n`;
++  writeFileSync(specFile, next, "utf8");
++  const prd = readFileSync(prdFile, "utf8");
++  writeFileSync(prdFile, prd.replace(/(technical-spec-sha256\s*:\s*)[a-f0-9]{64}/iu, `$1${createHash("sha256").update(next).digest("hex")}`), "utf8");
++}
++
+ /**
+  * Materialize a deliberately small but real design package.  It has a
+  * physical map, valid fitness/baseline data, a declared JS implementation
+@@ -99,6 +120,7 @@ export function materializeArchitectureDesignFixture({
+   decisionScope = null,
+   decisionRef = "TEST-ARCHITECTURE-DESIGN",
+   by = "Test PO",
++  admitSpecCriterion = false,
+ } = {}) {
+   const root = resolve(rootDir);
+   if (typeof planPath !== "string" || planPath === "" || planPath.startsWith("/") || planPath.includes("\\") || planPath.split("/").some((part) => part === "" || part === "." || part === "..")) {
+@@ -110,6 +132,7 @@ export function materializeArchitectureDesignFixture({
+   const moduleId = "application";
+   const plan = resolve(root, planPath);
+   if (!existsSync(plan)) throw new Error(`plan fixture is missing: ${planPath}`);
++  if (admitSpecCriterion) authorAdmittedSpecCriterion(root, planPath);
+   const currentPlan = readFileSync(plan, "utf8");
+   if (!currentPlan.includes(sourcePath)) writeFileSync(plan, `${currentPlan.trimEnd()}\n\nImplementation surface: \`${sourcePath}\`.\n`, "utf8");
+   // Existing project source is committed before the Pipeline's hooks apply; a
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 53b6750ec..71c784666 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -4796,7 +4796,7 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
+     assert.equal(authority.ok, true, JSON.stringify(authority));
+     const kickoffPlanPath = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath;
+     acknowledgePoGatePlan(path, kickoffPlanPath);
+-    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-AUTHORITY" });
++    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-AUTHORITY", admitSpecCriterion: true });
+     const stderr = [];
+     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+       dir: path,
+@@ -4845,7 +4845,7 @@ test("kickoff choosing a language different from the portable-seed default reach
+     assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
+     const kickoffPlanPath = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath;
+     acknowledgePoGatePlan(path, kickoffPlanPath);
+-    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-LANGUAGE" });
++    materializeArchitectureDesignFixture({ rootDir: path, planPath: kickoffPlanPath, decisionRef: "TEST-KICKOFF-LANGUAGE", admitSpecCriterion: true });
+     const stderr = [];
+     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+       dir: path,
+@@ -4900,7 +4900,7 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
+       rootDir: path, profile: "feature", featureId: "promo-lang-work", planPath: prdPath,
+       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
+     };
+-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN" });
++    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROMO-LANG-DESIGN", admitSpecCriterion: true });
+     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+     const promoted = applyProjectOnboardingKickoffPromotionV4({
+       runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true,
+@@ -5164,7 +5164,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
+       rootDir: path, profile: "feature", featureId: "gated-work", planPath: prdPath,
+       prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
+     };
+-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN" });
++    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-GATED-DESIGN", admitSpecCriterion: true });
+     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
+     assert.equal(promoted.status, "ready");
+@@ -5274,7 +5274,7 @@ for (const runner of ["claude", "codex", "antigravity"]) {
+         rootDir: path, profile: "feature", featureId: `handover-${runner}`, planPath: prdPath,
+         prdPath, specPath, designInputPath, runner, deps: localDeps,
+       };
+-      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}` });
++      materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: `TEST-HANDOVER-${runner}`, admitSpecCriterion: true });
+       const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+       const promoted = applyProjectOnboardingKickoffPromotionV4({ ...promotion, planSha256: planned.planSha256, activate: true });
+       assert.equal(promoted.status, "ready");
+@@ -5479,7 +5479,7 @@ test("NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause
+       rootDir: path, profile: "feature", featureId: "projdrift-work", planPath: prdPath,
+       prdPath, specPath, designInputPath, runner, deps: localDeps,
+     };
+-    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN" });
++    materializeArchitectureDesignFixture({ rootDir: path, planPath: prdPath, decisionRef: "TEST-PROJDRIFT-DESIGN", admitSpecCriterion: true });
+     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+     const promoted = applyProjectOnboardingKickoffPromotionV4({ runner, ...promotion, planSha256: planned.planSha256, activate: true });
+     assert.equal(promoted.status, "ready");

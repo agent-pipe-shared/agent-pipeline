@@ -1,0 +1,6 @@
+{
+  "template": "templates/prompts/goldfish-task.md",
+  "templateSha256": "399f1b7ddd66884776bddcb765dac58893a24e02ea910819494d93dd8bb68fba",
+  "renderedSha256": "178dcf1f8fc22d1c027d3f4581c247b3a8efb495723283104e2327d1d4d92905",
+  "methodOnly": true
+}

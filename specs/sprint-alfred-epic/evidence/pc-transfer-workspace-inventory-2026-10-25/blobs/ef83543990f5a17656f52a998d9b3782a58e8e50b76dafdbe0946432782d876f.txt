@@ -1,0 +1,17 @@
+// diag runner: node diag-run.mjs <label> <file>; writes full output to diag-out/<label>.txt
+import { spawnSync } from "node:child_process";
+import { mkdirSync, chmodSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+process.chdir(dirname(fileURLToPath(import.meta.url)));
+const [label, file, ...extra] = process.argv.slice(2);
+const tmp = join(homedir(), "pipeline-test-tmp", label, "0");
+mkdirSync(tmp, { recursive: true, mode: 0o700 }); chmodSync(tmp, 0o700);
+const env = { ...process.env, TMPDIR: tmp, TMP: tmp, TEMP: tmp };
+delete env.NODE_TEST_CONTEXT;
+const r = spawnSync(process.execPath, [...extra, file], { encoding: "utf8", env, timeout: 3600000, maxBuffer: 256 * 1024 * 1024 });
+mkdirSync("diag-out", { recursive: true });
+writeFileSync(join("diag-out", label + ".txt"), (r.stdout ?? "") + (r.stderr ?? ""));
+console.log("exit", r.status);

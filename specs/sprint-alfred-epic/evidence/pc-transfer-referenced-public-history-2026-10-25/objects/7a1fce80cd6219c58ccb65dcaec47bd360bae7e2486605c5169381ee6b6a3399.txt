@@ -1,0 +1,1 @@
+{"schema":"pipeline.project-resource-observations.v1","candidate":{"commit":"5e939278bf41fce6d190707a49bacfd3d0f988ef","tree":"96eaa8e7d8ffc56a30257f1610d0f780659b74d1"},"resources":[{"id":"host-output-budget","limit":null,"measurement":null}]}

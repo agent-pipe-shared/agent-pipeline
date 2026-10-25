@@ -1,0 +1,376 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 805ca0ed7..88700ef38 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -42,6 +42,7 @@ import { verifyAntigravityNativeDispatch } from "../lib/antigravity-native-dispa
+ import { isShippedPipelineAgentType } from "../lib/dispatch-policy.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { nativeHookGovernanceAdmission } from "./hook-governance-admission.mjs";
++import { antigravityArtifactHostContext, crossRepositoryDenialReason } from "../lib/current-session-artifact-export.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ // Repository admission precedes hook input hardening and all governed effects.
+ 
+@@ -310,6 +311,16 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
+   return { toolName, toolInput, filePath, command, isReadOnly };
+ }
+ 
++export function antigravityGuardPayload(input, normalized, projectRoot) {
++  return {
++    tool_name: normalized.toolName,
++    tool_input: normalized.toolInput,
++    cwd: projectRoot,
++    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
++    antigravity_artifact_host: antigravityArtifactHostContext(input),
++  };
++}
++
+ // PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
+ // credential-root decision is NOT restated here, and neither is any outside-the-project rule. It is the one the Claude native
+ // Read lane and the shell-read grammar already use -- readToolScopeVerdict (lib/guard/read-scope.mjs)
+@@ -685,12 +696,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+         ? ["guard-dispatch.mjs"]
+         : [];
+ 
+-  const canonicalPayload = JSON.stringify({
+-    tool_name: toolName,
+-    tool_input: toolInput,
+-    cwd: projectRoot,
+-    tool_use_id: input?.tool_use_id ?? input?.toolUseId,
+-  });
++  const canonicalPayload = JSON.stringify(antigravityGuardPayload(input, normalized, projectRoot));
+ 
+   const denials = [];
+   const warnings = [];
+@@ -853,26 +859,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+       deny(denials.map((entry) => entry.reason).join("\n"));
+     }
+     if (crossRepositoryOnlyDenial) {
+-      deny([
+-        denials.map((entry) => entry.reason).join("\n"),
+-        "Guard recovery route:",
+-        JSON.stringify({
+-          status: "external-operator-required",
+-          code: "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY",
+-          nextAction: {
+-            kind: "external-operator",
+-            executionBoundary: "separate-session-rooted-at-plugin-cache",
+-            invocation: "user-copy-only",
+-            action: {
+-              toolName,
+-              toolInputSha256,
+-              repositoryRoot: projectRoot,
+-              ...commandDisclosureFields(projectRoot, toolName, toolInput, command),
+-            },
+-            reason: "the target path is outside this repository's physical authority boundary",
+-          },
+-        }),
+-      ].join("\n"));
++      deny(crossRepositoryDenialReason(denials));
+     }
+ 
+     const overrideSpawn = (executable, args, options) => boundedSpawn(
+diff --git a/plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs b/plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs
+new file mode 100644
+index 000000000..0e0052bb0
+--- /dev/null
++++ b/plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from 'node:assert/strict';
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { antigravityGuardPayload, normalizeAntigravityToolInput } from '../hooks/antigravity-pretool-guard.mjs';
++import { evaluateLifecycleReadyGuard } from './guard/evaluate.mjs';
++import { isCurrentSessionArtifactExport } from './current-session-artifact-export.mjs';
++import { registerTestCaseCompletion } from './test-case-completion.mjs';
++const cases = [];
++function test(name, run) { cases.push({ id: `G13R${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
++function fixture() {
++  const checkout = fileURLToPath(new URL('../../..', import.meta.url));
++  mkdirSync(join(checkout, 'scratch'), { recursive: true });
++  const base = mkdtempSync(join(checkout, 'scratch/g13-runners-'));
++  const root = join(base, 'project');
++  const id = '11111111-2222-4333-8444-555555555555';
++  const artifacts = join(base, 'synthetic-home', 'brain', id);
++  const other = join(base, 'synthetic-home', 'brain', '11111111-2222-4333-8444-666666666666');
++  mkdirSync(join(root, 'gallery'), { recursive: true });
++  mkdirSync(artifacts, { recursive: true }); mkdirSync(other, { recursive: true });
++  const source = join(root, 'gallery/image.png');
++  writeFileSync(source, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1cAAAAASUVORK5CYII=', 'base64'));
++  const envelope = { conversationId: id, workspacePaths: [root], artifactDirectoryPath: artifacts,
++    transcriptPath: join(artifacts, '.system_generated/logs/transcript.jsonl'),
++    toolCall: { name: 'run_command', args: { Cwd: root, CommandLine: `cp ${JSON.stringify(source)} ${JSON.stringify(join(artifacts, 'gallery.png'))}` } } };
++  const input = JSON.parse(JSON.stringify(antigravityGuardPayload(envelope, normalizeAntigravityToolInput(envelope), root)));
++  return { root, artifacts, other, source, input, envelope, clean: () => rmSync(base, { recursive: true, force: true }) };
++}
++function dependencies(root, runner) { return { projectDir: root, runner,
++  observeGovernanceScopeFn: () => ({ requiresEnforcement: true }),
++  inspectProjectOnboardingV3Fn: () => ({ status: 'ready', lifecycle: { status: 'ready' } }),
++  requireProjectOnboardingReadyFn: () => ({ schema: 'pipeline.project-onboarding-ready-gate.v1', status: 'ready', intent: 'session' }),
++}; }
++test('AGY shared evaluation admits only the exact current-session export', () => {
++  const f = fixture(); try {
++    const result = evaluateLifecycleReadyGuard(f.input, dependencies(f.root, 'antigravity'));
++    assert.equal(result.exitCode, 0, result.stderr);
++    for (const input of [{ ...f.input, antigravity_artifact_host: undefined },
++      { ...f.input, tool_input: { command: `cp ${f.source} ${f.other}/image.png` } }]) {
++      const denied = evaluateLifecycleReadyGuard(input, dependencies(f.root, 'antigravity'));
++      assert.equal(denied.exitCode, 2); assert.match(denied.stderr, /GUARD-CROSS-REPO-MUTATION/u);
++    }
++  } finally { f.clean(); }
++});
++test('Claude and Codex cannot acquire artifact authority through supplied AGY metadata', () => {
++  const f = fixture(); try {
++    for (const runner of ['claude', 'codex', undefined]) {
++      assert.equal(isCurrentSessionArtifactExport(f.input, f.root, { runner }), false);
++      const denied = evaluateLifecycleReadyGuard(f.input, dependencies(f.root, runner));
++      assert.equal(denied.exitCode, 2); assert.match(denied.stderr, /GUARD-CROSS-REPO-MUTATION/u);
++    }
++  } finally { f.clean(); }
++});
++test('artifact containment does not bypass the live lifecycle gate', () => {
++  const f = fixture(); try {
++    const deps = dependencies(f.root, 'antigravity');
++    deps.requireProjectOnboardingReadyFn = () => { throw new Error('synthetic not ready'); };
++    const denied = evaluateLifecycleReadyGuard(f.input, deps);
++    assert.equal(denied.exitCode, 2); assert.doesNotMatch(denied.stderr, /GUARD-CROSS-REPO-MUTATION/u);
++  } finally { f.clean(); }
++});
++test('actual AGY adapter drops argument-forged metadata and refuses plugin cache destinations', () => {
++  const f = fixture(); try {
++    const forged = { toolCall: { ...f.envelope.toolCall, args: { ...f.envelope.toolCall.args,
++      ...f.envelope, antigravity_artifact_host: f.input.antigravity_artifact_host } } };
++    const payload = antigravityGuardPayload(forged, normalizeAntigravityToolInput(forged), f.root);
++    assert.equal(evaluateLifecycleReadyGuard(payload, dependencies(f.root, 'antigravity')).exitCode, 2);
++    const cache = join(f.artifacts, '..', '..', 'cache', 'brain', f.envelope.conversationId);
++    mkdirSync(cache, { recursive: true });
++    const input = { ...f.input, antigravity_artifact_host: { ...f.input.antigravity_artifact_host,
++      artifactDirectoryPath: cache, transcriptPath: join(cache, '.system_generated/logs/transcript.jsonl') },
++      tool_input: { command: `cp ${JSON.stringify(f.source)} ${JSON.stringify(join(cache, 'image.png'))}` } };
++    const denied = evaluateLifecycleReadyGuard(input, dependencies(f.root, 'antigravity'));
++    assert.equal(denied.exitCode, 2); assert.match(denied.stderr, /GUARD-CROSS-REPO-MUTATION/u);
++  } finally { f.clean(); }
++});
++if (cases.length !== 4) throw new Error('g13 runner case count drift');
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/current-session-artifact-export.mjs b/plugins/pipeline-core/lib/current-session-artifact-export.mjs
+new file mode 100644
+index 000000000..f2270387b
+--- /dev/null
++++ b/plugins/pipeline-core/lib/current-session-artifact-export.mjs
+@@ -0,0 +1,85 @@
++// SPDX-License-Identifier: SUL-1.0
++// Native hook metadata has the same transport trust as cwd. This is not a
++// portable attestation and must never be populated from tool arguments.
++import { constants, fstatSync, lstatSync, realpathSync, openSync, readSync, closeSync } from 'node:fs';
++import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
++import { parseGuardCommand } from '../hooks/guard-command-grammar.mjs';
++
++export function antigravityArtifactHostContext(envelope) {
++  if (envelope?.toolCall?.name !== 'run_command') return undefined;
++  return {
++    conversationId: envelope.conversationId,
++    artifactDirectoryPath: envelope.artifactDirectoryPath,
++    transcriptPath: envelope.transcriptPath,
++    workspacePaths: envelope.workspacePaths,
++  };
++}
++
++function physical(path, kind) {
++  if (typeof path !== 'string' || !isAbsolute(path) || resolve(path) !== path) return false;
++  try {
++    if (realpathSync(path) !== path) return false;
++    for (let cursor = path; ; cursor = dirname(cursor)) {
++      if (lstatSync(cursor).isSymbolicLink()) return false;
++      if (dirname(cursor) === cursor) break;
++    }
++    const stat = lstatSync(path);
++    return kind === 'directory' ? stat.isDirectory() : stat.isFile() && stat.nlink === 1;
++  } catch { return false; }
++}
++
++/** A permission check only: never copies or reads a transcript. Exact new PNG
++ * at the current host root, one regular project PNG source, no extra operands.
++ * The registered AGY adapter reconstructs the context from original top-level
++ * system fields; Claude/Codex cannot select this route with an input field.
++ */
++export function isCurrentSessionArtifactExport(input, root, { runner } = {}) {
++  if (runner !== 'antigravity' || input?.tool_name !== 'Bash') return false;
++  const host = input.antigravity_artifact_host;
++  if (!host || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(host.conversationId ?? '')) return false;
++  const artifactRoot = host.artifactDirectoryPath;
++  if (typeof artifactRoot !== 'string' || basename(artifactRoot) !== host.conversationId
++    || basename(dirname(artifactRoot)) !== 'brain'
++    || artifactRoot.split(sep).some((part) => /^(?:\.git|\.ssh|\.aws|\.codex|\.claude|plugins?|cache|marketplaces?|installations?|credentials?|keys?)$/iu.test(part))
++    || host.transcriptPath !== join(artifactRoot, '.system_generated', 'logs', 'transcript.jsonl')
++    || !Array.isArray(host.workspacePaths) || !host.workspacePaths.includes(root)
++    || !physical(root, 'directory') || !physical(artifactRoot, 'directory')) return false;
++  const parsed = parseGuardCommand(input.tool_input?.command, root, { platform: 'linux' });
++  if (parsed.parseStatus !== 'accepted' || parsed.operators.length || parsed.redirects.length || parsed.segments.length !== 1) return false;
++  const segment = parsed.segments[0];
++  if (segment.executable !== 'cp') return false;
++  const args = [...segment.argv];
++  if (args[0] === '--') args.shift();
++  if (args.length !== 2 || args.some((arg) => arg.startsWith('-') || /[\0\r\n*?\[\]{}]/u.test(arg))) return false;
++  const [sourceOperand, target] = args;
++  const source = resolve(root, sourceOperand);
++  const sourceRelative = relative(root, source);
++  const parts = sourceRelative.split(sep);
++  if (!sourceRelative || sourceRelative.startsWith(`..${sep}`) || isAbsolute(sourceRelative)
++    || parts.some((part) => part.startsWith('.') || /(?:credential|secret|private|transcript|session|cache|plugin|install|keys?|logs?)/iu.test(part))
++    || !/\.png$/u.test(source) || !/\.png$/u.test(target)
++    || sourceOperand.split(/[\\/]/u).some((part) => part === '.' || part === '..')
++    || !physical(source, 'file') || !isAbsolute(target) || resolve(target) !== target
++    || dirname(target) !== artifactRoot || !/^[A-Za-z0-9][A-Za-z0-9_.-]*\.png$/u.test(basename(target))) return false;
++  try { lstatSync(target); return false; } catch (error) { if (error.code !== 'ENOENT') return false; }
++  // A renamed source or credential is not an image. Read only a bounded header
++  // from the already contained regular file, using O_NOFOLLOW on supported hosts.
++  let fd;
++  try {
++    const expected = lstatSync(source);
++    fd = openSync(source, constants.O_RDONLY | constants.O_NOFOLLOW);
++    const actual = fstatSync(fd);
++    if (!actual.isFile() || actual.nlink !== 1 || actual.dev !== expected.dev || actual.ino !== expected.ino) return false;
++    const header = Buffer.alloc(24);
++    if (readSync(fd, header, 0, header.length, 0) !== header.length) return false;
++    return header.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
++      && header.readUInt32BE(8) === 13 && header.toString('ascii', 12, 16) === 'IHDR'
++      && header.readUInt32BE(16) > 0 && header.readUInt32BE(20) > 0;
++  } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
++}
++
++export function crossRepositoryDenialReason(denials) {
++  // The shared guard already selected the exact HGO recovery. A second adapter
++  // classification used to label every outside target as a plugin cache.
++  return denials.map((entry) => entry.reason).join('\n');
++}
+diff --git a/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs b/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs
+new file mode 100644
+index 000000000..a1ae81623
+--- /dev/null
++++ b/plugins/pipeline-core/lib/current-session-artifact-export.test.mjs
+@@ -0,0 +1,93 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from 'node:assert/strict';
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync, symlinkSync, linkSync } from 'node:fs';
++import { join } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { antigravityArtifactHostContext, isCurrentSessionArtifactExport, crossRepositoryDenialReason } from './current-session-artifact-export.mjs';
++import { registerTestCaseCompletion } from './test-case-completion.mjs';
++const cases = [];
++function test(name, run) { cases.push({ id: `G13A${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
++const checkout = fileURLToPath(new URL('../../..', import.meta.url));
++
++export function fixture() {
++  mkdirSync(join(checkout, 'scratch'), { recursive: true });
++  const base = mkdtempSync(join(checkout, 'scratch/g13-artifact-'));
++  const root = join(base, 'project');
++  const id = '11111111-2222-4333-8444-555555555555';
++  const brain = join(base, 'synthetic-home', '.gemini', 'synthetic-appdata', 'brain');
++  const artifacts = join(brain, id);
++  const other = join(brain, '11111111-2222-4333-8444-666666666666');
++  mkdirSync(join(root, 'public', 'gallery'), { recursive: true });
++  mkdirSync(artifacts, { recursive: true });
++  mkdirSync(other, { recursive: true });
++  // A real one-pixel PNG fixture, held entirely below this checkout's scratch.
++  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1cAAAAASUVORK5CYII=', 'base64');
++  const source = join(root, 'public/gallery/image.png');
++  writeFileSync(source, png);
++  const target = join(artifacts, 'gallery.png');
++  const host = { conversationId: id, artifactDirectoryPath: artifacts,
++    transcriptPath: join(artifacts, '.system_generated/logs/transcript.jsonl'), workspacePaths: [root] };
++  const envelope = { ...host, toolCall: { name: 'run_command', args: { Cwd: root,
++    CommandLine: `cp -- ${JSON.stringify(source)} ${JSON.stringify(target)}` } } };
++  const input = { tool_name: 'Bash', tool_input: { command: envelope.toolCall.args.CommandLine },
++    antigravity_artifact_host: antigravityArtifactHostContext(envelope) };
++  return { base, root, artifacts, other, source, target, host, envelope, input, png,
++    clean: () => rmSync(base, { recursive: true, force: true }) };
++}
++function withFixture(run) { const f = fixture(); try { run(f); } finally { f.clean(); } }
++const allowed = (input, root) => isCurrentSessionArtifactExport(input, root, { runner: 'antigravity' });
++
++test('exact original top-level metadata admits absolute and relative project PNG source', () => withFixture((f) => {
++  assert.equal(allowed(f.input, f.root), true);
++  assert.equal(allowed({ ...f.input, tool_input: { command: `cp public/gallery/image.png ${JSON.stringify(f.target)}` } }, f.root), true);
++}));
++test('tool arguments and canonical envelopes cannot supply host metadata', () => withFixture((f) => {
++  assert.deepEqual(antigravityArtifactHostContext({ toolCall: { name: 'run_command', args: f.host } }), {
++    conversationId: undefined, artifactDirectoryPath: undefined, transcriptPath: undefined, workspacePaths: undefined });
++  assert.equal(antigravityArtifactHostContext({ tool_name: 'Bash', ...f.host }), undefined);
++  const forged = { ...f.input, antigravity_artifact_host: undefined, tool_input: { ...f.input.tool_input, ...f.host } };
++  assert.equal(allowed(forged, f.root), false);
++}));
++test('other sessions, logs and metadata mismatch refuse', () => withFixture((f) => {
++  for (const target of [join(f.other, 'image.png'), join(f.artifacts, '.system_generated/logs/image.png'), f.artifacts]) {
++    assert.equal(allowed({ ...f.input, tool_input: { command: `cp ${JSON.stringify(f.source)} ${JSON.stringify(target)}` } }, f.root), false);
++  }
++  for (const delta of [{ conversationId: 'bad' }, { workspacePaths: [f.other] }, { transcriptPath: '/unread/transcript.jsonl' }, { artifactDirectoryPath: f.other }]) {
++    assert.equal(allowed({ ...f.input, antigravity_artifact_host: { ...f.host, ...delta } }, f.root), false);
++  }
++}));
++test('symlink and lexical aliases, existing destination and hardlink source refuse', () => withFixture((f) => {
++  const alias = join(f.base, 'alias'); symlinkSync(f.artifacts, alias);
++  for (const target of [join(alias, 'image.png'), `${f.artifacts}/../${f.host.conversationId}/image.png`]) {
++    assert.equal(allowed({ ...f.input, tool_input: { command: `cp ${JSON.stringify(f.source)} ${JSON.stringify(target)}` } }, f.root), false);
++  }
++  symlinkSync(f.source, join(f.root, 'public/gallery/alias.png'));
++  assert.equal(allowed({ ...f.input, tool_input: { command: `cp public/gallery/alias.png ${JSON.stringify(f.target)}` } }, f.root), false);
++  const fakeRoot = join(f.base, 'alias-brain', 'brain', f.host.conversationId);
++  mkdirSync(join(fakeRoot, '..'), { recursive: true }); symlinkSync(f.artifacts, fakeRoot);
++  assert.equal(allowed({ ...f.input, antigravity_artifact_host: { ...f.host,
++    artifactDirectoryPath: fakeRoot, transcriptPath: join(fakeRoot, '.system_generated/logs/transcript.jsonl') },
++    tool_input: { command: `cp ${JSON.stringify(f.source)} ${JSON.stringify(join(fakeRoot, 'image.png'))}` } }, f.root), false);
++  writeFileSync(f.target, f.png); assert.equal(allowed(f.input, f.root), false);
++  rmSync(f.target); linkSync(f.source, join(f.root, 'public/gallery/link.png'));
++  assert.equal(allowed(f.input, f.root), false);
++}));
++test('credentials, source text, plugin paths, multiple sources, options and commands refuse', () => withFixture((f) => {
++  const external = join(f.base, 'other-project.png'); writeFileSync(external, f.png);
++  assert.equal(allowed({ ...f.input, tool_input: { command: `cp ${JSON.stringify(external)} ${JSON.stringify(f.target)}` } }, f.root), false);
++  for (const path of ['.ssh/key.png', 'plugins/gallery.png', 'logs/image.png', 'public/source.png']) {
++    const source = join(f.root, path); mkdirSync(join(source, '..'), { recursive: true });
++    writeFileSync(source, path.endsWith('source.png') ? 'export const secret = 1;' : f.png);
++    assert.equal(allowed({ ...f.input, tool_input: { command: `cp ${JSON.stringify(source)} ${JSON.stringify(f.target)}` } }, f.root), false);
++  }
++  for (const command of [`cp -r ${f.source} ${f.target}`, `cp ${f.source} ${f.source} ${f.target}`, `cp ${f.source} ${f.target} && echo done`, `mv ${f.source} ${f.target}`, `cp public/gallery/*.png ${f.target}`]) {
++    assert.equal(allowed({ ...f.input, tool_input: { command } }, f.root), false);
++  }
++}));
++test('cross-repository denial transport preserves the authoritative recovery verbatim', () => {
++  const reason = 'GUARD-CROSS-REPO-MUTATION\nHGO-EXTERNAL-PROJECT-BOUNDARY';
++  assert.equal(crossRepositoryDenialReason([{ reason }]), reason);
++  assert.equal(crossRepositoryDenialReason([{ reason }]).includes('PLUGIN-CACHE'), false);
++});
++if (cases.length !== 6) throw new Error('g13 artifact case count drift');
++registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 89403abd2..31ebf28e5 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -33,6 +33,7 @@ import { isSourceOwnedContinuityVerificationCommand, isFixedOwningVerificationCo
+ import { evaluateAfterGrammarAdmission } from "./lifecycle-gate.mjs";
+ import { powerShellScopeVerdict, sanctionedPowerShellNodeCall } from "./powershell-dialect.mjs";
+ import { envDumpClassifierErrorRefusal, envDumpShellRefusal } from "./env-dump-lane.mjs";
++import { isCurrentSessionArtifactExport } from "../current-session-artifact-export.mjs";
+ 
+ /**
+  * NVA-B-REBWIRE-1 / Requirement 5, the half that is not a relief: EVERY refusal this guard
+@@ -273,6 +274,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   // action a later check refuses is surfaced rather than silently swallowed; it is already
+   // irreversibly consumed on disk by then, and there is no "un-consume" available here.
+   const lifts = [...shellLifts];
++  // Only AGY's original native host envelope can select this exact image-copy
++  // lane. It clears the cross-root objection only; grammar and READY still run.
++  const artifactExport = isCurrentSessionArtifactExport(input, root, dependencies);
+   const crossRepoReason = `${CROSS_REPO_DENIAL_CODE}: ${CROSS_REPO_DENIAL_GUIDANCE}`;
+   if (WRITE_TOOLS.includes(toolName)) {
+     const target = writeTargetPath(input.tool_input, toolName);
+@@ -372,6 +376,7 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   // retryActionsForDeniedCommand call site below that has `input` in scope. Never a module-
+   // level constant, unlike BOUNDED_PIPELINE_ADDITIONAL_ROOTS: both roots vary per invocation.
+   if (toolName === "Bash"
++    && !artifactExport
+     && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
+     const route = humanOverrideRoute(
+       CROSS_REPO_DENIAL_CODE, crossRepoReason, "command", root, toolName, input.tool_input, dependencies,

@@ -1,0 +1,163 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.design-generator-repeats-large-source-material
+type: workflow-improvement
+owner: pipeline
+status: open
+created: 2026-09-27
+source: "Codex/WSL greenfield review B6 and Claude/Windows greenfield review F-06, 2026-09-27; observed large generation output and repeated ask envelopes; exact token cost remains unmetered."
+sprint: none
+done_when: manual
+---
+
+# Design generation should reference large source material instead of repeating it
+
+## Description
+
+The greenfield run produced a 14,871-byte design input plus PRD, Spec,
+revised design and traceability files totaling 37,542 bytes. The report says
+the original request appeared multiple times and the generator response was
+partly truncated. File sizes are verified; the claimed token total and
+duplication cost require an actual output trace before optimization. The
+independent Claude run reports a roughly 50 KB `intake-generate-plan` response
+and repeated multi-kilobyte `pendingAsks` envelopes on `inspect`.
+
+## Triggering situation
+
+The 2026-09-27 Codex Feature intake of a roughly 14-kilobyte user request.
+
+## Affected artifact
+
+Greenfield design generator, its output envelope, design-input source
+binding, PRD/Spec/traceability generation and resume context budget.
+
+## Proposal
+
+Measure exact repeated bytes and response truncation on the recorded input.
+Keep the original text in one immutable, digest-bound design-input artifact;
+refer to stable section IDs and hashes in derived documents where this keeps
+them independently reviewable. Return compact metadata and paths by default,
+with full content on explicit read. Make routine `inspect` responses compact
+after an ask has been shown, while preserving a stable way to retrieve the
+full ask and generated target content.
+
+## Acceptance
+
+- A measured before/after run reports emitted bytes, output tokens where
+  available, truncation and duplication, with identical requirement coverage.
+- A fresh reviewer can still understand the PRD and Spec from their bounded
+  references and explicitly available source; no requirement disappears.
+- The host response remains below its output budget for the same large input.
+
+<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->
+
+## Controlled Codex CLI measurement (2026-09-28)
+
+The prepared summary option was measured against a controlled 14,030-byte
+Unicode/CRLF request using six actual CLI main calls. Full-plan output is
+47,815 UTF-8 bytes; summary output is 2,153 bytes, a reduction of 45,662 bytes
+(95.50%). The escaped request occupies 42,789 output bytes across three copies
+in the full response and none in the summary. The explicit returned full-plan
+action reproduces the full response byte-for-byte. All six calls return exit 0
+with empty stderr.
+
+The coordinator's proposed generation action adds `--summary`; a direct CLI
+call without that flag retains the legacy full response. Generated artifacts
+remain byte-identical to the baseline, including the original request once in
+each of design-input, PRD and Spec (45,481 total artifact bytes). This verifies
+unchanged coverage bytes for the controlled input, not independent semantic
+review. Stored duplication and routine `pendingAsks` compaction remain open.
+Native token counts, host output budget and host/display truncation are unknown.
+
+Exact commands, stdout hashes and artifact digests are recorded in
+`scratch/generator-output-measurement-report.md` and its evidence JSON. The run
+binds aggregate patch `da45198b2fabf5a5ab36defc1518865ca9cfde8e86a657029d865fa70de69337`
+and assembly source commit `35d2a7d2e6c9d60bf272a9ac38db817759b8e107`.
+This is preparation evidence; source integration, host-budget acceptance and
+candidate qualification remain pending. The item stays open.
+
+## Producer-to-guard summary parity (2026-09-28)
+
+Inspection of the full returned action exposed a further prepared-route gap:
+the coordinator adds `--summary`, while the existing lifecycle qualifier allows
+only root/intent for this derived action. A separate additive patch admits that
+boolean only for `intake-generate-plan`; other commands, duplicates, values,
+unknown flags and a foreign root remain refused.
+
+Two fixtures using the actual coordinator's returned argv pass, and an added
+regular guard-suite case passes after aggregate assembly. The new aggregate is
+`5de8ddca97b83d11c218f4e8d50274e20399c05740e4f0a1bad23e6d283e2029`
+(60 files, 52 syntax checks, Git dry application successful). Exact binding is
+in `scratch/summary-and-advisor-binding-preparation.evidence.json`; the actual
+producer run retains its earlier aggregate/guard hashes in
+`scratch/onboarding-summary-admission-evidence.md`. Direct CLI measurement alone
+does not prove installed-host admission. No productive integration occurred.
+
+## Observed 2026-10-18: real greenfield project, Claude on WSL (PF-06)
+
+The generated PRD/spec drafts carry a "do not hand-edit" header while the reference requires
+elaborating them before binding; and each draft embedded the full source material verbatim
+(about 87 KB, so three copies in total). The verbatim-copy half is addressed by commit
+38e1758a4 (`design-input.md` is now a provenance record). The header contradiction
+("do not hand-edit" versus "elaborate before binding") remains open.
+
+## Extension 2026-10-22: pendingAsks envelopes printed once (ALF-K15)
+
+Re-verified live before building: the stored-duplication half is closed (the pin
+asserts 0 copies of the request in design-input, PRD and Spec), and plain
+`project-onboarding-v3.mjs inspect` already carries each ask exactly once
+(measured: one 3,785-byte ask, 11,638-byte output). The remaining repetition sat in the
+`onboarding-init.mjs` driver output: for the `collect-input` outcome (codex first stop) the
+one 3,085-byte bundled ask was serialized three times (top-level `pendingAsks`,
+`collectInput.pendingAsks`, `final.nextAction.pendingAsks`); the `pending-asks` outcome
+already printed it once.
+
+Measured, fresh repository, 3 runs identical: BEFORE 23,033 bytes, AFTER 16,829 bytes
+(-6,204 bytes, -26.9%); the `pending-asks` outcome stays at 10,906 bytes. The driver now
+drops a sibling copy only when it is canonically equal to the top-level `pendingAsks`, so
+nothing is lost; the primary action stays in `collectInput` and `final.nextAction`.
+Pin: `[pendingAsks compaction]` cases in
+`lib/pins/design-generator-repeats-large-source-material.test.mjs` (each ask once, bound 19,000 bytes).
+
+PO decision (2026-10-22): the duplicated primary collect-input action is shortened too. On
+the wire `collectInput` is the single full copy and `final.nextAction` is
+`{ "kind": "collect-input", "see": "collectInput" }` when canonically equal to it;
+`resolvePrintedOnboardingInit()` (`lib/onboarding-driver-output.mjs`) resolves the reference
+and restores the asks for a consumer that needs the library shape. Readers checked: every
+consumer of the collect-input outcome (e2e tests, `measure-fresh-repo-onboarding-turns.mjs`)
+reads `collectInput`, none read the full action from `final.nextAction`, so no existing
+assertion changed. Measured, same fixture: 23,033 -> 16,829 -> 13,802 bytes (-9,231 bytes,
+-40.1%, ask and primary action each printed once).
+
+Still open: cross-call compaction (a separate stateless call cannot know an ask was already
+shown; it would need a persisted shown-digest) and the header contradiction above.
+
+### Blocker analysis 2026-10-22
+
+Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
+
+- **HOST-SESSION-NEEDED** — The host response budget for the same large input needs a real host measurement
+  Item states native token counts, host output budget and display truncation are unknown. Needs a real Codex (and Claude) host turn with the 14 KB input to observe truncation; the byte-level measurement (47,815 vs 2,153 bytes) is already done and is not the gap.
+
+## Reconciled 2026-10-23
+
+Text sweep K58-BACKLOG-TEXT-SWEEP-2. Superseded sentences above, kept as history:
+
+- "Controlled Codex CLI measurement (2026-09-28)": "Stored duplication and routine `pendingAsks` compaction remain open."
+  Both are closed: the stored-duplication half by commit `38e1758a4` (`fix(pipeline-core): keep raw intake material out of
+  tracked design files`; the pin asserts zero copies of the request in design-input, PRD and Spec), the `pendingAsks`
+  half by the "Extension 2026-10-22" section (driver output 23,033 to 13,802 bytes, each ask and the primary action
+  printed once). Pins: `plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs`
+  (history includes `0080379a7` each published ask once, `e82601a5b` collect-input primary action once).
+- "Producer-to-guard summary parity (2026-09-28)" ("No productive integration occurred", "source integration ...
+  remain pending"): statements of the preparation state of that date; whether the summary route has since been
+  integrated was not re-verified in this sweep, so these sentences are marked as dated history, not as current state.
+- Blocker analysis 2026-10-22 frames only the host gap (a real Codex/Claude host turn with the 14 KB input for output
+  budget and truncation). That remains the only open acceptance bullet ("The host response remains below its output
+  budget"), together with the two residues the 2026-10-22 extension already names: cross-call `pendingAsks` compaction
+  (needs a persisted shown-digest, a design decision not yet made) and the "do not hand-edit" versus "elaborate before
+  binding" header contradiction (not re-checked in this sweep).
+- Triage: the block under "## Triage" is a bare heading and no repository decision with an id settles this item, so it is
+  left as is. No status change is made here.
+
+<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog item has been removed for dispatch citation. It recorded a prior human or Critic verdict about this item -- never spec/reference content -- and would otherwise contaminate an independent downstream review or implementation. See the item's own file for the full history. Convention: backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->

@@ -1,0 +1,33 @@
+{
+  "extra": {
+    "39b": [
+      "git apply --check scratch/agent-out/K133-pin-surface.diff",
+      "git apply scratch/agent-out/K133-pin-surface.diff",
+      "node scripts/rebaseline-inventory.mjs",
+      "node harness/scripts/check-product-capability-inventory.mjs",
+      "node harness/scripts/check-verify-suite-registration.mjs",
+      "git add -- docs/product-capability-inventory.json",
+      "git commit -F scratch/agent-out/K133-msg-1.txt -- docs/product-capability-inventory.json"
+    ],
+    "46b": [
+      "git apply --check scratch/agent-out/K133-ratchet-final.diff",
+      "git apply scratch/agent-out/K133-ratchet-final.diff",
+      "git add -- architecture/boundary-policy.json",
+      "git commit -F scratch/agent-out/K133-msg-2.txt -- architecture/boundary-policy.json"
+    ],
+    "47": [
+      "git apply --check scratch/agent-out/K133-k132-allowlist-protected.diff",
+      "git apply scratch/agent-out/K133-k132-allowlist-protected.diff",
+      "node scripts/sync-reader-inputs.mjs",
+      "node scripts/sync-reader-inputs.mjs --check",
+      "git add -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs",
+      "git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/47-reader-input-mirrors-protected.txt -- plugins/pipeline-core/reader-inputs plugins/pipeline-core/lib/doc-reader-documentation-snapshot.mjs harness/scripts/check-consumer-safe-paths.mjs"
+    ],
+    "45": [
+      "git apply --check specs/sprint-alfred-epic/evidence/sitting/k128-fallback-unprotected.diff",
+      "git apply specs/sprint-alfred-epic/evidence/sitting/k128-fallback-unprotected.diff",
+      "git add -- plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs plugins/pipeline-core/scripts/design-review-receipt.mjs",
+      "git commit -F specs/sprint-alfred-epic/evidence/sitting/commit-messages/45-fallback-receipt-field-pin.txt -- plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs plugins/pipeline-core/scripts/design-review-receipt.mjs"
+    ]
+  }
+}

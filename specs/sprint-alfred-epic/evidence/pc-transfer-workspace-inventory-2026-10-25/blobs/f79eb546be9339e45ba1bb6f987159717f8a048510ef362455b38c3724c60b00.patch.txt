@@ -1,0 +1,1439 @@
+diff --git a/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md b/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
+index f02d14102..6d36a9dd0 100644
+--- a/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
++++ b/backlog/items/2026-10-08-denial-names-a-diagnosis-it-refuses.md
+@@ -54,3 +54,16 @@ Not covered: denials whose command is not introduced by a "Run"/"then run"/"use
+ and the PO-run commands that human-guard-override denials print (those are attended-operator steps by design). The second
+ half of the Proposal (an approved feature whose approval cannot be re-verified degrades to advisory) is a product
+ decision and was not touched.
++
++## Extension 2026-10-22: the second half is built (PO decision D117, decision BI)
++
++An approved feature whose approval cannot be re-verified now degrades to ONE advisory instead of blocking, in both lanes
++(Edit|Write hook and the Bash lane). "Cannot be re-verified" is deliberately narrow: only a verification INPUT that is
++unavailable qualifies, today exactly `DWP-PACKAGE-PHYSICAL` (the approved design workflow package file is missing or not a
++physical repository file). The advisory (`GUARD-DEVPLAN-APPROVAL-UNVERIFIED`) names the cause, what could not be verified,
++that nothing was verified, and the single repair (`reopen-design`); it travels on the existing exit-0 notice channel. Every
++mismatch (`DWP-APPROVAL-DIGEST-DRIFT`, source drift, wrong signer, binding drift), a missing trust-anchor setup, a revoked
++approval and an absent approval record keep blocking with their current codes. `designAdvisoryAdmission()` is unchanged, so
++callers that need real authority (architecture-design, design-decision-bindings) still see `ok:false`. Lane-level proof:
++`hooks/guard-devplan-approval-unverified.test.mjs`; the advisory contract is pinned in the denial pin. The first-half
++`todo` cases named in the earlier extension are already real (`todo: false`).
+diff --git a/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs b/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs
+new file mode 100644
+index 000000000..37f40139d
+--- /dev/null
++++ b/plugins/pipeline-core/hooks/guard-devplan-approval-unverified.test.mjs
+@@ -0,0 +1,170 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * PO decision D117 (decision BI of backlog item denial-names-a-diagnosis-it-refuses, second half): an approved
++ * feature whose approval cannot be RE-VERIFIED degrades to ONE advisory instead of blocking; a genuinely invalid
++ * approval keeps blocking with its current code. "Cannot be re-verified" is deliberately narrow: a verification INPUT
++ * is unavailable (today: the approved design workflow package file is missing, DWP-PACKAGE-PHYSICAL), never a mismatch.
++ *
++ * Both lanes are exercised against the same project: the Edit|Write hook as a process and the Bash lane
++ * (GUARD-DEVPLAN-SHELL) through evaluateLifecycleReadyGuard. The advisory travels on the channel the guard already
++ * uses for admission notices: exit 0 with the text on stderr.
++ *
++ * RED on the unchanged guard: the missing-package cases are refused (exit 2, DWP-PACKAGE-PHYSICAL) there. The negative
++ * controls are green before and after, which is what shows the degradation did not widen into a bypass.
++ */
++import assert from "node:assert/strict";
++import { execFileSync, spawnSync } from "node:child_process";
++import { createHash } from "node:crypto";
++import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import { after, test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
++import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
++import {
++  UNVERIFIABLE_APPROVAL_CODES, UNVERIFIED_APPROVAL_ADVISORY_CODE, designAdvisoryAdmission, unverifiedApprovalAdvisory,
++} from "../lib/guard-devplan-policy.mjs";
++import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
++
++const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
++const FEATURE_ID = "unverified-feature";
++const PLAN_PATH = "specs/feature/prd.md";
++const SPEC_PATH = "specs/feature/spec.md";
++const PACKAGE_PATH = "evidence/package.json";
++const PLAN_BYTES = "# PRD\n";
++const SPEC_BYTES = "# Spec\n";
++const PACKAGE_BYTES = '{"schema":"fixture"}\n';
++const MANIFEST_BLOCKING = "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
++const sha256 = (value) => createHash("sha256").update(value).digest("hex");
++const DIRS = [];
++after(() => { for (const dir of DIRS) rmSync(dir, { recursive: true, force: true }); });
++
++function writeText(dir, rel, text) {
++  const target = join(dir, ...rel.split("/"));
++  mkdirSync(dirname(target), { recursive: true });
++  writeFileSync(target, text);
++}
++
++/** A governed git repo whose state carries a v7 approval naming PACKAGE_PATH. `variant` shapes the one thing under test. */
++function fixture({ packageBytes = null, recordedPackageSha = sha256(PACKAGE_BYTES), planApproved = true, withApproval = true } = {}) {
++  const dir = mkdtempSync(join(tmpdir(), "guard-devplan-unverified-"));
++  DIRS.push(dir);
++  const git = (...args) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", timeout: 20_000 }).trim();
++  git("init", "--quiet");
++  git("config", "user.email", "fixture@example.invalid");
++  git("config", "user.name", "Fixture");
++  const governance = createGovernanceScopeController({ hostStateRoot: join(dir, "fixture-host-state") });
++  const plan = governance.planDecision({ rootDir: dir, decision: "enroll", by: "disposable-guard-fixture" });
++  const active = governance.applyDecision(plan, { activate: true, planSha256: plan.planSha256 });
++  assert.equal(active.state, "active", "fixture enrollment must become active");
++  writeText(dir, PLAN_PATH, PLAN_BYTES);
++  writeText(dir, SPEC_PATH, SPEC_BYTES);
++  if (packageBytes !== null) writeText(dir, PACKAGE_PATH, packageBytes);
++  const submission = {
++    schema: "pipeline.plan-submission.v1", featureId: FEATURE_ID, planPath: PLAN_PATH, planSha256: sha256(PLAN_BYTES),
++    specPath: SPEC_PATH, specSha256: sha256(SPEC_BYTES), profile: "feature", profileSha256: "3".repeat(64),
++    submittedBy: "Coordinator", submittedAt: "2026-10-22T09:00:00.000Z",
++  };
++  const approval = {
++    schema: "pipeline.plan-approval.v7", approvedBy: "PO", approvedAt: "2026-10-22T10:00:00.000Z",
++    submissionSha256: sha256CanonicalJson(submission), profileSha256: submission.profileSha256,
++    poGateAuthority: {
++      schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64),
++      receiptSha256: "3".repeat(64), repositoryFingerprint: "7".repeat(64), planPath: PLAN_PATH, planSha256: submission.planSha256,
++      specPath: SPEC_PATH, specSha256: submission.specSha256,
++    },
++    priorInvalidationSha256: null, designAdvisorAdmissionSha256: null,
++    designWorkflowPackagePath: PACKAGE_PATH, designWorkflowPackageSha256: recordedPackageSha,
++    designWorkflowApproval: {
++      schema: "pipeline.design-workflow-package-approval.v1", mode: "chat", approvedBy: "PO", approvedAt: "2026-10-22T10:00:00.000Z",
++      packageSha256: recordedPackageSha, intentSha256: null, proofSha256: null, proof: null,
++    },
++  };
++  const state = {
++    schema: "pipeline.state.v0",
++    activeFeature: { id: FEATURE_ID, planPath: PLAN_PATH, phase: "implementation" },
++    planApproved,
++    planSubmission: submission,
++    ...(withApproval ? { planApproval: approval } : {}),
++  };
++  writeText(dir, ".claude/pipeline.yaml", MANIFEST_BLOCKING);
++  writeText(dir, ".claude/pipeline-state.json", JSON.stringify(state));
++  return { dir, state, git };
++}
++
++function editLane(dir) {
++  const result = spawnSync(process.execPath, [GUARD], {
++    input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: "src/foo.ts", old_string: "a", new_string: "b" } }),
++    encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: dir }, timeout: 60_000,
++  });
++  return { code: result.status, stderr: String(result.stderr ?? "") };
++}
++function shellLane(dir) {
++  const result = evaluateLifecycleReadyGuard(
++    { tool_name: "Bash", tool_input: { command: "cp scratch/change.ts src/foo.ts" } },
++    { projectDir: dir, requireProjectOnboardingReadyFn: () => ({ schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }) },
++  );
++  return { code: result.exitCode, stderr: String(result.stderr ?? "") };
++}
++const occurrences = (text, needle) => text.split(needle).length - 1;
++const LANES = [["Edit|Write hook", editLane], ["Bash lane (GUARD-DEVPLAN-SHELL)", shellLane]];
++
++test("precondition: the missing-package fixture reaches admission and designAdvisoryAdmission still reports it as NOT authority", () => {
++  const { dir, state } = fixture();
++  const admission = designAdvisoryAdmission(state, dir, PLAN_PATH, SPEC_PATH);
++  assert.equal(admission.ok, false);
++  assert.equal(admission.code, "DWP-PACKAGE-PHYSICAL");
++});
++
++for (const [label, lane] of LANES) {
++  test(`D117 ${label}: approval record present, package file missing -> allowed with ONE self-describing advisory`, () => {
++    const { dir } = fixture();
++    const run = lane(dir);
++    assert.equal(run.code, 0, `must be allowed, got ${run.code}: ${run.stderr.slice(0, 400)}`);
++    assert.equal(occurrences(run.stderr, UNVERIFIED_APPROVAL_ADVISORY_CODE), 1, `exactly one typed advisory: ${run.stderr}`);
++    assert.ok(run.stderr.includes("DWP-PACKAGE-PHYSICAL"), "names the cause");
++    assert.ok(run.stderr.includes(PACKAGE_PATH), "names what could not be verified");
++    assert.match(run.stderr, /Nothing was verified/u);
++    assert.equal(occurrences(run.stderr, "reopen-design"), 1, "names the single repair command");
++    assert.ok(!run.stderr.includes("BLOCKED"), "an advisory is not a block");
++  });
++
++  test(`negative control ${label}: package present but its digest differs from the approval (tampered) -> still blocked with its own code`, () => {
++    const { dir } = fixture({ packageBytes: '{"schema":"tampered"}\n' });
++    const run = lane(dir);
++    assert.equal(run.code, 2, `must stay blocked: ${run.stderr.slice(0, 400)}`);
++    assert.ok(run.stderr.includes("DWP-APPROVAL-DIGEST-DRIFT"), run.stderr);
++    assert.ok(!run.stderr.includes(UNVERIFIED_APPROVAL_ADVISORY_CODE), "no advisory on a mismatch");
++  });
++
++  test(`negative control ${label}: approval revoked (planApproved false) with the package missing -> still blocked, no advisory`, () => {
++    const { dir } = fixture({ planApproved: false });
++    const run = lane(dir);
++    assert.equal(run.code, 2, `must stay blocked: ${run.stderr.slice(0, 400)}`);
++    assert.ok(!run.stderr.includes(UNVERIFIED_APPROVAL_ADVISORY_CODE), "a revoked approval never degrades");
++  });
++
++  test(`negative control ${label}: no approval record at all -> still blocked, no advisory`, () => {
++    const { dir } = fixture({ withApproval: false });
++    const run = lane(dir);
++    assert.equal(run.code, 2, `must stay blocked: ${run.stderr.slice(0, 400)}`);
++    assert.ok(!run.stderr.includes(UNVERIFIED_APPROVAL_ADVISORY_CODE));
++  });
++}
++
++test("negative control: only an unavailable verification INPUT degrades; every mismatch, wrong-signer, wrong-candidate and setup code does not", () => {
++  assert.deepEqual([...UNVERIFIABLE_APPROVAL_CODES], ["DWP-PACKAGE-PHYSICAL"]);
++  const state = { planApproval: { designWorkflowPackagePath: PACKAGE_PATH } };
++  assert.equal(unverifiedApprovalAdvisory({ ok: false, code: "DWP-PACKAGE-PHYSICAL" }, state)?.code, UNVERIFIED_APPROVAL_ADVISORY_CODE);
++  for (const code of [
++    "DWP-APPROVAL-DIGEST-DRIFT", "DWP-APPROVAL-SOURCE-DRIFT", "DWP-APPROVAL-PLAN-SPEC-MISMATCH", "DWP-APPROVAL-FEATURE-MISMATCH",
++    "DWP-APPROVAL-RECORD-DRIFT", "DWP-APPROVAL-INTENT-DRIFT", "DWP-BOUND-PATH-MODIFIED", "DWP-PACKAGE-SHAPE",
++    "DAA-PO-APPROVAL-TRUST-MISMATCH", "DAA-PO-APPROVAL-INVALID", "DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP", "DAA-PO-APPROVAL-TRUST-POLICY",
++    "DAA-PO-APPROVAL-RECORD-DRIFT", "DAA-DESIGN-APPROVAL-BINDING-DRIFT", "DAA-DESIGN-SOURCE-DRIFT", "DAA-PUBLIC-UNAVAILABLE",
++    "DAA-UNAVAILABLE-FINAL-APPROVAL", "DAA-PRIVATE-INVALID",
++  ]) assert.equal(unverifiedApprovalAdvisory({ ok: false, code }, state), null, `${code} must keep blocking`);
++  assert.equal(unverifiedApprovalAdvisory({ ok: true }, state), null);
++  assert.equal(unverifiedApprovalAdvisory(undefined, state), null);
++});
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.mjs b/plugins/pipeline-core/hooks/guard-devplan.mjs
+index a81ac2ed5..b486e07d2 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.mjs
+@@ -148,7 +148,7 @@ import {
+   validatePortablePipelineState,
+ } from "../lib/project-authority.mjs";
+ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+-import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath } from "../lib/guard-devplan-policy.mjs";
++import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
+ // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
+ // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
+ // the policy module both of this gate's lanes already share, never re-decided here. See that
+@@ -508,6 +508,10 @@ if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction
+     : hasGeneralizedLedgerBackedPlanApproval(state, projectDir);
+   if (resolved) {
+     const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
++    // D117 / BI: an approval whose verification input is unavailable degrades to ONE advisory (exit 0 + stderr notice,
++    // the same channel as the rebase-admission notice below) instead of a block. Every other refusal is unchanged.
++    const unverified = admission.ok ? null : unverifiedApprovalAdvisory(admission, state);
++    if (unverified !== null) emit(0, [unverified.text]);
+     if (!admission.ok) emit(gate.mode === "warn" ? 1 : 2, [designAdvisoryRemediation(admission.code)]);
+     process.exit(0);
+   }
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index f078e27d3..6e0c9e529 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -39,6 +39,9 @@
+  * helper function, interpolation) is NOT statically resolvable here and is deliberately left
+  * alone (fail-open, same posture as the rest of this file) rather than guessed at — a false
+  * positive on a script that never dispatches a Goldfish/Critic role is worse than a miss.
++ * A Goldfish `agent()` call that is skipped for that reason is admitted with a typed advisory
++ * (GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED, ALF-K35): it names the cause, says no route record was written
++ * for the call, and gives one repair (a static string-literal prompt built from goldfish-task.md). Never a refusal.
+  *
+  * ANTIGRAVITY RUNNER AWARENESS. The Antigravity runner's native `invoke_subagent` tool call
+  * uses neither of the two shapes above: its payload is `{ Subagents: [{ TypeName: "...",
+@@ -131,6 +134,42 @@ export function extractWorkflowDispatches(script) {
+   return found;
+ }
+ 
++// ALF-K35 (PO decision 2026-10-22): the calls `extractWorkflowDispatches` skips by design are not silent for a Goldfish.
++// Scans the same `agentType` anchors with the same window and reports every call whose role is Goldfish (the predicate
++// `requiresGovernedItemAdmission` uses) and whose prompt cannot be resolved statically: a `${` interpolation, a value that
++// is not a string literal (an identifier or expression), or a literal that does not terminate. Advisory only: the caller
++// admits the call and records nothing for it. Critic and other roles are out of scope of V-10.
++export function findUnresolvedWorkflowGoldfishPrompts(script) {
++  const unresolved = [];
++  const agentTypeRe = /agentType\s*:\s*(['"])((?:(?!\1)[\s\S])*?)\1/g;
++  let m;
++  while ((m = agentTypeRe.exec(script)) !== null) {
++    const agentType = m[2];
++    if (!requiresGovernedItemAdmission(dispatchFindings({ subagentType: agentType, prompt: "", transport: "workflow" }))) continue;
++    const window = script.slice(agentTypeRe.lastIndex, Math.min(script.length, agentTypeRe.lastIndex + 4000));
++    const key = /\bprompt\s*(:\s*|(?=[,}]))/.exec(window);
++    if (!key) continue; // no prompt field nearby -> not a dispatch call
++    const open = /^([`'"])/.exec(window.slice(key.index + key[0].length));
++    if (!key[1] || !open) { unresolved.push({ agentType, cause: "its prompt is not a string literal (an identifier or expression)" }); continue; }
++    const start = key.index + key[0].length + 1;
++    let i = start;
++    let body = null;
++    while (i < window.length) {
++      if (window[i] === "\\") { i += 2; continue; }
++      if (window[i] === open[1]) { body = window.slice(start, i); break; }
++      i += 1;
++    }
++    if (body === null) unresolved.push({ agentType, cause: "its prompt literal does not terminate within the scanned window" });
++    else if (body.includes("${")) unresolved.push({ agentType, cause: "its prompt contains a ${...} interpolation" });
++  }
++  return unresolved;
++}
++
++export function workflowPromptUnresolvedNotice(unresolved) {
++  const causes = [...new Set(unresolved.map(({ cause }) => cause))].join("; ");
++  return `WARNING (guard-dispatch): GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED: ${unresolved.length} Goldfish agent() call(s) in this Workflow script cannot be resolved statically (${causes}). The call is admitted, and no route record was written for this call, so the V-10 briefing-route binding does not apply to it. Repair: write the prompt as a static string literal (no \${...}, no variable) built from templates/prompts/goldfish-task.md, as plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md describes.\n`;
++}
++
+ // Recover `{ TypeName: '...', Prompt: '...' }`-shaped entries from the Antigravity runner's
+ // native `invoke_subagent` payload: `toolInput.Subagents` is an array, one entry per dispatched
+ // subagent. An entry with no string `TypeName` carries nothing to check against a role template
+@@ -704,6 +743,9 @@ if (isDirectInvocation(import.meta.url)) {
+     // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
+     // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
+     dispatches = extractWorkflowDispatches(toolInput.script).map((dispatch) => ({ ...dispatch, transport: "workflow" }));
++    // ALF-K35: an unresolvable Goldfish prompt stays admitted (fail-open) but is announced, never silent.
++    const unresolvedWorkflow = findUnresolvedWorkflowGoldfishPrompts(toolInput.script);
++    if (unresolvedWorkflow.length > 0) process.stderr.write(workflowPromptUnresolvedNotice(unresolvedWorkflow));
+     if (dispatches.length === 0) process.exit(0);
+   } else {
+     process.exit(0);
+diff --git a/plugins/pipeline-core/lib/critic-accepted-contract.mjs b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+index ed312dddf..a0288a028 100644
+--- a/plugins/pipeline-core/lib/critic-accepted-contract.mjs
++++ b/plugins/pipeline-core/lib/critic-accepted-contract.mjs
+@@ -141,6 +141,10 @@ export function commitAcceptedContractCapture({capture,persistEnvelope,publishSt
+   } catch { return {...no(retained ? 'CAC-CAPTURE-PUBLICATION' : 'CAC-CAPTURE-READBACK'),committed:false,envelopeRetained:retained}; }
+ }
+ 
++// Normative and excluded heading vocabulary of the criterion scan (shared with `inspectSpecCriterionRows`).
++const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
++const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
++
+ /**
+  * The ordered criterion-row scan of the host parser, exported unchanged so other readers (plan-readiness
+  * hand-off, lib/plan-handoff-readiness.mjs) see exactly the rows `parseAcceptedCriticCriterion` selects from.
+@@ -153,9 +157,7 @@ export function scanAcceptedCriterionRows(source) {
+     for (const raw of source.split(/(?<=\n)/u)) {
+       lines.push({text:raw.replace(/\r?\n$/u,''),byteOffset}); byteOffset += Buffer.byteLength(raw);
+     }
+-    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below.
+-    const NORMATIVE_HEADING = /\b(?:acceptance\s+(?:criteria|requirements)|abnahmekriterien|akzeptanzkriterien|abnahmeanforderungen)\b/iu;
+-    const EXCLUDED_HEADING = /\b(?:examples?|notes?|commentary|beispiele?|hinweise?|anmerkung(?:en)?|kommentare?)\b/iu;
++    // Normative and excluded heading vocabulary, shared by the table and the clause scanners below (module level).
+     // Two-column acceptance table: a number cell, then a criterion cell. Rows `n` and `R-n` map to `AC-n`.
+     const TWO_COLUMN_NUMBER = /^(?:#|nr\.?|id)$/iu;
+     const TWO_COLUMN_CRITERION = /^(?:kriterium|kriterien|abnahmekriterium|anforderung|criterion|requirement)$/iu;
+@@ -275,6 +277,66 @@ export function scanAcceptedCriterionRows(source) {
+     return rows;
+ }
+ 
++/** The criterion shapes the host parser locates, as named in a refusal (D64: the repair is stated where the refusal is). */
++export const SUPPORTED_CRITERION_SHAPES = Object.freeze([
++  'a three-column table with the header `| # | Criterion | Evidence |` and the id (AC-<n>) in the first cell',
++  'a two-column table with the header `| # | Criterion |` (or `| Nr. | Kriterium |`) whose first cell is `n`, `R-n` or `AC-n`',
++  'a heading `AC-<n>` followed by one paragraph',
++  'a bullet `- **AC-<n>:** text` or a numbered item `1. **AC-<n>:** text`',
++]);
++export const CRITERION_ID_RULE = 'an id is AC-<n> (n without a leading zero) or AC-E<epic>-<story>-<nn>';
++const CRITERION_CANDIDATE_TOKEN = 'AC-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*';
++const TABLE_CANDIDATE = new RegExp(`^\\s*\\|\\s*(?:\\*\\*|\`)?(${CRITERION_CANDIDATE_TOKEN})(?:\\*\\*|\`)?\\s*\\|`, 'u');
++const ITEM_CANDIDATE = new RegExp(`^\\s*(?:[-+*]|[0-9]+[.)])\\s+(?:\\*\\*|\`)?(${CRITERION_CANDIDATE_TOKEN})(?:\\*\\*|\`)?[:.)]?(?:\\s|$|\\*)`, 'u');
++const HEADING_CANDIDATE = new RegExp(`^ {0,3}#{1,6}\\s+(${CRITERION_CANDIDATE_TOKEN})(?:\\s+#+)?\\s*$`, 'u');
++
++/**
++ * D64 (present-plan): is every acceptance-criterion row of the Spec one the registration and dispatch parser locates?
++ * Reuses `scanAcceptedCriterionRows` for what is located; the only addition is the list of CANDIDATE rows under a
++ * normative acceptance heading (a line that starts with an `AC-` token in a table cell, list item or heading), so a
++ * row the scan silently ignores -- the four-column table, a leading-zero id -- is named instead of first failing at
++ * dispatch preparation. A Spec with no candidate row is outside this check (the delivery hand-off, which also wants
++ * a row to exist, is a separate and deferred concern, PO decision D85). `source` is the strictly decoded Spec text.
++ * @returns {{ok: true, located: string[]} | {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located: string[], unsupported: {id: string, line: number, reason: string}[], message: string}}
++ */
++export function inspectSpecCriterionRows(source) {
++  const rows = scanAcceptedCriterionRows(source);
++  const counts = new Map();
++  for (const row of rows) if (row.normative) counts.set(row.id, (counts.get(row.id) ?? 0) + 1);
++  const located = [...new Set(rows.filter(row => row.normative && row.valid !== false).map(row => row.id))];
++  const unsupported = [];
++  for (const row of rows) {
++    if (!row.normative) continue;
++    if (row.valid === false) unsupported.push({id: row.id, line: 0, reason: 'shape'});
++    else if (counts.get(row.id) > 1 && !unsupported.some(entry => entry.id === row.id && entry.reason === 'duplicate')) unsupported.push({id: row.id, line: 0, reason: 'duplicate'});
++  }
++  const headings = []; let comment = false, fence = null;
++  const lines = source.split(/\r?\n/u);
++  for (let index = 0; index < lines.length; index++) {
++    const text = lines[index];
++    if (comment || text.includes('<!--')) { if (text.includes('<!--')) comment = true; if (text.includes('-->')) comment = false; continue; }
++    const marker = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/u);
++    if (fence) { if (marker && marker[1][0] === fence.char && marker[1].length >= fence.length && marker[2].trim() === '') fence = null; continue; }
++    if (marker) { fence = {char: marker[1][0], length: marker[1].length}; continue; }
++    if (/^(?: {0,3}>| {4}|\t)/u.test(text)) continue;
++    const heading = text.match(/^ {0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/u);
++    if (heading) {
++      while (headings.length && headings.at(-1).level >= heading[1].length) headings.pop();
++      headings.push({level: heading[1].length, text: heading[2]});
++    }
++    if (!headings.some(entry => NORMATIVE_HEADING.test(entry.text)) || headings.some(entry => EXCLUDED_HEADING.test(entry.text))) continue;
++    const token = (heading ? text.match(HEADING_CANDIDATE) : text.match(TABLE_CANDIDATE) ?? text.match(ITEM_CANDIDATE))?.[1];
++    if (!token) continue;
++    if (!isCriterionId(token)) unsupported.push({id: token, line: index + 1, reason: 'id'});
++    else if (!located.includes(token)) unsupported.push({id: token, line: index + 1, reason: 'shape'});
++  }
++  if (unsupported.length === 0) return {ok: true, located};
++  const why = {id: `not a criterion id (${CRITERION_ID_RULE}; a leading zero is not allowed)`, shape: 'row shape the parser does not locate', duplicate: 'stated more than once'};
++  const named = unsupported.slice(0, 8).map(entry => `${entry.id}${entry.line ? ` (line ${entry.line}` : ' ('}${entry.line ? ', ' : ''}${why[entry.reason]})`).join('; ');
++  return {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located, unsupported,
++    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
++}
++
+ /** Pure original-byte interpretation only. Locators and parser success confer no authority. */
+ export function parseAcceptedCriticCriterion(input) {
+   let parserVersion = 'markdown-acceptance-table.v1';
+diff --git a/plugins/pipeline-core/lib/design-consistency-check.mjs b/plugins/pipeline-core/lib/design-consistency-check.mjs
+index 26d98d6e1..7d6197945 100644
+--- a/plugins/pipeline-core/lib/design-consistency-check.mjs
++++ b/plugins/pipeline-core/lib/design-consistency-check.mjs
+@@ -228,7 +228,9 @@ function assertSummary(summary) {
+     fail("a review receipt summary kind must be initial or delta");
+   }
+   assertSourceSet(summary.sources, "a review receipt summary sources", false);
+-  if (!hasExactKeys(summary.report, ["path", "sha256"]) || typeof summary.report.path !== "string" || !isSha(summary.report.sha256)) fail("a review receipt summary report is malformed");
++  // D64: a sanitized report carries the digest of its unpublished original beside the published digest (a distinct, well-formed pair).
++  const pairedReport = hasExactKeys(summary.report, ["path", "sha256", "originalSha256"]) && isSha(summary.report.originalSha256) && summary.report.originalSha256 !== summary.report.sha256;
++  if (!(hasExactKeys(summary.report, ["path", "sha256"]) || pairedReport) || typeof summary.report.path !== "string" || !isSha(summary.report.sha256)) fail("a review receipt summary report is malformed");
+   if (summary.verdict !== "pass" && summary.verdict !== "open-findings") fail("a review receipt summary verdict is malformed");
+   const findings = summary.openFindingIds;
+   if (!Array.isArray(findings) || findings.length > FINDING_IDS_MAX || !findings.every(isRequirementId) || new Set(findings).size !== findings.length) fail("a review receipt summary openFindingIds is malformed");
+diff --git a/plugins/pipeline-core/lib/design-readiness-host-evidence.mjs b/plugins/pipeline-core/lib/design-readiness-host-evidence.mjs
+index aefccbdfc..807ae3d40 100644
+--- a/plugins/pipeline-core/lib/design-readiness-host-evidence.mjs
++++ b/plugins/pipeline-core/lib/design-readiness-host-evidence.mjs
+@@ -10,6 +10,7 @@ import {rereadReadinessAdvisorContextV2} from './readiness-advisor-context-v2.mj
+ import { createHash } from "node:crypto";
+ import { readFileSync, realpathSync, lstatSync } from "node:fs";
+ import { isAbsolute } from "node:path";
++import { fileURLToPath } from "node:url";
+ import { resolveSystemExecutable } from "./trusted-tool-resolution.mjs";
+ import { TextDecoder } from "node:util";
+ 
+@@ -28,7 +29,48 @@ const RUNNER_RECEIPT_ID = /^drh_[a-f0-9]{32}$/u;
+ const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+ const RECEIPT_SCHEMA = JSON.parse(readFileSync(new URL("../schemas/pipeline.design-readiness-receipt.v1.json", import.meta.url), "utf8"));
+ 
+-function fail(code) { return { ok: false, code }; }
++function fail(code) { return withDeviceLocalFinding({ ok: false, code }); }
++
++// Backlog item pipeline.approval-bound-design-package-lives-in-an-ignored-directory (device switch). The
++// bound set of a design approval has two kinds of members. The committed ones (package, Advisor receipt,
++// readiness file, PRD, Spec, the approval record) arrive with a clone. The host-observed readiness receipt
++// and the Advisor course live in private state (`.git/agent-pipeline/`) and never do. An approved plan does
++// not need them again (PO decision BL; the stored-approval reader never consults them), but the
++// pre-approval readers do, and on a second device they used to refuse with a bare code. These codes
++// mean "this device cannot find or re-derive the device-local part"; they are NOT tamper codes, which
++// (MISMATCH, DRIFT, digest codes) deliberately get no finding. The finding is additive: `code` and `ok` never change.
++const DEVICE_LOCAL_CODES = Object.freeze({
++  "DWP-READINESS-HOST-RECEIPT-UNAVAILABLE": { part: "readiness-host-receipt", location: ".git/agent-pipeline/design-readiness/" },
++  "DWP-READINESS-HOST-REPOSITORY-MISMATCH": { part: "repository-identity", location: ".git/agent-pipeline/design-readiness/" },
++  "DWP2-REPOSITORY-IDENTITY": { part: "repository-identity", location: ".git/agent-pipeline/design-advisor-courses/" },
++  "DWP2-DURABLE-COURSE": { part: "advisor-course", location: ".git/agent-pipeline/design-advisor-courses/" },
++  "DWP2-DURABLE-FAILURE": { part: "advisor-course", location: ".git/agent-pipeline/design-advisor-courses/" },
++});
++export const DEVICE_LOCAL_BOUND_SET_FINDING_SCHEMA = "pipeline.device-local-bound-set-finding.v1";
++
++/** The typed device-local finding for a refusal code, or null when the code is not a missing-device-local-part code. */
++export function deviceLocalFindingForCode(code) {
++  const entry = typeof code === "string" && Object.hasOwn(DEVICE_LOCAL_CODES, code) ? DEVICE_LOCAL_CODES[code] : null;
++  if (entry === null) return null;
++  const script = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
++  return {
++    schema: DEVICE_LOCAL_BOUND_SET_FINDING_SCHEMA,
++    part: entry.part,
++    location: entry.location,
++    explanation: `The ${entry.part} of this design is device-local private state (${entry.location}); it is not committed, so a checkout on another device does not have it. This is not tampering.`,
++    repair: {
++      argv: [script, "rebind-approval"],
++      text: `Run once from the project root: node ${script} rebind-approval. For an already approved plan it verifies the approval from the committed bound set alone (zero signatures, no State change); if no approval is recorded yet it answers DWP-REBIND-NO-APPROVAL and the design course must be run again on this device.`,
++    },
++  };
++}
++
++/** Adds `deviceLocal` to a refusal whose code names a missing device-local part; every other result is returned as is. */
++export function withDeviceLocalFinding(result) {
++  if (result === null || typeof result !== "object" || result.ok !== false || Object.hasOwn(result, "deviceLocal")) return result;
++  const finding = deviceLocalFindingForCode(result.code);
++  return finding === null ? result : { ...result, deviceLocal: finding };
++}
+ function sha(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+ function exact(value, keys) {
+   return value !== null && typeof value === "object" && !Array.isArray(value)
+diff --git a/plugins/pipeline-core/lib/design-review-receipt.mjs b/plugins/pipeline-core/lib/design-review-receipt.mjs
+index 776fc7531..60c03f03d 100644
+--- a/plugins/pipeline-core/lib/design-review-receipt.mjs
++++ b/plugins/pipeline-core/lib/design-review-receipt.mjs
+@@ -101,6 +101,11 @@ function sameSources(a, b) {
+ 
+ const isFeatureId = (value) => isString(value) && FEATURE_ID.test(value);
+ const isRef = (value) => isObject(value) && hasExactKeys(value, ["path", "sha256"]) && isString(value.path) && isSha256(value.sha256);
++/** A report reference: path and published digest, plus (D64, a sanitized report) the digest of its unpublished original. */
++const isReportShape = (value) => isObject(value) && isString(value.path) && isSha256(value.sha256)
++  && (hasExactKeys(value, ["path", "sha256"]) || hasExactKeys(value, ["originalSha256", "path", "sha256"]));
++/** The pair is well-formed when absent, or when the original digest is a digest that differs from the published one. */
++const reportPairIsValid = (report) => !Object.hasOwn(report, "originalSha256") || (isSha256(report.originalSha256) && report.originalSha256 !== report.sha256);
+ const isReviewer = (value) => isObject(value) && hasExactKeys(value, ["model", "runner"]) && isString(value.runner) && RUNNER.test(value.runner) && isString(value.model) && MODEL.test(value.model);
+ const isSourcesShape = (value) => isObject(value) && hasExactKeys(value, ["companions", "prd", "spec"]) && isRef(value.prd) && isRef(value.spec) && Array.isArray(value.companions) && allOf(value.companions, isRef);
+ const isStringList = (value) => Array.isArray(value) && allOf(value, isString);
+@@ -151,11 +156,12 @@ function receiptRefusal(receipt) {
+     && (previousReceiptSha256 === null || isSha256(previousReceiptSha256))
+     && isSourcesShape(sources)
+     && isReviewer(receipt.reviewer)
+-    && isRef(report)
++    && isReportShape(report)
+     && (receipt.verdict === "pass" || receipt.verdict === "open-findings")
+     && isStringList(receipt.openFindingIds)
+     && isReviewedAt(receipt.reviewedAt);
+   if (!shapeOk) return "DRR-SHAPE";
++  if (!reportPairIsValid(report)) return "DRR-REPORT-PAIR";
+   const companionPaths = sources.companions.map((companion) => companion.path);
+   if (!pathsAreAcceptable(report.path, sources.prd.path, sources.spec.path, companionPaths, previousReceiptPath)) return "DRR-PATH";
+   if (!sourcesAreAcceptable(sources.prd.path, sources.spec.path, companionPaths)) return "DRR-SOURCES";
+@@ -305,10 +311,11 @@ export function createDesignReviewReceipt(input) {
+     && (previous === null || isPreviousInput(previous))
+     && isSourcesShape(sources)
+     && isReviewer(reviewer)
+-    && isRef(report)
++    && isReportShape(report)
+     && isStringList(openFindingIds)
+     && isReviewedAt(reviewedAt);
+   if (!shapeOk) return refuse("DRR-SHAPE");
++  if (!reportPairIsValid(report)) return refuse("DRR-REPORT-PAIR");
+ 
+   const companions = sources.companions.map(({ path, sha256 }) => ({ path, sha256 })).sort((a, b) => compareUnits(a.path, b.path));
+   const normalized = {
+@@ -360,7 +367,7 @@ export function createDesignReviewReceipt(input) {
+     previousReceiptSha256,
+     sources: normalized,
+     reviewer: { runner: reviewer.runner, model: reviewer.model },
+-    report: { path: report.path, sha256: report.sha256 },
++    report: Object.hasOwn(report, "originalSha256") ? { path: report.path, sha256: report.sha256, originalSha256: report.originalSha256 } : { path: report.path, sha256: report.sha256 },
+     verdict: ids.length === 0 ? "pass" : "open-findings",
+     openFindingIds: ids,
+     reviewedAt,
+diff --git a/plugins/pipeline-core/lib/design-workflow-package-v2.mjs b/plugins/pipeline-core/lib/design-workflow-package-v2.mjs
+index a78eb4501..603627147 100644
+--- a/plugins/pipeline-core/lib/design-workflow-package-v2.mjs
++++ b/plugins/pipeline-core/lib/design-workflow-package-v2.mjs
+@@ -13,12 +13,12 @@ import {nativeInitialAdvisorNoChildRoute} from './native-initial-advisor-executi
+ import {resolvePoGateRepositoryTopology,derivePoGateRepositoryFingerprint} from './po-gate-authority.mjs';
+ import {validateAgainstSchema} from './schema-lite.mjs';
+ import packageV2Schema from '../schemas/pipeline.design-workflow-package.v2.json' with {type:'json'};
+-import {verifyDesignReadinessHostExecution,designReadinessReportSha256} from './design-readiness-host-evidence.mjs';
++import {verifyDesignReadinessHostExecution,designReadinessReportSha256,withDeviceLocalFinding} from './design-readiness-host-evidence.mjs';
+ import {validateAdvisoryReceipt} from './advisory-receipt.mjs';
+ import {validateDesignReadinessReceipt} from './design-workflow-package.mjs';
+ import {resolveV3DutyRoute} from './critic-route-v3.mjs';
+ export const DESIGN_WORKFLOW_PACKAGE_V2_SCHEMA='pipeline.design-workflow-package.v2';
+-const SHA=/^[a-f0-9]{64}$/u,ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u,fail=code=>({ok:false,code});
++const SHA=/^[a-f0-9]{64}$/u,ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u,fail=code=>withDeviceLocalFinding({ok:false,code});
+ const sha=b=>createHash('sha256').update(b).digest('hex');
+ function diagnosticFailure(code,value){const diagnostic=projectAdvisorBindingDiagnostic(value);return diagnostic?{...fail(code),diagnostic}:fail(code);}
+ const same=(a,b)=>canonicalizeJson(a)===canonicalizeJson(b);
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 79b885007..503ad10a1 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -280,6 +280,33 @@ export function designAdvisoryRemediation(code) {
+ 
+ }
+ 
++/**
++ * PO decision D117 (decision BI, backlog item denial-names-a-diagnosis-it-refuses): an approved feature whose approval
++ * cannot be RE-VERIFIED degrades to an advisory instead of locking every write. Only a verification INPUT that is
++ * unavailable qualifies -- never a mismatch. Today that is exactly one admission code: `DWP-PACKAGE-PHYSICAL`, the approved
++ * design workflow package file is missing or is not a physical repository file, so its digest cannot be recomputed. Every
++ * code that says a record, digest, signature, candidate or source DIFFERS stays a block with its own code (the package
++ * digest drift is `DWP-APPROVAL-DIGEST-DRIFT`, a wrong signer is `DAA-PO-APPROVAL-TRUST-MISMATCH`, ...), and so does a
++ * missing trust-anchor setup (`DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP`: nothing was ever configured to verify against).
++ * `designAdvisoryAdmission()` itself is NOT changed: its other callers (architecture-design, design-decision-bindings)
++ * need real authority and keep reading `ok:false`; only the two gate call sites consult this function.
++ */
++export const UNVERIFIABLE_APPROVAL_CODES = Object.freeze(["DWP-PACKAGE-PHYSICAL"]);
++export const UNVERIFIED_APPROVAL_ADVISORY_CODE = "GUARD-DEVPLAN-APPROVAL-UNVERIFIED";
++
++/** @returns {null|{code:string,cause:string,text:string}} null unless the refusal is an unavailable verification input. */
++export function unverifiedApprovalAdvisory(admission, state) {
++  if (admission?.ok !== false || !UNVERIFIABLE_APPROVAL_CODES.includes(admission.code)) return null;
++  const packagePath = state?.planApproval?.designWorkflowPackagePath;
++  const where = typeof packagePath === "string" && packagePath !== "" ? ` at ${packagePath}` : "";
++  const text = [
++    `[guard-devplan] ADVISORY (${UNVERIFIED_APPROVAL_ADVISORY_CODE}, cause ${admission.code}): the recorded design approval could not be re-verified, so this write was allowed on the recorded approval alone.`,
++    `What could not be verified: the approved design workflow package${where} is missing or is not a physical repository file, so its digest, signature and bound sources were NOT checked. Nothing was verified.`,
++    "Repair: run reopen-design --by <human attribution>, then finish the sources and obtain the approval again (a package that is present but different still blocks as DWP-APPROVAL-DIGEST-DRIFT).",
++  ].join("\n");
++  return { code: UNVERIFIED_APPROVAL_ADVISORY_CODE, cause: admission.code, text };
++}
++
+ 
+ /**
+  * Why `scratch/` is here, and why it is the safest of the five rather than the
+@@ -511,6 +538,12 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+ 
+   if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+     const admission = designAdvisoryAdmission(state, projectDir, planPath, specPath);
++    // D117 / BI: an approval whose verification input is unavailable degrades to ONE advisory instead of blocking.
++    const unverified = admission.ok ? null : unverifiedApprovalAdvisory(admission, state);
++    if (unverified !== null) return {
++      verdict: "allow", advisory: unverified.text, advisoryCode: unverified.code,
++      feature: activeFeature.id, lifecycleStatus: lifecycle.status,
++    };
+     if (!admission.ok) return {
+       verdict: gate.mode === "warn" ? "warn" : "block",
+       reason: designAdvisoryRemediation(admission.code),
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 6877fec27..a76f07d1f 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -176,6 +176,7 @@ function sanctionedDesignReviewReceiptArgs(args, root) {
+       },
+       optionalValue: {
+         "--previous": input,
++        "--original-report": input,
+         "--requested-route": (value) => REQUESTED_ROUTE.test(value),
+         "--observed-identity": (value) => OBSERVED_IDENTITY.test(value),
+       },
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+index 9258e3762..83db4016c 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-lane.mjs
+@@ -35,10 +35,15 @@ import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinui
+  * `devPlanGateVerdict()` itself did not already contain to a "warn") returns a typed fault
+  * sentinel rather than silently falling through as "nothing to check".
+  *
+- * @returns {null|{fault:true,error:Error}|{verdict:"block",reason:string,feature?:string,
++ * D117 / BI: a candidate whose verdict is "allow" but carries an `advisory` (an approval whose
++ * verification input is unavailable) yields, when no candidate blocks, the non-blocking sentinel
++ * `{advisory:true, notice, code, candidate, lane}`; the caller must surface `notice` and must NOT
++ * treat the sentinel as a refusal.
++ *
++ * @returns {null|{fault:true,error:Error}|{advisory:true,notice:string,code:string|null,candidate:string,lane:string}|{verdict:"block",reason:string,feature?:string,
+  *   planPath?:string|null,lifecycleStatus?:string,candidate:string,lane:string}} the first
+- *   "block" verdict for any candidate (carrying which candidate/lane produced it), or null when
+- *   nothing blocks.
++ *   "block" verdict for any candidate (carrying which candidate/lane produced it), the advisory
++ *   sentinel when only an advisory arose, or null when nothing blocks.
+  */
+ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolName = "Bash", sessionRoots = []) {
+   if (typeof command !== "string" || command === "") return null;
+@@ -139,6 +144,7 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+         forceLifecycleGate: true,
+       });
+     }
++    let advisory = null;
+     for (const { candidate, lane, forceLifecycleGate = false } of targets) {
+       if ((lane === "opaque-interpreter-code" && ["-e", "-D", ".", ".."].includes(candidate))
+         || (lane === "powershell-write-cmdlet" && ["-Path", "-D"].includes(candidate))) {
+@@ -163,8 +169,12 @@ export function devPlanShellRefusalHit(command, root, dependencies = {}, toolNam
+       }
+       const result = verdictFn({ filePath: candidate, projectDir: root, ...(forceLifecycleGate ? { forceLifecycleGate: true } : {}) });
+       if (result.verdict === "block") return { ...result, candidate, lane };
++      // D117 / BI: the first advisory is remembered, a later block still wins, and one command yields ONE advisory.
++      if (advisory === null && typeof result.advisory === "string") {
++        advisory = { advisory: true, notice: result.advisory, code: result.advisoryCode ?? null, candidate, lane };
++      }
+     }
+-    return null;
++    return advisory;
+   } catch (error) {
+     return { fault: true, error };
+   }
+diff --git a/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs b/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs
+index 3ef3d1752..d8bbda99d 100644
+--- a/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs
++++ b/plugins/pipeline-core/lib/guard/dispatch-record-lane.mjs
+@@ -59,7 +59,7 @@ export const DISPATCH_RECORD_PATH_DENIAL_CODE = "GUARD-DISPATCH-RECORD-PATH";
+ //   - a FINAL-terminal record (any terminal outcome except the interim one) is immutable: only the owner's identical-content re-write is admitted
+ //     (a no-op, so a retried finalising write is not mistaken for a failure); an Edit can never prove identity and is refused.
+ // An UNCLAIMED record (created by the orchestrator, before this fix, or by a runner whose payload carries no agent identity) keeps the previous
+-// logic unchanged. No identity is ever guessed.
++// logic, plus one PO-decided admission (ALF-K34, see dispatchRecordInterimExtension): the next post-commit checkpoint of an interim record. No identity is ever guessed.
+ export const DISPATCH_RECORD_OWNER_SCHEMA = "pipeline.dispatch-record-owner.v1";
+ 
+ export const DISPATCH_RECORD_INTERIM_OUTCOME = "committed-pending-report";
+@@ -181,6 +181,22 @@ export function claimDispatchRecordOwnership({ relPath, requested, root, input,
+   }
+ }
+ 
++// PO decision 2026-10-22 (ALF-K34, "align the unclaimed path"): an UNCLAIMED record now admits what the claimed path already admits for a multi-commit
++// package -- the next post-commit checkpoint. The validator forces candidateCommit to the last commit, so the second checkpoint changes candidateCommit
++// against an interim record that the denylist calls terminal. Admitted only when the existing record is the INTERIM outcome, the incoming write is JSON
++// for the same task id that is still the interim outcome (not final, not in-progress), and its commits strictly EXTEND the existing list (prefix and
++// order preserved, nothing removed). Everything else keeps the previous refusal: a final record, another task id, a shrunk/reordered/replaced list,
++// an Edit-shaped (non-JSON) payload.
++function dispatchRecordInterimExtension({ taskId, existing, incoming }) {
++  const interim = (outcome) => String(outcome).trim().toLowerCase() === DISPATCH_RECORD_INTERIM_OUTCOME;
++  if (incoming === null || typeof incoming !== "object" || Array.isArray(incoming)) return false;
++  if (!interim(existing.outcome) || !interim(incoming.outcome)) return false;
++  if (incoming.taskId !== taskId || existing.taskId !== taskId) return false;
++  if (!Array.isArray(existing.commits) || !Array.isArray(incoming.commits)) return false;
++  if (incoming.commits.length <= existing.commits.length) return false;
++  return existing.commits.every((sha, index) => incoming.commits[index] === sha);
++}
++
+ export function checkDispatchRecordCollision({ relPath, requested, payload, root, input = null, dependencies = {} }) {
+   const match = /^evidence\/dispatch-record-([A-Za-z0-9._-]+)\.json$/.exec(relPath);
+   if (!match) {
+@@ -217,7 +233,7 @@ export function checkDispatchRecordCollision({ relPath, requested, payload, root
+ 
+     if (existing && typeof existing === "object") {
+       const isTerminalFn = dependencies.isTerminalOutcomeFn ?? isTerminalOutcome;
+-      if (isTerminalFn(existing.outcome)) {
++      if (isTerminalFn(existing.outcome) && !dispatchRecordInterimExtension({ taskId, existing, incoming })) {
+         if (!incoming || incoming.outcome === "in-progress" || (incoming.candidateCommit && incoming.candidateCommit !== existing.candidateCommit)) {
+           return {
+             taskId,
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index 2e8bd12c7..b12543747 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -196,9 +196,13 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+     const shellCommand = (input.tool_input.command ?? input.tool_input.CommandLine);
+     const sanctionedPowerShellLifecycleCall = toolName === "PowerShell"
+       && sanctionedPowerShellNodeCall(shellCommand, root);
+-    const devPlanHit = sanctionedPowerShellLifecycleCall
++    const devPlanOutcome = sanctionedPowerShellLifecycleCall
+       ? null
+       : devPlanShellRefusalHit(shellCommand, root, dependencies, toolName, sessionRoots);
++    // D117 / BI: an approval whose verification input is unavailable is an advisory, never a refusal. It rides the
++    // same notice channel as the rebase-admission notice (exit 0 + stderr text carried onto the final verdict).
++    if (devPlanOutcome?.advisory === true) shellLifts.push(verdict(0, `${devPlanOutcome.notice}\n`));
++    const devPlanHit = devPlanOutcome?.advisory === true ? null : devPlanOutcome;
+     if (devPlanHit !== null && devPlanHit.fault === true) {
+       return devPlanShellFaultBlocked(devPlanHit.error);
+     }
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index bf7359b42..465baf7dd 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -407,6 +407,9 @@ export function sanctionedPipelineStateArgs(args, root) {
+     });
+   }
+   if (args[0] === "materialize-architecture") return args.length === 1;
++  // D64: the next action `inspect` renders once a plan is approved. The verb takes no flags and writes one governed template
++  // file (it refuses when that file exists), the same class as materialize-architecture just above.
++  if (args[0] === "materialize-push-threat-model") return args.length === 1;
+   const validBy = (value) => typeof value === "string"
+     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
+   if (args[0] === "plan-legacy-v2-revocation-recovery") {
+diff --git a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+index 607c892d3..6ce392f6e 100644
+--- a/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-windows-greenfield-lifecycle-not-walkable.test.mjs
+@@ -785,6 +785,45 @@ describe("V-10 admission wiring: the guard records the route digest of the brief
+     assert.equal(readRoute(slice), null);
+   });
+ 
++  // PO decision 2026-10-22 (ALF-K35): the gap above is not closed by a refusal but by a typed advisory. The call is still admitted and
++  // still unrecorded (the case above is unchanged); the hook now says so, names the cause and the one repair.
++  const WARN_CODE = "GUARD-DISPATCH-WORKFLOW-PROMPT-UNRESOLVED";
++  test("V-10 typed warning: an unresolvable Goldfish agent() prompt in a Workflow script is admitted with an advisory naming the cause, the missing record and one repair", () => {
++    const slice = "ALF-V10-WIRE-DYNAMIC-WARN";
++    const briefing = v10wBriefing(slice);
++    const cases = {
++      interpolation: { script: `const sliceId = '${slice}';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${v10wBriefing("${sliceId}")}\` });`, cause: /\$\{/u },
++      "named const": { script: `const BRIEFING = \`${briefing}\`;\nawait agent({ agentType: '${V10W_ROLE}', prompt: BRIEFING });`, cause: /identifier|expression|variable/iu },
++    };
++    for (const [name, { script, cause }] of Object.entries(cases)) {
++      const res = runHook(dynamicScript(script));
++      assert.equal(res.code, 0, `${name}: still admitted: ${res.stderr.slice(0, 300)}`);
++      assert.ok(res.stderr.includes(WARN_CODE), `${name}: typed advisory code expected: ${res.stderr.slice(0, 300)}`);
++      assert.match(res.stderr, cause, `${name}: names the cause`);
++      assert.ok(res.stderr.includes("no route record was written for this call"), `${name}: says what is missing`);
++      assert.ok(res.stderr.includes("templates/prompts/goldfish-task.md") && res.stderr.includes("static string literal"), `${name}: one repair`);
++      assert.equal(readRoute(slice), null, `${name}: nothing recorded`);
++    }
++  });
++
++  test("V-10 typed warning scope: a static literal, a non-Goldfish role and a script without agent() calls get no advisory; a static literal beside a dynamic one is still recorded", () => {
++    const staticSlice = "ALF-V10-WIRE-DYNAMIC-WARN-STATIC";
++    const quiet = runHook(dynamicScript(staticCall(v10wBriefing(staticSlice))));
++    assert.equal(quiet.code, 0, quiet.stderr.slice(0, 300));
++    assert.ok(!quiet.stderr.includes(WARN_CODE), "a static literal is recorded and needs no advisory");
++    assert.equal(readRoute(staticSlice)?.briefingSha256, sha256Of(v10wBriefing(staticSlice)));
++    const critic = runHook(dynamicScript("const P = 'x';\nawait agent({ agentType: 'pipeline-core:critic', prompt: P });"));
++    assert.ok(!critic.stderr.includes(WARN_CODE), "Critic and other non-Goldfish roles are out of scope of V-10 (PO 2026-10-22)");
++    const plain = runHook(dynamicScript("const n = 1 + 1;"));
++    assert.equal(plain.code, 0);
++    assert.ok(!plain.stderr.includes(WARN_CODE));
++    const mixedSlice = "ALF-V10-WIRE-DYNAMIC-WARN-MIXED";
++    const mixed = runHook(dynamicScript(`${staticCall(v10wBriefing(mixedSlice))}\nconst S = 'a';\nawait agent({ agentType: '${V10W_ROLE}', prompt: \`${v10wBriefing("${S}")}\` });`));
++    assert.equal(mixed.code, 0, mixed.stderr.slice(0, 300));
++    assert.ok(mixed.stderr.includes(WARN_CODE), "the dynamic call beside the static one is flagged");
++    assert.equal(readRoute(mixedSlice)?.briefingSha256, sha256Of(v10wBriefing(mixedSlice)), "the static call is still recorded");
++  });
++
+   test("V-10 typed gap RED proof: a guard that did record the run-time prompt, or one that refused it, fails the same check", () => {
+     const slice = "ALF-V10-WIRE-DYNAMIC-RED";
+     assert.throws(() => checkDynamicWorkflowGap({ send: () => ({ code: 0, stderr: "" }), read: () => ({ sliceId: slice }) }), /records no route/u);
+diff --git a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+index ce39faa77..5d006b70e 100644
+--- a/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
++++ b/plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs
+@@ -203,3 +203,32 @@ test('observed limit: the commands GG-22 and the dispatch-record lane name are r
+     assert.equal(devPlanShellRefusalHit(command, root, allow), null);
+   }
+ });
++
++// --- Second half of the item (PO decision D117, decision BI), added 2026-10-22 ---
++// An approved feature whose approval cannot be re-verified degrades to ONE advisory instead of locking every write. The lane-level
++// proof (both lanes, real state, negative controls) is hooks/guard-devplan-approval-unverified.test.mjs; these cases pin the
++// advisory's own contract against the diagnosis rule this file exists for. They are green only with the D117 guard change applied.
++test('D117 advisory: typed code, what was not verified, one repair verb that is admitted, and no refused script command', async () => {
++  const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
++  const advisory = policy.unverifiedApprovalAdvisory({ ok: false, code: 'DWP-PACKAGE-PHYSICAL' }, { planApproval: { designWorkflowPackagePath: 'evidence/package.json' } });
++  assert.ok(advisory, 'DWP-PACKAGE-PHYSICAL (the code this item was filed for) must degrade to an advisory');
++  assert.equal(advisory.code, 'GUARD-DEVPLAN-APPROVAL-UNVERIFIED');
++  for (const needle of [advisory.code, 'DWP-PACKAGE-PHYSICAL', 'evidence/package.json', 'Nothing was verified', 'Repair: run reopen-design']) {
++    assert.ok(advisory.text.includes(needle), `advisory must contain: ${needle}`);
++  }
++  assert.ok(!refusedNames(advisory.text), 'the advisory names a script command the lane refuses');
++  assert.equal(advisory.text.split('Repair:').length - 1, 1, 'exactly one repair');
++  const verb = VERBS.find(v => advisory.text.includes(v));
++  assert.equal(verb, 'reopen-design');
++  mkdirSync(join(root, 'scratch'), { recursive: true });
++  try {
++    assert.equal(isSanctionedLifecycleCommand(build(verb), root, {}), true, 'the named repair verb is admitted in the lifecycle state');
++    assert.equal(devPlanShellRefusalHit(build(verb), root, blockedDraft), null);
++  } finally { rmSync(join(root, receiptRel), { force: true }); }
++});
++test('D117 advisory: the other codes of the former denial still block (the denial keeps naming only admitted verbs)', async () => {
++  const policy = await import(new URL('../guard-devplan-policy.mjs', import.meta.url));
++  for (const code of ['DWP-APPROVAL-DIGEST-DRIFT', 'DAA-PO-APPROVAL-TRUST-MISMATCH', 'DAA-PO-APPROVAL-TRUST-ANCHOR-SETUP', 'DAA-DESIGN-SOURCE-DRIFT']) {
++    assert.equal(policy.unverifiedApprovalAdvisory({ ok: false, code }, {}), null, `${code} must not degrade`);
++  }
++});
+diff --git a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+index a01dad883..1879cf161 100644
+--- a/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
++++ b/plugins/pipeline-core/lib/pins/design-phase-d64-criterion-parser-and-sanitized-review-chain.test.mjs
+@@ -4,22 +4,28 @@
+ // parser that registration and dispatch use BEFORE present-plan; (2) the review chain counts spent rounds
+ // independently of file names, and a sanitized report does not reset the count.
+ //
+-// Honest scope. The parser and the round counter are real and driven here. The present-plan refusal and the
+-// sanitized-report digest pair are NOT implemented in this tree (present-plan lives in the protected
+-// scripts/pipeline-state.mjs; design-review-receipt.mjs carries no original/published digest). Those two
+-// clauses are therefore counted as `todo` with a typed reason, never as a pass and never as a skip.
++// Both clauses are driven for real: present-plan refuses a Spec whose criterion rows the parser cannot locate, and the receipt
++// chain carries and checks the original/published report digest pair (D64 acceptance, 2026-10-22).
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+ import test from "node:test";
++import { execFileSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { dirname, join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ import { isCriterionId, scanAcceptedCriterionRows } from "../critic-accepted-contract.mjs";
+-import { DESIGN_REVIEW_MAX_ROUNDS, createDesignReviewReceipt } from "../design-review-receipt.mjs";
++import * as contract from "../critic-accepted-contract.mjs";
++import { createDesignApprovalBinding } from "../design-approval-binding.mjs";
++import { DESIGN_REVIEW_MAX_ROUNDS, createDesignReviewReceipt, summarizeDesignReviewReceipt } from "../design-review-receipt.mjs";
++import { canonical } from "../po-approval-proof.mjs";
++import { createReceiptFromDisk } from "../../scripts/design-review-receipt.mjs";
++import { run, statePath } from "../../scripts/pipeline-state.mjs";
+ 
+ const sha = (text) => createHash("sha256").update(text).digest("hex");
+ const ref = (path, text) => ({ path, sha256: sha(text) });
+ const sources = (specText) => ({ prd: ref("specs/f1/prd.md", "prd"), spec: ref("specs/f1/spec.md", specText), companions: [] });
+ const reviewer = { runner: "claude", model: "claude-sonnet-5-5" };
+-const PENDING = "implementation-pending: D64 clause not implemented in this tree; owner Coordinator, due 2026-11-04 (needs a protected pipeline-state.mjs / guard step, PO ceremony)";
+ 
+ const specWith = (table) => `# Spec\n\n## Acceptance criteria\n\n${table}\n`;
+ const FOUR_COLUMN = specWith("| ID | Criterion | Test | Status |\n| --- | --- | --- | --- |\n| AC-1 | The thing works | t.test.mjs | open |");
+@@ -81,10 +87,164 @@ test("D64 review chain (RED mirror): a producer given a predecessor derives roun
+   assert.equal(mislabelled.receipt.round, 2, "the producer derives round 2 from the chain; the caller cannot pick 'initial'");
+ });
+ 
+-test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", { todo: PENDING }, () => {
+-  assert.fail("present-plan accepts a Spec whose criteria the registration parser cannot locate (observed CAC-CRITERION-UNSUPPORTED only at dispatch)");
++// ---- present-plan: the criterion refusal (real present-plan on a disposable feature-profile root) ----
++const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
++const CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
++const FEATURE = "feature-test";
++function capture(fn) {
++  const out = []; const err = [];
++  const beforeLog = console.log; const beforeError = console.error;
++  console.log = (...values) => out.push(values.join(" "));
++  console.error = (...values) => err.push(values.join(" "));
++  try { return { code: fn(), stdout: out.join("\n"), stderr: err.join("\n") }; }
++  finally { console.log = beforeLog; console.error = beforeError; }
++}
++/** A submitted feature-profile root whose Spec is `spec`; the PRD carries the matching marker. */
++function submittedRoot(spec) {
++  const scratch = resolve(pluginRoot, "../../scratch");
++  mkdirSync(scratch, { recursive: true });
++  const root = mkdtempSync(join(scratch, "alf-k11-d64-"));
++  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
++  execFileSync("git", ["init", "-q", root], { env });
++  execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "test: fixture base",
++    "-m", "AI-Assisted: true\nDispatch: ALF-K11 (goldfish)"], { env });
++  const planPath = `specs/${FEATURE}/prd.md`; const specPath = `specs/${FEATURE}/spec.md`;
++  const now = "2026-10-03T00:00:00.000Z";
++  mkdirSync(join(root, "project"), { recursive: true });
++  mkdirSync(join(root, `specs/${FEATURE}`), { recursive: true });
++  mkdirSync(join(root, ".agent-pipeline"), { recursive: true });
++  writeFileSync(join(root, ".agent-pipeline/onboarding-consent.json"), JSON.stringify({ schema: "pipeline.onboarding-consent-marker.v1", status: "consent-given-onboarding-incomplete", consentGivenAt: now }));
++  const plan = `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${sha(spec)} -->\n# PRD\n${FEATURE}\n`;
++  writeFileSync(join(root, planPath), plan);
++  writeFileSync(join(root, specPath), spec);
++  const evidence = { schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en", sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64), receiptSha256: "3".repeat(64), repositoryFingerprint: "4".repeat(64) };
++  const continuity = { schema: "pipeline.continuity.v0", featureId: FEATURE, revision: 0, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
++    authority: { prd: { path: planPath, sha256: sha(plan) }, spec: { path: specPath, sha256: sha(spec) }, result: null },
++    queueHead: { packageId: "initial-planning", actionId: "review-plan", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
++    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
++    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
++  writeFileSync(statePath(root), JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: FEATURE, planPath, phase: "design" }, planApproved: false, continuity, updatedAt: now }));
++  const deps = { dir: root, now: () => now, gitCandidate: () => ({ ok: true, ...CANDIDATE }), gitHead: () => ({ ok: true, commit: CANDIDATE.commit }),
++    gitUserName: () => "Fixture", poGateProfile: () => ({ ok: true, value: evidence }),
++    poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: sha(plan), specPath, specSha256: sha(spec) } }),
++    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex" };
++  const submitted = capture(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
++  assert.equal(submitted.code, 0, submitted.stderr);
++  mkdirSync(join(root, "evidence"), { recursive: true });
++  writeFileSync(join(root, "evidence/review-1.json"), "{}\n");
++  return { root, deps, cleanup: () => rmSync(root, { recursive: true, force: true }) };
++}
++function presentPlan(spec) {
++  const f = submittedRoot(spec);
++  try { return capture(() => run(["present-plan", "--by", "Fixture", "--review-receipt", "evidence/review-1.json"], f.deps)); }
++  finally { f.cleanup(); }
++}
++const SUPPORTED_SHAPE_NAMES = [/\| # \| Criterion \| Evidence \|/u, /AC-<n>/u, /leading zero/u];
++
++test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", () => {
++  for (const [label, spec, id] of [["four-column table", FOUR_COLUMN, "AC-1"], ["leading-zero id", LEADING_ZERO, "AC-01"]]) {
++    const refused = presentPlan(spec);
++    assert.equal(refused.code, 2, label);
++    assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, `${label}: ${refused.stderr}`);
++    assert.ok(refused.stderr.includes(id), `${label}: names the offending id`);
++    for (const shape of SUPPORTED_SHAPE_NAMES) assert.match(refused.stderr, shape, `${label}: names the supported shapes`);
++  }
++});
++
++test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and a Spec with no criterion rows are not refused by it", () => {
++  for (const [label, spec] of [["supported three-column", THREE_COLUMN], ["supported two-column", TWO_COLUMN], ["no criterion rows at all", "# Technical Spec\nGuard admission regression.\n"]]) {
++    const result = presentPlan(spec);
++    assert.equal(result.code, 2, `${label}: the later receipt check still stops the bare fixture`);
++    assert.doesNotMatch(result.stderr, /CAC-CRITERION-UNSUPPORTED/u, `${label}: ${result.stderr}`);
++    assert.match(result.stderr, /present-plan refused \(DRR-/u, `${label}: ${result.stderr}`);
++  }
++});
++
++test("D64 criterion inspection: the located and the unsupported rows come from the parser's own scan", () => {
++  assert.equal(typeof contract.inspectSpecCriterionRows, "function");
++  const ok = contract.inspectSpecCriterionRows(THREE_COLUMN);
++  assert.deepEqual([ok.ok, ok.located], [true, ["AC-1"]]);
++  const none = contract.inspectSpecCriterionRows("# Spec\n\nNo criteria.\n");
++  assert.deepEqual([none.ok, none.located], [true, []]);
++  const four = contract.inspectSpecCriterionRows(FOUR_COLUMN);
++  assert.deepEqual([four.ok, four.code, four.unsupported.map((row) => row.id)], [false, "CAC-CRITERION-UNSUPPORTED", ["AC-1"]]);
++  const zero = contract.inspectSpecCriterionRows(LEADING_ZERO);
++  assert.deepEqual([zero.ok, zero.unsupported.map((row) => row.id)], [false, ["AC-01"]]);
++  // A row outside a normative acceptance heading is not a criterion row and is never refused.
++  assert.equal(contract.inspectSpecCriterionRows("# Spec\n\n## Examples\n\n| ID | Criterion | Test | Status |\n| --- | --- | --- | --- |\n| AC-1 | x | t | open |\n").ok, true);
++  // The same id stated in a supported shape elsewhere is located, so a cross-reference row does not refuse the Spec.
++  assert.equal(contract.inspectSpecCriterionRows(`${THREE_COLUMN}\n| AC-1 | tests/x.test.js | covered | open |\n`).ok, true);
++  // A criterion id located twice is ambiguous at dispatch and is refused here too.
++  const twice = contract.inspectSpecCriterionRows(specWith("| # | Criterion | Evidence |\n| --- | --- | --- |\n| AC-1 | one | t.test.mjs |\n| AC-1 | two | t.test.mjs |"));
++  assert.deepEqual([twice.ok, twice.unsupported.map((row) => row.reason)], [false, ["duplicate"]]);
++});
++
++// ---- the sanitized review-chain digest pair ----
++const ORIGINAL = sha("original report, unsanitized");
++const PUBLISHED = sha("published report, sanitized");
++const pairReport = (name, published = PUBLISHED, original = ORIGINAL) => ({ path: name, sha256: published, originalSha256: original });
++
++test("D64 review chain: a sanitized report binds the original and the published digest and a delta after a formal correction needs no budget exception", () => {
++  const specV1 = FOUR_COLUMN;
++  const first = createDesignReviewReceipt({ featureId: "f1", previous: null, sources: sources(specV1), reviewer, report: pairReport("specs/f1/report-a.md"),
++    openFindingIds: ["F-FORMAT"], reviewedAt: "2026-10-10T00:00:00.000Z" });
++  assert.equal(first.ok, true, JSON.stringify(first));
++  assert.deepEqual(first.receipt.report, { path: "specs/f1/report-a.md", sha256: PUBLISHED, originalSha256: ORIGINAL });
++  assert.deepEqual(summarizeDesignReviewReceipt({ path: "specs/f1/receipt-1.json", bytes: first.bytes }).summary.report, first.receipt.report);
++  // The formal correction changes the Spec bytes only; the delta is round 2 of the same chain, so no exception is needed.
++  const corrected = createDesignReviewReceipt({ featureId: "f1", previous: { path: "specs/f1/receipt-1.json", bytes: first.bytes }, sources: sources(THREE_COLUMN),
++    reviewer, report: pairReport("specs/f1/report-b.md", sha("b-published"), sha("b-original")), openFindingIds: [], reviewedAt: "2026-10-11T00:00:00.000Z" });
++  assert.equal(corrected.ok, true, JSON.stringify(corrected));
++  assert.deepEqual([corrected.receipt.kind, corrected.receipt.round, corrected.receipt.verdict], ["delta", 2, "pass"]);
++  const binding = createDesignApprovalBinding({ featureId: "f1", receipts: [{ path: "specs/f1/receipt-1.json", bytes: first.bytes }, { path: "specs/f1/receipt-2.json", bytes: corrected.bytes }], currentSources: sources(THREE_COLUMN) });
++  assert.equal(binding.ok, true, JSON.stringify(binding));
++  assert.deepEqual(binding.binding.reviewReceipts.map((entry) => entry.round), [1, 2]);
++  // The pair is part of what the receipt digest binds: the same review with another original digest is another receipt.
++  const other = createDesignReviewReceipt({ featureId: "f1", previous: null, sources: sources(specV1), reviewer, report: pairReport("specs/f1/report-a.md", PUBLISHED, sha("another original")),
++    openFindingIds: ["F-FORMAT"], reviewedAt: "2026-10-10T00:00:00.000Z" });
++  assert.notEqual(other.sha256, first.sha256);
++});
++
++test("D64 review chain (RED mirror): a pair whose original equals the published digest, or is no digest, is refused with a typed code", () => {
++  const make = (report) => createDesignReviewReceipt({ featureId: "f1", previous: null, sources: sources("spec-v1"), reviewer, report, openFindingIds: [], reviewedAt: "2026-10-10T00:00:00.000Z" });
++  assert.deepEqual([make(pairReport("specs/f1/r.md", PUBLISHED, PUBLISHED)).ok, make(pairReport("specs/f1/r.md", PUBLISHED, PUBLISHED)).code], [false, "DRR-REPORT-PAIR"]);
++  assert.equal(make(pairReport("specs/f1/r.md", PUBLISHED, "not-a-digest")).ok, false);
++  assert.equal(make({ path: "specs/f1/r.md", sha256: PUBLISHED }).ok, true, "a report without an original digest stays valid (unsanitized reports are the ordinary case)");
++});
++
++test("D64 review chain: present-plan checks the pair in the receipt it is handed and refuses a forged one", () => {
++  const spec = THREE_COLUMN;
++  const f = submittedRoot(spec);
++  try {
++    const good = createDesignReviewReceipt({ featureId: FEATURE, previous: null,
++      sources: { prd: ref(`specs/${FEATURE}/prd.md`, readFileSync(join(f.root, `specs/${FEATURE}/prd.md`), "utf8")), spec: ref(`specs/${FEATURE}/spec.md`, spec), companions: [] },
++      reviewer, report: pairReport(`specs/${FEATURE}/review.md`), openFindingIds: [], reviewedAt: "2026-10-10T00:00:00.000Z" });
++    assert.equal(good.ok, true, JSON.stringify(good));
++    const forged = JSON.parse(Buffer.from(good.bytes).toString("utf8"));
++    forged.report.originalSha256 = forged.report.sha256;
++    writeFileSync(join(f.root, "evidence/review-1.json"), `${canonical(forged)}\n`);
++    const refused = capture(() => run(["present-plan", "--by", "Fixture", "--review-receipt", "evidence/review-1.json"], f.deps));
++    assert.equal(refused.code, 2);
++    assert.match(refused.stderr, /present-plan refused \(DRR-REPORT-PAIR\)/u, refused.stderr);
++    writeFileSync(join(f.root, "evidence/review-1.json"), Buffer.from(good.bytes));
++    const accepted = capture(() => run(["present-plan", "--by", "Fixture", "--review-receipt", "evidence/review-1.json"], f.deps));
++    assert.doesNotMatch(accepted.stderr, /DRR-REPORT-PAIR|DRR-SHAPE|DRR-JSON|DRR-NONCANONICAL/u, `a well-formed pair passes the receipt parse: ${accepted.stderr}`);
++  } finally { f.cleanup(); }
+ });
+ 
+-test("D64 review chain: a sanitized report binds the original and the published digest and a delta after a formal correction needs no budget exception", { todo: PENDING }, () => {
+-  assert.fail("design-review-receipt.mjs records one report digest only; no original/published digest pair exists");
++test("D64 review chain: the producer derives the pair from an original report file and refuses the same bytes for both", () => {
++  const f = submittedRoot(THREE_COLUMN);
++  try {
++    writeFileSync(join(f.root, `specs/${FEATURE}/review.md`), "published (sanitized) report\n");
++    writeFileSync(join(f.root, `specs/${FEATURE}/review-original.md`), "original report with a private path\n");
++    const request = { repo: f.root, featureId: FEATURE, reportPath: `specs/${FEATURE}/review.md`, prdPath: `specs/${FEATURE}/prd.md`, specPath: `specs/${FEATURE}/spec.md` };
++    const env = { CLAUDECODE: "1" };
++    const now = () => new Date("2026-10-10T00:00:00.000Z");
++    const same = createReceiptFromDisk({ ...request, originalReportPath: `specs/${FEATURE}/review.md`, outPath: `specs/${FEATURE}/receipt-a.json` }, { env, now });
++    assert.deepEqual([same.ok, same.code], [false, "DRR-REPORT-PAIR"]);
++    const made = createReceiptFromDisk({ ...request, originalReportPath: `specs/${FEATURE}/review-original.md`, outPath: `specs/${FEATURE}/receipt-b.json` }, { env, now });
++    assert.equal(made.ok, true, JSON.stringify(made));
++    assert.equal(made.receipt.report.originalSha256, sha("original report with a private path\n"));
++    assert.equal(made.receipt.report.sha256, sha("published (sanitized) report\n"));
++  } finally { f.cleanup(); }
+ });
+diff --git a/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs b/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs
+index c1950c357..35cf28241 100644
+--- a/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs
++++ b/plugins/pipeline-core/lib/pins/dispatch-record-log-stays-empty-despite-mandatory-phase-entries.test.mjs
+@@ -209,19 +209,78 @@ test("MEASURED ordering (c): the SECOND post-commit checkpoint of a multi-commit
+   // included - so a checkpoint that follows the template literally MUST move candidateCommit with each commit.
+   assert.deepEqual(validateDispatchRecord(second).commits, [COMMIT_1, COMMIT_2]);
+   assert.equal(lane({ ...first, outcome: "in-progress", candidateCommit: BASE, commits: [], report: null }, first), null, "control: the first checkpoint (existing record still in-progress) is admitted");
+-  const hit = lane(first, second);
+-  assert.ok(hit, "measured: the lane's unclaimed path refuses the second checkpoint because candidateCommit changed against a terminal-by-denylist record");
+-  assert.match(hit.reason, /already been used by a completed dispatch/u);
++  // QG-04 (ALF-K34, PO decision 2026-10-22 "align the unclaimed path"): K24 measured here that the unclaimed path REFUSED this write
++  // (candidateCommit changed against a terminal-by-denylist record). The PO decided the unclaimed path must admit it, so the measured
++  // refusal is replaced by the admission; the refusals that remain are pinned by the K34 negative controls below.
++  assert.equal(lane(first, second), null, "the unclaimed path admits the second checkpoint of a multi-commit package (K34)");
+ });
+ 
+-// The decided behaviour for the unclaimed path is a design decision (lane change, lib/guard/* is protected); the case documents
+-// the contract the claimed path already honours (see parallel-work-in-one-checkout-is-unsafe.test.mjs, PARWORK-M2a/M2b).
+-test("DESIRED ordering (c): the second checkpoint is admitted on an unclaimed record too", { todo: "needs a lane decision, lib/guard is protected (ALF-K24 report)" }, () => {
++// Decided by the PO 2026-10-22 (ALF-K34): the unclaimed path honours the contract the claimed path already honours
++// (see parallel-work-in-one-checkout-is-unsafe.test.mjs, PARWORK-M2a/M2b).
++test("DESIRED ordering (c): the second checkpoint is admitted on an unclaimed record too", () => {
+   const first = interim(COMMIT_1, [COMMIT_1], goodLog);
+   const second = interim(COMMIT_2, [COMMIT_1, COMMIT_2], [...goodLog, { phase: "commit-2", toolUseCount: 20 }]);
+   assert.equal(lane(first, second), null);
+ });
+ 
++// K34 negative controls: every refusal the unclaimed path keeps against an interim record.
++const COMMIT_3 = "4".repeat(40);
++const secondCheckpoint = () => interim(COMMIT_2, [COMMIT_1, COMMIT_2], [...goodLog, { phase: "commit-2", toolUseCount: 20 }]);
++const COMPLETED = /already been used by a completed dispatch/u;
++
++test("K34 control: a three-commit chain is admitted checkpoint by checkpoint", () => {
++  const twoCommits = secondCheckpoint();
++  const third = interim(COMMIT_3, [COMMIT_1, COMMIT_2, COMMIT_3], [...goodLog, { phase: "commit-3", toolUseCount: 30 }]);
++  assert.equal(lane(twoCommits, third), null);
++});
++
++test("K34 refusal kept: a FINAL record stays immutable (changed candidateCommit and extended commits)", () => {
++  const final = { ...interim(COMMIT_1, [COMMIT_1], goodLog), outcome: "completed" };
++  const hit = lane(final, secondCheckpoint());
++  assert.ok(hit);
++  assert.match(hit.reason, COMPLETED);
++});
++
++test("K34 refusal kept: a different taskId in the incoming write is refused", () => {
++  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
++  assert.match(lane(first, { ...secondCheckpoint(), taskId: "OTHER-TASK-1" }).reason, COMPLETED);
++  assert.match(lane(first, { ...secondCheckpoint(), taskId: undefined }).reason, COMPLETED);
++});
++
++test("K34 refusal kept: shrinking, reordering or replacing the commit list is refused", () => {
++  const first = interim(COMMIT_2, [COMMIT_1, COMMIT_2], goodLog);
++  const next = (candidateCommit, commits) => interim(candidateCommit, commits, goodLog);
++  for (const [label, incoming] of [
++    ["shrunk", next(COMMIT_1, [COMMIT_1])],
++    ["reordered", next(COMMIT_3, [COMMIT_2, COMMIT_1, COMMIT_3])],
++    ["replaced", next(COMMIT_3, [COMMIT_3, COMMIT_2, COMMIT_1])],
++    ["first commit replaced", next(COMMIT_3, [COMMIT_3, COMMIT_2, COMMIT_3])],
++    ["same length, different last", next(COMMIT_3, [COMMIT_1, COMMIT_3])],
++    ["emptied", next(COMMIT_1, [])],
++  ]) {
++    const hit = lane(first, incoming);
++    assert.ok(hit, `${label} commit list must stay refused`);
++    assert.match(hit.reason, COMPLETED);
++  }
++});
++
++test("K34 refusal kept: an incoming write that is not the interim outcome (final, in-progress) against an interim record with changed candidateCommit", () => {
++  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
++  const grown = secondCheckpoint();
++  assert.match(lane(first, { ...grown, outcome: "completed" }).reason, COMPLETED);
++  assert.match(lane(first, { ...grown, outcome: "in-progress" }).reason, COMPLETED);
++});
++
++test("K34 refusal kept: an Edit-shaped (non-JSON) append to an interim record stays refused", () => {
++  assert.match(lane(interim(COMMIT_1, [COMMIT_1], goodLog), null).reason, COMPLETED);
++});
++
++test("K34 refusal kept: a non-array commits field on either side is refused", () => {
++  const first = interim(COMMIT_1, [COMMIT_1], goodLog);
++  assert.match(lane(first, { ...secondCheckpoint(), commits: COMMIT_2 }).reason, COMPLETED);
++  assert.match(lane({ ...first, commits: undefined }, secondCheckpoint()).reason, COMPLETED);
++});
++
+ // --- WORDING: what the texts an agent reads actually say about the log ---------------------------------------------------
+ test("MEASURED wording: the briefing names the exact log entry keys the validator accepts (phase, toolUseCount, note)", () => {
+   const marker = bullet(text("templates/prompts/goldfish-task.md"), "**Cheap progress markers");
+diff --git a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+index 5a9c76989..4d05ef0f7 100644
+--- a/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
++++ b/plugins/pipeline-core/lib/pins/lifecycle-coordination-commands-refused-as-implementation-writes.test.mjs
+@@ -12,6 +12,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+ import { join, resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+ import test from 'node:test';
++import { createHash } from 'node:crypto';
++import { spawnSync } from 'node:child_process';
++import { existsSync } from 'node:fs';
++import { run } from '../../scripts/pipeline-state.mjs';
+ 
+ const repo = resolve(fileURLToPath(new URL('../../../../', import.meta.url)));
+ const { devPlanShellRefusalHit } = await import(new URL('../guard/devplan-shell-lane.mjs', import.meta.url));
+@@ -235,3 +239,103 @@ test('D64 state machine harness fails a recovery whose retry meets the same refu
+   assert.equal(outcome.admittedFirst, false);
+   assert.equal(outcome.progress, false, 'the same refusal after the recovery is no progress');
+ });
++
++// ---- D64 (0.7.0, blocker): one integration walk with the REAL guards from a fresh repository to the first implementation dispatch ----
++// Every command is spelled exactly as the Pipeline itself renders it (the absolute node executable first, then the script and its
++// closed argv) and is put through the real lifecycle-ready guard (guard-lifecycle-ready main) AND the real dev-plan shell lane.
++// There is no override: the recording seam answers `ineligible`, so a refusal is a refusal. Any prescribed command a real guard
++// still refuses makes this test RED with the exact command and code in its message.
++const walkQuote = value => `'${value.replaceAll("'", "'\"'\"'")}'`;
++const walkRender = action => [action.executable, ...action.argv].map(walkQuote).join(' ');
++const walkAction = (...argv) => ({ executable: process.execPath, argv });
++const walkDigest = value => createHash('sha256').update(value).digest('hex');
++
++async function walkSteps(f, { actualGuard }) {
++  const { PIPELINE_STATE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT } = constants;
++  const steps = [];
++  const check = (label, action) => {
++    const rendered = walkRender(action);
++    const guard = actualGuard(action, f.root);
++    const lane = devPlanShellRefusalHit(rendered, f.root, deps);
++    steps.push({ label, rendered, code: guard.code, stderr: guard.stderr, lane: lane?.lane ?? null });
++    return guard.code === 0 && lane === null;
++  };
++  const stateCmd = (...argv) => walkAction(PIPELINE_STATE_SCRIPT, ...argv);
++  const out = [];
++  const capture = fn => { const lines = []; const before = console.log; console.log = (...v) => lines.push(v.join(' ')); try { return { code: fn(), stdout: lines.join('\n') }; } finally { console.log = before; } };
++
++  // 1. the state readback and the next action inspect renders in the submitted (design, awaiting-approval) state
++  check('inspect', stateCmd('inspect'));
++  const inspected = capture(() => run(['inspect'], f.deps));
++  const next = JSON.parse(inspected.stdout).nextAction;
++  if (next?.kind === 'command') check(`inspect next action (${next.code ?? next.kind})`, { executable: next.executable, argv: next.argv });
++  // 2. route selection, architecture materialization and baseline diagnosis, documented help
++  check('route selection', walkAction(MODEL_ROLE_DISPATCH_SELECT_SCRIPT, '--repo-root', f.root, '--runner', 'codex', '--task-route', 'profile.critic.review'));
++  check('architecture materialization', stateCmd('materialize-architecture'));
++  check('architecture baseline diagnosis', walkAction(ARCHITECTURE_BASELINE_SCRIPT, '--root', f.root));
++  check('pipeline-state --help', stateCmd('--help'));
++  // 3. the design-review receipt, produced for real through the spelling the guard admitted
++  mkdirSync(join(f.root, 'specs', f.featureId, 'review'), { recursive: true });
++  const reportPath = `specs/${f.featureId}/review/design-review-1.md`;
++  const receiptPath = `specs/${f.featureId}/review/design-review-receipt-1.json`;
++  writeFileSync(join(f.root, reportPath), '# Critic report\n\nVerdict: PASS\n');
++  const create = walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
++    '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', receiptPath);
++  const createAdmitted = check('design-review receipt (initial)', create);
++  if (createAdmitted) {
++    const made = spawnSync(create.executable, create.argv, { cwd: f.root, encoding: 'utf8', env: { ...process.env, CLAUDECODE: '1' } });
++    out.push({ label: 'receipt producer executes', ok: made.status === 0 && existsSync(join(f.root, receiptPath)), detail: `${made.status} ${made.stderr}` });
++  }
++  // sanitized report: the producer's optional original-report form (D64 digest pair) must be admitted too
++  writeFileSync(join(f.root, `specs/${f.featureId}/review/design-review-1.original.md`), 'original report\n');
++  check('design-review receipt (sanitized report pair)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
++    '--original-report', `specs/${f.featureId}/review/design-review-1.original.md`, '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--out', `specs/${f.featureId}/review/design-review-receipt-2.json`));
++  check('design-review receipt (delta)', walkAction(DESIGN_REVIEW_RECEIPT_SCRIPT, 'create', '--repo', f.root, '--feature', f.featureId, '--report', reportPath,
++    '--prd', f.sources.prd.path, '--spec', f.sources.spec.path, '--previous', receiptPath, '--open-finding', 'F-1', '--out', `specs/${f.featureId}/review/design-review-receipt-3.json`));
++  // 4. present-plan, then the approval transport in the spelling inspect renders after a presentation, then the phase switch
++  check('present-plan', stateCmd('present-plan', '--by', 'Fixture', '--review-receipt', receiptPath));
++  mkdirSync(join(f.root, 'scratch'), { recursive: true });
++  const requestPath = `scratch/design-approval-request-${walkDigest('request')}.json`;
++  writeFileSync(join(f.root, requestPath), '{}\n');
++  check('approve-plan (signature transport)', stateCmd('approve-plan', '--design-approval-request', requestPath));
++  check('approve-plan (attributed transport)', stateCmd('approve-plan', '--by', 'Fixture PO', '--design-approval-request', requestPath));
++  check('set-phase implementation', stateCmd('set-phase', '--phase', 'implementation'));
++  // 5. feature-package registration, the last step before the first implementation dispatch
++  check('feature-package registration', walkAction(REGISTER_FEATURE_PACKAGE_SCRIPT, '--root', f.root));
++  return { steps, out };
++}
++
++test('D64 integration: from a fresh repository to the first implementation dispatch every prescribed command is admitted by the real guards with zero overrides', async () => {
++  const hooks = await import(new URL('../../hooks/design-course-command-admission.test.mjs', import.meta.url));
++  const f = hooks.fixture('feature');
++  try {
++    const { steps, out } = await walkSteps(f, hooks);
++    const refusedSteps = steps.filter(step => step.code !== 0 || step.lane !== null);
++    assert.deepEqual(refusedSteps.map(step => `${step.label}: guard exit ${step.code}${step.lane ? `, dev-plan lane ${step.lane}` : ''}; command: ${step.rendered}; ${String(step.stderr).split('\n')[0]}`), [],
++      'a prescribed command is still refused by a real guard: report each with the file that must change');
++    assert.deepEqual(out.filter(entry => !entry.ok).map(entry => `${entry.label}: ${entry.detail}`), []);
++    assert.equal(steps.length >= 13, true, 'the walk covers every prescribed step');
++  } finally { f.cleanup(); }
++});
++
++test('D64 integration (implementation boundary): the next action inspect renders after approval is admitted by the real guards as spelled, absolute node executable included', async () => {
++  const { prepareApprovedItemCourseFixture } = await import(new URL('../test-item-approved-course-fixture.mjs', import.meta.url));
++  const approvedRoot = mkdtempSync(join(repo, 'scratch', 'alf-k11-approved-'));
++  const quiet = fn => { const before = console.log; console.log = () => {}; try { return fn(); } finally { console.log = before; } };
++  try {
++    quiet(() => prepareApprovedItemCourseFixture({ root: approvedRoot }));
++    const lines = [];
++    const before = console.log; console.log = (...v) => lines.push(v.join(' '));
++    try { assert.equal(run(['inspect'], { dir: approvedRoot, architectureEntryReadiness: () => ({ status: 'ready' }) }), 0); } finally { console.log = before; }
++    const inspected = JSON.parse(lines.join('\n'));
++    assert.equal(inspected.status, 'implementing');
++    const next = inspected.nextAction;
++    assert.equal(next.kind, 'command', JSON.stringify(next));
++    assert.equal(next.executable, process.execPath, 'the rendered executable is the absolute node path');
++    const action = { executable: next.executable, argv: next.argv };
++    // The fixture project is not governance-enforced, so the guard hooks would not run at all there; the closed-argv verdict is what an enforced,
++    // not-ready project applies to the same rendered command, and that is what must admit it.
++    assert.equal(isSanctionedLifecycleCommand(walkRender(action), approvedRoot), true, `the closed-argv catalogue refuses the command the Pipeline itself renders after approval: ${walkRender(action)}`);
++    assert.equal(devPlanShellRefusalHit(walkRender(action), approvedRoot, deps), null, `${walkRender(action)} is refused by the dev-plan shell lane after approval`);
++  } finally { rmSync(approvedRoot, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/scripts/design-review-receipt.mjs b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+index 930642110..12d6ca09e 100644
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ -39,7 +39,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ export const DESIGN_REVIEW_RECEIPT_CREATE_SCHEMA = "pipeline.design-review-receipt-create.v1";
+ 
+ const USAGE = "Usage: design-review-receipt.mjs create --repo <repo-root> --feature <feature-id> --report <critic-report> --prd <prd> --spec <spec> "
+-  + "[--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
++  + "[--original-report <path>] [--companion <path>]... [--previous <receipt>] [--open-finding <id>]... [--requested-route <route>] [--observed-identity <identity>] --out <receipt>\n"
+   + "Every path is repo-relative. The review time, runner and all digests are derived, never supplied. The observed identity is "
+   + "recorded only when you supply a direct observation of the concrete review dispatch; otherwise it is `unknown`.";
+ 
+@@ -51,7 +51,7 @@ const REQUESTED_ROUTE_PATTERN = /^[\x21-\x7e]{1,128}$/u;
+ const SINGLE_FLAGS = new Map([
+   ["repo", "repo"], ["feature", "featureId"], ["report", "reportPath"], ["prd", "prdPath"],
+   ["spec", "specPath"], ["previous", "previousPath"], ["out", "outPath"],
+-  ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
++  ["original-report", "originalReportPath"], ["requested-route", "requestedRoute"], ["observed-identity", "observedIdentity"],
+ ]);
+ const REPEATED_FLAGS = new Map([["companion", "companionPaths"], ["open-finding", "openFindingIds"]]);
+ const REQUIRED = ["repo", "feature", "report", "prd", "spec", "out"];
+@@ -136,6 +136,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const companionPaths = request.companionPaths ?? [];
+   const openFindingIds = request.openFindingIds ?? [];
+   const previousPath = request.previousPath ?? null;
++  const originalReportPath = request.originalReportPath ?? null;
+   const requestedRoute = request.requestedRoute ?? null;
+   const observedIdentity = request.observedIdentity ?? null;
+   const isStrings = (value) => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+@@ -153,6 +154,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
+   companionPaths.forEach((path) => named.push(["companion", path]));
+   if (previousPath !== null) named.push(["previous receipt", previousPath]);
++  if (originalReportPath !== null) named.push(["original report", originalReportPath]);
+   for (const [role, path] of named) {
+     if (!isSafePath(path)) return refuse("DRC-PATH-UNSAFE", `the ${role} path is not a safe repo-relative path: ${JSON.stringify(path)}`);
+   }
+@@ -184,6 +186,13 @@ export function createReceiptFromDisk(input, deps = {}) {
+   }
+   const reportRead = readBound(repoReal, request.reportPath, "report");
+   if (!reportRead.ok) return reportRead;
++  // D64: a sanitized report. The unpublished original is read only to derive its digest; the receipt binds both digests.
++  let originalSha256 = null;
++  if (originalReportPath !== null) {
++    const originalRead = readBound(repoReal, originalReportPath, "original report");
++    if (!originalRead.ok) return originalRead;
++    originalSha256 = sha256Of(originalRead.bytes);
++  }
+   let previous = null;
+   if (previousPath !== null) {
+     const previousRead = readBound(repoReal, previousPath, "previous receipt");
+@@ -203,7 +212,7 @@ export function createReceiptFromDisk(input, deps = {}) {
+     previous,
+     sources,
+     reviewer: { runner, model },
+-    report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes) },
++    report: { path: request.reportPath, sha256: sha256Of(reportRead.bytes), ...(originalSha256 === null ? {} : { originalSha256 }) },
+     openFindingIds,
+     reviewedAt: clock.toISOString(),
+     specBytes,
+@@ -261,7 +270,7 @@ function parseArgv(argv) {
+   }
+   const missing = REQUIRED.find((name) => !single.has(name));
+   if (missing !== undefined) return refuse("DRC-USAGE", `missing --${missing}\n${USAGE}`);
+-  const request = { ...repeated, previousPath: null, requestedRoute: null, observedIdentity: null };
++  const request = { ...repeated, previousPath: null, originalReportPath: null, requestedRoute: null, observedIdentity: null };
+   for (const [name, key] of SINGLE_FLAGS) if (single.has(name)) request[key] = single.get(name);
+   return { ok: true, request };
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index f62c0ca62..25f0376e0 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -378,7 +378,7 @@ import {
+   writeSync,
+ } from "node:fs";
+ import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+-import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture } from "../lib/critic-accepted-contract.mjs";
++import { createAcceptedDeliveryContractEnvelope, verifyAcceptedDeliveryContract, prepareAcceptedContractCapture, inspectSpecCriterionRows } from "../lib/critic-accepted-contract.mjs";
+ import { resolveCanonicalArtifactIdentity as acceptedContractArtifactIdentity } from "../lib/feature-package-topology.mjs";
+ import { verifyAgainstTrustAnchors as verifyAcceptedTrustAnchors } from "../lib/critical-human-proof-policy.mjs";
+ import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
+@@ -10975,6 +10975,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       const requiresWorkflowPackage = ["epic", "feature"].includes(submitted?.profile);
+       let approvalRequestPath = null, approvalReview = null;
+       if (requiresWorkflowPackage) {
++        // D64: every acceptance-criterion row the Spec states must be one the registration/dispatch parser locates; an unsupported
++        // shape or id is refused HERE, before the PO is asked to sign, not first at dispatch preparation. Scoped to Specs that carry
++        // such rows (a Spec with none is the deferred delivery hand-off concern, D85) and fail-open on an unreadable Spec, which the
++        // input check below refuses with its own typed code.
++        const specFile = physicalRebindFile(dir, submitted.specPath);
++        let specText = null;
++        try { specText = specFile ? new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(specFile.bytes) : null; } catch { specText = null; }
++        const criteria = specText === null ? { ok: true } : inspectSpecCriterionRows(specText);
++        if (!criteria.ok) { console.error(`Error: present-plan refused (${criteria.code}); ${criteria.message}`); return 2; }
+         const inputs = readDesignApprovalInputs(dir, submitted, reviewPaths);
+         if (!inputs.ok) { console.error(`Error: present-plan refused (${inputs.code}); use present-plan --review-receipt.`); return 2; }
+         const decisionDraft = inspectDesignDecisionBindingsDraft({rootDir:dir,sources:inputs.currentSources});
+diff --git a/plugins/pipeline-core/scripts/rebind-approval.test.mjs b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+index 452a1e977..db9f52130 100644
+--- a/plugins/pipeline-core/scripts/rebind-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/rebind-approval.test.mjs
+@@ -76,7 +76,7 @@ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+ import { materializeTestDesignWorkflowPackage } from "../lib/test-design-workflow-fixture.mjs";
+ import { createPoApprovalIntent, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+-import { rereadApprovedDesignWorkflowPackage } from "../lib/design-workflow-package.mjs";
++import { readDesignWorkflowPackageFromRepository, rereadApprovedDesignWorkflowPackage } from "../lib/design-workflow-package.mjs";
+ import { verifyStoredDesignWorkflowPackageSignature } from "../lib/design-workflow-approval.mjs";
+ import { validPlanSubmission, validPreviousCurrentPlanApproval } from "../lib/plan-spec-state-v2.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+@@ -345,6 +345,108 @@ test("R7-5c: a bound artifact absent from the clone yields DWP-REBIND-ARTIFACT-L
+   assert.deepEqual([...privateSnapshot(clone.dir)], [...privateBefore], "no receipt and no prior evidence promoted into private state");
+ });
+ 
++// ALF-K29 / backlog item pipeline.approval-bound-design-package-lives-in-an-ignored-directory, open entry
++// "2026-10-08 recurrence: the private readiness receipt and Advisor course stay device-local; survival of
++// the full bound set across a device switch is not shown". The bound set splits in two:
++//   committed (tracked-required): the package, the Advisor receipt, the readiness file, PRD, Spec and the
++//     approval record in project/pipeline-state.json -- they arrive with a clone;
++//   device-local (private state): the host-observed readiness receipt `.git/agent-pipeline/design-readiness/`
++//     and the Advisor course `.git/agent-pipeline/design-advisor-courses/` -- they never arrive.
++// PO decision BL (R7-5): an approved plan does not need the device-local parts again. R7-5a above reuses the
++// origin's host-execution test seam, so it cannot show that; these cases run the clone with NO seam and
++// with the origin's device-local stores populated, then pin the one remaining place a device-local part is
++// still demanded (the pre-approval reader) to a self-describing refusal with a repair that actually runs.
++function seedDeviceLocalStores(origin) {
++  const readiness = join(origin.dir, ".git", "agent-pipeline", "design-readiness", h("4"));
++  const course = join(origin.dir, ".git", "agent-pipeline", "design-advisor-courses", h("4"));
++  for (const directory of [readiness, course]) mkdirSync(directory, { recursive: true });
++  writeFileSync(join(readiness, `drh_${"a".repeat(32)}.json`), "{\"origin-device-readiness-receipt\":true}\n");
++  writeFileSync(join(course, "dac_origin.json"), "{\"origin-device-advisor-course\":true}\n");
++  return { readiness, course };
++}
++const cloneBareDeps = (clone) => { // the clone's deps WITHOUT the origin's host-execution / candidate test seam
++  const { dir, now, ownerNonce, env, readHumanApprovalMode } = clone.deps;
++  return { dir, now, ownerNonce, env, readHumanApprovalMode };
++};
++function headCandidate(dir) {
++  return { commit: git(dir, ["rev-parse", "HEAD"]), tree: git(dir, ["rev-parse", "HEAD^{tree}"]) };
++}
++
++test("[bound set / device switch] the committed bound set alone verifies the approval on a clone whose device-local stores are absent", async () => {
++  const { classifyBoundPathReference } = await import("../lib/bound-path-classification.mjs");
++  const origin = approvedOrigin("bs-survive");
++  const seeded = seedDeviceLocalStores(origin);
++  assert.equal(existsSync(seeded.readiness) && existsSync(seeded.course), true, "precondition: the origin device holds both device-local stores");
++  const clone = cloneOf(origin, "bs-survive");
++  assert.deepEqual([...privateSnapshot(clone.dir).keys()], [], "precondition: nothing of .git/agent-pipeline arrived by clone");
++  assert.equal(git(clone.dir, ["status", "--porcelain"]), "", "precondition: clone is clean");
++
++  const result = invoke(["rebind-approval"], cloneBareDeps(clone));
++  const payload = rebindPayload(result);
++  assert.equal(result.status, 0, `${result.err} ${result.out}`);
++  assert.equal(payload.status, "verified", "no host-execution seam, no private store: the committed state alone verifies");
++  assert.equal(payload.readinessHostExecution, "not-required-on-rebind");
++
++  const receiptDir = join(clone.dir, ".git", "agent-pipeline", "rebind-approval");
++  const receipt = JSON.parse(readFileSync(join(receiptDir, readdirSync(receiptDir)[0]), "utf8"));
++  assert.ok(receipt.boundSet.length >= 3, "the bound set holds the package, the Advisor receipt, the readiness file and the sources");
++  for (const { path } of receipt.boundSet) {
++    assert.equal(classifyBoundPathReference(path), "tracked-required", `${path} is a committed home`);
++    assert.notEqual(git(clone.dir, ["ls-files", "--", path]), "", `${path} is tracked on the clone`);
++  }
++  assert.equal(readdirSync(join(clone.dir, ".git", "agent-pipeline")).some((name) => /design-readiness|design-advisor-courses/u.test(name)), false,
++    "verification neither needed nor created a device-local readiness or Advisor store");
++});
++
++test("[bound set / device switch] the pre-approval reader names the missing device-local part and ONE repair that runs on the clone", () => {
++  const origin = approvedOrigin("bs-refusal");
++  seedDeviceLocalStores(origin);
++  const clone = cloneOf(origin, "bs-refusal");
++  const read = readDesignWorkflowPackageFromRepository({ repoRoot: clone.dir, packagePath: origin.state.planApproval.designWorkflowPackagePath,
++    readCandidate: () => headCandidate(clone.dir), requireCurrentCandidate: false });
++  assert.equal(read.ok, false, "without the origin's host-observed receipt the default reader cannot admit the package");
++  assert.equal(read.code, "DWP-READINESS-HOST-RECEIPT-UNAVAILABLE", "the existing typed code is unchanged");
++  const finding = read.deviceLocal;
++  assert.ok(finding && typeof finding === "object", `the refusal carries a typed device-local finding; got ${JSON.stringify(read)}`);
++  assert.equal(finding.schema, "pipeline.device-local-bound-set-finding.v1");
++  assert.equal(finding.part, "readiness-host-receipt");
++  assert.match(finding.location, /^\.git\/agent-pipeline\/design-readiness\/?$/u);
++  assert.match(finding.explanation, /device-local/iu);
++  assert.deepEqual(finding.repair.argv.slice(1), ["rebind-approval"], "exactly one repair command");
++  assert.equal(existsSync(finding.repair.argv[0]), true, "the repair names the real script on this device");
++  assert.match(finding.repair.text, /rebind-approval/u);
++
++  // The repair is runnable as given: it verifies the approval on the clone and requests nothing from the PO.
++  const ran = spawnSync(process.execPath, finding.repair.argv, { cwd: clone.dir, encoding: "utf8", env: { ...process.env, ...ENV } });
++  assert.ok(ran.stdout.trim().startsWith("{"), `repair must print one JSON object (exit ${ran.status}; stderr: ${ran.stderr.slice(0, 200)})`);
++  const payload = JSON.parse(ran.stdout);
++  assert.equal(payload.status, "verified", JSON.stringify(payload).slice(0, 400));
++  assert.equal(payload.signaturesRequested, 0);
++});
++
++test("[bound set / device switch] every device-local refusal code maps to a finding; a content refusal code never does", async () => {
++  const evidence = await import("../lib/design-readiness-host-evidence.mjs");
++  assert.equal(typeof evidence.deviceLocalFindingForCode, "function", "design-readiness-host-evidence exports deviceLocalFindingForCode");
++  const expected = new Map([
++    ["DWP-READINESS-HOST-RECEIPT-UNAVAILABLE", "readiness-host-receipt"],
++    ["DWP-READINESS-HOST-REPOSITORY-MISMATCH", "repository-identity"],
++    ["DWP2-REPOSITORY-IDENTITY", "repository-identity"],
++    ["DWP2-DURABLE-COURSE", "advisor-course"],
++    ["DWP2-DURABLE-FAILURE", "advisor-course"],
++  ]);
++  for (const [code, part] of expected) {
++    const finding = evidence.deviceLocalFindingForCode(code);
++    assert.equal(finding?.part, part, code);
++    assert.deepEqual(finding.repair.argv.slice(1), ["rebind-approval"], code);
++  }
++  for (const code of ["DWP-READINESS-HOST-RECEIPT-MISMATCH", "DWP-APPROVAL-DIGEST-DRIFT", "DWP2-PHYSICAL-DRIFT", "DWP-PACKAGE-PHYSICAL"]) {
++    assert.equal(evidence.deviceLocalFindingForCode(code), null, `${code} is a content/tamper refusal, not a missing device-local part`);
++  }
++  const untouched = { ok: false, code: "DWP-READINESS-HOST-RECEIPT-MISMATCH" };
++  assert.deepEqual(evidence.withDeviceLocalFinding(untouched), untouched, "a content refusal passes through unchanged");
++  assert.equal(evidence.withDeviceLocalFinding({ ok: true }).ok, true);
++});
++
+ const INSPECT_TODO = "onboarding inspect on the throwaway clone returns status partial (partial_authority, nextAction null) because the clone is not an onboarded project; the ready branch that calls designToImplementationHandoverAction is never reached, so the reopen-design precondition cannot be established on this fixture";
+ test("inspect of an approval that cannot be verified on this checkout lists rebind-approval alongside reopen-design", { todo: INSPECT_TODO }, () => {
+   const origin = approvedOrigin("inspect", { hideReadiness: true });

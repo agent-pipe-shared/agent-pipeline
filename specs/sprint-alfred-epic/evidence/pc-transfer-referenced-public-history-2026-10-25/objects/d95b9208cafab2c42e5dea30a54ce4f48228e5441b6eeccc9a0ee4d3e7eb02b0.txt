@@ -1,0 +1,21 @@
+command: node --test --test-name-pattern=^P[1-4]: scratch/clones/k150b-g31/plugins/pipeline-core/lib/pins/signing-prompt-prints-the-whole-review-package.test.mjs
+label: signing-prompt-pin-v2
+exitCode: 0
+head: b062173423dd17ce1a8d56ee4bbb3e86e4569e42
+tree: d8c0f5032b41a6b60af08ed6d5e96dae20a4991b
+dirty: true
+--- stdout ---
+✔ P1: a 4000-line, multi-megabyte review record renders as a bounded block carrying the intent digest (23.712358ms)
+✔ P2: the full material is referenced by path and sha256 and the omission is stated (54.862767ms)
+✔ P3: control characters and embedded newlines cannot add lines to the block (0.927091ms)
+✔ P4: the post-sign result for a human is exactly one short line; machine callers keep the full result (1.502484ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 746.329687
+
+--- stderr ---

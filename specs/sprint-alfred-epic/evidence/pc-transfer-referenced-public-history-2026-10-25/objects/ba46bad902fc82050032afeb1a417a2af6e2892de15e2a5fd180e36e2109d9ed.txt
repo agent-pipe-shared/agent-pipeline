@@ -1,0 +1,20 @@
+command: node --test plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs
+label: k150b-g31-green-final
+exitCode: 0
+head: 13ed1539bef27e3d897934ff9ce58e39c01ceb8f
+tree: b3d97247d51342b279e66586d3f830038afa7551
+dirty: true
+--- stdout ---
+✔ K150B: a long material path retains its full identity and digest in the disclosure (2.574812ms)
+✔ K150B: malformed digest and control-bearing material paths refuse (1.005531ms)
+✔ G31: human-facing critical authorization names the external proof (1.571325ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 664.892855
+
+--- stderr ---

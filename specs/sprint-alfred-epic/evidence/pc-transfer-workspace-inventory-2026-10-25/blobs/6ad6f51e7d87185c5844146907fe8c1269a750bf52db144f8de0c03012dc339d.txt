@@ -1,0 +1,7 @@
+docs(security-controls): label the catalog path as a maintainer reference and state the license check once
+
+Reader round 20261023b findings 26, 27 and 45 (finding 25 keeps its
+pointer to the Usage approval section; group C2 adds the matching text).
+
+AI-Assisted: true
+Dispatch: K124-READER-FIX2-GROUP-D (goldfish)

@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/** Inert preparation only. This command never launches a reviewer or writes a receipt. */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { prepareDesignReviewExecution } from "../lib/design-review-execution-producer.mjs";
+
+const refuse = code => ({ ok: false, code });
+export function prepareDesignReviewExecutionFromDisk(input) {
+  try {
+    const root = realpathSync(input.root);
+    const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 1048576 }).trim();
+    const candidate = { commit: git(["rev-parse", "HEAD"]), tree: git(["rev-parse", "HEAD^{tree}"]) };
+    if (!Array.isArray(input.sourcePaths) || input.sourcePaths.length < 2 || input.sourcePaths.length > 66) return refuse("DRE-SOURCES");
+    const sourcePaths = [...input.sourcePaths].sort();
+    if (new Set(sourcePaths).size !== sourcePaths.length || !sourcePaths.includes(input.specPath)) return refuse("DRE-SOURCES");
+    const records = [];
+    let specBytes;
+    for (const path of sourcePaths) {
+      if (typeof path !== "string" || path.length > 240 || /[\\\x00-\x1f:]/u.test(path) || path !== path.trim()
+        || path.split("/").some(part => !part || part === "." || part === "..")) return refuse("DRE-SOURCE-PATH");
+      let current = root;
+      for (const part of path.split("/")) {
+        current = join(current, part);
+        if (lstatSync(current).isSymbolicLink()) return refuse("DRE-SOURCE-PATH");
+      }
+      if (!lstatSync(current).isFile() || lstatSync(current).size > 1048576) return refuse("DRE-SOURCE-PATH");
+      const entry = git(["ls-tree", "HEAD", "--", path]).match(/^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t(.+)$/u);
+      if (!entry || entry[3] !== path) return refuse("DRE-SOURCE-UNTRACKED");
+      const bytes = readFileSync(current);
+      const committed = execFileSync("git", ["cat-file", "blob", entry[2]], { cwd: root, maxBuffer: 1048576 });
+      if (!bytes.equals(committed)) return refuse("DRE-SOURCE-DRIFT");
+      records.push({ path, sha256: createHash("sha256").update(bytes).digest("hex"), blobOid: entry[2], mode: entry[1] });
+      if (path === input.specPath) specBytes = bytes;
+    }
+    if (candidate.commit !== git(["rev-parse", "HEAD"]) || candidate.tree !== git(["rev-parse", "HEAD^{tree}"])) return refuse("DRE-CANDIDATE-DRIFT");
+    return prepareDesignReviewExecution({ featureId: input.featureId, candidate, sources: records, specPath: input.specPath,
+      specBytes, authorExecutionSha256: input.authorExecutionSha256, round: input.round, previousReceiptSha256: input.previousReceiptSha256 });
+  } catch { return refuse("DRE-SOURCE-UNAVAILABLE"); }
+}
+
+export function main(argv = process.argv.slice(2)) {
+  if (argv.length !== 2 || argv[0] !== "prepare-proposal") { process.stdout.write(`${JSON.stringify(refuse("DRE-PROPOSED-ONLY"))}\n`); return 2; }
+  let result;
+  try { result = prepareDesignReviewExecutionFromDisk(JSON.parse(readFileSync(argv[1], "utf8"))); }
+  catch { result = refuse("DRE-PREPARE-SHAPE"); }
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+  return result.ok ? 0 : 2;
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main();

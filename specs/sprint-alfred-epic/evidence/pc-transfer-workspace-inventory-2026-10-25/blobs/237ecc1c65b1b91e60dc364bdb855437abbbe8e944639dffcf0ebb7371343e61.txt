@@ -1,0 +1,961 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { spawn, spawnSync } from "node:child_process";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+import { VerifyEvidenceError, VERIFY_EVIDENCE_SCHEMA, produceVerifyEvidence } from "./verify-evidence-producer.mjs";
+import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
+import { prepareConsumerVerify, CONSUMER_VERIFY_ADAPTER_PATH } from "../lib/consumer-verify.mjs";
+import { verifySuiteArtifactName } from "./verify-journal.mjs";
+import { createPublicVerifyRunEvidence } from "../lib/verify-resume.mjs";
+import { verifyEvidenceSatisfiesBoundary } from "../lib/verify-selection.mjs";
+import { retryGovernanceVerificationAction } from "../lib/governance-verification-action.mjs";
+import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { admitSessionCriticReview, finalizeSessionCriticReview } from "./session-critic-finalizer.mjs";
+import { readConsumedCandidateReceipt } from "./critic-packet-preflight.mjs";
+import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
+import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
+import { planCommitNpmInvocation, prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
+
+function run(executable, args, options = {}) {
+  const result = spawnSync(executable, args, { encoding: "utf8", ...options });
+  assert.equal(isSuccessfulSpawn(result), true, result.stderr);
+  return String(result.stdout ?? "");
+}
+function git(root, args) { return run("git", ["-C", root, ...args]).trim(); }
+
+/** A minimal committed project: calibration naming `verify`, one commit, clean tree. */
+function fixture(verifyCommand) {
+  const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  // Fixture restatement (QG-04, bounded; PO decision 2026-10-23 "S4 follows R1", AC-232): an aliased
+  // identity is now refused, so the fixture project is named like its root. No assertion changed.
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root), verify: verifyCommand }, null, 2)}\n`);
+  writeFileSync(join(root, "README.md"), "# Fixture\n");
+  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
+  prepareConsumerVerify({ rootDir: root });
+  git(root, ["init", "-q"]);
+  git(root, ["add", "."]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"]);
+  return root;
+}
+async function withFixture(verifyCommand, run) {
+  const root = fixture(verifyCommand);
+  try { await run(root); } finally { rmSync(root, { recursive: true, force: true }); }
+}
+function activeSessionDescriptors(root) {
+  const directory = join(root, ".git", "agent-pipeline", "session-descriptors", "active");
+  return existsSync(directory) ? readdirSync(directory).sort() : [];
+}
+async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict = null, featureId = null } = {}) {
+  mkdirSync(join(root, "specs"), { recursive: true });
+  // A session Critic over no registered course needs a generic batch over a review unit committed at the base.
+  writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\nAC-1 AC-2\n");
+  writeFileSync(join(root, "specs", "review-unit.json"), JSON.stringify({
+    schema: "pipeline.critic-review-unit.v1", kind: "related-fixes", purpose: "Verify evidence producer fixture delivery",
+    specPath: "specs/spec.md", logicalWorkIds: ["AC-1", "AC-2"], criterionIds: ["AC-1", "AC-2"],
+    deliveryBoundary: { mainRef: "refs/heads/main" }, singletonRationale: null,
+  }));
+  git(root, ["add", "specs/spec.md", "specs/review-unit.json"]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "critic review unit base"]);
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Review fixture\nAC-1 AC-2\nchanged\n");
+  if (featureId !== null) {
+    mkdirSync(join(root, "specs", featureId, "evidence"), { recursive: true });
+    writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
+      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 },
+      state: "approved", artifacts: [],
+    })}\n`);
+  }
+  git(root, ["add", ".claude/pipeline.yaml", "specs/spec.md", ...(featureId === null ? [] : [`specs/${featureId}/lifecycle.json`])]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "critic candidate"]);
+  const candidate = git(root, ["rev-parse", "HEAD"]);
+  const base = git(root, ["rev-parse", "HEAD^1"]);
+  await produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-candidate.json", mode: "critic", base });
+  writeFileSync(join(root, "evidence", "dispatch-record-release-verify.json"), JSON.stringify({
+    schema: "pipeline.dispatch-record.v3",
+    taskId: "release-verify",
+    agentType: "default",
+    model: "gpt-5.6-luna",
+    effort: "medium",
+    rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0",
+    dispatcher: "elephant",
+    outcome: "completed",
+    commits: [candidate],
+    candidateCommit: candidate,
+    resultSha256: "a".repeat(64),
+    log: [],
+    report: { text: "done", changedFiles: ["specs/spec.md"] },
+    criticRequired: {
+      schema: "pipeline.critic-required-decision.v1",
+      trigger: {
+        schema: "pipeline.critic-trigger-input.v1",
+        rigorLevel: 2,
+        riskClass: "high",
+        riskFlag: true,
+        diff: { mechanical: false, architecture: false, guardrails: true, security: false },
+      },
+      appliedRow: "T1",
+    },
+  }, null, 2));
+  const review = {
+    preflightInput: { root, base, candidate, specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/critic-candidate.json"], priorCriticEvidencePath: null },
+    taskId: "release-verify", projectId: "fixture", sessionId: "release-review-1", packetId,
+    route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" },
+    verdict: verdict ?? { findings: [], deliberately_not_flagged: ["fixture"], trajectory_verdict: "consistent", trajectory_evidence: "fixture evidence", briefing_violations: [], pass: true },
+  };
+  const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
+  mkdirSync(controlRoot, { recursive: true, mode: 0o700 });
+  chmodSync(join(root, ".git", "agent-pipeline"), 0o700);
+  chmodSync(controlRoot, 0o700);
+  const batch = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: {
+    taskId: "release-verify", baseCommit: base, candidateCommit: candidate, logicalWorkIds: ["AC-1", "AC-2"],
+    specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
+  review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
+  admitSessionCriticReview(review);
+  const final = finalizeSessionCriticReview(review);
+  const observed = readConsumedCandidateReceipt({ controlRoot: join(root, ".git", "agent-pipeline", "critic-packets"), packetId });
+  assert.equal(observed.receipt.packetId, packetId);
+  return { packetId, candidate, final };
+}
+
+test("candidate Verify carries a consumed Critic only over exact registered evidence commits", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const featureId = "carry-feature";
+    const reviewed = await completedCriticPacket(root, { featureId });
+    const evidencePath = `specs/${featureId}/evidence/review.json`;
+    const evidenceBytes = `${JSON.stringify({ schema: "fixture.review.v1", verdict: "pass" })}\n`;
+    writeFileSync(join(root, evidencePath), evidenceBytes);
+    writeFileSync(join(root, "specs", featureId, "lifecycle.json"), `${JSON.stringify({
+      schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 1 },
+      state: "approved", artifacts: [{ class: "candidate-evidence", path: evidencePath,
+        sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+        authority: false, mutability: "immutable", retention: "retain" }],
+    })}\n`);
+    git(root, ["add", `specs/${featureId}`]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+      "commit", "-qm", "register review evidence"]);
+    const target = git(root, ["rev-parse", "HEAD"]);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "candidate",
+      criticPacketId: reviewed.packetId, criticEvidenceFeatureId: featureId });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.candidate.commit, target);
+    assert.equal(result.criticLifecycle.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v2");
+    assert.equal(result.criticLifecycle.receipt.carryForward.proof.reviewedCandidate.commit, reviewed.candidate);
+    const ready = checkCurrentCriticBoundVerify(root);
+    assert.equal(ready.ok, true, JSON.stringify({ code: ready.code,
+      candidate: ready.candidate, evidence: {
+        schema: result.evidence.schema, commit: result.evidence.commit,
+        tree: result.evidence.tree, candidate: result.evidence.candidate,
+        exitCode: result.evidence.exitCode, terminalStatus: result.evidence.verifyRun?.status,
+        terminalSha256: result.evidence.verifyRun?.terminalSha256,
+      } }));
+    assert.equal(ready.receiptId, result.criticLifecycle.receipt.id);
+    writeFileSync(join(root, "README.md"), "# Changed after review\n");
+    git(root, ["add", "README.md"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+      "commit", "-qm", "change source after review"]);
+    assert.equal(checkCurrentCriticBoundVerify(root).ok, false);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, mode: "candidate",
+      criticPacketId: reviewed.packetId, criticEvidenceFeatureId: featureId }),
+    error => error.code === "VEP-CVL-CARRY-CONTENT-CHANGED");
+  });
+});
+
+test("a passing verify produces a consumable artifact bound to the exact commit and tree", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" });
+    assert.equal(result.status, "passed");
+    const commit = git(root, ["rev-parse", "HEAD"]);
+    const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
+    assert.equal(result.evidence.schema, VERIFY_EVIDENCE_SCHEMA);
+    assert.equal(result.evidence.commit, commit);
+    assert.equal(result.evidence.tree, tree);
+    assert.equal(result.evidence.candidate.commit, commit);
+    assert.equal(result.evidence.candidate.tree, tree);
+    assert.equal(result.evidence.exitCode, 0);
+    assert.deepEqual(result.evidence.verifyRun, createPublicVerifyRunEvidence({
+      ...result.evidence.verifyRun,
+      resumePlanSha256: JSON.parse(readFileSync(join(root, ".git/agent-pipeline/verify/runs", result.evidence.verifyRun.runId, "resume-plan.json"), "utf8")).planSha256,
+      registeredSuiteCount: 5, terminalReceiptCount: 5, terminalStatus: "passed",
+      receiptReuse: "allowed",
+    }));
+    assert.deepEqual(result.evidence.steps.map(({ name, exitCode }) => ({ name, exitCode })), ["baseline-calibration", "baseline-manifest", "baseline-repository", "baseline-verify-contract", "configured-verify"].map((name) => ({ name, exitCode: 0 })));
+    assert.equal(result.evidence.coverage, "project-calibrated");
+    assert.equal(result.evidence.selection.mode, "candidate");
+    const onDisk = JSON.parse(readFileSync(join(root, "evidence", "verify.json"), "utf8"));
+    assert.deepEqual(onDisk, result.evidence);
+    assert.deepEqual(activeSessionDescriptors(root), [], "a completed Verify must retire its private session descriptor");
+  });
+});
+
+test("a failing verify command produces no artifact at all", async () => {
+  await withFixture('node -e "process.exit(3)"', async (root) => {
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED" && /"suite":"configured-verify","exitCode":3/u.test(error.message),
+    );
+    assert.equal(existsSync(join(root, "evidence", "verify.json")), false, "a failing verify must leave no evidence file");
+    assert.deepEqual(activeSessionDescriptors(root), [], "a terminal failed Verify must retire its private session descriptor");
+  });
+});
+
+test("CLI failure identifies the real repository check and bounded invalid JSON finding", async () => {
+  await withFixture('node -e "process.exit(0)"', root => {
+    writeFileSync(join(root, ".claude/settings.json"), "{");
+    git(root, ["add", ".claude/settings.json"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "invalid json fixture"]);
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)), "--root", root], { encoding: "utf8" });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /VEP-VERIFY-FAILED/u);
+    assert.match(result.stderr, /"suite":"baseline-repository","exitCode":1/u);
+    assert.match(result.stderr, /"code":"invalid-json","path":"\.claude\/settings.json"/u);
+    assert.doesNotMatch(result.stderr, new RegExp(root));
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+  });
+});
+
+test("an explicit event output emits exactly one aggregate candidate-bound action after passing source readback", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const result = await produceVerifyEvidence({
+      rootDir: root,
+      outPath: "evidence/verify.json",
+      eventOutPath: "evidence/actions/verify.json",
+    });
+    assert.equal(result.status, "passed");
+    assert.equal(result.actionEvent.kind, "verification");
+    assert.equal(result.actionEvent.status, "completed");
+    assert.equal(result.actionEvent.reasonCode, "VERIFICATION_PASSED");
+    assert.equal(result.actionEvent.correlation.requestId, result.evidence.verifyRun.terminalSha256);
+    assert.deepEqual(result.actionEvent.candidate, result.evidence.candidate);
+    assert.deepEqual(result.actionEvent.correlation.featureId, { state: "not-applicable" });
+    assert.deepEqual(result.actionEvent.correlation.sessionId, { state: "not-applicable" });
+    assert.equal(Object.hasOwn(result.actionEvent, "runner"), false);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence/actions/verify.json"), "utf8")), result.actionEvent);
+    assert.equal(readdirSync(join(root, "evidence/actions")).length, 1, "one terminal run emits one action artifact");
+  });
+});
+
+test("an explicit event output maps terminal Verify failure without creating success evidence", async () => {
+  await withFixture('node -e "process.exit(3)"', async (root) => {
+    const result = await produceVerifyEvidence({
+      rootDir: root,
+      outPath: "evidence/verify.json",
+      eventOutPath: "evidence/actions/verify.json",
+    });
+    assert.equal(result.status, "failed");
+    assert.equal(result.evidence, null);
+    assert.equal(result.actionEvent.status, "failed");
+    assert.equal(result.actionEvent.reasonCode, "VERIFICATION_FAILED");
+    assert.equal(existsSync(join(root, "evidence/verify.json")), false);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence/actions/verify.json"), "utf8")), result.actionEvent);
+  });
+});
+
+test("event target preflight failure leaves prior source evidence untouched and never starts Verify", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "verify-event-outside-"));
+  try {
+    await withFixture('node -e "require(\'fs\').writeFileSync(\'.git/verify-ran\', \'yes\')"', async (root) => {
+      mkdirSync(join(root, "evidence"));
+      writeFileSync(join(root, "evidence/verify.json"), "prior source bytes\n");
+      symlinkSync(outside, join(root, "event-alias"), "dir");
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", eventOutPath: "event-alias/action.json" }),
+        (error) => error.code === "GVA-OUTPUT-PATH",
+      );
+      assert.equal(readFileSync(join(root, "evidence/verify.json"), "utf8"), "prior source bytes\n");
+      assert.equal(existsSync(join(root, ".git/verify-ran")), false);
+      assert.equal(existsSync(join(outside, "action.json")), false);
+    });
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
+test("event source preflight failure is also zero mutation", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'.git/verify-ran\', \'yes\')"', async (root) => {
+    mkdirSync(join(root, "evidence"));
+    writeFileSync(join(root, "evidence/verify.json"), "prior source bytes\n");
+    writeFileSync(join(root, "README.md"), "dirty candidate\n");
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", eventOutPath: "evidence/actions/verify.json" }),
+      (error) => error.code === "VEP-EVENT-SOURCE",
+    );
+    assert.equal(readFileSync(join(root, "evidence/verify.json"), "utf8"), "prior source bytes\n");
+    assert.equal(existsSync(join(root, ".git/verify-ran")), false);
+    assert.equal(existsSync(join(root, "evidence/actions/verify.json")), false);
+  });
+});
+
+test("a post-source event path race returns typed retry data and does not roll back Verify evidence", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "verify-event-race-outside-"));
+  try {
+    const command = `node -e "require('fs').mkdirSync('evidence',{recursive:true});require('fs').symlinkSync('${outside}','evidence/actions','dir')"`;
+    await withFixture(command, async (root) => {
+      const result = await produceVerifyEvidence({
+        rootDir: root,
+        outPath: "evidence/verify.json",
+        eventOutPath: "evidence/actions/verify.json",
+      });
+      assert.equal(result.status, "source-complete/event-unavailable");
+      assert.equal(result.sourceStatus, "passed");
+      assert.equal(existsSync(join(root, "evidence/verify.json")), true);
+      assert.equal(existsSync(join(outside, "verify.json")), false);
+      assert.deepEqual(result.eventRetry.event, result.actionEvent);
+      unlinkSync(join(root, "evidence/actions"));
+      const retried = retryGovernanceVerificationAction({ rootDir: root, retry: result.eventRetry });
+      assert.equal(retried.status, "written");
+      assert.deepEqual(JSON.parse(readFileSync(retried.outPath, "utf8")), result.actionEvent);
+      assert.equal(retryGovernanceVerificationAction({ rootDir: root, retry: result.eventRetry }).status, "existing-identical");
+    });
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
+test("candidate drift suppresses a requested action as well as success evidence", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'README.md\', \'drift\')"', async (root) => {
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, eventOutPath: "evidence/actions/verify.json" }),
+      (error) => error.code === "VEP-DRIFT",
+    );
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+    assert.equal(existsSync(join(root, "evidence/actions/verify.json")), false);
+  });
+});
+
+test("a dirty working tree is refused before the verify command runs, and the rejection is recorded explicitly", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'ran.marker\', \'x\')"', async (root) => {
+    writeFileSync(join(root, "README.md"), "# Fixture\n\nuncommitted change\n");
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json" });
+    assert.equal(result.status, "dirty");
+    assert.equal(result.evidence.exitCode, 1);
+    assert.deepEqual(result.evidence.steps, [{ name: "candidate-preflight", exitCode: 1 }]);
+    assert.equal(existsSync(join(root, "evidence", "verify.json")), true, "the dirty rejection must still be recorded explicitly");
+    assert.equal(existsSync(join(root, "ran.marker")), false, "the configured verify command must never run against a dirty tree");
+  });
+});
+
+test("release Verify refuses a missing, conflicting, or forged Critic claim before overwriting evidence", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const prior = join(root, "evidence", "verify-latest.json");
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(prior, "prior retained evidence\n");
+    const missing = spawnSync(process.execPath, [script, "--root", root, "--mode", "release"], { encoding: "utf8" });
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /VEP-CRITIC-REQUIRED/u);
+    assert.equal(readFileSync(prior, "utf8"), "prior retained evidence\n");
+    const conflicting = spawnSync(process.execPath, [script, "--root", root, "--mode", "release", "--critic-packet-id", "a".repeat(32), "--critic-reverify-receipt-id", "b".repeat(64)], { encoding: "utf8" });
+    assert.equal(conflicting.status, 2);
+    assert.match(conflicting.stderr, /VEP-CRITIC-REQUIRED/u);
+    const forged = spawnSync(process.execPath, [script, "--root", root, "--mode", "release", "--critic-packet-id", "c".repeat(32)], { encoding: "utf8" });
+    assert.equal(forged.status, 2);
+    assert.match(forged.stderr, /VEP-CVL-CRITIC-UNAVAILABLE/u);
+  });
+});
+
+test("release Verify consumes a real fresh Critic packet and its same-candidate reverify chain", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const critic = await completedCriticPacket(root);
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticPacketId: critic.packetId });
+    const derived = deriveGateEvidence({ rootDir: root, gate: "verify", sourcePath: "evidence/verify.json" });
+    assert.equal(derived.evidence.gate, "verify");
+    assert.equal(derived.evidence.status, "passed");
+    assert.equal(derived.evidence.exitCode, 0);
+    assert.equal(derived.evidence.candidate.commit, result.evidence.commit);
+    assert.equal(derived.evidence.candidate.tree, result.evidence.tree);
+    assert.ok(result.criticLifecycle?.receipt?.id);
+    const rerun = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: result.criticLifecycle.receipt.id });
+    assert.equal(rerun.status, "passed");
+    assert.notEqual(rerun.criticLifecycle.receipt.id, result.criticLifecycle.receipt.id);
+  });
+});
+
+test("Critic-bound candidate Verify checks the packet before replacing evidence and binds a same-mode rerun", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const target = join(root, "evidence", "verify.json");
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(target, "prior retained evidence\n");
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json",
+        mode: "candidate", criticPacketId: "c".repeat(32) }),
+      error => error.code === "VEP-CVL-CRITIC-UNAVAILABLE",
+    );
+    assert.equal(readFileSync(target, "utf8"), "prior retained evidence\n");
+    const critic = await completedCriticPacket(root);
+    const first = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json",
+      mode: "candidate", criticPacketId: critic.packetId });
+    assert.equal(first.evidence.selection.mode, "candidate");
+    assert.equal(first.criticLifecycle.receipt.critic.packetId, critic.packetId);
+    const rerun = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json",
+      mode: "candidate", criticReverifyReceiptId: first.criticLifecycle.receipt.id });
+    assert.equal(rerun.status, "passed");
+    assert.equal(rerun.criticLifecycle.receipt.critic.packetId, critic.packetId);
+  });
+});
+
+test("release reverify refuses changed candidates and tampered prior evidence", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const critic = await completedCriticPacket(root);
+    const first = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticPacketId: critic.packetId });
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({
+      ...first.evidence, startedAt: "2026-09-26T00:00:00.000Z",
+    })}\n`);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: first.criticLifecycle.receipt.id }),
+      error => error.code === "VEP-CVL-VERIFY-DRIFT",
+    );
+    writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify(first.evidence)}\n`);
+    writeFileSync(join(root, "README.md"), "changed candidate\n");
+    git(root, ["add", "README.md"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "changed candidate"]);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/verify.json", mode: "release", base: "HEAD^1", criticReverifyReceiptId: first.criticLifecycle.receipt.id }),
+      error => error.code === "VEP-CVL-RECEIPT-INVALID",
+    );
+  });
+});
+
+test("a calibration naming no verify command cannot produce success at any boundary", async () => {
+  const root = mkdtempSync(join(tmpdir(), "verify-evidence-producer-"));
+  try {
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root) }, null, 2)}\n`);
+    writeFileSync(join(root, "README.md"), "# Baseline-only fixture\n");
+    prepareConsumerVerify({ rootDir: root });
+    git(root, ["init", "-q"]);
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"]);
+    for (const mode of ["work", "critic", "push", "candidate", "release"]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, outPath: `evidence/${mode}.json`, mode }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
+      );
+      assert.equal(existsSync(join(root, "evidence", `${mode}.json`)), false);
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("critic mode runs baseline and the changed project area without invoking unrelated or full commands", async () => {
+  await withFixture('node -e "process.exit(9)"', async (root) => {
+    const calibrationPath = join(root, ".claude", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.verifyImpact = {
+      schema: "pipeline.project-verify-impact.v1",
+      baseline: [{ id: "common", command: 'node -e "require(\'fs\').writeFileSync(\'.git/baseline-ran\', \'yes\')"' }],
+      areas: [
+        { id: "docs", paths: ["docs/**"], commands: [{ id: "docs", command: 'node -e "require(\'fs\').writeFileSync(\'.git/docs-ran\', \'yes\')"' }] },
+        { id: "source", paths: ["src/**"], commands: [{ id: "source", command: 'node -e "process.exit(8)"' }] },
+      ],
+    };
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "impact policy"]);
+    mkdirSync(join(root, "docs"));
+    writeFileSync(join(root, "docs", "guide.md"), "# Guide\n");
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "docs"]);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "critic", base: "HEAD^1" });
+    assert.equal(result.status, "passed");
+    assert.equal(result.evidence.selection.execution, "impacted");
+    assert.deepEqual(result.evidence.selection.matchedAreaIds, ["docs"]);
+    assert.equal(result.evidence.selection.selectedSuiteIds.includes("project-docs"), true);
+    assert.equal(result.evidence.selection.omittedSuiteIds.includes("project-source"), true);
+    assert.equal(existsSync(join(root, ".git", "baseline-ran")), true);
+    assert.equal(existsSync(join(root, ".git", "docs-ran")), true);
+  });
+});
+
+test("push mode cannot turn an equal base into empty impacted evidence", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'.git/full-ran\', \'yes\')"', async (root) => {
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "push", base: "HEAD" });
+    assert.equal(result.evidence.selection.execution, "full");
+    assert.equal(result.evidence.selection.fallbackReason, "invalid-base");
+    assert.equal(result.evidence.selection.omittedSuiteIds.length, 0);
+    assert.equal(existsSync(join(root, ".git", "full-ran")), true);
+    assert.equal(verifyEvidenceSatisfiesBoundary(result.evidence, "push"), true);
+  });
+});
+
+test("push/release Verify refuses to mint boundary evidence for an unbacked blocking push gate", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    for (const mode of ["push", "release"]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({
+          rootDir: root, mode,
+          assessPushHookBackstop: () => ({ blocking: true, backed: false, message: "UNBACKED_GATE: fixture", remedy: "install fixture", hook: { status: "decline" } }),
+        }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-UNBACKED_GATE",
+      );
+    }
+  });
+});
+
+test("consumer full fallback preserves the changed and unmatched paths", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const calibrationPath = join(root, ".claude", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.verifyImpact = {
+      schema: "pipeline.project-verify-impact.v1",
+      baseline: [],
+      areas: [{ id: "docs", paths: ["docs/**"], commands: [{ id: "docs", command: 'node -e "process.exit(0)"' }] }],
+    };
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+    git(root, ["add", "."]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "impact policy"]);
+    writeFileSync(join(root, "unknown.bin"), "changed\n");
+    git(root, ["add", "unknown.bin"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "unknown change"]);
+    const result = await produceVerifyEvidence({ rootDir: root, mode: "work", base: "HEAD^1" });
+    assert.equal(result.evidence.selection.execution, "full");
+    assert.equal(result.evidence.selection.fallbackReason, "unclassified-change");
+    assert.deepEqual(result.evidence.selection.changedPaths, ["unknown.bin"]);
+    assert.deepEqual(result.evidence.selection.unmatchedPaths, ["unknown.bin"]);
+    assert.equal(result.evidence.steps.some(({ name }) => name === "project-docs"), true);
+    assert.equal(result.evidence.steps.some(({ name }) => name === "configured-verify"), true);
+  });
+});
+
+test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const result = await produceVerifyEvidence({ rootDir: root });
+    assert.equal(result.status, "passed");
+    assert.equal(result.outPath, join(root, VERIFY_EVIDENCE_DEFAULT_PATH));
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
+  });
+});
+
+test("the CLI wrapper with no --out flag also resolves to the shared default path", async () => {
+  await withFixture('node -e "process.exit(0)"', (root) => {
+    const scriptPath = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const stdout = run("node", [scriptPath, "--root", root]);
+    const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
+    assert.equal(parsed.status, "passed");
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
+  });
+});
+
+test("the CLI wrapper exits 0 and writes evidence for a passing run", async () => {
+  await withFixture('node -e "process.exit(0)"', (root) => {
+    const scriptPath = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const stdout = run("node", [scriptPath, "--root", root, "--out", "evidence/verify.json"]);
+    const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
+    assert.equal(parsed.status, "passed");
+    assert.equal(existsSync(join(root, "evidence", "verify.json")), true);
+  });
+});
+
+test("the CLI exposes the explicit event boundary without changing the evidence default", async () => {
+  await withFixture('node -e "process.exit(0)"', (root) => {
+    const scriptPath = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const stdout = run("node", [scriptPath, "--root", root, "--event-out", "evidence/actions/verify.json"]);
+    const parsed = JSON.parse(stdout.slice(stdout.indexOf("{\n")));
+    assert.equal(parsed.status, "passed");
+    assert.equal(parsed.actionEvent.reasonCode, "VERIFICATION_PASSED");
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
+    assert.equal(existsSync(join(root, "evidence/actions/verify.json")), true);
+  });
+});
+
+test("explicit preparation is idempotent, preserves conflicts and the configured command", async () => {
+  await withFixture('node -e "process.exit(0)"', (root) => {
+    const before = readFileSync(join(root, ".claude/pipeline.json"), "utf8");
+    assert.equal(prepareConsumerVerify({ rootDir: root }).status, "unchanged");
+    rmSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH));
+    assert.equal(prepareConsumerVerify({ rootDir: root }).status, "prepared");
+    assert.equal(readFileSync(join(root, ".claude/pipeline.json"), "utf8"), before);
+    writeFileSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH), "// user owned\n");
+    assert.throws(() => prepareConsumerVerify({ rootDir: root }), /VEP-ADAPTER-CONFLICT/u);
+    assert.equal(readFileSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH), "utf8"), "// user owned\n");
+  });
+});
+
+test("output aliases cannot delete outside bytes even when configuration is invalid", async () => {
+  const outside = mkdtempSync(join(tmpdir(), "consumer-outside-"));
+  const victim = join(outside, "verify.json");
+  try {
+    await withFixture('node -e "process.exit(0)"', async (root) => {
+      writeFileSync(victim, "outside owned bytes\n");
+      symlinkSync(outside, join(root, "alias"), "dir");
+      writeFileSync(join(root, ".claude/pipeline.json"), "invalid JSON");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "alias/verify.json" }), (error) => error.code === "VEP-PATH");
+      assert.equal(readFileSync(victim, "utf8"), "outside owned bytes\n");
+      rmSync(join(root, "alias"));
+      symlinkSync(outside, join(root, "evidence"), "dir");
+      writeFileSync(join(outside, "verify-latest.json"), "canonical outside bytes\n");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), (error) => error.code === "VEP-PATH");
+      assert.equal(readFileSync(join(outside, "verify-latest.json"), "utf8"), "canonical outside bytes\n");
+    });
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
+test("unborn candidates are unavailable and a clean run never seeds a missing adapter", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    git(root, ["rm", CONSUMER_VERIFY_ADAPTER_PATH]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "remove adapter"]);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), /VEP-PREPARATION-REQUIRED/u);
+    assert.equal(existsSync(join(root, CONSUMER_VERIFY_ADAPTER_PATH)), false);
+    git(root, ["checkout", "--orphan", "unborn"]);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), /Git observation failed/u);
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+  });
+});
+
+test("real product assertions stay fresh while eligible baselines resume with durable receipts", async () => {
+  const command = 'node -e "require(\'assert\').equal(require(\'fs\').existsSync(\'.git/fail-product\'), false)"';
+  await withFixture(command, async (root) => {
+    const first = await produceVerifyEvidence({ rootDir: root });
+    const second = await produceVerifyEvidence({ rootDir: root });
+    assert.equal(second.evidence.command, command);
+    assert.deepEqual(second.evidence.steps.filter((s) => s.reused).map((s) => s.name), ["baseline-calibration", "baseline-repository", "baseline-verify-contract"]);
+    const runs = join(root, ".git/agent-pipeline/verify/runs");
+    const run = join(runs, second.evidence.verifyRun.runId);
+    assert.equal(readdirSync(join(run, "receipts")).length, 5);
+    assert.match(readFileSync(join(run, "progress.jsonl"), "utf8"), /"state":"reused"/u);
+    assert.match(readFileSync(join(run, "logs", `${verifySuiteArtifactName("baseline-manifest")}.log`), "utf8"), /"status":"absent"/u);
+    writeFileSync(join(root, ".git/fail-product"), "fail");
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), /VEP-VERIFY-FAILED|Required consumer Verify/u);
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+    assert.equal(first.evidence.exitCode, 0);
+  });
+});
+
+test("no-reuse re-executes eligible consumer receipts and marks public evidence", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    await produceVerifyEvidence({ rootDir: root });
+    const fresh = await produceVerifyEvidence({ rootDir: root, reuseReceipts: false });
+    assert.equal(fresh.evidence.verifyRun.receiptReuse, "disabled");
+    assert.ok(fresh.evidence.steps.every((step) => step.reused === false));
+    const planPath = join(root, ".git/agent-pipeline/verify/runs", fresh.evidence.verifyRun.runId, "resume-plan.json");
+    const plan = JSON.parse(readFileSync(planPath, "utf8"));
+    assert.ok(plan.reasons.some((reason) => reason.code === "reuse-disabled"));
+  });
+});
+
+test("invalid manifests and the legacy placeholder fail closed at every boundary", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    writeFileSync(join(root, ".claude/pipeline.yaml"), "invalid: manifest\n");
+    git(root, ["add", ".claude/pipeline.yaml"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "manifest"]);
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), /Required consumer Verify/u);
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+  });
+  await withFixture('node -e "console.log(\'the verify contract of this project is not configured\')"', async (root) => {
+    for (const mode of ["work", "critic", "push", "candidate", "release"]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, mode }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
+      );
+      assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+    }
+  });
+});
+
+test("candidate drift rejects success and a new candidate never reuses baseline receipts", async () => {
+  await withFixture('node -e "require(\'fs\').writeFileSync(\'README.md\', \'drift\')"', async (root) => {
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root }), /candidate commit or tree changed/u);
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+  });
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    await produceVerifyEvidence({ rootDir: root });
+    writeFileSync(join(root, "README.md"), "new candidate\n");
+    git(root, ["add", "README.md"]);
+    git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "candidate"]);
+    const result = await produceVerifyEvidence({ rootDir: root });
+    assert.ok(result.evidence.steps.every((s) => !s.reused));
+  });
+});
+
+test("an external installed package works and implementation changes invalidate resume", async () => {
+  const installed = mkdtempSync(join(tmpdir(), "consumer installed space-"));
+  try {
+    cpSync(new URL("../", import.meta.url), installed, { recursive: true });
+    await withFixture('node -e "require(\'assert\').equal(2 + 2, 4)"', async (root) => {
+      const critic = await completedCriticPacket(root);
+      const entry = join(installed, "scripts/verify-evidence-producer.mjs");
+      run(process.execPath, [entry, "--root", root, "--mode", "release", "--critic-packet-id", critic.packetId]);
+      const dependency = join(installed, "scripts/consumer-verify-check.mjs");
+      writeFileSync(dependency, `${readFileSync(dependency, "utf8")}\n// changed installed implementation\n`);
+      run(process.execPath, [entry, "--root", root, "--mode", "release", "--no-reuse", "--critic-packet-id", critic.packetId]);
+      const evidence = JSON.parse(readFileSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH), "utf8"));
+      assert.ok(evidence.steps.every((s) => !s.reused));
+      assert.equal(evidence.verifyRun.receiptReuse, "disabled");
+      assert.equal(deriveGateEvidence({ rootDir: root, gate: "verify", sourcePath: VERIFY_EVIDENCE_DEFAULT_PATH }).evidence.status, "passed");
+    });
+  } finally { rmSync(installed, { recursive: true, force: true }); }
+});
+
+test("an interrupted new attempt clears stale canonical success", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    await produceVerifyEvidence({ rootDir: root });
+    const script = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const child = spawn(process.execPath, [script, "--root", root], { stdio: ["ignore", "pipe", "pipe"] });
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("no journal progress")); }, 10000);
+      child.stdout.once("data", () => { clearTimeout(timer); child.kill("SIGKILL"); });
+      child.once("error", reject);
+      child.once("close", (_code, signal) => { clearTimeout(timer); try { assert.equal(signal, "SIGKILL"); resolve(); } catch (error) { reject(error); } });
+    });
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), false);
+  });
+});
+
+test("the producer registers the git common dir as a Windows boundary before registering the run record", () => {
+  const source = readFileSync(fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url)), "utf8");
+  const boundary = source.indexOf("verifyWindowsRegisterCommon(gitCommonDir)");
+  const register = source.indexOf("registerVerifyRunRecord({ gitCommonDir, runId, runPath");
+  assert.ok(register > 0, "registerVerifyRunRecord call present");
+  assert.ok(boundary > 0, "verifyWindowsRegisterCommon(gitCommonDir) call present");
+  assert.ok(boundary < register, "boundary registered before the run record");
+});
+
+// ALF-D61-AC224 (PF-57 (2)): Critic evidence for a named earlier commit, produced without touching the
+// shared checkout, so a Critic review and a Goldfish can work side by side.
+const COMMIT_WORKTREE_AREA = [".git", "agent-pipeline", "verify", "commit-worktrees"];
+function commitFile(root, paths, message) {
+  git(root, ["add", "--", ...paths]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+  return git(root, ["rev-parse", "HEAD"]);
+}
+/** first -> older candidate (manifest + spec) -> head (README moved on), then the checkout is left dirty. */
+function olderCandidateBehindDirtyHead(root) {
+  const first = git(root, ["rev-parse", "HEAD"]);
+  mkdirSync(join(root, "specs"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Older candidate\n");
+  const older = commitFile(root, [".claude/pipeline.yaml", "specs/spec.md"], "older candidate");
+  writeFileSync(join(root, "README.md"), "# Fixture moved on\n");
+  const head = commitFile(root, ["README.md"], "head moved on");
+  writeFileSync(join(root, "specs", "spec.md"), "# uncommitted edit of a tracked file\n");
+  writeFileSync(join(root, "README.md"), "# uncommitted edit of another tracked file\n");
+  writeFileSync(join(root, "untracked-note.txt"), "an untracked file the Goldfish is writing\n");
+  return { first, older, olderTree: git(root, ["rev-parse", `${older}^{tree}`]), head };
+}
+/** Every path and byte of the checkout outside .git and the evidence output directory. */
+function checkoutBytes(root, rel = "") {
+  const found = {};
+  for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+    const path = rel === "" ? entry.name : `${rel}/${entry.name}`;
+    if (path === ".git" || path === "evidence") continue;
+    if (entry.isDirectory()) { found[`${path}/`] = "directory"; Object.assign(found, checkoutBytes(root, path)); }
+    else found[path] = createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+  }
+  return found;
+}
+function observeCheckout(root) {
+  return {
+    head: git(root, ["rev-parse", "HEAD"]),
+    status: git(root, ["status", "--porcelain=v1", "--untracked-files=all"]),
+    bytes: checkoutBytes(root),
+    worktrees: git(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")),
+  };
+}
+function assertNoCommitWorktree(root) {
+  const area = join(root, ...COMMIT_WORKTREE_AREA);
+  assert.deepEqual(existsSync(area) ? readdirSync(area) : [], [], "the temporary worktree area must be empty again");
+  assert.equal(git(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")).length, 1, "git must not list a leftover worktree");
+}
+
+test("Critic evidence for a named earlier commit is bound to it, leaves a dirty checkout untouched, and the preflight accepts it", async () => {
+  // Passes only inside a clean checkout of the OLDER commit: the shared checkout has a different spec.md.
+  await withFixture(`node -e "process.exit(require('fs').readFileSync('specs/spec.md','utf8').startsWith('# Older')?0:7)"`, async (root) => {
+    const { first, older, olderTree, head } = olderCandidateBehindDirtyHead(root);
+    assert.notEqual(older, head);
+    const before = observeCheckout(root);
+    assert.match(before.status, /README\.md/u);
+    assert.match(before.status, /\?\? untracked-note\.txt/u);
+
+    const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", base: first, commit: older });
+
+    assert.equal(result.status, "passed");
+    assert.equal(result.outPath, join(root, "evidence", "critic-older.json"));
+    assert.equal(result.evidence.commit, older);
+    assert.equal(result.evidence.tree, olderTree);
+    assert.deepEqual(result.evidence.candidate, { commit: older, tree: olderTree });
+    assert.equal(result.evidence.exitCode, 0);
+    assert.equal(result.evidence.selection.mode, "critic");
+    assert.equal(result.evidence.selection.candidateCommit, older);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, "evidence", "critic-older.json"), "utf8")), result.evidence);
+    assert.deepEqual(readdirSync(join(root, "evidence")), ["critic-older.json"], "the evidence file is the only thing written into the checkout");
+
+    assert.deepEqual(observeCheckout(root), before, "HEAD, status, every tracked and untracked byte and the worktree list are unchanged");
+    assertNoCommitWorktree(root);
+
+    const accepted = preflightCriticDispatch({ root, base: first, candidate: older, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-older.json"] });
+    assert.deepEqual(accepted.candidate, { commit: older, tree: olderTree });
+    assert.deepEqual(accepted.evidence.map(({ path, candidate }) => ({ path, candidate })), [{ path: "evidence/critic-older.json", candidate: { commit: older, tree: olderTree } }]);
+    assert.throws(() => preflightCriticDispatch({ root, base: first, candidate: head, specPath: "specs/spec.md", guardrailPaths: [], evidencePaths: ["evidence/critic-older.json"] }),
+      (error) => error.code === "CDP-EVIDENCE-BINDING", "the evidence must not satisfy any other commit");
+  });
+});
+
+test("a failed run for a named earlier commit still removes its temporary worktree and leaves no consumable evidence", async () => {
+  await withFixture('node -e "process.exit(3)"', async (root) => {
+    const { first, older } = olderCandidateBehindDirtyHead(root);
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", "critic-older.json"), "stale evidence from an earlier attempt\n");
+    const before = observeCheckout(root);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", base: first, commit: older }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-VERIFY-FAILED" && /"suite":"configured-verify","exitCode":3/u.test(error.message),
+    );
+    assert.equal(existsSync(join(root, "evidence", "critic-older.json")), false, "a failed replacement must not leave the stale green behind");
+    assert.deepEqual(observeCheckout(root), before);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("a named commit that is not a local object is refused with a typed code that names it, before anything changes", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const { first } = olderCandidateBehindDirtyHead(root);
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    writeFileSync(join(root, "evidence", "critic-older.json"), "prior evidence\n");
+    const before = observeCheckout(root);
+    const absent = "f".repeat(40);
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", base: first, commit: absent }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-NOT-LOCAL" && error.message.includes(absent),
+    );
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", commit: "not-a-ref" }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-INVALID" && error.message.includes("not-a-ref"),
+    );
+    await assert.rejects(
+      () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/critic-older.json", mode: "critic", commit: "--upload-pack=x" }),
+      (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-INVALID",
+    );
+    assert.equal(readFileSync(join(root, "evidence", "critic-older.json"), "utf8"), "prior evidence\n", "a refusal leaves prior evidence alone");
+    assert.deepEqual(observeCheckout(root), before);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("a named commit is refused for the release and push lanes, the Critic-bound options and an action event, with the repair named", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const commit = git(root, ["rev-parse", "HEAD"]);
+    const before = observeCheckout(root);
+    for (const options of [{ mode: "release" }, { mode: "push" }, { mode: "candidate", criticPacketId: "a".repeat(32) }, { mode: "candidate", criticReverifyReceiptId: "b".repeat(64) }, { mode: "critic", eventOutPath: "evidence/actions/verify.json" }]) {
+      await assert.rejects(
+        () => produceVerifyEvidence({ rootDir: root, outPath: "evidence/never.json", commit, ...options }),
+        (error) => error instanceof VerifyEvidenceError && error.code === "VEP-COMMIT-MODE" && /without --commit/u.test(error.message),
+      );
+    }
+    assert.deepEqual(observeCheckout(root), before);
+    assert.equal(existsSync(join(root, "evidence")), false);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("the CLI accepts --commit and reports the named commit", async () => {
+  await withFixture('node -e "process.exit(0)"', async (root) => {
+    const { first, older, olderTree } = olderCandidateBehindDirtyHead(root);
+    const script = fileURLToPath(new URL("./verify-evidence-producer.mjs", import.meta.url));
+    const result = spawnSync(process.execPath, [script, "--root", root, "--mode", "critic", "--base", first, "--commit", older, "--out", "evidence/cli-older.json"], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    // Single-line progress events precede the pretty-printed result, whose first line is a lone "{".
+    const output = JSON.parse(result.stdout.slice(result.stdout.search(/^\{$/mu)));
+    assert.equal(output.status, "passed");
+    assert.deepEqual(output.candidate, { commit: older, tree: olderTree });
+    assert.equal(JSON.parse(readFileSync(join(root, "evidence", "cli-older.json"), "utf8")).commit, older);
+    assertNoCommitWorktree(root);
+    const missing = spawnSync(process.execPath, [script, "--root", root, "--commit", "f".repeat(40)], { encoding: "utf8" });
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /VEP-COMMIT-NOT-LOCAL/u);
+    assert.match(spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" }).stdout, /--commit <sha>/u);
+  });
+});
+
+test("a named candidate prepares committed npm dependencies before Verify without copying checkout packages", async () => {
+  const scratch = join(process.cwd(), "scratch");
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "g22-project-"));
+  const bin = mkdtempSync(join(scratch, "g22-bin-"));
+  try {
+    mkdirSync(join(root, ".claude"));
+    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: basename(root), verify: "node -e \"process.exit(require('fs').existsSync('node_modules/.g22-ready')?0:9)\"" }));
+    writeFileSync(join(root, ".gitignore"), "/evidence/\n/node_modules/\n");
+    writeFileSync(join(root, "README.md"), "first\n");
+    prepareConsumerVerify({ rootDir: root });
+    git(root, ["init", "-q"]);
+    commitFile(root, [".claude/pipeline.json", ".gitignore", "README.md", "project/consumer-verify.mjs"], "first");
+    const first = git(root, ["rev-parse", "HEAD"]);
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "g22", version: "1.0.0", packageManager: "npm@10.0.0", dependencies: { dep: "1.0.0", other: "2.0.0" } }));
+    writeFileSync(join(root, "package-lock.json"), JSON.stringify({ name: "g22", version: "1.0.0", lockfileVersion: 3, packages: { "": { dependencies: { other: "2.0.0", dep: "1.0.0" } }, "node_modules/dep": { version: "1.0.0" }, "node_modules/other": { version: "2.0.0" } } }));
+    const candidate = commitFile(root, ["package.json", "package-lock.json"], "candidate with dependencies");
+    writeFileSync(join(root, "README.md"), "later\n");
+    commitFile(root, ["README.md"], "later head");
+    mkdirSync(join(root, "node_modules"));
+    writeFileSync(join(root, "node_modules", ".g22-ready"), "host package");
+    const fake = join(bin, "fake-npm.mjs");
+    const log = join(bin, "calls.jsonl");
+    writeFileSync(fake, `#!/usr/bin/env node\nimport { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\nappendFileSync(process.env.G22_NPM_LOG, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }) + '\\n');\nif (process.argv[2] === '--version') console.log('10.0.0');\nelse if (process.env.G22_NPM_FAIL === '1') process.exitCode = 7;\nelse { mkdirSync('node_modules'); writeFileSync(join('node_modules', '.g22-ready'), 'prepared'); }\n`);
+    chmodSync(fake, 0o755);
+    const priorLog = process.env.G22_NPM_LOG;
+    process.env.G22_NPM_LOG = log;
+    const prepareDependencies = ({ root: worktree, commit }) => prepareCommitWorktreeDependencies({ root: worktree, commit, npmExecutable: process.execPath, npmPrefixArgs: [fake] });
+    try {
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies: () => ({ status: "not-required" }) }),
+        error => error.code === "VEP-VERIFY-FAILED", "the original unprepared worktree must fail its configured test");
+      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
+      const result = await produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies });
+      assert.equal(result.status, "passed");
+      assert.equal(result.evidence.commit, candidate);
+      assert.equal(readFileSync(join(root, "node_modules", ".g22-ready"), "utf8"), "host package");
+      const calls = readFileSync(log, "utf8").trim().split("\n").map(JSON.parse);
+      assert.deepEqual(calls.map(call => call.argv), [["--version"], ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]]);
+      assert.equal(calls[0].cwd, calls[1].cwd);
+      assert.notEqual(calls[0].cwd, root);
+      assertNoCommitWorktree(root);
+      process.env.G22_NPM_FAIL = "1";
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies }),
+        error => error.code === "VEP-DEPENDENCY-SETUP");
+      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
+      assertNoCommitWorktree(root);
+      assert.throws(() => prepareCommitWorktreeDependencies({ root, commit: candidate, npmExecutable: process.execPath, npmPrefixArgs: [fake] }),
+        error => error.code === "VEP-DEPENDENCY-CANDIDATE");
+      unlinkSync(join(root, "package-lock.json"));
+      const missingLock = commitFile(root, ["package-lock.json"], "missing lock");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: missingLock, prepareDependencies }),
+        error => error.code === "VEP-DEPENDENCY-LOCK");
+      assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
+      assertNoCommitWorktree(root);
+      writeFileSync(join(root, "package-lock.json"), JSON.stringify({ lockfileVersion: 3, packages: { "": { dependencies: { dep: "2.0.0" } } } }));
+      const staleLock = commitFile(root, ["package-lock.json"], "stale lock");
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: staleLock, prepareDependencies }),
+        error => error.code === "VEP-DEPENDENCY-LOCK");
+      assertNoCommitWorktree(root);
+    } finally {
+      if (priorLog === undefined) delete process.env.G22_NPM_LOG; else process.env.G22_NPM_LOG = priorLog;
+      delete process.env.G22_NPM_FAIL;
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); }
+});
+
+test("candidate npm preparation uses the existing closed Windows shim vector outside the worktree", () => {
+  const nodeDirectory = "C:\\tools\\node";
+  const candidate = "C:\\project\\candidate";
+  const cmd = "C:\\Windows\\System32\\cmd.exe";
+  const npm = `${nodeDirectory}\\npm.CMD`;
+  const files = new Set([npm.toLowerCase(), cmd.toLowerCase(), `${candidate}\\npm.CMD`.toLowerCase()]);
+  const lstatSyncFn = (path) => {
+    if (!files.has(path.toLowerCase())) { const error = new Error("ENOENT"); error.code = "ENOENT"; throw error; }
+    return { isFile: () => true, isSymbolicLink: () => false };
+  };
+  const options = { root: candidate, resolutionCwd: nodeDirectory, platform: "win32",
+    environment: { PATH: nodeDirectory, PATHEXT: ".CMD", SystemRoot: "C:\\Windows" }, lstatSyncFn };
+  const version = planCommitNpmInvocation(["--version"], options);
+  const install = planCommitNpmInvocation(["ci", "--ignore-scripts", "--no-audit", "--no-fund"], options);
+  assert.equal(version.executable, cmd);
+  assert.deepEqual(version.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
+  assert.match(version.args[4], /^""C:\\tools\\node\\npm\.CMD" "--version""$/u);
+  assert.match(install.args[4], /^""C:\\tools\\node\\npm\.CMD" "ci" "--ignore-scripts" "--no-audit" "--no-fund""$/u);
+  assert.equal(install.options.cwd, candidate);
+  assert.equal(install.options.shell, false);
+  assert.equal(install.options.windowsVerbatimArguments, true);
+  assert.throws(() => planCommitNpmInvocation(["a&b"], options), error => error.code === "CAPTURE-EVIDENCE-WINDOWS-NPM-ARGUMENT-UNSUPPORTED");
+});

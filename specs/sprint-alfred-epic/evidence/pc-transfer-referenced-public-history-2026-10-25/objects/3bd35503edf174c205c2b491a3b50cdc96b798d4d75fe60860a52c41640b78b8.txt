@@ -1,0 +1,106 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -897,6 +897,7 @@
+         "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
+         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
+         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
++        "verify-phase:harness/scripts/verify.mjs:po-only-discard-boundary-tests",
+         "verify-phase:harness/scripts/verify.mjs:portable-agy-authorship-export-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:portable-agy-authorship-export-tests",
+         "verify-phase:harness/scripts/verify.mjs:portable-critic-export-cli-tests",
+@@ -1060,6 +1061,7 @@
+         "verify-phase:harness/scripts/verify.mjs:shell-grammar-capability-placement-tests",
+         "verify-phase:harness/scripts/verify.mjs:signed-spec-descriptor-tests",
+         "verify-phase:harness/scripts/verify.mjs:signing-ceremony-tests",
++        "verify-phase:harness/scripts/verify.mjs:signing-help-delegation-qualification-tests",
+         "verify-phase:harness/scripts/verify.mjs:slice-queue-cli-tests",
+         "verify-phase:harness/scripts/verify.mjs:slice-queue-tests",
+         "verify-phase:harness/scripts/verify.mjs:source-observation-tests",
+@@ -1187,7 +1189,9 @@
+         "plugins/pipeline-core/lib/finding-lifecycle.test.mjs",
+         "plugins/pipeline-core/lib/g17-publication-observation.test.mjs",
+         "plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs",
++        "plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs",
+         "plugins/pipeline-core/lib/guard/read-option-operands.test.mjs",
++        "plugins/pipeline-core/lib/guard/signing-help-delegation-qualification.test.mjs",
+         "plugins/pipeline-core/lib/native-platform-process-observer.test.mjs",
+         "plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs",
+         "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -1459,6 +1459,11 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "po-only-discard-boundary-tests",
++      "path": "plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "post-compact-reground-tests",
+       "path": "plugins/pipeline-core/hooks/post-compact-reground.test.mjs",
+@@ -1891,6 +1896,11 @@
+       "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "signing-help-delegation-qualification-tests",
++      "path": "plugins/pipeline-core/lib/guard/signing-help-delegation-qualification.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "slice-queue-cli-tests",
+       "path": "plugins/pipeline-core/scripts/slice-queue.test.mjs",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -4209,6 +4209,45 @@
+       },
+       "invariantPinned": "Bounded diagnostic commands retain cross-runner recovery and refuse arbitrary code, global recursion and calibration rollback",
+       "nonOverlapNote": "Unique diagnostic toil behavior matrix across three controlled runner transports"
+-    }
++    },
++    {
++      "name": "signing-help-delegation-qualification-tests",
++      "file": "plugins/pipeline-core/lib/guard/signing-help-delegation-qualification.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "SHDQ001",
++          "SHDQ002",
++          "SHDQ003",
++          "SHDQ004",
++          "SHDQ005",
++          "SHDQ006",
++          "SHDQ007"
++        ],
++        "maxBytes": 65536
++      },
++      "invariantPinned": "Signing help remains agent-readable while real qualification requires an exact attended proof and all terminal signing refusals remain human-only.",
++      "nonOverlapNote": "Seven actual per-case completion IDs cover the signing help, valid/invalid/foreign/stale/replay qualification and discard refusal; all proof identity is synthetic and no native attestation is claimed."
++    },
++    {
++      "name": "po-only-discard-boundary-tests",
++      "file": "plugins/pipeline-core/lib/guard/po-only-discard-boundary.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "PODB001",
++          "PODB002",
++          "PODB003",
++          "PODB004",
++          "PODB005",
++          "PODB006",
++          "PODB007",
++          "PODB008"
++        ],
++        "maxBytes": 65536
++      },
++      "invariantPinned": "PO-only discard denials remain human-terminal across supported transports, planner admission, and closed unsupported or missing-read boundaries.",
++      "nonOverlapNote": "Eight actual per-case completion IDs cover refusal transport and pre-state denial; no actual discard, native attestation, or signer interaction is claimed."
++    }
+   ]
+ }

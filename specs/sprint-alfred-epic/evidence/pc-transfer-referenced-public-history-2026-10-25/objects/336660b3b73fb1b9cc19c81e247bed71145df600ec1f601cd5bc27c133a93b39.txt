@@ -1,0 +1,17 @@
+diff --git a/architecture/boundary-policy.json b/architecture/boundary-policy.json
+index eab9deb6b..d36e5140f 100644
+--- a/architecture/boundary-policy.json
++++ b/architecture/boundary-policy.json
+@@ -527,6 +527,12 @@
+       "maxLines": 1111,
+       "reason": "over the bound when the check was adopted on 2026-10-20; split it before it grows"
+     },
++    {
++      "rule": "over-line-bound",
++      "path": "plugins/pipeline-core/scripts/dispatch-briefing.test.mjs",
++      "maxLines": 1086,
++      "reason": "K142 (Greenfield finding G1): the runner-aware model check adds 142 lines of cases to the already registered dispatch-briefing suite (PO decision: extend it, no new test file); split the suite before it grows further"
++    },
+     {
+       "rule": "forbidden-dependency",
+       "path": "plugins/pipeline-core/scripts/document-hooks-manifest.test.mjs",

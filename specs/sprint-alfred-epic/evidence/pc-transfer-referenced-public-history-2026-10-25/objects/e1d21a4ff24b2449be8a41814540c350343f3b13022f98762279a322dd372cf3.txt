@@ -1,0 +1,498 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 5464a2516..21d8e64bb 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -586,6 +586,7 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/lib/verify-suite-registration.mjs`,
+ `plugins/pipeline-core/lib/windows-native-process-observer.mjs`,
+ `plugins/pipeline-core/lib/windows-owned-authority-backend.mjs`,
++`plugins/pipeline-core/lib/windows-authority-readiness.mjs`,
+ `plugins/pipeline-core/lib/windows-process-identity.mjs`,
+ `plugins/pipeline-core/lib/windows-requester-runtime.mjs`,
+ `plugins/pipeline-core/scripts/architecture-baseline.mjs`,
+diff --git a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+index fc7b72d58..656a45711 100644
+--- a/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
++++ b/plugins/pipeline-core/lib/calibration-verify-commit-transition.mjs
+@@ -24,7 +24,8 @@ const HELD = new WeakMap();
+ const HEX = /^[a-f0-9]{64}$/u;
+ const CODE = /^[A-Z][A-Z0-9-]{1,63}$/u;
+ const OID =/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
+-const fail = (code) => { const error = new Error(code); error.code = code; throw error; };
++const fail = (code, windowsAuthorityCause = null) => { const error = new Error(code); error.code = code;
++  if (windowsAuthorityCause) error.windowsAuthorityCause = windowsAuthorityCause; throw error; };
+ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ const canonical = (value) => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
+   ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+@@ -94,7 +95,8 @@ function repository(rootDir) {
+ 
+ function approval(repo) {
+   const value = observeCurrentPlanApprovalForCalibration({ rootDir: repo.root });
+-  if (value && value.status === "unavailable" && typeof value.code === "string" && CODE.test(value.code)) fail(value.code);
++  if (value && value.status === "unavailable" && typeof value.code === "string" && CODE.test(value.code))
++    fail(value.code, /^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.windowsAuthorityCause ?? "") ? value.windowsAuthorityCause : null);
+   const keys = ["status", "rootDir", "statePath", "stateSha256", "stateRevision", "candidate", "submissionSha256", "approvalSha256", "authoritySha256", "approvalBasis", "sourceRefs"];
+   if (!exactKeys(value, keys) || value.status !== "eligible" || value.rootDir !== repo.root
+     || !HEX.test(value.stateSha256) || !HEX.test(value.submissionSha256) || !HEX.test(value.approvalSha256) || !HEX.test(value.authoritySha256)
+@@ -196,7 +198,8 @@ function publish(repo, facts, phase) {
+   const published = writePrivateFileNoReplaceAtomic(path, bytes);
+   if (!published.created || !same(readRecord(repo, path), { schema: SCHEMA, phase, facts })) fail("CVCT-RECORD-CONFLICT");
+ }
+-const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && CODE.test(error.code) ? error.code : "CVCT-UNAVAILABLE" });
++const unavailable = (error) => ({ ok: false, code: typeof error?.code === "string" && CODE.test(error.code) ? error.code : "CVCT-UNAVAILABLE",
++  ...(/^WIN-AUTH-[A-Z-]{1,64}$/u.test(error?.windowsAuthorityCause ?? "") ? {windowsAuthorityCause:error.windowsAuthorityCause} : {}) });
+ 
+ export function prepareCalibrationVerifyCommitTransition({ rootDir, verifyCommand } = {}) {
+   let held = null;
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 371ac1f7c..3944bd9e3 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -814,6 +814,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/verify-suite-registration.mjs",
+   "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+   "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
++  "plugins/pipeline-core/lib/windows-authority-readiness.mjs",
+   "plugins/pipeline-core/lib/windows-process-identity.mjs",
+   "plugins/pipeline-core/lib/windows-requester-runtime.mjs",
+   "plugins/pipeline-core/scripts/architecture-baseline.mjs",
+diff --git a/plugins/pipeline-core/lib/session-requester-bridge.mjs b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+index c6fd516da..aebebf9ed 100644
+--- a/plugins/pipeline-core/lib/session-requester-bridge.mjs
++++ b/plugins/pipeline-core/lib/session-requester-bridge.mjs
+@@ -1199,7 +1199,8 @@ export async function spawnSourceOwnedContinuityVerificationChild(input,runtimeP
+         verificationAttemptHandle:data.verificationAttemptHandle,runtimePort:data.runtimePort,terminalExchangeHandle:failure});
+       }catch{}finally{osvExchanges.get(failure).live=false;}
+     }
+-    return {status:'unavailable',code};
++    return {status:'unavailable',code,
++      ...(/^WIN-AUTH-[A-Z-]{1,64}$/u.test(error?.reason??'') ? {windowsAuthorityCause:error.reason} : {})};
+   }finally{
+     if(data){data.ended=true;data.secret=null;
+       for(const c of data.children){const x=osvExchanges.get(c.exchange);if(x)x.live=false;c.wire?.revoke();
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+new file mode 100644
+index 000000000..4428b3cb7
+--- /dev/null
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -0,0 +1,76 @@
++// SPDX-License-Identifier: SUL-1.0
++// Read-only Windows custody diagnosis. The native authority backend remains the sole policy oracle.
++import { win32 } from 'node:path';
++import { existsSync } from 'node:fs';
++import { inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from './windows-owned-authority-backend.mjs';
++
++export const WINDOWS_AUTHORITY_READINESS_SCHEMA = 'pipeline.windows-authority-readiness.v1';
++const NATIVE_REASON = /^WIN-AUTH-[A-Z-]{1,64}$/u;
++
++function chain(path) {
++  const root = win32.parse(path).root;
++  if (!root || !win32.isAbsolute(path) || win32.normalize(path) !== path) return null;
++  const parts = win32.relative(root, path).split(win32.sep).filter(Boolean);
++  const rows = [root];
++  for (const part of parts) rows.push(win32.join(rows.at(-1), part));
++  return rows;
++}
++
++export function windowsAuthorityCause(error) {
++  return NATIVE_REASON.test(error?.reason) ? error.reason : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
++}
++
++function guidance(pathClass, reason) {
++  if (reason === 'WIN-AUTH-ANCESTOR-MUTATION') return {
++    kind: 'operator-review', mutation: false,
++    summary: `Inspect the inherited or explicit foreign write ACE on the ${pathClass} directory. Record the actual SID and ACE source; review a single-directory SID-targeted removal or move the repository into a private user-profile directory, then rerun readiness.`,
++    inspection: ['whoami /user', 'Get-Acl -LiteralPath <exact directory> | Format-List Owner,Access'],
++    repairPreview: 'At the reviewed ACE source only: icacls <exact directory> /remove:g *<observed SID>. If the ACE is inherited, review inheritance at that one directory before editing; never apply /T.',
++  };
++  return { kind: 'operator-review', mutation: false,
++    summary: `Inspect ${pathClass} custody for ${reason}; repair only the named directory after review, or relocate the repository into a private user-profile directory, then rerun readiness.`,
++    inspection: ['whoami /user', 'Get-Acl -LiteralPath <exact directory> | Format-List Owner,Access'],
++    repairPreview: null,
++  };
++}
++
++/** The injected probe is called once per distinct path; it must only observe, never repair. */
++export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, privateRoot,
++  exists = existsSync,
++  probe = ({ path, boundaryRoot, privatePath }) => privatePath
++    ? inspectWindowsOwnedAuthorityPath({ path, directory: true })
++    : observeWindowsAuthorityAncestor(boundaryRoot ? { path, boundaryRoot } : { path }),
++} = {}) {
++  const roots = [projectRoot, pluginRoot, privateRoot];
++  if (roots.some(value => typeof value !== 'string' || chain(value) === null)) {
++    return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: 'unavailable', causes: [{ pathClass: 'input', reason: 'WIN-AUTH-PATH', nextAction: guidance('input', 'WIN-AUTH-PATH') }] };
++  }
++  const seen = new Map();
++  const causes = [];
++  for (const [pathClass, target, boundaryRoot] of [
++    ['project', projectRoot, projectRoot], ['plugin', pluginRoot, null], ['private', privateRoot, projectRoot],
++  ]) {
++    // Plugin ancestors receive the strict native ancestor rule. Only physical
++    // directories above the proven project root get the existing human route.
++    for (const path of chain(target)) {
++      const privatePath = pathClass === 'private' && path.toLowerCase() === privateRoot.toLowerCase();
++      // A pristine project may not have a .git directory yet. Every existing
++      // ancestor was already inspected; only absent future private entries
++      // can be skipped until onboarding creates them.
++      if (!exists(path)) {
++        if (pathClass === 'private' && path.toLowerCase().startsWith(projectRoot.toLowerCase())) continue;
++        causes.push({ pathClass, reason: 'WIN-AUTH-OPEN', path, nextAction: guidance(pathClass, 'WIN-AUTH-OPEN') });
++        continue;
++      }
++      const key = `${path.toLowerCase()}|${privatePath ? 'private' : 'ancestor'}|${boundaryRoot?.toLowerCase() ?? 'strict'}`;
++      let reason = seen.get(key);
++      if (reason === undefined) {
++        try { probe({ path, boundaryRoot, privatePath, pathClass }); reason = null; }
++        catch (error) { reason = windowsAuthorityCause(error); }
++        seen.set(key, reason);
++      }
++      if (reason) causes.push({ pathClass, reason, path, nextAction: guidance(pathClass, reason) });
++    }
++  }
++  return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
++}
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+new file mode 100644
+index 000000000..4adffd94d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+@@ -0,0 +1,107 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
++
++const roots = {
++  projectRoot: 'D:\\work\\repo',
++  pluginRoot: 'C:\\Users\\owner\\plugins\\pipeline-core',
++  privateRoot: 'D:\\work\\repo\\.git\\agent-pipeline',
++};
++
++test('foreign inherited Modify at the repository root remains refused with bounded recovery', () => {
++  const calls = [];
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
++    probe(input) {
++      calls.push(input);
++      if (input.path === roots.projectRoot && input.pathClass === 'project')
++        throw Object.assign(new Error('closed'), { reason: 'WIN-AUTH-ANCESTOR-MUTATION' });
++    },
++  });
++  assert.equal(result.status, 'unavailable');
++  assert.equal(result.causes[0].reason, 'WIN-AUTH-ANCESTOR-MUTATION');
++  assert.equal(result.causes[0].pathClass, 'project');
++  assert.match(result.causes[0].nextAction.repairPreview, /observed SID/u);
++  assert.match(result.causes[0].nextAction.repairPreview, /never apply \/T/u);
++  assert.equal(calls.find(row => row.path === roots.projectRoot && row.pathClass === 'project').boundaryRoot, roots.projectRoot);
++  assert.equal(calls.find(row => row.path === roots.pluginRoot).boundaryRoot, null,
++    'the installed plugin directory is not silently treated as a proven repository root');
++});
++
++test('trusted project, plugin and private path observations stay ready without mutation', () => {
++  const calls = [];
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe: row => calls.push(row) });
++  assert.deepEqual(result, { schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] });
++  assert.equal(calls.filter(row => row.privatePath).length, 1);
++  assert.ok(calls.some(row => row.pathClass === 'project' && row.path === 'D:\\' && row.boundaryRoot === roots.projectRoot));
++});
++
++test('project, plugin and private failures are aggregated from one read-only pass', () => {
++  const failures = new Map([
++    [roots.projectRoot, 'WIN-AUTH-ANCESTOR-MUTATION'],
++    [roots.pluginRoot, 'WIN-AUTH-ANCESTOR-OWNER'],
++    [roots.privateRoot, 'WIN-AUTH-DACL'],
++  ]);
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
++    probe({ path }) {
++      if (failures.has(path)) throw Object.assign(new Error('closed'), { reason: failures.get(path) });
++    },
++  });
++  assert.equal(result.status, 'unavailable');
++  for (const pathClass of ['project', 'plugin', 'private'])
++    assert.ok(result.causes.some(row => row.pathClass === pathClass && row.reason.startsWith('WIN-AUTH-')));
++});
++
++test('a writable plugin ancestor is observed and refused before dispatch', () => {
++  const ancestor = 'C:\\Users\\owner\\plugins';
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
++    probe({ path, pathClass }) {
++      if (pathClass === 'plugin' && path === ancestor)
++        throw Object.assign(new Error('closed'), { reason: 'WIN-AUTH-ANCESTOR-MUTATION' });
++    },
++  });
++  assert.ok(result.causes.some(row => row.pathClass === 'plugin'
++    && row.path === ancestor && row.reason === 'WIN-AUTH-ANCESTOR-MUTATION'));
++});
++
++test('missing private namespace does not manufacture an ACL failure, while its parent is inspected', () => {
++  const calls = [];
++  const result = assessWindowsAuthorityReadiness({ ...roots,
++    exists: path => path !== roots.privateRoot,
++    probe: row => calls.push(row),
++  });
++  assert.equal(result.status, 'ready');
++  assert.equal(calls.some(row => row.privatePath), false);
++  assert.ok(calls.some(row => row.path === 'D:\\work\\repo\\.git'));
++});
++
++test('missing plugin prerequisite remains unavailable', () => {
++  const result = assessWindowsAuthorityReadiness({ ...roots,
++    exists: path => path !== roots.pluginRoot,
++    probe() {},
++  });
++  assert.equal(result.status, 'unavailable');
++  assert.ok(result.causes.some(row => row.pathClass === 'plugin' && row.reason === 'WIN-AUTH-OPEN'));
++});
++
++test('unknown native failures close without copying arbitrary exception text', () => {
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
++    probe() { throw Object.assign(new Error('private machine path'), { reason: 'private machine path' }); },
++  });
++  assert.equal(result.status, 'unavailable');
++  assert.ok(result.causes.every(row => row.reason === 'WIN-AUTH-OBSERVATION-UNAVAILABLE'));
++  assert.doesNotMatch(JSON.stringify(result), /private machine path/u);
++});
++
++test('a pristine project can inspect existing roots before Git creates its private namespace', () => {
++  const result = assessWindowsAuthorityReadiness({ ...roots,
++    exists: path => !path.toLowerCase().includes('\\.git'),
++    probe() {},
++  });
++  assert.equal(result.status, 'ready');
++});
++
++test('direct consumers receive only closed native causes', () => {
++  assert.equal(windowsAuthorityCause({ reason: 'WIN-AUTH-ANCESTOR-MUTATION' }), 'WIN-AUTH-ANCESTOR-MUTATION');
++  assert.equal(windowsAuthorityCause({ reason: 'private path and SID' }), 'WIN-AUTH-OBSERVATION-UNAVAILABLE');
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 572c62388..669491f2c 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -36,6 +36,7 @@ import { observeAntigravityLoadedTopologyWithWiring as observeAntigravityLoadedT
+ import { readAntigravityPhysicalJson } from "../lib/antigravity-plugin-topology.mjs";
+ import { parseYaml } from "../lib/yaml-lite.mjs";
+ import { observeNodeSandboxProbe } from "../lib/node-sandbox-probe.mjs";
++import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
+ import { observeAgyStartHint } from "../lib/agy-start-hint.mjs";
+ import {
+   evaluateSelfApplicationAttestation,
+@@ -49,6 +50,7 @@ import {
+   retireRegisteredWorktrees,
+ } from "../lib/session-cleanup-recovery.mjs";
+ import {
++  discoverRepository,
+   inspectSessionOwnerRuntime,
+   listActiveSessionDescriptors,
+ } from "../lib/worktree-lifecycle.mjs";
+@@ -1124,6 +1126,8 @@ export function observePipelineStartPreflight({
+   inspectEffectiveArchitectureDecisionsFn = inspectArchitectureDecisionContinuity,
+   observeContinuityAuthorityDriftFn = observeContinuityAuthorityDrift,
+   checkCloneProvisioningFn = checkCloneProvisioning,
++  assessWindowsAuthorityReadinessFn = assessWindowsAuthorityReadiness,
++  windowsAuthorityPlatform = process.platform,
+   verifyLocalInstalledPluginReceiptFn = verifyLocalDevelopmentInstalledPluginReceipt,
+   resolveCodexAttestationSourceFn = resolveCodexAttestationSourceForPreflight,
+   antigravityPluginRegistries = () => [
+@@ -1728,11 +1732,39 @@ export function observePipelineStartPreflight({
+   });
+   const resultStatus = hookRefresh.status;
+   const refreshAction = hookRefresh.action;
++  // A native Windows authority refusal is an early closed prerequisite, before a
++  // requester, State writer or Verify process can bury its WIN-AUTH cause.
++  // The observer is read-only and also has an injected seam for pure fixtures.
++  let windowsAuthorityReadiness = null;
++  if (windowsAuthorityPlatform === "win32") {
++    const observationUnavailable = () => ({ schema: "pipeline.windows-authority-readiness.v1", status: "unavailable", causes: [{ pathClass: "observer", reason: "WIN-AUTH-OBSERVATION-UNAVAILABLE", nextAction: { kind: "operator-review", mutation: false, summary: "Rerun Windows authority readiness before dispatch." } }] });
++    try {
++      windowsAuthorityReadiness = assessWindowsAuthorityReadinessFn({
++        projectRoot: resolve(cwd),
++        pluginRoot,
++        // Worktrees have a .git FILE. The authority namespace lives under the
++        // primary checkout's common Git directory, not below that file.
++        privateRoot: resolve((() => {
++          try { return discoverRepository(resolve(cwd)).commonDir; }
++          catch { return resolve(cwd, ".git"); } // pre-Git onboarding
++        })(), "agent-pipeline"),
++      });
++    } catch {
++      windowsAuthorityReadiness = observationUnavailable();
++    }
++    if (windowsAuthorityReadiness?.schema !== "pipeline.windows-authority-readiness.v1"
++      || !["ready", "unavailable"].includes(windowsAuthorityReadiness.status)
++      || !Array.isArray(windowsAuthorityReadiness.causes)
++      || (windowsAuthorityReadiness.status === "ready" && windowsAuthorityReadiness.causes.length > 0)
++      || (windowsAuthorityReadiness.status === "unavailable" && windowsAuthorityReadiness.causes.length === 0))
++      windowsAuthorityReadiness = observationUnavailable();
++  }
++  const windowsAuthorityBlocked = windowsAuthorityReadiness?.status === "unavailable";
+   const staleHookSnapshots = staleMandatoryHookSnapshots(cloneProvisioning);
+   const result = {
+     schema: SCHEMA,
+-    status: resultStatus,
+-    statusScope: STATUS_SCOPE,
++    status: windowsAuthorityBlocked ? "windows-authority-unavailable" : resultStatus,
++    statusScope: windowsAuthorityBlocked ? "windows-authority-readiness" : STATUS_SCOPE,
+     version,
+     installedVersion,
+     installedSource: installedIdentity?.source ?? "unknown",
+@@ -1751,7 +1783,10 @@ export function observePipelineStartPreflight({
+     ...(dutyNotRuntimeLive.status !== "not-applicable" ? { dutyNotRuntimeLive } : {}),
+     ...(staleHookSnapshots.length > 0 ? { staleHookSnapshots } : {}),
+     ...(sessionReadiness ? { sessionReadiness } : {}),
+-    nextAction: resultStatus === "hook-provisioning-required"
++    ...(windowsAuthorityReadiness ? { windowsAuthorityReadiness } : {}),
++    nextAction: windowsAuthorityBlocked
++      ? { kind: "operator-review", mutation: false, requiresConfirmation: false, causes: windowsAuthorityReadiness.causes }
++      : resultStatus === "hook-provisioning-required"
+       ? {
+           kind: "command",
+           executable: process.execPath,
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 48be6d550..6eb9bdca3 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -259,6 +259,58 @@ function assertGuidedOnboardingAction(result, root, runner) {
+     expected: { schema: "pipeline.onboarding-init.v1" },
+   });
+ }
++
++test('Windows authority refusal closes bootstrap before requester and Verify with all path-class causes', () => {
++  const causes = [
++    { pathClass: 'project', reason: 'WIN-AUTH-ANCESTOR-MUTATION', nextAction: { kind: 'operator-review', mutation: false } },
++    { pathClass: 'plugin', reason: 'WIN-AUTH-ANCESTOR-OWNER', nextAction: { kind: 'operator-review', mutation: false } },
++    { pathClass: 'private', reason: 'WIN-AUTH-DACL', nextAction: { kind: 'operator-review', mutation: false } },
++  ];
++  let calls = 0;
++  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
++    assessWindowsAuthorityReadinessFn(input) {
++      calls += 1;
++      assert.equal(input.projectRoot, ROOT_CURRENT);
++      return { schema: 'pipeline.windows-authority-readiness.v1', status: 'unavailable', causes };
++    },
++  });
++  assert.equal(calls, 1);
++  assert.equal(result.status, 'windows-authority-unavailable');
++  assert.equal(pipelineStartPreflightExitCode(result), 2);
++  assert.deepEqual(result.windowsAuthorityReadiness.causes, causes);
++  assert.deepEqual(result.nextAction, { kind: 'operator-review', mutation: false, requiresConfirmation: false, causes });
++});
++
++test('Windows custody refusal also closes a pending hook action until reinspection', () => {
++  const causes = [{ pathClass: 'project', reason: 'WIN-AUTH-ANCESTOR-MUTATION',
++    nextAction: { kind: 'operator-review', mutation: false } }];
++  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
++    checkCloneProvisioningFn: () => ({ schema: 'pipeline.clone-provisioning-report.v1', status: 'provisioning-required', checks: [
++      { id: 'pre-commit-hook', status: 'install' }, { id: 'commit-msg-hook', status: 'install' },
++      { id: 'pre-push-hook', status: 'decline' },
++    ] }),
++    assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'unavailable', causes }),
++  });
++  assert.equal(result.status, 'windows-authority-unavailable');
++  assert.equal(result.nextAction.mutation, false);
++  assert.deepEqual(result.nextAction.causes, causes);
++});
++
++test('trusted Windows custody leaves bootstrap ready', () => {
++  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
++    assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] }),
++  });
++  assert.equal(result.status, 'ready');
++  assert.equal(result.windowsAuthorityReadiness.status, 'ready');
++});
++
++test('malformed Windows observation cannot silently mark bootstrap ready', () => {
++  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
++    assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [{ reason: 'WIN-AUTH-DACL' }] }),
++  });
++  assert.equal(result.status, 'windows-authority-unavailable');
++  assert.equal(result.windowsAuthorityReadiness.causes[0].reason, 'WIN-AUTH-OBSERVATION-UNAVAILABLE');
++});
+ function assertRefreshAdvisory(result) {
+   assert.deepEqual(result.nextAction, {
+     kind: "advisory",
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 54b3d799b..d772889c5 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -558,6 +558,8 @@ import {
+   syncStateMdNextAction,
+ } from "../lib/onboarding-continuity.mjs";
+ import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
++import { inspectWindowsOwnedAuthorityPath } from "../lib/windows-owned-authority-backend.mjs";
++import { windowsAuthorityCause } from "../lib/windows-authority-readiness.mjs";
+ import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+ import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
+ 
+@@ -13753,7 +13755,12 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
+   if (!before.isFile() || before.nlink !== 1 || before.size < 1 || before.size > 1048576
+     || (typeof process.getuid === "function" && before.uid !== process.getuid())
+     || (privateState && process.platform !== "win32" && (before.mode & 0o077) !== 0)) throw Error("CVCT-FILE");
+-  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") throw Error("CVCT-FILE");
++  if (privateState && process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") {
++    const error = Error("CVCT-FILE");
++    try { inspectWindowsOwnedAuthorityPath({ path: target, directory: false }); }
++    catch (nativeError) { error.windowsAuthorityCause = windowsAuthorityCause(nativeError); }
++    throw error;
++  }
+   const same = info => info.isFile() && info.dev === before.dev && info.ino === before.ino
+     && info.mode === before.mode && info.nlink === 1 && info.size === before.size;
+   const fd = openSync(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+@@ -13769,7 +13776,8 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
+ }
+ 
+ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+-  const unavailable = code => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable."});
++  const unavailable = (code, windowsAuthorityCause = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
++    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {})});
+   try {
+     const root = resolve(rootDir);
+     if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return unavailable("CVCT-ROOT");
+@@ -13846,5 +13854,5 @@ export function observeCurrentPlanApprovalForCalibration({rootDir} = {}) {
+       submissionSha256:sha256CanonicalJson(state.planSubmission),approvalSha256:sha256CanonicalJson(state.planApproval),
+       authoritySha256:sha256CanonicalJson(authority.value),approvalBasis,
+       sourceRefs:Object.freeze([...new Map(refs.map(ref=>[ref.path,ref])).values()].sort((a,b)=>a.path.localeCompare(b.path)))});
+-  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE"); } // AC-140: keep the typed source failure
++  } catch (error) { return unavailable(/^CVCT-[A-Z0-9-]+$/u.test(error?.message ?? "") ? error.message : error?.code === "ENOENT" ? "CVCT-SOURCE-MISSING" : "CVCT-APPROVAL-UNAVAILABLE", error?.windowsAuthorityCause); } // AC-140: keep the typed source failure
+ }
+diff --git a/plugins/pipeline-core/skills/pipeline-start/SKILL.md b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+index 9ff8f1bfe..8cd86b90d 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/SKILL.md
++++ b/plugins/pipeline-core/skills/pipeline-start/SKILL.md
+@@ -20,7 +20,7 @@ Resolve the plugin root, then run exactly:
+ `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
+ 
+ Accept only schema `pipeline.start-preflight.v1`, status `ready`,
+-`pipeline-governance-inactive`, `plugin-refresh-required`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
++`pipeline-governance-inactive`, `plugin-refresh-required`, `windows-authority-unavailable`, the hook statuses or the hard recovery status below, absolute matching `pluginRoot`, valid
+ version/source/boundary/handoff, and a read-only `nextAction` when ready.
+ Goldfish/Critic validate but never execute onboarding; Elephant executes the
+ returned action at its declared boundary. Resolve role before preflight:
+@@ -37,6 +37,9 @@ or `refresh-mandatory-hooks.mjs --root <root>`. Elephant executes that exact
+ action once, then reruns the identical preflight and continues only on `ready`;
+ a missing or failed action stops bootstrap. Goldfish and Critic never execute it.
+ 
++Status `windows-authority-unavailable` stops bootstrap. Present its closed
++causes using `references/onboarding-recovery.md`; never execute an ACL repair.
++
+ Status `plugin-attestation-required` is a closed hard recovery, never the
+ soft `plugin-refresh-required` advisory. For Codex, accept it only with
+ `nextAction.schema: pipeline.installed-plugin-attestation-setup-action.v1`,
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+index 078a44863..fc0890475 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/onboarding-recovery.md
+@@ -72,3 +72,13 @@ not `ready` — run the read-only
+ mutates, only inspects and reports the same typed JSON (`status`,
+ `diagnostics[].repair`) that `project-onboarding-v3.mjs` consumes internally
+ via `validateV3BootstrapAuthority`.
++
++## Windows custody prerequisite
++
++When start preflight reports `windows-authority-unavailable`, present every
++`windowsAuthorityReadiness.causes` entry before onboarding or dispatch. Its
++`pathClass`, `reason`, and `nextAction` identify the exact directory to review,
++including a SID based single directory ACL preview where applicable. The
++operator may instead relocate the project into a private user profile path.
++No action in this diagnostic writes an ACL. Rerun preflight after a reviewed
++repair; a WSL fixture cannot certify native Windows custody.

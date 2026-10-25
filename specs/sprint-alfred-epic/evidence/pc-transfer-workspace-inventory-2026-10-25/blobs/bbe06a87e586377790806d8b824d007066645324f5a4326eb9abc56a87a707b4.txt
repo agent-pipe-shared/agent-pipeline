@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: SUL-1.0
+// Diagnostic qualification of a known capability gap. Passing these checks
+// confirms the contradiction; it does not certify a usable native carrier.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { prepareAntigravityNativeDispatch } from './antigravity-native-dispatch-coordinator.mjs';
+import { evaluateDispatchModel } from './dispatch-model-enforcement.mjs';
+import { registeredFunctionalTaskRoutes } from './model-role-route-source.mjs';
+import { ROLE_DISPATCH_REQUEST_SCHEMA } from './role-dispatch-preflight.mjs';
+import { transformAgyRunnerAgent } from './agy-central-snapshot.mjs';
+
+const digest = value => createHash('sha256').update(value).digest('hex');
+const adapter = fileURLToPath(new URL('../hooks/antigravity-pretool-guard.mjs', import.meta.url));
+function fixture(run) {
+  const parent = resolve('scratch/g18-fixtures');
+  mkdirSync(parent, { recursive: true });
+  const root = mkdtempSync(join(parent, 'carrier-'));
+  const home = join(root, 'fake-home');
+  mkdirSync(home);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  Object.assign(env, { HOME: home, USERPROFILE: home, GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: join(home, 'absent-gitconfig'), PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE: home });
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, encoding: 'utf8' }).trim();
+  try {
+    mkdirSync(join(root, '.agent-pipeline'));
+    writeFileSync(join(root, '.agent-pipeline/onboarding-consent.json'), JSON.stringify({
+      schema: 'pipeline.onboarding-consent-marker.v1', status: 'consent-given-onboarding-incomplete',
+      consentGivenAt: '2026-10-02T00:00:00.000Z',
+    }));
+    writeFileSync(join(root, 'input.txt'), 'input\n');
+    git('init', '-q'); git('config', 'user.name', 'Fixture');
+    git('config', 'user.email', 'fixture@example.invalid');
+    git('add', 'input.txt'); git('commit', '-q', '-m', 'fixture');
+    const nativeSubagents = [{ TypeName: 'consult-advisor', Role: 'Advisor', Prompt: 'Inspect input.txt.' }];
+    const packets = [{ schema: ROLE_DISPATCH_REQUEST_SCHEMA, dispatchId: 'g18-carrier',
+      transport: 'antigravity', role: 'consult-advisor', prompt: nativeSubagents[0].Prompt,
+      candidate: { commit: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}') },
+      requiredPaths: ['input.txt'], requiredPathSha256: { 'input.txt': digest('input\n') },
+      resultDestination: { kind: 'return' } }];
+    run({ root, env, nativeSubagents, packets });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+test('G18MC01 actual prepared batch reaches actual adapter model refusal', () => fixture(value => {
+  const prepared = prepareAntigravityNativeDispatch(value);
+  assert.equal(prepared.status, 'prepared');
+  const input = { workspacePaths: [value.root], tool_use_id: 'g18-safe-carrier',
+    toolCall: { name: 'invoke_subagent', args: prepared.invocation } };
+  const result = spawnSync(process.execPath, [adapter], { cwd: value.root,
+    env: { ...value.env, CLAUDE_PROJECT_DIR: value.root }, input: JSON.stringify(input),
+    encoding: 'utf8', shell: false, timeout: 15000 });
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /DISPATCH-MODEL-MISSING/);
+  console.log(JSON.stringify({ case: 'G18MC01', preparation: prepared.code,
+    adapterExit: result.status, modelFinding: 'DISPATCH-MODEL-MISSING',
+    modelCalls: prepared.modelCalls, launcherCalls: prepared.launcherCalls }));
+}));
+
+test('G18MC02 each demanded enum is rejected by the actual coordinator', () => fixture(value => {
+  for (const model of ['flash_lite', 'flash', 'pro']) {
+    const nativeSubagents = value.nativeSubagents.map(entry => ({ ...entry, Model: model }));
+    const result = prepareAntigravityNativeDispatch({ ...value, nativeSubagents });
+    assert.equal(result.code, 'AGY-NATIVE-SUBAGENTS');
+    console.log(JSON.stringify({ case: 'G18MC02', proposedModel: model, preparation: result.code }));
+  }
+}));
+
+test('G18MC03 configured concrete IDs are not a proved native tier binding', () => {
+  const source = registeredFunctionalTaskRoutes();
+  assert.equal(source.ok, true);
+  const routes = source.taskRoutes.filter(route => route.runner === 'antigravity' && route.state !== 'unavailable');
+  assert.ok(routes.length > 0);
+  assert.ok(routes.every(route => route.selector.kind === 'model-id' && !['flash_lite', 'flash', 'pro'].includes(route.selector.value)));
+  const concrete = routes.find(route => route.taskRoute === 'duty.implement').selector.value;
+  assert.equal(evaluateDispatchModel({ runner: 'antigravity', subagentType: 'consult-advisor', model: concrete, routeSource: source }).findings[0].code, 'DISPATCH-MODEL-UNROUTED');
+  // Current pure guard would admit this tier without a matching concrete duty.
+  // That is additional evidence that merely opening ENTRY_KEYS is unsound.
+  assert.equal(evaluateDispatchModel({ runner: 'antigravity', subagentType: 'consult-advisor', model: 'flash', routeSource: source }).ok, true);
+  const profile = readFileSync(new URL('../agents/critic.md', import.meta.url), 'utf8');
+  assert.match(profile, /^model: (?:opus|sonnet)$/m);
+  const runnerProfile = transformAgyRunnerAgent('agents/critic.md', Buffer.from(profile)).toString();
+  assert.match(runnerProfile, /^model: flash$/m);
+  console.log(JSON.stringify({ case: 'G18MC03', concreteSelector: concrete,
+    existingD13ProfileTier: 'flash', concreteSelectorHasApprovedTierBinding: false,
+    nativeIdentity: 'unknown' }));
+});

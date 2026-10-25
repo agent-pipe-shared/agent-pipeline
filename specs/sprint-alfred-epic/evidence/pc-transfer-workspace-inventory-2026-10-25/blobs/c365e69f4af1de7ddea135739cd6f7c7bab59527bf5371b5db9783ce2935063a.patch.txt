@@ -1,0 +1,222 @@
+diff --git a/harness/reader-review-protocol.md b/harness/reader-review-protocol.md
+index b2ab00167..ea5ed24df 100644
+--- a/harness/reader-review-protocol.md
++++ b/harness/reader-review-protocol.md
+@@ -126,8 +126,21 @@ finding names a commit in that round's correction batch. An `accepted` finding
+ requires null and its exact `<round>/<finding-id>` in the owner's acceptance
+ list. Open, unknown, duplicated or malformed findings fail. An empty earlier
+ round belongs to early ordinary closure rather than a manufactured terminal
+-course. This disposition contract is unchanged; no `openFindings` key belongs
+-in terminal v2.
++course. No `openFindings` key belongs in terminal v2.
++
++A finding may instead be `adjudicated` in terminal v1 and v2: the round's own
++phase-two Reader expressly declined the phase-one finding and the course
++changed nothing for it. It has `resolutionCommit: null` and exactly one extra
++field, `adjudication`, with `report` (exactly `path` and `sha256`, equal to
++that round's `phaseTwo` reference), `phaseOneQuote` and `phaseTwoQuote`. Each
++quote is one trimmed line of 16..300 characters occurring literally in the
++matching immutable report; the two differ and a phase-one quote is used once
++per disposition. The status is neither a correction nor an owner acceptance and
++never appears in the owner's acceptance list. The checker proves only the
++binding, not that the Reader's reasoning is right. Use it only for a decline the
++phase-two report states: a finding that report leaves open, carries forward or
++only partly addresses stays unresolved and keeps the course open. Never infer
++an adjudication, an acceptance or a resolution commit that was not recorded.
+ 
+ The closed owner record uses
+ `pipeline.doc-reader-terminal-owner-decision.v2` with exactly `schema`,
+diff --git a/harness/scripts/doc-reader-terminal-binding.mjs b/harness/scripts/doc-reader-terminal-binding.mjs
+index 8287bedfd..33b2766d0 100644
+--- a/harness/scripts/doc-reader-terminal-binding.mjs
++++ b/harness/scripts/doc-reader-terminal-binding.mjs
+@@ -47,6 +47,11 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
+     if(changes.status!==0||changeCommits.length!==1||changeCommits[0]!==commits[0])fail(label+' immutable report changed');
+     ancestor(reviewedCommit,commits[0]);ancestor(commits[0],upper);
+     if(commits[0]===reviewedCommit||!api.readBlob(root,commits[0],path,1024*1024).equals(bytes))fail(label+' immutable report changed');
++    return text;
++  };
++  // A report-bound adjudication quotes one literal line of each immutable report; it never infers meaning from it.
++  const quote=(value,text,label)=>{
++    if(typeof value!=='string'||value.length<16||value.length>300||/[\r\n]/.test(value)||value!==value.trim()||!text.includes(value))fail('adjudication '+label+' quote not found in its immutable report');
+   };
+   const v2=record.schema===TERMINAL_READER_SCHEMA_V2;
+   closed(record,['schema','courseId','rounds','correctionBatches','ownerDecision','final','policyTransition',...(v2?['escalation']:[])],'record');
+@@ -88,23 +93,34 @@ export function verifyTerminalReaderCourse({root,candidateCommit,featureId,recor
+     if(changed.status!==0)fail('correction history unavailable');
+     const changeCommits=changed.stdout.trim()?changed.stdout.trim().split('\n'):[];
+     if(changeCommits.length>32||!api.sameJson([...new Set(changeCommits)].sort(),[...batch.commits].sort()))fail('unlisted correction or input change');
++    const texts={};
+     for(const [field,phase] of [['phaseOne','phase-one'],['phaseTwo','phase-two']]){
+-      const path=prefix+phase+'/'+round.id+'.md';expectedPaths.add(path);report(round[field],path,field,round.reviewed.commit,upper);
++      const path=prefix+phase+'/'+round.id+'.md';expectedPaths.add(path);texts[field]=report(round[field],path,field,round.reviewed.commit,upper);
+     }
+     const path=prefix+'disposition/'+round.id+'.json';expectedPaths.add(path);
+     const disposition=jsonRef(round.disposition,path,256*1024,'disposition');
+     closed(disposition,['schema','round','status','findings'],'disposition');
+     if(disposition.schema!=='pipeline.doc-reader-terminal-disposition.v1'||disposition.round!==round.id
+       ||disposition.status!=='resolved'||!Array.isArray(disposition.findings)||disposition.findings.length<1||disposition.findings.length>256)fail('disposition or early closure');
+-    const ids=new Set();
++    const ids=new Set(),quotes=new Set();
+     for(const finding of disposition.findings){
+-      closed(finding,['id','class','status','resolutionCommit'],'finding');
++      const adjudicated=finding?.status==='adjudicated';
++      closed(finding,['id','class','status','resolutionCommit',...(adjudicated?['adjudication']:[])],'finding');
+       if(!findingId.test(finding.id??'')||ids.has(finding.id)||!['cut','fileline','reordering'].includes(finding.class))fail('finding identity');ids.add(finding.id);
+       if(finding.status==='resolved'){
+         if(!batch.commits.includes(finding.resolutionCommit))fail('finding resolution outside its correction batch');
+       }else if(finding.status==='accepted'){
+         const key=round.id+'/'+finding.id;
+         if(finding.resolutionCommit!==null||!owner.acceptedFindingIds.includes(key))fail('unaccepted finding');accepted.add(key);
++      }else if(adjudicated){
++        // The phase-two Reader's own expressed decline of a phase-one finding: bound to that round's immutable
++        // phase-two report. Not a correction, not an owner acceptance; nothing here can judge the Reader's reasoning.
++        if(finding.resolutionCommit!==null)fail('adjudicated finding names a resolution');
++        const a=finding.adjudication;closed(a,['report','phaseOneQuote','phaseTwoQuote'],'adjudication');
++        closed(a.report,['path','sha256'],'adjudication report');
++        if(a.report.path!==round.phaseTwo.path||a.report.sha256!==round.phaseTwo.sha256)fail('adjudication outside its own phase-two report');
++        quote(a.phaseOneQuote,texts.phaseOne,'phase-one');quote(a.phaseTwoQuote,texts.phaseTwo,'phase-two');
++        if(a.phaseOneQuote===a.phaseTwoQuote||quotes.has(a.phaseOneQuote))fail('adjudication quote reused');quotes.add(a.phaseOneQuote);
+       }else fail('unresolved finding');
+     }
+   }
+diff --git a/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs b/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs
+index fd05e77f0..dd03c2e8c 100644
+--- a/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs
++++ b/plugins/pipeline-core/lib/pins/bounded-reader-terminal-binding.test.mjs
+@@ -312,3 +312,86 @@ test("actual-course shape: a 15-document first-round scope expands to 16 without
+   fx.refresh(); const forged = fx.check();
+   assert.equal(forged.status, "failed"); assert.match(joined(forged), /snapshot digest mismatch/);
+ });
++
++// Report-bound phase-two adjudication (ALF-K33). A phase-two Reader may expressly decline a phase-one finding; the
++// closed form records that as `adjudicated`, bound to the round's OWN immutable phase-two report by path, digest and a
++// literal quote from each report. It is neither a correction nor an owner acceptance, and it infers neither.
++const adjudicated = (fx, index, over = {}) => {
++  const ref = fx.record.rounds[index].phaseTwo;
++  return { id: "F2", class: "reordering", status: "adjudicated", resolutionCommit: null,
++    adjudication: { report: { path: ref.path, sha256: ref.sha256 }, phaseOneQuote: "# Synthetic phase-one", phaseTwoQuote: "# Synthetic phase-two", ...over } };
++};
++
++test("a phase-two no-change adjudication closes a finding without a resolution commit or owner acceptance (RED: unchanged checker has no such status)", (t) => {
++  const fx = shared(t);
++  const [ok] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0)); }));
++  assert.equal(ok.status, "passed", joined(ok));
++  assert.deepEqual(JSON.parse(fx.read(fx.ownerPath)).acceptedFindingIds, []); // nothing was accepted on anyone's behalf
++  const [onlyAdjudicated] = fx.trial(() => fx.editDisposition(3, (d) => { d.findings = [adjudicated(fx, 3)]; }));
++  assert.equal(onlyAdjudicated.status, "passed", joined(onlyAdjudicated)); // the round's correction batch still exists and is checked
++  const [ownerKey] = fx.trial(() => {
++    fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0)); });
++    fx.editJson(fx.ownerPath, (o) => { o.acceptedFindingIds = ["round-1/F2"]; });
++    fx.editRecord((r) => { r.ownerDecision.sha256 = hash(fx.read(fx.ownerPath)); });
++  });
++  assert.equal(ownerKey.status, "failed", joined(ownerKey)); // an adjudication is not an acceptance and may not be listed as one
++});
++
++test("an adjudication names no resolution and carries exactly its closed report binding (RED: disabled checks pass the forgery)", async (t) => {
++  const fx = shared(t);
++  const noCommit = await mirror("adj-commit", [["if(finding.resolutionCommit!==null)fail('adjudicated finding names a resolution');", "void 0;"]]);
++  const [withCommit, redCommit] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push({ ...adjudicated(fx, 0), resolutionCommit: fx.record.correctionBatches[0].commits[0] }); }), [checkReaderBinding, noCommit]);
++  assert.equal(withCommit.status, "failed", joined(withCommit)); assert.match(joined(withCommit), /adjudicated finding names a resolution/);
++  assert.equal(redCommit.status, "passed");
++  const [missing] = fx.trial(() => fx.editDisposition(0, (d) => { const f = adjudicated(fx, 0); delete f.adjudication; d.findings.push(f); }));
++  assert.equal(missing.status, "failed", joined(missing));
++  const [extraOnResolved] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings[0].adjudication = adjudicated(fx, 0).adjudication; }));
++  assert.equal(extraOnResolved.status, "failed", joined(extraOnResolved)); // `adjudication` exists only on an adjudicated finding
++  const [extraKey] = fx.trial(() => fx.editDisposition(0, (d) => { const f = adjudicated(fx, 0); f.adjudication.ownerApproved = true; d.findings.push(f); }));
++  assert.equal(extraKey.status, "failed", joined(extraKey));
++  const [extraReportKey] = fx.trial(() => fx.editDisposition(0, (d) => { const f = adjudicated(fx, 0); f.adjudication.report.line = 1; d.findings.push(f); }));
++  assert.equal(extraReportKey.status, "failed", joined(extraReportKey));
++});
++
++test("an adjudication must cite the round's own phase-two report (RED: disabled binding passes a foreign or phase-one citation)", async (t) => {
++  const fx = shared(t);
++  const unbound = await mirror("adj-report", [["if(a.report.path!==round.phaseTwo.path||a.report.sha256!==round.phaseTwo.sha256)fail('adjudication outside its own phase-two report');", "void 0;"]]);
++  const foreign = fx.record.rounds[1].phaseTwo, own = fx.record.rounds[0];
++  const [otherRound, redOther] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { report: { path: foreign.path, sha256: foreign.sha256 } })); }), [checkReaderBinding, unbound]);
++  assert.equal(otherRound.status, "failed", joined(otherRound)); assert.match(joined(otherRound), /outside its own phase-two report/);
++  assert.equal(redOther.status, "passed");
++  const [phaseOne] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { report: { path: own.phaseOne.path, sha256: own.phaseOne.sha256 } })); }));
++  assert.equal(phaseOne.status, "failed", joined(phaseOne));
++  const [staleDigest] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { report: { path: own.phaseTwo.path, sha256: "e".repeat(64) } })); }));
++  assert.equal(staleDigest.status, "failed", joined(staleDigest));
++});
++
++test("an adjudication quotes both immutable reports literally, once (RED: disabled quote checks pass an invented or reused quote)", async (t) => {
++  const fx = shared(t);
++  const unquoted = await mirror("adj-quote", [["||!text.includes(value)", ""]]);
++  const [invented, redInvented] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseTwoQuote: "The reader never wrote this sentence." })); }), [checkReaderBinding, unquoted]);
++  assert.equal(invented.status, "failed", joined(invented)); assert.match(joined(invented), /quote not found in its immutable report/);
++  assert.equal(redInvented.status, "passed");
++  const [inventedOne] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseOneQuote: "The reader never wrote this either." })); }));
++  assert.equal(inventedOne.status, "failed", joined(inventedOne));
++  for (const bad of ["too short", "x".repeat(301), "# Synthetic phase-one\nFinding: change fixture paragraph.", " # Synthetic phase-one", 7, null]) {
++    const [rejected] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseOneQuote: bad })); }));
++    assert.equal(rejected.status, "failed", `bad quote ${JSON.stringify(bad)}: ${joined(rejected)}`);
++  }
++  const unreused = await mirror("adj-reuse", [["||quotes.has(a.phaseOneQuote)", ""]]);
++  const [reused, redReused] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0), { ...adjudicated(fx, 0), id: "F3" }); }), [checkReaderBinding, unreused]);
++  assert.equal(reused.status, "failed", joined(reused)); assert.match(joined(reused), /adjudication quote reused/);
++  assert.equal(redReused.status, "passed");
++  const [same] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0, { phaseTwoQuote: "# Synthetic phase-one" })); }));
++  assert.equal(same.status, "failed", joined(same)); // one sentence cannot stand for both reports; it would not be in the phase-two report either
++});
++
++test("unresolved, partial and unknown dispositions stay non-passing beside a valid adjudication (RED: disabled status gate passes them)", async (t) => {
++  const fx = shared(t);
++  const open = await mirror("adj-open", [["else fail('unresolved finding');", "else void 0;"]]);
++  for (const status of ["open", "partial", "no-change", "adjudication-pending", "adjudicated "]) {
++    const [result, red] = fx.trial(() => fx.editDisposition(0, (d) => { d.findings.push(adjudicated(fx, 0), { id: "F3", class: "cut", status, resolutionCommit: null }); }), [checkReaderBinding, open]);
++    assert.equal(result.status, "failed", `${status}: ${joined(result)}`); assert.match(joined(result), /unresolved finding|field set/);
++    if (status === "open") assert.equal(red.status, "passed");
++  }
++});
+diff --git a/plugins/pipeline-core/reader-inputs/manifest.json b/plugins/pipeline-core/reader-inputs/manifest.json
+index e9ffcbd91..8d0bdef91 100644
+--- a/plugins/pipeline-core/reader-inputs/manifest.json
++++ b/plugins/pipeline-core/reader-inputs/manifest.json
+@@ -1 +1 @@
+-{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"c4b97e145f008c989f29dc85d1cd508c25861282cc385e0843a98679fc5ce417"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"23bec3bf912551449c6b7e8282e6aa977b90566352cc655a678a331d4f5d7e73"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"3e1217a3ab7994a2fa9ac2986e61a803f1a3fbeba21f6c25f41bd7ad1a6057d0"}},"policySha256":"314e137abe661db2d7ac09f8552daff01aba4c9d7fc7343f8274362e3e48aa6f","schema":"pipeline.doc-reader-input-bundle.v1"}
++{"inputs":{"capabilityInventorySha256":{"canonicalSourcePath":"docs/product-capability-inventory.json","pluginPath":"plugins/pipeline-core/reader-inputs/product-capability-inventory.json","sha256":"c4b97e145f008c989f29dc85d1cd508c25861282cc385e0843a98679fc5ce417"},"governanceSha256":{"canonicalSourcePath":"governance/observation-doc-governance.json","pluginPath":"plugins/pipeline-core/reader-inputs/observation-doc-governance.json","sha256":"23bec3bf912551449c6b7e8282e6aa977b90566352cc655a678a331d4f5d7e73"},"readerProtocolSha256":{"canonicalSourcePath":"harness/reader-review-protocol.md","pluginPath":"plugins/pipeline-core/reader-inputs/reader-review-protocol.md","sha256":"9a520ae0e591259f88cacbf9c4f037c4b9070f7ccb0f85794e16b7f7e326a640"}},"policySha256":"e15f931d1500d1414014f3e1bd326b6c19f3992edc7c7b60919907e3ae6338d1","schema":"pipeline.doc-reader-input-bundle.v1"}
+diff --git a/plugins/pipeline-core/reader-inputs/reader-review-protocol.md b/plugins/pipeline-core/reader-inputs/reader-review-protocol.md
+index b2ab00167..ea5ed24df 100644
+--- a/plugins/pipeline-core/reader-inputs/reader-review-protocol.md
++++ b/plugins/pipeline-core/reader-inputs/reader-review-protocol.md
+@@ -126,8 +126,21 @@ finding names a commit in that round's correction batch. An `accepted` finding
+ requires null and its exact `<round>/<finding-id>` in the owner's acceptance
+ list. Open, unknown, duplicated or malformed findings fail. An empty earlier
+ round belongs to early ordinary closure rather than a manufactured terminal
+-course. This disposition contract is unchanged; no `openFindings` key belongs
+-in terminal v2.
++course. No `openFindings` key belongs in terminal v2.
++
++A finding may instead be `adjudicated` in terminal v1 and v2: the round's own
++phase-two Reader expressly declined the phase-one finding and the course
++changed nothing for it. It has `resolutionCommit: null` and exactly one extra
++field, `adjudication`, with `report` (exactly `path` and `sha256`, equal to
++that round's `phaseTwo` reference), `phaseOneQuote` and `phaseTwoQuote`. Each
++quote is one trimmed line of 16..300 characters occurring literally in the
++matching immutable report; the two differ and a phase-one quote is used once
++per disposition. The status is neither a correction nor an owner acceptance and
++never appears in the owner's acceptance list. The checker proves only the
++binding, not that the Reader's reasoning is right. Use it only for a decline the
++phase-two report states: a finding that report leaves open, carries forward or
++only partly addresses stays unresolved and keeps the course open. Never infer
++an adjudication, an acceptance or a resolution commit that was not recorded.
+ 
+ The closed owner record uses
+ `pipeline.doc-reader-terminal-owner-decision.v2` with exactly `schema`,
+diff --git a/plugins/pipeline-core/skills/reader-review/SKILL.md b/plugins/pipeline-core/skills/reader-review/SKILL.md
+index e1b08790e..f07d2c77a 100644
+--- a/plugins/pipeline-core/skills/reader-review/SKILL.md
++++ b/plugins/pipeline-core/skills/reader-review/SKILL.md
+@@ -117,7 +117,8 @@ source-bound mode.
+ 7. For terminal correction after two or three paired rounds, use the source
+    protocol's closed terminal v2 record. Preserve all report pairs and their
+    publication provenance, bind every reviewed snapshot and correction batch,
+-   record each finding's exact resolution or existing owner acceptance, and
++   record each finding's exact resolution, existing owner acceptance, or a
++   report-bound adjudication that its own phase-two report states, and
+    bind the final committed state. Disclose normalized reports and any protocol
+    transition. Derive the v2 owner record from existing policy or the actual
+    course decision; do not invent an approval or ask the PO merely to finish

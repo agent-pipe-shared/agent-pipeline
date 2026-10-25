@@ -1,0 +1,22 @@
+# Prepared Codex Advisor host context observer
+
+This is a Source proposal, with an import-only Scratch runtime projection. It creates no host capability, consent, export authorization, effective readiness or architectural adoption. No source files were changed. See the exact hashes and terminal counts in `codex-advisor-host-context-evidence.json`.
+
+## Inputs and implementation
+
+- Proposed target: `plugins/pipeline-core/lib/codex-advisor-host-context.mjs`.
+- Companion bridge patch changes exactly one line: it exports the existing `resolvedAdvisoryRoute` function. There is no copied V3 or role-selection policy. Existing semantics retain the independently validated committed V3 floor when optional selection fails, and replace its model/source digest only for exact host readback receipts.
+- The observer derives physical registered Git topology, HEAD commit/tree, committed V3 route, canonical existing local GUID, and independent binary path/hash/file identity. It reads the complete context twice, with root/file descriptor checks and final candidate/route/file identity rechecks. Closed immutable metadata contains no prompt, question, answer or evidence content.
+- Canonical GUID uses the separately prepared pure `readExistingLocalRepositoryFingerprint` accessor. It does not call the binding writer. Missing or v1 identity is unavailable; provisioning belongs to the controller outside this observer.
+- Binary selection uses existing `resolveTrustedSystemExecutable`, which ignores PATH. POSIX selection also examines fixed user-home locations, so its default was not executed against the operator's home. Tests use a controlled approved fixture resolver; the inert binary is never run. A separate resolver test supplies controlled filesystem/home dependencies and checks the exact fixed search list.
+- Binary hashing streams bounded 64 KiB descriptor reads with a conservative 64 MiB ceiling, before/after inode/mode/link/time/size checks, no symlink ancestry, and one physical hard link. Conservative size/link restrictions may reject a legitimate installed executable and require an explicit reviewed policy adjustment.
+
+## Verification scope
+
+Nine tests exercise actual normal Git checkout, synthetic complete registered V3 authority, sanctioned fixture GUID, V3 fallback/role replacement semantics, invalid committed source despite valid working file, optional selected-route drift, candidate drift, binary content/path/inode/alias/mode failures, Git-common-root replacement, missing GUID refusal without mint, and PATH-independent trusted resolver behavior. The positive binary resolver and optional successful role receipt are explicitly synthetic test-code dependencies. They prove contract handling, not real system Codex availability or authority.
+
+Initial direct test invocation omitted the pre-import loader and failed module linking; no tests passed in that invocation. First correctly loaded run passed 7/8; the remaining test looked for identity at the wrong fixture location. The test now uses the actual canonical governance-events/repository-binding.json location. Subsequent loaded run passed 9/9 (terminal `0e859f`). First recorder also passed 9/9 but its zero-context bridge patch failed ordinary git apply --check (terminal `f71aaa`); the retained historical evidence records that failure. The patch now includes standard unchanged context. Final evidence JSON records the stable-input run and ordinary dry patch applicability.
+
+## Necessary integration boundaries
+
+The future sealed controller must select these code dependencies itself and await the observer. External/model JSON must not choose resolver/role callbacks or treat a Promise as metadata authority. This code does not implement the seal, effective readiness or a live Advisor execution. Current role source depends on host session identity and receipt reconstruction; tests do not claim real role-host provenance. The observed route is committed candidate authority, not a clean-working-tree assertion. Repeated physical reads detect tested drift; they are not an atomic repository-wide snapshot or a filesystem lock. The canonical route source currently accepts SHA-1 candidates only, so SHA-256 Git repository route support remains outside this slice. Default resolver/role callbacks have their existing timing and availability contracts; this observer introduces no controller-wide deadline.

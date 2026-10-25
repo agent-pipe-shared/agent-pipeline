@@ -1,5 +1,13 @@
 # Post-stamp handoff: later work is not installed
 
+> Historical handoff, superseded for current status and restoration by
+> [current State](../../../../docs/state.md) and the
+> [portable transfer package](../pc-runner-transfer-2026-10-25/README.md).
+> The later detailed audit exports all retained briefing/spec construction
+> inputs in [tracked history](../pc-transfer-briefing-history-2026-10-25/README.md).
+> Statements below about local-only briefings or cancelled PC transfer describe
+> the old checkpoint and are not present continuation instructions.
+
 Historical package based on32b398bf7, before the AGY installer hotfix. Current installation identity is in docs/state.md; this package does not override it. Its three proposals are still unintegrated.
 
 Installation candidate remains32b398bf7, build suffix20261025125256.b68e22c. All three later slices are inert, based on that commit, and absent from Main's plugin files. No matrix stages changed. Worker calls/tests were terminal at handoff; no live child handle remains. Recheck actual process state on re-entry before starting anything.

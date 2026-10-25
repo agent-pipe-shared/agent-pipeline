@@ -1,0 +1,58 @@
+{
+  "task": "onboarding-unsafe-layout-inspection-dispatch-correction",
+  "sourcePath": "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+  "sourcePreSha256": "ff2f7ac45ee7044c974b78e95ec3cb341b20f382688f4c1c4bc0f37853e64c23",
+  "sourcePostSha256": "9da4a5056a6b33ddc04cd4c86071954b78886f72d048d0f833fa102cb068a703",
+  "exactInverse": true,
+  "qualification": "unchanged original callback via virtual registration; actual Source dependencies, isolated disposable roots; 1/1 FD3; no full suite claim",
+  "files": [
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/preimage.mjs.txt",
+      "sha256": "ff2f7ac45ee7044c974b78e95ec3cb341b20f382688f4c1c4bc0f37853e64c23"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/final.postimage.mjs.txt",
+      "sha256": "9da4a5056a6b33ddc04cd4c86071954b78886f72d048d0f833fa102cb068a703"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/final.source.patch",
+      "sha256": "9783e433b3c91ccea12cde6ae0f74e798e61c347ad4cb3c62167e1749bd9fd08"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/final.inverse.patch",
+      "sha256": "0072cf6cac250911a2e62d033ba8c5acdbe380f15138d71a939793cdf5ed93fe"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/directed.receipt.json",
+      "sha256": "0d7394d5ccb952084a898b8d3bf8cf405fd877b6ab5ff7047f7c5c6bebda8deb"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/directed.stdout.txt",
+      "sha256": "1f8d100cdb367805a3492c276e6f08da26261f59b0952c2dcf3cd2644578432e"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/directed.stderr.txt",
+      "sha256": "f198b7de95c8cab5aee55e696d058550a24bd41da4beba08d21b8df46012f705"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/directed.completion.jsonl",
+      "sha256": "22158452ff3abe4723df46f32738ee1b90620d0db93ec783bc330ae621bdbf01"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/successor-unsafe-layout/directed.receipt.json",
+      "sha256": "840bcf627b5f73c505a1e01bad5aa31ea09990c22c50ee10b860fe415527802c"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/successor-unsafe-layout/directed.stdout.txt",
+      "sha256": "613d8e13bf3e3934f5ffffea4d94fc16d635c65f8e04774d3110ecba9ee2297d"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/successor-unsafe-layout/directed.stderr.txt",
+      "sha256": "98b2b4d6b2475f2a2a05426112f9bcc3c82f594b74ea19a8f7151eb6fa22f138"
+    },
+    {
+      "path": "scratch/0.7-onboarding-fixture-source-failure-repair-20260929/alias-source-correction/successor-unsafe-layout/directed.completion.jsonl",
+      "sha256": "8054b7cc899bca76baa0de7fc28a80afaaca6d7fd9f502935e40f64f9f3b6784"
+    }
+  ]
+}

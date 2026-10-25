@@ -1,0 +1,23 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing and the files in field 2 are your ONLY input. Read `scratch/clones/k90/templates/prompts/agent-obligations.md` first, then `scratch/briefing-common-clone.md` (clone rules, quality rules, report shape; here the clone name is `k90`: replace `<name>` with `k90`). Shell grammar reminder: `rg -n` on ONE file, `rg -n "..." file | head -N`, single `cat`/Read, `find` are admitted; other pipelines and composed commands are refused.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261022204428.79cda46 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K90-MODEL-FAMILY-HOST-STORE-LONG-RUN/2026-10-23 · Role Goldfish`
+
+## Briefing K90-MODEL-FAMILY-HOST-STORE-LONG-RUN: one long counted run of the model-family host-store suite
+
+### 1. Goal
+`plugins/pipeline-core/lib/model-family-host-store.test.mjs` timed out at the 20-minute cap in the recount round (`specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md`, row for item `model-family-approval-with-automatic-version-upgrades`; MFHS001 to MFHS018 printed as passing, MFHS023 and MFHS028 were not reached; the earlier set-a run needed about 32 minutes; PO list row 5 calls MFHS023/028 a cross-process ownership problem for after 0.7.0). Measure it once with a cap of 60 minutes: copy `scratch/k85-run.mjs` (MAIN checkout) to `scratch/k90-run.mjs` replacing `k85` by `k90` everywhere, set the environment variable of the per-file timeout (see its header) to 3600000 and run the ONE file alone. A call longer than the Bash timeout runs with `run_in_background` and you wait for its completion notice (do not poll in a loop, do not start anything else heavy meanwhile; other dispatches have finished and the machine is quiet). Record: exit code, seconds, node summary counts, the exact names of all failing cases (expected: MFHS023 and MFHS028), and for each failing case the FIRST assertion/error message line (one line each) from the log, with no diagnosis beyond that. Do not retry unless the file times out or the failure list looks load-induced (then ONE retry, only if it fits the budget). Append the result as a new section "Long run of the model-family host-store suite" to the committed evidence file `specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md` in the clone (append only; do not alter existing rows) and commit it in the clone: explicit pathspec, message file under the clone's `scratch/commit-msg/`, subject `docs(evidence): record the long run of the model-family host-store suite`, trailers exactly `AI-Assisted: true` and `Dispatch: K90-MODEL-FAMILY-HOST-STORE-LONG-RUN (goldfish)`.
+
+### 2. Context files
+The evidence file above, `scratch/k85-run.mjs`, `docs/operating-tools.md`.
+
+### 3. DoD checks
+The result section with the counts and the failing case names; commit in the clone.
+
+### 4. Forbidden
+Any edit except the appended section; diagnosing or fixing; `CLAUDE.md`, `.claude/**`, `docs/state.md`, `backlog/**`, protected paths; signing; network; push/reset/stash/checkout/rebase; absolute home/repo paths, emails or secrets in committed text; Advisor.
+
+### 5. Stop conditions
+The file exceeds 60 minutes (record TIMEOUT with the last case printed); tool budget at 80 percent (commit what is measured).
+
+### 6. Dispatch metadata
+Ruleset `0.7.0+claude.20261022204428.79cda46`. Model/effort: Sonnet 5.5 (general-purpose carrier). Profile standard. Worktree: no, own clone `scratch/clones/k90`. Tool budget: base cap 30, closing allowance +5. TASK_ID: K90-MODEL-FAMILY-HOST-STORE-LONG-RUN. Status wording per the common briefing (never "done"). Final report max 15 lines. Your only main-checkout writes: `scratch/k90-run.mjs` and `scratch/agent-out/k90-*`.

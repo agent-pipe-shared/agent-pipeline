@@ -1,0 +1,6 @@
+// usage: node .diag-apply.mjs  (reads .diag-apply-args: patch-name [--check] [--allow-protected]); cwd must be the clone
+import { readFileSync } from "node:fs";
+const args = readFileSync(".diag-apply-args", "utf8").trim().split(/\s+/);
+const MAIN = "<repo-root>/scratch/patches/";
+process.argv = [process.argv[0], MAIN + "apply.mjs", MAIN + args[0], ...args.slice(1)];
+await import(MAIN + "apply.mjs");

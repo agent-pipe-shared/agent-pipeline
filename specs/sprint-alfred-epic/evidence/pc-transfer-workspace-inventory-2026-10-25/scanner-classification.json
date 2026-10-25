@@ -1,0 +1,402 @@
+{
+  "schema": "pipeline.pc-transfer-workspace-scanner-classification.v1",
+  "sourceKind": "actual local gitleaks default-rule directory scan followed by exact public artifact inspection",
+  "actualScanExitCode": 1,
+  "reportedFindings": 16,
+  "classifications": {
+    "false-positive-pem-header-code-literal": 3,
+    "false-positive-public-synthetic-key-reference": 5,
+    "false-positive-public-reuse-content-digest": 8
+  },
+  "reportRedacted": true,
+  "redactedReportSha256": "6dcb810fceaa33de786e18e471ed00c7daf0bcb93ceb10cec95704f94e53e159",
+  "rawCredentialValuesExported": false,
+  "ignoreOrAllowlistChanged": false,
+  "sourceEvidence": [
+    {
+      "path": "plugins/pipeline-core/lib/advisory-lifecycle-v2.mjs",
+      "lines": [
+        429,
+        468,
+        496,
+        497
+      ],
+      "fact": "reuseKeySha256 is digest(bindings), not an authentication secret; validation recomputes the content digest"
+    }
+  ],
+  "findings": [
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/33e2599d6f9a33aa1726f7b5409b50f2a1040200d52157d4c9ff2897afeb4374.txt",
+      "transportSha256": "33e2599d6f9a33aa1726f7b5409b50f2a1040200d52157d4c9ff2897afeb4374",
+      "startLine": 1713,
+      "endLine": 1714,
+      "startColumn": 22,
+      "endColumn": 58,
+      "rule": "private-key",
+      "spanLength": 111,
+      "spanSha256": "99c056f9b540c5195fee21ee07d09e65040f1a5a91cc6924ec3b974403362f7c",
+      "keyNames": [],
+      "valueFacts": [],
+      "classification": "false-positive-pem-header-code-literal",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/6b45860f3a6fe522116a618f3b7d06bfb2d97d702ff31d48f22fa455787aa5f4.patch.txt",
+      "transportSha256": "6b45860f3a6fe522116a618f3b7d06bfb2d97d702ff31d48f22fa455787aa5f4",
+      "startLine": 100,
+      "endLine": 100,
+      "startColumn": 11,
+      "endColumn": 42,
+      "rule": "generic-api-key",
+      "spanLength": 32,
+      "spanSha256": "b8d3c829c39bb7f543c5427380ce7cdddee0bf524940182feb9a8a70c7ab9e6e",
+      "keyNames": [
+        "eyReference"
+      ],
+      "valueFacts": [
+        {
+          "length": 15,
+          "sha256": "cdff34ce2ff61f645ca0449f33ec99af50e23bcdbc7d714b18dd5543b342bb49",
+          "isHexDigest": false,
+          "isFixtureLabel": true
+        }
+      ],
+      "classification": "false-positive-public-synthetic-key-reference",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 17926,
+      "endLine": 17940,
+      "startColumn": 27,
+      "endColumn": 50,
+      "rule": "private-key",
+      "spanLength": 775,
+      "spanSha256": "04d9f68207caa48ffcc1d3da637ef83fe324eeafdaa0165cb69b971b141da8fa",
+      "keyNames": [
+        "classified",
+        "pem"
+      ],
+      "valueFacts": [
+        {
+          "length": 9,
+          "sha256": "954d1bb83d80bb6f6e746b28f0de3ec4c4ed980cfe67ed23a9159cd464ff339a",
+          "isHexDigest": false,
+          "isFixtureLabel": false
+        },
+        {
+          "length": 17,
+          "sha256": "573da6fd127efb9e9d07de2d30783788373e365fa5abe86c541064f326aebfad",
+          "isHexDigest": false,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-pem-header-code-literal",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/b3e12add2e700896cdd38741e3c4b191eb7d6bd19c0330720144f3a0d21f09f8.txt",
+      "transportSha256": "b3e12add2e700896cdd38741e3c4b191eb7d6bd19c0330720144f3a0d21f09f8",
+      "startLine": 1693,
+      "endLine": 1694,
+      "startColumn": 22,
+      "endColumn": 58,
+      "rule": "private-key",
+      "spanLength": 111,
+      "spanSha256": "99c056f9b540c5195fee21ee07d09e65040f1a5a91cc6924ec3b974403362f7c",
+      "keyNames": [],
+      "valueFacts": [],
+      "classification": "false-positive-pem-header-code-literal",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/cc3e42efe94b0f44e62447c43a88b85ddac5ba3f4d4bf9d975bbcbf5c4aa3e13.txt",
+      "transportSha256": "cc3e42efe94b0f44e62447c43a88b85ddac5ba3f4d4bf9d975bbcbf5c4aa3e13",
+      "startLine": 141,
+      "endLine": 141,
+      "startColumn": 16,
+      "endColumn": 46,
+      "rule": "generic-api-key",
+      "spanLength": 31,
+      "spanSha256": "ccf6fdd09a44245f19ac37c50a82b1516d730da1d35ecc0429d9b7b3ba2c51b4",
+      "keyNames": [
+        "eyReference"
+      ],
+      "valueFacts": [
+        {
+          "length": 15,
+          "sha256": "e6cacd57ace4e74f2caf641ffa1761149312390fe0d7bcf2a6bfc86a0306d8ab",
+          "isHexDigest": false,
+          "isFixtureLabel": true
+        }
+      ],
+      "classification": "false-positive-public-synthetic-key-reference",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/e2d5e98563ef34cafc152596b73d03a02766de35a4884d9d42eb74cf0a3560a1.txt",
+      "transportSha256": "e2d5e98563ef34cafc152596b73d03a02766de35a4884d9d42eb74cf0a3560a1",
+      "startLine": 79,
+      "endLine": 79,
+      "startColumn": 10,
+      "endColumn": 41,
+      "rule": "generic-api-key",
+      "spanLength": 32,
+      "spanSha256": "b8d3c829c39bb7f543c5427380ce7cdddee0bf524940182feb9a8a70c7ab9e6e",
+      "keyNames": [
+        "eyReference"
+      ],
+      "valueFacts": [
+        {
+          "length": 15,
+          "sha256": "cdff34ce2ff61f645ca0449f33ec99af50e23bcdbc7d714b18dd5543b342bb49",
+          "isHexDigest": false,
+          "isFixtureLabel": true
+        }
+      ],
+      "classification": "false-positive-public-synthetic-key-reference",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29391,
+      "endLine": 29391,
+      "startColumn": 495,
+      "endColumn": 576,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "5af4de4f521c615d1119c99cf1fc0263a033a087f67418572aaea24eea1e8433",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "98291004a2f8ad98da0187ed4d318daf9fb0be8718b7c3a3efe1d865372158ab",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29392,
+      "endLine": 29392,
+      "startColumn": 368,
+      "endColumn": 449,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "5af4de4f521c615d1119c99cf1fc0263a033a087f67418572aaea24eea1e8433",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "98291004a2f8ad98da0187ed4d318daf9fb0be8718b7c3a3efe1d865372158ab",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29398,
+      "endLine": 29398,
+      "startColumn": 646,
+      "endColumn": 727,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "ff27b52e3a9b7eedfa413ed3f65474d8465a2439f2e4438140dce2a02d4367b5",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "b11eb4340237e5e06c1e3da071fc18ebca3db9957cfed843665c2862793cb12d",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29401,
+      "endLine": 29401,
+      "startColumn": 636,
+      "endColumn": 717,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "6a565b177672b7cae938186ddb11fc52ae58f9f8a1839aa5600a4eec10196cfc",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "8cf22e792b8ccafa33b98a43e91aaed1b55e164873c6ff345f6cb55b2b043fba",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29404,
+      "endLine": 29404,
+      "startColumn": 471,
+      "endColumn": 552,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "6a4d5a1ff601b9b8a84fddf3f92838db0e93bc90ae736cd739ce6be4a915910d",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "24d8ab602eca6a87e8a8a97b27bc9fcf1c7c6992d3b31bc1b236a8c6904b7e85",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29407,
+      "endLine": 29407,
+      "startColumn": 473,
+      "endColumn": 554,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "efe2c873e309a8928f4170a80991eb9d0c1c86c88c8686e5b75da6bd10b6ac15",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "4749522473259b023b116cd11b82afde2b32f4538c79d7cb392f4ca41a0b4ef4",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29424,
+      "endLine": 29424,
+      "startColumn": 508,
+      "endColumn": 589,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "6664dc4866881922598fd3e507095790c141c03d76022989fc43354381de71e4",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "b9e78e2236f6ff7de98a2be3615bb61e9350a79a3716aac2cfb339a8c9a13d44",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 29439,
+      "endLine": 29439,
+      "startColumn": 1000,
+      "endColumn": 1081,
+      "rule": "generic-api-key",
+      "spanLength": 82,
+      "spanSha256": "5af4de4f521c615d1119c99cf1fc0263a033a087f67418572aaea24eea1e8433",
+      "keyNames": [
+        "euseKeySha256"
+      ],
+      "valueFacts": [
+        {
+          "length": 64,
+          "sha256": "98291004a2f8ad98da0187ed4d318daf9fb0be8718b7c3a3efe1d865372158ab",
+          "isHexDigest": true,
+          "isFixtureLabel": false
+        }
+      ],
+      "classification": "false-positive-public-reuse-content-digest",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 71137,
+      "endLine": 71137,
+      "startColumn": 110,
+      "endColumn": 143,
+      "rule": "generic-api-key",
+      "spanLength": 34,
+      "spanSha256": "d7492d67025e0ead4711d633dee4d0887dbbac97d5a56c2e46d43b6617c7809a",
+      "keyNames": [
+        "keyReference"
+      ],
+      "valueFacts": [
+        {
+          "length": 17,
+          "sha256": "b2431c980950ab9137c9d5f809d01fd3fd11608354e10465e857d25ae26f2280",
+          "isHexDigest": false,
+          "isFixtureLabel": true
+        }
+      ],
+      "classification": "false-positive-public-synthetic-key-reference",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    },
+    {
+      "transport": "specs/sprint-alfred-epic/evidence/pc-transfer-workspace-inventory-2026-10-25/blobs/250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961.patch.txt",
+      "transportSha256": "250cedc8ff5435d7521ed527e92186b55df9a0c889892b749b0219e179776961",
+      "startLine": 89205,
+      "endLine": 89205,
+      "startColumn": 110,
+      "endColumn": 143,
+      "rule": "generic-api-key",
+      "spanLength": 34,
+      "spanSha256": "d7492d67025e0ead4711d633dee4d0887dbbac97d5a56c2e46d43b6617c7809a",
+      "keyNames": [
+        "keyReference"
+      ],
+      "valueFacts": [
+        {
+          "length": 17,
+          "sha256": "b2431c980950ab9137c9d5f809d01fd3fd11608354e10465e857d25ae26f2280",
+          "isHexDigest": false,
+          "isFixtureLabel": true
+        }
+      ],
+      "classification": "false-positive-public-synthetic-key-reference",
+      "action": "preserve-exact-transport; no suppression or ignore"
+    }
+  ]
+}

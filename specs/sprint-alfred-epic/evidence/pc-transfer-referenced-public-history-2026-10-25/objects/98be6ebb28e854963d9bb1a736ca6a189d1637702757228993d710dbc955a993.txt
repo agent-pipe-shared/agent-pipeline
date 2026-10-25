@@ -1,0 +1,254 @@
+diff --git a/plugins/pipeline-core/hooks/guard-command-grammar.mjs b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+index 4ac8d4fe7..bde7a88af 100644
+--- a/plugins/pipeline-core/hooks/guard-command-grammar.mjs
++++ b/plugins/pipeline-core/hooks/guard-command-grammar.mjs
+@@ -37,10 +37,9 @@ const NUMERIC_VALUE = new Set([
+   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
+   "-m", "--max-count", "--max-depth", "--max-columns",
+ ]);
+-// Only the type filters (-t/-T) may repeat. -g/--glob is deliberately NOT repeatable: a recursive rg carries at most one bounded basename
+-// glob, and a second one (in either spelling) is refused so the traversal stays selective in one place only (SEC-11; examiner: the
+-// "recursive rg keeps default hidden/ignore semantics; globs may expose private paths" case of hooks/guard-lifecycle-ready.test.mjs).
+-const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not"]);
++// Repeated filename filters remain bounded individually. They cannot select hidden
++// names, recurse through a path pattern, or change rg's default ignore policy.
++const REPEATABLE_SEARCH_VALUE = new Set(["-t", "--type", "-T", "--type-not", "-g", "--glob"]);
+ 
+ function isBoundedFilenameFilter(value) {
+   return typeof value === "string" && /^\*\.[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/u.test(value);
+@@ -370,7 +369,7 @@ function validateRg(argv, root, windows, additionalRoots = []) {
+         if (arg === "--max-columns" && value === "0") return false;
+         if (["-e", "--regexp"].includes(arg)) regexpProvided = true;
+         if (["-g", "--glob"].includes(arg)) {
+-          if (globProvided || !isBoundedFilenameFilter(value)) return false;
++          if (!isBoundedFilenameFilter(value)) return false;
+           globProvided = true;
+         }
+         if (["-f", "--file"].includes(arg)) {
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 50cfb7f82..6c2a6ca20 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -11606,19 +11606,21 @@ test("QP4-1 a single read-family command the grammar does not support is refused
+       // (QG-04 justification, bounded to the flag in these inputs): 8d4b3613e (ALF-C-P1-10D) taught guard-command-grammar.mjs --no-heading,
+       // -m/--max-count and -g, so those spellings are admitted now and can no longer be the refusal examiner. The examiner keeps its purpose
+       // with --column, an rg flag that is in none of SEARCH_BOOLEAN, SEARCH_VALUE, FILE_BOOLEAN or FILE_VALUE and is still refused with the
+-      // unsupported code. A repeated -g stays refused (only the type filters repeat).
++      // unsupported code. Repeated bounded -g is covered by G23's positive and negative matrix.
+       for (const command of [
+         `rg -n --column "authorize-commit" scratch -g "*.md" -g "*.txt" -g "*.ps1"`,
+         `rg -n --column "authorize-commit" ${fwd}/scratch`,
+         `rg -n --column -m 20 "authorize-commit\\|\\"apply\\"" ${script}`,
+         `rg -n --column -m 20 apply ${fwd}/${script} ${fwd}/plugins/pipeline-core/lib/a.mjs`,
+         `rg --column -m 5 apply ${script}`,
+-        `rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`,
+         "rg --hidden --no-ignore apply .",
+         "grep -R apply .",
+         "git diff --output scratch/escaped.txt",
+         "node --test-reporter-destination scratch/escaped.txt --test",
+       ]) qp4RefuseUnsupported(command, path);
++      // G23 changes only the bounded repeated-glob branch. Preserve this original
++      // examiner's unsupported-command controls above and pin the newly admitted case.
++      qp4Admit(`rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"`, path);
+       // The refusal still states the complete admitted grammar and a machine-readable (empty) retry envelope.
+       const unsupported = qp4Refuse(`rg -n --column apply ${script}`, path);
+       assert.match(unsupported.text, /pipeline\.guard-retry-actions\.v1/u);
+@@ -11811,6 +11813,22 @@ test("QP4-5 F1 a Read of a missing in-root file is refused with the distinct cod
+         assert.doesNotMatch(r.text, /GUARD-READ-TARGET-MISSING/u, file);
+       }
+       assert.equal(read(join(path, "scratch", "log.txt")).exitCode, 0);
++      // G23: the same missing-target diagnosis reaches Bash and the two
++      // runner-normalized shell packets, with the pattern kept as data.
++      for (const command of ["cat scratch/missing.log", "rg -n 'mini|feature|epic' scratch/missing.log"]) {
++        for (const packet of [bash(command),
++          { tool_name: "Bash", tool_input: { command } },
++          { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, cwd: path } }]) {
++          const result = qp4Verdict(packet, path);
++          assert.equal(result.exitCode, 2, command);
++          assert.match(result.text, /GUARD-READ-TARGET-MISSING/u, command);
++        }
++      }
++      const poHelp = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
++      for (const flag of ["--help", "-h"]) {
++        assert.equal(qp4Verdict(bash(`node ${poHelp} ${flag}`), path).exitCode, 0, flag);
++      }
++      assert.equal(qp4Verdict(bash(`node ${poHelp} approve`), path).exitCode, 2);
+     });
+   } finally {
+     rmSync(path, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index d4bee3088..442845334 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+@@ -250,6 +250,8 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
+ }
+ 
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
++  // The source CLI returns its static usage before parsing or reading signing state.
++  if (script === PO_HUMAN_APPROVAL_SCRIPT) return args.length === 1 && ["--help", "-h"].includes(args[0]);
+   if (script === MODEL_ROLE_BOOTSTRAP_SCRIPT) return sanctionedModelRoleBootstrapArgs(args, root);
+   if (script === ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT) return sanctionedAntigravityNativeDispatchPrepareArgs(args, root);
+   if (script === DOC_READER_COURSE_SCRIPT) return sanctionedDocReaderCourseArgs(args, root, options);
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index bd34de7fd..89403abd2 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -24,7 +24,7 @@ import { isNarrowRepositoryRecoveryCommand, isSanctionedStartPreflightInvocation
+ import { isClaudeSessionMemoryWritePath, isIntakeLifecycleScratchWrite, isMachinePlaneWritePath } from "./write-scope.mjs";
+ import { DISPATCH_RECORD_COLLISION_DENIAL_CODE, EVIDENCE_HOST_PATH_DENIAL_CODE, blockedDispatchRecordCollision, blockedEvidenceHostPath, checkDispatchRecordCollision, claimDispatchRecordOwnership, extractWritePayload, isEvidenceArtifactPath } from "./dispatch-record-lane.mjs";
+ import { gateStrengthShellRefusal, protectedTestPathShellBlocked, protectedTestPathShellFaultBlocked, protectedTestPathShellRefusalHit } from "./gate-strength-lane.mjs";
+-import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
++import { exactClaudeTaskOutputBashRead, exactClaudeTaskOutputPowerShellRead, isMissingSingleReadTarget, isOutsideRootBoundedDiagnosticRead, isOutsideRootReadOnlyAndChain, isOutsideRootSingleCommandRead, readToolScopeVerdict, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { externalPoSigningOnly, isForbiddenCrossRepositoryMutation, isHostOnlyClaudeCaptureInvocation, isHumanPoProfileChangeCommand, isHumanPoSigningCommand } from "./po-commands.mjs";
+ import { activeRebaseAuthority, lifecycleRebaseAdmissionNotice, rebaseAuthorityShapeBlocked, rebaseAuthorityShapeRefusal } from "./rebase-lane.mjs";
+ import { isFirstDenialThisScope, withLifecycleReturnedActionTelemetry } from "./denial-telemetry.mjs";
+@@ -399,6 +399,9 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+       // K96 (PO decision 2026-10-23, rows 6/16, M7): an in-root read whose target is a credential location is refused for the PATH, so it
+       // gets its own typed code (checked only when the target is inside the root: an outside-root credential read keeps the scope code, QP4-1).
+       credentialTarget = !outsideRoot && qp4OperandIsCredentialTarget(rejected, root);
++      if (!outsideRoot && !credentialTarget && isMissingSingleReadTarget(rejected, root)) {
++        return withLifts(lifts, verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET-MISSING: the target does not exist inside the project (nothing to read at that path); check the spelling or create it first.\n"));
++      }
+     } catch { outsideRoot = false; credentialTarget = false; }
+     if (credentialTarget) {
+       // Same override route as the other human-liftable read refusals: a consumed one-time capability lifts exactly this command; otherwise
+diff --git a/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+new file mode 100644
+index 000000000..954dc5ca0
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/g23-read-help.test.mjs
+@@ -0,0 +1,68 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { join, resolve } from "node:path";
++import { fileURLToPath } from "node:url";
++import test from "node:test";
++import { isBoundedSingleRg, parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
++import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
++import { isMissingSingleReadTarget, readToolScopeVerdict } from "./read-scope.mjs";
++
++const script = fileURLToPath(new URL("../../scripts/po-human-approval.mjs", import.meta.url));
++const fixtureBase = resolve("scratch");
++
++test("G23 bounded repeated rg globs preserve hidden and credential exclusions", () => {
++  mkdirSync(fixtureBase, { recursive: true });
++  const root = mkdtempSync(join(fixtureBase, "g23-read-"));
++  try {
++    mkdirSync(join(root, "docs"));
++    writeFileSync(join(root, "docs", "a.md"), "safe\n");
++    assert.equal(isBoundedSingleRg(["-n", "safe", "docs", "-g", "*.md", "-g", "*.txt"], root), true);
++    for (const bad of [".*", "../*.md", "**/*.md", "!*.md", "*.tar.gz"]) {
++      assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "-g", bad], root), false, bad);
++    }
++    assert.equal(isBoundedSingleRg(["safe", "docs", "-g", "*.md", "--pre", "run"], root), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("G23 exact source-owned PO help is a pure CLI route", () => {
++  mkdirSync(fixtureBase, { recursive: true });
++  const root = mkdtempSync(join(fixtureBase, "g23-help-"));
++  try {
++    for (const flag of ["--help", "-h"]) {
++      assert.equal(isSanctionedLifecycleCommand(`node ${script} ${flag}`, root), true);
++      const child = spawnSync(process.execPath, [script, flag], { cwd: root, encoding: "utf8" });
++      assert.equal(child.status, 0, child.stderr);
++      assert.match(child.stdout, /^Usage: po-human-approval\.mjs /u);
++      assert.deepEqual(readdirSync(root), [], "help leaves the fixture root untouched");
++    }
++    assert.equal(isSanctionedLifecycleCommand(`node ${script} --help --directory /tmp`, root), false);
++    assert.equal(isSanctionedLifecycleCommand(`node ${script} approve`, root), false);
++    assert.equal(isSanctionedLifecycleCommand(`node ${join(root, "foreign.mjs")} --help`, root), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("G23 missing local targets are distinct from unknown grammar and protected paths", () => {
++  mkdirSync(fixtureBase, { recursive: true });
++  const root = mkdtempSync(join(fixtureBase, "g23-missing-"));
++  const outside = mkdtempSync(join(fixtureBase, "g23-outside-"));
++  try {
++    mkdirSync(join(root, "docs"));
++    mkdirSync(join(root, "vault"));
++    symlinkSync(outside, join(root, "alias"), "dir");
++    const parse = command => parseGuardCommand(command, root, { platform: "linux" });
++    for (const command of ["cat docs/absent.md", "rg -n needle docs/absent.md", "grep needle docs/absent.md"]) {
++      assert.equal(isMissingSingleReadTarget(parse(command), root), true, command);
++    }
++    for (const command of ["rg --column needle docs/absent.md", "cat vault/id_rsa", "cat ../absent.md", "cat docs/*.md", "cat docs/../missing.md", "cat alias/missing.md"]) {
++      assert.equal(isMissingSingleReadTarget(parse(command), root), false, command);
++    }
++    const native = readToolScopeVerdict({ tool_name: "Read", tool_input: { file_path: join(root, "docs", "absent.md") } }, root, {});
++    assert.equal(native.exitCode, 2);
++    assert.match(native.stderr, /GUARD-READ-TARGET-MISSING/u);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++    rmSync(outside, { recursive: true, force: true });
++  }
++});
+diff --git a/plugins/pipeline-core/lib/guard/read-scope.mjs b/plugins/pipeline-core/lib/guard/read-scope.mjs
+index 90b61251b..a40d3df36 100644
+--- a/plugins/pipeline-core/lib/guard/read-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/read-scope.mjs
+@@ -560,6 +560,7 @@ const QP4_SECRET_NAME = /^(?:id_[^/\\]*|credentials|auth\.json|oauth_creds\.json
+ // Read: a file that does not exist, spelled as a plain in-root path whose nearest existing ancestor is a directory physically inside the project.
+ function qp4MissingInRootTarget(raw, root) {
+   if (typeof raw !== "string" || raw === "" || /[\0$\x60*?\[\]{}]/u.test(raw) || raw.startsWith("~")) return false;
++  if (raw.split(/[\\/]/u).some((segment) => segment === "." || segment === "..")) return false;
+   const rootResolved = resolve(root);
+   const candidate = resolve(passiveCandidate(raw, root));
+   if (candidate === rootResolved || !isPathWithinRoot(candidate, rootResolved)) return false;
+@@ -577,6 +578,23 @@ function qp4MissingInRootTarget(raw, root) {
+   } catch { return false; }
+ }
+ 
++// A missing target is diagnosable only for these exact, option-bounded single
++// reads. Keep pattern operands separate from paths and leave unfamiliar flags
++// to the closed grammar's unsupported-command diagnosis.
++export function isMissingSingleReadTarget(parsed, root) {
++  if (parsed?.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
++  const { executable, argv } = parsed.segments[0];
++  const name = basename(executable).toLowerCase();
++  let target = null;
++  if (["cat", "wc", "stat", "file", "head", "tail"].includes(name) && argv.length === 1) target = argv[0];
++  if (["rg", "grep"].includes(name)) {
++    const args = argv[0] === "-n" ? argv.slice(1) : argv;
++    if (args.length === 2 && args[0] !== "" && !args[0].startsWith("-")) target = args[1];
++  }
++  return target !== null && !target.startsWith("-") && qp4MissingInRootTarget(target, root);
++}
++
+ // ALF-C-P15-01C (AC-239, PO decision U3): native Read of ONE exact file under a WSL UNC share
+ // (\\wsl.localhost\<distro>\... or \\wsl$\<distro>\...) on a Windows host. Lexical only (no stat: a stopped distro must
+ // not hang the guard). Wildcards, dot segments, alternate data streams, credential roots (home-relative and system
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index 1f9f683ed..7b60177ea 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -2953,8 +2953,12 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
+ 
+ if (isDirectInvocation(import.meta.url)) {
+   const argv = process.argv.slice(2);
+-  try {
+-    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
+-    process.stdout.write(formatHumanApprovalCliResult(result));
+-  } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
++  if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) {
++    process.stdout.write(`${USAGE}\n`);
++  } else {
++    try {
++      const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : await runHumanApproval(argv);
++      process.stdout.write(formatHumanApprovalCliResult(result));
++    } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
++  }
+ }

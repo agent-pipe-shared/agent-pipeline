@@ -1,0 +1,64 @@
+diff --git a/GEMINI.md b/GEMINI.md
+index 392107c80..6696ca15a 100644
+--- a/GEMINI.md
++++ b/GEMINI.md
+@@ -13,28 +13,13 @@ by runner. See the [runner support boundaries](docs/runner-support.md) and
+ 
+ For the pipeline hooks to intercept and evaluate commands, the Antigravity host
+ must be able to resolve `node` in its PATH. A desktop or service launcher may
+-have a different PATH from an interactive shell.
+-
+-If Antigravity is launched from this same terminal, check before launching it.
+-On macOS/Linux use:
+-
+-```bash
+-command -v node
+-```
+-
+-On Windows, use PowerShell or Command Prompt:
+-
+-```powershell
+-where.exe node
+-```
+-
+-For a desktop or service launch, either shell check does **not** establish the
+-launcher PATH. Inspect the host's launcher/service environment and confirm
+-that Antigravity's own command tool can resolve and run `node --version` in a
+-new session. If that readback is unavailable or denied, treat hook readiness
+-as unknown; correct the host environment and fully restart Antigravity before
+-relying on its hooks. Do not use an unattended permission bypass to obtain the
+-readback.
++have a different PATH from an interactive shell, so a shell check does **not**
++establish it: confirm that Antigravity's own command tool can resolve and run
++`node --version` in a new session. If that readback is unavailable or denied,
++treat hook readiness as unknown; correct the host environment and fully restart
++Antigravity before relying on its hooks. Do not use an unattended permission
++bypass to obtain the readback. The per-platform pre-launch check is in the
++[Agy procedure](SETUP.md#antigravity-agy-workspace-local-binding).
+ 
+ ### Antigravity Installation (Workspace-Local)
+ 
+@@ -51,6 +36,11 @@ command. From the project root:
+    ```
+    Select **Approved Plugin Directory** (the default), then
+    **Workspace-Local** to register the plugin in `.agents/plugins.json`.
++
++   The installer also offers an optional autonomous tool policy. If selected,
++   it writes `.agents/settings.json`; this runner-local option does not grant
++   plan, release, remote, or human authority. Launching `agy` alone does not
++   select that option or bypass confirmation prompts.
+ 2. Fully restart Antigravity and open a new workspace session in the project
+    root. Launch the CLI if that is how you use the runner:
+ 
+@@ -66,9 +56,5 @@ refresh with `node ".../plugins/pipeline-core/install-agy.mjs" --refresh`: it
+ prints the plan and asks first (`--yes` only together with `--refresh`).
+ Then restart Agy and read the session lock; `agy plugin list` and
+ `plugins.json` are not proof of what is loaded. A global install is inert
+-outside opted-in repositories, except the destructive-git protection.
+-
+-The installer also offers an optional autonomous tool policy while installing.
+-If selected, it writes `.agents/settings.json`; this runner-local option does
+-not grant plan, release, remote, or human authority. Launching `agy` alone does
+-not select that option or bypass confirmation prompts.
++outside opted-in repositories, except the destructive-git protection. The
++full procedure is in the [Agy section of SETUP](SETUP.md#antigravity-agy-workspace-local-binding).

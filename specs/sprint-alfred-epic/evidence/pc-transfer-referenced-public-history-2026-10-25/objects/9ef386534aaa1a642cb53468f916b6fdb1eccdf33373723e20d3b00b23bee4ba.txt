@@ -1,0 +1,50 @@
+// node scratch/run-parallel.mjs <workers> <label> <test-file>... -- runs the test files on <workers> isolated workers at once: every worker has its OWN clone of HEAD (scratch/clones/pw-<label>-<n>), its OWN private HOME (with the git identity copied) and its own TMPDIR outside every repository, so no worker shares ~/.apsp, its lock or repo-local state with another. Prints counts and failing case names per file, in input order.
+import { spawn, execFileSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, chmodSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+const [nArg, label, ...rest] = process.argv.slice(2);
+// optional `--src <dir>` right after the label: the repository to clone for the workers (default: this checkout).
+const srcIdx = rest[0] === "--src" ? 1 : -1;
+const srcDir = srcIdx > 0 ? resolve(rest[1]) : resolve(".");
+const files = srcIdx > 0 ? rest.slice(2) : rest;
+const workers = Math.max(1, Number(nArg));
+if (!workers || !label || files.length === 0) { console.error("usage: run-parallel.mjs <workers> <label> <test-file>..."); process.exit(2); }
+const cfg = (k) => execFileSync("git", ["config", k], { encoding: "utf8" }).trim();
+const name = cfg("user.name"); const email = cfg("user.email");
+const base = join(homedir(), "pipeline-test-tmp", `par-${label}`);
+rmSync(base, { recursive: true, force: true });
+mkdirSync(base, { recursive: true, mode: 0o700 });
+const lanes = Array.from({ length: workers }, (_, n) => {
+  const clone = resolve("scratch/clones", `pw-${label}-${n}`);
+  if (!existsSync(clone)) execFileSync("git", ["clone", "--local", "--quiet", srcDir, clone]);
+  else execFileSync("git", ["-C", clone, "pull", "--quiet", "--ff-only", srcDir]);
+  const home = join(base, `home-${n}`); const tmp = join(base, `tmp-${n}`);
+  for (const d of [home, tmp]) { mkdirSync(d, { recursive: true, mode: 0o700 }); chmodSync(d, 0o700); }
+  writeFileSync(join(home, ".gitconfig"), `[user]\n\tname = ${name}\n\temail = ${email}\n`);
+  return { n, clone, home, tmp, queue: [] };
+});
+files.forEach((f, i) => lanes[i % workers].queue.push({ f, i }));
+const results = new Array(files.length);
+const num = (out, k) => (new RegExp(`^ℹ ${k} (\\d+)`, "m").exec(out) ?? [])[1] ?? "?";
+const runLane = async (lane) => {
+  for (const { f, i } of lane.queue) {
+    const env = { ...process.env, HOME: lane.home, USERPROFILE: lane.home, TMPDIR: lane.tmp, TMP: lane.tmp, TEMP: lane.tmp };
+    delete env.NODE_TEST_CONTEXT;
+    const out = await new Promise((done) => {
+      let buf = "";
+      const child = spawn(process.execPath, [f], { cwd: lane.clone, env });
+      const timer = setTimeout(() => child.kill("SIGKILL"), 3600000);
+      child.stdout.on("data", (d) => { buf += d; }); child.stderr.on("data", (d) => { buf += d; });
+      child.on("close", (code) => { clearTimeout(timer); done({ code, buf }); });
+    });
+    const failing = [...new Set([...out.buf.matchAll(/^✖ (.+?) \(\d/gm)].map((m) => m[1]).filter((t) => t !== "failing tests:"))];
+    let line = `${out.code === 0 ? "GREEN" : "RED  "} exit ${out.code} tests ${num(out.buf, "tests")} pass ${num(out.buf, "pass")} fail ${num(out.buf, "fail")} skip ${num(out.buf, "skipped")} todo ${num(out.buf, "todo")}  ${f}  [worker ${lane.n}]`;
+    for (const x of failing) line += `\n   ✖ ${x.slice(0, 160)}`;
+    if (num(out.buf, "tests") === "?") line += `\n   (no summary) tail: ${out.buf.trim().split("\n").slice(-3).join(" | ").slice(0, 400)}`;
+    results[i] = { line, code: out.code };
+  }
+};
+await Promise.all(lanes.map(runLane));
+for (const r of results) console.log(r.line);
+process.exit(results.some((r) => r.code !== 0) ? 1 : 0);

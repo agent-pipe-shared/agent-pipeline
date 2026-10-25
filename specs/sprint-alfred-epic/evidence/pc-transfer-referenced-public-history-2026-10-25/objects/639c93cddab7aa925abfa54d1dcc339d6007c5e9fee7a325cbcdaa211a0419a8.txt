@@ -1,0 +1,86 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+// Disposable implementation-design experiment, not a C1 store or baseline.
+const scratch = path.dirname(new URL(import.meta.url).pathname);
+const captureCandidate = () => {
+  const result = spawnSync('git', ['show', '-s', '--format=%H %T', 'HEAD'], { cwd: path.dirname(scratch), encoding: 'utf8', timeout: 5000 });
+  if (result.status !== 0) throw new Error('candidate binding unavailable');
+  const [commit, tree] = result.stdout.trim().split(' ');
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit ?? '') || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(tree ?? '') || commit.length !== tree.length) throw new Error('candidate binding invalid');
+  return { commit, tree };
+};
+const startCandidate = captureCandidate();
+const fixture = fs.mkdtempSync(path.join(scratch, 'alfred-c1-primitives-'));
+const checks = [];
+const check = (name, action) => {
+  try { action(); checks.push({ name, status: 'passed' }); }
+  catch (error) { checks.push({ name, status: 'failed', code: /^[A-Z0-9_]+$/.test(error?.code ?? '') ? error.code : 'PROBE_ASSERTION' }); }
+};
+const assert = (value) => { if (!value) throw new Error('probe assertion'); };
+const syncDirectory = (directory) => {
+  const fd = fs.openSync(directory, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0));
+  try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+};
+const expectedError = (code, action) => {
+  let caught = false;
+  try { action(); } catch (error) { assert(error.code === code); caught = true; }
+  assert(caught);
+};
+const payload = Buffer.from('alfred-c1-disposable-public-fixture');
+let filesystemType = null;
+try {
+  if (fs.statfsSync) filesystemType = `0x${fs.statfsSync(fixture, { bigint: true }).type.toString(16)}`;
+  const pending = path.join(fixture, '.commit.pending');
+  const committed = path.join(fixture, 'commit.json');
+  check('exclusive-create-write-fsync-readback', () => {
+    const fd = fs.openSync(pending, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), 0o600);
+    try { fs.writeFileSync(fd, payload); fs.fsyncSync(fd); assert(fs.fstatSync(fd).isFile()); }
+    finally { fs.closeSync(fd); }
+    assert(fs.readFileSync(pending).equals(payload));
+    expectedError('EEXIST', () => { const duplicate = fs.openSync(pending, 'wx'); fs.closeSync(duplicate); });
+  });
+  check('directory-fsync-before-and-after-create-only-link', () => {
+    syncDirectory(fixture);
+    fs.linkSync(pending, committed);
+    syncDirectory(fixture);
+    assert(fs.readFileSync(committed).equals(payload));
+    const first = fs.statSync(pending), second = fs.statSync(committed);
+    assert(first.ino === second.ino && first.dev === second.dev && first.nlink === 2 && second.nlink === 2);
+    expectedError('EEXIST', () => fs.linkSync(pending, committed));
+    assert(fs.readFileSync(committed).equals(payload));
+  });
+  check('no-follow-refuses-symlink-leaf', () => {
+    assert(fs.constants.O_NOFOLLOW !== undefined);
+    const alias = path.join(fixture, 'unsafe-link');
+    fs.symlinkSync(pending, alias);
+    expectedError('ELOOP', () => { const fd = fs.openSync(alias, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW); fs.closeSync(fd); });
+  });
+  check('separate-process-mkdir-lock-contention', () => {
+    const lock = path.join(fixture, 'lock');
+    fs.mkdirSync(lock);
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e',
+      'import fs from "node:fs";try{fs.mkdirSync(process.argv[1]);process.exitCode=3;}catch(error){process.exitCode=error.code==="EEXIST"?0:4;}', lock],
+    { encoding: 'utf8', timeout: 5000 });
+    assert(result.error === undefined && result.status === 0 && result.stdout === '' && result.stderr === '');
+  });
+} finally {
+  // Only the freshly allocated fixture of this invocation is removed.
+  fs.rmSync(fixture, { recursive: true });
+}
+const record = {
+  schema: 'pipeline.alfred-store-primitive-probe.v1',
+  candidate: { start: startCandidate, finish: captureCandidate() },
+  platform: process.platform,
+  nodeVersion: process.version,
+  filesystemType,
+  scope: 'disposable-local-fixture',
+  checks,
+  limitations: ['No C1 store implementation tested', 'No power-loss durability or crash recovery established', 'No hostile ancestor replacement, distributed filesystem or Windows qualification', 'No live interruption collection or baseline'],
+};
+record.candidate.binding = JSON.stringify(record.candidate.start) === JSON.stringify(record.candidate.finish) ? 'exact' : 'changed';
+const destination = path.join(scratch, 'alfred-c1-store-primitives-result.json');
+fs.writeFileSync(destination, `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx' });
+process.stdout.write(`${JSON.stringify(record)}\n`);
+if (checks.some((entry) => entry.status !== 'passed') || record.candidate.binding !== 'exact') process.exitCode = 1;

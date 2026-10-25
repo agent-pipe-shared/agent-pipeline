@@ -1,0 +1,41 @@
+# Prepared async Codex Advisor binding — v1
+
+Only new `scratch/codex-advisor-binding-async-*` artifacts were written. Existing binding, store, record, source and aggregate files remain unchanged.
+
+## API and source proposal
+
+Canonical target: `plugins/pipeline-core/lib/codex-advisor-binding.mjs`, export `async verifyCodexAdvisorBinding(context)`. Source proposal SHA-256 `a38300f11097063366ab4d5b62fc4d1ed6bd67165d7381b8011d64585fb076aa`; runtime projection `4c76028dbb117f818950d1162adc877c472be20aee2915ea7efba26f56508b51`; source patch `2f606b782edb5e5f50716ae9b003fbdb256daf24140a63e8e23ec8e6fe0a9bec`. Runtime projection changes import coordinates only.
+
+The verifier reconstructs the request from current physical evidence and Git candidate, verifies the selected physical executable independently, validates the response and sanitized duty receipt, and checks the private receipt twice. Both private reads are awaited sequentially. Each returned record is copied immediately before the next read so a shared mutable result cannot hide intervening drift. Private record byte digests and the imported closed v1 record validator are checked against reconstructed context.
+
+Caller dispatch, route, response, host pointer, references and receipt Buffer are copied before the first await. The private store method is captured once. Later caller mutation cannot replace the in-flight request with different question/route/receipt bytes or a different method. The completed result binds the original snapshot; a subsequent verification of changed arguments is refused. Current physical evidence and candidate are independently rechecked after the asynchronous reads, and the physical executable is checked again.
+
+## Live caller requirement
+
+Every caller must use `const result = await verifyCodexAdvisorBinding(context)` and then check `result.ok === true`. Checking the returned Promise or starting an unawaited verification is not admission. Caller route/package/demand identity and the private store instance must come from a governed sealed controller; none may be chosen by external/model JSON. This module does not prove the caller's admission or host seal. The prepared synchronous verifier remains unchanged and is not a drop-in consumer of the new asynchronous store.
+
+This slice is explicitly v1. It imports the frozen existing record contract and does not invent observed-output-custody fields, raw transport observations or provider attestations. Adoption of a v2 output-custody record requires a separate explicit compatibility update and targeted evidence.
+
+## Observed tests
+
+`node scratch/codex-advisor-binding-async-run.mjs` completed with exit 0 (handle 11136, terminal `037d47`), 23,643 ms, 10 tests / 10 pass / 0 fail / 0 skip / 0 todo. All 17 bound input hashes stayed stable. Source patch `git apply --check` exited 0. Full TAP and exact bindings are in the evidence JSON and stdout/stderr files.
+
+The actual private store revision is `821351db...`; actual record contract `d0804a55...`; pure canonical existing GUID accessor `ce509d12...`. The fixture creates a real normal Git checkout, obtains a real sanctioned fixture GUID, registers the Advisor namespace, starts and closes one actual managed Node process, writes an actual private receipt and exercises the real asynchronous store. Session/model/provider/tool-control fields are synthetic contract data; no host seal, Codex model or Advisor turn was observed.
+
+Nine nested cases plus their parent case cover:
+
+- Exact original v1 context qualifies only after two sequentially completed actual store reads.
+- A rejected Promise is awaited, returns a static non-leaking refusal and does not cause a second read.
+- Null or Promise-resolved nonreceipts cannot act as authority.
+- Drift between records is refused.
+- Mutating the first returned object during the second read cannot conceal drift.
+- Caller/method/Buffer mutation cannot substitute a new operation; changed follow-up verification is refused.
+- Physical source mutation during asynchronous reads invalidates qualification.
+- The expected executable must come from the independent host selection.
+- Actual Git candidate change after the first read invalidates the original result.
+
+The initial observed run (53256, `5d07a0`) also passed all 10 cases and remains separately recorded in the evidence JSON.
+
+## Limits
+
+There was no productive integration, installed runtime test, model call, raw stdio proof or formal Critic/Advisor stamp. Generic journal read bounds, shared namespace provisioning, live registered route/export admission and the final sealed host transaction remain separate work. Promise rejection is covered; this verifier does not impose a new timeout or cancellation contract on a hanging store implementation. The async private store and its governed controller must supply their own bounded operation behavior. Physical before/after checks are not an atomic repository-wide snapshot against arbitrary noncooperating writers.

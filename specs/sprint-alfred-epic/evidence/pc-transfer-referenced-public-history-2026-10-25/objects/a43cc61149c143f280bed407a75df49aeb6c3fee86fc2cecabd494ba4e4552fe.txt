@@ -1,0 +1,20 @@
+// K141 helper: which changed files of the k141 clone are protected (baseline + guard-config + briefing globs + kernel list)?
+import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+const clone = "scratch/clones/k141";
+const files = execFileSync("git", ["-C", clone, "diff", "--name-only"], { encoding: "utf8" }).split("\n").filter(Boolean);
+const pats = [];
+for (const e of JSON.parse(readFileSync("plugins/pipeline-core/protected-baseline.json", "utf8")).entries) pats.push([e.id, new RegExp(e.pathPattern)]);
+const gc = JSON.parse(readFileSync("project/guard-config.json", "utf8"));
+const walk = (o) => { if (o && typeof o === "object") for (const v of Object.values(o)) { if (typeof v === "string" && /\\|\$/.test(v)) pats.push(["GC", new RegExp(v)]); else walk(v); } };
+walk(gc);
+const src = readFileSync("plugins/pipeline-core/lib/guard-maintenance-window.mjs", "utf8");
+const m = /NEVER_LIFTABLE_KERNEL_PATHS\s*=\s*(?:Object\.freeze\()?\[([\s\S]*?)\]/.exec(src);
+const kernel = m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : [];
+console.log("patterns", pats.length, "kernel", kernel.length);
+for (const f of files) {
+  const hit = pats.filter(([, re]) => re.test(f)).map(([id]) => id);
+  if (kernel.includes(f)) hit.push("KERNEL");
+  if (/^plugins\/pipeline-core\/hooks\/guard-[^/]+\.mjs$/.test(f) || /^plugins\/pipeline-core\/lib\/guard\//.test(f) || f === "harness/verify-suites.json" || f === "docs/product-capability-inventory.json" || f === "plugins/pipeline-core/scripts/pipeline-state.mjs") hit.push("BRIEFING-GLOB");
+  console.log(hit.length ? "PROTECTED" : "free     ", f, hit.join(","));
+}

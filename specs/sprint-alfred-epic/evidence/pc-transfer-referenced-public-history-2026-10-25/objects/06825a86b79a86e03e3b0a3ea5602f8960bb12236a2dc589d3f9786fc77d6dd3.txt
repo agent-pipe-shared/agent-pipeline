@@ -1,0 +1,47 @@
+# Bounded Readiness pre-transmission provenance
+
+## Actual pre-fix reproduction
+
+Existing case `readiness supplemental Advisor metadata binds real current receipt, route, design question and bounded physical bytes` in `codex-readiness-finalization.test.mjs` was extended before implementation. A physical, hash-consistent initial context and fabricated failure with nonexistent private course, fabricated model, failed outcome, invalid phase, childStarted=true/inputSubmitted=false/attemptCount=7 reached an actual managed Node child. The child counter was exactly `turn\n`; the tool-free API returned `reviewed` with a request-bound receipt.
+
+Command: `node --test --test-name-pattern='metadata binds real current' plugins/pipeline-core/lib/codex-readiness-finalization.test.mjs`, with qualified `require_escalated` child-process reroute. Result: 1 pass, 0 fail, 4124.015214ms.
+
+The preceding sandbox-local run failed host-stdio-closed, including existing positive controls. The full sandbox-local finalization file had 2 pass, 7 fail, 19602.794129ms; this is transport friction, not provenance qualification.
+
+## Actual post-fix focused observations
+
+Same stable case after implementation: fake context rejected before receipt allocation and before the managed child counter existed. Valid private native no-child context returned reviewed. Fabricated private course, wrong route, bad child facts/outcome, wrong candidate, terminal observation drift rejected before child. Post-turn public failure-byte drift prevented publication.
+
+Initial post-fix focused result: 1 pass, 0 fail, 9320.834057ms.
+
+Expanded same case additionally checks standalone host before store/model invocation, direct isolated host before startup, genuine answered Advisor host/course through actual independent Readiness, and forged answered host pointer. Expanded run: 1 pass, 0 fail, 126540.087478ms. Canonical Codex no-child controls added subsequently are covered by the final focused suite, not this earlier run.
+
+Host and Codex bootstrap test files: 2 file envelopes passed, 0 failed, 540.00634ms (sandbox-local; no managed child invocation in those files).
+
+## Implementation boundary
+
+Full existing preparation semantics authenticate every inline v2 snapshot against current candidate, initial committed sources and revisions, private course and (when a child ran) actual private host provenance; reconstructed observation must match exactly. Private Symbol selects the internal inline path; no public verification-disable option or fabricated package file exists. The existing closed observation schema and canonical material context are preserved.
+
+No-child Codex routes are resolved from `initialCandidate.commit:pipeline.user.yaml` through the existing V3 resolver. The no-child RC12 fixture now commits canonical V3 authority. The long RC12C001 is not re-run or claimed as final-byte PASS; its final-byte no-child route logic is covered in the expanded existing focused case.
+
+All fixtures are synthetic managed Node protocol/process tests. No provider, model, native-provider PASS, Source staging, commit, maps, state or protected writer result is claimed.
+
+## Additional actual quality finding: productive max effort compatibility
+
+Combined qualified command: `node --test plugins/pipeline-core/lib/codex-readiness-finalization.test.mjs plugins/pipeline-core/lib/codex-tool-free-design-readiness.test.mjs plugins/pipeline-core/scripts/codex-design-readiness-host.test.mjs plugins/pipeline-core/scripts/codex-design-readiness-bootstrap.test.mjs plugins/pipeline-core/scripts/runner-design-readiness-bootstrap.test.mjs`.
+
+Actual result: 34 cases, 33 pass, 1 fail, 171904.899255ms. The one failure was the newly added genuine private Codex no-child context with actual committed `pipeline.user.yaml` route effort `max`: physical preparation returned `DWP2-PACKAGE-SCHEMA`. All other custody, five-source, v1 supplemental runtime, drift, bootstrap, and native bootstrap controls passed. This run loaded the reader before the subsequent physical answered-author equality addition.
+
+The actual productive repository policy selects advisory Codex `gpt-6-sol`, effort `max`. Codex Advisor admission/request and advisory receipt already admit `max`; both mirrored v2 package schemas omitted it in answered and unavailable route enums, and unavailable reader's explicit effort allowlist omitted it. This is a real approved-route compatibility finding. The parent owns both schema enum corrections; this implementor added `max` to the unavailable reader allowlist and keeps final fixtures at actual canonical `max`. No forged route authority is accepted: exact committed initial V3 route comparison remains required.
+
+The temporary high-effort synthetic fixture was an intermediate diagnostic, subsequently reverted. Its qualification cannot substitute for actual max qualification.
+
+Actual intermediate high-policy run: 1 fail, 0 pass, 128193.503189ms. V3 resolver correctly rejected the modified policy (`pipeline.user.yaml did not pass V3 validation`). This demonstrates the registry requires the actual approved `max` policy; the synthetic high-policy assumption was incorrect and is not retained in final tests.
+
+## Final affected-case qualification
+
+Final loaded code and mirrored schemas, same qualified focused command: 1 pass, 0 fail, 129658.42043ms (callback 129211.904126ms).
+
+The final case explicitly resolves and asserts committed Codex advisory effort `max`, authenticates its private no-child record through both physical preparation and inline reread, and rejects substituted model/effort/source hashes. The physical answered manifest with substituted authoringDispatchId returns `DWP2-COURSE-BINDING`; restoring the genuine manifest permits actual answered Advisor/independent Readiness execution. Fake course/bad failure facts, standalone/direct host rejection before child, native private no-child positive, actual answered positive, forged host pointer, v1 source/route controls, and public failure-byte drift all pass in this preserved existing case.
+
+The 33 unaffected controls from the earlier combined run and this corrected final affected case are the evidence set. No single final 34-case run or final long RC12C001 PASS is claimed. Scoped `git diff --check` passes. No implementation file changed after launching the final affected case.

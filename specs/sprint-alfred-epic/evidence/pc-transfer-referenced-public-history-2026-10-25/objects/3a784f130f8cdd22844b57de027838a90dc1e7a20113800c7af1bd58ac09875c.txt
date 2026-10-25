@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/consumer-verify.mjs b/plugins/pipeline-core/lib/consumer-verify.mjs
+index 340a2acfb..df10a4672 100644
+--- a/plugins/pipeline-core/lib/consumer-verify.mjs
++++ b/plugins/pipeline-core/lib/consumer-verify.mjs
+@@ -22,7 +22,7 @@ function commandEntry(value, label) {
+ export function readConsumerVerifyConfiguration(rootDir) {
+   const artifact = resolveAuthorityArtifactPath("calibration", { rootDir });
+   const projectIdentity = readProjectCalibrationIdentity({ rootDir });
+-  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}`);
++  if (projectIdentity.status !== "resolved") throw new Error(`VEP-PROJECT-IDENTITY: ${projectIdentity.code}${projectIdentity.message === undefined ? "" : ` - ${projectIdentity.message}`}`);
+   if (!artifact.exists) throw new Error("VEP-NO-CALIBRATION: no project calibration found.");
+   const calibrationBytes = readFileSync(artifact.path);
+   if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("VEP-PROJECT-IDENTITY: PCI-SOURCE-DRIFT");
+diff --git a/plugins/pipeline-core/lib/project-calibration-identity.mjs b/plugins/pipeline-core/lib/project-calibration-identity.mjs
+index 22aace40c..695978f46 100644
+--- a/plugins/pipeline-core/lib/project-calibration-identity.mjs
++++ b/plugins/pipeline-core/lib/project-calibration-identity.mjs
+@@ -86,6 +86,13 @@ function unavailable(reason, code, rootSha256 = null, source = null) {
+     project: null, rootSha256,
+     configuredValue: Object.freeze({ status: "unavailable", reason }), source, code });
+ }
++/** R1: an aliased identity is not bound to the project; the refusal says why and how to repair it. */
++function aliasRefused(stored, current, source) {
++  const refusal = unavailable("alias-refused", "PCI-ALIAS-REFUSED", current.rootSha256, source);
++  return Object.freeze({ ...refusal,
++    message: `the calibration stores project "${stored}" but the root-derived project name is "${current.project}"; `
++      + `an aliased identity is refused. Repair: regenerate the project identity or set "project" to the root name "${current.project}".` });
++}
+ function resolved(current, project, kind, source, placeholder = false) {
+   return Object.freeze({ schema: SCHEMA, status: "resolved", kind, project,
+     rootSha256: current.rootSha256,
+@@ -150,11 +157,15 @@ export function readProjectCalibrationIdentity({ rootDir = process.cwd(), deps =
+     if (metadata.kind === "root-derived" && project !== current.project) {
+       return unavailable("name-mismatch", "PCI-NAME-MISMATCH", current.rootSha256, source);
+     }
++    if (project !== current.project) return aliasRefused(project, current, source);
+     return resolved(current, project, metadata.kind, source);
+   }
+   // The historical seed is unavailable as a configured identity. Its factual
+   // physical-root replacement is a different observed source, even if the
+   // real directory itself is legitimately called "new-project".
+   if (project === "new-project") return resolved(current, current.project, "root-derived", source, true);
+-  return resolved(current, project, "configured-alias", source);
++  // R1 (AC-232, PO decision 2026-10-23 "S4 follows R1"): an aliased identity is
++  // refused. A stored name equal to the physical root name is no alias.
++  if (project !== current.project) return aliasRefused(project, current, source);
++  return resolved(current, project, "root-derived", source);
+ }
+diff --git a/plugins/pipeline-core/scripts/consumer-verify-check.mjs b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+index 85f352123..bc2f54027 100644
+--- a/plugins/pipeline-core/scripts/consumer-verify-check.mjs
++++ b/plugins/pipeline-core/scripts/consumer-verify-check.mjs
+@@ -16,7 +16,7 @@ export function runConsumerVerifyCheck(check, commandId = null) {
+     const artifact = resolveAuthorityArtifactPath("calibration", { rootDir: root });
+     if (!["ready", "missing"].includes(artifact.authorityStatus)) throw new Error(`project authority is ${artifact.authorityStatus}`);
+     const projectIdentity = readProjectCalibrationIdentity({ rootDir: root });
+-    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}`);
++    if (projectIdentity.status !== "resolved") throw new Error(`project calibration identity: ${projectIdentity.code}${projectIdentity.message === undefined ? "" : ` - ${projectIdentity.message}`}`);
+     const calibrationBytes = readFileSync(artifact.path);
+     if (projectIdentity.source.path !== artifact.relPath || projectIdentity.source.sha256 !== createHash("sha256").update(calibrationBytes).digest("hex")) throw new Error("project calibration identity: PCI-SOURCE-DRIFT");
+     const calibration = JSON.parse(calibrationBytes.toString("utf8"));

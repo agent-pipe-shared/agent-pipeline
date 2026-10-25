@@ -1,0 +1,64 @@
+// Helper (untracked): build scratch/k72-probe.test.mjs from the k67 clone's binding suite: header + the one case up to the failing start, with inspect probes.
+import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+const clone = resolve("scratch/clones/k67");
+const lines = readFileSync(`${clone}/plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs`, "utf8").split("\n");
+const libAbs = `${clone}/plugins/pipeline-core/lib/`;
+const fix = (s) => s.replaceAll('"../lib/', `"${libAbs}`);
+const header = lines.slice(0, 91).map(fix).join("\n");
+const body = lines.slice(1085, 1269).map(fix);
+const probe = (tag) => `    probe(root, ${JSON.stringify(tag)});`;
+const out = [];
+for (let i = 0; i < body.length; i++) {
+  out.push(body[i]);
+  const n = 1086 + i;
+  if (n === 1113) out.push(probe("A after descriptor retire (before private release)"));
+  if (n === 1250) out.push(probe("B after private release applied"));
+}
+const prelude = `
+import { readdirSync } from "node:fs";
+import { continuityAuthorityRepository } from ${JSON.stringify(libAbs + "onboarding-continuity.mjs")};
+import { inspectSignedDescriptorCustodyRepository } from ${JSON.stringify(libAbs + "worktree-lifecycle.mjs")};
+import { healSessionAuthorityDrift, releaseLostSessionAuthorityMember, withSessionAuthorityBoundary } from ${JSON.stringify(libAbs + "session-authority-registry.mjs")};
+import { spawnSync as __sp } from "node:child_process";
+const REPAIR = ${JSON.stringify(`${clone}/plugins/pipeline-core/scripts/session-authority-repair.mjs`)};
+function probe(root, tag) {
+  const r = __sp(process.execPath, [REPAIR, "inspect", "--root", root], { encoding: "utf8" });
+  console.log("PROBE " + tag + " exit " + r.status + "\\n" + (r.stdout + r.stderr).slice(0, 2500));
+}
+`;
+const tail = `
+    if (process.env.K72_RELEASE_MEMBER === "1") {
+      const repository = continuityAuthorityRepository(inspectSignedDescriptorCustodyRepository(root));
+      const res = withSessionAuthorityBoundary({ repository }, (token) => {
+        const r1 = releaseLostSessionAuthorityMember({ boundary: token, producerId: "onboarding-continuity",
+          target: { sessionId: started.output.sessionId, descriptorSha256: started.output.descriptorSha256 } });
+        const r2 = healSessionAuthorityDrift({ boundary: token });
+        return { r1: r1.status, r2: r2.status, r2code: r2.code, r2reason: r2.reason };
+      });
+      console.log("PROBE experiment member release+heal: " + JSON.stringify(res));
+    }
+    for (const f of readdirSync(join(root, ".git", "agent-pipeline", "onboarding"))) {
+      if (!/^session-cleanup-release-receipt\\./.test(f)) continue;
+      const b = readFileSync(join(root, ".git", "agent-pipeline", "onboarding", f));
+      const named = /\\.([a-f0-9]{64})\\.json$/.exec(f)?.[1] ?? null;
+      console.log("PROBE entry " + f.slice(0, 40) + " named=" + (named ? named.slice(0, 12) : null) + " byteSha=" + createHash("sha256").update(b).digest("hex").slice(0, 12)
+        + " recoveryPlanSha=" + String(JSON.parse(b.toString("utf8")).recoveryPlanSha256).slice(0, 12) + " planSha=" + plan.planSha256.slice(0, 12));
+    }
+    probe(root, "C before failing start");
+    let thrown = null;
+    try { invoke(["start", "--repo", root, "--session", "session-after-private-release"]); } catch (e) { thrown = e; }
+    for (const f of readdirSync(join(root, ".git", "agent-pipeline", "onboarding"))) {
+      if (!/^session-cleanup-release-receipt\\./.test(f)) continue;
+      const b = readFileSync(join(root, ".git", "agent-pipeline", "onboarding", f));
+      const named = /\\.([a-f0-9]{64})\\.json$/.exec(f)?.[1] ?? null;
+      console.log("PROBE after-start entry " + f.slice(0, 40) + " named=" + (named ? named.slice(0, 12) : null) + " byteSha=" + createHash("sha256").update(b).digest("hex").slice(0, 12)
+        + " recoveryPlanSha=" + String(JSON.parse(b.toString("utf8")).recoveryPlanSha256).slice(0, 12) + " planSha=" + plan.planSha256.slice(0, 12));
+    }
+    console.log("PROBE start threw: " + (thrown ? (thrown.code ?? "") + " " + String(thrown.reason ?? "") + " " + String(thrown.message).slice(0, 300) : "no"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+`;
+writeFileSync("scratch/k72-probe.test.mjs", header + "\n" + prelude + out.join("\n") + tail);

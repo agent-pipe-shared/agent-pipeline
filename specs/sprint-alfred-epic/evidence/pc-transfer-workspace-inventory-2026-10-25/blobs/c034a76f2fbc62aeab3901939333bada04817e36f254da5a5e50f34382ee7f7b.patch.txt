@@ -1,0 +1,100 @@
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.mjs b/plugins/pipeline-core/lib/model-family-host-store.mjs
+index 2e1f2b50a..45d079fa6 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.mjs
+@@ -1057,9 +1057,16 @@ export function createModelFamilyHostController({ rootDir, trustedSources, clock
+         nativeRequest: native.request, revalidate, consumed: false });
+     }
+     let result;
++    const callDriver = () => trustedSources.launchDriver({ invocation: invocation.receipt,
++      prelaunchToken: checked.value, ...(native ? { nativeRequest: native.request, driverContext } : {}) });
+     try {
+-      result = trustedSources.launchDriver({ invocation: invocation.receipt,
+-        prelaunchToken: checked.value, ...(native ? { nativeRequest: native.request, driverContext } : {}) });
++      // K147: a native driver spawns a managed host whose journal registers its own producer member in the session-authority
++      // registry. The BEGIN ticket (D113) binds only the synchronous prefix of this effect and compares a whole-registry
++      // snapshot afterwards, so that nested registration must not run inside the prefix: the driver is entered one microtask
++      // later, after the ticket closed, and registers under its own boundary (the lock is not held across the await).
++      // A synchronous driver keeps its synchronous result (legacy callers); an async native driver already returns a promise.
++      result = native && trustedSources.launchDriver?.constructor?.name === "AsyncFunction"
++        ? Promise.resolve().then(callDriver) : callDriver();
+     } catch { return fail("MODEL-FAMILY-LAUNCH-FAILED"); }
+     try {
+       if (result !== null && (typeof result === "object" || typeof result === "function")
+diff --git a/plugins/pipeline-core/lib/model-family-host-store.test.mjs b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+index ae598a815..4ae725a6b 100644
+--- a/plugins/pipeline-core/lib/model-family-host-store.test.mjs
++++ b/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+@@ -12,7 +12,7 @@ import { nativeContractFixtureParent } from "./test-item-approved-course-fixture
+ import { inspectSignedDescriptorCustodyRepository } from "./worktree-lifecycle.mjs";
+ import { createModelFamilyHostAuthorityLifecycle } from "./model-family-host-store.mjs";
+ import { createSessionAuthorityParticipantPorts } from "./session-authority-observers.mjs";
+-import { initializeSessionAuthorityRegistry } from "./session-authority-registry.mjs";
++import { initializeSessionAuthorityRegistry, withSessionAuthorityBoundary } from "./session-authority-registry.mjs";
+ import { createModelFamilyDiscoveryHost, RULE_FIELDS, pass, fail, digest as discoveryDigest } from "./model-family-discovery.mjs";
+ import { createCodexFamilyAdapter } from "./model-family-codex-adapter.mjs";
+ import { canonical, createPoApprovalIntent } from "./po-approval-proof.mjs";
+@@ -358,6 +358,37 @@ test("S4 private driver context carries the original sealed invocation and admit
+   } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
+ });
+ 
++test("K147 an async native driver runs after the BEGIN ticket closed and opens its own live registry boundary", async () => {
++  // Cause (K145 CADH001): the driver's synchronous prefix ran inside the open model-family-host ticket, so a nested producer
++  // registration was refused as a foreign concurrent registry writer, and a continuation inherited the closed boundary context
++  // (a dead token, no registry lock). The driver is now entered after the ticket and a closed boundary is never reused.
++  const f = fixture();
++  try {
++    activate(f);
++    const prepared = invoke(f, key("k147-nested-boundary"));
++    assert.equal(prepared.ok, true, prepared.code);
++    f.source.admitNativeRequest = () => ({ ok: true, code: "SYNTHETIC-ADMITTED" });
++    const lockFile = join(inspectSignedDescriptorCustodyRepository(f.repoDir).commonDir, "agent-pipeline", "session-authority", "registry.lock");
++    const seen = {};
++    f.source.launchDriver = async () => {
++      seen.beforeAwait = existsSync(lockFile);
++      await Promise.resolve();
++      withSessionAuthorityBoundary({ repository: inspectSignedDescriptorCustodyRepository(f.repoDir) }, () => { seen.insideBoundary = existsSync(lockFile); return null; });
++      return { ok: true, value: { nested: true } };
++    };
++    const request = { schema: "pipeline.synthetic-main-request.v1", purpose: "profile-main", runner: "codex", sessionId: "session-1",
++      invocationId: "k147-nested-boundary", taskRoute: route.taskRoute, selectedModelId: prepared.value.receipt.selectedModelId,
++      effort: prepared.value.receipt.effort, payload: { model: prepared.value.receipt.selectedModelId } };
++    const capability = await f.controller.admitNativeRequest({ invocation: prepared.value, request });
++    assert.equal(capability.ok, true, capability.code);
++    const launched = await f.controller.launch({ invocation: prepared.value,
++      packetBindingSha256: prepared.value.receipt.packetBindingSha256, nativeRequestCapability: capability.value });
++    assert.equal(launched.ok, true, JSON.stringify({ code: launched.code, seen }));
++    assert.equal(seen.beforeAwait, false, "the driver prefix runs after the BEGIN ticket released the registry lock");
++    assert.equal(seen.insideBoundary, true, "the continuation opened its own live boundary holding the registry lock");
++  } finally { rmSync(f.repoDir, { recursive: true, force: true }); }
++});
++
+ test("S4 trusted driver can complete a correlated synthetic profile-main operation from the original handle", async () => {
+   const taskRoute = "profile.main";
+   const f = fixture({ taskRoute });
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index b87a525a4..1816538fb 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -243,7 +243,7 @@ export function releaseSessionAuthorityLock({repository:input,reason,judge=judge
+   return freeze(aside===null?{status:'absent'}:{status:'released',aside,owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds});
+ }
+ 
+-export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
++export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
+ function boundary(token){const found=boundaryBrands.get(token);if(!found||boundaryContext.getStore()?.token!==token)fail('SDC-AUTHORITY-UNAVAILABLE','expired-boundary');repository(found.repository);return found.repository;}
+ 
+ function participant(def){const [producerId,,prefix,kinds,namespaceIds,paths]=def;const sourcePaths=paths.map(path=>`plugins/pipeline-core/${path}`).sort();const sources=sourcePaths.map(path=>{const abs=fileURLToPath(new URL(`../${path.slice('plugins/pipeline-core/'.length)}`,import.meta.url));const s=lstatSync(abs);if(!s.isFile()||s.isSymbolicLink())fail('SDC-AUTHORITY-UNAVAILABLE',`${producerId}:source-file`);return {path,sha256:hash(process.platform==='win32'?nativeSourceRead(abs,SESSION_AUTHORITY_LIMITS.maxSourceEntryBytes).bytes:readFileSync(abs))};});return freeze({producerId,kinds:[...kinds],sourcePaths,sourceSha256:digest(sources),namespaceIds:[...namespaceIds]});}
+diff --git a/plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs b/plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs
+index 9450f9c3c..92881fecc 100644
+--- a/plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-design-advisor-host.test.mjs
+@@ -95,7 +95,7 @@ test('active Advisor keeps its signed S4/S2 selection through metadata rechecks
+  const initialContext=contextResult.context,courseBinding={courseId:'advisor-native-course',initialContextSha256:contextResult.contextSha256,reservationId:'advisor-native-reservation',slot:1,routeStepSha256:hostDigest(native.observation.route)};
+  live.execution=native.execution;live.args={initialContext,dispatch,profile:'feature',reason:'risk-review',route:native.observation.route,courseBinding};
+  const prepared=await native.execution.prepareInitial(live.args);assert.equal(prepared.ok,true,prepared.code);
+- const result=await native.execution.executeInitial(live.args,prepared.preparedRequest);const emittedAnswer=JSON.parse(readFileSync(answerPath,'utf8'));
++ const result=await native.execution.executeInitial(live.args,prepared.preparedRequest);assert.equal(result.ok,true,JSON.stringify({code:result.code,outcome:result.outcome,launch:live.launchResult?.code,failureCode:live.finalizationFailureCode}));const emittedAnswer=JSON.parse(readFileSync(answerPath,'utf8'));
+  const exact=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join('\0')===[...keys].sort().join('\0');
+  const citationValid=refs=>Array.isArray(refs)&&refs.length<=5&&refs.every((ref,index)=>exact(ref,['path','sha256'])&&Object.values(initialContext.sources).some(source=>canonicalJson(source)===canonicalJson(ref))&&(index===0||refs[index-1].path<ref.path));
+  const answerDiagnostics={keys:Object.keys(emittedAnswer).sort(),shape:exact(emittedAnswer,['schema','dispatchId','initialContextSha256','questionSha256','evidenceSha256','answer','evidenceReferences','proposals']),

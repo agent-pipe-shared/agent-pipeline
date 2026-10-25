@@ -1,0 +1,17 @@
+You are a Goldfish of the Agent-Pipeline: fresh context, exactly ONE task. This briefing, `scratch/briefing-common-fv.md` and the files named in them are your ONLY input. Read the common file first. Clone name: `k144`.
+
+First output line: `Bootstrap check passed: ruleset 0.7.0+claude.20261023185750.bd9ee06 loaded · Project agent-pipeline · Calibration project/pipeline.json · State briefing K144-FV-GUARD-DISPATCH/2026-10-23 · Role Goldfish`
+
+## K144-FV-GUARD-DISPATCH: the guard and dispatch steps that are red alone
+
+### 1. Goal
+Find the root cause and fix (or restate, with proof the product is right) these steps, which were red alone and deterministic in the classification:
+ - `antigravity-native-dispatch-pretool-tests`: all 8 cases refused with `DISPATCH-MODEL-MISSING` (rule of D84, commit `7fcbce5ea`). `invoke_subagent` entries have no tool-layer `model`. Decide with evidence whether (a) the Antigravity dispatch path is a real product defect (a native Antigravity dispatch can never carry `model`, so every Antigravity dispatch would be refused: severe, the PO's Greenfield runs Antigravity) or (b) the fixtures predate D84 and need the model field the host really sends. Read the D84 decision (`docs/state.md` register, ADR if any, the commit) and `references/antigravity-native-dispatch.md` of the pipeline-start skill to learn what an Antigravity invocation carries. If (a), fix the guard/path; if (b), restate the fixtures with the evidence.
+ - `codex-pretool-guard-tests`: about 13 cases fail from one fixture that expects `architecture-design-required` after `intake-generate-apply` and gets `bootstrap-binding-required`: stale fixture or regression. Bisect with `git log` over the area (onboarding/intake code) and decide.
+ - `guard-dispatch-native-worker-tests`: red alone; adding `model: "sonnet"` to the fixture did not help; find the actual refusal and its source.
+ - `agy-session-dispatch-tests`: red alone, cause not isolated.
+Note the Codex runner fix K142 (`dispatch-briefing.mjs`, `--runner`) is already in your base HEAD; do not redo it.
+These four may share one cause (the dispatch model rule); check that first, then split.
+
+### 2. Task id
+TASK_ID: K144-FV-GUARD-DISPATCH.

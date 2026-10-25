@@ -1,0 +1,31 @@
+command: node --test scratch/clones/g20-publication-qualification/plugins/pipeline-core/lib/pins/close-coordinator-refuses-a-required-critic-without-evidence.test.mjs
+label: g20-close-pin-final
+exitCode: 0
+head: 89b40fb15a6dd442dc2ff4e7063df3e89600f416
+tree: 27b5bf2b1f4249313d0c20cfb479217c83a5ab99
+dirty: true
+--- stdout ---
+✔ the fixture delivery course is a valid slice queue (7.993346ms)
+✔ (a) this feature's course slice with a required record and no evidence refuses the close with zero mutation (3277.612969ms)
+✔ (a) the apply step re-checks: a required record that appears after planning refuses the transition (3903.363057ms)
+✔ (a) only the uncovered course slice is named (3251.493629ms)
+✔ (b) the same record with matching Critic evidence plans (3941.923596ms)
+✔ (c) a required record without evidence whose id is not in this feature's course plans (3279.053066ms)
+✔ (d) a feature with no delivery course plans, whatever other records exist (3307.158961ms)
+✔ rigor one close without a delivery course still needs the independent Critic/Verify audit (3285.161017ms)
+✔ (e) an invalid delivery course fails closed with a typed code and zero mutation (3253.061218ms)
+✔ (f) a delivery course that belongs to another feature fails closed rather than scoping the gate (3188.299576ms)
+✔ (g) the item course fixture is a valid slice queue (2.558211ms)
+✔ (g) a course slice recorded only by its orchestrator commit refuses the close off the audit route, naming it and the repair (3286.590305ms)
+✔ (g) on the audit route the commit-only slice is accepted and the audit route's own checks decide (3293.414645ms)
+✔ (g) a slice whose commit carries no Dispatch trailer is not commit-recorded and plans as before (3934.338872ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41898.449836
+
+--- stderr ---

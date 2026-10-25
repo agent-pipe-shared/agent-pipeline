@@ -1,0 +1,476 @@
+diff --git a/docs/adr/draft-scanner-diagnostic-sidecar.json b/docs/adr/draft-scanner-diagnostic-sidecar.json
+index dd64a7f41..5bbab155a 100644
+--- a/docs/adr/draft-scanner-diagnostic-sidecar.json
++++ b/docs/adr/draft-scanner-diagnostic-sidecar.json
+@@ -3,7 +3,7 @@
+   "id": "draft-scanner-diagnostic-sidecar",
+   "title": "Bounded scanner diagnostic sidecar",
+   "status": "proposed",
+-  "digest": "3caccbf3e194df46d43d03aabe8a5d9de25e8e0dc6af5bbde54a48c1f14d936e",
++  "digest": "11f1e4d948c7af1d6cf45a31f509faeb59ae9aef2d491cf728f214c817ef15e1",
+   "scope": "global",
+   "date": "2026-09-29"
+ }
+diff --git a/docs/adr/draft-scanner-diagnostic-sidecar.md b/docs/adr/draft-scanner-diagnostic-sidecar.md
+index e524b0e6a..3b40926f2 100644
+--- a/docs/adr/draft-scanner-diagnostic-sidecar.md
++++ b/docs/adr/draft-scanner-diagnostic-sidecar.md
+@@ -166,6 +166,25 @@ delivery/evidence, alongside the original approved artifact. This technical
+ refinement does not silently weaken the approved shape or claim schema standards
+ interoperability testing that has not occurred.
+ 
++## Additive per-finding projection (PO decision 2026-10-23, AC-249)
++
++The PO decided to add, additively and minimally, an OPTIONAL `findings` array to
++the existing `child-result` shape (at most 20 entries, at least 1 when present).
++Each entry has exactly `ruleId` (bounded safe-charset string), `location`
++(repo-relative `path` plus integer `line`; no absolute path, no `..` segment) and
++`evidenceFingerprint` (the first 12 hex characters of the sha256 of the matched
++text, plus its byte `length`). The clear match, a snippet and the finding message
++never enter the record; this narrows, by explicit decision, the "no raw-output
++hashes" wording of contract point 4 to a bounded prefix of a content digest. The
++array exists only for a child that exited 0 without error or signal and returned
++complete JSON, so a timed-out, refused, crashed or unparseable scan projects
++nothing and a `not-observed` child cannot carry one. Verdicts, deadlines, the 16KiB
++record bound and `additionalProperties: false` are unchanged; the strict-refinement
++schema SHA above is superseded by
++`56400c9c0a6a2df1f99ce6141751b0b3dc4b85b80f1d0a9422446d1adb747bb9`, and both
++schema copies stay byte-identical. Only the Semgrep child is projected; other
++adapters stay outside this sidecar's closed `tool` set.
++
+ ## Formal acceptance procedure
+ 
+ At actual trunk acceptance, allocate the next free flat ordinal under ADR-0069;
+diff --git a/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs b/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
+index 68f0ec8bc..bef20b941 100644
+--- a/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
++++ b/plugins/pipeline-core/lib/pins/security-scanner-failure-provenance.test.mjs
+@@ -177,6 +177,32 @@ test("P4 secrets and unrestricted child output are not persisted; unknown codes
+   assert.equal(parseScannerDiagnostics(" ".repeat(16385), evidence).ok, false);
+ });
+ 
++// AC-249 (PO decision 2026-10-23): additive per-finding projection; the clear match never crosses the surface.
++test("P3/P4 per-finding projection carries rule id, repo-relative location and a fingerprint only, from a completed scan only, and never changes the verdict", async () => {
++  const TOKEN = "<redacted-sensitive-value sha256=66e09601904962fcfc8e729459bb53be5b64039d98f8b3a804bd1d605e9f42a3>";
++  const lines = `key = "${TOKEN}"`;
++  const body = JSON.stringify({ version: "1.170.0", errors: [], results: [{ check_id: "rules.hardcoded-token", path: "src/a.js", start: { line: 4, col: 1, offset: 0 }, end: { line: 4, col: 9, offset: 8 }, extra: { message: `leak ${TOKEN}`, severity: "ERROR", lines, metadata: {} } }] });
++  const completed = (await call(productionRun, { status: 0, stdout: body, stderr: TOKEN })).value;
++  assert.equal(tuple(completed), "FINDINGS/findings", "the verdict is the adapter's own, independent of the projection");
++  const projection = completed.diagnostics.findings;
++  assert.deepEqual(projection, [{ ruleId: "rules.hardcoded-token", location: { path: "src/a.js", line: 4 }, evidenceFingerprint: { sha256: createHash("sha256").update(lines).digest("hex").slice(0, 12), length: Buffer.byteLength(lines) } }]);
++  const record = buildScannerDiagnostics(evidence, [{ tool: "semgrep", executableSha256: hash, rules: observeLocalRules("/r", null), child: completed.diagnostics }]);
++  const serialised = JSON.stringify(record);
++  assert.equal(serialised.includes(TOKEN), false, "the clear match must not be serialised");
++  assert.equal(serialised.includes(createHash("sha256").update(lines).digest("hex")), false, "only a 12-hex prefix of the digest is retained");
++  assert.equal(parseScannerDiagnostics(Buffer.from(serialised), evidence).ok, true);
++  // Unavailable stays unavailable: a timed-out, refused, crashed or unparseable child projects nothing, and the cases stay distinct.
++  const timedOut = (await call(productionRun, { status: null, error: { code: "ETIMEDOUT" }, signal: "SIGTERM", stdout: body, stderr: "" })).value;
++  const refused = (await call(productionRun, Object.assign(new Error("x"), { code: "EPERM" }))).value;
++  const crashed = (await call(productionRun, { status: 7, stdout: body, stderr: "" })).value;
++  for (const r of [timedOut, refused, crashed]) { assert.equal(r.status, "ERROR"); assert.equal("findings" in r.diagnostics, false); }
++  assert.equal(new Set([tuple(completed), tuple(timedOut), tuple(refused), tuple(await missingCall(productionRun))]).size, 4);
++  // The closed schema still refuses a forged field next to the projection.
++  const forged = structuredClone(record);
++  forged.scanners[0].child.findings[0].snippet = TOKEN;
++  assert.equal(validateScannerDiagnostics(forged), false);
++});
++
+ test("P2 diagnostics are verdict-independent: the record is diagnostic-only and any verdict field is refused", () => {
+   const record = buildScannerDiagnostics(evidence, []);
+   assert.equal(record.authority, "diagnostic-only");
+diff --git a/plugins/pipeline-core/lib/security-scanner-diagnostics.mjs b/plugins/pipeline-core/lib/security-scanner-diagnostics.mjs
+index 444bbfd2e..2cb994eca 100644
+--- a/plugins/pipeline-core/lib/security-scanner-diagnostics.mjs
++++ b/plugins/pipeline-core/lib/security-scanner-diagnostics.mjs
+@@ -1,5 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Prepared G13 contract implementation. No filesystem mutation or authority.
++import { createHash } from "node:crypto";
++import { isAbsolute as pathIsAbsolute, posix as pathPosix, relative as pathRelative, win32 as pathWin32 } from "node:path";
+ const MAX_OUTPUT = 1048576;
+ const MAX_RECORD = 16384;
+ const DIGEST = /^[a-f0-9]{64}(?![\s\S])/;
+@@ -13,7 +15,64 @@ const object = v => v !== null && typeof v === "object" && !Array.isArray(v) &&
+ const shape = (v, fields) => object(v) && Reflect.ownKeys(v).length === fields.length && fields.every(k => Object.hasOwn(v,k) && Object.hasOwn(Object.getOwnPropertyDescriptor(v,k),"value"));
+ const safeCount = v => natural(v) ? v : null;
+ 
+-export function observeSemgrepChild(result, elapsedMs, timeoutMs) {
++// Per-finding projection (AC-249, PO decision 2026-10-23): an OPTIONAL bounded array inside the
++// child-result shape. Each entry is exactly a rule id, a repo-relative location and an evidence
++// fingerprint (12-hex sha256 prefix plus byte length) of the matched text. The clear match, a
++// snippet, the finding message and any absolute path never enter this record. The bounds keep the
++// worst case (20 entries) inside MAX_RECORD, so a hostile identifier cannot cost the whole sidecar.
++const MAX_FINDINGS = 20;
++const MAX_RULE_ID = 128;
++const MAX_PATH = 256;
++const MAX_LINE = 2147483647;
++const RULE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\s\S])/;
++// Mirrors the schema pattern: forward-slash segments, no empty/./.. segment, no control character,
++// no backslash, no leading drive letter, no leading slash.
++const SEGMENT = "(?!\\.{1,2}(?:/|(?![\\s\\S])))[^\\\\/\\u0000-\\u001f\\u007f]+";
++const REL_PATH = new RegExp(`^(?![A-Za-z]:)${SEGMENT}(?:/${SEGMENT})*(?![\\s\\S])`);
++const FINGERPRINT = /^[a-f0-9]{12}(?![\s\S])/;
++const validFinding = f => shape(f, ["ruleId", "location", "evidenceFingerprint"])
++  && typeof f.ruleId === "string" && f.ruleId.length <= MAX_RULE_ID && RULE_ID.test(f.ruleId)
++  && shape(f.location, ["path", "line"]) && typeof f.location.path === "string" && f.location.path.length <= MAX_PATH && REL_PATH.test(f.location.path)
++  && Number.isSafeInteger(f.location.line) && f.location.line >= 1 && f.location.line <= MAX_LINE
++  && shape(f.evidenceFingerprint, ["sha256", "length"]) && typeof f.evidenceFingerprint.sha256 === "string" && FINGERPRINT.test(f.evidenceFingerprint.sha256)
++  && natural(f.evidenceFingerprint.length) && f.evidenceFingerprint.length <= MAX_OUTPUT;
++const typeName = type => typeof type === "string" ? type : Array.isArray(type) && typeof type[0] === "string" ? type[0] : null;
++const partialParsingWarning = e => object(e) && e.level === "warn" && typeName(e.type) === "PartialParsing";
++
++// Scan-root-relative path, or null. Absolute paths are accepted only when they sit under rootDir.
++function relativeFindingPath(file, rootDir) {
++  if (typeof file !== "string" || file.length === 0 || file.length > 4096) return null;
++  let relative = file;
++  if (pathIsAbsolute(file)) {
++    if (typeof rootDir !== "string" || !pathIsAbsolute(rootDir)) return null;
++    relative = pathRelative(rootDir, file);
++    if (relative.length === 0 || pathIsAbsolute(relative)) return null;
++  } else if (pathPosix.isAbsolute(file) || pathWin32.isAbsolute(file)) return null;
++  return process.platform === "win32" ? relative.replaceAll("\\", "/") : relative;
++}
++
++function projectFindings(parsed, rootDir) {
++  if (!Array.isArray(parsed?.results)) return [];
++  // Same completion rule as the adapter: only warn-level PartialParsing entries leave a completed scan.
++  if (parsed.errors !== undefined && !(Array.isArray(parsed.errors) && parsed.errors.every(partialParsingWarning))) return [];
++  const findings = [];
++  for (const r of parsed.results) {
++    if (findings.length >= MAX_FINDINGS) break;
++    const text = r?.extra?.lines;
++    const path = relativeFindingPath(r?.path, rootDir);
++    if (typeof r?.check_id !== "string" || typeof text !== "string" || path === null) continue;
++    const bytes = Buffer.from(text, "utf8");
++    const entry = {
++      ruleId: r.check_id,
++      location: { path, line: r?.start?.line },
++      evidenceFingerprint: { sha256: createHash("sha256").update(bytes).digest("hex").slice(0, 12), length: bytes.length },
++    };
++    if (validFinding(entry)) findings.push(entry);
++  }
++  return findings;
++}
++
++export function observeSemgrepChild(result, elapsedMs, timeoutMs, rootDir) {
+   if (!natural(timeoutMs) || timeoutMs < 1) return { observation:"not-observed" };
+   const stdout = typeof result?.stdout === "string" ? result.stdout : "";
+   const stderr = typeof result?.stderr === "string" ? result.stderr : "";
+@@ -23,9 +82,16 @@ export function observeSemgrepChild(result, elapsedMs, timeoutMs) {
+     try { parsed = JSON.parse(stdout); complete = true; } catch { /* opaque */ }
+   }
+   const version = typeof parsed?.version === "string" && VERSION.test(parsed.version) ? parsed.version : null;
++  const exitCode = Number.isInteger(result?.status) && result.status >= -2147483648 && result.status <= 2147483647 ? result.status : null;
++  // Unavailable stays unavailable: findings only from a child that exited 0 without error or signal
++  // and returned complete JSON; a timeout, refusal, crash or over-budget output projects nothing.
++  let findings = [];
++  if (complete && exitCode === 0 && !result?.error && !result?.signal) {
++    try { findings = projectFindings(parsed, rootDir); } catch { findings = []; }
++  }
+   return {
+     observation:"child-result",
+-    exitCode:Number.isInteger(result?.status) && result.status >= -2147483648 && result.status <= 2147483647 ? result.status : null,
++    exitCode,
+     errorCode:result?.error ? CODES.has(result.error.code) ? result.error.code : "OTHER" : null,
+     signal:result?.signal ? SIGNALS.has(result.signal) ? result.signal : "OTHER" : null,
+     elapsedMs:Number.isFinite(elapsedMs) ? Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,Math.round(elapsedMs))) : 0,
+@@ -35,6 +101,7 @@ export function observeSemgrepChild(result, elapsedMs, timeoutMs) {
+       interpretation:stdoutBytes > MAX_OUTPUT ? "over-diagnostic-budget" : complete ? "complete-json" : "not-complete-json",
+       resultsCount:Array.isArray(parsed?.results) ? safeCount(parsed.results.length) : null,
+       errorsCount:Array.isArray(parsed?.errors) ? safeCount(parsed.errors.length) : null},
++    ...(findings.length > 0 ? { findings } : {}),
+   };
+ }
+ 
+@@ -59,11 +126,20 @@ export function validateScannerDiagnostics(record) {
+       else if(typeof q.sha256 !== "string" || !DIGEST.test(q.sha256) || q.reason !== null || typeof q.unchanged !== "boolean") return false;
+       const c=r.child;
+       if (shape(c,["observation"]) && c.observation === "not-observed") continue;
+-      if (!shape(c,["observation","exitCode","errorCode","signal","elapsedMs","timeoutMs","version","output"]) || c.observation !== "child-result" || !nullable(c.exitCode,v=>Number.isInteger(v)&&v>=-2147483648&&v<=2147483647) || !nullable(c.errorCode,v=>CODES.has(v)) || !nullable(c.signal,v=>SIGNALS.has(v)) || !natural(c.elapsedMs) || !natural(c.timeoutMs) || c.timeoutMs < 1) return false;
++      const childFields=["observation","exitCode","errorCode","signal","elapsedMs","timeoutMs","version","output"];
++      const hasFindings=object(c) && Reflect.ownKeys(c).includes("findings");
++      if (!shape(c,hasFindings ? [...childFields,"findings"] : childFields) || c.observation !== "child-result" || !nullable(c.exitCode,v=>Number.isInteger(v)&&v>=-2147483648&&v<=2147483647) || !nullable(c.errorCode,v=>CODES.has(v)) || !nullable(c.signal,v=>SIGNALS.has(v)) || !natural(c.elapsedMs) || !natural(c.timeoutMs) || c.timeoutMs < 1) return false;
+       if(!shape(c.version,["value","source"]) || !["existing-json-output","unknown-or-withheld"].includes(c.version.source)) return false;
+       if(c.version.source === "existing-json-output" ? typeof c.version.value !== "string" || !VERSION.test(c.version.value) : c.version.value !== null) return false;
+       const o=c.output;
+       if(!shape(o,["stdoutBytes","stderrBytes","interpretation","resultsCount","errorsCount"]) || !natural(o.stdoutBytes) || !natural(o.stderrBytes) || !["complete-json","not-complete-json","over-diagnostic-budget"].includes(o.interpretation) || !nullable(o.resultsCount,natural) || !nullable(o.errorsCount,natural)) return false;
++      if (hasFindings) {
++        const f=c.findings;
++        if (!Array.isArray(f) || f.length < 1 || f.length > MAX_FINDINGS || Reflect.ownKeys(f).length !== f.length+1) return false;
++        // Unavailable stays unavailable: only a completed, clean child may carry projected findings.
++        if (c.exitCode !== 0 || c.errorCode !== null || c.signal !== null || o.interpretation !== "complete-json" || o.resultsCount === null || f.length > o.resultsCount) return false;
++        for (let i=0;i<f.length;i++) if (!Object.hasOwn(Object.getOwnPropertyDescriptor(f,String(i))??{},"value") || !validFinding(f[i])) return false;
++      }
+     }
+     return Buffer.byteLength(JSON.stringify(record)) <= MAX_RECORD;
+   } catch { return false; }
+diff --git a/plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs b/plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
+index 594372169..0a87502e6 100644
+--- a/plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
++++ b/plugins/pipeline-core/lib/security-scanner-diagnostics.test.mjs
+@@ -260,7 +260,153 @@ test('producer publication refusal preserves original evidence and verdict seman
+  }finally{close(f.base);}
+ },{skip:publisherSkip});
+ 
+-if(completionCases.length!==24)throw new Error("G13 completion topology drift");
++// K101 / AC-249 (PO decision 2026-10-23, batch 9): additive, bounded per-finding projection
++// (rule id, repo-relative location, evidence fingerprint) inside the closed child-result shape.
++// Synthetic scanner output only; the clear match text must never reach the serialised record.
++const FAKE_TOKEN='<redacted-sensitive-value sha256=66e09601904962fcfc8e729459bb53be5b64039d98f8b3a804bd1d605e9f42a3>';
++const projRoot='/work/root';
++const semgrepResult=(id,path,line,lines)=>({check_id:id,path,start:{line,col:1,offset:0},end:{line,col:9,offset:8},extra:{message:'leak '+FAKE_TOKEN,severity:'ERROR',lines,metadata:{}}});
++const semgrepOut=(results,extra={})=>JSON.stringify({version:'1.170.0',results,errors:[],...extra});
++const projected=(results,extra,rootDir=projRoot)=>observeSemgrepChild({status:0,stdout:semgrepOut(results,extra),stderr:''},10,60000,rootDir);
++const prefix12=text=>createHash('sha256').update(text,'utf8').digest('hex').slice(0,12);
++const finding=(over={})=>({ruleId:'rules.hardcoded-token',location:{path:'src/a.js',line:3},evidenceFingerprint:{sha256:'0123456789ab',length:12},...over});
++const withFindings=findings=>{const c=child();c.output={...c.output,resultsCount:Array.isArray(findings)?Math.max(1,findings.length):1};c.findings=findings;return record(c);};
++const oneResult=()=>child({status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')]),stderr:''});
++
++test('findings projection: rule id, repo-relative location and a 12-hex fingerprint with length, nothing else',()=>{
++  const lines='  token = "'+FAKE_TOKEN+'";';
++  const c=projected([semgrepResult('rules.hardcoded-token','src/a.js',3,lines),semgrepResult('rules.other_rule:v1',projRoot+'/lib/b.js',7,'x')]);
++  assert.deepEqual(c.findings,[
++    {ruleId:'rules.hardcoded-token',location:{path:'src/a.js',line:3},evidenceFingerprint:{sha256:prefix12(lines),length:Buffer.byteLength(lines)}},
++    {ruleId:'rules.other_rule:v1',location:{path:'lib/b.js',line:7},evidenceFingerprint:{sha256:prefix12('x'),length:1}},
++  ]);
++  assert.match(c.findings[0].evidenceFingerprint.sha256,/^[a-f0-9]{12}$/);
++  const r=record(c);assert.equal(validateScannerDiagnostics(r),true);
++  assert.deepEqual(parseScannerDiagnostics(JSON.stringify(r),evidence).record.scanners[0].child.findings,c.findings);
++  assert.equal('findings' in child(),false,'a scan without findings keeps the previous child shape byte for byte');
++  assert.equal('findings' in projected([]),false);
++});
++
++test('findings projection is bounded: at most 20 entries, over-long or unsafe identifiers are skipped, worst case stays inside the record budget',()=>{
++  const many=Array.from({length:25},(_, i)=>semgrepResult('rule.n'+i,'f'+i+'.js',i+1,'t'+i));
++  const c=projected(many);assert.equal(c.findings.length,20);assert.equal(c.output.resultsCount,25);assert.equal(c.findings[19].ruleId,'rule.n19');
++  const longId='a'.repeat(129),longPath='d'.repeat(254)+'.js';
++  const skipped=projected([semgrepResult(longId,'a.js',1,'x'),semgrepResult('rule.ok',longPath+'x','1'.length,'x'),semgrepResult('bad id with spaces','a.js',1,'x'),semgrepResult('rule.noline','a.js',0,'x'),semgrepResult('rule.fracline','a.js',1.5,'x'),semgrepResult('rule.nolines','a.js',1,undefined),semgrepResult('rule.kept','a.js',2,'x')]);
++  assert.deepEqual(skipped.findings.map(f=>f.ruleId),['rule.kept']);
++  const worst=Array.from({length:20},(_, i)=>semgrepResult('r'.repeat(127)+(i%10),'p'.repeat(250)+i+'.js',2147483647,'z'.repeat(5000)));
++  const w=projected(worst);assert.equal(w.findings.length,20);
++  const bytes=Buffer.byteLength(JSON.stringify(record(w)));assert.ok(bytes<=16384,'worst case record is '+bytes+' bytes');
++  assert.equal(validateScannerDiagnostics(withFindings(Array.from({length:20},()=>finding()))),true);
++  assert.throws(()=>withFindings(Array.from({length:21},()=>finding())),/diagnostic-record-invalid/,'21 entries exceed the cap');
++  assert.throws(()=>withFindings([]),/diagnostic-record-invalid/,'an empty array is not a projection');
++});
++
++test('findings entries are closed and typed; malformed entries are refused by validator, builder and decoder with the typed refusal',()=>{
++  assert.equal(validateScannerDiagnostics(withFindings([finding()])),true);
++  const bad=[
++    finding({ruleId:''}),finding({ruleId:'a'.repeat(129)}),finding({ruleId:'has space'}),finding({ruleId:'-leading'}),finding({ruleId:'rule\n'}),finding({ruleId:7}),
++    finding({location:{path:'src/a.js',line:0}}),finding({location:{path:'src/a.js',line:1.5}}),finding({location:{path:'src/a.js',line:2147483648}}),finding({location:{path:'src/a.js',line:'3'}}),
++    finding({location:{path:'src/a.js',line:3,column:1}}),finding({location:{path:'src/a.js'}}),finding({location:'src/a.js:3'}),
++    finding({evidenceFingerprint:{sha256:'0123456789a',length:1}}),finding({evidenceFingerprint:{sha256:'0123456789abc',length:1}}),finding({evidenceFingerprint:{sha256:'0123456789AB',length:1}}),
++    finding({evidenceFingerprint:{sha256:'0123456789ab',length:-1}}),finding({evidenceFingerprint:{sha256:'0123456789ab',length:1.5}}),finding({evidenceFingerprint:{sha256:'0123456789ab',length:1048577}}),
++    finding({evidenceFingerprint:{sha256:'0123456789ab'}}),finding({evidenceFingerprint:{sha256:'0123456789ab',length:1,match:FAKE_TOKEN}}),
++    {...finding(),snippet:FAKE_TOKEN},{ruleId:'a.b',location:{path:'a.js',line:1}},null,'rule',[]
++  ];
++  for(const entry of bad){
++    assert.throws(()=>withFindings([entry]),/diagnostic-record-invalid/,JSON.stringify(entry));
++  }
++  const good=JSON.stringify(withFindings([finding()]));
++  assert.equal(parseScannerDiagnostics(good.replace('"ruleId":"rules.hardcoded-token"','"ruleId":"rules.hardcoded-token","snippet":"x"'),evidence).code,'diagnostic-record-invalid');
++  assert.equal(parseScannerDiagnostics(good.replace('"ruleId":"rules.hardcoded-token"','"ruleId":"has space"'),evidence).code,'diagnostic-record-invalid');
++  const x=withFindings([finding()]);x.scanners[0].child.findings.extra='x';assert.equal(validateScannerDiagnostics(x),false);
++  const y=withFindings([finding()]);Object.defineProperty(y.scanners[0].child.findings[0].location,'path',{get(){throw Error('must not call getter')},enumerable:true});assert.equal(validateScannerDiagnostics(y),false);
++});
++
++test('findings location is repo-relative: absolute, drive, UNC, backslash and parent-directory paths are never projected nor admitted',()=>{
++  const refused=['/etc/passwd','C:\\x\\a.js','C:/x/a.js','\\\\server\\share\\a.js','a\\b.js','../a.js','a/../b.js','a/./b.js','a//b.js','a/b/','','a\u0000b.js','a\nb.js'];
++  const c=projected(refused.map((p,i)=>semgrepResult('rule.r'+i,p,1,'x')).concat([semgrepResult('rule.outside','/other/place/a.js',1,'x'),semgrepResult('rule.fine',projRoot+'/ok/a.js',1,'x')]));
++  assert.deepEqual(c.findings.map(f=>f.location.path),['ok/a.js']);
++  const noRoot=observeSemgrepChild({status:0,stdout:semgrepOut([semgrepResult('rule.abs',projRoot+'/ok/a.js',1,'x'),semgrepResult('rule.rel','ok/a.js',1,'x')]),stderr:''},10,60000);
++  assert.deepEqual(noRoot.findings.map(f=>f.ruleId),['rule.rel']);
++  for(const p of refused.concat(['/abs/a.js','x'.repeat(257)])){assert.throws(()=>withFindings([finding({location:{path:p,line:1}})]),/diagnostic-record-invalid/,JSON.stringify(p));}
++  assert.equal(validateScannerDiagnostics(withFindings([finding({location:{path:'a b/ä.js',line:1}})])),true);
++});
++
++test('the clear match text is never serialised: a fake secret-looking token reaches the record only as a 12-hex fingerprint and a length',()=>{
++  const lines='aws = "'+FAKE_TOKEN+'"';
++  const out=JSON.stringify({version:'1.170.0',results:[{...semgrepResult('rules.token','src/secret.js',4,lines),extra:{message:FAKE_TOKEN,severity:'ERROR',lines,metadata:{leak:FAKE_TOKEN},fingerprint:FAKE_TOKEN}}],errors:[]});
++  const c=observeSemgrepChild({status:0,stdout:out,stderr:FAKE_TOKEN},10,60000,projRoot);
++  const r=record(c);const bytes=JSON.stringify(r);
++  assert.equal(c.findings.length,1);
++  for(const needle of [FAKE_TOKEN,FAKE_TOKEN.slice(0,12),FAKE_TOKEN.slice(-12),lines,createHash('sha256').update(lines).digest('hex')])assert.equal(bytes.includes(needle),false,'record must not contain '+needle);
++  assert.equal(bytes.includes(prefix12(lines)),true);
++  assert.equal(parseScannerDiagnostics(bytes,evidence).ok,true);
++  const smuggled=structuredClone(r);smuggled.scanners[0].child.findings[0].evidenceFingerprint.sha256=createHash('sha256').update(lines).digest('hex');
++  assert.equal(validateScannerDiagnostics(smuggled),false,'a full digest is not a 12-hex prefix');
++});
++
++test('unavailable stays unavailable: no findings are projected, or admitted, when the scanner did not complete',async()=>{
++  const body=semgrepOut([semgrepResult('rules.token','a.js',1,'x')]);
++  const incomplete=[
++    {status:null,error:{code:'ETIMEDOUT',message:FAKE_TOKEN},signal:'SIGTERM',stdout:body,stderr:''},
++    {status:null,error:{code:'EPERM'},stdout:body,stderr:''},
++    {status:7,stdout:body,stderr:''},
++    {status:0,signal:'SIGKILL',stdout:body,stderr:''},
++    {status:0,stdout:'not json '+body,stderr:''},
++    {status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')],{pad:'x'.repeat(1048576)}),stderr:''},
++    {status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')],{errors:[{level:'error',type:'Timeout',path:'a.js'}]}),stderr:''},
++    {status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',1,'x')],{errors:[{level:'warn',type:'Timeout',path:'a.js'}]}),stderr:''},
++    {status:0,stdout:JSON.stringify({version:'1.170.0',errors:[]}),stderr:''},
++  ];
++  for(const result of incomplete){const c=observeSemgrepChild(result,10,60000,projRoot);assert.equal('findings' in c,false,JSON.stringify(c));}
++  assert.equal('findings' in observeSemgrepChild({status:0,stdout:body,stderr:''},10,0,projRoot),false);
++  assert.deepEqual(observeSemgrepChild({status:0,stdout:body,stderr:''},10,0,projRoot),{observation:'not-observed'});
++  // Degraded coverage (warn-level PartialParsing only) is still a completed scan, as in the adapter.
++  const partial=projected([semgrepResult('rules.token','a.js',1,'x')],{errors:[{level:'warn',type:['PartialParsing',[]],path:'b.js'}]});
++  assert.equal(partial.findings.length,1);
++  // The closed validator enforces the same gate, so a forged record cannot carry findings for an unavailable child.
++  const absent=record({observation:'not-observed'});absent.scanners[0].child.findings=[finding()];assert.equal(validateScannerDiagnostics(absent),false);
++  const base=oneResult();assert.equal(validateScannerDiagnostics(record(base)),true);
++  for(const patch of [{errorCode:'ETIMEDOUT'},{signal:'SIGTERM'},{exitCode:7},{exitCode:null},{output:{...base.output,interpretation:'not-complete-json'}},{output:{...base.output,interpretation:'over-diagnostic-budget'}},{output:{...base.output,resultsCount:null}},{output:{...base.output,resultsCount:0}}]){
++    assert.throws(()=>record({...base,...patch}),/diagnostic-record-invalid/,JSON.stringify(patch));
++  }
++  assert.throws(()=>record({...base,findings:[finding(),finding()]}),/diagnostic-record-invalid/,'more findings than the observed resultsCount');
++});
++
++test('verdict independence and schema: adapter verdict, findings and exit semantics are unchanged; both schema copies declare the optional bounded array',async()=>{
++  const {value}=await invoke({status:0,stdout:semgrepOut([semgrepResult('rules.token','a.js',3,'x '+FAKE_TOKEN)]),stderr:''});
++  assert.equal(value.status,'FINDINGS');assert.equal(value.classification,'findings');assert.equal(value.findings.length,1);assert.equal(value.findings[0].rule,'rules.token');assert.equal(value.findings[0].line,3);
++  assert.equal(value.diagnostics.findings.length,1);assert.equal(value.diagnostics.findings[0].ruleId,'rules.token');
++  assert.equal(JSON.stringify(record(value.diagnostics)).includes(FAKE_TOKEN),false);
++  const timedOut=(await invoke({status:null,error:{code:'ETIMEDOUT'},signal:'SIGTERM',stdout:semgrepOut([semgrepResult('rules.token','a.js',3,'x')]),stderr:''})).value;
++  assert.equal(timedOut.status,'ERROR');assert.equal('findings' in timedOut.diagnostics,false);
++  const clean=(await invoke({status:0,stdout:semgrepOut([]),stderr:''})).value;
++  assert.equal(clean.status,'PASS');assert.equal('findings' in clean.diagnostics,false);
++  for(const url of ['../../../schemas/pipeline.security-scanner-diagnostics.v1.json','../schemas/pipeline.security-scanner-diagnostics.v1.json']){
++    const schema=JSON.parse(readFileSync(new URL(url,import.meta.url),'utf8'));
++    const childResult=schema.properties.scanners.items.properties.child.oneOf[0];
++    assert.equal(childResult.additionalProperties,false);assert.equal(childResult.required.includes('findings'),false);
++    const f=childResult.properties.findings;assert.equal(f.type,'array');assert.equal(f.maxItems,20);assert.equal(f.items.additionalProperties,false);
++    assert.deepEqual(f.items.required,['ruleId','location','evidenceFingerprint']);
++    assert.equal(schema.additionalProperties,false);assert.deepEqual(schema.required,['schema','authority','evidencePayloadSha256','candidate','scanners']);
++  }
++});
++
++test('producer: a synthetic Semgrep finding with a fake token publishes rule id, location and fingerprint, and the sidecar bytes never contain the token',async()=>{
++ const f=producerFixture();try{
++  const lines='k = "'+FAKE_TOKEN+'"';
++  const result=await produce(f,{status:0,stdout:semgrepOut([semgrepResult('rules.token','src/a.js',4,lines)]),stderr:FAKE_TOKEN});
++  assert.equal(result.evidence.scanners[0].status,'FINDINGS');
++  const bytes=readFileSync(target(f.root));const parsed=parseScannerDiagnostics(bytes,result.evidence);assert.equal(parsed.ok,true);
++  assert.deepEqual(parsed.record.scanners[0].child.findings,[{ruleId:'rules.token',location:{path:'src/a.js',line:4},evidenceFingerprint:{sha256:prefix12(lines),length:Buffer.byteLength(lines)}}]);
++  assert.equal(bytes.toString('utf8').includes(FAKE_TOKEN),false);
++  const timed=await produce(f,{status:null,error:{code:'ETIMEDOUT'},signal:'SIGTERM',stdout:semgrepOut([semgrepResult('rules.token','src/a.js',4,lines)]),stderr:''});
++  assert.equal(timed.exitCode,2);assert.equal(timed.evidence.scanners[0].status,'ERROR');
++  const timedParsed=parseScannerDiagnostics(readFileSync(target(f.root)),timed.evidence);assert.equal(timedParsed.ok,true);assert.equal('findings' in timedParsed.record.scanners[0].child,false);
++ }finally{close(f.base);}
++},{skip:publisherSkip});
++
++if(completionCases.length!==32)throw new Error("G13 completion topology drift");
+ const completionFd=process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD===undefined
+   ? openCompletionDescriptor(devNull,"w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json b/plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json
+index 563c5ac46..5dc9ce508 100644
+--- a/plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json
++++ b/plugins/pipeline-core/schemas/pipeline.security-scanner-diagnostics.v1.json
+@@ -361,6 +361,92 @@
+                         ]
+                       }
+                     }
++                  },
++                  "findings": {
++                    "type": "array",
++                    "minItems": 1,
++                    "maxItems": 20,
++                    "items": {
++                      "type": "object",
++                      "additionalProperties": false,
++                      "required": [
++                        "ruleId",
++                        "location",
++                        "evidenceFingerprint"
++                      ],
++                      "properties": {
++                        "ruleId": {
++                          "type": "string",
++                          "maxLength": 128,
++                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}(?![\\s\\S])"
++                        },
++                        "location": {
++                          "type": "object",
++                          "additionalProperties": false,
++                          "required": [
++                            "path",
++                            "line"
++                          ],
++                          "properties": {
++                            "path": {
++                              "type": "string",
++                              "minLength": 1,
++                              "maxLength": 256,
++                              "pattern": "^(?![A-Za-z]:)(?!\\.{1,2}(?:/|(?![\\s\\S])))[^\\\\/\\u0000-\\u001f\\u007f]+(?:/(?!\\.{1,2}(?:/|(?![\\s\\S])))[^\\\\/\\u0000-\\u001f\\u007f]+)*(?![\\s\\S])"
++                            },
++                            "line": {
++                              "type": "integer",
++                              "minimum": 1,
++                              "maximum": 2147483647
++                            }
++                          }
++                        },
++                        "evidenceFingerprint": {
++                          "type": "object",
++                          "additionalProperties": false,
++                          "required": [
++                            "sha256",
++                            "length"
++                          ],
++                          "properties": {
++                            "sha256": {
++                              "type": "string",
++                              "pattern": "^[a-f0-9]{12}(?![\\s\\S])"
++                            },
++                            "length": {
++                              "type": "integer",
++                              "minimum": 0,
++                              "maximum": 1048576
++                            }
++                          }
++                        }
++                      }
++                    }
++                  }
++                },
++                "dependentSchemas": {
++                  "findings": {
++                    "properties": {
++                      "exitCode": {
++                        "const": 0
++                      },
++                      "errorCode": {
++                        "const": null
++                      },
++                      "signal": {
++                        "const": null
++                      },
++                      "output": {
++                        "properties": {
++                          "interpretation": {
++                            "const": "complete-json"
++                          },
++                          "resultsCount": {
++                            "type": "integer"
++                          }
++                        }
++                      }
++                    }
+                   }
+                 }
+               },
+diff --git a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+index 79148455e..8496f1732 100644
+--- a/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
++++ b/plugins/pipeline-core/scripts/security-adapters/semgrep.mjs
+@@ -282,7 +282,8 @@ export async function run(options) {
+     const started = performance.now();
+     try {
+       const result = delegate(...args);
+-      try { diagnostics = observeSemgrepChild(result, performance.now() - started, args[2].timeout); } catch { /* exit-neutral */ }
++      // args[2].cwd is the scan root: it lets the finding projection relativise absolute report paths.
++      try { diagnostics = observeSemgrepChild(result, performance.now() - started, args[2].timeout, args[2].cwd); } catch { /* exit-neutral */ }
+       return result;
+     } catch (error) {
+       try { diagnostics = observeSemgrepChild({ error }, performance.now() - started, args[2].timeout); } catch { /* exit-neutral */ }

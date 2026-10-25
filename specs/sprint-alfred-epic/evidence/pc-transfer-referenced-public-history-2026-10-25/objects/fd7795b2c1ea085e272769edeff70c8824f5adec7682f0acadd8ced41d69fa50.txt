@@ -1,0 +1,855 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Checks the staged Hawkeye product-capability inventory.
+ *
+ * The inventory is deliberately a closed, evidence-only index.  It does not
+ * derive marketing claims from prose: every claimed capability is bound to the
+ * sourceBaseline's directly discoverable committed product surface, code/configuration evidence,
+ * and (until the documentation reduction lands) a pending public anchor.
+ */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
+import { canonicalJson, readConsumedCandidateReceipt } from "../../plugins/pipeline-core/scripts/critic-packet-preflight.mjs";
+import { readBoundConsumedCriticReceipt } from "../../plugins/pipeline-core/lib/critic-verify-lifecycle.mjs";
+import { PORTABLE_CRITIC_EXPORT_PATH, verifyPortableCriticExport } from "../../plugins/pipeline-core/lib/portable-critic-export.mjs";
+import { canonical } from "../../plugins/pipeline-core/lib/po-approval-proof.mjs";
+
+// v3 (NVA-INVDERIVE-1, 2026-08-28): the `surfaces` array was removed from the
+// inventory and is now DERIVED from `discoverSurfaces()` on every run.
+//
+// WHY. In v2 the inventory declared all ~570 surfaces as `{surfaceId, kind, path,
+// member}` objects and the check then required that declared set to equal the
+// discovered set exactly -- the four fields were literally the four fields discovery
+// already computes, so the array was pure duplication of code output, hand-maintained.
+// Registering ONE new verify suite therefore required two separate hand edits in two
+// different places of this file, with no signal at registration time and a failure
+// that surfaced later as a red Verify entry naming neither verify.mjs nor the suite.
+// That happened four times (twice on 2026-08-19, twice more in one evening on
+// 2026-08-27, the second by the session that had just repaired the first), and each
+// previous fix added the missing entries without removing the reason they go missing.
+// See backlog item
+// pipeline.registering-a-verify-suite-silently-invalidates-the-capability-inventory.
+//
+// WHAT SURVIVES. Categorization stays declared, because it is a judgement the code
+// cannot derive: every discovered surface must still belong to exactly one capability
+// (see the two assertions at the end of validate()). So adding a suite is now one
+// hand edit -- put its surfaceId in a capability -- and the check names the exact
+// missing id instead of a coverage mismatch.
+const SCHEMA = "pipeline.product-capability-inventory.v3";
+const INVENTORY_PATH = "docs/product-capability-inventory.json";
+const SHA256_RE = /^[a-f0-9]{64}$/;
+const GIT_OID_RE = /^[a-f0-9]{40,64}$/;
+const STATUS = new Set(["shipped", "optional", "host-dependent", "deprecated", "planned"]);
+const RUNNER_DISPOSITION_STATUS = new Set(["supported", "optional", "host-dependent", "unavailable"]);
+const SURFACE_KINDS = new Set([
+  "skill", "agent-role", "human-role", "profile", "duty", "hook", "guard",
+  "verify-phase", "governance-extension", "template-extension", "setup", "publication", "release",
+]);
+const RUNNERS = new Set(["runner-neutral", "codex", "claude", "antigravity", "host-only"]);
+const PLATFORMS = new Set(["all", "linux", "wsl", "macos", "windows"]);
+const OPERATING_SHAPES = new Set(["solo", "small-team", "multi-team"]);
+const DOCUMENTS = new Set(["README", "FLOW", "OPERATING_MODEL", "SETUP"]);
+const TARGET_STATUS = new Set(["pending", "active"]);
+const REASON_CODE = /^[a-z]+(?:-[a-z]+)*$/;
+const CRITIC_REVIEW_STATUS = new Set(["required-before-publication", "attested"]);
+const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/;
+
+/** Only the final attestation and target activation may follow the reviewed candidate. */
+export function validateFinalCriticTransition({ reviewed, final, changedPaths, inventoryPath = INVENTORY_PATH,
+  portableExportPath = null }) {
+  if (!isObject(reviewed) || !isObject(final) || !Array.isArray(changedPaths)) return false;
+  if (reviewed.criticReview?.status !== "required-before-publication"
+    || reviewed.criticReview?.receiptSha256 !== null
+    || final.criticReview?.status !== "attested") return false;
+  if (changedPaths.some((path) => path !== inventoryPath
+    && path !== portableExportPath
+    && !/^specs\/sprint-alfred-epic\/evidence\/reader-review\/[a-zA-Z0-9._/-]+$/.test(path))) return false;
+  const normalized = structuredClone(reviewed);
+  normalized.criticReview = final.criticReview;
+  if (!Array.isArray(normalized.capabilities) || !Array.isArray(final.capabilities)
+    || normalized.capabilities.length !== final.capabilities.length) return false;
+  for (let index = 0; index < normalized.capabilities.length; index += 1) {
+    const oldTargets = normalized.capabilities[index].targets;
+    const newTargets = final.capabilities[index].targets;
+    if (!Array.isArray(oldTargets) || !Array.isArray(newTargets) || oldTargets.length !== newTargets.length) return false;
+    for (let targetIndex = 0; targetIndex < oldTargets.length; targetIndex += 1) {
+      if (newTargets[targetIndex]?.status !== "active" || !["pending", "active"].includes(oldTargets[targetIndex]?.status)) return false;
+      oldTargets[targetIndex].status = "active";
+    }
+  }
+  return canonicalJson(normalized) === canonicalJson(final);
+}
+
+function gitRead(root, args, encoding = "utf8") {
+  return execFileSync("git", args, { cwd: root, encoding, stdio: ["ignore", "pipe", "ignore"], timeout: 10_000 });
+}
+
+const PORTABLE_PLAN_PATH = "specs/sprint-alfred-epic/plans/sprint-alfred-execution-roadmap.md";
+const PORTABLE_SPEC_PATH = "specs/sprint-alfred-epic/spec.md";
+const PORTABLE_TRUST_PATH = "project/critical-human-proof.json";
+function portableCriticExportReadback(root, receiptSha256) {
+  const target = repoPath(root, PORTABLE_CRITIC_EXPORT_PATH);
+  if (!target) return { ok: false, code: "path-invalid" };
+  let entry = root;
+  for (const segment of PORTABLE_CRITIC_EXPORT_PATH.split("/")) {
+    entry = join(entry, segment);
+    const stat = lstatSync(entry);
+    if (stat.isSymbolicLink()) return { ok: false, code: "path-alias" };
+  }
+  const stat = lstatSync(target);
+  if (!stat.isFile() || stat.size < 1 || stat.size > 1024 * 1024) return { ok: false, code: "file-invalid" };
+  const bytes = readFileSync(target);
+  const committed = gitRead(root, ["show", `HEAD:${PORTABLE_CRITIC_EXPORT_PATH}`], null);
+  if (!bytes.equals(committed)) return { ok: false, code: "committed-bytes-differ" };
+  const record = JSON.parse(bytes.toString("utf8"));
+  if (!bytes.equals(Buffer.from(`${canonical(record)}\n`, "utf8"))) return { ok: false, code: "canonical-bytes-differ" };
+  const candidate = record?.subject?.candidate;
+  if (!candidate || typeof candidate.commit !== "string" || typeof candidate.tree !== "string") return { ok: false, code: "candidate-invalid" };
+  const policy = JSON.parse(gitRead(root, ["show", `${candidate.commit}:${PORTABLE_TRUST_PATH}`]));
+  const anchors = policy?.schema === "pipeline.critical-human-proof-policy.v3" ? policy.trustAnchors : null;
+  const planSha256 = createHash("sha256").update(gitRead(root, ["show", `${candidate.commit}:${PORTABLE_PLAN_PATH}`], null)).digest("hex");
+  const specSha256 = createHash("sha256").update(gitRead(root, ["show", `${candidate.commit}:${PORTABLE_SPEC_PATH}`], null)).digest("hex");
+  const checked = verifyPortableCriticExport({ exportRecord: record, candidate, receiptSha256,
+    planSha256, specSha256, trustAnchors: anchors });
+  return checked.ok ? { ok: true, reviewedCommit: candidate.commit, reviewedTree: candidate.tree }
+    : { ok: false, code: checked.code };
+}
+
+export function validateFinalCriticReadback(root, inventoryPath, inventory) {
+  try {
+    const checkoutInventory = JSON.parse(readFileSync(repoPath(root, inventoryPath), "utf8"));
+    if (canonicalJson(checkoutInventory) !== canonicalJson(inventory)) return "final Critic receipt readback requires the exact checkout inventory";
+    const common = realpathSync(resolve(root, gitRead(root, ["rev-parse", "--git-common-dir"]).trim()));
+    const packetRoot = join(common, "agent-pipeline", "critic-packets");
+    const matches = [];
+    const entries = existsSync(packetRoot) && lstatSync(packetRoot).isDirectory()
+      ? readdirSync(packetRoot, { withFileTypes: true }) : [];
+    if (entries.length > 4096) return "final Critic receipt readback exceeds its bounded packet inventory";
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !CRITIC_PACKET_ID.test(entry.name)) continue;
+      let packet;
+      try { packet = readConsumedCandidateReceipt({ controlRoot: packetRoot, packetId: entry.name }).packet; }
+      catch { continue; }
+      let bound;
+      try {
+        bound = readBoundConsumedCriticReceipt({
+          gitCommonDir: common,
+          criticPacketId: entry.name,
+          candidate: { commit: packet.candidate.commit, tree: packet.candidate.tree },
+        });
+      } catch { continue; }
+      if (bound.criticReceiptSha256 === inventory.criticReview.receiptSha256) matches.push(bound);
+    }
+    if (matches.length > 1) return "final Critic receipt readback is unavailable or ambiguous";
+    const portable = matches.length === 0
+      ? portableCriticExportReadback(root, inventory.criticReview.receiptSha256) : null;
+    if (matches.length === 0 && !portable?.ok) return `final Critic portable export ${portable?.code ?? "unavailable"}`;
+    const reviewedCommit = portable?.reviewedCommit ?? matches[0].critic.candidate.commit;
+    const reviewedTree = portable?.reviewedTree ?? matches[0].critic.candidate.tree;
+    const head = gitRead(root, ["rev-parse", "HEAD"]).trim();
+    if (canonicalJson(JSON.parse(gitRead(root, ["show", `HEAD:${inventoryPath}`]))) !== canonicalJson(inventory)) {
+      return "final Critic receipt requires the committed inventory, not a working-tree claim";
+    }
+    if (gitRead(root, ["rev-parse", `${reviewedCommit}^{tree}`]).trim() !== reviewedTree) {
+      return "final Critic receipt candidate tree does not match Git";
+    }
+    if (reviewedCommit === head) return "final Critic receipt requires a later inventory activation commit";
+    gitRead(root, ["merge-base", "--is-ancestor", reviewedCommit, "HEAD"]);
+    const reviewed = JSON.parse(gitRead(root, ["show", `${reviewedCommit}:${inventoryPath}`]));
+    const changedPaths = gitRead(root, ["diff", "--name-only", "-z", reviewedCommit, "HEAD"]).split("\0").filter(Boolean);
+    if (!validateFinalCriticTransition({ reviewed, final: inventory, changedPaths, inventoryPath,
+      portableExportPath: portable === null ? null : PORTABLE_CRITIC_EXPORT_PATH })) {
+      return "final Critic receipt candidate is stale or inventory activation changed unreviewed content";
+    }
+    return null;
+  } catch {
+    return "final Critic receipt readback failed or candidate is not an ancestor";
+  }
+}
+
+function utf8Compare(left, right) {
+  return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
+}
+
+function sortedUniqueStrings(value) {
+  return Array.isArray(value)
+    && value.every((item) => typeof item === "string")
+    && value.every((item, index) => index === 0 || utf8Compare(value[index - 1], item) < 0);
+}
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasExactKeys(value, keys) {
+  if (!isObject(value)) return false;
+  const actual = Object.keys(value).sort(utf8Compare);
+  const expected = [...keys].sort(utf8Compare);
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function fail(findings, message) {
+  findings.push(message);
+}
+
+function repoPath(root, path) {
+  if (typeof path !== "string" || path === "" || isAbsolute(path)) return null;
+  const cleaned = normalize(path);
+  if (cleaned === ".." || cleaned.startsWith(`..${sep}`)) return null;
+  const resolved = resolve(root, cleaned);
+  if (relative(root, resolved).startsWith("..") || relative(root, resolved) === "") return null;
+  return resolved;
+}
+
+function existingRepoPath(root, path, findings, label, { regularFile = false } = {}) {
+  const resolved = repoPath(root, path);
+  if (!resolved || !existsSync(resolved)) {
+    fail(findings, `${label} must be an existing repo-relative path: ${String(path)}`);
+    return false;
+  }
+  if (regularFile && !lstatSync(resolved).isFile()) {
+    fail(findings, `${label} must name a regular file: ${path}`);
+    return false;
+  }
+  return true;
+}
+
+function walkFiles(root, start, accept) {
+  const absolute = join(root, start);
+  if (!existsSync(absolute)) return [];
+  const found = [];
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => utf8Compare(a.name, b.name))) {
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (entry.isFile()) {
+        const path = relative(root, full).split(sep).join("/");
+        if (accept(path)) found.push(path);
+      }
+    }
+  };
+  visit(absolute);
+  return found.sort(utf8Compare);
+}
+
+function checkoutSource(root) {
+  return {
+    exists(path) { return existsSync(join(root, path)); },
+    read(path) { return readFileSync(join(root, path), "utf8"); },
+    walk(start, accept) { return walkFiles(root, start, accept); },
+  };
+}
+
+/** Read only regular tracked blobs from one already-verified baseline commit. */
+const COMMITTED_SOURCE_MAX_BUFFER = 256 * 1024 * 1024;
+
+export function committedSource(root, commit) {
+  const listing = execFileSync("git", ["ls-tree", "-r", "-z", commit], {
+    cwd: root, encoding: "utf8", maxBuffer: COMMITTED_SOURCE_MAX_BUFFER, stdio: ["ignore", "pipe", "ignore"],
+  });
+  const files = new Set();
+  for (const row of listing.split("\0")) {
+    if (!row) continue;
+    const match = /^(100644|100755) blob [a-f0-9]+\t(.+)$/s.exec(row);
+    if (match) files.add(match[2]);
+  }
+  return {
+    exists(path) { return files.has(path) || [...files].some((file) => file.startsWith(`${path}/`)); },
+    read(path) {
+      if (!files.has(path)) throw new Error(`baseline source path is unavailable: ${path}`);
+      return execFileSync("git", ["show", `${commit}:${path}`], { cwd: root, encoding: "utf8", maxBuffer: COMMITTED_SOURCE_MAX_BUFFER, stdio: ["ignore", "pipe", "ignore"] });
+    },
+    walk(start, accept) { return [...files].filter((path) => path.startsWith(`${start}/`) && accept(path)).sort(utf8Compare); },
+  };
+}
+
+function safeStem(path) {
+  return path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "").replace(/\.mjs$/, "");
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hookMembers(path, contents) {
+  const parsed = JSON.parse(contents);
+  const members = [];
+  for (const [event, registrations] of Object.entries(parsed.hooks ?? {})) {
+    if (!Array.isArray(registrations)) throw new Error(`${path}: hooks.${event} must be an array`);
+    registrations.forEach((registration, registrationIndex) => {
+      if (!isObject(registration) || !Array.isArray(registration.hooks)) {
+        throw new Error(`${path}: hooks.${event}[${registrationIndex}] is malformed`);
+      }
+      registration.hooks.forEach((hook, hookIndex) => {
+        if (!isObject(hook) || typeof hook.command !== "string") {
+          throw new Error(`${path}: hooks.${event}[${registrationIndex}].hooks[${hookIndex}] lacks command`);
+        }
+        const matcher = typeof registration.matcher === "string" ? registration.matcher : "";
+        members.push(`${event}:${matcher}:${hook.command}`);
+      });
+    });
+  }
+  return members.sort(utf8Compare);
+}
+
+function verifyMembers(source) {
+  const text = source.read("harness/scripts/verify.mjs");
+  const start = text.indexOf("const TEST_SUITES = [");
+  const end = text.indexOf("];", start);
+  if (start < 0 || end < 0) throw new Error("harness/scripts/verify.mjs TEST_SUITES declaration is unavailable");
+  const names = [...text.slice(start, end).matchAll(/\{ name: "([^"]+)"/g)].map((match) => match[1]);
+  if (names.length === 0 || new Set(names).size !== names.length) {
+    throw new Error("harness/scripts/verify.mjs TEST_SUITES names are missing or duplicate");
+  }
+  if (source.exists("harness/verify-suites.json")) {
+    try {
+      const declarative = JSON.parse(source.read("harness/verify-suites.json"));
+      if (Array.isArray(declarative?.suites)) {
+        for (const suite of declarative.suites) {
+          if (typeof suite?.name === "string" && !names.includes(suite.name)) {
+            names.push(suite.name);
+          }
+        }
+      }
+    } catch {}
+  }
+  // These are the two manifest-gated phases registered directly below TEST_SUITES.
+  return [...names, "security-scan", "validate-manifest"].sort(utf8Compare);
+}
+
+function releaseCommandMembers(source) {
+  const paths = source.walk("plugins/pipeline-core/scripts", (path) =>
+    /\/(?:codex-plugin-validator-parity|native-plugin-readback|neutral-exclusion-review|neutral-range-plan|public-baseline-diagnose|publication-close-journal)\.mjs$/.test(path),
+  );
+  return paths.map((path) => ({ path, member: safeStem(path), kind: path.includes("publication") || path.includes("public-") ? "publication" : "release" }));
+}
+
+/** Discover exactly the direct product-surface members defined by Hawkeye. */
+export function discoverSurfaces(root, source = checkoutSource(root)) {
+  const surfaces = [];
+  const add = (kind, path, member) => surfaces.push({ surfaceId: `${kind}:${path}:${member}`, kind, path, member });
+
+  for (const path of source.walk("plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/SKILL\.md$/.test(item))) {
+    add("skill", path, path.split("/").slice(-2, -1)[0]);
+  }
+  for (const path of source.walk("plugins", (item) => /^plugins\/[^/]+\/agents\/[^/]+\.md$/.test(item))) {
+    add("agent-role", path, safeStem(path));
+  }
+  for (const path of source.walk("roles", (item) => /^roles\/[^/]+\.md$/.test(item))) {
+    add("human-role", path, safeStem(path));
+  }
+
+  const intentPath = "pipeline.user.yaml";
+  const intent = parseYaml(source.read(intentPath));
+  if (!isObject(intent?.routing?.profiles) || !isObject(intent?.routing?.duties)) {
+    throw new Error("pipeline.user.yaml has no routing.profiles/routing.duties object");
+  }
+  for (const member of Object.keys(intent.routing.profiles).sort(utf8Compare)) add("profile", intentPath, member);
+  for (const member of Object.keys(intent.routing.duties).sort(utf8Compare)) add("duty", intentPath, member);
+
+  for (const path of ["plugins/pipeline-core/hooks/codex-hooks.json", "plugins/pipeline-core/hooks/hooks.json"]) {
+    for (const member of hookMembers(path, source.read(path))) add("hook", path, member);
+  }
+  for (const path of source.walk("plugins/pipeline-core/hooks", (item) => /\/guard-[^/]+\.mjs$/.test(item) && !item.endsWith(".test.mjs"))) {
+    add("guard", path, safeStem(path));
+  }
+  for (const member of verifyMembers(source)) add("verify-phase", "harness/scripts/verify.mjs", member);
+
+  for (const member of ["guidelines", "policies"]) {
+    const path = `governance/examples/${member}`;
+    if (source.exists(path)) add("governance-extension", path, member);
+  }
+  for (const path of source.walk("templates", () => true)) add("template-extension", path, path.slice("templates/".length));
+  add("setup", "setup.mjs", "setup");
+  for (const command of releaseCommandMembers(source)) add(command.kind, command.path, command.member);
+  add("publication", ".claude-plugin/marketplace.json", "marketplace");
+  add("publication", "plugins/pipeline-core/.claude-plugin/plugin.json", "plugin-manifest");
+  add("publication", "plugins/pipeline-core/.codex-plugin/plugin.json", "codex-plugin-manifest");
+
+  const ordered = surfaces.sort((left, right) => utf8Compare(left.surfaceId, right.surfaceId));
+  const ids = new Set();
+  const composite = new Set();
+  for (const surface of ordered) {
+    const key = `${surface.kind}\u0000${surface.path}\u0000${surface.member}`;
+    if (ids.has(surface.surfaceId) || composite.has(key)) throw new Error(`surface discovery is not unique: ${surface.surfaceId}`);
+    ids.add(surface.surfaceId); composite.add(key);
+  }
+  return ordered;
+}
+
+// ---------------------------------------------------------------------------
+// NVA-W8-VERIFYREG2 (backlog pipeline.nothing-checks-that-a-capability-is-reachable):
+// entry-point reachability. Two properties, checked mechanically for every DERIVED
+// agent-facing entry point:
+//   - named: something an agent actually reads (a skill body, or a guard's own
+//     source -- where refusal text and sanctioned-invocation lists live) mentions it.
+//   - admitted: guard-lifecycle-ready.mjs's OWN source -- the file that decides whether
+//     a Bash invocation is refused before the session reaches "ready" -- mentions it,
+//     i.e. it has an explicit admission rule rather than falling through to the generic
+//     not-ready refusal every other command gets.
+// The enumeration is DERIVED, never a hand-maintained list of "the three known
+// instances": every entry point in ENTRY_POINT_DIRS that documents its own invocation
+// with this codebase's own established `Usage: node <path> ...` convention (already
+// used by 20+ scripts, e.g. onboarding-init.mjs, push-gate-satisfiability.mjs,
+// pipeline-state.mjs) enters the check automatically. A script that adopts the same
+// convention later needs no second edit anywhere else -- the exact failure mode the v3
+// note above documents for the surface array this file used to hand-maintain.
+const ENTRY_POINT_DIRS = ["plugins/pipeline-core/scripts", "harness/scripts"];
+
+const USAGE_MARKER = "Usage: node ";
+const LIFECYCLE_GUARD_PATH = "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs";
+
+/** Every non-test .mjs entry point under ENTRY_POINT_DIRS that documents its own CLI
+ * invocation with the established `Usage: node ...` convention. */
+export function discoverEntryPoints(root) {
+  const found = [];
+  for (const dir of ENTRY_POINT_DIRS) {
+    for (const path of walkFiles(root, dir, (item) => item.endsWith(".mjs") && !item.endsWith(".test.mjs")
+      && !item.slice(dir.length + 1).includes("/"))) {
+      const source = readFileSync(join(root, path), "utf8");
+      if (!source.includes(USAGE_MARKER)) continue;
+      const usageIndex = source.indexOf(USAGE_MARKER);
+      const lineEnd = source.indexOf("\n", usageIndex);
+      const usageLine = source.slice(usageIndex, lineEnd < 0 ? source.length : lineEnd).replace(/["'`;]+\s*$/, "").trim();
+      found.push({ path, basename: safeStem(path), usage: usageLine });
+    }
+  }
+  return found.sort((left, right) => utf8Compare(left.path, right.path));
+}
+
+/**
+ * Concatenated text of every surface an agent actually reads to learn what exists: skill
+ * bodies (loaded into context), the typed lazy-loading reference files those bodies point
+ * at (loaded under the stated condition -- pipeline-start's own "Typed lazy loading"
+ * section names this as the mechanism, not a fallback), and guard source (refusal text).
+ * Deliberately EXCLUDES `LIFECYCLE_GUARD_PATH`: that file is the dedicated "admitted"
+ * oracle below, and folding it into "named" too would make admitted-but-unnamed
+ * structurally unreachable -- an internal admission-dispatch reference (an argv-shape
+ * branch keyed on a script constant) is not the same thing as an agent-visible naming,
+ * even though both happen to live in guard source. Every OTHER guard's refusal text still
+ * counts, per the acceptance criteria's own wording.
+ */
+function agentReadableCorpus(root) {
+  const skillBodies = walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/SKILL\.md$/.test(item))
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  const skillReferences = walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/skills\/[^/]+\/references\/.+\.md$/.test(item))
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  const guardSources = walkFiles(root, "plugins/pipeline-core/hooks", (item) =>
+    /\/guard-[^/]+\.mjs$/.test(item) && !item.endsWith(".test.mjs") && item !== LIFECYCLE_GUARD_PATH)
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  // Dispatch prompt templates are read by every briefed Goldfish/Critic, so a script they name is agent-visible.
+  const promptTemplates = walkFiles(root, "plugins", (item) => /^plugins\/[^/]+\/templates\/prompts\/[^/]+\.md$/.test(item))
+    .map((path) => readFileSync(join(root, path), "utf8"));
+  return [...skillBodies, ...skillReferences, ...guardSources, ...promptTemplates].join("\n \n");
+}
+
+/**
+ * For each discovered entry point, asserts it is never named-but-refused nor
+ * admitted-but-unnamed -- the two failure shapes the backlog item names. "Admitted" is
+ * read off guard-lifecycle-ready.mjs's OWN source: that file's `isSanctionedLifecycleCommand()`
+ * dispatch is the guard union's real, already-curated pre-readiness allowlist -- this reads
+ * it rather than reimplementing it, so a script the guard does not yet know how to admit is
+ * never mistaken for one it does.
+ *
+ * "Admitted" is deliberately NOT a bare-stem substring test over the whole guard file.
+ * pipeline.entry-point-reachability-check-substring-matches-whole-source-files (measured
+ * 2026-09-03) showed a comment citing an evidence filename that merely CONTAINS a script's
+ * stem (`...-f5-continuity-status.json` against `continuity-status.mjs`) read as a phantom
+ * admission. Every real admission in this guard follows one fixed code idiom, confirmed by
+ * reading every `..._SCRIPT` constant in guard-lifecycle-ready.mjs: a `const X_SCRIPT =
+ * fileURLToPath(new URL("../scripts/<name>.mjs", import.meta.url))` declaration, later
+ * compared with `script === X_SCRIPT` inside `isSanctionedLifecycleCommand()`. The declaration
+ * line always contains the literal substring `scripts/<name>.mjs`, so requiring that
+ * path-shaped needle -- not just the bare stem -- rules out a same-stem citation in a comment
+ * or an unrelated identifier while still matching every genuine admission (verified against
+ * this repository's own guard, see HAW-B01 and check 2 below). This is narrower than fully
+ * sound (a prose comment that happens to cite the real `scripts/<name>.mjs` path without
+ * actually admitting it would still match), but it closes the measured false-positive shape;
+ * full soundness needs the guard to declare its admitted set structurally (backlog item
+ * option 3), which is out of scope here.
+ *
+ * `named`/`namedInBootstrap` stay bare-stem substring tests deliberately, not because the
+ * risk is absent but because the corpus is different in kind: unconstrained prose (skill
+ * bodies, typed reference docs, other guards' refusal text) that legitimately cites a script
+ * many ways -- a backticked bare filename, a full repo-relative path, or an inline mention --
+ * with no single idiom to anchor a stricter regex on the way the guard-admission idiom
+ * has. Narrowing here trades a low-probability same-stem false positive for a real risk of
+ * false negatives (missing a genuine citation phrased differently), each of which would
+ * manufacture ITS OWN spurious finding. The guard-admission corpus admits exactly one code
+ * idiom we could enumerate; the prose corpus does not.
+ *
+ * A consumer-shaped root (no `plugins/pipeline-core` source tree, e.g. an installed-plugin
+ * layout) simply discovers zero entry points and zero corpus text -- `ok: true`, no
+ * findings, never a false failure from a self-checkout-only path. This mirrors the
+ * consumer-shaped-fixture requirement for the security-gate instance this item cites: every
+ * path this function reads is root-relative, so it degrades to "nothing found" rather than
+ * a fixed self-checkout resolution.
+ */
+export function checkEntryPointReachability({ root }) {
+  const findings = [];
+  let entryPoints;
+  let corpus;
+  let bootstrapCorpus;
+  let guardSource;
+  try {
+    entryPoints = discoverEntryPoints(root);
+    corpus = agentReadableCorpus(root);
+    bootstrapCorpus = bootstrapReadableCorpus(root);
+  } catch (error) {
+    return { ok: false, findings: [`entry-point reachability discovery failed: ${error.message}`] };
+  }
+  try {
+    guardSource = readFileSync(join(root, LIFECYCLE_GUARD_PATH), "utf8");
+  } catch {
+    guardSource = "";
+  }
+  // S2 guard split (380eb7faa): the facade only re-exports; the `*_SCRIPT` admission declarations live in lib/guard.
+  guardSource += walkFiles(root, "plugins/pipeline-core/lib/guard", (item) => item.endsWith(".mjs") && !item.endsWith(".test.mjs"))
+    .map((path) => `\n${readFileSync(join(root, path), "utf8")}`).join("");
+  for (const entryPoint of entryPoints) {
+    const namedInBootstrap = bootstrapCorpus.includes(entryPoint.basename);
+    const named = corpus.includes(entryPoint.basename);
+    // Path-shaped, not a bare-stem substring: see the function docstring above for why.
+    const admitted = new RegExp(`scripts/${escapeRegExp(entryPoint.basename)}\\.mjs\\b`).test(guardSource);
+    // named-but-refused: an entry point the bootstrap docs themselves point an agent at,
+    // for the exact non-ready phase those docs govern, yet the guard that decides
+    // pre-readiness admission has never heard of it -- instance 1 of the backlog item,
+    // exactly.
+    if (namedInBootstrap && !admitted) fail(findings, `entry point named by the bootstrap docs but not admitted by ${LIFECYCLE_GUARD_PATH}: ${entryPoint.path} (${entryPoint.usage})`);
+    // admitted-but-unnamed: the guard already has an explicit pre-readiness admission rule
+    // for this script, yet no skill or guard body anywhere tells an agent it exists -- the
+    // guard's authority is real but undiscoverable.
+    if (admitted && !named) fail(findings, `entry point admitted by ${LIFECYCLE_GUARD_PATH} but named by no skill or guard: ${entryPoint.path} (${entryPoint.usage})`);
+  }
+  return { ok: findings.length === 0, findings };
+}
+
+/**
+ * The narrower corpus an agent actually reads DURING the exact non-ready phase where
+ * pre-readiness admission matters: the bootstrap skill and its full spec. Scoping the
+ * named-but-refused direction to this corpus (rather than every skill in the product) is
+ * what keeps a ready-only script -- e.g. a backlog reconciliation tool nobody would try to
+ * run before the session is ready -- from false-positiving just because some unrelated,
+ * ready-phase skill happens to mention it: its own guard admission is legitimately absent,
+ * and no bootstrap doc claims otherwise.
+ */
+function bootstrapReadableCorpus(root) {
+  const paths = ["plugins/pipeline-core/skills/pipeline-start/SKILL.md", "harness/session-bootstrap.md"];
+  return paths
+    .filter((path) => existsSync(join(root, path)))
+    .map((path) => readFileSync(join(root, path), "utf8"))
+    .join("\n \n");
+}
+
+function gitRevision(root, argument) {
+  try {
+    return execFileSync("git", ["rev-parse", argument], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function isAncestor(root, commit, descendant) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", commit, descendant], { cwd: root, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const DEFAULT_GIT_OPERATIONS = Object.freeze({ revision: gitRevision, isAncestor });
+
+function validationGitOperations(testOperations) {
+  if (testOperations === undefined) return DEFAULT_GIT_OPERATIONS;
+  if (!hasExactKeys(testOperations, ["revision", "isAncestor"])
+    || typeof testOperations.revision !== "function"
+    || typeof testOperations.isAncestor !== "function") {
+    return null;
+  }
+  // This narrow seam is intentionally unavailable to the CLI and inventory
+  // document. It lets the unit test represent a resolvable foreign history
+  // without writing synthetic objects into a sandboxed checkout.
+  return testOperations;
+}
+
+function documentPath(document) {
+  return {
+    README: "README.md",
+    FLOW: "PIPELINE_FLOW.md",
+    OPERATING_MODEL: "docs/operating-model.md",
+    SETUP: "SETUP.md",
+  }[document];
+}
+
+function renderedMarkdown(text) {
+  const uncommented = text.replace(/<!--[\s\S]*?-->/g, "");
+  const lines = [];
+  let fence = null;
+  for (const line of uncommented.split("\n")) {
+    const match = /^(?: {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence === null && match) { fence = { marker: match[1][0], width: match[1].length }; continue; }
+    if (fence !== null && match && match[1][0] === fence.marker && match[1].length >= fence.width && match[2].trim() === "") {
+      fence = null;
+      continue;
+    }
+    if (fence === null) lines.push(line);
+  }
+  return lines.join("\n");
+}
+
+function simpleHeadingSlug(value) {
+  // This exact subset has GitHub's rendered heading-slug behavior. Capability
+  // IDs outside it must use the explicit standalone HTML form below rather
+  // than an approximation of a Markdown renderer's full slug algorithm.
+  if (!/^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/.test(value)) return null;
+  return value.toLowerCase().replace(/ /g, "-");
+}
+
+export function targetAnchorExists(root, target) {
+  const text = renderedMarkdown(readFileSync(join(root, documentPath(target.document)), "utf8"));
+  const heading = text.split("\n").some((line) => {
+    const match = /^(?: {0,3})#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    return match !== null && simpleHeadingSlug(match[1]) === target.anchorId;
+  });
+  const html = text.split("\n").some((line) => {
+    const tag = /^ {0,3}<a\s+id\s*=\s*(?:"([^"]*)"|'([^']*)')\s*>\s*<\/a\s*>\s*$/iu.exec(line);
+    return tag !== null && (tag[1] ?? tag[2]) === target.anchorId;
+  });
+  return heading || html;
+}
+
+function capabilityMarkerExists(root, id) {
+  return ["README.md", "PIPELINE_FLOW.md", "docs/operating-model.md", "SETUP.md"].some((path) =>
+    readFileSync(join(root, path), "utf8").includes(`<!-- capability:${id} -->`),
+  );
+}
+
+export function validateInventory({
+  root,
+  phase = "inventory",
+  inventoryPath = INVENTORY_PATH,
+  requireCurrentBaseline = true,
+  document = undefined,
+  _testGitOperations = undefined,
+}) {
+  const findings = [];
+  if (phase !== "inventory" && phase !== "final") return { ok: false, findings: [`phase must be inventory or final, got ${phase}`] };
+  const gitOperations = validationGitOperations(_testGitOperations);
+  if (!gitOperations) return { ok: false, findings: ["test Git operations must have exactly revision and isAncestor functions"] };
+  let inventory = document;
+  if (inventory === undefined) {
+    const absoluteInventory = repoPath(root, inventoryPath);
+    if (!absoluteInventory || !existsSync(absoluteInventory)) return { ok: false, findings: [`inventory is missing: ${inventoryPath}`] };
+    try { inventory = JSON.parse(readFileSync(absoluteInventory, "utf8")); }
+    catch (error) { return { ok: false, findings: [`inventory is not valid JSON: ${error.message}`] }; }
+  }
+
+  const rootKeys = ["schema", "sourceBaseline", "criticReview", "capabilities"];
+  if (!hasExactKeys(inventory, rootKeys)) fail(findings, `inventory root must have exactly ${rootKeys.join(", ")}`);
+  if (inventory.schema !== SCHEMA) fail(findings, `inventory schema must equal ${SCHEMA}`);
+  let baselineSource = null;
+  if (!hasExactKeys(inventory.sourceBaseline, ["commit", "tree"]) || !GIT_OID_RE.test(inventory.sourceBaseline?.commit ?? "") || !GIT_OID_RE.test(inventory.sourceBaseline?.tree ?? "")) {
+    fail(findings, "sourceBaseline must have exactly full lowercase Git commit and tree");
+  } else {
+    const baselineCommit = gitOperations.revision(root, `${inventory.sourceBaseline.commit}^{commit}`);
+    if (!baselineCommit) {
+      fail(findings, "sourceBaseline commit does not resolve as a commit");
+    } else {
+      const baselineTree = gitOperations.revision(root, `${baselineCommit}^{tree}`);
+      if (inventory.sourceBaseline.tree !== baselineTree) fail(findings, "sourceBaseline tree does not match commit");
+      const baselineIsAncestor = !requireCurrentBaseline || gitOperations.isAncestor(root, baselineCommit, "HEAD");
+      if (!baselineIsAncestor) {
+        fail(findings, "sourceBaseline commit is not an ancestor of current HEAD");
+      }
+      if (inventory.sourceBaseline.tree === baselineTree && baselineIsAncestor) {
+        try { baselineSource = committedSource(root, baselineCommit); }
+        catch { fail(findings, "sourceBaseline committed source cannot be read"); }
+      }
+    }
+  }
+  if (!hasExactKeys(inventory.criticReview, ["status", "receiptSha256", "reason"]) || !CRITIC_REVIEW_STATUS.has(inventory.criticReview?.status)) {
+    fail(findings, "criticReview must have exact status, receiptSha256, and reason fields with a supported status");
+  } else if (inventory.criticReview.status === "attested") {
+    if (typeof inventory.criticReview.receiptSha256 !== "string" || !SHA256_RE.test(inventory.criticReview.receiptSha256)) {
+      fail(findings, "attested criticReview requires a lowercase receiptSha256 digest");
+    }
+    if (inventory.criticReview.reason !== null) fail(findings, "attested criticReview must have null reason");
+    if (phase === "final" && SHA256_RE.test(inventory.criticReview.receiptSha256 ?? "")) {
+      const criticFinding = validateFinalCriticReadback(root, inventoryPath, inventory);
+      if (criticFinding) fail(findings, criticFinding);
+    }
+  } else {
+    if (inventory.criticReview.receiptSha256 !== null) fail(findings, "pending criticReview must not contain a fabricated receipt digest");
+    if (typeof inventory.criticReview.reason !== "string" || inventory.criticReview.reason.length < 20) fail(findings, "pending criticReview requires a concrete reason");
+    if (phase === "final") fail(findings, "final inventory requires an attested Critic receipt");
+  }
+  if (!Array.isArray(inventory.capabilities)) fail(findings, "capabilities must be an array");
+
+  // The product surface is DISCOVERED, never declared (see SCHEMA's note above).
+  // `discoverSurfaces()` already guarantees uniqueness by surfaceId and by the
+  // kind/path/member composite -- it throws otherwise -- so the duplicate checks the
+  // declared block used to perform have no counterpart here: there is nothing left to
+  // contradict. Path existence is likewise a property of discovery (it walks real
+  // files) rather than of a hand-written record. The kind check survives, because
+  // SURFACE_KINDS is this file's own contract with the capability schema and a future
+  // discovery rule could emit a kind nobody added to that set.
+  const surfaceById = new Map();
+  let discovered = [];
+  if (baselineSource === null) fail(findings, "surface discovery requires a readable exact sourceBaseline");
+  else {
+    try { discovered = discoverSurfaces(root, baselineSource); }
+    catch (error) { fail(findings, `surface discovery failed: ${error.message}`); }
+  }
+  for (const surface of discovered) {
+    if (!SURFACE_KINDS.has(surface.kind)) fail(findings, `discovered surface has an invalid kind: ${surface.surfaceId}`);
+    surfaceById.set(surface.surfaceId, surface);
+  }
+
+  const capabilityIds = new Set();
+  const surfaceAssignments = new Map();
+  const capabilityKeys = [
+    "id", "publicName", "problem", "benefit", "status", "surfaceIds", "runners", "platforms", "operatingShapes",
+    "runnerDispositions", "prerequisites", "productionEvidence", "testEvidence", "targets", "configurationPath", "specializedOnlyReason",
+  ];
+  for (const [index, capability] of (Array.isArray(inventory.capabilities) ? inventory.capabilities : []).entries()) {
+    const label = `capabilities[${index}]`;
+    if (!hasExactKeys(capability, capabilityKeys)) { fail(findings, `${label} has unexpected shape`); continue; }
+    for (const key of ["id", "publicName", "problem", "benefit", "status", "configurationPath"]) {
+      if (typeof capability[key] !== "string" || capability[key] === "") fail(findings, `${label}.${key} must be a nonempty string`);
+    }
+    if (capability.specializedOnlyReason !== null && (typeof capability.specializedOnlyReason !== "string" || capability.specializedOnlyReason === "")) {
+      fail(findings, `${label}.specializedOnlyReason must be null or a nonempty string`);
+    }
+    if (capabilityIds.has(capability.id)) fail(findings, `duplicate capability id: ${capability.id}`);
+    capabilityIds.add(capability.id);
+    if (!STATUS.has(capability.status)) fail(findings, `${label}.status is invalid: ${capability.status}`);
+    for (const key of ["surfaceIds", "runners", "platforms", "operatingShapes", "prerequisites", "productionEvidence", "testEvidence"]) {
+      if (!sortedUniqueStrings(capability[key])) fail(findings, `${label}.${key} must be a sorted, duplicate-free string array`);
+    }
+    if (!Array.isArray(capability.surfaceIds) || capability.surfaceIds.length === 0) fail(findings, `${label}.surfaceIds must be nonempty`);
+    for (const id of capability.surfaceIds ?? []) {
+      if (!surfaceById.has(id)) fail(findings, `${label} references missing surface ${id}${baselineSource === null
+        ? "" : ` in committed sourceBaseline ${inventory.sourceBaseline.commit} (uncommitted worktree files are not discovery evidence)`}`);
+      else if (surfaceAssignments.has(id)) fail(findings, `surface ${id} belongs to both ${surfaceAssignments.get(id)} and ${capability.id}`);
+      else surfaceAssignments.set(id, capability.id);
+    }
+    for (const [key, allowed] of [["runners", RUNNERS], ["platforms", PLATFORMS], ["operatingShapes", OPERATING_SHAPES]]) {
+      for (const value of capability[key] ?? []) if (!allowed.has(value)) fail(findings, `${label}.${key} has invalid value ${value}`);
+      if (!Array.isArray(capability[key]) || capability[key].length === 0) fail(findings, `${label}.${key} must be nonempty for an available support matrix`);
+    }
+    if (!hasExactKeys(capability.runnerDispositions, ["claude", "codex", "antigravity"])) {
+      fail(findings, `${label}.runnerDispositions has unexpected shape`);
+    } else {
+      for (const runner of ["claude", "codex", "antigravity"]) {
+        const disposition = capability.runnerDispositions[runner];
+        const dispositionLabel = `${label}.runnerDispositions.${runner}`;
+        if (!hasExactKeys(disposition, ["status", "reasonCode"])) {
+          fail(findings, `${dispositionLabel} has unexpected shape`);
+          continue;
+        }
+        if (!RUNNER_DISPOSITION_STATUS.has(disposition.status)) {
+          fail(findings, `${dispositionLabel}.status is invalid: ${disposition.status}`);
+          continue;
+        }
+        if (disposition.status === "supported" && disposition.reasonCode !== null) {
+          fail(findings, `${dispositionLabel} supported must have null reasonCode`);
+        }
+        if (disposition.status !== "supported" && (typeof disposition.reasonCode !== "string" || !REASON_CODE.test(disposition.reasonCode))) {
+          fail(findings, `${runner === "codex" ? "Codex" : runner === "antigravity" ? "Antigravity" : "Claude"} ${disposition.status} ${dispositionLabel} requires a safe nonempty lowercase-hyphenated reasonCode`);
+        }
+        const declared = capability.runners?.includes(runner) || capability.runners?.includes("runner-neutral");
+        if (declared && disposition.status === "unavailable") {
+          fail(findings, `${runner === "codex" ? "Codex" : runner === "antigravity" ? "Antigravity" : "Claude"} support matrix conflicts with ${dispositionLabel}`);
+        }
+        if (!declared && disposition.status !== "unavailable") {
+          fail(findings, `${runner === "codex" ? "Codex" : runner === "antigravity" ? "Antigravity" : "Claude"} support matrix conflicts with ${dispositionLabel}`);
+        }
+      }
+    }
+    if (capability.configurationPath !== "none") existingRepoPath(root, capability.configurationPath, findings, `${label}.configurationPath`);
+    if (!Array.isArray(capability.productionEvidence) || capability.productionEvidence.length === 0) fail(findings, `${label}.productionEvidence must be nonempty`);
+    for (const path of capability.productionEvidence ?? []) existingRepoPath(root, path, findings, `${label}.productionEvidence`);
+    if (capability.status !== "planned" && (!Array.isArray(capability.testEvidence) || capability.testEvidence.length === 0)) {
+      fail(findings, `${label} is ${capability.status} but has no testEvidence`);
+    }
+    for (const path of capability.testEvidence ?? []) existingRepoPath(root, path, findings, `${label}.testEvidence`, { regularFile: true });
+    if (!Array.isArray(capability.targets)) fail(findings, `${label}.targets must be an array`);
+    if (capability.targets?.length === 0 && capability.specializedOnlyReason === null) fail(findings, `${label} needs a target or specializedOnlyReason`);
+    if (capability.targets?.length > 0 && capability.specializedOnlyReason !== null) fail(findings, `${label} has targets and must have null specializedOnlyReason`);
+    const targetIds = new Set();
+    for (const [targetIndex, target] of (capability.targets ?? []).entries()) {
+      const targetLabel = `${label}.targets[${targetIndex}]`;
+      if (!hasExactKeys(target, ["document", "anchorId", "status"])) { fail(findings, `${targetLabel} has unexpected shape`); continue; }
+      if (!DOCUMENTS.has(target.document) || typeof target.anchorId !== "string" || target.anchorId === "" || !TARGET_STATUS.has(target.status)) {
+        fail(findings, `${targetLabel} has invalid document, anchorId, or status`);
+      }
+      const key = `${target.document}\u0000${target.anchorId}`;
+      if (targetIds.has(key)) fail(findings, `${targetLabel} repeats target ${target.document}/${target.anchorId}`);
+      targetIds.add(key);
+      if (phase === "inventory" && target.status !== "pending") fail(findings, `${targetLabel} must be pending during inventory phase`);
+      if (phase === "final" && target.status !== "active") fail(findings, `${targetLabel} must be active during final phase`);
+      if (target.status === "active" && !targetAnchorExists(root, target)) fail(findings, `${targetLabel} active anchor is missing`);
+    }
+    if (capability.status === "shipped" && (capability.runners?.length === 0 || capability.platforms?.length === 0 || capability.operatingShapes?.length === 0)) {
+      fail(findings, `${label} makes an unsupported shipped claim`);
+    }
+    if (capability.status === "planned" && (capability.targets ?? []).some((target) => target.status === "active")) {
+      fail(findings, `${label} presents planned capability as active`);
+    }
+    if (phase === "final" && !capabilityMarkerExists(root, capability.id)) fail(findings, `${label} has no public capability marker`);
+  }
+  for (const id of surfaceById.keys()) if (!surfaceAssignments.has(id)) fail(findings, `discovered surface is absent from every capability: ${id}`);
+  for (const id of surfaceAssignments.keys()) if (!surfaceById.has(id)) fail(findings, `capability maps unknown surface: ${id}`);
+  return { ok: findings.length === 0, findings };
+}
+
+function parseArgs(argv) {
+  let phase = "inventory";
+  let root = null;
+  let inventoryPath = INVENTORY_PATH;
+  let printDiscovered = false;
+  let checkReachability = false;
+  for (let index = 0; index < argv.length; index++) {
+    const value = argv[index];
+    if (value === "--phase") phase = argv[++index];
+    else if (value === "--root") root = argv[++index];
+    else if (value === "--inventory") inventoryPath = argv[++index];
+    else if (value === "--print-discovered") printDiscovered = true;
+    else if (value === "--check-reachability") checkReachability = true;
+    else if (value === "--help") return { help: true };
+    else return { error: `unknown argument: ${value}` };
+  }
+  if (!root) root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  return { phase, root: resolve(root), inventoryPath, printDiscovered, checkReachability };
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help) {
+    console.log("Usage: node harness/scripts/check-product-capability-inventory.mjs [--phase inventory|final] [--root PATH] [--inventory PATH] [--print-discovered] [--check-reachability]");
+    return 0;
+  }
+  if (args.error) { console.error(args.error); return 2; }
+  if (args.printDiscovered) {
+    try { console.log(JSON.stringify(discoverSurfaces(args.root), null, 2)); return 0; }
+    catch (error) { console.error(`FAIL: ${error.message}`); return 1; }
+  }
+  if (args.checkReachability) {
+    const result = checkEntryPointReachability({ root: args.root });
+    if (result.ok) { console.log("PASS: entry-point reachability"); return 0; }
+    for (const finding of result.findings) console.error(`FAIL: ${finding}`);
+    return 1;
+  }
+  const result = validateInventory(args);
+  if (result.ok) { console.log(`PASS: product capability inventory (${args.phase})`); return 0; }
+  for (const finding of result.findings) console.error(`FAIL: ${finding}`);
+  return 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main();

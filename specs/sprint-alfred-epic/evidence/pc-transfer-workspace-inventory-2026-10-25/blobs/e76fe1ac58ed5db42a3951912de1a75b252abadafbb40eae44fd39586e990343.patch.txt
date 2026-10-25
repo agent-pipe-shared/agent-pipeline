@@ -1,0 +1,251 @@
+diff --git a/docs/product-capability-inventory.json b/docs/product-capability-inventory.json
+index 2099d2267..1becc6558 100644
+--- a/docs/product-capability-inventory.json
++++ b/docs/product-capability-inventory.json
+@@ -316,6 +316,7 @@
+         "verify-phase:harness/scripts/verify.mjs:clean-candidate-run-tests",
+         "verify-phase:harness/scripts/verify.mjs:cli-help-tests",
+         "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-partial-tests",
++        "verify-phase:harness/scripts/verify.mjs:clone-hook-readiness-refresh-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-block-fanout-report-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-coordinator-audit-lifecycle-tests",
+         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
+@@ -358,8 +359,10 @@
+         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
+         "verify-phase:harness/scripts/verify.mjs:codex-tool-free-design-readiness-tests",
++        "verify-phase:harness/scripts/verify.mjs:commit-message-policy-administrative-refusal-tests",
+         "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
+         "verify-phase:harness/scripts/verify.mjs:commit-msg-hook-install-tests",
++        "verify-phase:harness/scripts/verify.mjs:commit-pipeline-owned-tests",
+         "verify-phase:harness/scripts/verify.mjs:consumer-baseline-verify-tests",
+         "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
+         "verify-phase:harness/scripts/verify.mjs:continuity-authority-drift-tests",
+@@ -433,6 +436,7 @@
+         "verify-phase:harness/scripts/verify.mjs:dispatch-record-write-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-recovery-admission-tests",
+         "verify-phase:harness/scripts/verify.mjs:dispatch-recovery-tests",
++        "verify-phase:harness/scripts/verify.mjs:dispatch-scope-overlap-tests",
+         "verify-phase:harness/scripts/verify.mjs:doc-reader-course-budget-tests",
+         "verify-phase:harness/scripts/verify.mjs:doc-reader-terminal-binding-tests",
+         "verify-phase:harness/scripts/verify.mjs:elephant-agy-implementation-dispatch-tests",
+@@ -473,6 +477,7 @@
+         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
+         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-repair-ignore-value-binding-tests",
++        "verify-phase:harness/scripts/verify.mjs:gitleaks-scratch-clones-exclusion-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-tests",
+         "verify-phase:harness/scripts/verify.mjs:gitleaks-windows-suppression-tests",
+         "verify-phase:harness/scripts/verify.mjs:goldfish-antigravity-host-tests",
+@@ -641,6 +646,7 @@
+         "verify-phase:harness/scripts/verify.mjs:onboarding-first-restart-intake-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-greenfield-walk-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-init-intake-author-tests",
++        "verify-phase:harness/scripts/verify.mjs:onboarding-init-machine-plane-reason-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-init-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-inspect-prefilter-tests",
+         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+@@ -859,6 +865,7 @@
+         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-announce-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-argv-closure-tests",
++        "verify-phase:harness/scripts/verify.mjs:pipeline-state-approve-push-chat-catalogue-repair-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-close-audit-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
+         "verify-phase:harness/scripts/verify.mjs:pipeline-state-discard-feature-tests",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index 2ca5a7425..636859f88 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -316,6 +316,12 @@
+       "path": "plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "commit-message-policy-administrative-refusal-tests",
++      "path": "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs",
++      "disposition": "legacy-process-only",
++      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++    },
+     {
+       "name": "commit-message-policy-tests",
+       "path": "plugins/pipeline-core/lib/commit-message-policy.test.mjs",
+@@ -699,6 +705,12 @@
+       "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "gitleaks-scratch-clones-exclusion-tests",
++      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
++      "disposition": "legacy-process-only",
++      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++    },
+     {
+       "name": "goldfish-antigravity-host-tests",
+       "path": "plugins/pipeline-core/scripts/goldfish-antigravity-host.test.mjs",
+@@ -1211,6 +1223,12 @@
+       "path": "plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "onboarding-init-machine-plane-reason-tests",
++      "path": "plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs",
++      "disposition": "legacy-process-only",
++      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++    },
+     {
+       "name": "p3b-runner-conformance-tests",
+       "path": "plugins/pipeline-core/lib/p3b-runner-conformance.test.mjs",
+@@ -1288,6 +1306,12 @@
+       "disposition": "legacy-process-only",
+       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+     },
++    {
++      "name": "pipeline-state-approve-push-chat-catalogue-repair-tests",
++      "path": "plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs",
++      "disposition": "legacy-process-only",
++      "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
++    },
+     {
+       "name": "pipeline-state-close-audit-tests",
+       "path": "plugins/pipeline-core/scripts/pipeline-state-close-audit.test.mjs",
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 09e6ae79c..9180f5108 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -125,6 +125,12 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   // `node-test-single` (a regex literal containing a backtick hides its node:test calls from the mask), so it is registered
+   // `legacy-process-only` and counted here (+1 classified, registry 357). It is also excluded from the R5 set below (registered after R5).
+   // No existing row, assertion or digest is removed or weakened.
++  // Added 2026-10-23 (QG-04, own hunk; K118-SUITE-REGISTRATION-STEP): commit-message-policy-administrative-refusal-tests,
++  // gitleaks-scratch-clones-exclusion-tests, onboarding-init-machine-plane-reason-tests and
++  // pipeline-state-approve-push-chat-catalogue-repair-tests are Verify registrations of the decision round (K98, K103) that were never
++  // given a completion-registry row; the conservative classifier reports each `node-test-single`, so each is registered
++  // `legacy-process-only` and counted here (+4 classified, registry 361), and excluded from the R5 set below (registered after R5).
++  // No existing row, assertion or digest is removed or weakened.
+   const newlyCounted = [
+     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
+     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
+@@ -141,6 +147,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
+     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
+     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
++    ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",60],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",158],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",18],
+@@ -164,6 +171,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",14],
+     ["git-stash-readonly-tests","plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs","top-level-assertions",7],
+     ["gitleaks-repair-ignore-cli-tests","plugins/pipeline-core/scripts/gitleaks-repair-ignore.cli.test.mjs","top-level-assertions",2],
++    ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
+     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
+     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
+     ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",140],
+@@ -178,11 +186,13 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
+     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
+     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
++    ["onboarding-init-machine-plane-reason-tests","plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs","node-test-single",4],
+     ["passive-read-credential-follow-tests","plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs","top-level-assertions",23],
+     ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",10],
+     ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",43],
+     ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",9],
+     ["pin-installed-design-trailer-example-is-rejected-by-git-guard-tests","plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs","node-test-single",60],
++    ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
+     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
+     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
+     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
+@@ -220,7 +230,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length);
+   assert.equal(classified.length, result.vulnerableCount,
+     "all classified Verify registrations must have a completion-registry row");
+-  assert.equal(result.registryCount, 357);
++  assert.equal(result.registryCount, 361);
+   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
+   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
+   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
+@@ -233,6 +243,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     "architecture-prospective-materialization-tests",
+     "bootstrap-acknowledgement-mode-tests",
+     "clone-hook-readiness-rollback-tests",
++    "commit-message-policy-administrative-refusal-tests",
+     "critic-course-admission-tests",
+     "critic-dispatch-preflight-tests",
+     "critic-generic-batch-tests",
+@@ -251,6 +262,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     "git-null-device-sites-tests",
+     "git-stash-readonly-tests",
+     "gitleaks-repair-ignore-cli-tests",
++    "gitleaks-scratch-clones-exclusion-tests",
+     "governance-scope-win32-acl-tests",
+     "guard-devplan-design-approval-v7-tests",
+     "guard-dispatch-budget-checkpoint-tests",
+@@ -263,12 +275,14 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     "native-goldfish-host-state-fanout-tests",
+     "native-platform-process-observer-tests",
+     "onboarding-greenfield-walk-tests",
++    "onboarding-init-machine-plane-reason-tests",
+     "passive-read-credential-follow-tests",
+     "phoenix-authority-revision-installed-package-tests",
+     "pin-denial-names-a-diagnosis-it-refuses-tests",
+     "pin-devplan-lane-admits-the-producer-materialize-step-tests",
+     "pin-installed-design-trailer-example-is-rejected-by-git-guard-tests",
+     "pin-windows-authority-ancestors-above-repository-are-human-controlled-tests",
++    "pipeline-state-approve-push-chat-catalogue-repair-tests",
+     "plan-reopen-current-action-tests",
+     "project-onboarding-foreign-residue-tests",
+     "project-onboarding-foreign-residue-unit-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 6fed7fb1c..acff02089 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -3766,6 +3766,48 @@
+       "file": "scripts/run-parallel.test.mjs",
+       "invariantPinned": "The parallel candidate runner runs the exact committed HEAD of a clean source, refuses a source with an uncommitted new case unless told to leave it out, and survives a rewritten history in its reused worker clone",
+       "nonOverlapNote": "Unique test suite for scripts/run-parallel.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
++    },
++    {
++      "name": "commit-message-policy-administrative-refusal-tests",
++      "file": "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs",
++      "invariantPinned": "The commit-message policy refusal for an administrative commit names Dispatch: stage-0 (elephant) as the admitted trailer form (K98 row 7/7)",
++      "nonOverlapNote": "Unique case: the administrative-trailer refusal text of the commit-message policy"
++    },
++    {
++      "name": "dispatch-scope-overlap-tests",
++      "file": "plugins/pipeline-core/lib/dispatch-scope-overlap.test.mjs",
++      "invariantPinned": "A dispatch batch or a running dispatch whose declared write scope overlaps another is refused in enforce mode and admitted with a warning in shadow mode, a read-only dispatch overlaps nothing, and the hook keeps no import cycle with the dispatch-record liveness reader (K104)",
++      "nonOverlapNote": "Unique cases: the write-scope overlap check, its enforce/shadow mode and the running-dispatch reader"
++    },
++    {
++      "name": "onboarding-init-machine-plane-reason-tests",
++      "file": "plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs",
++      "invariantPinned": "The machine-plane refusal of onboarding-init names the unusable home directory and the repair (K98 row 1/2)",
++      "nonOverlapNote": "Unique case: the machine-plane refusal reason text of onboarding-init"
++    },
++    {
++      "name": "pipeline-state-approve-push-chat-catalogue-repair-tests",
++      "file": "plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs",
++      "invariantPinned": "A chat-mode approve-push with a catalogue is refused with a typed reason and a runnable repair instead of a pointer to an inspect that finds nothing (K103 D1)",
++      "nonOverlapNote": "Unique case: the chat-mode catalogue refusal and its repair in pipeline-state approve-push"
++    },
++    {
++      "name": "clone-hook-readiness-refresh-tests",
++      "file": "plugins/pipeline-core/scripts/clone-hook-readiness.refresh.test.mjs",
++      "invariantPinned": "Applying the clone hook readiness installs a missing hook and refreshes a stale one in the same run, a failed refresh is a typed non-ready result, and nothing stale means no refresh call (K103)",
++      "nonOverlapNote": "Unique cases: the hook refresh half of clone-hook-readiness apply"
++    },
++    {
++      "name": "commit-pipeline-owned-tests",
++      "file": "plugins/pipeline-core/scripts/commit-pipeline-owned.test.mjs",
++      "invariantPinned": "The push-approval record refusal names the fold and the admitted trailer form, and a refusal for any other foreign file keeps the plain reason (K98 row 7/7)",
++      "nonOverlapNote": "Unique cases: the pipeline-owned commit refusal reasons for foreign files"
++    },
++    {
++      "name": "gitleaks-scratch-clones-exclusion-tests",
++      "file": "plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs",
++      "invariantPinned": "The gitleaks scan source excludes scratch/clones and nothing else (K98 row 13)",
++      "nonOverlapNote": "Unique cases: the scratch/clones exclusion of the gitleaks adapter scan source"
+     }
+   ]
+ }

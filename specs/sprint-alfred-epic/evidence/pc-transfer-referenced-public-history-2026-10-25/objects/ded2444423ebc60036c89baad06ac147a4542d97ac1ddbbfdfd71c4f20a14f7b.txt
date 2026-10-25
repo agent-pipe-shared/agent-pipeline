@@ -1,0 +1,11 @@
+command: node scripts/run-in.mjs scratch/clones/k153 k153-agy plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+label: k153-agy-red
+exitCode: 1
+head: 54bde561371592529494601badeb1b50697be742
+tree: 05ba2f35a2adba5582e0a8f5dbf52a5aabc86bfe
+dirty: true
+--- stdout ---
+RED   exit 1 tests ? pass ? fail ? skip ? todo ?  plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+   (no summary) tail:     at file://<repo-root>/scratch/clones/k153/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs:982:14 |     at check (file://<repo-root>/scratch/clones/k153/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs:311:5) |     at file://<repo-root>/scratch/clones/k153/plugin
+
+--- stderr ---

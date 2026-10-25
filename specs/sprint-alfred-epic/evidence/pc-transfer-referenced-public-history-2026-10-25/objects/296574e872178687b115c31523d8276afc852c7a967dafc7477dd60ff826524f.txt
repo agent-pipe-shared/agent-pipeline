@@ -1,0 +1,102 @@
+diff --git a/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs b/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
+index 24569f6c4..fffce4bba 100644
+--- a/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
++++ b/plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs
+@@ -163,3 +163,54 @@ test("AC-231 host-limitation: POSIX branch does not consult the seams (chmod 070
+   assert.equal(report.seen.length, 0, "seams are not consulted off win32");
+   assert.equal(report.first.code, null);
+ });
++
++// Additional Linux-reachable logical witnesses; original native cases above
++// retain their skips. Both adapters are injected before any controlled call.
++// This process view establishes no native Windows permission assurance.
++async function controlledScenario(url) {
++  const { privateMkdtemp } = await import(MODULE_URL);
++  const fixture = privateMkdtemp(`ac231-controlled-${randomUUID()}-`);
++  const parentPlatform = process.platform;
++  try {
++    const source = [
++      `for (const key of ["TMPDIR", "TMP", "TEMP"]) process.env[key] = ${JSON.stringify(fixture)};`,
++      'Object.defineProperty(process, "platform", { value: "win32" });',
++      SCENARIO,
++    ].join("\n");
++    const report = run(url, source);
++    assert.equal(process.platform, parentPlatform, "controlled view must stay in the child");
++    for (const root of report.seen) assert.equal(dirname(root), fixture, "all roots belong to this nonce fixture");
++    return report;
++  } finally {
++    rmSync(fixture, { recursive: true, force: true });
++  }
++}
++
++function assertControlledScenario(report) {
++  assertGuardedScenario(report, "controlled child");
++  assert.equal(report.seen.length, 3, "each refusal and later success must harden a fresh root");
++  assert.equal(new Set(report.seen).size, 3, "refusals must not memoize a root");
++  assert.equal(report.third.code, null, "secure retry after refusals must succeed");
++  assert.equal(report.fourth.value, report.third.value, "success is memoized despite a later insecure seam");
++}
++
++const CONTROLLED_ONLY = process.platform !== "linux" && "controlled Linux branch witness only; native cases retained separately";
++test("AC-231 controlled production: actual refusal, cleanup and retry/memoization", { skip: CONTROLLED_ONLY }, async () => {
++  assertControlledScenario(await controlledScenario(MODULE_URL));
++});
++test("AC-231 controlled mirror: unchanged helper satisfies the same examiner", { skip: CONTROLLED_ONLY }, async () => {
++  assertControlledScenario(await controlledScenario(mirror("controlled-control", null)));
++});
++test("AC-231 controlled mutation: removing refusal is rejected by the same examiner", { skip: CONTROLLED_ONLY }, async () => {
++  const url = mirror("controlled-no-refusal", text => text.replace('if (state?.status !== "secure") {', 'if (false) {'));
++  const report = await controlledScenario(url);
++  assert.equal(report.first.code, null, "mutation must actually accept the insecure root");
++  assert.throws(() => assertControlledScenario(report), { name: "AssertionError", message: /must not return a root/ });
++});
++test("AC-231 controlled mutation: removing cleanup is rejected by the same examiner", { skip: CONTROLLED_ONLY }, async () => {
++  const url = mirror("controlled-no-cleanup", text => text.replace("    discard(root);\n    throw error;", "    throw error;"));
++  const report = await controlledScenario(url);
++  assert.equal(report.first.code, "PRIVATE_TMP_ROOT_NOT_SECURE", "refusal remains active in cleanup mutant");
++  assert.equal(report.firstRootGone, false, "mutation must leave the refused root behind");
++  assert.throws(() => assertControlledScenario(report), { name: "AssertionError", message: /rejected root must be removed/ });
++});
+diff --git a/plugins/pipeline-core/lib/test-private-tmp.test.mjs b/plugins/pipeline-core/lib/test-private-tmp.test.mjs
+index 2395c312d..189a312d5 100644
+--- a/plugins/pipeline-core/lib/test-private-tmp.test.mjs
++++ b/plugins/pipeline-core/lib/test-private-tmp.test.mjs
+@@ -345,3 +345,38 @@ test("B-S1-T2: PRIVATE_TMP_PREFIX_ESCAPES_ROOT refuses a prefix that resolves ou
+     for (const path of leaked()) rmSync(path, { recursive: true, force: true });
+   }
+ });
++
++// Controlled branch execution only: this does not qualify native Windows DACLs.
++test("TEMP-SEAM-CONTROLLED: child-only win32 view refuses insecure roots before cleanup and retries without memoization", { skip: process.platform !== "linux" && "controlled Linux child witness" }, async () => {
++  const sandbox = await child("temp-seam-controlled-");
++  const hostPlatform = process.platform;
++  const report = runModuleChild([
++    'import { existsSync, readdirSync } from "node:fs";',
++    'import { tmpdir } from "node:os";',
++    'Object.defineProperty(process, "platform", { value: "win32" });',
++    'const { privateTempRoot } = await import(process.argv[1]);',
++    'const hardened = [], assessed = [];',
++    'const harden = root => { hardened.push(root); };',
++    'const assess = root => { assessed.push(root); return { status: "insecure", reason: "controlled-insecure" }; };',
++    'const failures = [];',
++    'for (let i = 0; i < 2; i++) {',
++    '  try { privateTempRoot({ harden, assess }); failures.push({ code: null }); }',
++    '  catch (error) { failures.push({ code: error.code, message: error.message, entries: readdirSync(tmpdir()) }); }',
++    '}',
++    'const root = privateTempRoot({ harden, assess: path => { assessed.push(path); return { status: "secure" }; } });',
++    'const same = privateTempRoot({ harden: () => { throw Error("memoized harden called"); }, assess: () => { throw Error("memoized assess called"); } }) === root;',
++    'console.log(JSON.stringify({ failures, hardened, assessed, root, same, exists: existsSync(root) }));',
++  ].join("\n"), sandbox);
++  assert.equal(process.platform, hostPlatform, "the parent platform must remain unchanged");
++  for (const failure of report.failures) {
++    assert.equal(failure.code, "PRIVATE_TMP_ROOT_NOT_SECURE");
++    assert.match(failure.message, /status=insecure, reason=controlled-insecure/);
++    assert.deepEqual(failure.entries, [], "cleanup must precede the surfaced refusal");
++  }
++  assert.equal(report.hardened.length, 3);
++  assert.deepEqual(report.assessed, report.hardened, "both seams see the same fresh roots in order");
++  assert.equal(new Set(report.hardened).size, 3, "refusals must not memoize");
++  for (const root of report.hardened) assert.equal(isInside(sandbox, root), true);
++  assert.equal(report.exists && report.same, true, "a secure attempt succeeds and is memoized");
++  assert.deepEqual(readdirSync(sandbox), [], "exit cleanup removes the successful root too");
++});

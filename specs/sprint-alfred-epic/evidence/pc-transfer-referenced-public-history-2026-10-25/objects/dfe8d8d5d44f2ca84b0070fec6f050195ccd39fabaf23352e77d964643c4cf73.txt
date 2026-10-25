@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+index 0b39b20af..e92d85252 100644
+--- a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
++++ b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+@@ -32,6 +32,8 @@ const A = "a".repeat(64);
+ const B = "b".repeat(64);
+ const C = "c".repeat(64);
+ const D = "d".repeat(64);
++const ATOMIC_PLAN = "# Atomic phase projection\n\nPreserve the lifecycle marker through implementation entry.\n";
++const ATOMIC_SPEC = "# Technical Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN implementation starts, the system SHALL project the implementation phase atomically. | State marker transition |\n";
+ 
+ function freshDir() {
+   const dir = mkdtempSync(join(tmpdir(), "state-phase-consistency-"));
+@@ -50,13 +52,13 @@ function projectedNextAction(dir) {
+ }
+ 
+ // Mirrors pipeline-state-approve-announce.test.mjs's injectedPoGateAuthority:
+-// a synthetic authority derived from the plan/spec path text (not real file
+-// bytes), stable across submit-plan's initial call and approve-plan's
++// a synthetic authority bound to the authored fixture bytes, stable across
++// submit-plan's initial call and approve-plan's
+ // beforeCommit re-check.
+ function injectedPoGateAuthority(planPath) {
+-  const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
++  const planSha256 = createHash("sha256").update(ATOMIC_PLAN).digest("hex");
+   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+-  const specSha256 = createHash("sha256").update(`fixture:${specPath}`).digest("hex");
++  const specSha256 = createHash("sha256").update(ATOMIC_SPEC).digest("hex");
+   const value = {
+     schema: PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
+     humanFacing: "en",
+@@ -199,6 +201,13 @@ test("the marker stays atomic with a real design -> implementation transition",
+       verify: verifyCommand,
+       handover: "docs/state.md",
+     }, null, 2)}\n`);
++    // Submission requires a real HEAD and current authored criterion sources.
++    // Keep the phase-marker examiner on the configured verify-command route.
++    mkdirSync(join(dir, "specs/atomic-feature"), { recursive: true });
++    writeFileSync(join(dir, planPath), ATOMIC_PLAN);
++    writeFileSync(join(dir, "specs/atomic-feature/spec.md"), ATOMIC_SPEC);
++    execFileSync("git", ["add", "--", planPath, "specs/atomic-feature/spec.md", "project/pipeline.json"], { cwd: dir, windowsHide: true });
++    execFileSync("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "seed atomic phase fixture"], { cwd: dir, windowsHide: true });
+     const setFeature = run(["set-feature", "--id", "atomic-feature", "--plan-path", planPath], { dir, now: FIXED_NOW });
+     assert.equal(setFeature, 0);
+     const afterSetFeature = checkStatePhaseConsistency({ rootDir: dir });

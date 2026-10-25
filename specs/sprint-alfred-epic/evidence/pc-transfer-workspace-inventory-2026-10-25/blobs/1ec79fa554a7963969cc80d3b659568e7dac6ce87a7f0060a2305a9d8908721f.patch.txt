@@ -1,0 +1,318 @@
+diff --git a/README.md b/README.md
+index 282e50a63..e908dfefd 100644
+--- a/README.md
++++ b/README.md
+@@ -5,28 +5,38 @@ reviewable, traceable, and measurable. It turns a change into a bounded task,
+ machine evidence, independent review, and a durable record that a team can
+ inspect later.
+ 
++**The problem.** Teams with audit obligations often need more than a chat
++transcript or a claim that a test passed. They need a repeatable delivery
++record: who made a decision, what was checked against which candidate commit,
++what was refused, and what remained outside the evidence. Agent-Pipeline supplies that
++shared method without making it a compliance certification or a claim about
++every host's enforcement.
++
+ **At a glance, Agent-Pipeline helps you to:**
+ 
+ - **Specify what can be checked:** turn an idea into a scoped brief and, when its
+-  stakes warrant it, a PRD or spec with EARS-style acceptance criteria linked
+-  to tests and review.
++  stakes warrant it, a PRD or spec with
++  [EARS-style](docs/README.md#terms-used-across-these-documents) acceptance
++  criteria linked to tests and review.
+ - **Preserve architecture across sessions:** assess the impact of a change,
+   record significant choices in ADRs and, in the forthcoming `0.7.0`
+-  line, use an OKF-based, machine-readable map and architecture-fitness checks
+-  where the project has adopted them.
++  line, use an [OKF-based](docs/README.md#terms-used-across-these-documents),
++  machine-readable map and architecture-fitness checks where the project has
++  adopted them.
+ - **Keep agent work bounded:** split implementation into fresh-context tasks
+   with explicit scope, handovers, and role/model effort matched to the work.
+ - **Verify the actual candidate:** apply configured project policies and
+   Git/write guardrails, then run tests and security checks against the exact
+-  candidate. Depending on the project's setup, these cover secret detection,
++  candidate commit. Depending on the project's setup, these cover secret detection,
+   dependency vulnerability scanning, static analysis, and license checks;
+   optional SBOM and provenance checks make supply-chain inputs inspectable.
+ - **Separate review from authority:** obtain independent Critic findings,
+-  while people retain plan acceptance, go/no-go, and approval of consequential
+-  external actions.
+-- **Leave an inspectable trail:** retain candidate-bound receipts, decision
+-  records, and offline audit bundles; missing or unavailable checks stay
+-  visible rather than becoming an implied pass.
++  while people retain plan acceptance, final acceptance where calibration or
++  stakes require it, and approval of consequential external actions.
++- **Leave an inspectable trail:** retain receipts bound to the candidate commit,
++  decision records, and optional offline audit bundles of a
++  [Feature Package](docs/README.md#terms-used-across-these-documents); missing
++  or unavailable checks stay visible rather than becoming an implied pass.
+ 
+ > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+ 
+@@ -36,16 +46,9 @@ inspect later.
+ > optional reference.
+ >
+ > **Documentation line `0.7.0`:** until it is released, keep the approved
+-> GitHub-distributed version you already use; a maintainer's local candidate is
+-> not an installation source. Release status: [overview](docs/overview.md).
+-
+-## The problem
+-
+-Teams with audit obligations often need more than a chat transcript or a claim
+-that a test passed. They need a repeatable delivery record: who made a decision,
+-what was checked against which candidate, what was refused, and what remained
+-outside the evidence. Agent-Pipeline supplies that shared method without making
+-it a compliance certification or a claim about every host's enforcement.
++> GitHub-distributed version you already use; a maintainer's local release
++> candidate is not an installation source. Release status:
++> [overview](docs/overview.md).
+ 
+ ## What you get
+ 
+@@ -54,11 +57,12 @@ Four deliberately separated roles carry the model:
+ <!-- capability:human-accountability-roles -->
+ <a id="capability-human-accountability-roles"></a>
+ 
+-- **Product Owner (you)** — the human gate. Sets direction, reviews outcomes, holds
+-  final sign-off.
++- **Product Owner (PO, you)** — the human gate. Sets direction, reviews outcomes and,
++  where calibration or stakes require it, gives final acceptance of the delivered
++  candidate commit.
+ - **Elephant** — the role name of the Coordinator: the long-lived main session that
+   dispatches work. Turns your intent into a spec, breaks it into small tasks,
+-  dispatches them, and prepares a go/no-go recommendation for the Product Owner.
++  dispatches them, and prepares a recommendation for the PO.
+ - **Goldfish** — a fresh-context implementor subagent. Owns one complete, independently
+   checkable acceptance criterion or backlog outcome: analysis, test cases, code,
+   targeted checks and fixes stay in the same context. Reports actual evidence.
+@@ -83,10 +87,17 @@ Around those roles:
+   command, and its exit code — never a model-formulated claim that something
+   "should work."
+ 
+-> **What you can inspect:** a candidate-bound Verify receipt, security-scan
+-> status, review and approval records where the project requires them, and a
+-> validated Feature Package or offline Audit Bundle. These artifacts support an
+-> audit trail; they do not certify compliance or replace an auditor. Start with
++<!-- capability:architecture-adoption-and-fitness -->
++<a id="capability-architecture-adoption-and-fitness"></a>
++
++- **Architecture adoption** — the architecture capability of the forthcoming
++  `0.7.0` line is described, with its adoption route for an existing repository,
++  in [Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
++
++> **What you can inspect:** beyond the receipts and bundles above, the
++> security-scan status and the review and approval records where the project
++> requires them. These artifacts support an audit trail; they do not certify
++> compliance or replace an auditor. Start with
+ > [audit and evidence](docs/audit-and-evidence.md).
+ 
+ > **Measurement boundary:** [measurement guidance](docs/cost-and-measurement.md)
+@@ -97,7 +108,7 @@ Around those roles:
+ 
+ ```mermaid
+ flowchart LR
+-    PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(Coordinator)"]
++    PO["PO<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(Coordinator)"]
+     Elephant -->|"spec + dispatch"| Goldfish["Goldfish<br/>(fresh-context implementor)"]
+     Goldfish -->|"evidence"| Gates["Targeted checks<br/>(tests, security, lint)"]
+     Gates -.->|"fail"| Goldfish
+@@ -105,17 +116,10 @@ flowchart LR
+     Critic -->|"findings"| Elephant
+     Critic -->|"reviewed candidate"| FullVerify["Full Verify<br/>(release qualification)"]
+     FullVerify -->|"candidate evidence"| Elephant
+-    Elephant -->|"go/no-go recommendation"| PO
++    Elephant -->|"recommendation"| PO
+ ```
+ 
+-<a id="capability-architecture-adoption-and-fitness"></a>
+-<!-- capability:architecture-adoption-and-fitness -->
+-
+-The architecture capability of the forthcoming `0.7.0` line is described, with
+-its adoption route for an existing repository, in
+-[Usage](docs/usage.md#assess-architecture-adoption-in-an-existing-project).
+-
+-**The front door: optional design pre-stage.** There is deliberately no
++**Optional design pre-stage.** There is deliberately no
+ mandatory step before the pipeline: idea → optional design brainstorming with
+ any chat AI → requirements export → feeds the pipeline. You can always skip it;
+ the guide, prompt and export template are under
+@@ -133,8 +137,7 @@ choices shape that work:
+   0 / 1 / 2 in [Pipeline Flow](PIPELINE_FLOW.md#2-decide-the-amount-of-design-and-review)
+ - **Governance mode per rule set** — advisory / enforcing / off
+ - **Work profile per topic** — epic / feature / mini (model and effort per
+-  phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
+-  bootstrap and consultation is on demand)
++  phase and runner are set in `pipeline.user.yaml`)
+ 
+ **Risk is assessed separately.** Security, architecture, guardrail, irreversible,
+ costly or externally visible impact can require stronger independent review
+@@ -165,7 +168,7 @@ For the normative contract, read [`docs/operating-model.md`](docs/operating-mode
+ ### Maintainer and runtime reference
+ 
+ Source maintainers can find checkout commands and the V3 authority sequence in
+-[Maintain a shared pipeline source](SETUP.md). Supported runner integrations
++[Maintain a shared pipeline source](SETUP.md#b-maintain-a-shared-pipeline-source-occasional). Supported runner integrations
+ can enforce configured guards, while the methodology remains portable; see
+ [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for current boundaries
+ and setup requirements.
+diff --git a/docs/README.md b/docs/README.md
+index abfcc6ac5..6faa2960b 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -4,24 +4,21 @@ The reader path is the Newcomer box of the top-level [README](../README.md).
+ Use the rest of this map as reference; [`overview.md`](overview.md) is a short
+ companion, not a competing front door.
+ 
+-**Terms:** *PO* means Product Owner, the human who decides. The *Coordinator*
+-is the main session that dispatches work (the README calls this role the
+-Elephant).
+-
+ **Command convention:** In user-repository examples, `<plugin-root>` is the
+ installed directory of the approved GitHub-distributed `pipeline-core` plugin;
+ `<absolute-plugin-root>` is the same directory written as an absolute path.
+ `<project-root>` and `<repo>` are the root of the governed repository.
++`<feature-id>` is the identifier of one feature under `specs/`.
+ Run commands from the governed repository unless the example says otherwise.
+-`<plugin-root>` never means a maintainer checkout.
++`<plugin-root>` never means a maintainer checkout. Terms such as PO, Driver and
++Feature Package are defined in
++[Terms used across these documents](#terms-used-across-these-documents).
+ 
+ **Audience rule:** This map, Setup, Usage, the flow, enforcement, evidence,
+ security, cost, onboarding, and operation pages describe what an application
+ repository does with the installed plugin. Source-maintainer procedures are
+ explicitly labelled and isolated in the maintainer sections, local-development
+ guides, release records, architecture decision records, and state archives.
+-Those durable records retain their original repository/commit context as
+-evidence; they are not copy-and-run instructions for a consumer project.
+ 
+ ## Adoption
+ 
+@@ -33,8 +30,8 @@ evidence; they are not copy-and-run instructions for a consumer project.
+ - [`usage.md#assess-architecture-adoption-in-an-existing-project`](usage.md#assess-architecture-adoption-in-an-existing-project)
+   — read-only status and proposal before an existing project adopts the
+   architecture controls.
+-- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
+-  integration boundaries.
++- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
++  Nova product strands.
+ - [`v3-consumer-onboarding.md`](v3-consumer-onboarding.md) — detailed
+   preview-first migration and the Codex lifecycle V4.
+ - [`migration.md`](migration.md) — pointer to the current onboarding and V3
+@@ -91,8 +88,6 @@ evidence; they are not copy-and-run instructions for a consumer project.
+ 
+ - [`operating-model.md`](operating-model.md) — normative roles, lifecycle,
+   review, evidence, and human authority.
+-- [`overview.md`](overview.md) — the `0.7.0` release status and the Phoenix and
+-  Nova product strands.
+ - [`design-decisions.md`](design-decisions.md) — the "why" behind the method.
+ - [`whats-new-0.6.0.md`](whats-new-0.6.0.md) — what was new in the `0.6.0`
+   release: product scope, release boundary, and non-claims at that time.
+@@ -108,6 +103,8 @@ evidence; they are not copy-and-run instructions for a consumer project.
+ 
+ ## Operations and reference
+ 
++- [`parallel-work.md`](parallel-work.md) — bounded parallel delivery and
++  integration boundaries.
+ - [`observation-intake.md`](observation-intake.md) — public observation intake,
+   privacy routing, triage, and backlog-link governance.
+ - [`github-issue-operations.md`](github-issue-operations.md) — project-scoped
+@@ -117,8 +114,7 @@ evidence; they are not copy-and-run instructions for a consumer project.
+ 
+ ## Maintainer reference
+ 
+-These documents are classified as maintainer material in the repository's
+-documentation governance.
++Classified as maintainer material.
+ 
+ - [`po-human-approval.md`](po-human-approval.md) — the one-time external-key
+   setup and the bounded human signing commands; agent-side preparation remains
+@@ -132,3 +128,27 @@ documentation governance.
+ - [`nova-execution-plane-threat-model.md`](nova-execution-plane-threat-model.md)
+   — execution-plane scope, evidence, and intentionally excluded claims.
+ - [`adr/`](adr/) — durable decisions and rationale.
++
++## Terms used across these documents
++
++- **Agent-Pipeline** — the product name; always spelled with the hyphen.
++- **PO** — Product Owner, the human who decides.
++- **Coordinator / Elephant** — the same role: the long-lived main session that
++  dispatches work. Prose uses Coordinator; the README and the flow also use its
++  role name, Elephant.
++- **Driver** — the onboarding driver of the public Pipeline-start path: it
++  inspects the directory and returns the next structured action.
++- **Trust anchor** — the one-time human-approval key setup that a project on
++  the default `signature` approval mode needs before its first signature-path
++  gate; see [Setup](../SETUP.md#human-approval-key-one-time-setup).
++- **Feature Package** — the validated artifacts of one governed feature, kept
++  under `specs/<feature-id>/` with a lifecycle manifest; an Audit Bundle is a
++  copy of one.
++- **Greenfield** — a new project that starts from an empty directory.
++- **OKF** — the format of the machine-readable architecture map of the
++  forthcoming `0.7.0` line.
++- **EARS** — the sentence-template style for acceptance criteria that a spec
++  uses so each criterion can be linked to a test.
++- **Candidate** — two meanings: the *release candidate* is a version that is
++  not yet released (`0.7.0` today); the *candidate commit* is the commit under
++  verification, to which receipts and reviews are bound.
+diff --git a/docs/overview.md b/docs/overview.md
+index 1c281e495..d87560d8b 100644
+--- a/docs/overview.md
++++ b/docs/overview.md
+@@ -3,31 +3,33 @@
+ Agent-Pipeline is for controlled, agent-assisted software delivery where a team
+ needs a reviewable record beyond a chat history. It turns an intent into a
+ bounded change, deterministic evidence, independent review, and a preserved
+-decision. Candidate-bound receipts and validated packages can support an audit
+-trail; they do not certify compliance or replace an auditor.
++decision. Receipts bound to the candidate commit and validated packages can
++support an audit trail; they do not certify compliance or replace an auditor.
+ 
+ ## The next release line: 0.7.0
+ 
++**Names.** *Alfred* is the working name of the `0.7.0` scope. *Phoenix* and
++*Nova* are the two product strands it integrates. *Sprint Alfred* is the
++maintainer sprint that builds the scope.
++
+ `0.7.0` names the next distributed Alfred architecture scope. Until that
+ version is released, an application repository continues to use its approved
+-GitHub-distributed plugin version; a maintainer candidate is not an
++GitHub-distributed plugin version; a maintainer release candidate is not an
+ installation recommendation, production-availability claim, or proof that
+ release gates passed. The scope adds a staged adoption route for existing
+ repositories, a machine-readable architecture map, baseline and fitness
+-checks, and typed architecture impact at feature close. Begin with the
++checks, and typed architecture impact at feature close. Where the installed
++plugin contains the architecture-adoption CLI (read back the installed plugin
++version and root in a fresh `pipeline-start` session first), begin with the
+ read-only [adoption status and proposal](usage.md#assess-architecture-adoption-in-an-existing-project)
+ in the repository you intend to govern.
+ 
+-**Names.** *Alfred* is the working name of this `0.7.0` scope. *Phoenix* and
+-*Nova* are the two product strands it integrates. *Sprint Alfred* is the
+-maintainer sprint that builds the scope.
+-
+ | Product strand | What it contributes to this release scope | Status |
+ | --- | --- | --- |
+ | Phoenix | Durable delivery governance: explicit human decisions, candidate-bound evidence, deterministic gates before review, safe external-action boundaries, and recoverable public records. | Integrated foundation |
+-| Nova | Runner-aware execution and guided adoption: public Driver actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Implemented in the repository; final `0.7.0` acceptance pending. |
++| Nova | Runner-aware execution and guided adoption: public [Driver](README.md#terms-used-across-these-documents) actions, resumable onboarding context, a real verify setup, and scoped parallel delivery. | Implemented in the repository; final `0.7.0` acceptance pending. |
+ 
+-**Status.** The `0.7.0` candidate is not yet qualified: it still needs
++**Status.** The `0.7.0` release candidate is not yet qualified: it still needs
+ criterion-level evidence, full Verify, security checks, independent review, and
+ any applicable human acceptance, and host-dependent behavior needs readback from
+ the runner that actually executes it. This overview claims neither a released
+@@ -37,8 +39,8 @@ The documented Greenfield route (empty directory to first implementation step)
+ is covered for Claude, Codex, and Antigravity; see [Usage](usage.md). Runner
+ integrations are described by their evidence: a common methodology does not
+ mean that every host has identical native hooks, sandbox isolation, model
+-identity, or platform coverage. Missing, stale, malformed, or
+-candidate-mismatched evidence stays a typed non-success.
++identity, or platform coverage. Missing, stale, or malformed evidence, and
++evidence that does not match the candidate commit, stays a typed non-success.
+ 
+ For the product entry point, use the top-level [README](../README.md); for
+ everything else, the [documentation map](README.md). The

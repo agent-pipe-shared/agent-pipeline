@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
+
+const roots = {
+  projectRoot: 'D:\\work\\repo',
+  pluginRoot: 'C:\\Users\\owner\\plugins\\pipeline-core',
+  privateRoot: 'D:\\work\\repo\\.git\\agent-pipeline',
+};
+
+test('foreign inherited Modify at the repository root remains refused with bounded recovery', () => {
+  const calls = [];
+  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+    probe(input) {
+      calls.push(input);
+      if (input.path === roots.projectRoot && input.pathClass === 'project')
+        throw Object.assign(new Error('closed'), { reason: 'WIN-AUTH-ANCESTOR-MUTATION' });
+    },
+  });
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.causes[0].reason, 'WIN-AUTH-ANCESTOR-MUTATION');
+  assert.equal(result.causes[0].pathClass, 'project');
+  assert.match(result.causes[0].nextAction.repairPreview, /observed SID/u);
+  assert.match(result.causes[0].nextAction.repairPreview, /never apply \/T/u);
+  assert.equal(calls.find(row => row.path === roots.projectRoot && row.pathClass === 'project').boundaryRoot, roots.projectRoot);
+  assert.equal(calls.find(row => row.path === roots.pluginRoot).boundaryRoot, null,
+    'the installed plugin directory is not silently treated as a proven repository root');
+});
+
+test('trusted project, plugin and private path observations stay ready without mutation', () => {
+  const calls = [];
+  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe: row => calls.push(row) });
+  assert.deepEqual(result, { schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] });
+  assert.equal(calls.filter(row => row.privatePath).length, 1);
+  assert.ok(calls.some(row => row.pathClass === 'project' && row.path === 'D:\\' && row.boundaryRoot === roots.projectRoot));
+});
+
+test('project, plugin and private failures are aggregated from one read-only pass', () => {
+  const failures = new Map([
+    [roots.projectRoot, 'WIN-AUTH-ANCESTOR-MUTATION'],
+    [roots.pluginRoot, 'WIN-AUTH-ANCESTOR-OWNER'],
+    [roots.privateRoot, 'WIN-AUTH-DACL'],
+  ]);
+  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+    probe({ path }) {
+      if (failures.has(path)) throw Object.assign(new Error('closed'), { reason: failures.get(path) });
+    },
+  });
+  assert.equal(result.status, 'unavailable');
+  for (const pathClass of ['project', 'plugin', 'private'])
+    assert.ok(result.causes.some(row => row.pathClass === pathClass && row.reason.startsWith('WIN-AUTH-')));
+});
+
+test('a writable plugin ancestor is observed and refused before dispatch', () => {
+  const ancestor = 'C:\\Users\\owner\\plugins';
+  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+    probe({ path, pathClass }) {
+      if (pathClass === 'plugin' && path === ancestor)
+        throw Object.assign(new Error('closed'), { reason: 'WIN-AUTH-ANCESTOR-MUTATION' });
+    },
+  });
+  assert.ok(result.causes.some(row => row.pathClass === 'plugin'
+    && row.path === ancestor && row.reason === 'WIN-AUTH-ANCESTOR-MUTATION'));
+});
+
+test('missing private namespace does not manufacture an ACL failure, while its parent is inspected', () => {
+  const calls = [];
+  const result = assessWindowsAuthorityReadiness({ ...roots,
+    exists: path => path !== roots.privateRoot,
+    probe: row => calls.push(row),
+  });
+  assert.equal(result.status, 'ready');
+  assert.equal(calls.some(row => row.privatePath), false);
+  assert.ok(calls.some(row => row.path === 'D:\\work\\repo\\.git'));
+});
+
+test('missing plugin prerequisite remains unavailable', () => {
+  const result = assessWindowsAuthorityReadiness({ ...roots,
+    exists: path => path !== roots.pluginRoot,
+    probe() {},
+  });
+  assert.equal(result.status, 'unavailable');
+  assert.ok(result.causes.some(row => row.pathClass === 'plugin' && row.reason === 'WIN-AUTH-OPEN'));
+});
+
+test('unknown native failures close without copying arbitrary exception text', () => {
+  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+    probe() { throw Object.assign(new Error('private machine path'), { reason: 'private machine path' }); },
+  });
+  assert.equal(result.status, 'unavailable');
+  assert.ok(result.causes.every(row => row.reason === 'WIN-AUTH-OBSERVATION-UNAVAILABLE'));
+  assert.doesNotMatch(JSON.stringify(result), /private machine path/u);
+});
+
+test('a pristine project can inspect existing roots before Git creates its private namespace', () => {
+  const result = assessWindowsAuthorityReadiness({ ...roots,
+    exists: path => !path.toLowerCase().includes('\\.git'),
+    probe() {},
+  });
+  assert.equal(result.status, 'ready');
+});
+
+test('direct consumers receive only closed native causes', () => {
+  assert.equal(windowsAuthorityCause({ reason: 'WIN-AUTH-ANCESTOR-MUTATION' }), 'WIN-AUTH-ANCESTOR-MUTATION');
+  assert.equal(windowsAuthorityCause({ reason: 'private path and SID' }), 'WIN-AUTH-OBSERVATION-UNAVAILABLE');
+});

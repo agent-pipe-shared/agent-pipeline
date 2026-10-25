@@ -1,0 +1,36 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index baf4efd40..f3752b686 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -149,6 +149,22 @@ function followLifecycleAction(root, result, name) {
+   return lifecycleCommand(root, ...result.nextAction.argv.slice(1));
+ }
+ 
++// A greenfield staging PRD must carry one complete pipeline-architecture-design
++// block before the single PO acknowledgement is offered (the onboarding
++// ARCHITECTURE-DESIGN-PACKAGE-REQUIRED stop, collectPrdAcknowledgementAction).
++// This minimal closed package serves adapter routing only, not design semantics.
++function agyArchitectureDesignBlock() {
++  const module = { id: "application", responsibility: "Local application", nonResponsibilities: ["Network"],
++    ownedPaths: ["src/**", "tests/**"], publicContracts: ["docs/contract.md"],
++    allowedDependencies: [], authorityEffects: [], verificationEntryPoints: ["tests/application.test.mjs"], adrReferences: [] };
++  const design = { schema: "pipeline.architecture-design.v1", repositoryKind: "greenfield",
++    disposition: { decision: "approved-scoped", scope: ["src/", "tests/", "docs/contract.md", "architecture/", "specs/"], rationale: "Explicit design scope" },
++    modules: [module], implementationSurface: ["src/application.mjs"],
++    fitnessModel: { schema: "pipeline.fitness-model.v1", profileId: "local", revision: 1,
++      allowedBoundaryCrossings: [], antiFragmentationPolicy: { rejectTrivialFacades: true } } };
++  return "\n```pipeline-architecture-design\n" + JSON.stringify(design) + "\n```\n";
++}
++
+ function readyLifecycleFixture(mode = "chat") {
+   const root = mkdtempSync(join(tmpdir(), "agy-ready-hgo-"));
+   const home = join(root, "fixture-home");
+@@ -214,7 +230,7 @@ function readyLifecycleFixture(mode = "chat") {
+   const prdFile = join(root, generated.targets.prd.path);
+   const language = readFileSync(prdFile, "utf8").match(/^<!-- po-language: ([a-z]{2}) -->/u)[1];
+   writeFileSync(join(root, generated.targets.spec.path), "# Completed AGY fixture specification\n\n## Acceptance criteria\n- AC-01: WHEN the AGY adapter fixture is acknowledged, the system SHALL bind its exact final document bytes.\n- AC-02: WHEN a document changes after planning, the system SHALL refuse stale digest authority.\n\n## Architecture\nThe intake checkpoint owns package paths; the marker writer binds the final specification digest.\n");
+-  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n`);
++  writeFileSync(prdFile, `<!-- po-language: ${language} -->\n<!-- technical-spec-sha256: ${generated.targets.spec.afterSha256} -->\n# Completed AGY fixture design\n\n## Goal\nExercise adapter routing, repository binding and HGO policy assertions.\n\n## Scope\nThe fixture serves guard cases only; no Feature design semantics.\n\n## Acceptance\nThe completed specification defines the observable outcomes.\n${agyArchitectureDesignBlock()}`);
+   const markerPlan = invoke("intake-spec-marker-plan", "--root", root, "--runner", "antigravity");
+   invoke("intake-spec-marker-apply", "--root", root, "--plan-sha256", markerPlan.planSha256, "--activate", "--runner", "antigravity");
+   // Mini staging still requires the canonical chat acknowledgement before

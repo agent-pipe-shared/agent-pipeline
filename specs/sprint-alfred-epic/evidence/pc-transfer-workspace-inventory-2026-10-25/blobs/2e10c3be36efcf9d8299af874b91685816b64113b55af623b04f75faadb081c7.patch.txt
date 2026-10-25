@@ -1,0 +1,291 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index aca84cf4b..268fb8084 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -647,6 +647,15 @@ or archived session-cleanup binding for `lib/session-cleanup-recovery.mjs`).
+ This source closure does not establish protected-source delivery, independent
+ review, native qualification or activation.
+ 
++ALF-K32 adds one further first-party module that a kernel file imports and that
++executes with kernel authority:
++`plugins/pipeline-core/scripts/advisory-admitted-consult.mjs` (the admitted half of
++the ordinary Codex consult; `scripts/advisory-host-bridge.mjs` hands it the result of a
++sealed host-owned executor, and it reports an answer only when
++`lib/advisory-answered-receipt.mjs` binds that result). It has no I/O of its own, imports
++only kernel paths and `lib/advisory-lifecycle-v2.mjs` and `lib/advisory-receipt-assurance.mjs`
++(both already kernel paths), and is itself one.
++
+ ## Threats and controls
+ 
+ | Threat | Control |
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 2c6fe0e80..a1d198dd8 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -789,10 +789,10 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+   "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+   // Closure additions 2026-10-21 (GMWKC01): first-party imports of kernel paths that were never listed.
+-  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit
+-  // writers; orphan-member-step <- onboarding-continuity; budget-notice <- hooks/guard-dispatch-budget;
+-  // answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight.
++  // lost-binding <- session-cleanup-recovery; observers <- native-goldfish-host-state; owned-files <- push/commit writers; orphan-member-step <- onboarding-continuity;
++  // budget-notice <- hooks/guard-dispatch-budget; answered-receipt <- scripts/advisory-host-bridge; sandbox-probe <- scripts/pipeline-start-preflight; admitted-consult (ALF-K32) <- scripts/advisory-host-bridge.
+   "plugins/pipeline-core/lib/advisory-answered-receipt.mjs",
++  "plugins/pipeline-core/scripts/advisory-admitted-consult.mjs",
+   "plugins/pipeline-core/lib/read-command-diagnosis.mjs",
+   "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
+   "plugins/pipeline-core/lib/dispatch-briefing-build.mjs",
+diff --git a/plugins/pipeline-core/scripts/advisory-admitted-consult.mjs b/plugins/pipeline-core/scripts/advisory-admitted-consult.mjs
+new file mode 100644
+index 000000000..5ddf39d74
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/advisory-admitted-consult.mjs
+@@ -0,0 +1,86 @@
++// SPDX-License-Identifier: SUL-1.0
++
++/**
++ * The admitted half of the ordinary Codex consult in the host bridge.
++ *
++ * The bridge calls this only after the host reported an explicit `admitted`
++ * export decision AND a sealed, host-owned executor was installed as a
++ * dependency (never as stdin input). The executor's result is not trusted: an
++ * answer is reported only when the returned receipt, execution record and
++ * answer digest bind the candidate, route, question, evidence and host result
++ * through `verifyAnsweredAdvisoryReceipt`. Any other outcome is a typed refusal
++ * with a repair. Because an attempt may already have started, a refusal here is
++ * deliberately NOT described as a no-child route selection.
++ *
++ * The bridge's own helpers (route resolution, receipt construction, atomic
++ * persistence, event emission) are handed in; this module has no I/O of its own.
++ */
++import { ANSWERED_RECEIPT_REFUSALS, verifyAnsweredAdvisoryReceipt } from "../lib/advisory-answered-receipt.mjs";
++import { createAdvisoryConsultationRecord } from "../lib/advisory-lifecycle-v2.mjs";
++import { AdvisoryReceiptAssuranceError } from "../lib/advisory-receipt-assurance.mjs";
++
++/**
++ * Every refusal of the ordinary Codex consult names what the user can do next.
++ * Nothing ran, or nothing is trusted, so the alternative is to continue without
++ * an Advisor (an on-demand Advisor is optional, ADR-0085). Runner-neutral and
++ * free of question/evidence content.
++ */
++export const ORDINARY_CONSULT_REPAIRS = Object.freeze({
++  "advisor-repository-export-declined": "Repository Advisor export consent is declined, so no data was exported and no model was called. Continue without an Advisor (an on-demand Advisor is optional), or set advisor_export.consent to approved in pipeline.user.yaml and ask again.",
++  "advisor-host-export-denied": "The host did not approve this export, so no data was exported and no model was called. Continue without an Advisor; do not retry through another command or provider.",
++  "ordinary-consult-host-route-unavailable": "Repository export consent is missing or the host route is unavailable, so no data was exported and no model was called. Continue without an Advisor, or record advisor_export.consent in pipeline.user.yaml and ask again.",
++  "ordinary-consult-host-callback-unavailable": "This host has no sealed executor installed for an ordinary consult, so no data was exported and no model was called. Continue without an Advisor; an on-demand Advisor is optional and no design stage requires one.",
++  "advisor-host-execution-unavailable": "The host-owned executor failed or returned no verifiable result, so no answer is reported and nothing the executor said is trusted. Continue without an Advisor, or ask again once the host executor is repaired; a consultation of this request is spent.",
++  "advisory_route_unavailable": "The registered advisory route could not be resolved for this candidate, so the executor was not called. Resolve the registered route and ask again, or continue without an Advisor.",
++});
++
++/** Returns the process exit code after emitting exactly one `advisory.completed` event. */
++export async function finishAdmittedOrdinaryConsult({ input, args, repositoryRoot, dependencies, consultationRecordPath, host }) {
++  const base = { schema: "pipeline.advisory-host.v1", type: "advisory.completed", answer: null, attempts: [], attemptTrailPath: null, routeSelectionPath: null, sandboxBinding: null, agentDecisionEvent: null };
++  const route = host.resolveRoute();
++  if (route === null) {
++    host.emit({ ...base, ok: false, code: "advisory_route_unavailable", repair: ORDINARY_CONSULT_REPAIRS.advisory_route_unavailable,
++      receiptPath: null, consultationRecord: null, consultationRecordPath: null, modelCalls: 0, launcherCalls: 0 });
++    return 2;
++  }
++  let outcome = null;
++  try { outcome = await dependencies.executeAdmittedConsult({ input: structuredClone(input), repoRoot: repositoryRoot }); } catch { outcome = null; }
++  const result = outcome?.advisoryResult;
++  let failure = null;
++  if (result?.ok === true && result.code === "answered" && typeof result.answer === "string") {
++    const bound = verifyAnsweredAdvisoryReceipt({ receipt: result.receipt, execution: outcome.execution, answer: result.answer,
++      demand: input.demand, route, dispatch: input.dispatch, evidenceSha256: input.demand.evidenceSha256, selection: outcome.sandboxBinding ?? null });
++    if (!bound.ok) failure = { code: bound.code, repair: bound.repair };
++  } else if (typeof result?.code === "string" && Object.hasOwn(ANSWERED_RECEIPT_REFUSALS, result.code)) {
++    failure = { code: result.code, repair: ANSWERED_RECEIPT_REFUSALS[result.code] };
++  } else {
++    failure = { code: "advisor-host-execution-unavailable", repair: ORDINARY_CONSULT_REPAIRS["advisor-host-execution-unavailable"] };
++  }
++  let persisted = null;
++  let receipt = failure === null ? result.receipt : null;
++  if (failure === null) {
++    try { persisted = host.writeJsonAtomic(args.receipt, receipt); } catch (error) {
++      if (!(error instanceof AdvisoryReceiptAssuranceError)) throw error;
++      failure = { code: `advisory_receipt_${error.status}`, repair: ORDINARY_CONSULT_REPAIRS["advisor-host-execution-unavailable"] };
++      receipt = null;
++    }
++  }
++  if (failure !== null) {
++    // Only the unavailable receipt is written; a no-child route selection would claim no attempt started.
++    receipt = host.receiptFor(input, route, { status: "unavailable", fallbackReason: "consult-unavailable" });
++    persisted = host.writeJsonAtomic(args.receipt, receipt);
++  }
++  const record = createAdvisoryConsultationRecord({ demand: input.demand, receipt, outcome: receipt.observed.status, completedAtMs: Date.now() });
++  if (!record.ok) throw new Error(record.code);
++  host.writeJsonAtomic(consultationRecordPath, record.record);
++  const common = { receiptPath: host.resolvePath(args.receipt), directoryDurability: persisted?.directoryDurability ?? null, consultationRecord: record.record, consultationRecordPath };
++  if (failure !== null) {
++    host.emit({ ...base, ...common, ok: false, code: failure.code, repair: failure.repair });
++    return 2;
++  }
++  const decision = await (dependencies.recordAdvisoryDecisionEvent ?? host.recordAdvisoryDecisionEvent)(receipt, { repoRoot: repositoryRoot });
++  host.emit({ ...base, ...common, ok: true, code: "answered", answer: result.answer,
++    attempts: [{ adapter: "host-consult", kind: "consult", runner: "codex", status: "answered" }],
++    sandboxBinding: structuredClone(outcome.sandboxBinding), agentDecisionEvent: decision });
++  return 0;
++}
+diff --git a/plugins/pipeline-core/scripts/advisory-host-bridge.mjs b/plugins/pipeline-core/scripts/advisory-host-bridge.mjs
+index 96b31370c..d3aaf0aef 100644
+--- a/plugins/pipeline-core/scripts/advisory-host-bridge.mjs
++++ b/plugins/pipeline-core/scripts/advisory-host-bridge.mjs
+@@ -32,6 +32,7 @@ import {
+ } from "../lib/advisory-lifecycle-v2.mjs";
+ import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
+ import { verifyAnsweredAdvisoryReceipt } from "../lib/advisory-answered-receipt.mjs";
++import { ORDINARY_CONSULT_REPAIRS, finishAdmittedOrdinaryConsult } from "./advisory-admitted-consult.mjs";
+ import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
+ import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
+ import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
+@@ -42,7 +43,7 @@ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+ import { resolveV3DutyRoute } from "../lib/critic-route-v3.mjs";
+ import { CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+-import { ROUTES, selectHostAdvisorRoute, selectHostAdvisorRouteForHost } from "./codex-host-advisor-route.mjs";
++import { ROUTES, WSL_PREFLIGHT_REPAIR, selectHostAdvisorRoute, selectHostAdvisorRouteForHost } from "./codex-host-advisor-route.mjs";
+ import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
+ import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
+ import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
+@@ -449,7 +450,7 @@ function disabledHostAdvisory(route) {
+         : route === ROUTES.WSL_UNAVAILABLE
+           ? "advisory_unavailable_wsl_native_deferred"
+           : "advisory_disabled",
+-      answer: null,
++      answer: null, ...(route === ROUTES.WSL_UNAVAILABLE ? { repair: WSL_PREFLIGHT_REPAIR } : {}),
+       receipt: null,
+       attempts: [],
+     },
+@@ -509,8 +510,8 @@ export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, tra
+   }
+   const routeInput = hostRouteInput(input);
+   const route = transport.hostObservation === undefined
+-    ? selectHostAdvisorRoute(routeInput)
+-    : selectHostAdvisorRouteForHost(routeInput, transport.hostObservation);
++    ? selectHostAdvisorRoute(routeInput, transport.sandboxPreflight ?? null)
++    : selectHostAdvisorRouteForHost(routeInput, transport.hostObservation, transport.sandboxPreflight ?? null);
+   if (route !== ROUTES.HOST) return disabledHostAdvisory(route);
+   const root = transport.repoRoot ?? process.cwd();
+   const advisoryRoute = resolvedAdvisoryRoute(
+@@ -832,6 +833,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
+             dispatch: structuredClone(input.dispatch), profile: input.profile,
+             questionSha256: sha256(input.question), evidenceSha256: input.demand.evidenceSha256 })
+           : null;
++        if (admission?.status === "admitted" && typeof dependencies.executeAdmittedConsult === "function") return await finishAdmittedOrdinaryConsult({ input, args, repositoryRoot, dependencies, consultationRecordPath, host: { resolveRoute: () => resolvedAdvisoryRoute(input, repositoryRoot, dependencies.resolveAdvisoryRoute ?? resolveV3DutyRoute, dependencies.selectModelRoleForTaskFn ?? selectModelRoleForTask, dependencies.modelRoleEnvironment ?? process.env), receiptFor, writeJsonAtomic, emit, resolvePath: resolve, recordAdvisoryDecisionEvent } });
+         code = admission?.status === "denied" ? "advisor-host-export-denied"
+           : admission?.status === "unavailable" ? "ordinary-consult-host-route-unavailable"
+             : "ordinary-consult-host-callback-unavailable";
+@@ -853,7 +855,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
+       if (!record.ok) throw new Error(record.code);
+       writeJsonAtomic(consultationRecordPath, record.record);
+       emit({ schema: "pipeline.advisory-host.v1", type: "advisory.completed",
+-        ok: false, code, answer: null, receiptPath: resolve(args.receipt),
++        ok: false, code, repair: ORDINARY_CONSULT_REPAIRS[code], answer: null, receiptPath: resolve(args.receipt),
+         directoryDurability: persisted?.directoryDurability ?? null,
+         attempts: [], attemptTrailPath: null, routeSelectionPath,
+         consultationRecord: record.record, consultationRecordPath,
+diff --git a/plugins/pipeline-core/scripts/codex-host-advisor-route.mjs b/plugins/pipeline-core/scripts/codex-host-advisor-route.mjs
+index b853cb30b..df3858e65 100644
+--- a/plugins/pipeline-core/scripts/codex-host-advisor-route.mjs
++++ b/plugins/pipeline-core/scripts/codex-host-advisor-route.mjs
+@@ -3,7 +3,9 @@
+ 
+ /** Model-free route authority used only after a valid on-demand trigger. */
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import { readFileSync } from "node:fs";
+ import { release as osRelease } from "node:os";
++import { validatePreflightReceipt } from "./codex-sandbox-preflight.mjs";
+ 
+ export const ROUTES = Object.freeze({
+   HOST: "host-bound-consult",
+@@ -46,9 +48,26 @@ function currentHostObservation() {
+   };
+ }
+ 
+-export function selectHostAdvisorRouteForHost(input, hostObservation) {
++/** The one runnable repair for the WSL deferral: the existing sandbox preflight, which writes the receipt that lifts it. */
++export const WSL_PREFLIGHT_REPAIR = "node <plugin-root>/scripts/codex-sandbox-preflight.mjs --run --kind intermediate --codex <absolute-codex-path> --receipt <absolute-new-receipt-path>";
++export const WSL_PREFLIGHT_REASON = "wsl-sandbox-preflight-not-passed";
++
++/**
++ * True only for a valid, existing pipeline.codex-sandbox-preflight.v1 receipt that
++ * a real run on a WSL2 kernel reported as an intermediate "ok" with unchanged canaries.
++ * Anything else, including a malformed receipt, is false and keeps the deferral.
++ */
++export function isPassingWslSandboxPreflight(receipt) {
++  try {
++    validatePreflightReceipt(receipt);
++    return receipt.eligibility === "intermediate" && receipt.terminalCode === "ok"
++      && receipt.platform.kernelClass === "wsl2" && receipt.canaries.unchanged === true;
++  } catch { return false; }
++}
++
++export function selectHostAdvisorRouteForHost(input, hostObservation, sandboxPreflight = null) {
+   const route = selectHostAdvisorRouteWithoutHost(input);
+-  if (route === ROUTES.HOST && isWslHostObservation(hostObservation)) return ROUTES.WSL_UNAVAILABLE;
++  if (route === ROUTES.HOST && isWslHostObservation(hostObservation) && !isPassingWslSandboxPreflight(sandboxPreflight)) return ROUTES.WSL_UNAVAILABLE;
+   return route;
+ }
+ 
+@@ -64,21 +83,26 @@ function selectHostAdvisorRouteWithoutHost(input) {
+   return ROUTES.HOST;
+ }
+ 
+-export function selectHostAdvisorRoute(input) {
+-  return selectHostAdvisorRouteForHost(input, currentHostObservation());
++export function selectHostAdvisorRoute(input, sandboxPreflight = null) {
++  return selectHostAdvisorRouteForHost(input, currentHostObservation(), sandboxPreflight);
+ }
+ 
+ // Compatibility name for callers that use the generic advisory terminology.
+ export const selectAdvisoryRoute = selectHostAdvisorRoute;
+ 
+-export function resolveHostAdvisorRoute(input) {
+-  const route = selectHostAdvisorRoute(input);
++export function resolveHostAdvisorRouteForHost(input, hostObservation, sandboxPreflight = null) {
++  const route = selectHostAdvisorRouteForHost(input, hostObservation, sandboxPreflight);
+   return {
+     route,
+     policy: route === ROUTES.HOST ? HOST_ADVISOR_POLICY : null,
++    ...(route === ROUTES.WSL_UNAVAILABLE ? { reason: WSL_PREFLIGHT_REASON, repair: WSL_PREFLIGHT_REPAIR } : {}),
+   };
+ }
+ 
++export function resolveHostAdvisorRoute(input, sandboxPreflight = null) {
++  return resolveHostAdvisorRouteForHost(input, currentHostObservation(), sandboxPreflight);
++}
++
+ export function parseHostAdvisorRouteArgs(argv) {
+   if (!Array.isArray(argv) || argv.length !== 6) invalid(USAGE);
+   const input = {};
+@@ -94,8 +118,16 @@ export function parseHostAdvisorRouteArgs(argv) {
+   return input;
+ }
+ 
+-function writeRoute(input, write) {
+-  write(`${JSON.stringify(resolveHostAdvisorRoute(input))}\n`);
++function writeRoute(input, write, sandboxPreflight = null) {
++  write(`${JSON.stringify(resolveHostAdvisorRoute(input, sandboxPreflight))}\n`);
++}
++
++/** Optional trailing `--sandbox-preflight <receipt.json>`: the receipt a real preflight run wrote; unreadable means absent. */
++function splitPreflightArgs(argv) {
++  if (argv.length !== 8 || argv[6] !== "--sandbox-preflight") return { routeArgv: argv, sandboxPreflight: null };
++  let sandboxPreflight = null;
++  try { sandboxPreflight = JSON.parse(readFileSync(argv[7], "utf8")); } catch { sandboxPreflight = null; }
++  return { routeArgv: argv.slice(0, 6), sandboxPreflight };
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+@@ -105,7 +137,8 @@ if (isDirectInvocation(import.meta.url)) {
+       process.stdout.write(`${USAGE}\n`);
+     } else {
+       try {
+-        writeRoute(parseHostAdvisorRouteArgs(argv), process.stdout.write.bind(process.stdout));
++        const { routeArgv, sandboxPreflight } = splitPreflightArgs(argv);
++        writeRoute(parseHostAdvisorRouteArgs(routeArgv), process.stdout.write.bind(process.stdout), sandboxPreflight);
+       } catch {
+         process.stderr.write(`${USAGE}\n`);
+         process.exitCode = 2;
