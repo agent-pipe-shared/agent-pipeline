@@ -1,0 +1,30 @@
+[
+  {
+    "source": "scratch/agent-out/generator-integrated-13-qualification/report.md",
+    "sourceSha256": "06e9a57dc093dd533f01a6d9f5c1fa2a56ba58039bce8f081005b9f7251cca4f",
+    "artifact": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-current-failures/method/generator-report.md",
+    "sha256": "06e9a57dc093dd533f01a6d9f5c1fa2a56ba58039bce8f081005b9f7251cca4f",
+    "transformation": "Repository/home prefix projection in human report only; original capture bytes unchanged privately"
+  },
+  {
+    "source": "scratch/agent-out/d124-current-carry-qualification/report.md",
+    "sourceSha256": "0bc5e473cad1815ceb1386b52f495681ff2fbd2f87f0c54c7461ad6e6102751f",
+    "artifact": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-current-failures/method/d124-report.md",
+    "sha256": "0bc5e473cad1815ceb1386b52f495681ff2fbd2f87f0c54c7461ad6e6102751f",
+    "transformation": "Repository/home prefix projection in human report only; original capture bytes unchanged privately"
+  },
+  {
+    "source": "scratch/clones/g17-source-settlement-correction/scratch/agent-out/g17-approved-host-qualification/report.md",
+    "sourceSha256": "ee44e32e32d9c5cd4bfd309cb987ed973e231780846e5469a576f97fe68a88dd",
+    "artifact": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-current-failures/method/g17-report.md",
+    "sha256": "ee44e32e32d9c5cd4bfd309cb987ed973e231780846e5469a576f97fe68a88dd",
+    "transformation": "Repository/home prefix projection in human report only; original capture bytes unchanged privately"
+  },
+  {
+    "source": "scratch/clones/g6-matcher-readback-finalization/scratch/agent-out/g6-matcher-readback-finalization/final-report.md",
+    "sourceSha256": "76153fba8487dfd50fc14817b58faa46cbf3d309655326a3ea57f77e46d1caf2",
+    "artifact": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-current-failures/method/g6-report.md",
+    "sha256": "336d74012fdfb9976af219fc00a7439a37523740341423975e95390ca272eb54",
+    "transformation": "Repository/home prefix projection in human report only; original capture bytes unchanged privately"
+  }
+]

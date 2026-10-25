@@ -1,9 +1,9 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/snapshot.json",
-  "sha256": "7a8fb90bb87004bbc01360656b82fb74e64c89405a408efef48cdb6091d41822",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-current-failures/snapshot.json",
+  "sha256": "52583fbc5584fe02d336697791c284c522681b7ad6645465b292669bd06a692d",
   "measuredAt": "2026-10-25",
-  "head": "5017a7287485783fa2d4ff17d3f3240f2a719e13",
+  "head": "7ee8597e7453952e5041b01b1105325502df50f2",
   "counts": {
     "25": 2,
     "50": 24,
@@ -13,5 +13,5 @@
   },
   "index": 71.39,
   "total": 194,
-  "scope": "Same active0.7.0 scope; twelve original-clause committed readiness updates"
+  "scope": "Same194-row scope and stages; current qualification/decision reason amendment"
 }

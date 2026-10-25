@@ -1,0 +1,26 @@
+[
+  {
+    "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+    "stageUnchanged": "50",
+    "previousReason": "02916c512 and d63befd20 restated the D124 pin with GREEN 7/7, but 02916c512 reports the protected transition still succeeds for unconfigured baseline-only entry. Original implementation-authority rejection remains open; retain 50.",
+    "reason": "Latest explicit PO decision October23 tiles row4/34 supersedes older implementation-rejection wording: typed baseline-only carry is admitted at implementation and release remains blocked. Original current pin is6/7; A3 first real-command transition exits2 instead of0. A1/A2 pass. Fixture-first Git/calibration repair is active; no production weakening or original assertion change."
+  },
+  {
+    "itemId": "pipeline.design-generator-repeats-large-source-material",
+    "stageUnchanged": "50",
+    "previousReason": "C18 landed as 31378b331 and fixes the staging banner; PO triage moves cross-call compaction to later work. The original host output-budget clause still lacks a real large-input host measurement; retain 50.",
+    "reason": "Original current13-case pin is12 pass/1 fail: actual Codex driver15230 bytes exceeds unchanged15000 budget. The14047-byte source request is measured; source copies0/0/0 and other preservation checks pass. Narrow output repair is active; native host display/token qualification remains absent. Cross-call compaction remains deferred."
+  },
+  {
+    "itemId": "pipeline.greenfield.g6",
+    "stageUnchanged": "50",
+    "previousReason": "Native tool matcher and normalization committed; complete original installer/user-level matcher clause has no independently counted qualifying evidence here. Native-only 75 cannot be assumed.",
+    "reason": "Actual user-level installer matcher omission is reproduced. Frozen cumulative Source correction has green matcher/ownership/source-script/final-readback controls; aggregate12 primary write/edit denials remain unqualified because fixture mutates readiness inputs after binding. Fixture repair/enrollment is active; package remains inert and uncommitted."
+  },
+  {
+    "itemId": "pipeline.greenfield.g17",
+    "stageUnchanged": "50",
+    "previousReason": "Current qualification is active and uncommitted; prior inert helper 1/1/full attempt exit130 is partial, not committed delivery. C28 re-pin and actual launch/finalize mutation negatives remain.",
+    "reason": "PO-approved clone host correction now has focused GREEN managed positive with actual receipt hashes, nonvacuous settlement gap, inventory/root mutations and custody/replay compatibility. Exact nine-path patch8366bc8bc21599456c77c927af54aff2a498ee62e41877b074debab08641523a remains unintegrated. Automatic review refused Main import beyond clone-only approval; explicit Main tile pending. Enrollment, C28 re-pin and native qualification remain."
+  }
+]
