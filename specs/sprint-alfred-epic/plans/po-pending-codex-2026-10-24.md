@@ -1,5 +1,7 @@
 # Collected PO matters during the Codex fix wave
 
+**October25 active goal:** exact27 operator package is resolved as5e939278b. G7 normal commit5017a7287 and matrix1ccf0cb0f are read back. Matrix194 /26 below75 /71.39%. G23 four-file overlay is applied/staged and qualified; regular commit still refused TP-13/SDC after the explicitly approved heal succeeded. No capability seeded or bypass. Collect real operator work while independent slices continue. G17 clone-only host approval is complete and full focused qualification green; exact nine-path cumulative patch8366bc8b has a NEW explicit automatic-review Main-import refusal. Async Main-integration approval is pending; no G17 Main application. No need to repeat the already approved/performed heal or clone test permission. See docs/state.md current active-goal block and retained exact reports.
+
 **Follow-up readback:** `982e66c27` committed the isolated unsafe-options test
 fixture normally (74 pass/1 existing native skip, original assertions unchanged).
 It requires no operator repetition. The delivered27-path package remains exactly
