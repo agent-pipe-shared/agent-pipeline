@@ -1,0 +1,11 @@
+command: <host-path> --import <repo-root>/scratch/agent-out/codex-ready-fixture-user-preload.mjs plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+label: codex-ready-fixture-authoring-red
+exitCode: 0
+head: 32b398bf7c5bd03ba9184bea09305893ea4fbd61
+tree: 926a91a3f1718477cfd1234f2e7b4b8a375ac65f
+dirty: true
+--- stdout ---
+ok 1 - Bash, apply_patch, Edit and Write each reach their intended guard family
+1..1
+
+--- stderr ---

@@ -8,7 +8,16 @@ authority or review budget.
 
 ## Current machine/session course — PO update2026-10-25
 
-Continuehere; the planned PCtransfer/interruptionis cancelled. A signedinterim checkpoint hitG35 (Codexnestedpushguardbudget8s versusvalid14.09sevaluation); amanualpushworkarounddoesnotfulfilthefix. RepairandqualifyG35, updatecompletionmatrixanddurablehandover, thennewstamp/localinstallation/reloadwithruntimeversionreadbackandparallelrealGreenfieldruns. Backupfeaturepushisoptionaldeliverythroughits existingproofgate, notafeaturecloseorapause. Thisimplements theinformativeinstalled-candidateruns in step1 below; itdoesnotwaivetheremainingmatrixcontent, finalfullVerify/Security orfrozenbatchreview.
+Continue on this machine; PC transfer/interruption is cancelled. G35 is repaired
+and qualified in Source7502188da; evidence/bindingsb68e22c10 and the
+three-runner stamp32b398bf7 are committed. Install build suffix
+20261025125256.b68e22c, fully restart the host, read back the loaded runtime,
+then run the real Greenfield projects in parallel. Do not restamp or wait for
+later isolated fixes to start this informative candidate. See
+[restart handover](../../../docs/state.md) and its post-stamp checkpoint.
+Backup feature push remains optional through its proof route. This implements
+the informative installed-candidate runs in step1; the remaining matrix
+content, final Full Verify/Security and frozen review batch remain required.
 
 ## Release scope and matrix
 

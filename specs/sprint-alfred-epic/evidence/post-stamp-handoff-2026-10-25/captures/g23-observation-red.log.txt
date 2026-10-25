@@ -1,0 +1,36 @@
+command: <host-path> --import <repo-root>/plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs --test --test-name-pattern ^A4 <repo-root>/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+label: observation-red
+exitCode: 1
+head: 32b398bf7c5bd03ba9184bea09305893ea4fbd61
+tree: 926a91a3f1718477cfd1234f2e7b4b8a375ac65f
+dirty: true
+--- stdout ---
+✖ A4 a failed child adapter process is not observed as an implicit allow (1.792666ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 374.269135
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs:220:1
+✖ A4 a failed child adapter process is not observed as an implicit allow (1.792666ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs:222:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /child process/u,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+--- stderr ---

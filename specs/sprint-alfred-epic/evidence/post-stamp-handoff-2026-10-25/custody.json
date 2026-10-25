@@ -1,0 +1,167 @@
+{
+  "schema": "pipeline.post-stamp-local-handoff.v1",
+  "candidateCommit": "32b398bf7c5bd03ba9184bea09305893ea4fbd61",
+  "assurance": "Unintegrated methodology-only worker results; no native host proof or matrix promotion.",
+  "files": [
+    {
+      "slice": "codex",
+      "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+      "preSha256": "51ea61def89f1ab8619e57b61a4c275ce928828f34a46f669c6a1b0de6c08b0d",
+      "postSha256": "d0d8bdbf3cec6266fccce9b3ae67c5660a621bd30980c8fa2209f4c8a3dbf3e3"
+    },
+    {
+      "slice": "g23",
+      "path": "plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs",
+      "preSha256": "097f6c74883d5e9c0b7dd357e0c3d0f1afe7f65a648c1c2100f0646e797acb48",
+      "postSha256": "09b63b7742144e5f23644f76ee3973b10be548f1b112004c3a6beb54834882bf"
+    },
+    {
+      "slice": "g33",
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "preSha256": "a2e4e03434c39a73f3d44d3bb56b7233fa365be860245afaa4a3b5f664e6e218",
+      "postSha256": "1fa4fb4f0f69c425b4905f5fafea70eb86b73a86ae7b043675867d67d3300c91"
+    },
+    {
+      "slice": "g33",
+      "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+      "preSha256": "802e354b0052b8b6b1e35b54b13d2a838f7eb8fe9e73b2af92af062cace0685e",
+      "postSha256": "e73d434f7dd60c8b31eabcf86639a72c8ab33e789b65f5a7196527ee1acd671e"
+    }
+  ],
+  "captures": [
+    {
+      "slice": "codex",
+      "localOriginal": "scratch/clones/codex-ready-fixture-authoring/scratch/agent-out/codex-ready-fixture-authoring-green.json",
+      "originalSha256": "91ca673a0a2ebf690ce3d7ee48e137ca533568958b69dbc551b2a8e6ffc81a9b",
+      "portable": "captures/codex-focused-green.log.txt",
+      "portableSha256": "91ca673a0a2ebf690ce3d7ee48e137ca533568958b69dbc551b2a8e6ffc81a9b",
+      "scope": "exit0,1/1; original RED file overwritten and unavailable; full39 unrun"
+    },
+    {
+      "slice": "g23",
+      "localOriginal": "scratch/clones/g23-original-m7-qualification/scratch/agent-out/g23-original-m7/focused-m7-m8.txt",
+      "originalSha256": "a1d4be662bffda2baddf39d8960223603904008f72ae2fba408b708a3ce07367",
+      "portable": "captures/g23-original-m7-m8.log.txt",
+      "portableSha256": "a1d4be662bffda2baddf39d8960223603904008f72ae2fba408b708a3ce07367",
+      "scope": "exact baseline32b,exit0,5/5"
+    },
+    {
+      "slice": "g23",
+      "localOriginal": "scratch/clones/g23-original-m7-qualification/scratch/agent-out/g23-original-m7/observation-red.txt",
+      "originalSha256": "330e2bb6ff3b5aa7e5825bba852a3cfea54a3650453032c72a2d733b793255cf",
+      "portable": "captures/g23-observation-red.log.txt",
+      "portableSha256": "330e2bb6ff3b5aa7e5825bba852a3cfea54a3650453032c72a2d733b793255cf",
+      "scope": "exit1,1 regression fails before observation correction"
+    },
+    {
+      "slice": "g23",
+      "localOriginal": "scratch/clones/g23-original-m7-qualification/scratch/agent-out/g23-original-m7/observation-green.txt",
+      "originalSha256": "3c359550f38e194ad74f8b9e4f3d7eac5998dbe7c112d0d062bfbd7c5f904dda",
+      "portable": "captures/g23-observation-green.log.txt",
+      "portableSha256": "3c359550f38e194ad74f8b9e4f3d7eac5998dbe7c112d0d062bfbd7c5f904dda",
+      "scope": "exit0,1/1; precedes final Claude observer edit"
+    },
+    {
+      "slice": "g23",
+      "localOriginal": "scratch/clones/g23-original-m7-qualification/scratch/agent-out/g23-original-m7/corrected-m7-m8.txt",
+      "originalSha256": "838a63ff64fdc208a142fc45cfd8b51e46fc318f2c0276c1d0fb7104e9d38fae",
+      "portable": "captures/g23-corrected-m7-m8.log.txt",
+      "portableSha256": "838a63ff64fdc208a142fc45cfd8b51e46fc318f2c0276c1d0fb7104e9d38fae",
+      "scope": "exit0,5/5; precedes final Claude observer edit; full original unrun"
+    },
+    {
+      "slice": "g33",
+      "localOriginal": "scratch/clones/g33-existing-state-recovery/scratch/g33-post-close-deploy-test.log",
+      "originalSha256": "92d9172b53849e2e94dcec28dac6f9d41b93802e24da19e023719b43137ad48d",
+      "portable": "captures/g33-writer-green.log.txt",
+      "portableSha256": "92d9172b53849e2e94dcec28dac6f9d41b93802e24da19e023719b43137ad48d",
+      "scope": "exit0,one top-level Node test with three new internal assert cases"
+    },
+    {
+      "slice": "g33",
+      "localOriginal": "scratch/clones/g33-existing-state-recovery/scratch/g33-consumer-safe-paths.log",
+      "originalSha256": "97630d5795b6fd3fa41b00f8c93aaceef47d2f4b7cb7d6ab61c7453e7c9a38c0",
+      "portable": "captures/g33-consumer-green.log.txt",
+      "portableSha256": "97630d5795b6fd3fa41b00f8c93aaceef47d2f4b7cb7d6ab61c7453e7c9a38c0",
+      "scope": "exit0,9/9"
+    },
+    {
+      "slice": "g33",
+      "localOriginal": "scratch/clones/g33-existing-state-recovery/scratch/g33-continuity-regression.log",
+      "originalSha256": "2aa3fa7b1934409a8bcd1a27f864b085968b701d6bcfbfed8eea1f16b4302b63",
+      "portable": "captures/g33-continuity-environment-limited.log.txt",
+      "portableSha256": "2aa3fa7b1934409a8bcd1a27f864b085968b701d6bcfbfed8eea1f16b4302b63",
+      "scope": "exit1,268/308,40 SP-ADDRESS environment failures; unusable as product qualification"
+    }
+  ],
+  "ownerReports": [
+    {
+      "slice": "codex",
+      "localOriginal": "scratch/clones/codex-ready-fixture-authoring/scratch/agent-out/codex-ready-fixture-authoring-report.md",
+      "sha256": "b8a8648ac0b5c599f83966de159ffea1848f949d356bce8e3977182486f3d448",
+      "note": "Original local owner report; see explicit qualification limits."
+    },
+    {
+      "slice": "g23",
+      "localOriginal": "scratch/clones/g23-original-m7-qualification/scratch/agent-out/g23-original-m7/partial-report.md",
+      "sha256": "047a76898fc6cc2053b2f3b59689caa27a3956ee022d71dcb0d8b51abc40236f",
+      "note": "Original local owner report; see explicit qualification limits."
+    },
+    {
+      "slice": "g33",
+      "localOriginal": "scratch/clones/g33-existing-state-recovery/scratch/G33-EXISTING-INACTIVE-STATE-RECOVERY-checkpoint.md",
+      "sha256": "6d188405dc415045d6f4dcd5756e3656d5481d0fa13ba630ff88ff5e3b6ba239",
+      "note": "Initial entry paragraph predates edits; final implementation/hash sections supersede it. Canonical current status is README here."
+    }
+  ],
+  "patches": [
+    {
+      "slice": "codex",
+      "path": "codex.proposal.patch.txt",
+      "sha256": "7a741ccac87d89eaaad4e1a8c0116d6922edd5e0362952b968758ea027896900",
+      "status": "inert text export; not applied to Main"
+    },
+    {
+      "slice": "g23",
+      "path": "g23.proposal.patch.txt",
+      "sha256": "8bca872f6496c15a31289c01072446667c434ece779762443cd30fb7c68a3c50",
+      "status": "inert text export; not applied to Main"
+    },
+    {
+      "slice": "g33",
+      "path": "g33.proposal.patch.txt",
+      "sha256": "93ae53a53a7f274e7b3a651d7910f86e49e6bde37cfe3eec7ccbca55eda02db5",
+      "status": "inert text export; not applied to Main"
+    }
+  ],
+  "launchers": [
+    {
+      "slice": "codex",
+      "localOriginal": "scratch/clones/codex-ready-fixture-authoring/scratch/agent-out/codex-ready-fixture-test-runner.mjs",
+      "portable": "launchers/codex-codex-ready-fixture-test-runner.mjs.txt",
+      "sha256": "5d2ea285fb3648f38f7ecf572fd97b3c10e8e88e1d9fcebe486653046947aadf",
+      "scope": "Final local launcher configuration, not claimed to have run a full final suite. Review before execution."
+    },
+    {
+      "slice": "codex",
+      "localOriginal": "scratch/clones/codex-ready-fixture-authoring/scratch/agent-out/codex-ready-fixture-user-preload.mjs",
+      "portable": "launchers/codex-codex-ready-fixture-user-preload.mjs.txt",
+      "sha256": "af6c224acbe0c7183fb35926248de6da2fc7d1f16356390225002d341c3a8482",
+      "scope": "Final local launcher configuration, not claimed to have run a full final suite. Review before execution."
+    },
+    {
+      "slice": "g23",
+      "localOriginal": "scratch/clones/g23-original-m7-qualification/scratch/agent-out/g23-original-m7/safe-capture.mjs",
+      "portable": "launchers/g23-safe-capture.mjs.txt",
+      "sha256": "5f5da2421f0361f31a210ad5e34c4c8330e6613de54d7111117a5943f8f42c06",
+      "scope": "Final local launcher configuration, not claimed to have run a full final suite. Review before execution."
+    },
+    {
+      "slice": "g33",
+      "localOriginal": "scratch/clones/g33-existing-state-recovery/scratch/g33-synthetic-node-runtime.mjs",
+      "portable": "launchers/g33-g33-synthetic-node-runtime.mjs.txt",
+      "sha256": "90f0423875592f6298730a6943d09a6ab5eba5a5fa3e6778acc6db6c5077c31b",
+      "scope": "Final local launcher configuration, not claimed to have run a full final suite. Review before execution."
+    }
+  ]
+}

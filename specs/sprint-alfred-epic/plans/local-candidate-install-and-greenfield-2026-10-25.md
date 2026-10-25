@@ -12,11 +12,14 @@ The current matrix has197 items:175 at75,20 at50,two at25. The22 remaining
 content items remain in scope. No PRD/Spec change, Enterprise policy change,
 Full Verify PASS or Critic acceptance is implied.
 
-Commit evidence and administrative bindings, verify the checkout is clean,
-then run `node scripts/stamp-candidate.mjs`. Commit all three manifests in
-one separate stamp commit with one `Checkpoint-Intent` trailer. Read the
-expected candidate from the resulting tracked manifests; never substitute
-the previous `bc7dccb43` stamp or proof.
+Already completed: evidence/bindings commit `b68e22c10`, then three-manifest
+stamp commit `32b398bf7`. Expected shared suffix: `20261025125256.b68e22c`;
+Codex version: `0.7.0+codex.20261025125256.b68e22c`. Do not stamp again for
+this installation. A subsequent documentation-only handover HEAD does not
+change that plugin build. Never substitute the previous `bc7dccb43` stamp or
+its proof. Later isolated patches are described in the
+[post-stamp checkpoint](post-stamp-work-checkpoint-2026-10-25.md) and are not
+part of this installed test candidate.
 
 ## Attended local Codex installation
 

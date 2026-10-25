@@ -1,0 +1,969 @@
+command: node --test <repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+label: g33-continuity-regression
+exitCode: 1
+head: 32b398bf7c5bd03ba9184bea09305893ea4fbd61
+tree: 926a91a3f1718477cfd1234f2e7b4b8a375ac65f
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ OBC001 pristine requires all three continuity sources to be absent (24.222007ms)
+✔ OBC002 empty handover without machine state is damaged (18.057206ms)
+✔ OBC003 manual handover without machine state is damaged (16.53028ms)
+✔ OBC004 custom configured handover is observed instead of docs/state.md (17.776928ms)
+✔ OBC005 object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable (17.661008ms)
+✔ OBC006 object-shaped configured handover without a usable .path still fails unavailable (13.797197ms)
+✔ OBC007 present inactive state is damaged rather than pristine (20.379317ms)
+✔ OBC008 writer-shaped closed state is a valid feature re-entry boundary (21.534221ms)
+✔ OBC009 a current closed entry keeps its compact audit reference observable without weakening historical entries (16.04299ms)
+✔ OBC010 writer-shaped unapproved design state remains valid before continuity initialization (17.69077ms)
+✔ OBC011 inactive and design transition lookalikes remain damaged (28.274807ms)
+✔ OBC012 writer-shaped discard state is a valid feature re-entry boundary (77.736918ms)
+✔ OBC013 writer-shaped discard state with a prior closed feature remains valid (64.550085ms)
+✔ OBC014 a discard as the latest transaction is observable by the cleanup reader, not only by the projection (131.66666ms)
+✔ OBC015 discard transition accepts exact feature-bound archived plan receipts (16.605037ms)
+✔ OBC016 discard transition rejects malformed or foreign archived plan receipts (63.917693ms)
+✔ OBC017 discard transition with a stale updatedAt remains damaged (15.866443ms)
+✔ OBC018 discard entry with an extra key remains damaged (15.69596ms)
+✔ OBC019 discard entry missing a required key remains damaged (15.633231ms)
+✔ OBC020 discard transition with planApproved true remains damaged (15.426969ms)
+✔ OBC021 discard transition with continuity still present remains damaged (15.757186ms)
+✔ OBC022 discard transition with an empty discardedFeatures array remains damaged (15.907601ms)
+✔ OBC023 discard entry whose planPath escapes the project root remains damaged (16.472194ms)
+✔ OBC024 orphan continuity and invalid active feature are damaged (19.143795ms)
+✔ OBC025 malformed state is unavailable and retains no invented digest (15.20923ms)
+✔ OBC026 mode-unreadable state is unavailable (12.450284ms)
+✔ OBC027 machine-state symlink is unavailable (13.231352ms)
+✔ OBC028 project-root symlink is unavailable (12.882283ms)
+✔ OBC029 private history without machine state is damaged (23.273232ms)
+✔ OBC030 malformed private history is unavailable with its observed digest (17.006459ms)
+✔ OBC031 non-private history mode is unavailable (22.308273ms)
+✔ OBC032 win32: a POSIX-insecure history file is admitted via the injected DACL assurance instead of failing closed (23.478685ms)
+✔ OBC033 win32: an insecure DACL assessment on the private directory still fails closed (18.437543ms)
+✔ OBC034 win32: a secure directory but an insecure history-file DACL assessment still fails closed (23.676642ms)
+✔ OBC035 unsafe escape handover path is unavailable (12.160262ms)
+✔ OBC036 unsafe absolute handover path is unavailable (12.044848ms)
+✔ OBC037 unsafe backslash handover path is unavailable (12.104319ms)
+✔ OBC038 handover symlink is unavailable (13.13749ms)
+✔ OBC039 mode-unreadable handover is unavailable even for privileged test runners (12.97464ms)
+✔ OBC040 goal validation trims UTF-8 and preserves shell metacharacters as data (0.235267ms)
+✔ OBC041 goal rejects blank (0.437932ms)
+✔ OBC042 goal rejects NUL (0.079612ms)
+✔ OBC043 goal rejects multiple lines (0.102224ms)
+✔ OBC044 goal rejects over 160 bytes (0.083649ms)
+✔ OBC045 goal rejects UTF-8 over 160 bytes (0.066286ms)
+✔ OBC046 160-byte goal is accepted exactly (0.078499ms)
+✔ OBC047 kickoff plan is deterministic, closed, valid, and read-only (22.689396ms)
+✔ OBC048 kickoff resolves the PO language from a neutral runtime manifest (18.731677ms)
+✔ OBC049 apply requires activation and the exact plan digest (23.066853ms)
+✔ OBC050 apply is calibration-CAS bound and writes nothing after drift (39.871879ms)
+✔ OBC051 apply rejects apply-metadata drift even when the top-level digest field is unchanged (21.013082ms)
+✔ OBC052 apply rejects a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-H-LASTBUILDERS) (21.96496ms)
+✔ OBC053 reconstructOnboardingKickoffPlan (replay): the reconstructed goal-bound plan also publishes nextAction identical to applyAction (NVA-H-LASTBUILDERS) (63.601582ms)
+✔ OBC054 planOnboardingKickoff: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-H-LASTBUILDERS) (16.908934ms)
+✖ OBC055 planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS) (658.547176ms)
+✔ OBC056 planOnboardingKickoffPromotionCleanupRecovery: a not-applicable result carries neither applyAction nor nextAction nor planSha256 (NVA-H-LASTBUILDERS) (21.661459ms)
+✔ OBC057 pre-existing initial authority artifact blocks plan without overwriting it (26.896328ms)
+✔ OBC058 apply creates exact state, configured handover, private history, and immediate valid readback (73.841877ms)
+✖ OBC059 cleanup descriptor bind and release use exact state CAS without touching other fields (653.79562ms)
+✖ OBC060 bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state (612.910343ms)
+✔ OBC061 bindEphemeralPrivateCleanup refuses a non-neutral (legacy .claude/) state -- it never writes tracked authority state on a session-less caller's behalf (60.818184ms)
+✖ OBC062 bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound (630.20984ms)
+✔ OBC063 bounded repair normalizes only the invalid active-turn resume pair (91.865363ms)
+✔ OBC064 shared close-evidence damage is diagnosed and repaired without changing evidence bytes (59.652931ms)
+✔ OBC065 shared evidence repair keeps the sole matching claimant regardless of age and quarantines every mismatch (47.230305ms)
+✔ OBC066 shared close-evidence repair refuses missing, unrelated, and ambiguous evidence (52.785423ms)
+✔ OBC067 shared evidence diagnosis refuses zero matching claims, multiple groups, and independent stale claims (55.696094ms)
+✔ OBC068 shared evidence repair refuses unsafe paths and malformed unrelated state without writing (106.674714ms)
+✔ OBC069 shared evidence repair rejects forged audit relationships after a successful repair (79.340449ms)
+✔ OBC070 repair records must bind existing feature IDs and exact live closed-feature assertions (127.108654ms)
+✔ OBC071 repair records cannot reuse a claimant across records even with different plan and preimage digests (73.890339ms)
+✔ OBC072 a new collision overlapping an earlier repair is refused before changing State (57.749475ms)
+✔ OBC073 shared evidence repair preserves earlier repair records byte-for-byte on another independent repair (78.009666ms)
+✔ OBC074 shared close-evidence repair reports typed lock and CAS drift refusals without touching evidence (55.423856ms)
+✔ OBC075 shared evidence drift before replacement refuses without changing State and cleans the owned temporary (75.380381ms)
+✔ OBC076 shared evidence repair failed readback is typed and committed, even if continuity remains valid (88.820364ms)
+✔ OBC077 legacy adoption is explicit, PO-bound, and does not invent kickoff history (38.287029ms)
+✔ OBC078 continuity repair rejects authority drift and arbitrary invalid state (62.196102ms)
+✔ OBC079 operator-authority-required repair goes red then green once operator authority is supplied (21.893875ms)
+✔ OBC080 operator-confirmed repair applies end-to-end to a valid classification (41.293681ms)
+✔ OBC081 operator-confirmed repair refuses a bad or missing operator-supplied PRD or Spec path (22.687774ms)
+✔ OBC082 completed apply replay is byte-null and returns the identical continuity hashes (70.171464ms)
+✔ OBC083 a competing state appearance fails closed (32.225764ms)
+✔ OBC084 lock rejection creates neither private nor project target parents (21.600628ms)
+✔ OBC085 kickoff never unlinks a predictable foreign temporary artifact (45.617401ms)
+✔ OBC086 failed kickoff removes only its newly created empty target parents (44.171493ms)
+✔ OBC087 fault at prd-temp-fsync rolls back every proposed byte and permits a clean retry (85.094812ms)
+✔ OBC088 fault at spec-temp-fsync rolls back every proposed byte and permits a clean retry (90.686755ms)
+✔ OBC089 fault at state-temp-fsync rolls back every proposed byte and permits a clean retry (94.407368ms)
+✔ OBC090 fault at handover-temp-fsync rolls back every proposed byte and permits a clean retry (99.935671ms)
+✔ OBC091 fault at history-temp-fsync rolls back every proposed byte and permits a clean retry (108.656855ms)
+✔ OBC092 fault at prd-rename rolls back every proposed byte and permits a clean retry (105.740459ms)
+✔ OBC093 fault at prd-directory-fsync rolls back every proposed byte and permits a clean retry (106.493384ms)
+✔ OBC094 fault at spec-rename rolls back every proposed byte and permits a clean retry (108.39432ms)
+✔ OBC095 fault at spec-directory-fsync rolls back every proposed byte and permits a clean retry (108.574554ms)
+✔ OBC096 fault at handover-rename rolls back every proposed byte and permits a clean retry (109.155814ms)
+✔ OBC097 fault at handover-directory-fsync rolls back every proposed byte and permits a clean retry (112.361113ms)
+✔ OBC098 fault at history-rename rolls back every proposed byte and permits a clean retry (108.038439ms)
+✔ OBC099 fault at history-directory-fsync rolls back every proposed byte and permits a clean retry (110.024052ms)
+✔ OBC100 fault at state-rename rolls back every proposed byte and permits a clean retry (109.621998ms)
+✔ OBC101 fault at state-directory-fsync rolls back every proposed byte and permits a clean retry (115.508649ms)
+✔ OBC102 crash at prd-temp-fsync is recovered only by the same digest-bound plan (96.400449ms)
+✔ OBC103 crash at spec-temp-fsync is recovered only by the same digest-bound plan (86.033871ms)
+✔ OBC104 crash at state-temp-fsync is recovered only by the same digest-bound plan (86.221086ms)
+✔ OBC105 crash at handover-temp-fsync is recovered only by the same digest-bound plan (86.915694ms)
+✔ OBC106 crash at history-temp-fsync is recovered only by the same digest-bound plan (90.373946ms)
+✔ OBC107 crash at prd-rename is recovered only by the same digest-bound plan (85.846565ms)
+✔ OBC108 crash at prd-directory-fsync is recovered only by the same digest-bound plan (88.459568ms)
+✔ OBC109 crash at spec-rename is recovered only by the same digest-bound plan (85.503974ms)
+✔ OBC110 crash at spec-directory-fsync is recovered only by the same digest-bound plan (87.716526ms)
+✔ OBC111 crash at handover-rename is recovered only by the same digest-bound plan (83.31207ms)
+✔ OBC112 crash at handover-directory-fsync is recovered only by the same digest-bound plan (82.095237ms)
+✔ OBC113 crash at history-rename is recovered only by the same digest-bound plan (81.840533ms)
+✔ OBC114 crash at history-directory-fsync is recovered only by the same digest-bound plan (82.93413ms)
+✔ OBC115 crash at state-rename is recovered only by the same digest-bound plan (75.527059ms)
+✔ OBC116 crash at state-directory-fsync is recovered only by the same digest-bound plan (77.895217ms)
+✔ OBC117 revision-0 kickoff seed promotion remains monotonic and replayable (139.215688ms)
+✔ OBC118 promotion requires bound design evidence and rejects post-promotion evidence drift without repair (151.737616ms)
+✖ OBC119 authentic post-privatization kickoff seed promotes revision 1 to revision 2 (634.375729ms)
+✖ OBC120 post-privatization promotion promotion-history-temp-fsync crash recovers with the same bound plan (614.003185ms)
+✖ OBC121 post-privatization promotion promotion-history-rename crash recovers with the same bound plan (716.094975ms)
+✖ OBC122 post-privatization promotion promotion-history-published crash recovers with the same bound plan (642.408516ms)
+✖ OBC123 post-privatization promotion promotion-handover-temp-fsync crash recovers with the same bound plan (607.938224ms)
+✖ OBC124 post-privatization promotion promotion-handover-rename crash recovers with the same bound plan (676.992649ms)
+✖ OBC125 post-privatization promotion promotion-handover-published crash recovers with the same bound plan (645.045375ms)
+✖ OBC126 post-privatization promotion promotion-cleanup-binding-published crash recovers with the same bound plan (656.464118ms)
+✖ OBC127 post-privatization promotion promotion-state-temp-fsync crash recovers with the same bound plan (622.152231ms)
+✖ OBC128 post-privatization promotion promotion-state-rename crash recovers with the same bound plan (621.689032ms)
+✖ OBC129 post-privatization promotion promotion-state-published crash recovers with the same bound plan (637.489932ms)
+✔ OBC130 promotion retires the provisional kickoff anchors with a marker naming its successor (120.246395ms)
+✔ OBC131 the promotion replaces the handover the kickoff wrote (136.97525ms)
+✖ OBC132 a crash after the handover publication rolls forward, never backward (629.208292ms)
+✔ OBC133 a foreign handover write is drift, not a prefix to roll forward over (82.739512ms)
+✖ OBC134 promotion crash at promotion-history-temp-fsync leaves the provisional kickoff anchors byte for byte (605.984935ms)
+✖ OBC135 promotion crash at promotion-history-rename leaves the provisional kickoff anchors byte for byte (631.302425ms)
+✖ OBC136 promotion crash at promotion-history-published leaves the provisional kickoff anchors byte for byte (653.854512ms)
+✖ OBC137 promotion crash at promotion-handover-temp-fsync leaves the provisional kickoff anchors byte for byte (679.55132ms)
+✖ OBC138 promotion crash at promotion-handover-rename leaves the provisional kickoff anchors byte for byte (725.644974ms)
+✖ OBC139 promotion crash at promotion-handover-published leaves the provisional kickoff anchors byte for byte (630.719099ms)
+✖ OBC140 promotion crash at promotion-cleanup-binding-published leaves the provisional kickoff anchors byte for byte (629.159437ms)
+✖ OBC141 promotion crash at promotion-state-temp-fsync leaves the provisional kickoff anchors byte for byte (628.232487ms)
+✖ OBC142 promotion crash at promotion-state-rename leaves the provisional kickoff anchors byte for byte (679.888016ms)
+✖ OBC143 promotion crash at promotion-state-published leaves the provisional kickoff anchors byte for byte (704.524212ms)
+✔ OBC144 promotion replay after supersession stays zero-write and canonically identical (137.311709ms)
+✔ OBC145 an already-cleaned provisional location survives inspection and replay (135.810375ms)
+✔ OBC146 an already-marked provisional location is never overwritten by the promotion (127.626659ms)
+✖ OBC147 legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay (649.38401ms)
+✖ OBC148 legacy promotion cleanup recovery is crash-replay safe after private binding publication (590.018718ms)
+✖ OBC149 ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay (582.677577ms)
+✖ OBC150 legacy promotion cleanup mismatch history-binding fails closed (602.436094ms)
+✖ OBC151 legacy promotion cleanup mismatch state-feature fails closed (583.987419ms)
+✔ OBC152 revision-1 kickoff lookalike without authenticated private binding is rejected (73.422956ms)
+✖ OBC153 post-privatization kickoff rejects revision-two (632.616005ms)
+✖ OBC154 post-privatization kickoff rejects authority-drift (595.119235ms)
+✖ OBC155 post-privatization kickoff rejects dispatch (601.583336ms)
+✖ OBC156 post-privatization kickoff rejects blocker (621.375285ms)
+✖ OBC157 post-privatization kickoff rejects queue-mutation (652.540172ms)
+✖ OBC158 post-privatization kickoff rejects result (691.296741ms)
+✖ OBC159 post-privatization kickoff rejects decision (718.838955ms)
+✖ OBC160 post-privatization kickoff rejects false-history (800.698244ms)
+✔ OBC161 promotion binds the PRD as the approval subject and presents the Spec beside it (120.302353ms)
+✔ OBC162 the recorded promotion transaction names the PRD and the Spec with both digests (113.659438ms)
+✔ OBC163 editing the promoted PRD invalidates the mutual digest binding (115.17704ms)
+✔ OBC164 editing the promoted Spec invalidates the mutual digest binding (118.078404ms)
+✔ OBC165 the promoted state's language is the promoted PRD's marker, not the kickoff default (221.818504ms)
+✔ OBC166 a reopened design may edit its promoted documents without ending the session (127.968182ms)
+✔ OBC167 promotion refuses a plan that is the Spec, a plan that is not a prd_*.md, and a noncanonical Spec (68.322788ms)
+✔ OBC168 promotion refuses a feature id that would later fail push-approval's stricter shape (73.680186ms)
+✔ OBC169 promotion refuses a PRD without the technical Spec marker, naming the exact digest to add (68.107058ms)
+✔ OBC170 promotion refuses a PRD carrying more than one technical Spec marker, with the same missing-marker code (69.472483ms)
+✔ OBC171 promotion refuses a PRD whose technical Spec marker disagrees with the neighboring spec.md, with a distinct code (68.754609ms)
+✔ OBC172 promotion refuses a PRD without the PO plan acknowledgement marker (NVA-W4-2B) (67.87654ms)
+✔ OBC173 promotion refuses a PRD carrying more than one PO plan acknowledgement marker, with the same missing-marker code (NVA-W4-2B) (69.634289ms)
+✔ OBC174 a generated coordinator checkpoint cannot be re-routed through a new legacy kickoff promotion (318.489619ms)
+✔ OBC175 promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set (139.911221ms)
+✔ OBC176 promote apply independently refuses a PRD that lost its technical Spec marker after plan (90.483498ms)
+✔ OBC177 promotion admits a PRD carrying both correct po-gate markers exactly as before (105.705647ms)
+✔ OBC178 promotion admits a PRD carrying a document-language marker outside {de, en} and records it separately from the operator-facing language (111.59724ms)
+✔ OBC179 a promoted feature satisfies the PO plan gate and its evidence names PRD and Spec alike (112.493613ms)
+✔ OBC180 a legacy promotion whose planPath is the Spec stays readable and is refused a new promotion (108.461143ms)
+✔ OBC181 a plan-bound apply action cannot be constructed without the runner its plan was made under (85.435014ms)
+✔ OBC182 every kickoff/promotion plan builder carries its runner into the resolved apply action (enumerating) (266.309814ms)
+✔ OBC183 nextActionSection: no active feature renders the set-feature action (0.87401ms)
+✔ OBC184 nextActionSection: a closed feature (activeFeature removed) renders the same set-feature action (0.326861ms)
+✔ OBC185 nextActionSection: draft (no submission yet) renders submit-plan (0.476415ms)
+✔ OBC186 nextActionSection: awaiting-approval points at the canonical typed inspection action (0.479711ms)
+✔ OBC187 nextActionSection: approved but still in design phase renders set-phase implementation (0.542711ms)
+✔ OBC188 nextActionSection: implementing (phase switched) renders the proceed-with-implementation text (0.228033ms)
+✔ OBC189 nextActionSection: a contradictory state (planApproved true, no approval on record) fails closed to the live-source fallback (0.158721ms)
+✔ OBC190 nextActionSection: a malformed state (unrecognized schema) never throws and falls back to the live-source text (0.090271ms)
+✔ OBC191 nextActionSection does not mutate its input state object (0.166697ms)
+✔ OBC192 replaceNextActionSection: replaces only the Next-action span; another heading follows (0.190392ms)
+✔ OBC193 replaceNextActionSection: Next action is the last section (EOF); trailing newline preserved (0.093167ms)
+✔ OBC194 replaceNextActionSection: returns null (fail closed) when no '## Next action' heading exists (0.070354ms)
+✔ OBC195 replaceNextActionSection: returns null on non-string input rather than throwing (0.069523ms)
+✔ OBC196 syncStateMdNextAction: rewrites docs/state.md's Next action section in place (2.440426ms)
+✔ OBC197 syncStateMdNextAction: fails closed (no write) when docs/state.md is absent (0.948071ms)
+✔ OBC198 syncStateMdNextAction: fails closed (no corruption) when no '## Next action' heading exists (1.622182ms)
+✔ OBC199 syncStateMdNextAction: resyncs a calibration-configured handover path, not docs/state.md (13.312841ms)
+✔ OBC200 syncStateMdNextAction: resyncs an object-shaped ({ path, maxBytes }) calibration-configured handover (13.041566ms)
+✔ OBC201 syncStateMdNextAction: is a no-op write when the rendered text already matches (1.812233ms)
+✔ OBC202 intake checkpoint: validateIntakeCheckpoint round-trips through readOnboardingIntakeCheckpoint (74.316546ms)
+✔ OBC203 applyOnboardingIntakeConsent: happy path grants consent and fills all three values in one bundled ask (45.238312ms)
+✔ OBC204 applyOnboardingIntakeConsent: activation is required (11.762437ms)
+✔ OBC205 applyOnboardingIntakeConsent: requires explicit affirmative consent (11.572615ms)
+✔ OBC206 applyOnboardingIntakeConsent: rejects an invalid candidate git author (12.047939ms)
+✔ OBC207 applyOnboardingIntakeConsent: rejects an invalid candidate language (11.457707ms)
+✔ OBC208 applyOnboardingIntakeConsent: rejects an invalid candidate profile (12.714403ms)
+✔ OBC209 applyOnboardingIntakeConsent: idempotent re-run only fills fields still null, never overwrites an answered one (88.177068ms)
+✔ OBC210 applyOnboardingIntakeConsent: without text, consent applies without creating a material capture (61.138991ms)
+✔ OBC211 applyOnboardingIntakeConsent: text is likewise a true no-op when explicitly undefined (60.782403ms)
+✔ OBC212 applyOnboardingIntakeConsent: on a FRESH project (no checkpoint yet), supplying text records consent AND captures that material in one call -- proving consent is recorded before capture runs (98.796712ms)
+✔ OBC213 applyOnboardingIntakeConsent: a merged call produces the identical checkpoint (minus timestamps) as two separate consent-apply then capture-apply calls (167.200404ms)
+✔ OBC214 applyOnboardingIntakeConsent: a merged call that fails at the capture step leaves consent durably recorded, and a retry converges (104.475669ms)
+✔ OBC215 applyOnboardingIntakeCapture: happy path appends one evidence file and one materialInput entry (92.932662ms)
+✔ OBC216 applyOnboardingIntakeCapture: activation is required (47.234815ms)
+✔ OBC217 applyOnboardingIntakeCapture: rejects empty text (47.162639ms)
+✔ OBC218 applyOnboardingIntakeCapture: rejects a chunk over the per-chunk byte limit (48.028666ms)
+✔ OBC219 applyOnboardingIntakeCapture: requires consent to already be recorded (45.455628ms)
+✔ OBC220 applyOnboardingIntakeCapture: advances transactionState from collecting to design-questions-pending only on the first capture (123.553051ms)
+✔ OBC221 applyOnboardingIntakeCapture: an idempotent duplicate-content capture converges without a second entry (110.166158ms)
+✔ OBC222 readOnboardingIntakeMaterialInput: absent checkpoint returns status absent and an empty chunk list (17.76977ms)
+✔ OBC223 readOnboardingIntakeMaterialInput: resolves every captured chunk back to its byte-identical text, in capture order (132.624515ms)
+✔ OBC224 applyOnboardingIntakeDesignQuestions: happy path records the bundled round and flips to ready-to-generate (116.361669ms)
+✔ OBC225 applyOnboardingIntakeDesignQuestions: activation is required (86.87802ms)
+✔ OBC226 applyOnboardingIntakeDesignQuestions: rejects an empty answer set (89.23194ms)
+✔ OBC227 applyOnboardingIntakeDesignQuestions: affirmative zero-open disposition is distinct from missing input and replays exactly (125.648863ms)
+✔ OBC228 applyOnboardingIntakeDesignQuestions: requires at least one captured material-input chunk first (58.792897ms)
+✔ OBC229 applyOnboardingIntakeDesignQuestions: requires an existing checkpoint at all (26.015305ms)
+✔ OBC230 applyOnboardingIntakeDesignQuestions: normal apply refuses a different answer set once the round is already answered (124.54808ms)
+✔ OBC231 applyOnboardingIntakeDesignQuestions: explicit replacement corrects answers before generation (135.169901ms)
+✔ OBC232 applyOnboardingIntakeDesignQuestions: explicit replacement is refused after staging generation (232.305785ms)
+✔ OBC233 applyOnboardingIntakeDesignQuestions: an exact replay of the same already-answered round is a no-op (125.407644ms)
+✔ OBC234 intake checkpoint write: crash at cas-recheck leaves either absent or fully committed content, never torn, and a retry converges (91.761482ms)
+✔ OBC235 intake checkpoint write: crash at temp-fsync leaves either absent or fully committed content, never torn, and a retry converges (94.527843ms)
+✔ OBC236 intake checkpoint write: crash at rename leaves either absent or fully committed content, never torn, and a retry converges (80.197747ms)
+✔ OBC237 intake checkpoint write: crash at directory-fsync leaves either absent or fully committed content, never torn, and a retry converges (79.130907ms)
+✔ OBC238 intake checkpoint evidence: crash at evidence-temp-fsync leaves either absent or fully committed evidence bytes, never torn, and a retry converges (102.242594ms)
+✔ OBC239 intake checkpoint evidence: crash at evidence-rename leaves either absent or fully committed evidence bytes, never torn, and a retry converges (100.317868ms)
+✔ OBC240 intake checkpoint evidence: crash at evidence-directory-fsync leaves either absent or fully committed evidence bytes, never torn, and a retry converges (103.999232ms)
+✔ OBC241 intake checkpoint: a preimage that changes between the two observations is refused as CAS drift, not silently overwritten (76.227329ms)
+✔ OBC242 planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path derives and writes all three staging targets (233.688586ms)
+✔ OBC243 applyOnboardingIntakeGenerate: private host paths and material never reach a tracked target, the ignored authoring copy keeps the original verbatim, and restart-readable intake evidence is unchanged (363.327028ms)
+✔ OBC244 planOnboardingIntakeGenerate: path-free material is repeated in no tracked artifact and keeps its exact byte layout in the ignored authoring copy (268.956012ms)
+✔ OBC245 applyOnboardingIntakeGenerate: private host paths and material never reach a tracked target, the ignored authoring copy keeps the original verbatim, and restart-readable intake evidence is unchanged (385.399889ms)
+✔ OBC246 planOnboardingIntakeGenerate: path-free material is repeated in no tracked artifact and keeps its exact byte layout in the ignored authoring copy (245.268971ms)
+✔ OBC247 planOnboardingIntakeGenerate: publishes a nextAction naming intake-generate-apply with the plan's own digest, so the generic guided driver (onboarding-init.mjs, which reads ONLY nextAction) does not stall here (220.410925ms)
+✔ OBC248 applyOnboardingIntakeGenerate: activation is required (128.218625ms)
+✔ OBC249 planOnboardingIntakeGenerate: requires an existing checkpoint (19.483295ms)
+✔ OBC250 planOnboardingIntakeGenerate: refuses a checkpoint still short of ready-to-generate (56.718015ms)
+✔ OBC251 applyOnboardingIntakeGenerate: refuses a plan digest mismatch (126.669032ms)
+✔ OBC252 applyOnboardingIntakeGenerate: creates specs/ itself instead of demanding it, on a root that has neither specs/ nor project/ (232.569295ms)
+✔ OBC253 applyOnboardingIntakeGenerate: a re-run against the same checkpoint revision is a true no-op (309.397334ms)
+✔ OBC254 applyOnboardingIntakeGenerate: a changed checkpoint safely regenerates with a STABLE featureId (374.67839ms)
+✔ OBC255 intake staging generation: crash at designInput-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges (297.959766ms)
+✔ OBC256 intake staging generation: crash at designInput-rename leaves that target either absent or fully committed, never torn, and a retry converges (308.81116ms)
+✔ OBC257 intake staging generation: crash at designInput-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges (291.197077ms)
+✔ OBC258 intake staging generation: crash at prd-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges (269.602827ms)
+✔ OBC259 intake staging generation: crash at prd-rename leaves that target either absent or fully committed, never torn, and a retry converges (273.282037ms)
+✔ OBC260 intake staging generation: crash at prd-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges (271.538886ms)
+✔ OBC261 intake staging generation: crash at spec-temp-fsync leaves that target either absent or fully committed, never torn, and a retry converges (269.612466ms)
+✔ OBC262 intake staging generation: crash at spec-rename leaves that target either absent or fully committed, never torn, and a retry converges (269.092418ms)
+✔ OBC263 intake staging generation: crash at spec-directory-fsync leaves that target either absent or fully committed, never torn, and a retry converges (299.574446ms)
+✖ OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement (513.309737ms)
+✔ OBC265 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor (445.656767ms)
+✔ OBC266 applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay (468.633569ms)
+✔ OBC267 planOnboardingBootstrapBind: requires an existing intake checkpoint (18.894481ms)
+✔ OBC268 planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated (125.444976ms)
+✔ OBC269 planOnboardingBootstrapBind: refuses once already bound (not absent-pristine) (452.860027ms)
+✔ OBC270 applyOnboardingBootstrapBind: activation is required (381.715379ms)
+✔ OBC271 a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1) (443.107333ms)
+✔ OBC272 planOnboardingBootstrapBind: a marker-less generated PRD is refused even before a hand edit (237.179544ms)
+✔ OBC273 planOnboardingBootstrapBind / applyOnboardingBootstrapBind: an acknowledged intake-generated staging PRD binds end to end through the coordinator-sourced path (443.223133ms)
+✔ OBC274 applyOnboardingBootstrapBind: a PRD edit made after planning is refused by the plan-digest binding (442.152624ms)
+✔ OBC275 applyOnboardingBootstrapBind: consent withdrawal after an acknowledged plan does not erase its bound acknowledgement (454.9146ms)
+✔ OBC276 planOnboardingBootstrapBind: the same pure-generator staging PRD is refused when the checkpoint's recorded consent is absent (NVA-R2-STAGINGACKTESTS) (247.08386ms)
+✔ OBC277 planOnboardingKickoffPromotion: a kickoff-sourced (non-coordinator) promotion of a marker-less PRD stays refused -- the exemption is unreachable from this route (NVA-R2-STAGINGACKTESTS) (73.14514ms)
+✔ OBC278 planOnboardingKickoffPromotion (kickoff-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest (73.420583ms)
+✔ OBC279 reconstructOnboardingKickoffPromotionPlan (kickoff-sourced, replay): the reconstructed plan also publishes nextAction identical to applyAction (111.612311ms)
+✔ OBC280 planOnboardingBootstrapBind (coordinator-sourced, freshly built): publishes nextAction identical to applyAction, carrying the plan's own digest (392.296265ms)
+✔ OBC281 reconstructOnboardingKickoffPromotionPlan (coordinator-sourced, replay): the reconstructed binding also publishes nextAction identical to applyAction (442.223064ms)
+✔ OBC282 planOnboardingKickoffPromotion: planSha256 is bound to the transaction alone -- publishing nextAction changes no plan digest (NVA-F-PROMOTIONACTION) (71.538096ms)
+✔ OBC283 applyOnboardingKickoffPromotion: refuses a plan whose nextAction disagrees with its own re-derived apply action, exactly as a mismatched applyAction is refused (NVA-F-PROMOTIONACTION) (69.409813ms)
+✔ OBC284 promotion apply for a local repository publishes a PO-gate profile receipt that po-gate-authority.mjs's own validator accepts (NVA-P-RECEIPTPIN) (142.31176ms)
+✔ OBC285 promotion apply replay leaves exactly one valid PO-gate profile receipt, untouched byte for byte (NVA-P-RECEIPTPIN) (177.30186ms)
+✔ OBC286 applyOnboardingBootstrapBind: a PO answer of de propagates into the configured language pair, and the PO gate does not raise PO-GATE-PRD-LANGUAGE-MISMATCH (NVA-R5-LANGWIRE) (505.414561ms)
+✔ OBC287 applyOnboardingBootstrapBind: a content language outside {de, en} (fr) still binds end to end and passes the PO gate without forcing the operator-facing axis (NVA-R5-LANGWIRE) (472.90251ms)
+✔ OBC288 mechanical Spec marker repair preserves all other document and checkpoint bytes (443.290576ms)
+✔ OBC289 mechanical Spec marker repair rejects stale PRD and Spec before any replacement (543.513389ms)
+✔ OBC290 mechanical Spec marker repair refuses acknowledged or bound authority (827.506249ms)
+✔ OBC291 mechanical Spec marker repair refuses malformed duplicate and invalid UTF8 input (773.866974ms)
+✔ OBC292 mechanical Spec marker repair rejects an edit between temporary fsync and publication (328.288869ms)
+✔ OBC293 mechanical Spec marker repair reports committed readback drift without a success receipt (337.782429ms)
+✔ OBC294 mechanical Spec marker repair rejects symlink and hardlink staging aliases (481.614438ms)
+✔ OBC295 mechanical Spec marker repair preserves BOM CRLF Unicode and final blank lines (329.737086ms)
+✔ OBC296 mechanical Spec marker route publishes CLI argv admitted in bootstrap-binding phase (474.054314ms)
+✔ OBC297 mechanical Spec marker route parser and guard refuse incomplete or expanded argv (247.570122ms)
+✔ OBC298 first enrollment history reads stay empty and ignore foreign shared worktree intake (187.640014ms)
+✔ OBC299 two worktrees keep root-bound intake slots and preserve the other root's legacy authority (153.46299ms)
+✔ OBC300 planOnboardingBootstrapBind: the marker-missing refusal on an unfinished architecture draft carries the architecture-design next action (greenfield walk F7) (257.212667ms)
+✔ OBC301 planOnboardingBootstrapAcknowledgementChat: a PRD or spec still holding generated-draft markers is refused with BOOTSTRAP-ACK-PLACEHOLDER-CONTENT and writes no request (greenfield walk F9) (258.54635ms)
+✔ OBC302 a closed entry carrying the writer's rigor fields and journal is a valid feature re-entry boundary (54.259799ms)
+✔ OBC303 a malformed rigorObservationSha256 on a closed entry is damaged (66.39986ms)
+✔ OBC304 an unknown key or a wrong value inside a closed entry's rigor verify row is damaged (171.936525ms)
+✔ OBC305 an unknown extra closed-entry key beside the rigor fields is damaged (17.950994ms)
+✔ OBC306 a malformed top-level rigorHistory journal is damaged (184.061757ms)
+✔ OBC307 planOnboardingBootstrapAcknowledgementChat accepts an authored spec quoting the criterion example only in Notes (520.04892ms)
+✔ OBC308 planOnboardingBootstrapAcknowledgementChat refuses a placeholder under titled nested acceptance requirements (468.697559ms)
+ℹ tests 308
+ℹ suites 0
+ℹ pass 268
+ℹ fail 40
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 58197.273789
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC055 planOnboardingKickoffPromotionCleanupRecovery: a ready recovery plan publishes nextAction identical to applyAction, carrying the plan's own digest (NVA-H-LASTBUILDERS) (658.547176ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC059 cleanup descriptor bind and release use exact state CAS without touching other fields (653.79562ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC060 bindEphemeralPrivateCleanup only ever takes the private-runtime route, on a neutral unbound state (612.910343ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC062 bindEphemeralPrivateCleanup refuses a state that is already bound, closed, or otherwise not plainly unbound (630.20984ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC119 authentic post-privatization kickoff seed promotes revision 1 to revision 2 (634.375729ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC120 post-privatization promotion promotion-history-temp-fsync crash recovers with the same bound plan (614.003185ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC121 post-privatization promotion promotion-history-rename crash recovers with the same bound plan (716.094975ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC122 post-privatization promotion promotion-history-published crash recovers with the same bound plan (642.408516ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC123 post-privatization promotion promotion-handover-temp-fsync crash recovers with the same bound plan (607.938224ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC124 post-privatization promotion promotion-handover-rename crash recovers with the same bound plan (676.992649ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC125 post-privatization promotion promotion-handover-published crash recovers with the same bound plan (645.045375ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC126 post-privatization promotion promotion-cleanup-binding-published crash recovers with the same bound plan (656.464118ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC127 post-privatization promotion promotion-state-temp-fsync crash recovers with the same bound plan (622.152231ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC128 post-privatization promotion promotion-state-rename crash recovers with the same bound plan (621.689032ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC129 post-privatization promotion promotion-state-published crash recovers with the same bound plan (637.489932ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC132 a crash after the handover publication rolls forward, never backward (629.208292ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC134 promotion crash at promotion-history-temp-fsync leaves the provisional kickoff anchors byte for byte (605.984935ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC135 promotion crash at promotion-history-rename leaves the provisional kickoff anchors byte for byte (631.302425ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC136 promotion crash at promotion-history-published leaves the provisional kickoff anchors byte for byte (653.854512ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC137 promotion crash at promotion-handover-temp-fsync leaves the provisional kickoff anchors byte for byte (679.55132ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC138 promotion crash at promotion-handover-rename leaves the provisional kickoff anchors byte for byte (725.644974ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC139 promotion crash at promotion-handover-published leaves the provisional kickoff anchors byte for byte (630.719099ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC140 promotion crash at promotion-cleanup-binding-published leaves the provisional kickoff anchors byte for byte (629.159437ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC141 promotion crash at promotion-state-temp-fsync leaves the provisional kickoff anchors byte for byte (628.232487ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC142 promotion crash at promotion-state-rename leaves the provisional kickoff anchors byte for byte (679.888016ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC143 promotion crash at promotion-state-published leaves the provisional kickoff anchors byte for byte (704.524212ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC147 legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay (649.38401ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC148 legacy promotion cleanup recovery is crash-replay safe after private binding publication (590.018718ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC149 ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay (582.677577ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC150 legacy promotion cleanup mismatch history-binding fails closed (602.436094ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC151 legacy promotion cleanup mismatch state-feature fails closed (583.987419ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC153 post-privatization kickoff rejects revision-two (632.616005ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC154 post-privatization kickoff rejects authority-drift (595.119235ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC155 post-privatization kickoff rejects dispatch (601.583336ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC156 post-privatization kickoff rejects blocker (621.375285ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC157 post-privatization kickoff rejects queue-mutation (652.540172ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC158 post-privatization kickoff rejects result (691.296741ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC159 post-privatization kickoff rejects decision (718.838955ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC160 post-privatization kickoff rejects false-history (800.698244ms)
+  Error [SessionPowerError]: physical OS home cannot hold a Linux socket address
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:62:38)
+      at addressDirectory (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:337:64)
+      at prepareAddressRoot (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:383:19)
+      at powerAuthorityOwner (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:623:49)
+      at createSessionPowerAuthorityProducerPort (file://<repo-root>/plugins/pipeline-core/lib/session-power.mjs:661:78)
+      at file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:55:18
+      at Array.map (<anonymous>)
+      at createSessionAuthorityParticipantPorts (file://<repo-root>/plugins/pipeline-core/lib/session-authority-observers.mjs:49:23)
+      at prepareSessionAuthorityRegistryFixture (file://<repo-root>/plugins/pipeline-core/lib/test-item-approved-course-fixture.mjs:58:14)
+      at startDescriptorWithBoundRequester (file://<repo-root>/plugins/pipeline-core/lib/test-session-cleanup-requester-fixture.mjs:106:5) {
+    code: 'SP-ADDRESS'
+  }
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ OBC264 planOnboardingBootstrapBind: mechanical markers stay mandatory while feature and epic defer acknowledgement (513.309737ms)
+  Error [KickoffError]: author the generated PRD and Spec before binding their bytes
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.mjs:310:9)
+      at buildCoordinatorSourcedPromotionPlan (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.mjs:5793:5)
+      at buildKickoffPromotionPlan (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.mjs:5899:12)
+      at planOnboardingBootstrapBind (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.mjs:7794:10)
+      at file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:4443:20
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/onboarding-continuity.test.mjs:108:13)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18) {
+    code: 'BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED',
+    committed: false
+  }
+
+--- stderr ---

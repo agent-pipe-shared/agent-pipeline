@@ -1,0 +1,22 @@
+command: <host-path> --import <repo-root>/plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs --test --test-name-pattern ^M7|^M8 <repo-root>/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+label: focused-m7-m8
+exitCode: 0
+head: 32b398bf7c5bd03ba9184bea09305893ea4fbd61
+tree: 926a91a3f1718477cfd1234f2e7b4b8a375ac65f
+dirty: false
+--- stdout ---
+✔ M7 a denied credential read never says the refusal is about flags or spelling and not about a path (A2; PO decision 2026-10-23 rows 6/16: own typed code, K96) (136.899864ms)
+✔ M7b an in-root credential read on every shell runner carries GUARD-READ-CREDENTIAL-TARGET, names the path as the cause and gives a repair (6223.716941ms)
+✔ M7c the claude lane's credential refusal also offers the override route text of the other human-liftable refusals, and says plainly when none is offered (108.473402ms)
+✔ M7d negative control: refusals that are not about a credential keep their codes (a flag the grammar does not know, an unsupported recursive grep, a missing file) (3705.337216ms)
+✔ M8 Claude native Read, Grep and Glob of a credential target are refused with GUARD-READ-CREDENTIAL-TARGET and its repair; non-credential refusals keep GUARD-READ-TARGET; an in-root file stays allowed (975.344369ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11535.881458
+
+--- stderr ---

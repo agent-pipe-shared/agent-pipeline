@@ -1,0 +1,41 @@
+import {spawnSync} from 'node:child_process';
+import {lstatSync, mkdtempSync, rmSync} from 'node:fs';
+import {join, resolve} from 'node:path';
+
+const repo = process.cwd();
+const outDir = resolve(repo, 'scratch/agent-out/g23-original-m7');
+const [label, outputName, pattern] = process.argv.slice(2);
+if (!label || !outputName) throw new Error('usage: safe-capture.mjs <label> <output-name> [test-name-pattern]');
+
+const helper = resolve(repo, 'plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs');
+const capture = resolve(repo, 'plugins/pipeline-core/scripts/capture-evidence.mjs');
+const testFile = resolve(repo, 'plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs');
+const home = mkdtempSync(join(outDir, 'launcher-home-'));
+const identity = lstatSync(home);
+const env = {
+  ...process.env,
+  HOME: home,
+  USERPROFILE: home,
+  XDG_CONFIG_HOME: join(home, 'config'),
+  XDG_STATE_HOME: join(home, 'state'),
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: join(home, 'gitconfig'),
+  NODE_OPTIONS: `--import=${helper}`,
+};
+const testArgs = ['--import', helper, '--test'];
+if (pattern) testArgs.push('--test-name-pattern', pattern);
+testArgs.push(testFile);
+const args = [capture, '--out', join(outDir, outputName), '--label', label, '--', process.execPath, ...testArgs];
+let result;
+try {
+  result = spawnSync(process.execPath, args, {cwd: repo, env, encoding: 'utf8', timeout: 420000});
+} finally {
+  const current = lstatSync(home, {throwIfNoEntry: false});
+  if (current?.isDirectory() && !current.isSymbolicLink() && current.dev === identity.dev && current.ino === identity.ino) {
+    rmSync(home, {recursive: true, force: true});
+  }
+}
+if (result.error) throw new Error(`capture runner failed: ${result.error.code ?? result.error.name}`);
+process.stdout.write(result.stdout ?? '');
+process.stderr.write(result.stderr ?? '');
+process.exitCode = result.status ?? 1;

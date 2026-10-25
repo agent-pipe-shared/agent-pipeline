@@ -1,0 +1,18 @@
+command: <host-path> --import <repo-root>/plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs --test --test-name-pattern ^A4 <repo-root>/plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+label: observation-green
+exitCode: 0
+head: 32b398bf7c5bd03ba9184bea09305893ea4fbd61
+tree: 926a91a3f1718477cfd1234f2e7b4b8a375ac65f
+dirty: true
+--- stdout ---
+✔ A4 a failed child adapter process is not observed as an implicit allow (3.017603ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 394.772782
+
+--- stderr ---

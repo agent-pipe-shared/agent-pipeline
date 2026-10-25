@@ -1,0 +1,14 @@
+import os from "node:os";
+import { fileURLToPath } from "node:url";
+
+process.env.HOME = fileURLToPath(new URL("./codex-ready-fixture-test-home", import.meta.url));
+process.env.USERPROFILE = process.env.HOME;
+process.env.PIPELINE_ONBOARDING_HOMEDIR_OVERRIDE = process.env.HOME;
+process.env.NODE_OPTIONS = `--import=${fileURLToPath(import.meta.url)}`;
+os.userInfo = () => ({
+  uid: 65000,
+  gid: 65000,
+  username: "pipeline-fixture",
+  homedir: process.env.HOME,
+  shell: "",
+});
