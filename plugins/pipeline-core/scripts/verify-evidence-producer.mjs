@@ -281,9 +281,8 @@ function mkdirPrivate(base, path) {
 }
 
 /**
- * The temporary named-commit worktree directory carries the NAME OF THE CHECKOUT ROOT: the project
- * calibration identity is root-derived and an aliased identity is refused (AC-232 / R1, PO decision
- * 2026-10-23), so a worktree directory named differently from the project would refuse its own commit.
+ * Keep the familiar checkout label for diagnostics. Root-bound calibration uses
+ * verified Git worktree lineage; this basename grants no project identity.
  */
 function commitWorktreePath(root, container) { return join(container, basename(resolve(root))); }
 
@@ -334,16 +333,16 @@ async function produceVerifyEvidenceForCommit({ root, commit, prepareDependencie
     try { prepareDependencies({ root: commitWorktreePath(root, container), commit: sha }); }
     catch (error) { fail(error.code ?? "VEP-DEPENDENCY-SETUP", error.message ?? "Candidate dependency preparation failed."); }
     const produced = await produceVerifyEvidence({ ...options, rootDir: commitWorktreePath(root, container), commit: null });
-    // The run above wrote into the temporary worktree; publish the evidence into the requested path of the checkout.
-    writeEvidence(root, target, produced.evidence);
+    // Hold evidence until the temporary checkout has actually been retired.
     result = { ...produced, outPath: target };
   } catch (error) {
     removeCommitWorktree(root, container); // never masks the run's own error
     throw error;
   }
   if (!removeCommitWorktree(root, container)) {
-    fail("VEP-COMMIT-CLEANUP", `Evidence was written to ${relative(root, target).replaceAll("\\", "/")}, but the temporary worktree <git-common-dir>/agent-pipeline/verify/commit-worktrees/${relative(dirname(container), container)} could not be removed. Remove it with git worktree remove --force on its checkout directory, then git worktree prune.`);
+    fail("VEP-COMMIT-CLEANUP", `Evidence was not published because the temporary worktree <git-common-dir>/agent-pipeline/verify/commit-worktrees/${relative(dirname(container), container)} could not be removed. Remove it with git worktree remove --force on its checkout directory, then git worktree prune.`);
   }
+  writeEvidence(root, target, result.evidence);
   return result;
 }
 
@@ -521,6 +520,10 @@ export async function produceVerifyEvidence({ rootDir = process.cwd(), outPath =
   }
   const rigorReadback = readRigorVerifyObservation(root);
   if (JSON.stringify(rigorReadback) !== JSON.stringify(rigorObservations)) fail("VEP-RIGOR-DRIFT", "Report-only floor history changed during Verify; no success evidence was written.");
+  let identityReadback;
+  try { identityReadback = readConsumerVerifyConfiguration(root).projectIdentity; }
+  catch { fail("VEP-DRIFT", "Project calibration identity changed during Verify."); }
+  if (JSON.stringify(identityReadback) !== JSON.stringify(projectIdentity)) fail("VEP-DRIFT", "Project calibration identity changed during Verify.");
   if (JSON.stringify(consumerVerifyPolicy(root)) !== JSON.stringify(policyInputs)) fail("VEP-DRIFT", "Installed implementation or declared inputs changed during Verify.");
 
   const finished = candidateIdentity(root);

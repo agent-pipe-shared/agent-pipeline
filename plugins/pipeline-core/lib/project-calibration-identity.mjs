@@ -2,9 +2,10 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "./project-authority.mjs";
 import { repositoryPathIdentityOrSelf } from "./repository-path-identity.mjs";
+import { resolvePoGateRepositoryTopology } from "./po-gate-authority.mjs";
 
 const SCHEMA = "pipeline.project-calibration-identity.v1";
 const ROOT_DOMAIN = "pipeline.project-calibration-root.v1\0";
@@ -162,6 +163,44 @@ function resolved(current, project, kind, source, placeholder = false) {
       reason: placeholder ? "legacy-placeholder" : null }), source });
 }
 
+// A linked checkout may consume the original physical project's calibration,
+// but never a caller-provided root or copied hash. Reuse the established Git
+// topology and require both directions of Git's physical worktree registration.
+// Calibration bytes must still agree with the live original project.
+function linkedProjectIdentity(current, source, bytes, io, deps) {
+  try {
+    const topology = resolvePoGateRepositoryTopology(current.root);
+    const { primaryRoot, gitCommonDir, registeredWorktreeRoots } = topology;
+    if (primaryRoot === current.root || !registeredWorktreeRoots.includes(current.root)) return null;
+    const originalTopology = resolvePoGateRepositoryTopology(primaryRoot);
+    if (originalTopology.primaryRoot !== primaryRoot || originalTopology.gitCommonDir !== gitCommonDir
+      || !originalTopology.registeredWorktreeRoots.includes(current.root)) return null;
+    const gitFile = join(current.root, ".git");
+    const info = io.lstatSync(gitFile);
+    if (!info.isFile() || info.isSymbolicLink() || info.size > MAX_IDENTITY_FILE_BYTES) return null;
+    const declaration = /^gitdir: ([^\r\n]+)\r?\n?$/u.exec(io.readFileSync(gitFile, "utf8"));
+    if (declaration === null) return null;
+    const admin = resolve(current.root, declaration[1]);
+    const physical = path => {
+      const stat = io.lstatSync(path);
+      if (stat.isSymbolicLink() || io.realpathSync(path) !== path) throw new Error("unsafe registration");
+      return stat;
+    };
+    if (!physical(admin).isDirectory() || dirname(admin) !== join(gitCommonDir, "worktrees")) return null;
+    for (const file of [join(admin, "gitdir"), join(admin, "commondir")]) {
+      if (!physical(file).isFile()) return null;
+    }
+    if (resolve(admin, io.readFileSync(join(admin, "gitdir"), "utf8").trim()) !== gitFile
+      || resolve(admin, io.readFileSync(join(admin, "commondir"), "utf8").trim()) !== gitCommonDir) return null;
+    const original = readProjectCalibrationIdentity({ rootDir: primaryRoot, deps });
+    if (original.status !== "resolved" || original.source?.path !== source.path
+      || original.source.sha256 !== source.sha256
+      || !readBoundCalibration(primaryRoot, source.path, io)?.equals(bytes)) return null;
+    return Object.freeze({ ...original, source,
+      checkoutRootSha256: current.rootSha256, identityMode: "registered-worktree" });
+  } catch { return null; }
+}
+
 /**
  * Selected calibration is the only alias source. Root provenance is freshly
  * observed, not supplied by that JSON and not a replacement for Git/PO custody.
@@ -214,6 +253,8 @@ export function readProjectCalibrationIdentity({ rootDir = process.cwd(), deps =
       return unavailable("metadata-invalid", "PCI-METADATA-INVALID", current.rootSha256, source);
     }
     if (metadata.rootSha256 !== current.rootSha256) {
+      const linked = linkedProjectIdentity(current, source, bytes, io, deps);
+      if (linked !== null && metadata.rootSha256 === linked.rootSha256) return linked;
       return unavailable("root-mismatch", "PCI-ROOT-MISMATCH", current.rootSha256, source);
     }
     if (metadata.kind === "root-derived" && project !== current.project) {

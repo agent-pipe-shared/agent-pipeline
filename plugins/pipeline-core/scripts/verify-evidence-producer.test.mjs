@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,7 @@ import { checkCurrentCriticBoundVerify } from "./check-critic-bound-verify.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
 import { planCommitNpmInvocation, prepareCommitWorktreeDependencies } from "../lib/commit-worktree-dependencies.mjs";
+import { buildRootProjectCalibrationIdentity, readProjectCalibrationIdentity } from "../lib/project-calibration-identity.mjs";
 
 function run(executable, args, options = {}) {
   const result = spawnSync(executable, args, { encoding: "utf8", ...options });
@@ -38,11 +39,13 @@ function fixture(verifyCommand) {
   mkdirSync(join(root, ".claude"), { recursive: true });
   // Fixture restatement (QG-04, bounded; PO decision 2026-10-23 "S4 follows R1", AC-232): an aliased
   // identity is now refused, so the fixture project is named like its root. No assertion changed.
-  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root), verify: verifyCommand }, null, 2)}\n`);
+  const identity = buildRootProjectCalibrationIdentity({ rootDir: root });
+  const projectIdentity = { schema: identity.schema, kind: identity.kind, rootSha256: identity.rootSha256 };
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({ project: basename(root), projectIdentity, verify: verifyCommand }, null, 2)}\n`);
   writeFileSync(join(root, "README.md"), "# Fixture\n");
   writeFileSync(join(root, ".gitignore"), "/evidence/\n");
   prepareConsumerVerify({ rootDir: root });
-  git(root, ["init", "-q"]);
+  git(root, ["init", "-q", "--initial-branch=main"]);
   git(root, ["add", "."]);
   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "initial"]);
   return root;
@@ -749,6 +752,8 @@ function checkoutBytes(root, rel = "") {
 }
 function observeCheckout(root) {
   return {
+    branch: git(root, ["symbolic-ref", "--short", "HEAD"]),
+    index: createHash("sha256").update(readFileSync(join(root, ".git", "index"))).digest("hex"),
     head: git(root, ["rev-parse", "HEAD"]),
     status: git(root, ["status", "--porcelain=v1", "--untracked-files=all"]),
     bytes: checkoutBytes(root),
@@ -760,6 +765,104 @@ function assertNoCommitWorktree(root) {
   assert.deepEqual(existsSync(area) ? readdirSync(area) : [], [], "the temporary worktree area must be empty again");
   assert.equal(git(root, ["worktree", "list", "--porcelain"]).split("\n").filter((line) => line.startsWith("worktree ")).length, 1, "git must not list a leftover worktree");
 }
+
+test("root-bound calibration follows reciprocal Git lineage and refuses copied or changed associations", async () => {
+  await withFixture('node -e "process.exit(0)"', async root => {
+    const before = observeCheckout(root);
+    const parent = mkdtempSync(join(tmpdir(), "r2-lineage-"));
+    const heldParent = lstatSync(parent);
+    const linked = join(parent, "different-checkout-name");
+    const unrelated = join(parent, basename(root));
+    const calibrationPath = ".claude/pipeline.json";
+    const bytes = readFileSync(join(root, calibrationPath));
+    try {
+      git(root, ["worktree", "add", "--detach", linked, before.head]);
+      const identity = readProjectCalibrationIdentity({ rootDir: linked });
+      assert.equal(identity.status, "resolved");
+      assert.equal(identity.project, basename(root));
+      assert.equal(identity.rootSha256, buildRootProjectCalibrationIdentity({ rootDir: root }).rootSha256);
+      assert.equal(identity.identityMode, "registered-worktree");
+      assert.notEqual(identity.checkoutRootSha256, identity.rootSha256);
+      mkdirSync(join(unrelated, ".claude"), { recursive: true });
+      writeFileSync(join(unrelated, calibrationPath), bytes);
+      git(unrelated, ["init", "-q"]);
+      git(unrelated, ["remote", "add", "origin", root]);
+      assert.equal(readProjectCalibrationIdentity({ rootDir: unrelated }).code, "PCI-ROOT-MISMATCH", "same name, copied root hash and origin do not grant lineage");
+      const unbound = join(parent, "unbound");
+      mkdirSync(join(unbound, ".claude"), { recursive: true });
+      writeFileSync(join(unbound, calibrationPath), bytes);
+      assert.equal(readProjectCalibrationIdentity({ rootDir: unbound }).code, "PCI-ROOT-MISMATCH");
+      const forged = join(parent, "forged");
+      mkdirSync(join(forged, ".claude"), { recursive: true });
+      writeFileSync(join(forged, calibrationPath), bytes);
+      writeFileSync(join(forged, ".git"), readFileSync(join(linked, ".git")));
+      assert.equal(readProjectCalibrationIdentity({ rootDir: forged }).code, "PCI-ROOT-MISMATCH", "copied Git pointer lacks reciprocal registration");
+      writeFileSync(join(linked, calibrationPath), `${bytes.toString().trim()}\n\n`);
+      assert.equal(readProjectCalibrationIdentity({ rootDir: linked }).code, "PCI-ROOT-MISMATCH", "changed candidate bytes cannot borrow original identity");
+      writeFileSync(join(linked, calibrationPath), bytes);
+      const admin = git(linked, ["rev-parse", "--absolute-git-dir"]);
+      const pointer = readFileSync(join(admin, "gitdir"));
+      writeFileSync(join(admin, "gitdir"), join(forged, ".git"));
+      assert.equal(readProjectCalibrationIdentity({ rootDir: linked }).code, "PCI-ROOT-MISMATCH", "forged reverse registration is refused");
+      writeFileSync(join(admin, "gitdir"), pointer);
+      commitFile(unrelated, [calibrationPath], "copied identity in unrelated repository");
+      const foreignLinked = join(parent, "foreign-linked");
+      git(unrelated, ["worktree", "add", "--detach", foreignLinked, "HEAD"]);
+      git(unrelated, ["config", "core.worktree", root]);
+      assert.equal(readProjectCalibrationIdentity({ rootDir: foreignLinked }).code, "PCI-ROOT-MISMATCH", "an unrelated common directory cannot assert the original root through Git configuration");
+      git(unrelated, ["config", "--unset", "core.worktree"]);
+      git(unrelated, ["worktree", "remove", "--force", foreignLinked]);
+    } finally {
+      git(root, ["worktree", "remove", "--force", linked]);
+      const settledParent = lstatSync(parent);
+      if (heldParent.dev === settledParent.dev && heldParent.ino === settledParent.ino) rmSync(parent, { recursive: true, force: true });
+    }
+    assert.deepEqual(observeCheckout(root), before);
+  });
+});
+
+test("changed committed calibration fails named Verify without green evidence or checkout mutation", async () => {
+  await withFixture('node -e "process.exit(0)"', async root => {
+    const first = git(root, ["rev-parse", "HEAD"]);
+    const path = join(root, ".claude", "pipeline.json");
+    const original = readFileSync(path);
+    writeFileSync(path, `${original.toString().trim()}\n\n`);
+    const changed = commitFile(root, [".claude/pipeline.json"], "changed calibration bytes");
+    writeFileSync(path, original);
+    commitFile(root, [".claude/pipeline.json"], "original calibration restored");
+    const before = observeCheckout(root);
+    mkdirSync(join(root, "evidence"));
+    writeFileSync(join(root, "evidence", "changed.json"), "stale green");
+    await assert.rejects(() => produceVerifyEvidence({ rootDir: root, mode: "critic", base: first,
+      commit: changed, outPath: "evidence/changed.json" }),
+    error => error.code === "VEP-CALIBRATION" && /PCI-ROOT-MISMATCH/u.test(error.message));
+    assert.equal(existsSync(join(root, "evidence", "changed.json")), false);
+    assert.deepEqual(observeCheckout(root), before);
+    assertNoCommitWorktree(root);
+  });
+});
+
+test("named Verify refuses original calibration drift before publishing candidate evidence", async () => {
+  await withFixture("node -e \"require('fs').appendFileSync(process.env.R2_DRIFT_CALIBRATION,String.fromCharCode(10))\"", async root => {
+    const path = join(root, ".claude", "pipeline.json");
+    const bytes = readFileSync(path);
+    const before = observeCheckout(root);
+    const previous = process.env.R2_DRIFT_CALIBRATION;
+    process.env.R2_DRIFT_CALIBRATION = path;
+    try {
+      await assert.rejects(() => produceVerifyEvidence({ rootDir: root, mode: "critic", commit: before.head,
+        outPath: "evidence/drift.json" }), error => error.code === "VEP-DRIFT");
+      assert.notDeepEqual(readFileSync(path), bytes, "the configured command really changed the original calibration");
+      assert.equal(existsSync(join(root, "evidence", "drift.json")), false);
+      assertNoCommitWorktree(root);
+    } finally {
+      writeFileSync(path, bytes);
+      if (previous === undefined) delete process.env.R2_DRIFT_CALIBRATION;
+      else process.env.R2_DRIFT_CALIBRATION = previous;
+    }
+    assert.deepEqual(observeCheckout(root), before);
+  });
+});
 
 test("Critic evidence for a named earlier commit is bound to it, leaves a dirty checkout untouched, and the preflight accepts it", async () => {
   // Passes only inside a clean checkout of the OLDER commit: the shared checkout has a different spec.md.
@@ -871,13 +974,14 @@ test("the CLI accepts --commit and reports the named commit", async () => {
 });
 
 test("a named candidate prepares committed npm dependencies before Verify without copying checkout packages", async () => {
-  const scratch = join(process.cwd(), "scratch");
+  const scratch = tmpdir();
   mkdirSync(scratch, { recursive: true });
   const root = mkdtempSync(join(scratch, "g22-project-"));
   const bin = mkdtempSync(join(scratch, "g22-bin-"));
   try {
     mkdirSync(join(root, ".claude"));
-    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: basename(root), verify: "node -e \"process.exit(require('fs').existsSync('node_modules/.g22-ready')?0:9)\"" }));
+    const identity = buildRootProjectCalibrationIdentity({ rootDir: root });
+    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({ project: basename(root), projectIdentity: { schema: identity.schema, kind: identity.kind, rootSha256: identity.rootSha256 }, verify: "node -e \"process.exit(require('fs').existsSync('node_modules/.g22-ready')?0:9)\"" }));
     writeFileSync(join(root, ".gitignore"), "/evidence/\n/node_modules/\n");
     writeFileSync(join(root, "README.md"), "first\n");
     prepareConsumerVerify({ rootDir: root });
@@ -899,6 +1003,7 @@ test("a named candidate prepares committed npm dependencies before Verify withou
     process.env.G22_NPM_LOG = log;
     const prepareDependencies = ({ root: worktree, commit }) => prepareCommitWorktreeDependencies({ root: worktree, commit, npmExecutable: process.execPath, npmPrefixArgs: [fake] });
     try {
+      const originalCheckout = observeCheckout(root);
       await assert.rejects(() => produceVerifyEvidence({ rootDir: root, outPath: "evidence/g22.json", mode: "critic", base: first, commit: candidate, prepareDependencies: () => ({ status: "not-required" }) }),
         error => error.code === "VEP-VERIFY-FAILED", "the original unprepared worktree must fail its configured test");
       assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
@@ -906,6 +1011,7 @@ test("a named candidate prepares committed npm dependencies before Verify withou
       assert.equal(result.status, "passed");
       assert.equal(result.evidence.commit, candidate);
       assert.equal(readFileSync(join(root, "node_modules", ".g22-ready"), "utf8"), "host package");
+      assert.deepEqual(observeCheckout(root), originalCheckout, "original branch, HEAD, index, runtime and package bytes survive success");
       const calls = readFileSync(log, "utf8").trim().split("\n").map(JSON.parse);
       assert.deepEqual(calls.map(call => call.argv), [["--version"], ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]]);
       assert.equal(calls[0].cwd, calls[1].cwd);
@@ -916,6 +1022,7 @@ test("a named candidate prepares committed npm dependencies before Verify withou
         error => error.code === "VEP-DEPENDENCY-SETUP");
       assert.equal(existsSync(join(root, "evidence", "g22.json")), false);
       assertNoCommitWorktree(root);
+      assert.deepEqual(observeCheckout(root), originalCheckout, "dependency failure preserves the original checkout and packages");
       assert.throws(() => prepareCommitWorktreeDependencies({ root, commit: candidate, npmExecutable: process.execPath, npmPrefixArgs: [fake] }),
         error => error.code === "VEP-DEPENDENCY-CANDIDATE");
       unlinkSync(join(root, "package-lock.json"));
