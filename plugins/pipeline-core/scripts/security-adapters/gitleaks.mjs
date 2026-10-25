@@ -516,10 +516,12 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
         // Shell-safe public selectors; the reviewed value is never an argv operand.
         const quote = value => "'" + String(value).replace(/'/gu, "'\\''") + "'";
         const selectors = `--path ${quote(fingerprint.path)} --rule ${quote(fingerprint.rule)} --column ${fingerprint.column} --old-line ${nearMissLine}`;
-        const repairCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs ${selectors}`;
-        const recomputeCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs --recompute ${selectors}`;
+        const reviewFiles = "--gate-file scratch/gitleaks-gate.json --reviewed-value-file scratch/reviewed-domain.txt";
+        const prepareCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs --prepare-gate --path ${quote(fingerprint.path)} --rule ${quote(fingerprint.rule)} --line ${fingerprint.line} --column ${fingerprint.column} ${reviewFiles}`;
+        const repairCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs ${selectors} ${reviewFiles}`;
+        const recomputeCmd = `node plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs --recompute ${selectors} ${reviewFiles}`;
         const recomputedEntry = gitleaksContentAuthorityLine(f);
-        base.msg = `${base.msg} [possibly-stale .gitleaksignore suppression: an entry exists for ${fingerprint.path}:${fingerprint.rule} column ${fingerprint.column} recorded at line ${nearMissLine}, but this finding is now at line ${fingerprint.line} -- likely the suppression just needs its line updated, not a new secret. Recomputed entry (diagnostic only, not reviewed authorization): ${recomputedEntry}. Recompute without writing: ${recomputeCmd}. Explicit repair after review: ${repairCmd}]`;
+        base.msg = `${base.msg} [possibly-stale .gitleaksignore suppression: an entry exists for ${fingerprint.path}:${fingerprint.rule} column ${fingerprint.column} recorded at line ${nearMissLine}, but this finding is now at line ${fingerprint.line} -- likely the suppression just needs its line updated, not a new secret. Recomputed entry (diagnostic only, not reviewed authorization): ${recomputedEntry}. Put only the reviewed plain domain in scratch/reviewed-domain.txt; reproduce: ${prepareCmd}. Recompute without writing: ${recomputeCmd}. Explicit repair after review: ${repairCmd}]`;
       }
     }
     return base;
