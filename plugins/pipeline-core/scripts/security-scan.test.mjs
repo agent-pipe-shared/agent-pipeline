@@ -30,7 +30,7 @@ import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
-import { formatScannerLine, resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
+import { deriveSummaryVerdict, formatScannerLine, resolveEvidenceRoot, runSecurityScan } from "./security-scan.mjs";
 // NVA-SECGATE-1: security-scan.mjs's own gate-mode resolution now delegates to this exact
 // shared function -- see the pinning test below.
 // NVA-R18-SCANBOOT: also imports checkSecurityCompleteness -- the SAME function guard-push.mjs
@@ -1381,6 +1381,37 @@ security:
 }
 
 {
+  // mode "off" keeps its configured exit 0 even when execution fails; the summary still names
+  // the failed scan as incomplete rather than projecting that policy choice to CLEAN.
+  const rootDir = makeRootDir("runner-off-summary-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: off
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+    license-check:
+      enabled: false
+`,
+  );
+  const env = { PIPELINE_SEMGREP_PATH: semgrepCrash };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual("runner: mode off retains exit 0 for execution failure", exitCode, 0);
+  assertEqual("runner: mode off summary reports failed execution as incomplete", deriveSummaryVerdict({ ...evidence, exitCode }), "INCOMPLETE");
+}
+
+{
   // ERROR forces blocking-class even with zero findings.
   const rootDir = makeRootDir("runner-error-zero-findings-root");
   writeManifest(
@@ -1945,6 +1976,56 @@ security:
   );
 }
 
+// Summary verdicts describe scanner coverage separately from the unchanged policy exit code.
+assertEqual(
+  "summary: no enabled scanners is not a clean scan",
+  deriveSummaryVerdict({ scanners: [], exitCode: 0 }),
+  "NO SCANNERS ENABLED",
+);
+assertEqual(
+  "summary: all required scanners missing is incomplete while policy still exits 0",
+  deriveSummaryVerdict({
+    scanners: [
+      { status: "SKIPPED", reportStatus: "tool-unavailable" },
+      { status: "SKIPPED", reportStatus: "tool-unavailable" },
+      { status: "SKIPPED", reportStatus: "tool-unavailable" },
+    ],
+    exitCode: 0,
+  }),
+  "INCOMPLETE",
+);
+assertEqual(
+  "summary: a successful scanner plus a missing tool is partial coverage",
+  deriveSummaryVerdict({
+    scanners: [
+      { status: "PASS", reportStatus: "passed" },
+      { status: "SKIPPED", reportStatus: "tool-unavailable" },
+    ],
+    exitCode: 0,
+  }),
+  "PARTIAL",
+);
+assertEqual(
+  "summary: not-applicable-only coverage is explicit",
+  deriveSummaryVerdict({ scanners: [{ status: "SKIPPED", reportStatus: "not-applicable" }], exitCode: 0 }),
+  "NOT APPLICABLE",
+);
+assertEqual(
+  "summary: no configured policy is distinct from not-applicable coverage",
+  deriveSummaryVerdict({ scanners: [{ status: "SKIPPED", reportStatus: "not-configured" }], exitCode: 0 }),
+  "NOT CONFIGURED",
+);
+assertEqual(
+  "summary: a genuine successful scan remains clean",
+  deriveSummaryVerdict({ scanners: [{ status: "PASS", reportStatus: "passed" }], exitCode: 0 }),
+  "CLEAN",
+);
+assertEqual(
+  "summary: configured blocking exit remains authoritative",
+  deriveSummaryVerdict({ scanners: [{ status: "SKIPPED", reportStatus: "tool-unavailable" }], exitCode: 2 }),
+  "BLOCKING",
+);
+
 // ===============================================================================================
 // CLI smoke test (real child process, bare rootDir -> everything SKIPPED, exit 0)
 // ===============================================================================================
@@ -1956,7 +2037,7 @@ security:
   // independent from host-installed system and standard per-user scanners.
   const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: { ...baseEnv, HOME: rootDir, USERPROFILE: "", APPDATA: "", LOCALAPPDATA: "", PATH: "", Path: "" }, shell: false });
   assertEqual("CLI: bare rootDir -> exit 0", res.status, 0);
-  assertIncludes("CLI: stdout contains verdict line", res.stdout, "Verdict: CLEAN");
+  assertIncludes("CLI: all scanners skipped does not report a clean scan", res.stdout, "Verdict: INCOMPLETE (policy exit 0)");
   assertIncludes("CLI: stdout reports evidence path", res.stdout, "Evidence written:");
   assertTrue("CLI: evidence file actually created", existsSync(join(rootDir, "evidence", "security-latest.json")), "no evidence file");
 }

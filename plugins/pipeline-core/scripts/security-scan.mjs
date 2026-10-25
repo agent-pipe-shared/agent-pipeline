@@ -1135,12 +1135,44 @@ export function formatScannerLine(s) {
   return `${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}${coverageSuffix}`;
 }
 
+/**
+ * Summarizes whether enabled scanners actually produced usable results, independently from
+ * the configured security policy's exit decision. SKIPPED entries are coverage information,
+ * not successful scans; only explicit not-applicable/not-configured skips can be excluded from
+ * an otherwise complete scan. This projection never changes `evidence.exitCode`.
+ */
+export function deriveSummaryVerdict(evidence) {
+  if (evidence?.exitCode === 2) return "BLOCKING";
+  if (evidence?.exitCode === 1) return "WARNING";
+
+  const scanners = Array.isArray(evidence?.scanners) ? evidence.scanners : [];
+  if (scanners.length === 0) return "NO SCANNERS ENABLED";
+
+  const successful = scanners.filter((scanner) => scanner.status === "PASS" || scanner.status === "FINDINGS");
+  const unresolved = scanners.some((scanner) => {
+    if (scanner.status === "PASS" || scanner.status === "FINDINGS") return false;
+    if (scanner.status === "SKIPPED"
+      && (scanner.reportStatus === "not-applicable" || scanner.reportStatus === "not-configured")) return false;
+    return true;
+  });
+
+  if (unresolved) return successful.length > 0 ? "PARTIAL" : "INCOMPLETE";
+  if (successful.length === 0) {
+    const skipStatuses = scanners.map((scanner) => scanner.reportStatus);
+    if (skipStatuses.every((status) => status === "not-applicable")) return "NOT APPLICABLE";
+    if (skipStatuses.every((status) => status === "not-configured")) return "NOT CONFIGURED";
+    return "NO APPLICABLE CHECKS";
+  }
+  return "CLEAN";
+}
+
 function printSummary(evidence) {
   for (const s of evidence.scanners) {
     console.log(formatScannerLine(s));
   }
-  const verdict = evidence.exitCode === 0 ? "CLEAN" : evidence.exitCode === 1 ? "WARNING" : "BLOCKING";
-  console.log(`\nVerdict: ${verdict} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);
+  const verdict = deriveSummaryVerdict(evidence);
+  const policyNote = evidence.exitCode === 0 && verdict !== "CLEAN" ? ` (policy exit ${evidence.exitCode})` : "";
+  console.log(`\nVerdict: ${verdict}${policyNote} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);
 }
 
 // ---------------------------------------------------------------------------------------------
