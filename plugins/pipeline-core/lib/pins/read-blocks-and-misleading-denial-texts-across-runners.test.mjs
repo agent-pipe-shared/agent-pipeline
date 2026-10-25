@@ -44,8 +44,9 @@ const withFixture = (fn) => {
   const path = fixture();
   try { return fn(path); } finally { rmSync(path, { recursive: true, force: true }); }
 };
-const run = (input, path) => {
-  const r = evaluateLifecycleReadyGuard(input, { projectDir: path });
+const run = (input, path, evaluate = evaluateLifecycleReadyGuard) => {
+  const r = evaluate(input, { projectDir: path });
+  if (r.exitCode !== 0 && r.exitCode !== 2) throw new Error("Claude guard did not return an allow or deny exit code");
   return { exitCode: r.exitCode, text: String(r.stderr ?? "") };
 };
 const bash = (command) => ({ tool_name: "Bash", tool_input: { command } });
@@ -194,7 +195,7 @@ const withRunnerFixture = (fn) => {
 };
 
 /** One call through a runner's real guard surface: { denied, text } where text is what the agent reads. */
-function runnerDecision(runner, toolCall, path) {
+function runnerDecision(runner, toolCall, path, spawnChild = spawnSync) {
   if (runner === "claude") {
     const result = run(toolCall.claude, path);
     return { denied: result.exitCode === 2, text: result.text };
@@ -202,20 +203,63 @@ function runnerDecision(runner, toolCall, path) {
   const { PIPELINE_GUARD_OVERRIDE: _dropInherited, ...baseEnv } = process.env;
   const script = join(HOOKS_DIR, runner === "codex" ? "codex-pretool-guard.mjs" : "antigravity-pretool-guard.mjs");
   const envelope = runner === "codex" ? { cwd: path, session_id: "alf-c-p15-01", ...toolCall.codex } : { cwd: path, ...toolCall.antigravity };
-  const child = spawnSync(process.execPath, [script], {
+  const child = spawnChild(process.execPath, [script], {
     cwd: path, input: JSON.stringify(envelope), encoding: "utf8", timeout: 120000,
     env: { ...baseEnv, CLAUDE_PROJECT_DIR: path },
   });
-  let parsed = {};
-  try { parsed = JSON.parse(String(child.stdout).trim().split("\n")[0]); } catch { parsed = {}; }
-  if (runner === "codex") {
-    return {
-      denied: parsed?.hookSpecificOutput?.permissionDecision === "deny",
-      text: String(parsed?.hookSpecificOutput?.permissionDecisionReason ?? ""),
-    };
+  if (child.error || child.signal !== null || !Number.isInteger(child.status)) {
+    throw new Error(`runner child process did not complete: ${child.error?.code ?? child.signal ?? "unknown"}`);
   }
-  return { denied: parsed.decision === "deny", text: String(parsed.reason ?? "") };
+  if (runner === "codex") {
+    if (child.status !== 0) throw new Error(`Codex runner child process exited ${child.status}`);
+    if (child.stdout === "" && child.stderr === "") return {denied: false, text: ""};
+    let parsed;
+    try { parsed = JSON.parse(String(child.stdout)); } catch { throw new Error("invalid child result: Codex output is not one JSON payload"); }
+    const output = parsed?.hookSpecificOutput;
+    if (output?.hookEventName !== "PreToolUse" || output.permissionDecision !== "deny"
+      || typeof output.permissionDecisionReason !== "string") {
+      throw new Error("invalid child result: unrecognized Codex payload");
+    }
+    return {denied: true, text: output.permissionDecisionReason};
+  }
+  if (runner !== "antigravity") throw new Error(`invalid child result: unsupported runner ${runner}`);
+  let parsed;
+  try { parsed = JSON.parse(String(child.stdout)); } catch { throw new Error("invalid child result: Antigravity output is not one JSON payload"); }
+  if (parsed?.decision === "allow" && child.status === 0 && child.stderr === "") return {denied: false, text: ""};
+  if (parsed?.decision === "deny" && child.status === 2 && typeof parsed.reason === "string") {
+    return {denied: true, text: parsed.reason};
+  }
+  throw new Error("invalid child result: unrecognized Antigravity payload or exit status");
 }
+
+test("A4 a failed child adapter process is not observed as an implicit allow", () => {
+  const error = Object.assign(new Error("fixture timeout"), { code: "ETIMEDOUT" });
+  const call = {codex: {tool_name: "Bash", tool_input: {command: "cat docs/2026-09-21-a.md"}}};
+  const child = (status, stdout = "", stderr = "") => ({status, signal: null, stdout, stderr});
+  assert.throws(() => runnerDecision("codex", call, process.cwd(), () => ({
+    error, status: null, signal: null, stdout: "", stderr: "",
+  })), /child process/u);
+  assert.deepEqual(runnerDecision("codex", call, process.cwd(), () => child(0)), {denied: false, text: ""});
+  const denial = JSON.stringify({hookSpecificOutput: {
+    hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: "blocked by fixture",
+  }});
+  assert.deepEqual(runnerDecision("codex", call, process.cwd(), () => child(0, `${denial}\n`)), {
+    denied: true, text: "blocked by fixture",
+  });
+  assert.throws(() => runnerDecision("codex", call, process.cwd(), () => child(1)), /child process/u);
+  assert.throws(() => runnerDecision("codex", call, process.cwd(), () => child(0, "not json")), /invalid child result/u);
+
+  const agyCall = {antigravity: {toolCall: {name: "view_file", args: {AbsolutePath: "/synthetic/docs/a.md"}}}};
+  assert.deepEqual(runnerDecision("antigravity", agyCall, process.cwd(), () => child(0, '{"decision":"allow"}\n')),
+    {denied: false, text: ""});
+  assert.deepEqual(runnerDecision("antigravity", agyCall, process.cwd(), () => child(2,
+    '{"decision":"deny","reason":"blocked by fixture"}\n', "BLOCKED: blocked by fixture\n")),
+  {denied: true, text: "blocked by fixture"});
+  assert.throws(() => runnerDecision("antigravity", agyCall, process.cwd(), () => child(0)), /invalid child result/u);
+  assert.equal(run({tool_name: "Read", tool_input: {file_path: "/synthetic/docs/a.md"}}, process.cwd(),
+    () => ({exitCode: 0, stderr: ""})).exitCode, 0);
+  assert.throws(() => run({}, process.cwd(), () => ({exitCode: null, stderr: ""})), /Claude guard/u);
+});
 
 const shellCall = (command, path) => ({
   claude: bash(command),
