@@ -69,6 +69,10 @@ const LIFECYCLE_GUARD_BUDGET = Object.freeze({
 const STDIN_TIMEOUT_MS = 1_000;
 const STDIN_MAX_BYTES = 1024 * 1024;
 const NESTED_GUARD_BUDGETS = Object.freeze({
+  // A recorded production push-guard run needed 14,090ms. Give this
+  // proof-heavy guard a bounded 24s share while preserving 8s for the
+  // adapter's typed fail-closed recovery inside the unchanged 42s ceiling.
+  "guard-push.mjs": { capMs: 24_000, reserveMs: 8_000 },
   "guard-apply-patch.mjs": { capMs: 36_000, reserveMs: 5_000 },
   default: { capMs: 8_000, reserveMs: 5_000 },
 });
