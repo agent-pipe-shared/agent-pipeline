@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 import { PLAN_AUTHORITY_PRD_FRAMING_CODE, PO_ACK_APPLY_CONFIRMATION_TOKEN, SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, resolvePoRebindRunner, run, statePath, statePhaseProjectionMarker } from "./pipeline-state.mjs";
-import { INTAKE_STAGING_DIRNAME } from "../lib/onboarding-continuity.mjs";
+import { INTAKE_STAGING_DIRNAME, classifyOnboardingContinuity, inactiveLifecycleTransitionTimestamp } from "../lib/onboarding-continuity.mjs";
 import {
   PLAN_AUTHORITY_PROMOTION_SUBCOMMAND,
   PLAN_AUTHORITY_STAGING_CODE,
@@ -200,6 +200,7 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.ok(initialAttempt.lines.some((line) => line.includes("PO-CHALLENGE")));
   const intermediate = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
   assert.ok(intermediate.pendingPushChallenge?.code, "challenge code must be recorded in state");
+  assert.equal(intermediate.updatedAt, now, "active state mutations continue to advance updatedAt");
   const challengeCode = intermediate.pendingPushChallenge.code;
 
   // AGY-CHATADAPTER-1 (the actual security proof, confirmed vulnerability closed):
@@ -238,6 +239,7 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   // an approval recorded under a different policy than the one now in force.
   assert.equal(recorded.pushApproval.lastApproved.criticalProofWaiver.kind, "push");
   assert.equal(recorded.pushApproval.lastApproved.criticalProofWaiver.mode, "chat");
+  assert.equal(recorded.updatedAt, now, "active push approval continues to advance updatedAt");
   assert.equal(recorded.pendingPushChallenge, undefined, "challenge must be cleared on approval");
 
   // An attended call that types the WRONG value must still be refused, and must
@@ -261,6 +263,89 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.equal(signatureApproval.result, 2, "signature mode must still refuse an unproven approval");
   assert.ok(signatureApproval.lines.some((line) => line.includes("CRITICAL-PROOF-POLICY-KIND-REQUIRED")),
     `the requiredKinds gate must survive for every non-waived kind: ${signatureApproval.lines.join(" ")}`);
+}
+
+// A push audit mutation must not replace the timestamp of a verified inactive
+// lifecycle transition. Exercise both the chat challenge write and approval
+// write for close and discard states, plus a stale timestamp with a forged
+// approval-shaped object that must not qualify for preservation.
+for (const kind of ["closed", "discarded"]) {
+  const root = mkdtempSync(join(nativeContractFixtureParent(), `post-close-push-${kind}-`));
+  try {
+    const gitAt = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
+    gitAt("init", "-q", "-b", "main");
+    gitAt("config", "user.email", "po@example.invalid");
+    gitAt("config", "user.name", "Synthetic PO");
+    mkdirSync(join(root, "project"), { recursive: true });
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
+      project: "post-close-push fixture", verify: "node verify.mjs", autonomy: "bounded",
+      branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
+    }));
+    const lifecycleAt = "2026-08-01T08:00:00.000Z";
+    const state = { schema: "pipeline.state.v0", planApproved: false, updatedAt: lifecycleAt };
+    if (kind === "closed") {
+      state.closedFeatures = [{
+        id: "closed-feature", planPath: "specs/closed-feature/prd.md", phaseAtClose: "implementation",
+        closedAt: lifecycleAt, closedBy: "Synthetic PO", forCommit: null,
+      }];
+    } else {
+      state.discardedFeatures = [{
+        id: "discarded-feature", planPath: "specs/discarded-feature/prd.md", phaseAtDiscard: "implementation",
+        discardedAt: lifecycleAt, discardedBy: "Synthetic PO", reason: "fixture discard", forCommit: null,
+      }];
+    }
+    assert.equal(inactiveLifecycleTransitionTimestamp(root, state), lifecycleAt);
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(state, null, 2));
+    writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
+    const deps = { dir: root, now: () => now, gitHead: () => ({ ok: true, commit: candidate.commit }), gitCandidate: () => ({ ok: true, ...candidate }) };
+    assert.equal(run(["materialize-push-threat-model"], deps), 0);
+    gitAt("add", "-A");
+    gitAt("commit", "-q", "-m", `verified ${kind} lifecycle fixture`);
+    const realHeadCommit = gitAt("rev-parse", "HEAD").stdout.trim();
+    deps.gitHead = () => ({ ok: true, commit: realHeadCommit });
+    deps.gitCandidate = () => ({ ok: true, commit: realHeadCommit, tree: candidate.tree });
+
+    const challenge = capturedStderr(() => run(["approve-push", "--by", "Synthetic PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
+    assert.equal(challenge.result, 1, `${kind} challenge must be recorded: ${challenge.lines.join(" ")}`);
+    const challenged = JSON.parse(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"));
+    assert.equal(challenged.updatedAt, lifecycleAt, `${kind} challenge must preserve lifecycle updatedAt`);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid", `${kind} challenge must preserve valid continuity`);
+    assert.ok(challenged.pendingPushChallenge?.code);
+    const challengeCode = challenged.pendingPushChallenge.code;
+    const approved = capturedStderr(() => run(["approve-push", "--by", "Synthetic PO", "--remote", "origin", "--destination", "refs/heads/main"], {
+      ...deps, isattyFn: () => true, readLineFn: () => challengeCode,
+    }));
+    assert.equal(approved.result, 0, `${kind} approval must succeed: ${approved.lines.join(" ")}`);
+    const recorded = JSON.parse(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"));
+    assert.equal(recorded.updatedAt, lifecycleAt, `${kind} approval must preserve lifecycle updatedAt`);
+    assert.equal(recorded.pushApproval.lastApproved.approvedAt, now, "approval time remains in the approval record");
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid", `${kind} approval must preserve valid continuity`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "post-close-push-stale-"));
+  try {
+    const state = {
+      schema: "pipeline.state.v0", planApproved: false, updatedAt: "2026-08-01T08:00:01.000Z",
+      closedFeatures: [{
+        id: "stale-feature", planPath: "specs/stale-feature/prd.md", phaseAtClose: "implementation",
+        closedAt: "2026-08-01T08:00:00.000Z", closedBy: "Synthetic PO", forCommit: null,
+      }],
+      pushApproval: { lastApproved: { approvedAt: now } },
+    };
+    assert.equal(inactiveLifecycleTransitionTimestamp(root, state), null,
+      "stale lifecycle time plus an approval-shaped object is not source binding");
+    assert.equal(inactiveLifecycleTransitionTimestamp(root, {
+      schema: "pipeline.state.v0", planApproved: false, updatedAt: "2026-08-01T08:00:00.000Z",
+      closedFeatures: [{ id: "malformed-feature" }],
+    }), null, "malformed transition entries do not qualify for timestamp preservation");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 // The committed global selection is intentionally different from the older push-local

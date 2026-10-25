@@ -486,6 +486,14 @@ function validDiscardedTransitionState(root, state) {
   return true;
 }
 
+// Keep non-lifecycle writes bound to the same fully validated inactive
+// transition predicates used by continuity classification.
+export function inactiveLifecycleTransitionTimestamp(root, state) {
+  return validClosedTransitionState(root, state) || validDiscardedTransitionState(root, state)
+    ? state.updatedAt
+    : null;
+}
+
 // Rigor journal fields the State writer records on submit-plan and close-feature
 // (top-level `rigorHistory`, `closedEntry.rigorObservationSha256`,
 // `closedEntry.rigorVerifyRows`). The literals below deliberately mirror the

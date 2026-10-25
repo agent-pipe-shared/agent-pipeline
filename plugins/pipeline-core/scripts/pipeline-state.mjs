@@ -551,6 +551,7 @@ import {
   observeOnboardingBootstrapPlanApproval,
   planOrphanSessionCleanupBindingRelease,
   readOnboardingIntakeCheckpoint,
+  inactiveLifecycleTransitionTimestamp,
   readSourceOwnedOnboardingAfkProjectionForState,
   observeSourceOwnedControlledMethodAfkStateRename,
   syncStateMdNextAction,
@@ -12268,6 +12269,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const approvedAt = now();
+      // Push approval is an audit mutation, not a new lifecycle transition.
+      // Preserve updatedAt only when Source can fully validate the existing
+      // closed/discarded boundary; malformed or stale states keep the ordinary
+      // mutation timestamp and remain subject to continuity refusal.
+      const stateUpdatedAt = inactiveLifecycleTransitionTimestamp(dir, base) ?? approvedAt;
       const remote = parsed.value.remote;
       const destination = parsed.value.destination;
       if (typeof remote !== "string" || !/^[A-Za-z0-9._-]{1,80}$/u.test(remote)
@@ -12323,7 +12329,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
             ...base,
             schema: SCHEMA_ID,
             pendingPushChallenge: { code, forCommit: head.commit, remote, destination, expiresAt },
-            updatedAt: approvedAt,
+            updatedAt: stateUpdatedAt,
           };
           writeState(dir, challengeState, base);
           console.error(`[PO-CHALLENGE] Human confirmation required for push approval in chat mode.`);
@@ -12427,7 +12433,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         criticalProofConsumption: verified.proof === null
           ? consumed
           : [...consumed, { proofSha256: verified.proof.proofSha256, kind: "push", consumedAt: approvedAt }],
-        updatedAt: approvedAt,
+        updatedAt: stateUpdatedAt,
       };
       delete next.pendingPushChallenge;
       if (!stateWriteSucceeded(writeState(dir, next, base, {
