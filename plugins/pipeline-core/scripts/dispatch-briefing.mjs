@@ -46,15 +46,56 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
+
+const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const cliArguments = process.argv.slice(2);
+const cliHelp = directInvocation && cliArguments.some(argument => argument === "--help" || argument === "-h");
+const USAGE = `Usage:
+  node <plugin-root>/scripts/dispatch-briefing.mjs --help | -h
+  node <plugin-root>/scripts/dispatch-briefing.mjs binding --dispatch-id <id> --item <slug> --agent-type <type> --model-id <model> --check <test-path> [--path <path>]...
+  node <plugin-root>/scripts/dispatch-briefing.mjs build --package <package.json> [--out scratch/<briefing>.md] [--root <directory>]
+
+binding prints a native dispatch binding and briefing skeleton as JSON; it writes no file.
+  Required: --dispatch-id, --item, --agent-type, --model-id, --check.
+  Types: goldfish-implementor, goldfish-mechanic, goldfish-deep.
+  Optional: --root, repeated --path, --spec, --criterion, --recon-note.
+  --runner claude|codex defaults to claude; the selected model must match its role route.
+  --check is included in the write scope. Paths are repository-relative.
+  --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
+
+build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+  Required strings: id, item, agentType, modelId, check, title, ac, goal.
+  Required non-empty string arrays: paths, context, targeted.
+  Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner.
+  Optional string arrays: newFiles, forbidden, stops; optional positive integer: estimatedToolCalls.
+  Unknown keys are refused. --package is repository-relative. Only --out writes,
+  to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
+
+Help must be the only argument and needs no project setup or model store.
+Binding/build still validate their project, criterion, model and scope inputs.
+Generation does not authorize a dispatch or attest native execution.
+`;
+
+if (cliHelp) {
+  if (cliArguments.length === 1) process.stdout.write(USAGE);
+  else {
+    process.stdout.write(`${JSON.stringify({ schema: "pipeline.dispatch-briefing.refusal.v1", ok: false,
+      code: "DBG-HELP-ARGUMENTS", message: "--help or -h must be the only argument; run help separately from binding/build." }, null, 2)}\n`);
+    process.exitCode = 2;
+  }
+}
+
+// Help is available before loading builders whose dependency initialization can
+// resolve account paths. Ordinary imports and binding/build retain their owners.
+const {
   NATIVE_GOLDFISH_HOST_DIRECTIVE,
   NATIVE_GOLDFISH_ITEM_BRIEFING_SCHEMA,
   parseNativeGoldfishBriefing,
   validateItemDeliveryBriefing,
-} from "../lib/native-goldfish-host-return.mjs";
-import { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } from "../lib/agent-model-registry.mjs";
-import { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } from "../lib/model-role-route-source.mjs";
-import {
+} = cliHelp ? {} : await import("../lib/native-goldfish-host-return.mjs");
+const { modelBelongsToFamily, parseAgentFrontmatter, resolveAgentModel } = cliHelp ? {} : await import("../lib/agent-model-registry.mjs");
+const { functionalTaskRoutesForRunner, registeredFunctionalTaskRoutes } = cliHelp ? {} : await import("../lib/model-role-route-source.mjs");
+const {
   BRIEFING_BUILD_SCHEMA,
   BriefingPackageRefusal,
   RECON_NOTE_PREFIXES,
@@ -65,21 +106,21 @@ import {
   resolveBriefingCalibration,
   skeletonToolBudget,
   validateBriefingPackage,
-} from "../lib/dispatch-briefing-build.mjs";
-import { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } from "../lib/critic-accepted-contract.mjs";
-import { dispatchBudgetLineForRole, parseDispatchSlice } from "../lib/dispatch-policy.mjs";
-import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
-import { protectedBaselineRuleFor, resolveProtectedBaseline } from "../lib/protected-baseline.mjs";
-import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
-import { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+} = cliHelp ? {} : await import("../lib/dispatch-briefing-build.mjs");
+const { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } = cliHelp ? {} : await import("../lib/critic-accepted-contract.mjs");
+const { dispatchBudgetLineForRole, parseDispatchSlice } = cliHelp ? {} : await import("../lib/dispatch-policy.mjs");
+const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/public-core-observation.mjs");
+const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
+const { resolveProjectAuthorityPaths } = cliHelp ? {} : await import("../lib/project-authority.mjs");
+const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
-import { readRunningDispatches } from "../lib/dispatch-record-liveness.mjs";
-import { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } from "../lib/slice-queue.mjs";
-import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
-import * as sessionAuthorityRegistry from "../lib/session-authority-registry.mjs";
-import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
-import { loadMapBundle } from "./module-inventory.mjs";
-import { owningModules } from "./architecture-boundary-check.mjs";
+const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
+const { observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
+const sessionAuthorityRegistry = cliHelp ? {} : await import("../lib/session-authority-registry.mjs");
+const { inspectSignedDescriptorCustodyRepository } = cliHelp ? {} : await import("../lib/worktree-lifecycle.mjs");
+const { loadMapBundle } = cliHelp ? {} : await import("./module-inventory.mjs");
+const { owningModules } = cliHelp ? {} : await import("./architecture-boundary-check.mjs");
 
 export const DISPATCH_BINDING_SCHEMA = "pipeline.dispatch-briefing.binding.v1";
 export const DISPATCH_REFUSAL_SCHEMA = "pipeline.dispatch-briefing.refusal.v1";
@@ -857,7 +898,7 @@ export function runDispatchBriefing(argv, deps = {}) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (directInvocation && !cliHelp) {
   const result = runDispatchBriefing(process.argv.slice(2));
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   if (!result.ok) process.exitCode = 2;

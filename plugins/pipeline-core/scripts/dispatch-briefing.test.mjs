@@ -11,7 +11,7 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -106,6 +106,75 @@ function argvOf(fx, overrides = {}, extra = []) {
 
 const capOf = (type) => Number(/≤(\d+) tool uses/u.exec(dispatchBudgetLineForRole(type))[1]);
 const budgetOf = (skeleton) => Number(/Tool budget[^\n]*≤(\d+) tool uses/u.exec(skeleton)[1]);
+
+function directorySnapshot(root, prefix = "") {
+  return readdirSync(join(root, prefix)).sort().flatMap(name => {
+    const path = prefix ? `${prefix}/${name}` : name;
+    const stat = lstatSync(join(root, path));
+    const row = [path, stat.mode, stat.size, stat.mtimeMs, stat.ctimeMs];
+    return stat.isDirectory() ? [row, ...directorySnapshot(root, path)] : [[...row, sha(readFileSync(join(root, path)))]];
+  });
+}
+
+for (const flag of ["--help", "-h"]) test(`public ${flag} prints actionable usage and exits zero`, () => {
+  const result = spawnSync(process.execPath, [SCRIPT, flag], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Usage:[\s\S]*binding[\s\S]*build/u);
+});
+
+test("public --help and -h work before setup without private reads, processes or filesystem effects", () => {
+  const root = mkdtempSync(join(tmpdir(), "dispatch-help-"));
+  const held = lstatSync(root);
+  try {
+    const audit = join(root, "audit.mjs");
+    writeFileSync(audit, `import fs from 'node:fs';
+import cp from 'node:child_process';
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+const calls=[];
+for(const key of ['readFileSync','lstatSync','statSync','existsSync','readdirSync','realpathSync','openSync','writeFileSync','mkdirSync','rmSync','unlinkSync','renameSync']) {
+ const original=fs[key];
+ const wrapped=function(path,...args) {
+  const text=String(path);
+  if(text.startsWith(process.cwd()) || text.startsWith(process.env.HOME) || text.includes('/.git/agent-pipeline/')) { calls.push(key); throw new Error('HELP-FORBIDDEN-IO'); }
+  return original.call(this,path,...args);
+ };
+ if(original.native) wrapped.native=wrapped;
+ fs[key]=wrapped;
+}
+for(const key of ['spawnSync','execFileSync','spawn','execFile','execSync','exec']) cp[key]=()=>{calls.push(key);throw new Error('HELP-FORBIDDEN-PROCESS');};
+for(const key of ['homedir','userInfo']) os[key]=()=>{calls.push(key);throw new Error('HELP-FORBIDDEN-IDENTITY');};
+syncBuiltinESMExports();
+process.on('exit',()=>process.stderr.write('HELP-AUDIT:'+JSON.stringify(calls)+'\\n'));
+`);
+    const before = directorySnapshot(root);
+    for (const flag of ["--help", "-h"]) {
+      const result = spawnSync(process.execPath, ["--import", audit, SCRIPT, flag], {
+        cwd: root, encoding: "utf8", env: { ...process.env, PIPELINE_MODEL_ROLE_STORE: join(root, "unavailable-store") },
+      });
+      assert.equal(result.status, 0, `${flag}: ${result.stdout}\n${result.stderr}`);
+      assert.match(result.stdout, /Usage:/u);
+      assert.match(result.stdout, /binding[\s\S]*--dispatch-id[\s\S]*--item[\s\S]*--agent-type[\s\S]*--model-id[\s\S]*--check[\s\S]*--path/u);
+      assert.match(result.stdout, /build[\s\S]*--package[\s\S]*--out/u);
+      assert.match(result.stdout, /pipeline\.dispatch-briefing-package\.v1/u);
+      assert.match(result.stdout, /--runner[\s\S]*claude[\s\S]*codex/u);
+      assert.match(result.stdout, /no.*(?:authoriz|attest)|does not.*(?:authoriz|attest)/iu);
+      assert.equal(result.stderr, "HELP-AUDIT:[]\n");
+      assert.deepEqual(directorySnapshot(root), before);
+    }
+    for (const args of [["--help", "build", "--out", "scratch/help.md"], ["build", "--help", "--package", "missing.json"],
+      ["binding", "-h"], ["--help", "--bogus"], ["--help", "--root", root], ["--help", "-h"]]) {
+      const result = spawnSync(process.execPath, ["--import", audit, SCRIPT, ...args], { cwd: root, encoding: "utf8" });
+      assert.equal(result.status, 2, JSON.stringify(args));
+      assert.equal(JSON.parse(result.stdout).ok, false);
+      assert.equal(result.stderr, "HELP-AUDIT:[]\n");
+      assert.deepEqual(directorySnapshot(root), before);
+    }
+  } finally {
+    const now = lstatSync(root);
+    if (now.dev === held.dev && now.ino === held.ino) rmSync(root, { recursive: true });
+  }
+});
 
 test("binding fields equal the facts of their own sources", async () => {
   const { runDispatchBriefing } = await lib();
