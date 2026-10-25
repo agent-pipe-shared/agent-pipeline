@@ -1,0 +1,9 @@
+command: node --check plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+label: ORIGINAL-CONTROLLER-COMPLETION/syntax-source-route
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+
+--- stderr ---

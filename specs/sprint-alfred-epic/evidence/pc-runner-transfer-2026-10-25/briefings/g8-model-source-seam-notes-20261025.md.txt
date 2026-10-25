@@ -1,0 +1,40 @@
+# G8 bounded Source navigation notes
+
+Read-only code exploration, not a Critic/Advisor review, approval or native PASS.
+The implementation owner must inspect actual code before relying on these notes.
+
+- `lib/model-family-host-store.mjs:1170` exposes the controlled driver and Model
+  producer port. `modelMethodTerminalRead` currently observes receipt facts only.
+  `disposeInvocation` around1102 rejects native admissions; do not reuse its
+  controlled terminal token as a native return. Add the separately validated
+  native-return path selected by D150.
+- `lib/session-authority-domain-owner.mjs:251` moves operation effectFacts into
+  member sourceFacts; terminal advances/releases the member and returns boolean.
+  Retain existing callers' return semantics; a narrowly Source-owned readback
+  operation may expose the final member/release refs needed by the locator.
+- `lib/session-authority-registry.mjs:650` already has
+  `inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort,memberRef})`.
+  Under the real boundary it demands the current ref and supplies member/release.
+- Obtain the Model producer port with
+  `createModelFamilyHostAuthorityProducerPort({repository})`. The indexed receipt
+  read by `readHeldModelFamilyInvocation` is insufficient original publication.
+- `readAuthoritySourceFile` around119 currently parses JSON before semantic
+  validation. A bounded Source-owned raw-bytes sibling/mode is needed for Markdown
+  report facts; preserve identity, nofollow and double-read checks and default
+  behavior. Return exact facts, never turn caller bytes into original custody.
+- Registry definitions around39 and Model host scan around1187 enumerate Model
+  namespaces. Enroll the narrowly Model-owned terminal-artifact namespace/root
+  consistently in both. This is within the same existing principal/domain,
+  not a new independent ledger or authority. Unknown namespaces must still fail.
+- Native precedent: `scripts/codex-native-critic-host.mjs` WeakMap at44 and checked
+  child return mint at563; `scripts/codex-critic-host.mjs:1174` captures it.
+  Reconstruction at1209 deliberately refuses JSON/WeakMap recreation; preserve it.
+- The e2e `buildSubmittedFeature` setup around488 directly handwrites report and
+  pure receipt. That is not valid original producer input under D150. Replace
+  only the valid fixture's publication prerequisite with a genuine public Source
+  transaction; retain original case IDs/assertions and preserve the handwritten
+  case as a refusal control. Fixture setup is not an examiner expectation.
+- Controlled Model driver is `controlled-unit-method`. It can qualify real
+  registry advance/release/readback mechanics; it cannot be labelled a native
+  model review or independently passing Critic. Never accept caller JSON or a
+  public JSON-to-native-handle constructor to make a positive fixture pass.

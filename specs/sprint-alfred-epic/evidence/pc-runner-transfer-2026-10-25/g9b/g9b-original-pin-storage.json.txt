@@ -1,0 +1,21 @@
+command: node --import <repo-root>/scratch/clones/g9b-active-hook-view-20261025/scratch/g9b-synthetic-identity.mjs --test "--test-name-pattern=runner continuity|bounded storage" <repo-root>/scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+label: g9b-original-pin-storage
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+✔ runner continuity: an older loaded view survives updates when session liveness is unobservable (1615.047585ms)
+✔ bounded storage: after two installs the older view remains when liveness is unobservable; foreign view-<sha> directories, view-tmp-*, notes and an import source stay (835.506232ms)
+✔ bounded storage: a view nothing references any more is removed, a view an import source names is not (41.755322ms)
+✔ bounded storage: a refused validate prunes nothing (630.816181ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3561.328705
+
+--- stderr ---

@@ -1,0 +1,119 @@
+{
+  "schema": "agy.original-critic-source-package.v1",
+  "baseCommit": "69643e345443ca4100ab164e0db808d275b2cd78",
+  "methodOnly": true,
+  "nativeReturn": {
+    "status": "unavailable",
+    "code": "AGY-CRITIC-NATIVE-RETURN-UNAVAILABLE",
+    "reason": "no original terminal child result in installed AGY hook"
+  },
+  "patch": {
+    "path": "patch.diff",
+    "sha256": "0548799cba98831bd99e5e57915789a2aace874ab0794e9d485d83368e53d407",
+    "bytes": 23382
+  },
+  "files": [
+    {
+      "path": "plugins/pipeline-core/lib/agy-original-critic-return.test.mjs",
+      "sha256": "c32dd48dfcacd607f834cca6af907b6ad3ad976454baf4a955600e7396a6bc10",
+      "bytes": 6905
+    },
+    {
+      "path": "plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs",
+      "sha256": "6a825a0420985af3614880bd81028ef3860ed20d717f71093e7c4ac62f7df188",
+      "bytes": 24682
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs",
+      "sha256": "971164313537065cf824c85da6ed59f6450f65d7c1ed3eb4faa8c41b66ba29f5",
+      "bytes": 3281
+    }
+  ],
+  "captures": [
+    {
+      "path": "captures/r2-agy-original-critic-test.json",
+      "sha256": "3f5897b95a4eaf4db51783f425a4ed9a807c88b369308f1f04daf3020604beb1",
+      "wrappedExitCode": 1
+    },
+    {
+      "path": "captures/r2-agy-original-critic-test-v2.json",
+      "sha256": "9fd2b5066a103a8a0044c616efaaca538625d3fe4abd9e842274def43cea2ae4",
+      "wrappedExitCode": 1
+    },
+    {
+      "path": "captures/r2-agy-original-critic-test-v3.json",
+      "sha256": "d6a8e0e34cef1675e2790ba080b1157922408ee2cbe0fd5cff68672309bcb8f6",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-original-critic-test-v4.json",
+      "sha256": "c493f1dbbee688f30d88ea6db5f11391e3b7f09c5ba78f1d9b2f802adc339e03",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-original-critic-final.json",
+      "sha256": "c498424118096a6ca8d576b0d0088d12872af2e2432dd94c573c9e5af43684b3",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-native-existing-suite.json",
+      "sha256": "f644193e7f69913f3b86fb6acaf34c9e62e81db24336f744127e9f14d9f8317b",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-native-existing-final.json",
+      "sha256": "3356b3bc0d50023aff69867ce3d408f5f4fb28ca8933dd66608632c7a1ba557d",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-source-final-combined.json",
+      "sha256": "e4feb953279d7106be7b3594131873488d1fb003512fedea1d6f46638917d559",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-consumer-safe.json",
+      "sha256": "e5328237bbd9a8bffa3df72158f2b1252e1bf7c56202bd10c4c5e75a93fe55d9",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-inert-harness-test.json",
+      "sha256": "0d2c0171e6d07f36475969d0be5097fb9b37827118ae47920af50dd20e963385",
+      "wrappedExitCode": 0
+    },
+    {
+      "path": "captures/r2-agy-v2-offline-test-final3.json",
+      "sha256": "0f1b7f2da6ee5df8b4a1d0f22b948f920395cbef4edfa157a9c290eb58bb892c",
+      "wrappedExitCode": 0
+    }
+  ],
+  "checks": {
+    "sourceCombined": "wrapped exit 0",
+    "consumerSafe": "wrapped exit 0",
+    "inertHarness": "wrapped exit 0",
+    "sessionFamily": "interrupted after prolonged no-output foreground run; no machine capture or PASS",
+    "fullVerify": "parent-owned",
+    "independentCritic": "parent-owned",
+    "poAcceptance": "open"
+  },
+  "proposal": "native-terminal-return-proposal.md",
+  "v1": {
+    "harness": "observe-native-terminal-shape.mjs",
+    "sha256": "57fde1a8a31fa27e2a666128c6d9dfac97221fa0e316c1274c2146000531b9ec",
+    "executedOnce": true,
+    "observation": {
+      "path": "native-terminal-shape-4dcfdcc6-0dce-4a13-b63c-3e6cd7f8d984.json",
+      "sha256": "0c1602823c7a8d3a0beacba62fc70423b6fa023ba804b017f63e624b175d42c2",
+      "observedChildCount": 0,
+      "nativeIndependentPass": false
+    }
+  },
+  "v2": {
+    "harness": "observe-native-terminal-shape-v2.mjs",
+    "sha256": "7f5be379708f4366bdade1c697939efd337d44dc16e048b91d85a837cf5ae385",
+    "test": "observe-native-terminal-shape-v2.test.mjs",
+    "testSha256": "f6fa50f9c2900a055c051b8149cb2b31e03303964405a3b721b496679e53bbbb",
+    "proposal": "native-terminal-v2-decision-proposal.md",
+    "executed": false,
+    "newPoDecisionRequired": true
+  }
+}

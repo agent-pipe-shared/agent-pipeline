@@ -1,0 +1,27 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-native-critic-host.test.mjs
+label: g8-native-host-regression
+exitCode: 0
+head: 0b80f4f0908faf49eec36fcb5549e63ed80c44ea
+tree: c593d41a37ac39f6a584c63a036503de021a3272
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ NCH01 native packet binds role prompt paths candidate and return destination (67.218795ms)
+✔ NCH02 invalid native role reaches no fixed child (26.161963ms)
+✔ NCH03 empty native prompt reaches no fixed child (25.520334ms)
+✔ NCH04 invalid native required path reaches no fixed child (33.797861ms)
+✔ NCH05 invalid native candidate reaches no fixed child (29.274356ms)
+✔ NCH06 invalid native return destination reaches no fixed child (25.666741ms)
+✔ NCH07 late required-path drift is rechecked before the fixed child (51.829884ms)
+✔ NCH08 late coordinator-evidence drift is rechecked before the fixed child (51.56445ms)
+✔ NCH09 ordinary native route retains its own effort under exact construction validation and copied context refuses (29.705525ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 675.151363
+
+--- stderr ---

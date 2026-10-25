@@ -1,0 +1,62 @@
+command: node scratch/original-controller-run.mjs devplan
+label: ORIGINAL-CONTROLLER-COMPLETION/devplan-policy
+exitCode: 1
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+ORIGINAL184 CALLBACK START shard=null index=94 pid=307153 mono_ns=7578860541797
+Plan submitted by "po" on 2026-08-01T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/gated/prd_gated.md(338789a7e38b...)+specs/gated/spec.md(330e5a6e6773...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-01T12:00:00.000Z; bound to submission f88ce92fb478....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "gated",
+  "sources": {
+    "prd": {
+      "path": "specs/gated/prd_gated.md",
+      "sha256": "338789a7e38b8f57ce0c705f4148db05df72ca04ddf1bf7c6179d6935ce34e54"
+    },
+    "spec": {
+      "path": "specs/gated/spec.md",
+      "sha256": "330e5a6e677370ea5b1a01f2ba4e2496c1d36396437e1081a35f5a758e242a4d"
+    },
+    "companions": [
+      {
+        "path": "specs/gated/design.md",
+        "sha256": "38521f19d1d14142c346e6defc5422ada433364edbdbac28164497fa363a15e4"
+      },
+      {
+        "path": "specs/gated/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/gated/review/design-review-receipt-1.json",
+      "sha256": "53d80a7ab79fbc127c134d5d378b642a80f347a4b073202791f225e8d0dd6836",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-3e71f62047ff77147b2ac073c5cb10a90bcb9c4605f95bb0d8aea349a49f84c1.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-mXT9io/project onboarding v3 matrix with spaces-ZDWaid" --request "/run/user/1000/ap-g17/g17c-mXT9io/project onboarding v3 matrix with spaces-ZDWaid/scratch/design-approval-request-3e71f62047ff77147b2ac073c5cb10a90bcb9c4605f95bb0d8aea349a49f84c1.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-gated-1" on 2026-08-01T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/gated/prd_gated.md(338789a7e38b...)+specs/gated/spec.md(330e5a6e6773...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+FAIL  the seeded dev-plan gate refuses implementation before approval and admits it after -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=94 pid=307153 mono_ns=7597643890027 elapsed_ms=18783.348 outcome=throw
+{"schema":"pipeline.original-controller-selected-summary.v1","starts":1,"ends":1,"passes":0,"failures":1,"failedIndices":[94]}
+ORIGINAL CONTROLLER owned synthetic home cleanup passed after child settlement
+
+--- stderr ---
+Error: serialized state write failed before commit (SDC-AUTHORITY-UNAVAILABLE); zero mutation.
+Error: set-phase implementation requires an exact approved submission (SDC-AUTHORITY-UNAVAILABLE).

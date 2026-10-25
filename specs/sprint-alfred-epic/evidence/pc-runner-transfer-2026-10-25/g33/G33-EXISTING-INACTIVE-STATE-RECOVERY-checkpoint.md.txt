@@ -1,0 +1,40 @@
+# G33 existing inactive-State recovery checkpoint
+
+## Entry and scope
+
+- Frozen Main candidate: `32b398bf7c5bd03ba9184bea09305893ea4fbd61`.
+- Isolated scratch clone is detached at that exact commit.
+- Goldfish pipeline-start preflight returned `plugin-refresh-required` (advisory), `roleScope.testCommands.route=host-boundary-from-first-call`, and `modelRoleBootstrap.status=unavailable` with `MODEL-ROLE-SESSION-IDENTITY-CONFLICT`.
+- Parent confirmed the PO-approved method-only exception applies. Do not repair shared registry, bootstrap models for another host, fabricate bindings, or access private profiles.
+- No tracked files or frozen Main files have been edited. No tests or product scripts have run.
+
+## Contract and architecture
+
+- The task is narrowly to recover damaged post-close `inactiveState` only when an independently validated lifecycle preimage proves the original timestamp; approval-shaped data and `updatedAt` equality alone do not suffice.
+- Keep closed/discarded validators strict; preserve closure/history bytes, approval and proof-consumption audits, and existing digest/root/calibration/handover/history/State CAS bindings.
+- ADR-0082 (`docs/adr/0082-bounded-continuity-self-repair.md`) allows a bounded new repair only with its own closed diagnosis and threat-model review; it does not authorize widening the existing route automatically.
+- G33 note (`scratch/g33-next-recovery-scope-20261025.md`) is investigative guidance, not an accepted design or passing test.
+
+## Investigation and implementation status
+
+- ADR-0082 is the applicable accepted architecture decision. The continuity observer validates current State, configured handover, kickoff history, and closed evidence, but carries no independently authenticated preimage for the inactive lifecycle boundary. The planner binds current State/history/calibration/handover/evidence and repeated CAS; these bindings establish current-byte consistency, not that a stale `updatedAt` was previously written by a legitimate closure/discard.
+- `approve-deploy` appended a genuine approval record with its own `approvedAt` but unconditionally replaced `updatedAt`. The existing strict `inactiveLifecycleTransitionTimestamp()` already covers a valid close/discard transition, so the deploy writer now mirrors the existing `approve-push` preservation behavior. Invalid or active State retains the ordinary audit timestamp. This is a narrow preventive writer fix only.
+- Already damaged-state recovery remains deliberately unsupported: no independently validated State preimage producer/reader was identified in the inspected continuity and deploy/push approval paths, and approval/consumption fields do not bind the rest of State. ADR-0082 explicitly requires a separate closed diagnosis/threat-model review for a new corruption type. No repair verb, new authority field, or history append was invented.
+- Actual captured checks: `node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs` via `capture-evidence.mjs`, label `g33-post-close-deploy`, exit 0, artifact `scratch/g33-post-close-deploy-test.log` (32.633s). The file reports one top-level Node test; the new G33 block contains three assert-based writer cases: valid close, valid discard, and stale/approval-shaped refusal. Required consumer-safe-path check via `capture-evidence.mjs`, label `g33-consumer-safe-paths`, exit 0, 9/9 tests, artifact `scratch/g33-consumer-safe-paths.log`.
+- Existing continuity regression suite via `capture-evidence.mjs`, label `g33-continuity-regression`, exit 1: 308 tests, 268 pass, 40 fail, 58.2s, artifact `scratch/g33-continuity-regression.log`. Every failure is `SP-ADDRESS`: the required synthetic HOME under repo scratch is too long for the source's Unix socket bound (`$HOME/.apsp/<16-char>/<24-char>.sock` <=107 bytes). Do not move HOME/test files to host temp or actual private profiles; this run is not valid product evidence.
+- Both checks ran from this clone with `scratch/g33-synthetic-node-runtime.mjs` preloaded before imports; it supplies synthetic HOME, tmpdir, and `os.userInfo()` and propagates itself through `NODE_OPTIONS` to child Node processes. No actual profile, key, or anchor was accessed.
+- Refusals encountered: (1) compound `rg` command rejected by shell grammar; (2) guessed ADR filename was missing; (3) `ls` command unsupported; (4) clone path did not exist before clone setup. The exact read-only `verify-audit` action was run after each guard refusal. No guard override or private state was used.
+- `docs/adr/0082-bounded-continuity-self-repair.md` is the correct ADR filename.
+
+## Remaining
+
+- The inspected continuity route does not expose an independent preimage producer. Return this limitation as a typed unsupported recovery proposal; further source evidence or a new accepted authority decision and producer are required before an existing damaged State can be repaired safely.
+- The deploy-writer prevention patch is uncommitted and confined to `plugins/pipeline-core/scripts/pipeline-state.mjs` and `plugins/pipeline-core/scripts/pipeline-state.test.mjs` in this isolated clone. No Main or cache files were edited.
+- G33 existing-state recovery is unimplemented and remains stage 50. The deployed patch is only preventive; it does not repair any damaged State. No Full Verify, Critic, stage promotion, commit, or Main integration was performed.
+
+## Exact Source hashes
+
+- `plugins/pipeline-core/scripts/pipeline-state.mjs` pre `a2e4e03434c39a73f3d44d3bb56b7233fa365be860245afaa4a3b5f664e6e218`; post `1fa4fb4f0f69c425b4905f5fafea70eb86b73a86ae7b043675867d67d3300c91`.
+- `plugins/pipeline-core/scripts/pipeline-state.test.mjs` pre `802e354b0052b8b6b1e35b54b13d2a838f7eb8fe9e73b2af92af062cace0685e`; post `e73d434f7dd60c8b31eabcf86639a72c8ab33e789b65f5a7196527ee1acd671e`.
+- The exact uncommitted partial patch is `scratch/G33-EXISTING-INACTIVE-STATE-RECOVERY.patch`.
+- No running process/session handle remains outstanding; the two long test calls completed and their machine-written logs are in clone scratch.

@@ -1,0 +1,334 @@
+{
+  "schema": "pipeline.final-transfer-integrated-qualification.v1",
+  "head": "869dafa521c19fb04699dbd1f493d1ca2a5a3e0f",
+  "subjects": [
+    {
+      "id": "checkout",
+      "sourceCommit": "183ecfb2ddfc5bd424c88958b0bf60c1d2cda809",
+      "files": [
+        {
+          "path": "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+          "sha256": "bf5dbefc518bbdcc26660884c4f9849d5a345f94e2c3a8589b014e755a5451e8"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/verify-evidence-producer.mjs",
+          "sha256": "f8359768630385c74dd135d7519ea9830541c7fa25faa3365e80740a6f11cf8c"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs",
+          "sha256": "c73011e58d66fed8e4cd1762c74c814e857a512ab81f30bcbc6cabd841315174"
+        }
+      ],
+      "pass": 99,
+      "skip": 0
+    },
+    {
+      "id": "ready",
+      "sourceCommit": "cf1d5c422cdc7ed40e43bc21bf4798257c4624e4",
+      "files": [
+        {
+          "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+          "sha256": "71fa86793afaacaf3d9b3f66630b441fc24c180edb4dd5b52103a398c2b1a5cb"
+        },
+        {
+          "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+          "sha256": "746015a6b28315feb4c269d7c0adf7a2ca3c0db687355b629ac748fcc8f87062"
+        }
+      ],
+      "pass": 405,
+      "skip": 3
+    },
+    {
+      "id": "help",
+      "sourceCommit": "869dafa521c19fb04699dbd1f493d1ca2a5a3e0f",
+      "files": [
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-briefing.mjs",
+          "sha256": "bb859021f060a63ec6c309d0ca7143d9b24c0a74dad43f5fc1b84fe450f258ba"
+        },
+        {
+          "path": "plugins/pipeline-core/scripts/dispatch-briefing.test.mjs",
+          "sha256": "d2abece3dc16e92491dc2aedad8f5e80e4173a74486cdebc01596b0914218ca9"
+        }
+      ],
+      "pass": 88,
+      "skip": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/manifest.json",
+      "sourceSha256": "4eaa65cc9ca36f5221cae55b40d9f31ff322b01ddf33419236b1b2d2b5b65813",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/worker-manifest.json.txt",
+      "transportSha256": "4eaa65cc9ca36f5221cae55b40d9f31ff322b01ddf33419236b1b2d2b5b65813",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/green-named-commit.txt",
+      "sourceSha256": "1ef7f33b9543c9fec4414b640754980cff1e74fc3f2f6de43f6e79cca6e9cdad",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/green-named-commit.txt.txt",
+      "transportSha256": "1ef7f33b9543c9fec4414b640754980cff1e74fc3f2f6de43f6e79cca6e9cdad",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/green-original-suites-complete.txt",
+      "sourceSha256": "68d3e0cf9212bf0201a6064b787642340cb3e7b6e237347dc21e3eb65c08f1a7",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/green-original-suites-complete.txt.txt",
+      "transportSha256": "68d3e0cf9212bf0201a6064b787642340cb3e7b6e237347dc21e3eb65c08f1a7",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/green-original-suites-final.txt",
+      "sourceSha256": "affc0bf9ecdb0f0d3885f79020f24c7351186e195855302af40ffa277453d8a8",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/green-original-suites-final.txt.txt",
+      "transportSha256": "affc0bf9ecdb0f0d3885f79020f24c7351186e195855302af40ffa277453d8a8",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/green-original-suites-settled.txt",
+      "sourceSha256": "fac8c7c5a61ba2515c78ecdcb2fce079bfe47eee785b0ab280ba7f6482988823",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/green-original-suites-settled.txt.txt",
+      "transportSha256": "fac8c7c5a61ba2515c78ecdcb2fce079bfe47eee785b0ab280ba7f6482988823",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/green-original-suites.txt",
+      "sourceSha256": "657ed683b188aba4274d807d0e4824e8eee663de4b747d3fa3ed23d2fc186b0b",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/green-original-suites.txt.txt",
+      "transportSha256": "657ed683b188aba4274d807d0e4824e8eee663de4b747d3fa3ed23d2fc186b0b",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/red-named-commit.txt",
+      "sourceSha256": "91727dfa593879adad216c2246ff2ee36c50d14af5699d92174babe874ef2bc9",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/red-named-commit.txt.txt",
+      "transportSha256": "91727dfa593879adad216c2246ff2ee36c50d14af5699d92174babe874ef2bc9",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/synthetic-preload.mjs",
+      "sourceSha256": "ceb5951a3a5e39191e2260c4d0a84ac8822f7ca02382133d43c139d5c0c46d48",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/synthetic-preload.mjs.txt",
+      "transportSha256": "ceb5951a3a5e39191e2260c4d0a84ac8822f7ca02382133d43c139d5c0c46d48",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/package-handoff.mjs",
+      "sourceSha256": "b887f213d1330e2fdf5e7595f620fa79ca6e5efb312aa2763993854ea389a87e",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/package-handoff.mjs.txt",
+      "transportSha256": "b887f213d1330e2fdf5e7595f620fa79ca6e5efb312aa2763993854ea389a87e",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-checkout-identity-20261025/report.md",
+      "sourceSha256": "bec0b88c44ea2a6465e546297f0a5fd4d6073ebce029420d85791bc4b0d6fb1d",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/report.md.txt",
+      "transportSha256": "bec0b88c44ea2a6465e546297f0a5fd4d6073ebce029420d85791bc4b0d6fb1d",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/checkout.log",
+      "sourceSha256": "5794670ea6f804bec2765a98752f2fd7c2448e43c1be5d530e4e96d2564980d1",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/main.log.txt",
+      "transportSha256": "5794670ea6f804bec2765a98752f2fd7c2448e43c1be5d530e4e96d2564980d1",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/checkout-custody.json",
+      "sourceSha256": "c0a423144d2b42bd19414022b734349e0908337c51005f0e5939b9a519ea2826",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/checkout/main-custody.json.txt",
+      "transportSha256": "c0a423144d2b42bd19414022b734349e0908337c51005f0e5939b9a519ea2826",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/manifest.json",
+      "sourceSha256": "474357b5384480d31dd693277c359af4fa6f926564f97398a3d07d3abb6f0d56",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/worker-manifest.json.txt",
+      "transportSha256": "474357b5384480d31dd693277c359af4fa6f926564f97398a3d07d3abb6f0d56",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/focused-red.log",
+      "sourceSha256": "2f05e18d7bb62bba4792c773a16c70eb7b10c58a204215923431318469f8b6f4",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/focused-red.log.txt",
+      "transportSha256": "2f05e18d7bb62bba4792c773a16c70eb7b10c58a204215923431318469f8b6f4",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/focused-green.log",
+      "sourceSha256": "67c9609abac643d68d2bd8b7e7b8582a58d8806b7c6d9b0beec83f41492e59d0",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/focused-green.log.txt",
+      "transportSha256": "67c9609abac643d68d2bd8b7e7b8582a58d8806b7c6d9b0beec83f41492e59d0",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/physical-red.log",
+      "sourceSha256": "8d8907cb7a51ba359040d11eb8ed84391e6088168478ddb92d548d5ef05f33cf",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/physical-red.log.txt",
+      "transportSha256": "8d8907cb7a51ba359040d11eb8ed84391e6088168478ddb92d548d5ef05f33cf",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/physical-green.log",
+      "sourceSha256": "a83218fe1166017608ad4b1ea0565ace16ea228fb8e9517b1fc027b80878177a",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/physical-green.log.txt",
+      "transportSha256": "a83218fe1166017608ad4b1ea0565ace16ea228fb8e9517b1fc027b80878177a",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/final-full.log",
+      "sourceSha256": "3f1ec3b89f401c4555ce4389b564c554a4444c6fcfe02228385690dbfed7e78d",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/final-full.log.txt",
+      "transportSha256": "3f1ec3b89f401c4555ce4389b564c554a4444c6fcfe02228385690dbfed7e78d",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/consumer.log",
+      "sourceSha256": "a62ca9686be28172a9c3beaaa72ae7fd6c389a62d1f2cc0d0f4baa3957754eaa",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/consumer.log.txt",
+      "transportSha256": "a62ca9686be28172a9c3beaaa72ae7fd6c389a62d1f2cc0d0f4baa3957754eaa",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/r2-ready-launch.cjs",
+      "sourceSha256": "9cc2b82bc3aef7040dc0edbe672062248f35b20e356c12bb91edbd26cdcc4891",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/r2-ready-launch.cjs.txt",
+      "transportSha256": "9cc2b82bc3aef7040dc0edbe672062248f35b20e356c12bb91edbd26cdcc4891",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/r2-ready-synthetic-os.cjs",
+      "sourceSha256": "892c8cc0c29170b411bc9946443779e7bfefb481b1e3ee8a66b0b39c753bffea",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/r2-ready-synthetic-os.cjs.txt",
+      "transportSha256": "892c8cc0c29170b411bc9946443779e7bfefb481b1e3ee8a66b0b39c753bffea",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/r2-ready-summary.cjs",
+      "sourceSha256": "a150e29bf501f55e7b7e8bcda9f27bfdb417fbeec064e3d8f962dabaa04446c7",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/r2-ready-summary.cjs.txt",
+      "transportSha256": "a150e29bf501f55e7b7e8bcda9f27bfdb417fbeec064e3d8f962dabaa04446c7",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/patch-before-physical.diff",
+      "sourceSha256": "b3439f6fa0f399c0fbdbaa252b03ea14b8d150947194b9d2b916d6625d7aece6",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/patch-before-physical.diff.txt",
+      "transportSha256": "b3439f6fa0f399c0fbdbaa252b03ea14b8d150947194b9d2b916d6625d7aece6",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/manifest-before-physical.json",
+      "sourceSha256": "23afec9cec377d44b9ff436c97ba5bc68b8fe6936f51a53d49d31d0965480976",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/manifest-before-physical.json.txt",
+      "transportSha256": "23afec9cec377d44b9ff436c97ba5bc68b8fe6936f51a53d49d31d0965480976",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/final-full-before-physical.log",
+      "sourceSha256": "c9a89e0760f05ac6c63cb56eaf013768bbcb09825cb937291a9a3db3a943e42f",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/final-full-before-physical.log.txt",
+      "transportSha256": "c9a89e0760f05ac6c63cb56eaf013768bbcb09825cb937291a9a3db3a943e42f",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-ready-guard-20261025/consumer-before-physical.log",
+      "sourceSha256": "194d361ef31b944d5489911a083a4994f8872f5483d7120fbc153dfdbd4a07ef",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/consumer-before-physical.log.txt",
+      "transportSha256": "194d361ef31b944d5489911a083a4994f8872f5483d7120fbc153dfdbd4a07ef",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/ready.log",
+      "sourceSha256": "69c44eadf48a5bb9de5e4859fd8da4450b4b309c2c59a37cacec0d113fe73b06",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/main.log.txt",
+      "transportSha256": "69c44eadf48a5bb9de5e4859fd8da4450b4b309c2c59a37cacec0d113fe73b06",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/ready-custody.json",
+      "sourceSha256": "15cec5d841927c6cff1f39eb3712257474f78c3f44d330a9f2997d13b661255c",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/ready/main-custody.json.txt",
+      "transportSha256": "15cec5d841927c6cff1f39eb3712257474f78c3f44d330a9f2997d13b661255c",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/manifest.json",
+      "sourceSha256": "4e8668ab87efacc9e47aa43089a47bc7cd542c43ac477dd2d5a80c80101162d3",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/worker-manifest.json.txt",
+      "transportSha256": "4e8668ab87efacc9e47aa43089a47bc7cd542c43ac477dd2d5a80c80101162d3",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/green-cli-help.txt",
+      "sourceSha256": "90bca021d5cfdcf6f563e6868c2112b6fe1f62a2765dedba0c07773ff8e3508d",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/green-cli-help.txt.txt",
+      "transportSha256": "90bca021d5cfdcf6f563e6868c2112b6fe1f62a2765dedba0c07773ff8e3508d",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/green-original-and-consumer-safe.txt",
+      "sourceSha256": "e25ac5281c8fc563978932b18b5e4d21372626cdd799e14b005108dfec858cd1",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/green-original-and-consumer-safe.txt.txt",
+      "transportSha256": "e25ac5281c8fc563978932b18b5e4d21372626cdd799e14b005108dfec858cd1",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/red-cli-flags.txt",
+      "sourceSha256": "3dfe3bce232987d4c0a82fef79515bafff6d2eb261399b1c83db42e02d9840cb",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/red-cli-flags.txt.txt",
+      "transportSha256": "3dfe3bce232987d4c0a82fef79515bafff6d2eb261399b1c83db42e02d9840cb",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/red-cli-help.txt",
+      "sourceSha256": "db652f1569fed797afee2f5035998badbe42bbf65a79325bbd22d43fba430d3c",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/red-cli-help.txt.txt",
+      "transportSha256": "db652f1569fed797afee2f5035998badbe42bbf65a79325bbd22d43fba430d3c",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/synthetic-preload.mjs",
+      "sourceSha256": "a7267491bf08b380eb9e6d286cb8ac7f812d40dc85d5a475d2f69532c1b26a92",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/synthetic-preload.mjs.txt",
+      "transportSha256": "a7267491bf08b380eb9e6d286cb8ac7f812d40dc85d5a475d2f69532c1b26a92",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/package-handoff.mjs",
+      "sourceSha256": "87f4abe3a859f7e7156387a7cbc2f4260bf5b4ef56d15b167c4c3b4553ac361d",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/package-handoff.mjs.txt",
+      "transportSha256": "87f4abe3a859f7e7156387a7cbc2f4260bf5b4ef56d15b167c4c3b4553ac361d",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/r2-dispatch-help-20261025/report.md",
+      "sourceSha256": "5aa98fb34920fbc1c526f6b6a2f58953c1fe8ec0d46c71729ec2721dfe5d7136",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/report.md.txt",
+      "transportSha256": "5aa98fb34920fbc1c526f6b6a2f58953c1fe8ec0d46c71729ec2721dfe5d7136",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/help.log",
+      "sourceSha256": "c4d4726a9d392938c6aab58b8b9de49e921df1676515f03ec6dcbeeac280910b",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/main.log.txt",
+      "transportSha256": "c4d4726a9d392938c6aab58b8b9de49e921df1676515f03ec6dcbeeac280910b",
+      "byteExact": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/help-custody.json",
+      "sourceSha256": "2c4b7caa23fdbdb52d987c3b07965b81887cfd5a01fae4c0fcc328ee569032ea",
+      "transport": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/help/main-custody.json.txt",
+      "transportSha256": "2c4b7caa23fdbdb52d987c3b07965b81887cfd5a01fae4c0fcc328ee569032ea",
+      "byteExact": true
+    }
+  ],
+  "assurance": "focused-source-method",
+  "nativeQualified": false,
+  "limits": [
+    "Capture headers retain original dirty precommit state; exact committed postimages are independently compared.",
+    "Root graph/input helpers evolved between runs; no missing original test-input digest is invented.",
+    "Guard applied and committed by human operator after actual timed-out edit and author-root commit refusal; no agent hook bypass.",
+    "No final full Verify/Security, frozen Critic, native Windows or PO acceptance follows from these targeted checks."
+  ]
+}

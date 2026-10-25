@@ -1,0 +1,37 @@
+# G8 locator handoff and retained examiner rationale
+
+D150 approves a public locator as an index into the existing Model registry.
+The pure design-approval binding has a fixed closed shape, so this candidate
+does not add a caller-supplied locator to that kernel. Instead, Source reads the
+physical publication file named by the receipt digest, asks the current Model
+registry row for the unique released member whose terminal Source facts contain
+that exact publication fact, constructs the locator from the publication and
+request, and invokes `readOriginalDesignReview`. The lookup is scoped to one
+producer and one exact physical fact; missing or multiple matches refuse. Both
+present-plan paths and signing pass the public report bytes so Source can compare
+them to the original private report. The locator remains an index, never an
+authority grant or a JSON-to-handle constructor.
+
+The earlier active route capture and the new `g8-locator-active-route.json`
+both retain 9/14: the same five original positive cases fail because
+`buildSubmittedFeature` handwrites a PASS receipt and report. Source correctly
+finds no original publication/member. Changing their assertions, skipping cases,
+or blessing the hand-authored setup would defeat the approved contract. A valid
+replacement setup needs an original `duty.deep` author Model member on the same
+candidate, then `prepareOriginalDesignReview`, followed by the held Codex Critic
+route's `invokeCodexNativeCriticHost` with `originalDesignReview` so its actual
+validated return enters `publishHeldCriticOriginalDesignReview`. The CCH137
+fake app-server fixture proves controlled host mechanics only; it cannot supply
+independent native/provider evidence for the active approval positives. No
+native provider call is authorized in this continuation.
+
+CCH136/137 previously failed at the isolated module's `reconstruct` call.
+D150 explicitly rejects JSON-to-handle reconstruction. The retained assertions
+now verify that isolated reconstruction refuses, copied contexts refuse, and
+finalization works with the original live context. The CCH137 fingerprint
+examiner additionally checks that review and candidate Git content are stable;
+only Source-owned `agent-pipeline/` administrative entries may change as the
+Model registry records original execution. The first revised capture exposed
+this previously masked administrative delta, the second exposed a diagnostic
+object-shape mistake, and the final focused capture exits 0. None of these
+captures claims a provider-signed review.

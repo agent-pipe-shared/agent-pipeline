@@ -1,0 +1,19 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-split-test-home.mjs --test --test-name-pattern MFHS007 <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-baseline-62008/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-mfhs007-baseline-split
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFHS007 main launch revalidates the sealed candidate after asynchronous config application (36324.947588ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36869.253598
+
+--- stderr ---

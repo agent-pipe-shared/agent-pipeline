@@ -1,0 +1,108 @@
+command: <host-path> "--test-name-pattern=TPSHELL-OPAQUEMENTION|IR-4 incident replay|NVA-B-READCONTAIN-1" --test <repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+label: focused-red
+exitCode: 1
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: true
+--- stdout ---
+✖ NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment (889.92913ms)
+✖ TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused (20.30198ms)
+✖ IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature (16.755873ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1391.26599
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7661:1
+✖ NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment (889.92913ms)
+  AssertionError [ERR_ASSERTION]: node -e 'process.exit(0)'
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7686:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).\nThis refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.\nUse one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\nDo not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\nIf typed retryActions are present, run only those exact read-only actions as separate tool calls.\nThe complete admitted grammar, with bounds and exact spellings:\n- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n`,
+    expected: /GUARD-LIFECYCLE-NOT-READY/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7889:1
+✖ TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused (20.30198ms)
+  AssertionError [ERR_ASSERTION]: refused a mention/run command: node -e "require('fs').writeFileSync('scratch/note.txt','mentions plugins/pipeline-core/hooks/guard-push.test.mjs')" -- BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7904:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at node:internal/test_runner/test:1133:31
+      at node:internal/process/task_queues:150:7
+      at AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+      at AsyncResource.runMicrotask (node:internal/process/task_queues:147:8) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7926:1
+✖ IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature (16.755873ms)
+  AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7931:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,25 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-split-test-home.mjs --test --test-name-pattern MFHS00[1-7] <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-baseline-62008/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-mfhs001-007-baseline-split
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFHS001 activation marker plus generation index qualify a fresh invocation; failed launch retains its watermark (27352.038984ms)
+✔ MFHS002 trusted asynchronous driver success is awaited while synchronous success remains synchronous (35513.250161ms)
+✔ MFHS003 S4 private driver context carries the original sealed invocation and admitted immutable request once (44416.670766ms)
+✔ MFHS004 K147 an async native driver runs after the BEGIN ticket closed and opens its own live registry boundary (35165.757307ms)
+✔ MFHS005 S4 trusted driver can complete a correlated synthetic profile-main operation from the original handle (35899.565014ms)
+✔ MFHS006 profile-main boundary refuses duty routes and existing-main switches before configured operations (72501.339048ms)
+✔ MFHS007 main launch revalidates the sealed candidate after asynchronous config application (37819.211458ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 289040.325222
+
+--- stderr ---

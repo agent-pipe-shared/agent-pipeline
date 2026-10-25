@@ -1,0 +1,44 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-synthetic-identity.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs
+label: g8-original-custody-red
+exitCode: 1
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: false
+--- stdout ---
+node:internal/modules/esm/resolve:271
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.mjs' imported from <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:861:10)
+    at defaultResolve (node:internal/modules/esm/resolve:988:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:697:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:714:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:746:52)
+    at #resolve (node:internal/modules/esm/loader:679:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:599:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:162:33)
+    at ModuleJob.link (node:internal/modules/esm/module_job:252:17) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.mjs'
+}
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs (39.146324ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 48.394565
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs:1:1
+✖ <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs (39.146324ms)
+  'test failed'
+
+--- stderr ---

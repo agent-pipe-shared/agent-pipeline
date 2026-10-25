@@ -1,0 +1,125 @@
+{
+  "schema": "pipeline.original-guard-method-package.v1",
+  "candidate": "0b80f4f0908faf49eec36fcb5549e63ed80c44ea",
+  "sourceHashes": [
+    {
+      "path": "plugins/pipeline-core/hooks/stop-fanout.mjs",
+      "sha256": "49ffcfc55be5c696021723be472feddba79d79c7a6a7dc6c83e031c7f71de5d3"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+      "sha256": "d7fb8e60ed3fd09db656145a0e9990558fcf22524f502d454f08162f42246882"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs",
+      "sha256": "f005ab3c35cc03de5401e36633145735adda8200cc2c363de58e1796b71618d8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "9e0b6f85b9a363cee66c3c34080a5f3bbeb5de61f2cc5475f38e14bc19908def"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/elephant-context-measure.mjs",
+      "sha256": "61c8660ae75fb8dae7cd4c0006c36fd5ad893926be787a78bff890b190627ff6"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/elephant-context-measure.test.mjs",
+      "sha256": "63f6fd61d0db9fa71bd31a323e1d30deb3ed19348024bb8c78133bfa6b030dd9"
+    }
+  ],
+  "guardDependencyHashes": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "sha256": "89f59f82084cd2bbda881ffe049c0b4b03b721a503882245c2bbf8a709188bf8"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "sha256": "ed7b04a3219c19674f9524f97571fad8fcc2d38244ce72798be330b0151a309e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "9e0b6f85b9a363cee66c3c34080a5f3bbeb5de61f2cc5475f38e14bc19908def"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs",
+      "sha256": "97cc1cfbb152ca64fe5279d8ed0dc72cb9b43a339caf25d6f9c52dab7050206c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-power.mjs",
+      "sha256": "a64537deacf8dfa424f761b92a9a06b2080e286ce11d0e1aec24ca2e9d2fa41e"
+    }
+  ],
+  "fileHashes": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "sha256": "247e3745d4e64eed6b9e58323be65ab452bb7e57156d9b90d7f20bf3256a7f4d"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.fixture-root.mjs",
+      "sha256": "ea94a73752250b3f7a74c7d49cab164c720d93652c690f27e344b248a1d2a056"
+    },
+    {
+      "path": "scratch/original-guard-launch.cjs",
+      "sha256": "015a1996cb907891445aa1b6a5eee1c0d9bce1d0a66774035897d8c2889020e7"
+    },
+    {
+      "path": "scratch/original-guard-synthetic-os.cjs",
+      "sha256": "d03bd91fae6168945e023e3d0b3f7dcffd23fd92b1a4c0e56320d330a0836e91"
+    },
+    {
+      "path": "scratch/package-original-guard.cjs",
+      "sha256": "862f3d6be13ef23985394dc114787483cec2a0d45b342bcb5eb1eed1c5a54fdb"
+    },
+    {
+      "path": "scratch/agent-out/original-guard-lifecycle-current/attempt-report.json",
+      "sha256": "dc7699883fb464a36530919fabe61606c3a045a74ade550cb7d2370dbacff0e0"
+    }
+  ],
+  "fixturePatch": {
+    "path": "scratch/agent-out/original-guard-lifecycle-current/fixture-only.patch",
+    "sha256": "7fb3d877aadd4301f0f455bb246ed8ee01f4d4e7242dadbbb417ed91702e7d11"
+  },
+  "captures": [
+    {
+      "path": "scratch/agent-out/original-guard-lifecycle-current/original-guard-full-suite.json",
+      "sha256": "431a84c9c6d560cf2e9dc7bf33aed84507dfe0980eeeaf91869d34e9d6976261",
+      "exitCode": 1,
+      "tests": 392,
+      "pass": 376,
+      "fail": 13,
+      "skipped": 3
+    },
+    {
+      "path": "scratch/agent-out/original-guard-lifecycle-current/original-guard-full-suite-isolated.txt",
+      "sha256": "38f1ebfe5a2b4a467592414d7a42b478ac87fe1dff3f87a51cafd8049dd7b841",
+      "exitCode": 1,
+      "tests": 390,
+      "pass": 320,
+      "fail": 67,
+      "skipped": 3
+    },
+    {
+      "path": "scratch/agent-out/original-guard-lifecycle-current/original-guard-full-suite-ac168.txt",
+      "sha256": "e8c027c591114f17039252b4428e77606598a0e84a5ab7439f2fa0c9d9aaecc6",
+      "exitCode": 1,
+      "tests": 392,
+      "pass": 376,
+      "fail": 13,
+      "skipped": 3
+    },
+    {
+      "path": "scratch/agent-out/original-guard-lifecycle-current/consumer-safe-paths-ac168.txt",
+      "sha256": "9ee1159dac300ce4661c22efdc90976a2036a351f02bef3e42f52c4be504a14b",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0
+    }
+  ],
+  "limits": [
+    "The current private D148 external root is correctly rejected by original public-read examiners; it cannot prove those examiner outcomes.",
+    "The synthetic general temp under clone scratch inherits the clone Git ancestor, affecting independent-root examiners.",
+    "Native Windows cases remain skipped; this Linux/WSL count grants no native-Windows assurance."
+  ]
+}

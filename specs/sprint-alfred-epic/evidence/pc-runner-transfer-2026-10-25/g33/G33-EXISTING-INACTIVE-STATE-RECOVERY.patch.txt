@@ -1,0 +1,111 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 93e20dc71..a35ef74d5 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13082,6 +13082,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         }
+       }
+       const approvedAt = now();
++      // Deploy approval is an audit mutation, not a new lifecycle transition.
++      // Preserve updatedAt only when Source can fully validate the existing
++      // closed/discarded boundary. A damaged or active State keeps the ordinary
++      // mutation timestamp and remains subject to continuity refusal.
++      const stateUpdatedAt = inactiveLifecycleTransitionTimestamp(dir, base) ?? approvedAt;
+       let proof = null;
+       let waiver = null;
+       if (deployProofDemanded) {
+@@ -13129,7 +13134,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         ...base,
+         schema: SCHEMA_ID,
+         deployApprovals: [...priorApprovals, entry],
+-        updatedAt: approvedAt,
++        updatedAt: stateUpdatedAt,
+       };
+       if (!stateWriteSucceeded(writeState(dir, next, base, {
+         requirePhysicalReadback: actionEventRequested,
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index b3e6610d8..b73a36d1d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -326,6 +326,81 @@ for (const kind of ["closed", "discarded"]) {
+   }
+ }
+ 
++// A deploy approval is the same kind of post-close audit mutation as a push
++// approval. It records its own approvedAt but must retain a strictly validated
++// inactive lifecycle timestamp. Stale or malformed lifecycle preimages remain
++// ineligible for timestamp preservation.
++for (const kind of ["closed", "discarded"]) {
++  const root = mkdtempSync(join(nativeContractFixtureParent(), `post-close-deploy-${kind}-`));
++  try {
++    const gitAt = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
++    gitAt("init", "-q", "-b", "main");
++    mkdirSync(join(root, "project"), { recursive: true });
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
++      project: "post-close deploy fixture", verify: "node verify.mjs", autonomy: "bounded",
++      branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
++    }));
++    const lifecycleAt = "2026-08-01T08:00:00.000Z";
++    const state = { schema: "pipeline.state.v0", planApproved: false, updatedAt: lifecycleAt };
++    if (kind === "closed") {
++      state.closedFeatures = [{
++        id: "closed-feature", planPath: "specs/closed-feature/prd.md", phaseAtClose: "implementation",
++        closedAt: lifecycleAt, closedBy: "Synthetic PO", forCommit: null,
++      }];
++    } else {
++      state.discardedFeatures = [{
++        id: "discarded-feature", planPath: "specs/discarded-feature/prd.md", phaseAtDiscard: "implementation",
++        discardedAt: lifecycleAt, discardedBy: "Synthetic PO", reason: "fixture discard", forCommit: null,
++      }];
++    }
++    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(state, null, 2));
++    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid", `${kind} fixture starts valid`);
++    assert.equal(run(["approve-deploy", "--env", "production", "--artifact", "release-1", "--by", "Synthetic PO"], {
++      dir: root, now: () => now,
++    }), 0);
++    const approved = JSON.parse(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"));
++    assert.equal(approved.updatedAt, lifecycleAt, `${kind} deploy audit retains the lifecycle timestamp`);
++    assert.equal(approved.deployApprovals.at(-1).approvedAt, now, "deploy approval has its own audit timestamp");
++    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid", `${kind} observer remains valid`);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++}
++
++{
++  const root = mkdtempSync(join(nativeContractFixtureParent(), "post-close-deploy-stale-"));
++  try {
++    mkdirSync(join(root, "project"), { recursive: true });
++    mkdirSync(join(root, ".claude"), { recursive: true });
++    writeFileSync(join(root, ".claude", "pipeline.json"), JSON.stringify({
++      project: "post-close deploy stale fixture", verify: "node verify.mjs", autonomy: "bounded",
++      branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
++    }));
++    const lifecycleAt = "2026-08-01T08:00:00.000Z";
++    const state = {
++      schema: "pipeline.state.v0", planApproved: false, updatedAt: "2026-08-01T08:00:01.000Z",
++      closedFeatures: [{
++        id: "stale-feature", planPath: "specs/stale-feature/prd.md", phaseAtClose: "implementation",
++        closedAt: lifecycleAt, closedBy: "Synthetic PO", forCommit: null,
++      }],
++      deployApprovals: [{ forArtifact: "old-release", forEnvironment: "production", approvedBy: "Synthetic PO", approvedAt: "2026-08-01T08:00:01.000Z" }],
++    };
++    assert.equal(inactiveLifecycleTransitionTimestamp(root, state), null,
++      "a stale lifecycle timestamp and approval-shaped object cannot establish a preimage");
++    writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify(state, null, 2));
++    assert.equal(run(["approve-deploy", "--env", "production", "--artifact", "release-2", "--by", "Synthetic PO"], {
++      dir: root, now: () => now,
++    }), 0);
++    const approved = JSON.parse(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"));
++    assert.equal(approved.updatedAt, now, "stale State keeps ordinary audit mutation timestamping");
++    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged",
++      "the deploy writer does not bless an unproven inactive State");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++}
++
+ {
+   const root = mkdtempSync(join(nativeContractFixtureParent(), "post-close-push-stale-"));
+   try {

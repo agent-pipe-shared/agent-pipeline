@@ -1,0 +1,29 @@
+# Dispatch helper help — method-only handoff
+
+Targeted delivery: green. Nothing committed or staged. Source base `183ecfb2ddfc5bd424c88958b0bf60c1d2cda809`, tree `8662ec234032f106c762069fc3916db68215760d`; changes remain in the new inert clone `scratch/clones/r2-dispatch-help-20261025`. Main and other owners' Source remain untouched.
+
+The actual public `--help` and `-h` originally returned exit2, `DBG-SUBCOMMAND`. A separate audited RED proved that imported builder dependencies attempted `homedir()` before argument parsing. Both original captures are retained. The entrypoint now prints actionable standalone help before loading those dependencies. Help mixed with any other argument returns exit2 using the existing refusal schema and no builder imports. Help describes the supported binding flags, closed package field types, output behavior, runner choices and authority boundary. No schema subcommand or native execution claim was added.
+
+Only `plugins/pipeline-core/scripts/dispatch-briefing.mjs` and its existing `dispatch-briefing.test.mjs` changed. Builder dependencies are now conditionally loaded through ESM dynamic imports/top-level await; ordinary ESM consumers and binding/build still use their original implementation and admission checks. No existing acceptance case, assertion or ID was weakened, skipped or deleted. Three regression cases were added to the existing file; the mixed-help audit was strengthened after implementation, without weakening the original RED assertions. No additional test enrollment is needed.
+
+## Evidence
+
+Every command below was wrapped by Source `capture-evidence.mjs`, with the synthetic preload installed before capture/test imports and descendants. Capture files include actual command, baseline HEAD/tree, dirty status and exit. Artifact paths below are relative to this handoff directory.
+
+- `node --test --test-name-pattern 'public --help and -h' plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`: exit1, 1 fail, `red-cli-help.txt`; original dependency/account-path lookup detected before help handling.
+- `node --test --test-name-pattern 'public .*prints actionable' plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`: exit1, both flags fail, `red-cli-flags.txt`; actual original CLI `DBG-SUBCOMMAND`.
+- `node --test --test-name-pattern 'public ' plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`: exit0, 3 pass, 0 fail/skip, `green-cli-help.txt`.
+- `node --test plugins/pipeline-core/scripts/dispatch-briefing.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs`: exit0, 88 tests/pass, 0 fail/cancelled/skip/todo, 2416.435892ms, `green-original-and-consumer-safe.txt`. This runs the complete original builder suite and required consumer-safe suite.
+- `git diff --check`: exit0. Exact owned paths are unstaged; packaging independently verifies baseline, path set and empty staged diff.
+
+The actual CLI runs outside a governed repository. The child audit forbids project/private synchronous I/O, `homedir`/`userInfo`, and child processes, and reports zero calls for both standalone help flags and all tested mixed-help refusals. Directory snapshots compare file content and write-relevant metadata before/after. Mixed negatives include build/out/package/binding/root, an unknown flag and both help flags together. Existing unknown-flag/build/binding examiners remain intact. No private/model store was read or repaired. The model-store environment pointer in the fixture names a deliberately nonexistent public fixture path; it grants no authority.
+
+Fixtures use own unique0700 public `/tmp` roots and separate unique private synthetic HOME children under the approved parent. The preload validates physical ownership/mode before imports, supplies synthetic account/Git identity, isolates Git configuration, propagates to descendants, and checks held device/inode before cleanup after settlement. The new CLI fixture also checks held device/inode before deletion. No actual account/profile lookup, permission repair or hook bypass occurred.
+
+## Remaining boundaries
+
+Same own ready runtime; bootstrap was not repeated and no parent receipt/native binding was borrowed. D143 method-only scope overrides generic record/commit boilerplate: no native receipt, dispatch record, staging, commit, child agent or provider/model call. There were no guard-admission changes or foreign edits. The two RED captures establish separate original failures rather than repeated blind repair attempts.
+
+Project-resource measurements/headroom and quick route remain unknown: no project cap/check was supplied. Integrated Verify/Security, independent batch Critic and PO acceptance remain parent-owned and pending. Native platform/store assurance beyond the controlled Source CLI checks is not claimed. All production edits finished before the local23:15 cutoff; no close-block, feature close, stamp/install/push, merge or main switch occurred.
+
+`complete.patch` is the cumulative two-file Source patch. `manifest.json` binds preimages/postimages, captures, report and auxiliary scripts. The auxiliary scripts are inert scratch evidence tools, not shipped production or new enrolled tests.

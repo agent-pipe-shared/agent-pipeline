@@ -1,0 +1,219 @@
+command: node --import ./scratch/clones/r2-critic-finalizer-original-20261025/scratch/r2-critic-synthetic-preload.mjs --test scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+label: r2-critic-original-suite-cont
+exitCode: 1
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+✔ private task snapshot binds uppercase delivered-v3 bytes without exporting record prose (756.395038ms)
+✔ uppercase task ID is safe and wrong or traversal IDs cannot select a different record (405.497656ms)
+✔ empty-tree packet base rejects a non-root authored candidate (437.121629ms)
+✔ prelaunch admission creates one claimed, digest-bound packet before the verdict exists (896.712331ms)
+✔ invalid optional Critic selection retains V3, while valid selection binds before packet creation (1380.355276ms)
+✖ an admitted exact session model survives finalization without reselecting the V3 model (1044.817078ms)
+✔ missing optional model selection retains the independently admitted V3 Critic route (1454.388956ms)
+✔ high-risk T2 and normal T3 retain their V3 duties when optional selection is unavailable (1547.522631ms)
+✖ normal fresh-session finalization consumes the prelaunch packet, reads back, and emits (879.55364ms)
+✔ a schema-invalid or contradictory verdict fails before packet or event publication (184.617457ms)
+✖ an event write failure reports source-complete and a closed identical-only retry (885.097228ms)
+✖ review action construction cannot occur before identical consume readback (901.015388ms)
+✔ a root-authored candidate keeps its empty-tree base but cannot register a generic batch review unit (149.700527ms)
+✖ findings emit REVIEW_FINDINGS (936.075427ms)
+✔ dispatch record drift after admission blocks finalization (827.615791ms)
+✖ receipt validation is closed and refuses provider metadata (924.445361ms)
+✔ closed CLI admits a packet but refuses a caller-written verdict without original Source (1083.370842ms)
+✔ a copied or caller-created Source context cannot finalize a claimed packet (882.869667ms)
+✔ CLI refuses a valid returned verdict when no prelaunch admission exists (158.371707ms)
+✔ CLI closes argv/request vocabulary and reports typed exit-2 errors (124.21803ms)
+✔ a foreign failure inside the generic batch keeps CGB-PHYSICAL and surfaces its original cause (0.507404ms)
+✖ export publishes a consumed review as receipt, report and index with matching hashes (878.386831ms)
+✖ a failing review exports too, with reviewPass false and its finding count (884.140783ms)
+✖ export refuses an unconsumed packet, an unsafe destination and an unusable report without publishing (887.822486ms)
+✖ the export verb runs from a scratch request with no git on PATH and closes its request vocabulary (891.825861ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 15
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19750.831272
+
+✖ failing tests:
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:325:1
+✖ an admitted exact session model survives finalization without reselecting the V3 model (1044.817078ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:349:25)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:414:1
+✖ normal fresh-session finalization consumes the prelaunch packet, reads back, and emits (879.55364ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:418:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:451:1
+✖ an event write failure reports source-complete and a closed identical-only retry (885.097228ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:454:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:466:1
+✖ review action construction cannot occur before identical consume readback (901.015388ms)
+  AssertionError [ERR_ASSERTION]: The validation function is expected to return "true". Received false
+  
+  Caught error:
+  
+  OriginalCriticSourceAdmissionError: Original Critic source admission is unavailable or invalid.
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:471:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: OriginalCriticSourceAdmissionError: Original Critic source admission is unavailable or invalid.
+        at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+        at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+        at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+        at file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:471:25
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:471:12)
+        at Test.runInAsyncScope (node:async_hooks:227:14)
+        at Test.run (node:internal/test_runner/test:1201:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:831:18),
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:500:1
+✖ findings emit REVIEW_FINDINGS (936.075427ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:514:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:534:1
+✖ receipt validation is closed and refuses provider metadata (924.445361ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:537:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:655:1
+✖ export publishes a consumed review as receipt, report and index with matching hashes (878.386831ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:659:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:691:1
+✖ a failing review exports too, with reviewPass false and its finding count (884.140783ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:696:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:711:1
+✖ export refuses an unconsumed packet, an unsafe destination and an unusable report without publishing (887.822486ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:720:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:750:1
+✖ the export verb runs from a scratch request with no git on PATH and closes its request vocabulary (891.825861ms)
+  Error [OriginalCriticSourceAdmissionError]: Original Critic source admission is unavailable or invalid.
+      at fail (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:13:32)
+      at admitOriginalCriticSource (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/session-critic-original-source-admission.mjs:24:62)
+      at finalizeSessionCriticReview (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs:521:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs:754:18)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    code: 'SCF-ORIGINAL-SOURCE-REQUIRED'
+  }
+
+--- stderr ---

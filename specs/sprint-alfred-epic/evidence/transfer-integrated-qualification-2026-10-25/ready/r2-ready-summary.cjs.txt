@@ -1,0 +1,8 @@
+const { readFileSync } = require("node:fs");
+const { join } = require("node:path");
+const mode = process.argv[2];
+if (!/^(?:focused-red|focused-green|physical-red|physical-green|full-green|final-full|consumer)$/.test(mode)) throw new Error("invalid capture name");
+const body = readFileSync(join(__dirname, "agent-out", "r2-ready-guard-20261025", `${mode}.log`), "utf8");
+for (const line of body.split("\n")) {
+  if (/^(?:exitCode:|ℹ (?:tests|pass|fail|skipped|cancelled|todo)|# (?:tests|pass|fail|skipped)|✖ failing tests:|    actual:|    expected:)/u.test(line)) process.stdout.write(`${line.slice(0, 1000)}\n`);
+}

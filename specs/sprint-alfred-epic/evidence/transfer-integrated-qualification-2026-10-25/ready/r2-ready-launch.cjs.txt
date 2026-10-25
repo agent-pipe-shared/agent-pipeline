@@ -1,0 +1,50 @@
+// Test-only launcher: separate Source-validated private HOME and public /tmp fixtures.
+const { mkdirSync, mkdtempSync, lstatSync, realpathSync, rmSync, statSync } = require("node:fs");
+const { spawnSync } = require("node:child_process");
+const { join, resolve } = require("node:path");
+const root = resolve(__dirname, "..");
+const parent = "/run/user/1000/ap-g17";
+const publicParent = "/tmp";
+const output = join(root, "scratch", "agent-out", "r2-ready-guard-20261025");
+mkdirSync(output, { recursive: true });
+let privateHome, publicTemp, privateIdentity, publicIdentity, childSettled = false;
+function removeOwned(path, identity) {
+  if (!path || !identity) return;
+  const now = lstatSync(path);
+  if (now.dev !== identity.dev || now.ino !== identity.ino || !now.isDirectory()) throw new Error("R2-READY-FIXTURE-OWNER-CHANGED");
+  rmSync(path, { recursive: true });
+}
+async function main() {
+  try {
+    if (realpathSync(publicParent) !== publicParent || !statSync(publicParent).isDirectory()) throw new Error("R2-READY-PUBLIC-PARENT-INVALID");
+    if (realpathSync(parent) !== parent || !statSync(parent).isDirectory()) throw new Error("R2-READY-PRIVATE-PARENT-INVALID");
+    privateHome = mkdtempSync(join(parent, "r2-ready-home-"));
+    privateIdentity = lstatSync(privateHome);
+    publicTemp = mkdtempSync(join(publicParent, "r2-ready-public-"));
+    publicIdentity = lstatSync(publicTemp);
+    process.env.PIPELINE_SYNTH_HOME = privateHome;
+    process.env.PIPELINE_SYNTH_TMP = publicTemp;
+    const preload = join(root, "scratch", "r2-ready-synthetic-os.cjs");
+    process.env.NODE_OPTIONS = `--require=${preload}`;
+    require(preload);
+    const { validatePrivateParent, validateCreatedHome } = await import(join(root, "plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs"));
+    validatePrivateParent(parent);
+    validateCreatedHome(privateHome);
+    const mode = process.argv[2];
+    const capture = join(root, "plugins/pipeline-core/scripts/capture-evidence.mjs");
+    const test = join(root, mode === "consumer" ? "harness/scripts/check-consumer-safe-paths.test.mjs" : "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs");
+    const artifact = join(output, `${mode}.log`);
+    const testArgs = ["focused-red", "focused-green", "physical-red", "physical-green"].includes(mode)
+      ? ["--test-name-pattern=TPSHELL-OPAQUEMENTION|IR-4|NVA-B-READCONTAIN-1", "--test", test]
+      : ["--test", test];
+    const result = spawnSync(process.execPath, [capture, "--out", artifact, "--label", mode, "--", process.execPath, ...testArgs], {
+      cwd: root, env: process.env, stdio: "inherit", timeout: 3600000,
+    });
+    if (result.error) throw result.error;
+    childSettled = true;
+    process.exitCode = result.status ?? 1;
+  } finally {
+    if (childSettled) { removeOwned(publicTemp, publicIdentity); removeOwned(privateHome, privateIdentity); }
+  }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

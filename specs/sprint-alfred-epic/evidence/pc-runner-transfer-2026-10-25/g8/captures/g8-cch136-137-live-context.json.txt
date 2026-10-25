@@ -1,0 +1,26 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test --test-name-pattern "active native PREPARE|both genuine prepared duties" ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: g8-cch136-137-live-context
+exitCode: 1
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+ℹ Error: A resource generated asynchronous activity after the test ended. This activity created the error "AssertionError [ERR_ASSERTION]: CCH137 pre-finalization fingerprint diagnostics: reviewPreparedMatch=true; reviewDetailsChanged={}; protectedChanged=["candidate"]" which triggered an unhandledRejection event, caught by the test runner.
+✖ scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (67913.725261ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 67921.985766
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs:1:1
+✖ scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (67913.725261ms)
+  'test failed'
+
+--- stderr ---

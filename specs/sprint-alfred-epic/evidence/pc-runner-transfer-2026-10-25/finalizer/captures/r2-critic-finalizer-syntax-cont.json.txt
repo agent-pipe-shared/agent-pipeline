@@ -1,0 +1,9 @@
+command: node --check scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+label: r2-critic-finalizer-syntax-cont
+exitCode: 0
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+
+--- stderr ---

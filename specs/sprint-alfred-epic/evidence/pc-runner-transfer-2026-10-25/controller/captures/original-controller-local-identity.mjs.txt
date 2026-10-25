@@ -1,0 +1,11 @@
+// Test-only identity for checks that do not create private runtime addresses.
+import os from "node:os";
+import { syncBuiltinESMExports } from "node:module";
+import { isAbsolute } from "node:path";
+const home = process.env.ORIGINAL_CONTROLLER_SYNTHETIC_HOME;
+if (!home || !isAbsolute(home)) throw new Error("SYNTHETIC-HOME-REQUIRED");
+const username = "original-controller-synthetic-fixture";
+os.userInfo = () => ({ uid: process.getuid(), gid: process.getgid(), username, homedir: home, shell: "/bin/sh" });
+os.homedir = () => process.env.HOME || home;
+syncBuiltinESMExports();
+for (const key of ["USER", "LOGNAME", "USERNAME"]) process.env[key] = username;

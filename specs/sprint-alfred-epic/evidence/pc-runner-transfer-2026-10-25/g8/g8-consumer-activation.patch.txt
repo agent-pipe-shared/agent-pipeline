@@ -1,0 +1,54 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 93e20dc71..39333144b 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -382,6 +382,7 @@ import { spawnSync } from "node:child_process";
+ import { checkDesignConsistency, registerFromRequirementTraceability } from "../lib/design-consistency-check.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
+ import { createDesignApprovalBinding, createDesignApprovalRequest, verifyDesignApprovalRequest, validateDesignApprovalBinding } from "../lib/design-approval-binding.mjs";
++import { readAndAdmitOriginalDesignReviews } from "../lib/design-review-original-custody.mjs";
+ import { inspectDesignDecisionBindingsDraft, inspectApprovedDesignDecisionBindings, readApprovedDesignDecisionBindingsHandle, retainApprovedDesignModelPolicyReference } from "../lib/design-decision-bindings.mjs";
+ import { canonical as canonicalDesignApproval, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+ import { evaluateRequirementTraceability, requirementMapPath } from "../lib/requirement-traceability.mjs";
+@@ -9441,6 +9442,13 @@ function readDesignApprovalInputs(dir, submission, paths) {
+     const summaries = receipts.map(entry => summarizeDesignReviewReceipt(entry));
+     const refused = summaries.find(entry => !entry.ok);
+     if (refused) return refused;
++    // Both active present-plan binding paths call this physical input reader.
++    // The closed Source route refuses a receipt without original custody before
++    // either request or State companion effects are prepared.
++    const custody = readAndAdmitOriginalDesignReviews({ repository: dir, featureId: submission.featureId,
++      receipts: receipts.map((entry,index)=>({...entry,
++        reportBytes:physicalRebindFile(dir,summaries[index].summary.report.path)?.bytes})) });
++    if (!custody.ok) return custody;
+     const latest = summaries.at(-1).summary;
+     const companions = latest.sources.companions.map(entry => entry.path);
+     const bound = [...new Set([submission.planPath, submission.specPath, ...companions, ...paths, ...summaries.map(entry => entry.summary.report.path)])];
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index ad73ca4dc..7aa5a49d3 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -40,6 +40,7 @@ import { PORTABLE_AGY_AUTHORSHIP_REQUEST_SCHEMA, validatePortableAgyAuthorshipRe
+ import { readCriticalHumanProofPolicy, readHumanApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+ import { DESIGN_APPROVAL_REQUEST_SCHEMA, validateDesignApprovalBinding, verifyDesignApprovalRequest } from "../lib/design-approval-binding.mjs";
+ import { summarizeDesignReviewReceipt } from "../lib/design-review-receipt.mjs";
++import { readAndAdmitOriginalDesignReviews } from "../lib/design-review-original-custody.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+@@ -385,11 +386,14 @@ function observeDesignApprovalSigningRequest(record, intentSha256, repository) {
+       if (!summary.ok || summary.summary.featureId !== record.binding.featureId) throw Error("DAB-SIGN-RECEIPT-INVALID");
+       const report = observe(summary.summary.report.path);
+       if (report.sha256 !== summary.summary.report.sha256) throw Error("DAB-SIGN-REPORT-DRIFT");
+-      return { path: ref.path, bytes: file.bytes, summary: summary.summary };
++      return { path: ref.path, bytes: file.bytes, reportBytes: report.bytes, summary: summary.summary };
+     });
+     const source = ref => ({ path: ref.path, sha256: observe(ref.path).sha256 });
+     const currentSources = { prd: source(record.binding.sources.prd), spec: source(record.binding.sources.spec),
+       companions: receipts.at(-1).summary.sources.companions.map(ref => ({ path: ref.path, sha256: observe(ref.path, { optional: true })?.sha256 ?? null })) };
++    const custody = readAndAdmitOriginalDesignReviews({ repository: root, featureId: record.binding.featureId,
++      receipts: receipts.map(({ path, bytes, reportBytes }) => ({ path, bytes, reportBytes })) });
++    if (!custody.ok) return null;
+     const checked = verifyDesignApprovalRequest({ request: physicalRequest, featureId: record.binding.featureId,
+       receipts: receipts.map(({ path, bytes }) => ({ path, bytes })), currentSources });
+     if (!checked.ok || checked.intentSha256 !== intentSha256) return null;

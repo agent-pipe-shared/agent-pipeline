@@ -1,0 +1,3 @@
+import { ONBOARDING_TEST_CASES } from "../plugins/pipeline-core/lib/project-onboarding-v3.test.mjs";
+console.log(JSON.stringify(ONBOARDING_TEST_CASES.filter(({ index }) => index >= 94 && index <= 100)
+  .map(({ index, id, name }) => ({ index, id, name })), null, 2));

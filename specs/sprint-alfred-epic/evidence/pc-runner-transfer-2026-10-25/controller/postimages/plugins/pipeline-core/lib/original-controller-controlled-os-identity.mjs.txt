@@ -1,0 +1,20 @@
+// SPDX-License-Identifier: SUL-1.0
+// Test-only synthetic identity, installed before the controller imports Source.
+import os from "node:os";
+import { syncBuiltinESMExports } from "node:module";
+import { isAbsolute, join } from "node:path";
+import { validateCreatedHome } from "../scripts/codex-critic-private-parent-fixture.mjs";
+
+const home = process.env.ORIGINAL_CONTROLLER_SYNTHETIC_HOME;
+if (!home || !isAbsolute(home) || !/^\/run\/user\/1000\/ap-g17\/g17c-[A-Za-z0-9]{6}$/u.test(home)) {
+  throw new Error("ORIGINAL-CONTROLLER-SYNTHETIC-HOME-REQUIRED");
+}
+validateCreatedHome(home);
+const username = "original-controller-synthetic-fixture";
+os.userInfo = () => ({ uid: process.getuid(), gid: process.getgid(), username, homedir: home, shell: "/bin/sh" });
+os.homedir = () => process.env.HOME || process.env.USERPROFILE || home;
+syncBuiltinESMExports();
+for (const key of ["USER", "LOGNAME", "USERNAME"]) process.env[key] = username;
+for (const [key, leaf] of [["XDG_CONFIG_HOME", "config"], ["XDG_STATE_HOME", "state"], ["XDG_CACHE_HOME", "cache"]]) {
+  process.env[key] ??= join(home, leaf);
+}

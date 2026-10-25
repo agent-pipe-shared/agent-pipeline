@@ -1,0 +1,19 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-synthetic-identity.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs
+label: g8-original-custody-green
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: false
+--- stdout ---
+✔ G8 original custody: serialized receipt without Source origin refuses (3.045727ms)
+✔ G8 original custody: explicit fallback remains weaker than independent review (0.497105ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 64.147069
+
+--- stderr ---

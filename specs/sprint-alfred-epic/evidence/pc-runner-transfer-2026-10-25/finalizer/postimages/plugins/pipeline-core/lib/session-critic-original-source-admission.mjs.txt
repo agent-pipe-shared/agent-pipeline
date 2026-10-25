@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: SUL-1.0
+/** Compare the original Source-owned Critic return with this finalizer packet. */
+import { inspectOriginalSessionCriticReturn, readInspectedOriginalSessionCriticReturn } from "../scripts/codex-critic-host.mjs";
+
+export class OriginalCriticSourceAdmissionError extends Error {
+  constructor(code) {
+    super("Original Critic source admission is unavailable or invalid.");
+    this.name = "OriginalCriticSourceAdmissionError";
+    this.code = code;
+  }
+}
+
+const fail = (code) => { throw new OriginalCriticSourceAdmissionError(code); };
+const SHA256 = /^[a-f0-9]{64}$/u;
+const usedContexts = new WeakSet();
+const canonical = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+};
+
+/** No JSON, digest or caller boolean can reconstruct the producer's live context. */
+export function admitOriginalCriticSource({ sourceContext, root, packet, packetDigest, admission, sessionId, verdict }) {
+  if (sourceContext === undefined || sourceContext === null) fail("SCF-ORIGINAL-SOURCE-REQUIRED");
+  if (packet?.route?.runner !== "codex") fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE");
+  if (typeof sourceContext !== "object" || !sourceContext.context || typeof sourceContext.context !== "object"
+    || usedContexts.has(sourceContext.context) || !SHA256.test(sourceContext.preparedSha256 ?? ""))
+    fail("SCF-ORIGINAL-SOURCE-INVALID");
+  let handle;
+  try { handle = inspectOriginalSessionCriticReturn({ context: sourceContext.context,
+    repoRoot: root, preparedSha256: sourceContext.preparedSha256 }); }
+  catch { fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE"); }
+  const recheck = () => {
+    let source;
+    try { source = readInspectedOriginalSessionCriticReturn(handle); }
+    catch { fail("SCF-ORIGINAL-SOURCE-DRIFT"); }
+    const binding = source?.sessionPacketBinding;
+    if (binding === undefined || binding === null) fail("SCF-ORIGINAL-PACKET-UNBOUND");
+    if (binding?.packetId !== packet.packetId || binding.packetDigest !== packetDigest
+      || binding.sessionId !== sessionId || binding.preflightSha256 !== admission?.preflightSha256
+      || binding.claimSha256 !== admission?.claimSha256
+      || binding.diffSha256 !== packet.diff.sha256) fail("SCF-ORIGINAL-PACKET-BINDING");
+    if (source?.schema !== "pipeline.original-session-critic-return.v1"
+      || source.preparedSha256 !== sourceContext.preparedSha256
+      || source.originalDispatch?.role !== "pipeline-core:critic"
+      || source.originalDispatch?.transport !== "codex"
+      || source.originalDispatch?.resultDestination?.kind !== "return"
+      || source.originalDispatch?.dispatchId !== source.dispatchId
+      || source.reviewerResult?.dispatch_id !== source.dispatchId
+      || source.hostReturn?.host_execution?.dispatch_id !== source.dispatchId
+      || source.originalDispatch?.candidate?.commit !== packet.candidate.commit
+      || source.originalDispatch?.candidate?.tree !== packet.candidate.tree
+      || source.candidate?.base !== packet.candidate.base
+      || source.candidate?.commit !== packet.candidate.commit
+      || source.candidate?.tree !== packet.candidate.tree
+      || source.reviewerResult?.candidate_commit !== packet.candidate.commit
+      || source.reviewerResult?.candidate_tree !== packet.candidate.tree
+      || source.originalChild?.terminal?.code !== 0
+      || source.originalChild?.terminal?.started !== true
+      || source.hostReturn?.host_execution?.terminal_status !== "completed"
+      || source.hostReturn?.host_execution?.agent_id === packet.request?.taskId
+      || source.hostReturn?.host_execution?.agent_id === sessionId
+      || source.reviewPass !== source.verdict?.pass
+      || source.dispatchId === packet.request?.taskId
+      || source.dispatchId === sessionId
+      || canonical(source.verdict) !== canonical(verdict)) fail("SCF-ORIGINAL-SOURCE-BINDING");
+    return source;
+  };
+  recheck();
+  return Object.freeze({ recheck, consume() {
+    if (usedContexts.has(sourceContext.context)) fail("SCF-ORIGINAL-SOURCE-REPLAY");
+    recheck();
+    usedContexts.add(sourceContext.context);
+  } });
+}

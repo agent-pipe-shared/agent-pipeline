@@ -1,0 +1,20 @@
+command: node --test --test-name-pattern "public " plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+label: R2-dispatch-help-public-GREEN
+exitCode: 0
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+✔ public --help prints actionable usage and exits zero (40.369776ms)
+✔ public -h prints actionable usage and exits zero (34.505602ms)
+✔ public --help and -h work before setup without private reads, processes or filesystem effects (310.543521ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 708.88731
+
+--- stderr ---

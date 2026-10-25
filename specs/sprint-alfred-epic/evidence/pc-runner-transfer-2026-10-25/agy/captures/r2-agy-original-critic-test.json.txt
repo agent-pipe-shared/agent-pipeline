@@ -1,0 +1,97 @@
+command: node --require <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs --test <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs
+label: r2-agy-original-critic
+exitCode: 1
+head: fb18ac6b0af42d1674129bad07a8d15947372e80
+tree: a2b166ec8398c65ad517f9cd81843daa32b5d1a4
+dirty: false
+--- stdout ---
+✖ original AGY Critic METHOD return binds prepared packet, diff, candidate and child through an opaque Source handle (55.409908ms)
+✖ missing Critic review, foreign child model and invalid return cannot create Source admission (44.069294ms)
+✖ changed reviewed bytes after return invalidate the Source readback (42.802906ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 487.264894
+
+✖ failing tests:
+
+test at scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:60:1
+✖ original AGY Critic METHOD return binds prepared packet, diff, candidate and child through an opaque Source handle (55.409908ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.antigravity-native-dispatch-verdict.v1","status":"rejected","code":"RDB-PREPARATION-FAILED","field":"packets","modelCalls":0,"launcherCalls":0,"preparation":{"schema":"pipeline.role-dispatch-batch.v1","status":"rejected","code":"RDB-PREPARATION-FAILED","preparations":[{"schema":"pipeline.role-dispatch-preflight.v1","status":"rejected","code":"DBB-BASE-CAP-MISSING","field":"role","findings":[{"code":"DBB-BASE-CAP-MISSING","field":"role"},{"code":"DISPATCH-NO-MODEL","field":"role"}],"modelCalls":0,"launcherCalls":0}],"modelCalls":0,"launcherCalls":0}}
+  + actual - expected
+  
+  + 'rejected'
+  - 'prepared'
+  
+      at verified (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:53:10)
+      at file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:61:18
+      at withFixture (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:46:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:60:130)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:82:1
+✖ missing Critic review, foreign child model and invalid return cannot create Source admission (44.069294ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'RDB-PREPARATION-FAILED'
+  - 'AGY-CRITIC-REVIEW-REQUIRED'
+  
+      at file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:84:10
+      at withFixture (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:46:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:82:108)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'RDB-PREPARATION-FAILED',
+    expected: 'AGY-CRITIC-REVIEW-REQUIRED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:91:1
+✖ changed reviewed bytes after return invalidate the Source readback (42.802906ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.antigravity-native-dispatch-verdict.v1","status":"rejected","code":"RDB-PREPARATION-FAILED","field":"packets","modelCalls":0,"launcherCalls":0,"preparation":{"schema":"pipeline.role-dispatch-batch.v1","status":"rejected","code":"RDB-PREPARATION-FAILED","preparations":[{"schema":"pipeline.role-dispatch-preflight.v1","status":"rejected","code":"DBB-BASE-CAP-MISSING","field":"role","findings":[{"code":"DBB-BASE-CAP-MISSING","field":"role"},{"code":"DISPATCH-NO-MODEL","field":"role"}],"modelCalls":0,"launcherCalls":0}],"modelCalls":0,"launcherCalls":0}}
+  + actual - expected
+  
+  + 'rejected'
+  - 'prepared'
+  
+      at verified (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:53:10)
+      at file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:92:19
+      at withFixture (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:46:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:91:82)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

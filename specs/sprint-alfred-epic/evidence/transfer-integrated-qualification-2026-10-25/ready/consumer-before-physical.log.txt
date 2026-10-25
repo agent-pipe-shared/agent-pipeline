@@ -1,0 +1,27 @@
+command: <host-path> --test <repo-root>/harness/scripts/check-consumer-safe-paths.test.mjs
+label: consumer
+exitCode: 0
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.18473ms)
+✔ a clean fixture passes (0.674942ms)
+✔ an allowlisted occurrence passes (0.269061ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.258551ms)
+✔ multiple prefix hits on one line each produce a finding (0.164152ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.22069ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.246969ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (150.311157ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (11.03254ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 236.744993
+
+--- stderr ---

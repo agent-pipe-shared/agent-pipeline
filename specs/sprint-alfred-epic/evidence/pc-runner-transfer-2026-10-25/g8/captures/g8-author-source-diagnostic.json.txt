@@ -1,0 +1,53 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test --test-name-pattern "G8 author lookup" <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-author-source-diagnostic
+exitCode: 1
+head: 9f1dc52d3738e1c01f3c17320e000003657ff62f
+tree: 38bad49e18518a702657ab16dfef1970752e1a6c
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+MFHS035 G8 author lookup reads a genuinely released controlled Model member without granting independent review: AssertionError [ERR_ASSERTION]: {"code":"DRE-AUTHOR-SOURCE-DRIFT","phase":"released","released":true,"offline":true,"value":true,"factMatches":[{"namespaceId":"registered-native-context-lifetimes","path":false,"bytes":false,"identity":false,"semantic":false}]}
+
+false !== true
+
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:1252:12
+    at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:31:24)
+    at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.start (node:internal/test_runner/test:1096:17)
+    at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17)
+✖ MFHS035 G8 author lookup reads a genuinely released controlled Model member without granting independent review (31121.770974ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31474.374212
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS035 G8 author lookup reads a genuinely released controlled Model member without granting independent review (31121.770974ms)
+  AssertionError [ERR_ASSERTION]: {"code":"DRE-AUTHOR-SOURCE-DRIFT","phase":"released","released":true,"offline":true,"value":true,"factMatches":[{"namespaceId":"registered-native-context-lifetimes","path":false,"bytes":false,"identity":false,"semantic":false}]}
+  
+  false !== true
+  
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:1252:12
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:31:24)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

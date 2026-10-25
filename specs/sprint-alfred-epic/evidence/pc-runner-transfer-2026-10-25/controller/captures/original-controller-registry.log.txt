@@ -1,0 +1,47 @@
+command: node scratch/original-controller-consumer-check.mjs registry
+label: ORIGINAL-CONTROLLER-COMPLETION/registry
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+[
+  {
+    "index": 94,
+    "id": "POV-083a78a2f3946112",
+    "name": "the seeded dev-plan gate refuses implementation before approval and admits it after"
+  },
+  {
+    "index": 95,
+    "id": "POV-e68ae592fbfeb492",
+    "name": "the public onboarding handover is executable for every runner with baseline-only and configured verify claude"
+  },
+  {
+    "index": 96,
+    "id": "POV-ef1eb4827109991c",
+    "name": "the public onboarding handover is executable for every runner with baseline-only and configured verify codex"
+  },
+  {
+    "index": 97,
+    "id": "POV-fc4d55a6719443b5",
+    "name": "the public onboarding handover is executable for every runner with baseline-only and configured verify antigravity"
+  },
+  {
+    "index": 98,
+    "id": "POV-b4965efe00ba3fb9",
+    "name": "NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection"
+  },
+  {
+    "index": 99,
+    "id": "POV-0715659135c026ec",
+    "name": "the seeded push gate refuses an unapproved push and admits it after the shipped commands"
+  },
+  {
+    "index": 100,
+    "id": "POV-f5b7719b5ea3a938",
+    "name": "the seeded security gate refuses a push with missing security evidence and admits it after the shipped scan command runs (SECGATE-1)"
+  }
+]
+ORIGINAL CONTROLLER local synthetic identity cleanup passed
+
+--- stderr ---

@@ -1,0 +1,27 @@
+command: node --import ./scratch/clones/r2-critic-finalizer-original-20261025/scratch/r2-critic-synthetic-preload.mjs --test scratch/clones/r2-critic-finalizer-original-20261025/harness/scripts/check-consumer-safe-paths.test.mjs
+label: r2-critic-consumer-paths-cont
+exitCode: 0
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.20544ms)
+✔ a clean fixture passes (0.7529ms)
+✔ an allowlisted occurrence passes (0.287767ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.282246ms)
+✔ multiple prefix hits on one line each produce a finding (0.163491ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.214197ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.312614ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (327.609183ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (11.38003ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 416.784119
+
+--- stderr ---

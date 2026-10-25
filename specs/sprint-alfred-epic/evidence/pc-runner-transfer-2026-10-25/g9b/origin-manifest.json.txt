@@ -1,0 +1,37 @@
+{
+  "schema": "pipeline.g9b-active-hook-view-method-package.v1",
+  "baseCommit": "fcdbd288d3d6b33c8914dd0f8258e727175946c9",
+  "sourcePaths": [
+    {
+      "path": "plugins/pipeline-core/lib/pins/antigravity-active-hook-cwd-survives-runner-view-refresh.test.mjs",
+      "sha256": "5153b9194802f13dde982005e77243c89c9962fd82ef470bdf6af8168939fe58"
+    }
+  ],
+  "patch": {
+    "file": "g9b-active-hook-view.patch",
+    "sha256": "a74f1cfbb4a59fe2b12611672e2c17b30cdde675e14c6eb97d602f5ab1f6c952"
+  },
+  "captures": [
+    {
+      "file": "g9b-active-cwd-focused-final.json",
+      "sha256": "e7749b2449559aa1b8e631c5cd7606fb94e99ac3ed9761d7d8ae76cb91494136"
+    },
+    {
+      "file": "g9b-original-pin-storage.json",
+      "sha256": "7c1752e7edf087ef0d436c624c02cd704f740a571aa5d0c4765acdf238fb9a6b"
+    },
+    {
+      "file": "g9b-original-pin-private-home.json",
+      "sha256": "a9c56a6df256107ca980651689fab8b1dc34e8f70a1495f18db312a9ff54f74a"
+    },
+    {
+      "file": "g9b-consumer-safe-final.json",
+      "sha256": "0fa6395d684b5fc69685a3285f7f83f87849409a32f384bee4f42c50abfbfc33"
+    }
+  ],
+  "methodHelper": {
+    "file": "g9b-synthetic-identity.mjs",
+    "sha256": "197311e99955ff4da871f6722cd6edcca2336d814a930248bab9b273bc7dca90"
+  },
+  "assurance": "controlled-source-method; native-antigravity-cli-not-tested"
+}

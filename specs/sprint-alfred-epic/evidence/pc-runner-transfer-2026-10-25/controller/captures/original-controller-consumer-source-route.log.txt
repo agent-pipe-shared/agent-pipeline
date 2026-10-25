@@ -1,0 +1,28 @@
+command: node scratch/original-controller-consumer-check.mjs
+label: ORIGINAL-CONTROLLER-COMPLETION/consumer-source-route
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.214287ms)
+✔ a clean fixture passes (0.687416ms)
+✔ an allowlisted occurrence passes (0.271146ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.32118ms)
+✔ multiple prefix hits on one line each produce a finding (0.197195ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.193117ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.43147ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (152.798914ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (11.683668ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 238.612042
+ORIGINAL CONTROLLER local synthetic identity cleanup passed
+
+--- stderr ---

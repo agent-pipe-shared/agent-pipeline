@@ -1,0 +1,18 @@
+command: node --import ./scratch/clones/r2-critic-finalizer-original-20261025/scratch/r2-critic-synthetic-preload.mjs --test --test-name-pattern=closed.CLI.admits.before.verdict plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+label: r2-critic-baseline-cli
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+✔ closed CLI admits before verdict and finalizes only that durable packet (1103.432597ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1431.939446
+
+--- stderr ---

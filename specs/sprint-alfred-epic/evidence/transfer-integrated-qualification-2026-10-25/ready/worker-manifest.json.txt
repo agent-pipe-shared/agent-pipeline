@@ -1,0 +1,147 @@
+{
+  "schema": "pipeline.r2-ready-guard-method-package.v1",
+  "base": "73afcf74241fd38627161d5a5e9956d12b7e9341",
+  "scope": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+    "plugins/pipeline-core/lib/guard/evaluate.mjs"
+  ],
+  "source": [
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+      "beforeSha256": "f3bff80d58ccbee33bb1321039c34c8df624008d2413c8df9d379dcf71098fb9",
+      "afterSha256": "71fa86793afaacaf3d9b3f66630b441fc24c180edb4dd5b52103a398c2b1a5cb"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/evaluate.mjs",
+      "beforeSha256": "0d6e54e110ab79464e00985e64d7121141ccffabd8b73c120195d704b34707d8",
+      "afterSha256": "746015a6b28315feb4c269d7c0adf7a2ca3c0db687355b629ac748fcc8f87062"
+    }
+  ],
+  "patch": {
+    "name": "patch.diff",
+    "sha256": "a8a23ce38d594dbc8ee20b1031026c3c80bcdc14d49fe41701db55d507650332",
+    "bytes": 13811
+  },
+  "captures": [
+    {
+      "name": "focused-red.log",
+      "sha256": "2f05e18d7bb62bba4792c773a16c70eb7b10c58a204215923431318469f8b6f4",
+      "bytes": 11572
+    },
+    {
+      "name": "focused-green.log",
+      "sha256": "67c9609abac643d68d2bd8b7e7b8582a58d8806b7c6d9b0beec83f41492e59d0",
+      "bytes": 1032
+    },
+    {
+      "name": "physical-red.log",
+      "sha256": "8d8907cb7a51ba359040d11eb8ed84391e6088168478ddb92d548d5ef05f33cf",
+      "bytes": 3043
+    },
+    {
+      "name": "physical-green.log",
+      "sha256": "a83218fe1166017608ad4b1ea0565ace16ea228fb8e9517b1fc027b80878177a",
+      "bytes": 1164
+    },
+    {
+      "name": "final-full.log",
+      "sha256": "3f1ec3b89f401c4555ce4389b564c554a4444c6fcfe02228385690dbfed7e78d",
+      "bytes": 47993
+    },
+    {
+      "name": "consumer.log",
+      "sha256": "a62ca9686be28172a9c3beaaa72ae7fd6c389a62d1f2cc0d0f4baa3957754eaa",
+      "bytes": 1122
+    }
+  ],
+  "helpers": [
+    {
+      "name": "r2-ready-launch.cjs",
+      "sha256": "9cc2b82bc3aef7040dc0edbe672062248f35b20e356c12bb91edbd26cdcc4891",
+      "bytes": 2967
+    },
+    {
+      "name": "r2-ready-synthetic-os.cjs",
+      "sha256": "892c8cc0c29170b411bc9946443779e7bfefb481b1e3ee8a66b0b39c753bffea",
+      "bytes": 823
+    },
+    {
+      "name": "r2-ready-summary.cjs",
+      "sha256": "a150e29bf501f55e7b7e8bcda9f27bfdb417fbeec064e3d8f962dabaa04446c7",
+      "bytes": 621
+    }
+  ],
+  "retained": [
+    {
+      "name": "patch-before-physical.diff",
+      "sha256": "b3439f6fa0f399c0fbdbaa252b03ea14b8d150947194b9d2b916d6625d7aece6",
+      "bytes": 10572
+    },
+    {
+      "name": "manifest-before-physical.json",
+      "sha256": "23afec9cec377d44b9ff436c97ba5bc68b8fe6936f51a53d49d31d0965480976",
+      "bytes": 4035
+    },
+    {
+      "name": "final-full-before-physical.log",
+      "sha256": "c9a89e0760f05ac6c63cb56eaf013768bbcb09825cb937291a9a3db3a943e42f",
+      "bytes": 47871
+    },
+    {
+      "name": "consumer-before-physical.log",
+      "sha256": "194d361ef31b944d5489911a083a4994f8872f5483d7120fbc153dfdbd4a07ef",
+      "bytes": 1121
+    }
+  ],
+  "results": {
+    "focusedRed": {
+      "exitCode": 1,
+      "testNames": [
+        "NVA-B-READCONTAIN-1",
+        "TPSHELL-OPAQUEMENTION",
+        "IR-4 incident replay"
+      ]
+    },
+    "focusedGreen": {
+      "exitCode": 0
+    },
+    "physicalRed": {
+      "exitCode": 1,
+      "actual": [
+        "docs-parent-symlink admitted",
+        "inventory-symlink admitted",
+        "inventory-hardlink admitted"
+      ]
+    },
+    "physicalGreen": {
+      "exitCode": 0
+    },
+    "finalOriginalSuite": {
+      "exitCode": 0,
+      "tests": 394,
+      "pass": 391,
+      "fail": 0,
+      "skipped": 3
+    },
+    "consumerSafe": {
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "rationale": [
+    "AC239 READY admission checks the ordinary readiness tail before a closed literal Node inline-script whitelist. All other node inline code retains GUARD-READ-COMMAND-UNSUPPORTED in READY; pre-ready remains GUARD-LIFECYCLE-NOT-READY.",
+    "The literal scratch note writer requires a fresh contained file and rejects existing symlink/hardlink aliases. The inventory probe reads one fixed public inventory path; arbitrary credential reads remain refused.",
+    "The fixed inventory path also requires a physical docs directory and a direct regular file with one link. Missing docs/inventory is admitted only as an inert guard decision; execution gets ordinary ENOENT. Symlinked parent/file and hardlink aliases to synthetic credential bytes are refused.",
+    "D151 places ordinary test temp under a unique 0700 public /tmp child outside Git/credential ancestry. D148 validates a separate unique private HOME under /run/user/1000/ap-g17. Synthetic userInfo/homedir/tmpdir are installed before test/capture imports and descendants; cleanup verifies owned dev/ino after child settlement.",
+    "The two original rg glob expectations were stale against accepted G23 quoted-read tests: repeated bounded filename globs and the exact *.test.mjs suffix are admitted. The recursive/path/negated/hidden negatives stay unchanged."
+  ],
+  "limits": [
+    "The 3 native Windows examiners remain skipped on this Linux/WSL host; no native Windows PASS is claimed.",
+    "The physical check precedes interpreter execution and does not provide atomic same-UID hostile-filesystem CAS against a rename/link race; native host enforcement and final review remain separate.",
+    "This method-only package has not run Full Verify, independent Critic or PO acceptance; parent owns integration and final gates.",
+    "Fixture cleanup after child settlement and inode/device identity does not prove absence of a concurrent unrelated process under a compromised fixture; no unknown-live state was observed."
+  ]
+}

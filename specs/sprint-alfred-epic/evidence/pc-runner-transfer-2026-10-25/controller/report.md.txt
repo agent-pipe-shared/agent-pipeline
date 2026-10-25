@@ -1,0 +1,37 @@
+# ORIGINAL-CONTROLLER-COMPLETION — retained RED qualification
+
+Base `62008d6bd39f68aa849e7257cdc3161b59222ebb`; method-only D143, no commit, staging, Main edit, or production edit. Optional model-role bootstrap: `MODEL-ROLE-SESSION-IDENTITY-CONFLICT`; Source preflight ready and observation-governance bootstrap passed. Patch and exact SHA-256/file byte counts are in `package.json` beside this report. The three owned plugin paths are the only diff.
+
+## Measured outcomes
+
+Every executed check used `node plugins/pipeline-core/scripts/capture-evidence.mjs --out <listed-log> --label ORIGINAL-CONTROLLER-COMPLETION/<phase> -- <listed-command>` at the required host boundary, clone cwd. The command and actual exit are in each machine-written log.
+
+| Log in clone `scratch/` | Wrapped command | Exit | Settled result |
+| --- | --- | ---: | --- |
+| `original-controller-selected.log` | `node scratch/original-controller-run.mjs selected` | 1 | Before callbacks: approved short parent was absent then. |
+| `original-controller-selected-after-parent.log` | same | 1 | 7 starts/7 ends, 0 pass/7 fail, owned home cleanup passed. Cases 94–98 `CAC-REGISTRATION-INVALID`; 99–100 `private-critic-binding-unavailable`. |
+| `original-controller-calibration-registration.log` | `node scratch/original-controller-run.mjs calibration` | 1 | 5 starts/5 ends, 0 pass/5 fail, cleanup passed. Source registration writer reached; two canonical-directory failures and three unstaged-envelope pathspec failures. |
+| `original-controller-calibration-registration-v2.log` | same | 1 | 5 starts/5 ends, 0 pass/5 fail, cleanup passed. `CAC-SOURCE-UNAVAILABLE` after registration/commit. |
+| `original-controller-devplan-policy.log` | `node scratch/original-controller-run.mjs devplan` | 1 | 1 start/1 end, 0 pass/1 fail, cleanup passed. With real policy source committed, `set-phase` now reports `SDC-AUTHORITY-UNAVAILABLE` before State commit. |
+| `original-controller-devplan-source-route.log` | `node scratch/original-controller-run.mjs devplan` | 0 | Case 94: 1 start/1 end, 1 pass, cleanup passed. |
+| `original-controller-handover-source-route.log` | `node scratch/original-controller-run.mjs handover` | 0 | Cases 95–98: 4 starts/4 ends, 4 pass, cleanup passed. |
+| `original-controller-consumer-source-route.log` | `node scratch/original-controller-consumer-check.mjs` | 0 | Consumer-safe paths 9/9 pass, no skips; synthetic local identity cleanup passed. |
+| `original-controller-syntax-source-route.log`, `original-controller-fixture-syntax-final.log`, `original-controller-identity-syntax-final.log` | `node --check <owned path>` | 0 each | Syntax only. |
+| `original-controller-resource.log` | `node scratch/original-controller-consumer-check.mjs resource` | 0 | Report emission only: `not-certified`, no supplied observations. |
+
+`git diff --check` exited 0. There is no configured quick route. The five calibration callbacks are GREEN in settled focused runs; the complete seven-case selected cohort remains RED because cases 99–100 were not changed or requalified. The full original 216 course was not run. Prior original 216 evidence remains 216 starts/ends, 201 pass/15 fail, 12 settled children, 547.119 seconds. Prior controlled-identity 15 selected remains 8 pass/7 fail. The separate 19-cell init performance criterion remains unmeasured.
+
+## Source-bound fixture work
+
+- `project-onboarding-v3.test.mjs` serially awaits each of the existing twelve children and continues after a failed chunk, preserving callback IDs/order/assertions. It adds the original coordinator authoring prerequisite and real Source calibration/accepted-package setup for indices 94–98. Normal fixture Git commits run with hooks. `inspectCommittedCalibrationVerifyLayout`, `inspectCurrentCalibrationVerifyReady`, `inspectCalibrationVerifyCommitTransition`, and `runRegisterFeaturePackage` are the real public Source interfaces used; no receipt is hand-written. Once registered, State calls use only `{dir, now}` so the Source session-authority writer can own their mutation.
+- `original-onboarding-controller-fixture.mjs` authors the generated design templates and repairs the Spec marker through the public onboarding transaction before the retained language mismatch examiner.
+- `original-controller-controlled-os-identity.mjs` supplies synthetic account input before test imports/descendants, never calls the original account API, validates the new owned private home through the Source validator, and leaves privacy scanning active.
+- QG-04 fixture-setup justification: two original test setup feature IDs (`gated-work`, `projdrift-work`) did not match their existing `specs/gated/` and `specs/projdrift/` source directories. Source's `register-feature-package` requires `specs/<featureId>/`; these setup IDs and matching review-receipt fixture IDs were aligned to `gated` and `projdrift`. Original test names, generated completion IDs, assertions, and case order were kept. The prior RED captures above are preserved for independent scrutiny. This is still RED and is not offered as acceptance-policy approval.
+
+Cases 99–100 are original push/security examiners. In the seven-case replay, their final real guard refused with `private-critic-binding-unavailable` after their other fixture setup. The public satisfying chain is `readBoundConsumedCriticReceipt` on a genuine consumed passing packet, candidate-bound green Verify, `recordCriticVerifyLifecycle`, then `inspectCriticBoundVerify`; no synthetic Critic/review/Verify/native PASS was created. G8 Source-custody completion remains a separate dependency, not a proven sole cause of these two callbacks.
+
+## Actual next dependency
+
+The approved short parent `/run/user/1000/ap-g17` was restored by the PO between the first and second selected runs. The second run validated it through Source, created one owned `g17c-*` child, and checked dev/ino/uid before cleanup after all callbacks settled. No alternate outside parent or validator bypass is used.
+
+The `SDC-AUTHORITY-UNAVAILABLE` cause was fixture-injected `writeError`/`designAdvisoryAdmission` dependencies: `pipeline-state.mjs`'s source-owned `set-phase` route sets `sourceDefaults` only when dependency keys are `dir` and `now`. That exact fixture issue is repaired and the five affected callbacks pass. Cases 99–100 remain genuinely blocked at `private-critic-binding-unavailable` in the retained seven-case replay. Full216 runs only after all seven selected cases genuinely pass. Integrated Verify/Security and frozen independent review remain Coordinator-owned; native/platform qualification and PO acceptance remain open.

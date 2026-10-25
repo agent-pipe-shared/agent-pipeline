@@ -1,0 +1,398 @@
+{
+  "schema": "g8.original-custody-candidate-manifest.v1",
+  "base": "62008d6bd39f68aa849e7257cdc3161b59222ebb",
+  "status": "partial-uncommitted",
+  "regressionRun": {
+    "capture": "scratch/agent-out/g8-original-custody/g8-model-full-after-terminal.json",
+    "loadedCases": 35,
+    "pass": 33,
+    "fail": 0,
+    "todo": 2,
+    "exitCode": 0,
+    "exactLoadedTestFileSha256": null,
+    "reason": "The broad process loaded its 35-case test module before the owned MFHS036 import, fixture option and case were added; no pre-edit byte snapshot was captured.",
+    "separateNewCaseCapture": "scratch/agent-out/g8-original-custody/g8-original-request-positive.json",
+    "productionFilesEditedDuringRun": false
+  },
+  "paths": [
+    {
+      "path": "plugins/pipeline-core/lib/design-review-execution-producer.mjs",
+      "status": "added",
+      "bytes": 2942,
+      "sha256": "efeee96ae89f985ba299a9b01c531f53c1e2d397461e82157e945f51af796bdf"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-execution-request.mjs",
+      "status": "added",
+      "bytes": 3576,
+      "sha256": "2a9a8636738e23c53a49d1bc6990873745b2d41d87f1fba83745588e261b67eb"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-original-custody.mjs",
+      "status": "added",
+      "bytes": 12477,
+      "sha256": "a6466b8154b12db4e71f3c1833ed800d80c17a00dfb6e3d54245e08f3fed2bfc"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-original-custody.test.mjs",
+      "status": "added",
+      "bytes": 1777,
+      "sha256": "bf607d7924b9216b10bdf441808fd18970043572d93ba81408390df376e6141b"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs",
+      "status": "added",
+      "bytes": 6705,
+      "sha256": "7c61a8fe7afcf925168e7c75ebbdcca787aed9609baffaa3be17ad59c1c63403"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "status": "modified",
+      "bytes": 93809,
+      "sha256": "7ef82691780d982f90232f0e13fb557a20462f66db91b6a209260f0282b3728a"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+      "status": "modified",
+      "bytes": 86186,
+      "sha256": "d54724a5db0a9a71a7dcc3abc4fc1057349b9903d7f0de2581da93c84e8d44a7"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+      "status": "modified",
+      "bytes": 16488,
+      "sha256": "c82dc03b4147ea1aad879ef79077dd6e671c1265ca04bada97a56059a65851f1"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "status": "modified",
+      "bytes": 69898,
+      "sha256": "c1fe372b82946e5354a2bd2ee5d273b574940d35405e3736577847bbb210f33e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "status": "modified",
+      "bytes": 178958,
+      "sha256": "0c84044f04d8c959142e4c445d7a0c0dbd60cfbd5930d98cf462b86209e2ba5d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+      "status": "modified",
+      "bytes": 128505,
+      "sha256": "9dc38b95609d83c8e7ea9b941224152ad43b2766d58fb0fbfc4ba748b40a11cc"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+      "status": "modified",
+      "bytes": 214291,
+      "sha256": "a00dc976fd1f3b05ac5c148663b0368532c9919cb6f878c72ada292df27e9c4e"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+      "status": "modified",
+      "bytes": 10687,
+      "sha256": "5df09ec8ce106231632f9dad6a96ad1271b4e1f4a62489c68780c0315ac53e02"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-native-critic-host.mjs",
+      "status": "modified",
+      "bytes": 41112,
+      "sha256": "cb8d4c6acb037a621f3cc61156529a6b2f0e1db8132c4bd3cb6ae37cf6e8f517"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/design-review-dispatch.mjs",
+      "status": "added",
+      "bytes": 5919,
+      "sha256": "bb312f21e7d9654aacd0e438ec6a182294559e6f56e04fc7dd4a8e16555c7da5"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "status": "modified",
+      "bytes": 861723,
+      "sha256": "5245a2f23fe2b8babfaf19f2adafa965c83a9c23e4d8446361ea3836f6e13474"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "status": "modified",
+      "bytes": 203869,
+      "sha256": "20c6d5a236bce952d4634721323eb5e634aba323435812df223a2bce9ad479f9"
+    }
+  ],
+  "patch": {
+    "path": "g8-original-custody.patch",
+    "bytes": 129355,
+    "sha256": "e7a284aa917735c60569055a054a0d27f3aadaa38819b83044723b013aeb0ffd"
+  },
+  "producerPatch": {
+    "path": "g8-producer-dependency.patch",
+    "bytes": 124580,
+    "sha256": "ef531c45e9c15c3af61c50ebc9463cf3e4025ba10afb018bb5446f4d33af36f3"
+  },
+  "consumerPatch": {
+    "path": "g8-consumer-activation.patch",
+    "bytes": 4775,
+    "sha256": "9df41263feb20b3d5708db4daefaff0c730dd758e252abf5bf64d34d48b6b6da"
+  },
+  "decision": {
+    "path": "source-transaction-decision.md",
+    "bytes": 4131,
+    "sha256": "8783798bb928d098ffccd326dc640aa10ab1728d4e40abd907213e85595b0b6b"
+  },
+  "closingAllowance": {
+    "path": "closing-allowance.json",
+    "bytes": 8316,
+    "sha256": "87f740ca765515e228f4082ef6512e9980c87f5fd05e40ed72d5e4ba7018f3bb"
+  },
+  "positiveExperiment": {
+    "path": "source-positive-experiment.md",
+    "bytes": 3995,
+    "sha256": "9fa95fae2e2839756e4826302e157ecc27e56231b70cd0ff31fcd4ecc543495a"
+  },
+  "locatorHandoffRationale": {
+    "path": "locator-handoff-rationale.md",
+    "bytes": 2534,
+    "sha256": "23594486dd7ed8ebcc6b99b2717472c03178e0218a25ee43a58c7f1d19b4626f"
+  },
+  "exactSessionPacketRationale": {
+    "path": "exact-session-packet-rationale.md",
+    "bytes": 2687,
+    "sha256": "7ee12c354acb3239ae5a682546f5fcf231c77577c342bcc9511a08e2bfa4109c"
+  },
+  "captures": [
+    {
+      "path": "scratch/g8-custody-red.json",
+      "bytes": 2263,
+      "sha256": "0ea76a39fa74caa4134668356020991a777e1953ca58b71648db60b35c7a65e7"
+    },
+    {
+      "path": "scratch/g8-custody-green.json",
+      "bytes": 721,
+      "sha256": "4600f493034dc186c10891df7140f8bb73e4264c2f02804f95e82a94a0400d90"
+    },
+    {
+      "path": "scratch/g8-producer-test.json",
+      "bytes": 1054,
+      "sha256": "3d72463217e974cd1f810e12eaa07cf540387a28b79d40dd92580877be4be301"
+    },
+    {
+      "path": "scratch/g8-binding-unit.json",
+      "bytes": 13056,
+      "sha256": "979490b42294a8b156b700736353ad7c1308a0c1346b721af0d5c63464344133"
+    },
+    {
+      "path": "scratch/g8-consumer-safe.json",
+      "bytes": 1266,
+      "sha256": "1f82761a113be6c16dc734c6efe93f4739c4ea39367496ccf18b0a008d8b93b0"
+    },
+    {
+      "path": "scratch/g8-design-approval-route.json",
+      "bytes": 20132,
+      "sha256": "414144795ef0eca97a3420bcfbf017212e0c44d58a27ea6f78253ac52f1b61ed"
+    },
+    {
+      "path": "scratch/g8-design-approval-route-private.json",
+      "bytes": 10914,
+      "sha256": "7877d7314edabf2e8805db709335be71167ada64f49758bcdc0f4ca63bc81a6d"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-source-kernel-test.json",
+      "bytes": 1435,
+      "sha256": "8336b85ea9bda2577c06cd1fef9215643de57338968b28e2122cab92e0d66097"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-source-kernel-test-green.json",
+      "bytes": 722,
+      "sha256": "6cffa94157b13003b2833ff5a2f78ed62f6ed8174e831518881bead6de0e4dad"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-model-store-regression.json",
+      "bytes": 100693,
+      "sha256": "443a76a760d0b8bab56f19f503f5d9a6238cd457c3fcf1ca6eea42c8e1b1d409"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-model-mfhs007.json",
+      "bytes": 775,
+      "sha256": "209f46f681687102e0730271722c3a9ea46cc6eb6892239011cc5935e576d7d8"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-model-g8-refusal.json",
+      "bytes": 777,
+      "sha256": "26973907fa41177c0f393a842981496a4b3e393d2557e295ad3449bda4874dc5"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-consumer-safe-after-source.json",
+      "bytes": 1223,
+      "sha256": "c582e272365c3ff7d780ce4d0b5b489cf003353a46e025b12514fc42bac359fd"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-native-host-regression.json",
+      "bytes": 1413,
+      "sha256": "86e1d8c8e2c1382bbb501a55e6694aeb70e605c79ab10d933cb94c1bd3ea4885"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-mfhs007-baseline-split.json",
+      "bytes": 808,
+      "sha256": "0082ef6fe7d001a9b2fea13cc056c292d288f1250361c6a200b4f7e582539672"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-mfhs007-candidate-split.json",
+      "bytes": 782,
+      "sha256": "3ea34356306ce11cd48dcfdbf89333df26b5a16754c37b027c393044c3fdaa33"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-mfhs001-007-baseline-split.json",
+      "bytes": 1593,
+      "sha256": "0ef2763f12411b407023ea8d4580829d7c0b1828adf9e866177dc5a1b9c48aa4"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-mfhs001-007-candidate-split.json",
+      "bytes": 1567,
+      "sha256": "ce0d01ebf8b2567157fba07868db86420579f020872648ff035e567535bef1d3"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-original-session-inspect-test.json",
+      "bytes": 1714,
+      "sha256": "73e81421fcbba7e7a4af41bee77c4590ad78380f8e280aaad3e9514d428746dd"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-original-session-inspect-private.json",
+      "bytes": 9836,
+      "sha256": "7e3c27aa6c0bf1e5af3092d13fa2f28b32a7a40c25d7d9bbb91ee2b6cb14358d"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-source-core-after-author.json",
+      "bytes": 1367,
+      "sha256": "17e7c3548e8b165f9fbc3e64165e14909f61223f47ce277ba76d18852f22de26"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-consumer-safe-continuation.json",
+      "bytes": 1220,
+      "sha256": "d3ba5c222e501b6d5c47ecde22e2b8e906a0d3fc95edd823bdfa935c2b326458"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-author-source-positive.json",
+      "bytes": 2882,
+      "sha256": "fb255118b6158454f8e192d499cb2aff35966407b27735f9eb5990b018adf641"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-author-source-positive-green.json",
+      "bytes": 2888,
+      "sha256": "d3479f34695b9ab6c5f8bb484757cc462a0001475fcfb0539f40a35846526c93"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-author-source-diagnostic.json",
+      "bytes": 3293,
+      "sha256": "0f73f1058430512300d313395b136e487b4234be40b857ab433f8918ddaa3f02"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-author-source-positive-fixed.json",
+      "bytes": 1911,
+      "sha256": "f2634640f827e3bf9444f1368a7954809c1f92013e3243ad8324d438391b6ee7"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-author-source-positive-fixed-path.json",
+      "bytes": 808,
+      "sha256": "5888da52919fc40140fe1a627e8850aed9c7d5c59b5f276e35b3ad7cacd79c92"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-author-source-positive-final.json",
+      "bytes": 802,
+      "sha256": "1580c6df137712ea386d6ae88971d890cbe39137bcce78f48a51699a198e16b1"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-original-request-positive.json",
+      "bytes": 803,
+      "sha256": "0a72db209c8f1b59dee370fd8816a7cbc14685cd0ec0d732ffbf766542182613"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-model-full-after-terminal.json",
+      "bytes": 16963,
+      "sha256": "af51e6decee464d16fe792330d5da30ff3c2a95168be32de3daf7a4f4aa335a9"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-locator-source-kernel.json",
+      "bytes": 1334,
+      "sha256": "1b722111ca4094d64c462abbc68f89f75d4099f60c9f88d95b9de2e80fb6a54f"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-cch136-137-live-context.json",
+      "bytes": 1436,
+      "sha256": "8e243020b3f5072ebc66342987173fbc8c5eb375b01b6cac3fa02fe0b560af99"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-cch136-137-source-admin.json",
+      "bytes": 1338,
+      "sha256": "1570bcf7dea3c2f7c78cc4349b906971b6cc04e9b3dcd71bbc76ce16514b0595"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-cch136-137-source-admin-shape.json",
+      "bytes": 825,
+      "sha256": "41cba2f117af9b0fa9b7425adb428dc6efbd75a5639a4aa28f5862f87efbce79"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-locator-consumer-safe.json",
+      "bytes": 1255,
+      "sha256": "76cc10e60d8051da773ce85ac6104bffa1cec5ad9c6eda98009913d55e1445fe"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-locator-active-route.json",
+      "bytes": 10883,
+      "sha256": "7e8ac5342a11110a1bcd6e21aa929ad487be3e59624e3031a7ed61b1a6ba90b1"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-session-packet-legacy-cch.json",
+      "bytes": 819,
+      "sha256": "78e1c87bf5cbd668fc524c943140d88a9aa43f764bf5518ab9cbd153087e239d"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-session-packet-first.json",
+      "bytes": 1764,
+      "sha256": "49eef1d8023eea390cf99cecf1b7f8b38f0615fec0c3e7ab16dbbc0e31b4d0da"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-session-packet-source-prereq.json",
+      "bytes": 807,
+      "sha256": "68e3450195389b27edbd510ab88306b5f963d2073f3b531e06d74bae5c63ff23"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-session-packet-prelaunch-negatives.json",
+      "bytes": 1404,
+      "sha256": "400acd46d9355b4f308831b731aa04a1031f961bf8a62a544f717c190810b5a5"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-session-packet-prelaunch-typed.json",
+      "bytes": 808,
+      "sha256": "59bda8446558d3da7e0d2acfd7a4ff220e30f3624d214fa9620dccbd95f06758"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-finalizer-adapter-positive.json",
+      "bytes": 1624,
+      "sha256": "19e7deb739540253727a9566fcb05afecac54de01195a8566cf24f3b0bca24c9"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-finalizer-adapter-import.json",
+      "bytes": 1622,
+      "sha256": "79f2a06a540069a72bc8ce3c9d511211055e76410d99fd427fe82554ce0bc0e7"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-finalizer-adapter-deferred.json",
+      "bytes": 1624,
+      "sha256": "f8bd5f623e73cca424e7b46e48cb9812994fbbe30d728864735d23210760dd95"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-finalizer-adapter-import-cycle-fix.json",
+      "bytes": 1632,
+      "sha256": "8d63a4da349e088041d31106f2ff84643149d844bdd61192df656df300f9274b"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-finalizer-adapter-preload-diagnostic.json",
+      "bytes": 1740,
+      "sha256": "bad48f6958456a6a6a349f68a0938b0ea185e99762bb1f6c45c5bb08863848fc"
+    },
+    {
+      "path": "scratch/agent-out/g8-original-custody/g8-outer-finalizer-adapter-preloaded-focus.json",
+      "bytes": 1488,
+      "sha256": "7711aa2d2ed5b326f6b1f10d070d3428b62482ba6cd8c45089f647997c15f5c0"
+    }
+  ]
+}

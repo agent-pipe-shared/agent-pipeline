@@ -1,0 +1,19 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test --test-name-pattern "G8 original request preparation" ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-original-request-positive
+exitCode: 0
+head: 17899cc7321d61b396a57ff34a12051917b34ba7
+tree: 7def5e697c42bdf319c8c8faa7a59fa196a22b53
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFHS036 G8 original request preparation binds a released author member and current committed sources (13093.778256ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13474.103093
+
+--- stderr ---

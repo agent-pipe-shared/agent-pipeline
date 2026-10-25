@@ -1,0 +1,21 @@
+command: node --require <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs --test <repo-root>/scratch/agent-out/r2-agy-original-critic-return-20261025/observe-native-terminal-shape.test.mjs
+label: r2-agy-inert-harness
+exitCode: 0
+head: de400a9f204ebf587eb7cd95ad2f023bec10e9b3
+tree: 6e30519158dccda9f707eef4b64c51f4e9248a78
+dirty: false
+--- stdout ---
+✔ a single observed child terminal and parent terminal permit exact fixture cleanup (1.698306ms)
+✔ timeout or signal retains fixture despite a terminal-looking stream (0.262799ms)
+✔ unknown child settlement retains fixture even after parent result (0.323484ms)
+✔ non-JSON and private event fields yield only sanitized classifications and hashes (0.505691ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68.621361
+
+--- stderr ---

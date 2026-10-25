@@ -1,0 +1,54 @@
+{
+  "schema": "pipeline.method-readonly-dependency-overlay.v1",
+  "targetClone": "scratch/clones/g8-original-custody-20261025",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sha256": "543709a9d1703ce2ab86a2f4aee555f677131be952f4ad359346847a0059fd8d",
+      "owner": "r2-critic-finalizer-original",
+      "status": "unqualified-readonly-dependency"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs",
+      "sha256": "c89d614f50b6b2bde4697b0ce64ea008cc134e857bc5249c9d3539acbe1cb63b",
+      "owner": "r2-critic-finalizer-original",
+      "status": "unqualified-readonly-dependency"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-critic-original-source-admission.mjs",
+      "sha256": "9aac8580945898d45182af4b97fc7cb3c6b0b169d48ccd10ad80f63ebae3576c",
+      "owner": "r2-critic-finalizer-original",
+      "status": "unqualified-readonly-dependency"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "ec2f6feee7679ec83776513427c39b566318135c73da952f07f7462e0357c4a8",
+      "owner": "r2-critic-close-inputs",
+      "status": "committed-readonly-dependency",
+      "sourceCommit": "73afcf74241fd38627161d5a5e9956d12b7e9341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "sha256": "a36aa1a0e6e8867bcb85be050b292139138f3b0d3022459a56c9002ddf876341",
+      "owner": "r2-critic-close-inputs",
+      "status": "committed-readonly-dependency",
+      "sourceCommit": "73afcf74241fd38627161d5a5e9956d12b7e9341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "sha256": "914bee757426fec6a3f0f3ffe6465cfdb9354bd39c7b5481c89cc1e1bb846dff",
+      "owner": "r2-critic-close-inputs",
+      "status": "committed-readonly-dependency",
+      "sourceCommit": "73afcf74241fd38627161d5a5e9956d12b7e9341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "sha256": "d46297dbca165dfb96c9e09ade7b362f3e9cbb633c799eae7fcc97952883128f",
+      "owner": "r2-critic-close-inputs",
+      "status": "committed-readonly-dependency",
+      "sourceCommit": "73afcf74241fd38627161d5a5e9956d12b7e9341"
+    }
+  ],
+  "nativeQualified": false,
+  "excludeFromG8OwnedPatch": true
+}

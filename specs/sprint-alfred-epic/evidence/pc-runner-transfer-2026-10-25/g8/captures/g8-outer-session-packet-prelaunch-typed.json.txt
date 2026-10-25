@@ -1,0 +1,19 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test --test-name-pattern "both genuine prepared duties" ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: g8-outer-session-packet-prelaunch-typed
+exitCode: 0
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (87553.24922ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 87561.232186
+
+--- stderr ---

@@ -1,0 +1,116 @@
+command: node --import <repo-root>/scratch/clones/g9b-active-hook-view-20261025/scratch/g9b-synthetic-identity.mjs --test <repo-root>/scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+label: g9b-original-pin-private-home
+exitCode: 1
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+✔ imports: null (what Antigravity writes when no import remains) is observed with no entries (34.690113ms)
+✔ any other non-array imports value stays unavailable (62.914006ms)
+✔ a dangling managed global entry is observed as dangling, not as an unavailable registry (37.904815ms)
+✔ a missing root at any other path, or a non-ENOENT failure at the managed path, stays unavailable (69.787656ms)
+✔ half-done state: a global refresh no longer stops at ATR-TOPOLOGY-UNVERIFIABLE and rebinds the dangling entry, foreign bytes kept exactly (162.755467ms)
+✔ the shared source with a model tier the CLI refuses is not installed by the raw host: validate refuses it before anything changes (59.234817ms)
+✖ half-done state through the runner view: validate and install the generated copy, complete, receipt written (357.107761ms)
+✔ the runner view differs from the shared source only in the mapped model lines (43.714977ms)
+✔ the transform is one closed table: frontmatter model line only, anything unmapped is refused with a typed code (0.652419ms)
+✔ an agent with an unmapped model value refuses the global install before anything changes (34.025594ms)
+✔ a view is only built inside an approved global change (32.385867ms)
+✔ a refused validate still changes nothing: the stale managed copy is neither uninstalled nor rebound (193.5758ms)
+✔ D79: option 2 in a workspace that is the source checkout leaves the tracked path-free registry byte-identical and leaks no machine path (764.688662ms)
+✔ D79: a legacy leaked absolute Pipeline entry in the workspace registry is removed by a global refresh, foreign bytes exact (427.482508ms)
+✔ D79: workspace scope with the source outside the workspace is refused with the typed reason and its repair, nothing is written (52.449769ms)
+✔ workspace scope keeps registering the shared source (repo-relative), never a generated view (135.600655ms)
+✔ D79: a relative workspace entry is marked relative and does not make the loaded topology ambiguous next to the global view entry (144.74415ms)
+✔ the interactive installer routes option 2 through the runner view and option 1 through the shared source (0.359854ms)
+✔ public-core-observation: an installed runner view is the exact transform of its source, one extra changed byte is a content mismatch (673.721298ms)
+✖ installed-plugin-attestation: its default observer verifies an Antigravity view install; one extra changed byte is refused before any receipt is read (408.973773ms)
+✖ installed-plugin-attestation-host readback: a view install verifies; the view and its copy carrying one extra byte are refused by the observer alone (348.372992ms)
+✔ option 3: the central snapshot carries the mapped model lines and its own verify stays honest (39.58792ms)
+✔ option 3: an unmapped model value is refused AGV-AGENT-MODEL-UNMAPPED and nothing is published (32.046592ms)
+✔ runner continuity: an older loaded view survives updates when session liveness is unobservable (1094.224556ms)
+✔ bounded storage: after two installs the older view remains when liveness is unobservable; foreign view-<sha> directories, view-tmp-*, notes and an import source stay (795.928836ms)
+✔ bounded storage: a view nothing references any more is removed, a view an import source names is not (34.302052ms)
+✔ bounded storage: a refused validate prunes nothing (511.349546ms)
+✔ PO state: hook commands into the removed managed copy are rewritten together with the registry rebind and the install, foreign bytes kept (255.5149ms)
+✔ PO state through the runner view (option 2): the hooks end up inside the installed view and none in the removed location (443.611078ms)
+✔ a hook command into the removed managed location that no template covers is deleted from its array, foreign commands stay (229.254726ms)
+✔ a template-less hook command into the removed managed location outside an array stays the typed refusal, nothing changes (73.443881ms)
+✔ a pipeline-shaped hook command into any other absent location is still refused: elsewhere, a sibling of the managed location, an escape from it, the location itself (144.953918ms)
+✔ a hook command into the managed location while it exists keeps the old rule: owned only through the copy's own template set (62.165534ms)
+✔ the loaded-topology wiring observation stays fail-closed and surfaces the inner typed ATR reason, any other failure keeps the generic one (199.292532ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 31
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8313.52669
+
+✖ failing tests:
+
+test at scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs:207:1
+✖ half-done state through the runner view: validate and install the generated copy, complete, receipt written (357.107761ms)
+  Error: ENOENT: no such file or directory, scandir '/run/user/1000/ap-g17/g9b-active-cwd-4rYlEA/tmp/agy-view-pin-ufzq7Z<host-path>'
+      at readdirSync (node:fs:1570:26)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs:225:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/run/user/1000/ap-g17/g9b-active-cwd-4rYlEA/tmp/agy-view-pin-ufzq7Z<host-path>'
+  }
+
+test at scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs:479:1
+✖ installed-plugin-attestation: its default observer verifies an Antigravity view install; one extra changed byte is refused before any receipt is read (408.973773ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.installed-plugin-attestation-verification.v1","status":"rejected","reasonCodes":["IPA-AUTHORITY"]}
+  + actual - expected
+  
+  + 'rejected'
+  - 'verified'
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs:489:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'verified',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs:501:1
+✖ installed-plugin-attestation-host readback: a view install verifies; the view and its copy carrying one extra byte are refused by the observer alone (348.372992ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.installed-plugin-attestation-verification.v1","status":"unavailable","reasonCodes":["IPA-HOST-LOCATOR-UNAVAILABLE"]}
+  + actual - expected
+  
+  + 'unavailable'
+  - 'verified'
+  
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs:507:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'verified',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: SUL-1.0
+/** G8 Source admission boundary. A receipt's JSON, reviewer label, hashes and
+ * absence of a fallback field never establish an original review execution.
+ * The independent route remains closed until the native producer and registry
+ * publish and read back original invocation and report custody.
+ */
+import { summarizeDesignReviewReceipt, isDesignReviewFallback, parseDesignReviewReceipt } from './design-review-receipt.mjs';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { authorityRepositoryFromRoot, readAuthoritySourceFile, authorityDomainDigest } from './session-authority-domain-owner.mjs';
+import { withSessionAuthorityBoundary, inspectSourceOwnedSessionAuthorityMemberRecord } from './session-authority-registry.mjs';
+import { createModelFamilyHostAuthorityProducerPort, readHeldModelFamilyInvocation } from './model-family-host-store.mjs';
+import { validateDesignReviewExecutionRequest } from './design-review-execution-producer.mjs';
+
+const SHA = /^[a-f0-9]{64}$/u;
+const sha = value => createHash('sha256').update(value).digest('hex');
+const exact = (value, keys) => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && Object.keys(value).sort().join('\0') === [...keys].sort().join('\0');
+const same = (a, b) => authorityDomainDigest(a) === authorityDomainDigest(b);
+
+const refuse = code => ({ ok: false, code });
+
+/** The locator is an untrusted index. Registry and all physical files are reopened. */
+export function readOriginalDesignReview({ repository, locator, expectedSubject } = {}) {
+  const fields = ['schema','requestSha256','receiptSha256','reportSha256','originalInvocationSha256','sourceRevisionSha256','modelMemberRef'];
+  if (typeof repository !== 'string' || !exact(locator, fields)
+    || locator.schema !== 'pipeline.design-review-source-locator.v1'
+    || fields.slice(1, 6).some(key => !SHA.test(locator[key] ?? ''))
+    || !exact(expectedSubject, ['featureId','candidateCommit','round','previousReceiptSha256','receiptPath','receiptBytes','reportBytes'])
+    || !(expectedSubject.receiptBytes instanceof Uint8Array)||!(expectedSubject.reportBytes instanceof Uint8Array)) return refuse('DRE-LOCATOR-INVALID');
+  try {
+    const repo = authorityRepositoryFromRoot(repository);
+    const port = createModelFamilyHostAuthorityProducerPort({ repository: repo });
+    const member = withSessionAuthorityBoundary({ repository: repo }, boundary =>
+      inspectSourceOwnedSessionAuthorityMemberRecord({ boundary, producerPort: port, memberRef: locator.modelMemberRef }));
+    if (member.record.phase !== 'released' || !member.releaseRecord) return refuse('DRE-ORIGIN-UNAVAILABLE');
+    const root = join(repo.commonDir, 'agent-pipeline', 'model-family-host');
+    const files = [
+      ['design-review-requests', join(root, 'design-reviews', 'requests', `${locator.requestSha256}.json`),
+        ({ value }) => validateDesignReviewExecutionRequest(value).ok ? value : null],
+      ['design-review-reports', join(root, 'design-reviews', 'reports', `${locator.reportSha256}.md`),
+        ({ value }) => typeof value === 'string' ? { sha256: sha(Buffer.from(value)) } : null],
+      ['design-review-publications', join(root, 'design-reviews', 'publications', `${locator.receiptSha256}.json`),
+        ({ value }) => value?.schema === 'pipeline.design-review-original-publication.v1' ? value : null],
+    ];
+    const reads = files.map(([namespaceId, filePath, semantic]) =>
+      readAuthoritySourceFile({ namespaceId, filePath, semantic,
+        ...(namespaceId === 'design-review-reports' ? { format: 'utf8' } : {}) }));
+    if (reads.some((read, index) => !member.record.sourceFacts.some(fact => same(fact, reads[index].sourceFact))))
+      return refuse('DRE-SOURCE-FACT-DRIFT');
+    const [request, report, publication] = reads.map(read => read.value);
+    const checked = validateDesignReviewExecutionRequest(request);
+    if (!checked.ok || checked.requestSha256 !== locator.requestSha256
+      || sha(report) !== locator.reportSha256
+      || publication.requestSha256 !== locator.requestSha256
+      || publication.reportSha256 !== locator.reportSha256
+      || publication.receiptSha256 !== locator.receiptSha256
+      || publication.modelInvocationReceiptSha256 !== locator.originalInvocationSha256
+      || sha(publication.receiptText) !== locator.receiptSha256
+      || locator.sourceRevisionSha256 !== authorityDomainDigest({candidate:request.candidate,sources:request.sources,criteria:request.criteria})
+      || publication.receiptPath !== expectedSubject.receiptPath
+      || !Buffer.from(expectedSubject.receiptBytes).equals(Buffer.from(publication.receiptText))
+      || !Buffer.from(expectedSubject.reportBytes).equals(Buffer.from(report))
+      || request.featureId !== expectedSubject.featureId
+      || request.candidate.commit !== expectedSubject.candidateCommit
+      || request.round !== expectedSubject.round
+      || request.previousReceiptSha256 !== expectedSubject.previousReceiptSha256)
+      return refuse('DRE-SUBJECT-DRIFT');
+    const held = readHeldModelFamilyInvocation({ rootDir: join(repo.commonDir, 'agent-pipeline'), key: publication.modelInvocationKey });
+    if (!held.ok || held.value.receiptSha256 !== locator.originalInvocationSha256
+      || held.value.candidateCommit !== request.candidate.commit || held.value.candidateTree !== request.candidate.tree
+      || held.value.role !== 'frontier' || held.value.taskRoute !== 'duty.critic_high_risk') return refuse('DRE-INVOCATION-DRIFT');
+    const author=readOriginalAuthorModelInvocation({repository,reference:publication.originalAuthorReference,
+      candidate:request.candidate});
+    if(!author.ok||author.receipt.receiptSha256!==request.authorExecutionSha256
+      ||author.receipt.runner===held.value.runner&&author.receipt.sessionId===held.value.sessionId
+        &&author.receipt.invocationId===held.value.invocationId)
+      return refuse('DRE-AUTHOR-ORIGIN-UNAVAILABLE');
+    const parsed=parseDesignReviewReceipt(expectedSubject.receiptBytes);
+    if(!parsed.ok||parsed.receipt.featureId!==request.featureId||parsed.receipt.round!==request.round
+      ||parsed.receipt.previousReceiptSha256!==request.previousReceiptSha256
+      ||parsed.receipt.report.path!==publication.reportPath||parsed.receipt.report.sha256!==locator.reportSha256
+      ||parsed.receipt.reviewer.runner!==held.value.runner||parsed.receipt.reviewer.model!==held.value.selectedModelId
+      ||Object.hasOwn(parsed.receipt,'fallback'))return refuse('DRE-RECEIPT-DRIFT');
+    // Model registry/readback is qualified here. Author Source relation and native
+    // result must still be admitted by the producer before an independent PASS.
+    return { ok: true, assurance: 'model-source-readback', independentCriticPass: false,
+      request, publication, report, sourceFacts: reads.map(read => read.sourceFact) };
+  } catch { return refuse('DRE-ORIGIN-UNAVAILABLE'); }
+}
+
+/** Resolve an author's released Model invocation from its physical Source member. */
+export function readOriginalAuthorModelInvocation({repository,reference,candidate}={}) {
+  if(typeof repository!=='string'||!exact(reference,['modelMemberRef','invocationKey','receiptSha256'])
+    ||!SHA.test(reference.receiptSha256??'')||!exact(candidate,['commit','tree']))
+    return refuse('DRE-AUTHOR-REFERENCE-INVALID');
+  try{
+    const repo=authorityRepositoryFromRoot(repository);
+    const port=createModelFamilyHostAuthorityProducerPort({repository:repo});
+    const member=withSessionAuthorityBoundary({repository:repo},boundary=>
+      inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:reference.modelMemberRef}));
+    if(member.record.phase!=='released'||!member.releaseRecord)return refuse('DRE-AUTHOR-ORIGIN-UNAVAILABLE');
+    const held=readHeldModelFamilyInvocation({rootDir:join(repo.commonDir,'agent-pipeline'),key:reference.invocationKey});
+    if(!held.ok||held.value.receiptSha256!==reference.receiptSha256
+      ||held.value.candidateCommit!==candidate.commit||held.value.candidateTree!==candidate.tree
+      ||held.value.taskRoute==='duty.critic_high_risk'||held.value.taskRoute==='duty.critic_normal')
+      return refuse('DRE-AUTHOR-SUBJECT-DRIFT');
+    const file=join(repo.commonDir,'agent-pipeline','model-family-host','receipts',
+      authorityDomainDigest(reference.invocationKey)+'.json');
+    const physical=readAuthoritySourceFile({namespaceId:'receipts',filePath:file,
+      semantic:({value})=>value?.receiptSha256===reference.receiptSha256?value:null});
+    if(!same(physical.value,held.value)||!member.record.sourceFacts.some(fact=>same(fact,physical.sourceFact)))
+      return refuse('DRE-AUTHOR-SOURCE-DRIFT');
+    return {ok:true,receipt:held.value,sourceFact:physical.sourceFact,memberRef:member.memberRef};
+  }catch{return refuse('DRE-AUTHOR-ORIGIN-UNAVAILABLE');}
+}
+
+export function readAndAdmitOriginalDesignReviews({ repository, featureId, receipts } = {}) {
+  if (typeof repository !== 'string' || !repository || typeof featureId !== 'string'
+    || !Array.isArray(receipts) || receipts.length < 1 || receipts.length > 2) return refuse('DRE-INPUT');
+  for (let index = 0; index < receipts.length; index++) {
+    const entry = receipts[index];
+    const summary = summarizeDesignReviewReceipt(entry);
+    if (!summary.ok || summary.summary.featureId !== featureId || summary.summary.round !== index + 1)
+      return refuse('DRE-RECEIPT-INVALID');
+    if (!isDesignReviewFallback(summary.summary.fallback)) return refuse('DRE-ORIGIN-UNAVAILABLE');
+  }
+  return { ok: true, assurance: 'self-dispatch-fallback', independentCriticPass: false };
+}

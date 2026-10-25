@@ -1,0 +1,2036 @@
+command: <host-path> --test <repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+label: original-guard-full-suite
+exitCode: 1
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+(node:537718) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.
+✔ ordinary non-governed repositories remain untouched and never inspect lifecycle (15.763278ms)
+✔ inactive repositories remain silent for session writes and Bash; valid consent enforces readiness (91.143596ms)
+✔ bare invalid source, calibration, lock, runtime and consent markers stay inactive; valid consent enforces (164.952292ms)
+✔ governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws (0.353592ms)
+✔ governanceMarkers() returns the real runtime-projection-derived markers, with no warning, when the loader succeeds (0.402535ms)
+✔ evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader (12.886961ms)
+✔ evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present (9.3906ms)
+✔ exact session readiness allows the governed project write and threads the caller-supplied runner explicitly (16.797933ms)
+✔ a direct PRD acknowledgement marker write is refused even when readiness is otherwise exact (23.23364ms)
+✔ direct State edits remain blocked even when session readiness is exact (44.336664ms)
+✔ a valid architecture deferral does not let a missing physical map mint implementation authority (24.338825ms)
+✔ AC-7 reports expanded or unknown B1 rigor without deadlocking implementation authority (69.803771ms)
+✔ writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route (30.664567ms)
+✔ Write and NotebookEdit are refused for a bound authority document exactly like Edit (19.80725ms)
+✔ a reopened design (planInvalidation recorded) releases the authority-document write refusal (30.380658ms)
+✔ a file beside the bound documents is not blocked by the authority-document refusal (9.791192ms)
+✔ an absent, malformed, or authority-less Pipeline State is not treated as a bound authority document (29.631435ms)
+✔ governed consumer edits cannot escape their physical project root (71.410218ms)
+✔ a host-temp-style scratchpad path is refused exactly like any other cross-repo target, and ADR-0059 documents that consequence (23.768336ms)
+✔ consumer sessions cannot mutate Pipeline sources, cachebusters or plugin installations (260.292887ms)
+✔ in-place sed distinguishes its program from its file operands before cross-repository classification (14.507832ms)
+✔ agents prepare and verify only public PO artifacts while human signing stays external (55.919578ms)
+✔ newly-recognized human-signing commands (approve-critical, authorize-critical, sign-intent) stay external (21.20685ms)
+✔ po-approval-gate --help and --version are read-only, never a forbidden cross-repository mutation (18.847848ms)
+✔ cachebuster is source-root scoped while plugin installation remains operator-only (0.61066ms)
+✔ confirmed host-init admission or exact existing protected Git mount handles only repository cross-view failures (111.145214ms)
+✔ host-init admission never masks App Server, runtime, continuity, or malformed readiness failures (136.472155ms)
+✔ exact session readiness allows an arbitrary Bash command while non-ready Bash writes are denied (18.835418ms)
+✖ non-ready governed roots retain a narrow simple-command read-only diagnostic lane (30.227427ms)
+✔ non-ready write denials surface only the typed lifecycle status and recovery route (824.250698ms)
+✔ NVA-W4-READYGUARDTEST: the recovery inspection named by a non-ready denial is admitted at every controlling status (791.047997ms)
+✔ PORG-INVALID-OBSERVATION is named as an invalid observation, distinct from both a typed not-ready status and the generic unresolved-cause denial (19.868556ms)
+✔ NVA-B8-IPA: only the exact fresh preflight attestation writer survives an invalid onboarding observation (73.407802ms)
+✔ NVA-B8-RUNNER-PERMISSIONS: only the exact observed settings repair survives an invalid onboarding observation (103.634662ms)
+✔ closed command grammar preserves native Windows paths and direct node.exe identity (0.711171ms)
+✔ literal ANSI-C multiline commit messages are admitted only as git commit message argv (10.664415ms)
+✔ Claude/Bash-path command parsing ignores a win32 host: $PWD expands and POSIX grammar governs (54.167459ms)
+✔ NVA-R15-ROOTADMIT: a --root value that does not resolve at all stays refused, and carries no root-identity-mismatch hint (512.036503ms)
+✔ NVA-R15-ROOTADMIT: a --root value that resolves to a DIFFERENT real directory stays refused, and the denial names it a root-identity mismatch, not an unadmitted shape (513.594714ms)
+✔ NVA-R15-ROOTADMIT: a symlinked parent resolving to the exact same project root is admitted regardless of which spelling was typed (0.57895ms)
+✔ NVA-R15-ROOTADMIT: differing separator and differing drive-letter case admit the same logical Windows root (0.494168ms)
+✖ only bounded rg search pipelines and platform null redirect are read-only (4.56464ms)
+✖ single and piped rg share trusted recursive roots and unconditional exclusions (4.669729ms)
+✖ bounded rg pipeline admits self-inspection reads of the plugin's own installed root (16.124384ms)
+✖ bounded rg-to-head pipeline accepts both head -n N and combined head -N (3.303724ms)
+✖ NVA-CATPIPE-1: cat-sourced bounded pipeline -- single-path grep and head sinks are admitted, the exact live GUARD-OPERATOR-UNAPPROVED refusal (3.207543ms)
+✖ NVA-CATPIPE-1: a multi-path cat source piped into grep -E is admitted -- the exact live multi-file refusal shape (3.408714ms)
+✖ NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as a read, never GUARD-GATE-STRENGTH-SHELL (17.382194ms)
+✖ NVA-CATPIPE-1: exactness -- an outside-root read and unsafe composition stay refused (3.733761ms)
+✖ NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecognised flag fails closed (3.623792ms)
+✔ NVA-CF-GITPIPEALLOWLIST: git-sourced bounded pipeline into head is admitted, both head forms (20.490908ms)
+✔ NVA-CF-GITPIPEALLOWLIST: exactness -- outside-root reads, mutation, and unsafe composition stay refused (4.120606ms)
+✔ NVA-CF-GITPIPEALLOWLIST: the admitted grammar shapes include the git-to-head pipeline, and its example is genuinely admitted (0.307734ms)
+✖ the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more (12.240638ms)
+✖ physical newline diagnostic blocks admit only independently read-only lines (12.567681ms)
+✔ the narrowed mkdir chain predicate (F1) still admits scratch/ and refuses an arbitrary in-repo path on a genuinely governed, not-yet-ready root (64.243455ms)
+✖ redirect-looking quoted data stays argv while hostile composition is typed and denied (126.857351ms)
+✖ grammar denials return closed typed retries only for independent read diagnostics (4.547203ms)
+✖ GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined (91.988515ms)
+✔ GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded newline yields no typed action (173.616738ms)
+✔ GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the structured commit shape as text (155.498166ms)
+✔ HEREDOCHINT-1: a refused real heredoc teaches the Write/Edit route without admitting it (26.760286ms)
+✔ GRAMMARHINT-1 AC-4: GUARD-OPERATOR-UNAPPROVED and GUARD-PARSE-UNSUPPORTED stay distinct, own codes never conflated (175.586298ms)
+✔ non-ready Bash permits only exact plugin-local lifecycle remediation argv (1039.922219ms)
+✔ greenfield verify transition admits only the exact non-placeholder set-phase argv (70.60678ms)
+✔ GF-097: bare `gh --version` and `gh auth status` are admitted while lifecycle is not-ready, and no other `gh` shape is (70.022473ms)
+✔ stale pipeline-owned pre-push hook recovery is admitted only by its exact installer argv (1530.314746ms)
+✔ root-bound governance bootstrap is admitted only by its exact read-only argv (1531.015365ms)
+✔ F6 governance checker is admitted only from the active repository root (1531.568791ms)
+✔ OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and nothing beside it (2558.18836ms)
+✔ LND-5 admits only canonical session Critic prelaunch and finalization requests under the project scratch root (131.746253ms)
+✔ NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readiness status, in its exact argv shape and no wider one (19891.11192ms)
+✔ non-ready Bash admits the repair script's own --human-facing argv, positionally and closed (504.638206ms)
+✔ signature plan's prepare-for-signature action remains admitted during lifecycle recovery (106.950113ms)
+✔ signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated (267.256074ms)
+✔ plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents (5.954692ms)
+✔ GUARDALLOW-1: plan-partial-authority is admitted with the same shape as its plan* siblings (2.544645ms)
+✔ GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivation, and admits exactly that set (7.883227ms)
+✔ SUMMARYADMIT-1: only intake-generate-plan accepts the optional boolean summary flag (2.494429ms)
+✔ GUARDDERIVE-1: the derivation keys on the declared properties, never on the plan name prefix (0.234044ms)
+✔ GUARDDERIVE-1: every registered onboarding subcommand declares both properties explicitly (0.27353ms)
+✔ NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shape and no wider one (2.788219ms)
+✔ NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and no third subcommand (2.95343ms)
+✔ NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle shape and no wider one (2.506552ms)
+✔ NVA-V10B-INTAKEONEROUND: intake-consent-apply admits the same optional --text/--text-file material intake-capture-apply accepts, order-insensitively with the other four optional flags, and refuses a duplicated or malformed value (1.607063ms)
+✔ NVA-VERIFYGREEN-1: intake-consent-apply admits consent alone (--granted/--activate, no optional value flags) and refuses a duplicated flag (0.946599ms)
+✔ NVA-VERIFYGREEN-1: runner-profile-migration apply admits --activate before --root, and stays exact everywhere else (0.987126ms)
+✔ NVA-W5-GUARDADMIT-1: intake-capture-apply admits exactly the --text/--activate shape and no wider one (1.06307ms)
+✔ NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --answers-json/--activate shape and no wider one (0.918986ms)
+✔ R5-13 intake-design-questions-apply admits --answers-file with and without --answers-file-sha256, in any argument order (0.914277ms)
+✔ R5-13 intake-design-questions-apply refuses a malformed, duplicated, conflicting or incomplete answers-file argv (1.188809ms)
+✔ R5-13 intake-design-questions-replace admits --answers-file with and without --answers-file-sha256, in any argument order (0.756737ms)
+✔ R5-13 intake-design-questions-replace refuses a malformed, duplicated, conflicting or incomplete answers-file argv (1.122903ms)
+✔ NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha256/--activate shape and no wider one (1.115048ms)
+✔ NVA-W5-COORD-STEP5-2: bootstrap-bind-apply admits exactly the --plan-sha256/--activate shape and no wider one, under exact session readiness (1.025449ms)
+✔ NVA-W5-COORD-STEP5-2: bootstrap-bind-plan admits the bare lifecycle argv via GUARDDERIVE-1's derived admission (0.599078ms)
+✔ NVA-CODEXARGV-1 (AC-3): automatedMutatingApplyArgv's own emitted argv is admitted by the guard's real admission function, for every declared mutating subcommand (2.065113ms)
+✔ NVA-CODEXARGV-1 (AC-4): the same emitted mutating-apply argv, with --activate removed, stays refused for every declared subcommand (1.360945ms)
+✔ bootstrap chat acknowledgement admits only its exact digest-bound non-ready recovery action (0.588899ms)
+✔ NVA-V4-PUSHDRIVER: push-init.mjs is admitted in exactly its own argv shape and nothing wider (6665.299275ms)
+✔ NVA-V4-PUSHDRIVER: buildPushInitArgv's own emitted argv is admitted by the guard's real admission function (1.181194ms)
+✔ NVA-V4-PUSHDRIVER: the presented authorize-critical signature command is refused for a Bash tool call, real argv from po-human-approval.mjs (27.44852ms)
+✔ NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-authority shape (2.973249ms)
+✔ continuity self-repair admission is exactly root plus digest, activation, and optional intent (1.324296ms)
+✔ GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv the planner returns and no wider shape (652.86896ms)
+✔ GUARDFIX-1: a null-device stderr suppressor is never itself a cross-repository mutation while every real redirect keeps its own code (351.144602ms)
+✔ partial PO authority rebind admits only the exact read-only planner (2046.76318ms)
+✔ non-ready cleanup recovery and privatization admit only exact closed argv (328.509232ms)
+✔ non-ready session-cleanup admits the documented optional --runner tail on every subcommand this allowlist covers (736.381259ms)
+✔ partial lifecycle admits only exact rebase abort plus ordinary readback (1642.327042ms)
+✔ restart-required admits bounded resume-hint capture and required readback (691.801438ms)
+✔ RESTART_LIFECYCLE_SCRATCH_WRITE: restart-required admits any resolved scratch/ write and matching mkdir, nothing wider (152.626372ms)
+✔ NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider (4258.797395ms)
+✔ NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses stay unchanged (550.285667ms)
+✔ NVA-GF-SCRATCH: intake statuses admit any resolved scratch/ write and matching mkdir, nothing wider (497.484114ms)
+✔ NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging PRD/spec authoring writes, nothing wider (244.227466ms)
+✔ NVA-MICRO-1: a near-miss resume-hint-input write names the correct path and does not escalate (593.853205ms)
+✔ isRestartResumeHintInputWrite recognizes an apply_patch write to the resume-hint input file (0.692626ms)
+✔ restart-process launcher is always rejected as an external user-copy-only action (13.623247ms)
+✔ every controlling non-ready status denies before the governed implementation write (1826.309093ms)
+✔ guard exceptions and malformed ready receipts fail closed with sanitized output (40.61039ms)
+✔ every in-root Edit or Write requires readiness while outside targets stop before readiness (320.890743ms)
+✔ H3 recovery commands admit only exact plugin-local argv and reject lookalikes (3.723864ms)
+✔ main() reads --runner from its own argv and reaches the gate with codex even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority) (24.520002ms)
+✔ main() fails closed on an absent or invalid --runner without ever inspecting lifecycle readiness (44.947319ms)
+✔ NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes (3655.321561ms)
+✔ NOVA-LCR-HGO-1: a signature-armed capability admits the denied grammar command, regardless of the committed mode (623.782068ms)
+✔ NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appropriate next command (ADR-0059 Decision 4) (297.222124ms)
+✔ signature-mode HGO guidance resolves the configured key directory without disclosing its private path (146.238985ms)
+✔ NVA-GF-COPYSAFE: lifecycle denials default to a bounded, platform-determined command block without an unsafe primary command or rendering prerequisite (291.823556ms)
+✔ NVA-B-DENIALBOILER-1: chat-mode denial renders its exact plan command once (148.795865ms)
+✔ NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was (50.118147ms)
+✔ NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, and names the mode-appropriate next command (246.26116ms)
+✔ NOVA-XREPO-HGO-2: a signature-armed capability admits the exact cross-repo command, and only once (392.194172ms)
+✔ NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository (1385.571957ms)
+✔ NOVA-XREPO-HGO-4: a capability armed for a different command does not admit this one (705.009772ms)
+✔ NOVA-XREPO-HGO-5: GUARD-LIFECYCLE-NOT-READY is never liftable, armed capability or not (1482.917687ms)
+✔ NOVA-XREPO-HGO-6: an out-of-root target is refused but routable on narrowed terms, while a still-unroutable one reports why instead of falling silent (742.131192ms)
+✔ NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admission path here (265.795472ms)
+✔ NVA-BL-75: the guard-classification corpus measures override reachability, not only the verdict (1652.850818ms)
+✔ NVA-BL-75: the reachability labels are proven against a real capability, not read off the message (691.325329ms)
+✔ NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command only once the readiness tail also admits it (481.294459ms)
+✔ NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYCLE-NOT-READY (1225.999101ms)
+✔ NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning throws prints a typed reason, not silence (100.124236ms)
+✔ NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-planned status reports that status (660.147153ms)
+✔ NOVA-HGOSIG-ROUTE-1: the printed reason is bounded to typed tokens, whatever planning returns or throws (142.960469ms)
+✔ NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly() (361.901276ms)
+✔ MEMPATH-1: a governed session admits its own derived Claude memory directory, and only that directory (22.771151ms)
+✔ MEMPATH-1: the derived memory admission still requires session readiness, not a substitute for it (512.25918ms)
+✔ MEMPATH-1: a symlink planted inside the derived memory directory cannot redirect a write outside it (31.205284ms)
+✔ MEMPATH-1: an absent, empty, relative, or not-yet-materialized transcript_path fails closed rather than guessing (0.616932ms)
+✔ MEMPATH-1: a not-yet-materialized memory directory is refused end to end by the guard, not just by the helper (39.546471ms)
+✔ MEMPATH-1: every other standard-Claude-path shape stays refused -- settings, agents, plugins, marketplace, another repository, and a merely-similarly-named directory (204.490616ms)
+✔ MACHPATH-1: a governed session admits the exact machine-plane file, for every write-capable tool (39.919363ms)
+✔ MACHPATH-1: nothing else under the derived home directory is admitted -- the directory itself, a sibling, a nested file, a similarly-named neighbour, and a bare-home file (294.099093ms)
+✔ MACHPATH-1: a lexical escape through the derived file path is refused (29.554568ms)
+✔ MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write outside the derived home directory (95.257632ms)
+✔ MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same home directory is a pinned, accepted limit -- the write is admitted, not refused (16.084167ms)
+✔ MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned (98.632794ms)
+✔ MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned (97.775608ms)
+✔ MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing (0.407134ms)
+✔ MACHPATH-1: the machine-plane admission still requires session readiness, not a substitute for it (515.830103ms)
+✔ MACHPATH-1: the shell lane stays unchanged -- a Bash write to the same machine-plane path is still refused as a cross-repository mutation, with the same code as before this change (27.975107ms)
+✔ MACHPATH-1/AC-10: the path the guard admits is exactly the path the machine-plane writer writes to -- proven via the library's own writer and resolver, not the guard's re-export (18.408493ms)
+✔ GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, while every verb that can rewrite it stays refused (725.567051ms)
+✔ NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a substring is admitted, while the real protected file stays refused (317.224111ms)
+✔ NVA-STARNEEDLE-1: a command whose text merely quotes an asterisk is never refused by this lane (143.619421ms)
+✔ NVA-STARNEEDLE-1: a shell command naming a real file under the GS-15 staging directory stays refused (106.327491ms)
+✔ NVA-STARNEEDLE-1 AC-3: every configured gate-strength path still refuses a shell command naming a real instance of it (480.45444ms)
+✔ NVA-STARNEEDLE-1 AC-4: the needle-derivation rule and its defensive filter, pinned directly (0.404238ms)
+✖ registered plugin diagnostic scope admits bounded reads but rejects private paths and aliases (68.450127ms)
+✖ Claude task output is an exact session-bound passive read file, never a directory or executable scope (114.693141ms)
+✖ standalone head and tail accept only bounded counts and passive file operands (31.302517ms)
+✖ read-only diagnostics accept host-visible external roots in every supported shell shape (29.628427ms)
+✖ external reports stay readable while key files and effectful read options are refused (80.299225ms)
+✖ host-provided transcript, memory and sibling paths share passive read behavior (31.180726ms)
+✖ PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories agree across read routes under active enrollment (896.551278ms)
+✖ runner session paths are ordinary host-visible passive read targets (149.939251ms)
+✖ the dedicated Codex transcript recovery routes stay exact before readiness (3654.129587ms)
+✖ a sibling transcript path follows the same passive read policy (174.690072ms)
+✖ passive reads accept leading tilde and symlink paths (1065.351378ms)
+✖ passive reads accept host-resolved symlink-plus-dotdot paths (44.119084ms)
+✔ read-boundary resolution fails closed when the filesystem cannot establish containment (0.425538ms)
+✔ a leading-tilde mutation is classified as a cross-repository target in every commandPath call-site class (124.652511ms)
+✖ a leading-tilde read is admitted in the rg pipeline lane (50.557318ms)
+✖ ordinary in-root passive reads remain available (158.713308ms)
+✖ NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment (1021.57666ms)
+✖ TPSHELL-1: a shell write to a protected test path is refused, while reading and running it stay admitted (463.228706ms)
+✔ TPSHELL-REBASE-EXEC: a git rebase --exec payload naming a protected test path is refused, while ordinary rebase steps are not claimed (141.470054ms)
+✔ TPSHELL-REBASE-ABBREV: an abbreviated or unenumerated rebase option carrying a write payload is refused (143.401333ms)
+✖ TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused (21.759327ms)
+✖ IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature (24.158334ms)
+✔ NVA-B-UNPARSED-CAVEAT-1: a protected-path mention in an unparsed command is conservatively refused without echoing the raw command (107.559048ms)
+✔ TPSHELL-2: with no protectedTestPaths configured the shell lane claims nothing (44.473521ms)
+✖ TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refused, Get-Content is not (121.409946ms)
+✔ TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once (1721.230672ms)
+✔ TPSHELL-4: the shell-lane refusal is liftable by a real signature-armed capability, once, on every host (612.543655ms)
+✔ TPSHELL-5: the shell lane and the write lane resolve the same rules from the same committed config (5.195681ms)
+✔ TPSHELL-6: literal basenames are derived from the configured patterns, alternation included (5.246256ms)
+✔ TPSHELL-7: a classifier fault fails closed (GL-09), never silently admits the command (13.125684ms)
+✖ DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted (545.556016ms)
+✔ DEVPLANSHELL-5: indirect script/package writes and the hook-disable setting are covered independently of the Claude harness (365.234456ms)
+✔ DEVPLANSHELL-2: a target under an exempt prefix is not blocked by this lane (62.691836ms)
+✖ DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not (129.75608ms)
+✔ DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently admits the command (11.007361ms)
+✔ NVA-B-GITARGV case 5: git rebase --show-current-patch is not blocked as a dev-plan write (48.132018ms)
+✔ isSanctionedStartPreflightInvocation: matches only the exact zero-argument preflight invocation, never a looser shape (0.481184ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's sanctioned preflight Bash call writes a receipt, and a subsequent Edit then passes (525.061472ms)
+✔ NVA-B-GL09-ACTIVATE-1: measured runtime agent keys produce and consume one same-agent receipt (72.077878ms)
+✔ NVA-B-GL09-ACTIVATE-1: invalid transcript paths stay fail-closed and unsafe runtime keys stay visible unresolved (41.025166ms)
+✔ NVA-BOOTRECEIPT-1: near-miss Bash commands do not write a receipt (523.678805ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's first Edit/Write/NotebookEdit with no receipt is denied, naming the exact preflight command (28.049306ms)
+✔ NVA-BOOTRECEIPT-1 / pipeline.identity-attestation-fail-closed-fallback: a transcript_path that is present but relative is denied, never fail-open (10.127519ms)
+✔ NVA-BOOTRECEIPT-1: a subagent's Edit WITH a receipt is allowed (10.415216ms)
+✔ NVA-BOOTRECEIPT-1: the orchestrating session is never gated, whatever the receipt state (9.554391ms)
+✖ NVA-BOOTRECEIPT-1: Read, Grep and Glob are never gated for a subagent with no receipt (18.790186ms)
+✔ NVA-BOOTRECEIPT-1: an unresolved subagent identity (missing meta.json) allows the call and appends an observation line (10.509646ms)
+✔ NVA-BOOTRECEIPT-1: an unreadable/corrupt receipt file allows the call and appends an observation line (10.786161ms)
+✔ NVA-BOOTRECEIPT-1: a thrown filesystem error while checking the receipt allows the call and appends an observation line (10.505698ms)
+✔ NVA-BOOTRECEIPT-1: every gate decision is observed, and the guard writes nothing outside bootstrap-receipt/ (19.588683ms)
+✔ NVA-INTAKEARGV-1: the agent-facing command hint names every flag its own shape requires (0.537561ms)
+✔ NVA-INTAKEARGV-1: the one-of text routes admit exactly one alternative, and every mandatory flag is load-bearing (4.0115ms)
+✔ greenfield Claude acknowledgement argv: emitted session intent is admitted narrowly (0.868009ms)
+✔ greenfield scratch recovery: ordinary contained writes and mkdir survive every readiness status (2223.546847ms)
+✖ greenfield passive PowerShell and native reads accept host-visible paths (17.540073ms)
+✔ NVA-INTAKESPECS-1: the bootstrap-binding authoring admission covers specs/<featureId>/, and a PRD in a foreign feature's directory is refused (194.004398ms)
+✔ NVA-B-GREENFIELD-SCRATCH-1: bootstrap-binding-required admits only contained scratch Edit/Write while preserving staging and lifecycle boundaries (390.101367ms)
+✔ NVA-B-CAPABILITY-PHASE-1: native lifecycle denial includes only the closed failed session-probe phase (66.59553ms)
+✔ NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: intended pre-plan scratch lanes require physical scratch containment (792.632893ms)
+✔ NVA-B-GREENFIELD-SCRATCH-CONTAINMENT-1: only ENOENT permits first creation; scratch inspection faults fail closed (62.311054ms)
+✖ NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, never as shell syntax, for all three backlog reproductions (31.120331ms)
+✖ NVA-I-GRAMMAR DoD 2: head -N is admitted wherever head -n N is, for grep-to-head and cat-to-head, with the same 1..500 bound (13.527049ms)
+✖ NVA-I-GRAMMAR DoD 5: every admitted-grammar-shape example is printed in the refusal AND independently admitted when submitted (28.653448ms)
+✖ NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, or cross-repo-mutating segment is admitted by composition with an admitted one (313.098869ms)
+✔ NVA-B-DENIALTRIM AC-1/AC-2/AC-3: a second same-class denial in one session renders shorter, the first stays full, and both stay actionable (100.159306ms)
+✔ NVA-B-DENIALTRIM AC-4: with no resolvable session identity, the guard renders full text every time and never throws (101.347906ms)
+✔ NVA-B-DENIALTRIM AC-6: per-session denial-class state is written under the git common dir's agent-pipeline/ tree, never scratch/ or the working tree (47.634587ms)
+✔ NVA-B-TRIMKEY AC-4: a subagent's own first denial of a class renders full text even though its orchestrating session already saw that class (100.139806ms)
+✔ NVA-B-GL09-ACTIVATE-1: runtime-keyed subagent denial trim is independent of its parent session (103.770744ms)
+✔ rebwire fixture: a real conflicted rebase, and the guard reads its real .git/rebase-merge (533.989936ms)
+✔ rebwire positive-1: the exact continuations are admitted mid-rebase, with the gate armed (789.704965ms)
+✔ rebwire positive-2: an Edit/Write resolving a conflicted path is admitted, relative and absolute (2055.451627ms)
+✔ rebwire positive-3: git checkout --ours on a real conflict path is admitted, relative and absolute (457.800949ms)
+✔ rebwire positive-4: git rebase --show-current-patch is admitted during an active rebase (593.02046ms)
+✔ rebwire positive-5: git rebase --abort keeps its own recovery lane, independent of this authority (596.948784ms)
+✔ rebwire negative-1: a file outside the conflict set stays blocked while a rebase is active (1304.703962ms)
+✔ rebwire negative-2 / negative-3: --edit-todo, --exec and --skip are refused under active authority (677.591852ms)
+✔ rebwire negative-4: only -c core.editor=true is admitted, never an arbitrary -c (607.241403ms)
+✔ rebwire negative-5: no push authority is granted, implied or represented anywhere (439.592272ms)
+✔ rebwire negative-6: a conflict command whose pathspec lies outside the surface is refused (658.261237ms)
+✔ rebwire negative-7: a rebase whose orig-head is not validly approved gets no authority at all (663.971793ms)
+✔ rebwire req5-1: a mid-rebase denial carries a non-empty read-only envelope naming the surface (716.465251ms)
+✔ rebwire req5-2: an uninformed session reaches a finished rebase by following only the denials (1283.944053ms)
+✔ rebwire regression: with no rebase in progress the guard's output is unchanged (36.332593ms)
+✔ rebdead positive-1: Edit/Write on the exact conflict path (the lifecycle state file itself) is admitted, relative and absolute (509.438742ms)
+✔ rebdead positive-1 (apply_patch): a raw apply_patch call naming the conflict path is admitted, through the guard's real evaluation entry point, because the outer tool-name gate does not recognize apply_patch at all (193.273243ms)
+✔ rebdead positive-2: checkout --ours/--theirs and restore are admitted on the conflict path (495.322924ms)
+✔ rebdead positive-3: git add on the conflict path is admitted (170.667386ms)
+✔ rebdead positive-4: git rebase --continue is admitted, and once the conflict path is actually resolved and staged the rebase genuinely finishes (432.728175ms)
+✔ rebdead positive-5: all three read-only diagnostics are reachable despite the invalid conflict JSON (273.83358ms)
+✔ rebdead positive-6: continuity-damaged (the parseable-but-inconsistent lane) also receives the rebase relief (232.052663ms)
+✔ rebdead negative-1: a path outside conflictPaths stays refused, including the OTHER lifecycle state file (222.535246ms)
+✔ rebdead positive-1 (LEGACY_STATE conflict): Edit/Write on the exact conflict path is admitted, relative and absolute -- the same relief on the OTHER lifecycle state file (298.375183ms)
+✔ rebdead negative-1 (LEGACY_STATE conflict): NEUTRAL_STATE stays refused in the same fixture -- the exact mirror of rebdead negative-1 (178.077241ms)
+✔ rebdead negative-2: --skip, --edit-todo, --exec, an arbitrary -c, push and force-push all stay refused (422.796649ms)
+✔ rebdead negative-3: the admission disappears entirely once the rebase is aborted (276.924525ms)
+✔ rebdead negative-4: no human signature is demanded anywhere in the admitted path (378.745575ms)
+✔ rebdead negative-5: a restart-required session with a validly-resolved active rebase does not receive the rebase relief, only its own narrower sibling exemption where it applies (227.948674ms)
+✔ EVIDENCE-HOST-PATH: isEvidenceArtifactPath matches evidence targets and rejects non-evidence paths (0.244745ms)
+✔ EVIDENCE-HOST-PATH: extractWritePayload extracts content across tools (0.147169ms)
+✔ EVIDENCE-HOST-PATH: writing an absolute host path into evidence is blocked and diagnostic redacts path (86.216805ms)
+✔ DISPATCH-RECORD-COLLISION: checkDispatchRecordCollision detects completed record overwrite and git history collisions (26.215761ms)
+✔ DISPATCH-RECORD-COLLISION: evaluateLifecycleReadyGuard blocks tool writes colliding on task IDs (38.841852ms)
+✔ proposed marker quotation permits native and translated inert scratch across readiness outcomes (296.570615ms)
+✔ proposed marker quotation still refuses real authority, aliases and traversal (86.558844ms)
+✔ proposed marker quotation refuses an active plugin physically installed under scratch (7.898784ms)
+▶ SIGNED-AGENT closed enforcing origin and filesystem grammar
+  ✔ SIGNED-AGENT symlinked script is refused (0.180242ms)
+  ✔ SIGNED-AGENT symlinked input is refused (0.313345ms)
+✔ SIGNED-AGENT closed enforcing origin and filesystem grammar (5.82014ms)
+✔ SIGNED-AGENT basename admission retains lifecycle denial (123.004804ms)
+✔ QW04-1 a PORG-INVALID-OBSERVATION (session) observation admits Write, Edit and NotebookEdit to backlog/ and docs/ records in every lifecycle status (779.123968ms)
+✔ QW04-2 the bound PRD, Spec and design input stay refused in every spelling, while a sibling record is admitted (2173.038573ms)
+✔ QW04-3 a path the persisted state records anywhere (here a nested baseline) is refused, its sibling is admitted (287.303288ms)
+✔ QW04-4 inside the project nothing outside backlog/ and docs/ is admitted: implementation, protected state and baselines, hidden segments, traversal, case variants (3718.639222ms)
+✔ QW04-4b targets outside the project root (traversal, absolute and cross-drive spellings) are refused (493.825621ms)
+✔ QW04-5 a junction or symlink under docs/ that leaves the record tree is refused (344.462021ms)
+✔ QW04-6 the lane fails closed when the persisted state is absent, empty, unparseable or unreadable (1050.230338ms)
+✔ QW04-7 the lane exists only for PORG-INVALID-OBSERVATION with session intent: PORG-NOT-READY and a bootstrap-intent observation get nothing (8786.688516ms)
+✔ QW04-8 GL-09 fault injection: an exception inside the record lane's own evaluation blocks the write and never admits it (78.400509ms)
+✔ QP3-1 non-ready session-cleanup admits the zero-authority orphan archive verbs only in their exact closed argv (also while partial) (20268.45512ms)
+﹣ QP3-2a G8 on native Windows the signed-package lane admits backslash path words only as their canonical rendering (0.160806ms) # native Windows path words exist only on a win32 host
+✔ QP3-2b G8 a backslash path word beside any forbidden metacharacter is refused on every platform (host independent) (1.124517ms)
+▶ QP3-2c F-B the sanctioned script is matched by physical identity: a same-named file in another directory and a link to the real script are refused
+  ✔ QP3-2c directory link to the real scripts directory is not the sanctioned spelling (0.208797ms)
+  ✔ QP3-2c file symlink to the real script is not the sanctioned spelling (0.190552ms)
+✔ QP3-2c F-B the sanctioned script is matched by physical identity: a same-named file in another directory and a link to the real script are refused (3.12631ms)
+﹣ QP3-2d F-B on native Windows a letter-case variant of the real script is admitted because it is the same physical file (0.069001ms) # letter case is irrelevant only on a case-insensitive win32 filesystem
+✔ QP3-3 W0-4 hardening F-1: the record lane's realpath walk continues only on ENOENT/ENOTDIR and refuses on any other fault (832.616706ms)
+✔ QP3-4 W0-4 F-2: the record lane admits exactly backlog/, docs/ and scratch/ and refuses a traversal out of scratch/ (2420.054094ms)
+✖ QP4-1 a single read-family command the grammar does not support is refused with GUARD-READ-COMMAND-UNSUPPORTED (R1, R2, R3, R6 shapes), a target that really resolves outside the root keeps GUARD-READ-SCOPE-OUTSIDE-ROOT (376.178715ms)
+﹣ QP4-2 R5 on native Windows a double-quoted drive path of plain path characters is admitted; protected and mixed-quote spellings stay refused (0.131229ms) # native Windows drive paths exist only on a win32 host (the rewrite is gated on process.platform and is inert elsewhere)
+✖ QP4-3 R4 an existing in-root file through tail, wc and head is admitted; the Codex and Antigravity Bash payload shapes reach the same predicate and carry the same labels (82.313505ms)
+✖ QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); every directory-scoped Grep stays refused (R2-1, SEC-11) (41.255481ms)
+✖ QP4-5 F1 a Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING; private, secret-named and outside paths keep GUARD-READ-TARGET (292.496189ms)
+✖ QP4-6 R2-1 the Glob wildcard listing is admitted only when no directory at or below the named path is hidden (name starts with a dot); the refusal is the walk's, not the secret screen's (34.450753ms)
+✔ QP4-7 R2-2 the outside-root label looks only at read targets: an rg/grep pattern and the value of an option that takes a value are never one (411.627126ms)
+✔ RECCOL-1 owner may checkpoint after commit: log append, interim outcome, Edit of the interim record and the final outcome with report are admitted for the dispatch that opened the record (84.158534ms)
+✔ RECCOL-2 a foreign writer (another dispatch, the orchestrator) is refused on a claimed record; an unclaimed record keeps today's behaviour (243.616885ms)
+✔ RECCOL-3 a final-terminal record refuses every write except the owner's identical-content re-write (506.586211ms)
+✔ RECCOL-4 reusing a task id that git history or another owner's claim already binds stays refused and creates no claim (95.322115ms)
+✔ RECCOL-5 a payload without a resolvable agent identity creates no claim and keeps today's behaviour (the post-commit refusal remains for that runner) (61.755808ms)
+✔ RECCOL-6 claimDispatchRecordOwnership claims on the first opening write only, never adopts an existing record, never overwrites a claim, never guesses an identity (1.629196ms)
+✔ ENVDUMP: agent Bash "env" (16.207833ms)
+✔ ENVDUMP: agent Bash "/usr/bin/env" (14.038896ms)
+✔ ENVDUMP: agent Bash "\"/usr/bin/env\" <<EOF\nx\nEOF" (11.806616ms)
+✔ ENVDUMP: agent Bash "printenv" (10.633458ms)
+✔ ENVDUMP: agent Bash "printenv PATH" (9.647415ms)
+✔ ENVDUMP: agent Bash "set" (16.534696ms)
+✔ ENVDUMP: agent Bash "export -p" (15.481613ms)
+✔ ENVDUMP: agent Bash "declare -x" (16.34879ms)
+✔ ENVDUMP: agent Bash "cat /proc/self/environ" (12.105699ms)
+✔ ENVDUMP: agent Bash "env | sort" (14.029387ms)
+✔ ENVDUMP: agent Bash "node -e \"console.log(process.env)\"" (11.32703ms)
+✔ ENVDUMP: agent Bash "node -p process.env" (13.169628ms)
+✔ ENVDUMP: agent PowerShell "Get-ChildItem env:" (15.845226ms)
+✔ ENVDUMP: agent PowerShell "gci env:" (15.731127ms)
+✔ ENVDUMP: agent PowerShell "dir env:" (15.773829ms)
+✔ ENVDUMP: agent PowerShell "[Environment]::GetEnvironmentVariables()" (16.756998ms)
+✔ ENVDUMP: control agent Bash "git status" (17.168157ms)
+✔ ENVDUMP: control agent Bash "node --test plugins/pipeline-core/lib/git-cmd.test.mjs" (18.72016ms)
+✔ ENVDUMP: main Bash "env" (14.972434ms)
+✔ ENVDUMP: main Bash "/usr/bin/env" (15.227183ms)
+✔ ENVDUMP: main Bash "\"/usr/bin/env\" <<EOF\nx\nEOF" (14.783467ms)
+✔ ENVDUMP: main Bash "printenv" (15.225605ms)
+✔ ENVDUMP: main Bash "printenv PATH" (15.593168ms)
+✔ ENVDUMP: main Bash "set" (16.752598ms)
+✔ ENVDUMP: main Bash "export -p" (14.027427ms)
+✔ ENVDUMP: main Bash "declare -x" (13.755806ms)
+✔ ENVDUMP: main Bash "cat /proc/self/environ" (13.391171ms)
+✔ ENVDUMP: main Bash "env | sort" (17.3191ms)
+✔ ENVDUMP: main Bash "node -e \"console.log(process.env)\"" (14.02464ms)
+✔ ENVDUMP: main Bash "node -p process.env" (14.910881ms)
+✔ ENVDUMP: main PowerShell "Get-ChildItem env:" (13.233836ms)
+✔ ENVDUMP: main PowerShell "gci env:" (13.494304ms)
+✔ ENVDUMP: main PowerShell "dir env:" (15.621311ms)
+✔ ENVDUMP: main PowerShell "[Environment]::GetEnvironmentVariables()" (12.999817ms)
+✔ ENVDUMP: control main Bash "git status" (15.944939ms)
+✔ ENVDUMP: control main Bash "node --test plugins/pipeline-core/lib/git-cmd.test.mjs" (17.386099ms)
+✔ ENVDUMP: agent Bash "env printenv" (T1-T2) (13.506541ms)
+✔ ENVDUMP: agent Bash "env env" (T1-T2) (13.874839ms)
+✔ ENVDUMP: agent Bash "env FOO=1 printenv" (T1-T2) (13.383888ms)
+✔ ENVDUMP: agent Bash "env -i printenv" (T1-T2) (14.471915ms)
+✔ ENVDUMP: agent Bash "env -- printenv" (T1-T2) (14.349262ms)
+✔ ENVDUMP: agent Bash "env FOO=1 env" (T1-T2) (13.505849ms)
+✔ ENVDUMP: control agent Bash "env FOO=1 node --version" (T1-T2) (16.329897ms)
+✔ ENVDUMP: main Bash "env printenv" (T1-T2) (14.073371ms)
+✔ ENVDUMP: main Bash "env env" (T1-T2) (15.263164ms)
+✔ ENVDUMP: main Bash "env FOO=1 printenv" (T1-T2) (14.822203ms)
+✔ ENVDUMP: main Bash "env -i printenv" (T1-T2) (16.143862ms)
+✔ ENVDUMP: main Bash "env -- printenv" (T1-T2) (13.672996ms)
+✔ ENVDUMP: main Bash "env FOO=1 env" (T1-T2) (14.555295ms)
+✔ ENVDUMP: control main Bash "env FOO=1 node --version" (T1-T2) (14.865491ms)
+✔ ENVDUMP: agent 5000 env words then printenv (T1-T3) (21.293817ms)
+✔ ENVDUMP: agent 5000 env words then node --version (T1-T3) (16.290651ms)
+✔ ENVDUMP: agent 40-level nested env -S (T1-T3) (13.952085ms)
+✔ ENVDUMP: control agent two-level env env node --version (T1-T3) (17.43732ms)
+✔ ENVDUMP: main 5000 env words then printenv (T1-T3) (13.241898ms)
+✔ ENVDUMP: main 5000 env words then node --version (T1-T3) (14.066967ms)
+✔ ENVDUMP: main 40-level nested env -S (T1-T3) (15.735453ms)
+✔ ENVDUMP: control main two-level env env node --version (T1-T3) (16.91756ms)
+✖ TR-B T74 rg -o: admitted for an ordinary in-project operand (74.447658ms)
+✖ TR-B T74 rg -o: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (130.216765ms)
+✖ TR-B T74 rg --only-matching: admitted for an ordinary in-project operand (78.772121ms)
+✖ TR-B T74 rg --only-matching: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (122.286877ms)
+✖ TR-B T74 rg --max-columns 200: admitted for an ordinary in-project operand (78.25327ms)
+✖ TR-B T74 rg --max-columns 200: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (145.116828ms)
+✖ TR-B T74 grep -o: admitted for an ordinary in-project operand (81.146404ms)
+✖ TR-B T74 grep -o: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (63.714987ms)
+✖ TR-B T74 grep --only-matching: admitted for an ordinary in-project operand (81.495172ms)
+✖ TR-B T74 grep --only-matching: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (64.364521ms)
+✖ TR-B T74 rg quoted alternation: admitted for an ordinary in-project operand (74.800514ms)
+✖ TR-B T74 rg quoted alternation: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (121.718151ms)
+✖ TR-B T74 grep quoted alternation: admitted for an ordinary in-project operand (69.33786ms)
+✖ TR-B T74 grep quoted alternation: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (64.013323ms)
+✖ TR-B T77 rg -g: admitted for an ordinary in-project operand (82.259971ms)
+✖ TR-B T77 rg -g: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (137.771249ms)
+✖ TR-B T77 rg --glob: admitted for an ordinary in-project operand (83.077656ms)
+✖ TR-B T77 rg --glob: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (116.748035ms)
+✖ TR-B T74/T77 control: the already-admitted rg and grep spellings admit an ordinary operand and refuse every key operand (79.425362ms)
+✖ TR-B T77 rg -g lane: one bounded basename-extension filter is admitted; multi-dot, path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED (characterisation, GREEN by design -- flip deliberately if TR-B admits one) (92.791539ms)
+✔ TR-B T74 directory Grep: the Grep tool on a directory stays refused with GUARD-READ-TARGET (SEC-11; also pinned by QP4-4, repeated here under the row) (73.704864ms)
+ℹ tests 390
+ℹ suites 0
+ℹ pass 320
+ℹ fail 67
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 0
+ℹ duration_ms 157398.936112
+
+✖ failing tests:
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1156:1
+✖ non-ready governed roots retain a narrow simple-command read-only diagnostic lane (30.227427ms)
+  AssertionError [ERR_ASSERTION]: rg -n repository-control-path-invalid plugins
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1197:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1765:1
+✖ only bounded rg search pipelines and platform null redirect are read-only (4.56464ms)
+  AssertionError [ERR_ASSERTION]: rg -n -S lifecycle plugins 2>/dev/null | head -n 280
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1786:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1842:1
+✖ single and piped rg share trusted recursive roots and unconditional exclusions (4.669729ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1859:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1915:1
+✖ bounded rg pipeline admits self-inspection reads of the plugin's own installed root (16.124384ms)
+  AssertionError [ERR_ASSERTION]: rg --files <repo-root>/plugins/pipeline-core/hooks | rg 'guard-lifecycle-ready' (SEC-11 exact file or separately bounded recursive directory)
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1929:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1952:1
+✖ bounded rg-to-head pipeline accepts both head -n N and combined head -N (3.303724ms)
+  AssertionError [ERR_ASSERTION]: rg -n lifecycle . | head -40
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1957:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1974:1
+✖ NVA-CATPIPE-1: cat-sourced bounded pipeline -- single-path grep and head sinks are admitted, the exact live GUARD-OPERATOR-UNAPPROVED refusal (3.207543ms)
+  AssertionError [ERR_ASSERTION]: cat notes.txt | grep open
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1979:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1991:1
+✖ NVA-CATPIPE-1: a multi-path cat source piped into grep -E is admitted -- the exact live multi-file refusal shape (3.408714ms)
+  AssertionError [ERR_ASSERTION]: cat a.txt b.txt c.txt | grep -E 'alpha|bravo'
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1998:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2015:1
+✖ NVA-CATPIPE-1: a cat pipeline naming a gate-strength file is classified as a read, never GUARD-GATE-STRENGTH-SHELL (17.382194ms)
+  AssertionError [ERR_ASSERTION]: cat pipeline.user.yaml | grep push_approval
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2033:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-GATE-STRENGTH-SHELL: This command names pipeline.user.yaml, a file whose contents decide how strong a gate is.\nThe match is on the file NAME pipeline.user.yaml appearing in the command, not on a detected write: this rule cannot tell a read from a write inside an arbitrary shell command, so it refuses both rather than risk letting the gate-weakening write through.\nReading is unaffected: cat, rg, head, sha256sum and git diff/log/show on this path are admitted -- including a bounded cat-to-grep/cat-to-head read pipeline naming this path, not only the single-command form -- and so is the one exact, closed script exemption this rule grants (GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS) -- if this command was one of those shapes and was still refused, that is this classifier under-covering, not this file genuinely changing.\nTo actually CHANGE this file, use the Edit or Write tool instead of a shell command: guard-gate-strength.mjs enforces the identical rule there and offers the audited human-guard-override ceremony (chat- or signature-mode, matching whatever gates.push_approval is actually committed) -- never a hand-edit outside a session. There is deliberately no in-session override for this shell-lane refusal itself -- not even the audited one.\n',
+    expected: /GUARD-GATE-STRENGTH-SHELL/u,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2042:1
+✖ NVA-CATPIPE-1: exactness -- an outside-root read and unsafe composition stay refused (3.733761ms)
+  AssertionError [ERR_ASSERTION]: cat /run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-catpipe-outside-WZ5vAf/secret.txt | grep open
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2049:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2069:1
+✖ NVA-CATPIPE-1: a recognised display-only cat flag is admitted, an unrecognised flag fails closed (3.623792ms)
+  AssertionError [ERR_ASSERTION]: cat -n notes.txt | grep open
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2078:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2151:1
+✖ the &&-chain union (read-only classifier plus the small always-safe-write allowlist) and trailing 2>/dev/null admit exactly the backlog's triggering shapes, widened per NVA-I-GRAMMAR, and nothing more (12.240638ms)
+  AssertionError [ERR_ASSERTION]: grep -n "pattern" backlog/items/passive-probe.txt 2>/dev/null
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2209:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2252:1
+✖ physical newline diagnostic blocks admit only independently read-only lines (12.567681ms)
+  AssertionError [ERR_ASSERTION]: rg -n lifecycle plugins/pipeline-core
+  head -n 20 docs/push-release-flow.md
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2265:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2354:1
+✖ redirect-looking quoted data stays argv while hostile composition is typed and denied (126.857351ms)
+  AssertionError [ERR_ASSERTION]: rg -n lifecycle .
+  head -n 20 output.txt
+  + actual - expected
+  
+    {
+  +   exitCode: 2,
+  +   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-PARSE-UNSUPPORTED: The command is outside the closed Pipeline shell grammar.\n' +
+  +     'Rejected element: a newline character inside the command text.\n' +
+  +     'Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n' +
+  +     'Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\n' +
+  +     'If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n' +
+  +     'The complete admitted grammar, with bounds and exact spellings:\n' +
+  +     '- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n' +
+  +     '- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n' +
+  +     '- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n' +
+  +     '- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n' +
+  +     '- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n' +
+  +     '- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n' +
+  +     '{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n' +
+  +     '\n' +
+  +     'No human override route is offered for this exact command; the guard attempted to plan one.\n' +
+  +     'Reason: planning the route failed with code=HGO-GIT.\n'
+  -   exitCode: 0,
+  -   stderr: ''
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2391:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { exitCode: 2, stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-PARSE-UNSUPPORTED: The command is outside the closed Pipeline shell grammar.\nRejected element: a newline character inside the command text.\nUse one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\nDo not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\nIf typed retryActions are present, run only those exact read-only actions as separate tool calls.\nThe complete admitted grammar, with bounds and exact spellings:\n- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n\nNo human override route is offered for this exact command; the guard attempted to plan one.\nReason: planning the route failed with code=HGO-GIT.\n' },
+    expected: { exitCode: 0, stderr: '' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2398:1
+✖ grammar denials return closed typed retries only for independent read diagnostics (4.547203ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   {
+  -     argv: [
+  -       '-n',
+  -       '1,10p',
+  -       'one.txt'
+  -     ],
+  -     executable: 'sed',
+  -     executionBoundary: 'separate-tool-call',
+  -     expected: {
+  -       exitCodes: [
+  -         0,
+  -         1
+  -       ]
+  -     },
+  -     mutation: false,
+  -     requiresConfirmation: false
+  -   },
+  -   {
+  -     argv: [
+  -       '-n',
+  -       '1,10p',
+  -       'two.txt'
+  -     ],
+  -     executable: 'sed',
+  -     executionBoundary: 'separate-tool-call',
+  -     expected: {
+  -       exitCodes: [
+  -         0,
+  -         1
+  -       ]
+  -     },
+  -     mutation: false,
+  -     requiresConfirmation: false
+  -   }
+  - ]
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2407:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ { executable: 'sed', argv: [Array], mutation: false, requiresConfirmation: false, executionBoundary: 'separate-tool-call', expected: [Object] }, { executable: 'sed', argv: [Array], mutation: false, requiresConfirmation: false, executionBoundary: 'separate-tool-call', expected: [Object] } ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2437:1
+✖ GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined (91.988515ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Rejected element: "&&"-chain segment 2 of 2 \("touch output\.txt"\) is not independently admitted/u. Input:
+  
+  'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-PARSE-UNSUPPORTED: The command is outside the closed Pipeline shell grammar.\n' +
+    'Rejected element: "&&"-chain segment 1 of 2 ("rg -n lifecycle .") is not independently admitted as a read-only diagnostic or an approved always-safe write.\n' +
+    'Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n' +
+    'Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\n' +
+    'If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n' +
+    'The complete admitted grammar, with bounds and exact spellings:\n' +
+    '- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n' +
+    '- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n' +
+    '- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n' +
+    '- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n' +
+    '- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n' +
+    '- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n' +
+    '{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n' +
+    '\n' +
+    'No human override route is offered for this exact command; the guard attempted to plan one.\n' +
+    'Reason: planning the route failed with code=HGO-GIT.\n'
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:2475:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-PARSE-UNSUPPORTED: The command is outside the closed Pipeline shell grammar.\nRejected element: "&&"-chain segment 1 of 2 ("rg -n lifecycle .") is not independently admitted as a read-only diagnostic or an approved always-safe write.\nUse one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\nDo not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\nIf typed retryActions are present, run only those exact read-only actions as separate tool calls.\nThe complete admitted grammar, with bounds and exact spellings:\n- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n\nNo human override route is offered for this exact command; the guard attempted to plan one.\nReason: planning the route failed with code=HGO-GIT.\n',
+    expected: /Rejected element: "&&"-chain segment 2 of 2 \("touch output\.txt"\) is not independently admitted/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7148:1
+✖ registered plugin diagnostic scope admits bounded reads but rejects private paths and aliases (68.450127ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7173:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7198:1
+✖ Claude task output is an exact session-bound passive read file, never a directory or executable scope (114.693141ms)
+  AssertionError [ERR_ASSERTION]: D96: a sibling task's output is an ordinary outside file
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7230:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7264:1
+✖ standalone head and tail accept only bounded counts and passive file operands (31.302517ms)
+  AssertionError [ERR_ASSERTION]: head -n 1 /run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-read-scope-outside-Ku1bG3/pipeline-greenfield-review.md
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7277:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7292:1
+✖ read-only diagnostics accept host-visible external roots in every supported shell shape (29.628427ms)
+  AssertionError [ERR_ASSERTION]: cat /run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-read-scope-outside-mhXaVN/pipeline-greenfield-review.md
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7303:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7316:1
+✖ external reports stay readable while key files and effectful read options are refused (80.299225ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7321:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7346:1
+✖ host-provided transcript, memory and sibling paths share passive read behavior (31.180726ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7354:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7364:1
+✖ PASSIVE-READ-ROOT-INTEROP: exact transcript files and memory directories agree across read routes under active enrollment (896.551278ms)
+  AssertionError [ERR_ASSERTION]: 
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Read admits the exact session transcript
+  
+  2 !== 0
+  
+      at file:///run/user/1000/ap-g17/g17c-qtch2R/passive-read-root-interop-RDEAf9/repo/[eval1]:29:12 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v24.15.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7455:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7458:1
+✖ runner session paths are ordinary host-visible passive read targets (149.939251ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7467:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7475:1
+✖ the dedicated Codex transcript recovery routes stay exact before readiness (3654.129587ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7498:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7505:1
+✖ a sibling transcript path follows the same passive read policy (174.690072ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7516:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7524:1
+✖ passive reads accept leading tilde and symlink paths (1065.351378ms)
+  AssertionError [ERR_ASSERTION]: cat ~/../../../../../../../../../../run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-read-scope-outside-Gvf9ap/pipeline-greenfield-review.md
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7549:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7558:1
+✖ passive reads accept host-resolved symlink-plus-dotdot paths (44.119084ms)
+  AssertionError [ERR_ASSERTION]: cat /run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-hgo-nQ41GW/linked-outside/../sibling/secret.txt
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7575:15)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7630:1
+✖ a leading-tilde read is admitted in the rg pipeline lane (50.557318ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7634:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7647:1
+✖ ordinary in-root passive reads remain available (158.713308ms)
+  AssertionError [ERR_ASSERTION]: cat verify-latest.json
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7651:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7659:1
+✖ NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment (1021.57666ms)
+  AssertionError [ERR_ASSERTION]: node -e 'process.exit(0)'
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7684:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).\nThis refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.\nUse one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\nDo not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.\nIf typed retryActions are present, run only those exact read-only actions as separate tool calls.\nThe complete admitted grammar, with bounds and exact spellings:\n- one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").\n- bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").\n- bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").\n- bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").\n- bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").\n- up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").\n{"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}\n`,
+    expected: /GUARD-LIFECYCLE-NOT-READY/u,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7753:1
+✖ TPSHELL-1: a shell write to a protected test path is refused, while reading and running it stay admitted (463.228706ms)
+  AssertionError [ERR_ASSERTION]: refused a read/run/unrelated command: cat plugins/pipeline-core/hooks/guard-push.test.mjs -- BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7796:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7887:1
+✖ TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused (21.759327ms)
+  AssertionError [ERR_ASSERTION]: refused a mention/run command: node -e "require('fs').writeFileSync('scratch/note.txt','mentions plugins/pipeline-core/hooks/guard-push.test.mjs')" -- BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7902:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7924:1
+✖ IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature (24.158334ms)
+  AssertionError [ERR_ASSERTION]: BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7929:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:7999:1
+✖ TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refused, Get-Content is not (121.409946ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8014:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8199:1
+✖ DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted (545.556016ms)
+  AssertionError [ERR_ASSERTION]: refused a read/unrelated command: cat src/app.js -- BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-COMMAND-UNSUPPORTED: The read-only command is not supported by the closed Pipeline shell grammar (a flag, a repeated option or a spelling it does not admit).
+  This refuses the command's own flags or spelling, not a path: it is not reported as a read outside the project root. Re-spell it with the admitted grammar below; where the runner offers native Read, Glob or Grep tools, those cover reads inside the project.
+  Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.
+  Do not construct a new composed command with ;, pipelines, redirects, or line continuation outside the admitted shapes below.
+  If typed retryActions are present, run only those exact read-only actions as separate tool calls.
+  The complete admitted grammar, with bounds and exact spellings:
+  - one simple, un-piped read-only command (rg, grep, cat, head, tail, wc, stat, file, sed [non-mutating], find [non-mutating], pwd, selected printf labels, git [read-only subcommands], and a few narrow hash/check forms) (e.g. "rg -n needle probe.txt").
+  - bounded rg-to-rg, rg-to-head, or rg-to-tail diagnostic pipeline: "rg ... | rg ...", "rg ... | head -n N" / "rg ... | head -N", or "rg ... | tail -n N" / "rg ... | tail -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "rg -n needle probe.txt | head -5").
+  - bounded grep-to-grep or grep-to-head diagnostic pipeline: "grep ... | grep ..." or "grep ... | head -n N" / "grep ... | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "grep -n needle probe.txt | head -5").
+  - bounded cat-to-grep or cat-to-head diagnostic pipeline: "cat <paths...> | grep ..." or "cat <paths...> | head -n N" / "cat <paths...> | head -N" (N in 1..500), optionally followed by "2>/dev/null" (e.g. "cat probe.txt | head -5").
+  - bounded git-to-head (or git-to-tail) diagnostic pipeline: "git <read-only-subcommand> ... | head -n N" / "git <read-only-subcommand> ... | head -N", or the same with "tail -n N" / "tail -N" (the same read-only subcommand set the un-piped git form already trusts; N in 1..500), optionally followed by "2>/dev/null" (e.g. "git log | head -5").
+  - up to 6 "&&"-chained segments, admitted only when EVERY segment is independently one of the shapes above or the small always-safe-write allowlist (echo; "mkdir -p" under scratch/ or .claude/worktrees/) (e.g. "rg -n needle probe.txt && rg -n needle probe.txt").
+  {"schema":"pipeline.guard-retry-actions.v1","retryActions":[]}
+  
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8250:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8382:1
+✖ DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not (129.75608ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8397:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8722:1
+✖ NVA-BOOTRECEIPT-1: Read, Grep and Glob are never gated for a subagent with no receipt (18.790186ms)
+  AssertionError [ERR_ASSERTION]: Read
+  + actual - expected
+  
+    {
+  +   exitCode: 2,
+  +   stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n'
+  -   exitCode: 0,
+  -   stderr: ''
+    }
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:8739:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { exitCode: 2, stderr: 'BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n' },
+    expected: { exitCode: 0, stderr: '' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9003:1
+✖ greenfield passive PowerShell and native reads accept host-visible paths (17.540073ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9016:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9306:1
+✖ NVA-I-GRAMMAR DoD 1: quoted operator-looking characters are read as data, never as shell syntax, for all three backlog reproductions (31.120331ms)
+  AssertionError [ERR_ASSERTION]: grep -n "^const X\|^export function Y" some/file.mjs
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9331:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9357:1
+✖ NVA-I-GRAMMAR DoD 2: head -N is admitted wherever head -n N is, for grep-to-head and cat-to-head, with the same 1..500 bound (13.527049ms)
+  AssertionError [ERR_ASSERTION]: grep -n alpha probe.txt | head -40
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9367:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9379:1
+✖ NVA-I-GRAMMAR DoD 5: every admitted-grammar-shape example is printed in the refusal AND independently admitted when submitted (28.653448ms)
+  AssertionError [ERR_ASSERTION]: rg -n needle probe.txt
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9392:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9403:1
+✖ NVA-I-GRAMMAR DoD 6: negative regression -- no mutating, protected-path, or cross-repo-mutating segment is admitted by composition with an admitted one (313.098869ms)
+  AssertionError [ERR_ASSERTION]: rg -n alpha probe.txt
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:9425:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11599:1
+✖ QP4-1 a single read-family command the grammar does not support is refused with GUARD-READ-COMMAND-UNSUPPORTED (R1, R2, R3, R6 shapes), a target that really resolves outside the root keeps GUARD-READ-SCOPE-OUTSIDE-ROOT (376.178715ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n "authorize-commit" scratch -g "*.md" -g "*.txt"
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11624:7
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11603:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11672:1
+✖ QP4-3 R4 an existing in-root file through tail, wc and head is admitted; the Codex and Antigravity Bash payload shapes reach the same predicate and carry the same labels (82.313505ms)
+  AssertionError [ERR_ASSERTION]: predicate: tail -n 20 scratch/log.txt
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11677:163
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11676:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11709:1
+✖ QP4-4 Glob wildcard listing inside the project root is admitted (G1, G3, G4); .git and escapes stay refused (G2); every directory-scoped Grep stays refused (R2-1, SEC-11) (41.255481ms)
+  AssertionError [ERR_ASSERTION]: {"pattern":"scratch/sub/*","path":"/run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-ready-VfTQUO"}
+  
+  2 !== 0
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11721:17
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11713:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11799:1
+✖ QP4-5 F1 a Read of a missing in-root file is refused with the distinct code GUARD-READ-TARGET-MISSING; private, secret-named and outside paths keep GUARD-READ-TARGET (292.496189ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11816:14
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11803:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11854:1
+✖ QP4-6 R2-1 the Glob wildcard listing is admitted only when no directory at or below the named path is hidden (name starts with a dot); the refusal is the walk's, not the secret screen's (34.450753ms)
+  AssertionError [ERR_ASSERTION]: {"pattern":"src/*","path":"/run/user/1000/ap-g17/g17c-qtch2R/tmp/guard-lifecycle-ready-dkX57Z"}
+  
+  2 !== 0
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11867:17
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11863:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 rg -o: admitted for an ordinary in-project operand (74.447658ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n -o apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 rg -o: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (130.216765ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 rg --only-matching: admitted for an ordinary in-project operand (78.772121ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n --only-matching apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 rg --only-matching: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (122.286877ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 rg --max-columns 200: admitted for an ordinary in-project operand (78.25327ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n --max-columns 200 apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 rg --max-columns 200: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (145.116828ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 grep -o: admitted for an ordinary in-project operand (81.146404ms)
+  AssertionError [ERR_ASSERTION]: predicate: grep -n -o apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 grep -o: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (63.714987ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 grep --only-matching: admitted for an ordinary in-project operand (81.495172ms)
+  AssertionError [ERR_ASSERTION]: predicate: grep -n --only-matching apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 grep --only-matching: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (64.364521ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 rg quoted alternation: admitted for an ordinary in-project operand (74.800514ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n "apply|authorize" scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 rg quoted alternation: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (121.718151ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T74 grep quoted alternation: admitted for an ordinary in-project operand (69.33786ms)
+  AssertionError [ERR_ASSERTION]: predicate: grep -n "apply\|authorize" scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T74 grep quoted alternation: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (64.013323ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T77 rg -g: admitted for an ordinary in-project operand (82.259971ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n -g "*.md" apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T77 rg -g: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (137.771249ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12372:3
+✖ TR-B T77 rg --glob: admitted for an ordinary in-project operand (83.077656ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n --glob "*.md" apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:38
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12375:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12380:3
+✖ TR-B T77 rg --glob: a key or credential operand is refused by the operand check, never by the spelling (key-operand corpus) (116.748035ms)
+  AssertionError [ERR_ASSERTION]: the first-positional shape was checked for every corpus operand
+  
+  0 !== 5
+  
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12401:16
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12383:7)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 5,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12409:1
+✖ TR-B T74/T77 control: the already-admitted rg and grep spellings admit an ordinary operand and refuse every key operand (79.425362ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n private scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12413:7
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12412:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12424:1
+✖ TR-B T77 rg -g lane: one bounded basename-extension filter is admitted; multi-dot, path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED (characterisation, GREEN by design -- flip deliberately if TR-B admits one) (92.791539ms)
+  AssertionError [ERR_ASSERTION]: predicate: rg -n -g "*.md" apply scratch/notes.md
+  
+  false !== true
+  
+      at qp4Admit (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11574:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12428:7
+      at qp4WithoutAppDataRoots (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:11561:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:12427:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

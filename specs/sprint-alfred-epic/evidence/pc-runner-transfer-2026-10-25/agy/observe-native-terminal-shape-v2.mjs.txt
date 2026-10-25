@@ -1,0 +1,274 @@
+#!/usr/bin/env node
+// Synthetic, attended capability experiment. Do not run without the PO's explicit native-call decision.
+// The CLI stream and hook transcript are held in memory; only digests and field shapes are exported.
+import { spawnSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { appendFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { validatePrivateParent, validateCreatedHome } from "../../clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs";
+
+const script = fileURLToPath(import.meta.url);
+const sha = value => createHash("sha256").update(value).digest("hex");
+const shape = value => value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+const ALLOWED_KEYS = new Set(["event", "conversation_id", "step_update", "step_index", "state", "step_type", "tool_name", "tool_info", "subagent_info", "subagents", "type_name", "role", "log_uri", "workspace_uris", "result", "status", "response", "structured_output", "json_schema", "toolCall", "name", "args", "stepIdx", "error", "conversationId", "workspacePaths", "transcriptPath", "modelName", "fullyIdle", "terminationReason", "executionNum", "model"]);
+const allowed = (value, choices) => typeof value === "string" && choices.includes(value) ? value : value == null ? null : `sha256:${sha(String(value))}`;
+const keys = value => value && typeof value === "object" && !Array.isArray(value)
+  ? Object.keys(value).sort().map(key => [ALLOWED_KEYS.has(key) ? key : `sha256:${sha(key)}`, shape(value[key])]) : [];
+const boundedId = value => typeof value === "string" && /^[A-Za-z0-9._:-]{1,128}$/u.test(value) ? sha(value) : null;
+const toolName = value => allowed(value, ["invoke_subagent", "run_command", "view_file", "grep_search", "ask_permission"]);
+const errorType = value => value == null ? null : typeof value === "string"
+  ? allowed(value, ["PermissionDenied", "ToolError", "TimeoutError", "ValidationError"])
+  : `type:${shape(value)}`;
+const terminalStatuses = ["SUCCESS", "ERROR", "CANCELED", "INTERRUPTED", "INVALID"];
+
+function summarizeStep(row, parentId) {
+  const step = row?.step_update;
+  const info = step?.tool_info;
+  const error = info?.error;
+  return { eventKeys: keys(row), stepKeys: keys(step), stepIndex: Number.isSafeInteger(step?.step_index) ? step.step_index : null,
+    conversationSha256: boundedId(step?.conversation_id), parentConversation: step?.conversation_id === parentId,
+    state: allowed(step?.state, ["ACTIVE", "DONE"]), stepType: allowed(step?.step_type, ["user_input", "agent_response", "tool", "checkpoint"]),
+    toolName: toolName(step?.tool_name ?? info?.name), toolInfoKeys: keys(info), errorKeys: keys(error),
+    errorType: errorType(error?.type), errorPresent: error != null, subagentInfoKeys: keys(step?.subagent_info) };
+}
+
+function command(root, executable, args, env) {
+  const result = spawnSync(executable, args, { cwd: root, shell: false, encoding: "utf8", timeout: 20_000, maxBuffer: 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"], env });
+  if (result.status !== 0) throw new Error(`${executable} ${args[0]} failed`);
+  return result.stdout.trim();
+}
+
+function inspectSyntheticTranscript(input) {
+  const conversationId = input?.conversationId;
+  const path = input?.transcriptPath;
+  if (typeof conversationId !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/u.test(conversationId)
+    || typeof path !== "string" || !path.endsWith("/transcript.jsonl") || !path.includes(`/${conversationId}/`)) return { status: "unavailable" };
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024 * 1024 || realpathSync(path) !== path) return { status: "unavailable" };
+    const rows = readFileSync(path, "utf8").split("\n").filter(Boolean);
+    if (rows.length > 2048) return { status: "unavailable" };
+    const parsed = rows.map(row => JSON.parse(row));
+    return { status: "shape-only", lineCount: parsed.length, stream: streamShape(rows.join("\n")) };
+  } catch { return { status: "unavailable" }; }
+}
+
+async function hook(root, phase) {
+  let raw = "";
+  let matched = false;
+  for await (const chunk of process.stdin) {
+    raw += chunk;
+    if (raw.length > 512 * 1024) { raw = ""; break; }
+  }
+  try {
+    const input = JSON.parse(raw);
+    const stat = lstatSync(root);
+    if (stat.isDirectory() && !stat.isSymbolicLink() && input?.toolCall?.name === "invoke_subagent"
+      && input?.workspacePaths?.some(path => path === root)) {
+      matched = true;
+      const row = summarizeHookInput(input, inspectSyntheticTranscript(input));
+      appendFileSync(join(root, `${phase}-shapes.ndjson`), `${JSON.stringify(row)}\n`, { flag: "a", mode: 0o600 });
+    }
+  } catch { /* no raw input or error is exported */ }
+  process.stdout.write(phase === "pretool" && matched ? `${JSON.stringify(preToolDecision(root))}\n` : "{}\n");
+}
+
+export function preToolDecision(root) {
+  try {
+    writeFileSync(join(root, "invoke-subagent-attempt.marker"), "attempted\n", { flag: "wx", mode: 0o600 });
+    return {};
+  } catch (error) {
+    return { decision: "deny", reason: error?.code === "EEXIST" ? "synthetic-one-attempt-cap" : "synthetic-attempt-marker-unavailable" };
+  }
+}
+
+export function summarizeHookInput(input, transcript = { status: "unavailable" }) {
+  return { schema: "agy.synthetic-posttool-shape.v1", hookKeys: keys(input), toolCall: keys(input?.toolCall),
+    callArgsSha256: sha(JSON.stringify(input?.toolCall?.args ?? null)), stepIdx: Number.isSafeInteger(input?.stepIdx) ? input.stepIdx : null,
+    parentConversationSha256: boundedId(input?.conversationId), errorPresent: Boolean(input?.error),
+    errorKind: typeof input?.error === "string" && input.error ? "opaque-runtime-error" : null, transcript };
+}
+
+export function streamShape(stdout, expectedFixture = null) {
+  const lines = String(stdout).split("\n").filter(Boolean);
+  if (lines.length > 2048) return { status: "oversize" };
+  try {
+    const rows = lines.map(line => JSON.parse(line));
+    const initRows = rows.filter(row => row?.event === "init");
+    const init = initRows[0]?.init;
+    const initTools = Array.isArray(init?.tools) ? init.tools : null;
+    const steps = rows.filter(row => row?.event === "step_update");
+    const subagentSteps = rows.filter(row => row?.event === "step_update" && row.step_update?.subagent_info);
+    const results = rows.filter(row => row?.event === "result");
+    const childRows = subagentSteps.flatMap(row => Array.isArray(row.step_update.subagent_info?.subagents) ? row.step_update.subagent_info.subagents : []);
+    const childIds = [...new Set(childRows.map(child => child.conversation_id).filter(value => typeof value === "string"))];
+    const childTerminalRows = results.filter(row => childIds.includes(row?.result?.conversation_id ?? row?.conversation_id)
+      && ["SUCCESS", "ERROR", "CANCELED", "INTERRUPTED", "INVALID"].includes(row?.result?.status));
+    const parentId = rows.find(row => row?.event === "init")?.conversation_id;
+    const linkedChildIds = [...new Set(subagentSteps.filter(row => row?.step_update?.conversation_id === parentId)
+      .flatMap(row => Array.isArray(row.step_update.subagent_info?.subagents) ? row.step_update.subagent_info.subagents : [])
+      .map(child => child?.conversation_id).filter(id => typeof id === "string" && id !== parentId))];
+    const parentTerminalRows = results.filter(row => (row?.result?.conversation_id ?? row?.conversation_id) === parentId
+      && ["SUCCESS", "ERROR", "CANCELED", "INTERRUPTED", "INVALID"].includes(row?.result?.status));
+    return { status: "shape-only", eventCount: rows.length, parentConversationSha256: boundedId(parentId),
+      cwdMatchesExpectedFixture: typeof expectedFixture === "string" ? init?.cwd === expectedFixture : null,
+      eventTypes: [...new Set(rows.map(row => allowed(row?.event, ["init", "step_update", "result"])).filter(Boolean))],
+      eventShapes: rows.slice(0, 2048).map(row => ({ event: allowed(row?.event, ["init", "step_update", "result"]), keys: keys(row) })),
+      init: { count: initRows.length, keys: keys(init), toolsPresent: initTools !== null,
+        toolCount: initTools?.length ?? null, invokeSubagentAvailable: initTools?.includes("invoke_subagent") ?? null,
+        toolNames: initTools?.slice(0, 128).map(toolName) ?? [] },
+      steps: steps.map(row => summarizeStep(row, parentId)),
+      invokeSubagentToolStepCount: steps.filter(row => (row?.step_update?.tool_name ?? row?.step_update?.tool_info?.name) === "invoke_subagent").length,
+      subagentSteps: subagentSteps.map(row => ({ stepKeys: keys(row.step_update), infoKeys: keys(row.step_update.subagent_info),
+        parentConversation: row.step_update?.conversation_id === parentId,
+        children: Array.isArray(row.step_update.subagent_info?.subagents) ? row.step_update.subagent_info.subagents.map(child => ({
+          keys: keys(child), conversationSha256: boundedId(child.conversation_id), typeNameSha256: boundedId(child.type_name),
+          roleSha256: boundedId(child.role),
+          observedModelSha256: boundedId(child.model), distinctFromParent: child.conversation_id !== parentId,
+        })) : [] })).slice(0, 4),
+      observedChildCount: childIds.length, observedLinkedChildCount: linkedChildIds.length,
+      observedChildTerminalCount: childTerminalRows.length,
+      observedParentTerminalCount: parentTerminalRows.length,
+      resultCount: results.length, resultKeys: results.length ? keys(results.at(-1).result) : [],
+      terminalStatus: allowed(results.at(-1)?.result?.status, [...terminalStatuses, "WAITING", "RUNNING"]),
+      terminalResponseSha256: typeof results.at(-1)?.result?.response === "string" ? sha(results.at(-1).result.response) : null };
+  } catch { return { status: "unparseable" }; }
+}
+
+export function assessSettlement({ exitCode, signal, errorCode, stream, postToolHooks } = {}) {
+  if (exitCode !== 0 || signal || errorCode) return { proven: false, reason: "process-not-clean" };
+  if (stream?.status !== "shape-only" || stream.cwdMatchesExpectedFixture !== true
+    || stream.observedChildCount !== 1 || stream.observedChildTerminalCount !== 1
+    || stream.observedLinkedChildCount !== 1 || stream.observedParentTerminalCount !== 1) return { proven: false, reason: "child-terminal-unobserved" };
+  if (!Array.isArray(postToolHooks) || postToolHooks.length !== 1 || postToolHooks[0]?.errorPresent !== false)
+    return { proven: false, reason: "posttool-unobserved" };
+  return { proven: true, reason: "parent-and-child-terminal-observed" };
+}
+
+export function classifyObservation({ launch, stream, preToolHooks = [], postToolHooks = [] } = {}) {
+  if (launch?.errorCode === "ETIMEDOUT" || launch?.signal) return "timeout-or-signal";
+  if (stream?.status !== "shape-only") return "stream-unavailable";
+  if (stream.cwdMatchesExpectedFixture === false) return "unexpected-init-cwd";
+  if (stream.init?.toolsPresent && stream.init.invokeSubagentAvailable === false) return "invoke-subagent-absent-from-init";
+  if (stream.observedChildCount > 0 && stream.observedLinkedChildCount !== stream.observedChildCount) return "foreign-or-unlinked-child";
+  if (stream.cwdMatchesExpectedFixture === true && stream.observedLinkedChildCount === 1
+    && stream.observedChildTerminalCount === 1 && postToolHooks.length === 1)
+    return "linked-child-terminal-observed";
+  if (preToolHooks.length > 0 && postToolHooks.length === 0 && stream.steps?.some(step =>
+    step.toolName === "invoke_subagent" && step.errorPresent)) return "tool-refusal-shape-observed";
+  if (stream.observedChildCount === 0 && preToolHooks.length === 0 && stream.invokeSubagentToolStepCount === 0)
+    return "no-child-attempt-observed";
+  return "attempt-or-settlement-incomplete";
+}
+
+function run() {
+  const publicParent = "/tmp";
+  const privateParent = "/run/user/1000/ap-g17";
+  const parentStat = lstatSync(publicParent);
+  if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) throw new Error("synthetic fixture parent unavailable");
+  validatePrivateParent(privateParent);
+  const root = mkdtempSync(join(publicParent, "agy-critic-shape-"));
+  const identity = lstatSync(root);
+  const observationId = randomUUID();
+  const output = join(dirname(script), `native-terminal-shape-v2-${observationId}.json`);
+  const privateCleanup = join(dirname(script), `native-terminal-cleanup-v2-${observationId}.private.json`);
+  let fixture = null;
+  let launch = { executable: "agy", onePromptRequested: true, exitCode: null, signal: null, errorCode: null, elapsedMs: null };
+  let stream = { status: "not-launched" };
+  let preHookRows = [];
+  let hookRows = [];
+  let failure = null;
+  let home = null;
+  let tmp = null;
+  let homeIdentity = null;
+  let tmpIdentity = null;
+  try {
+    home = mkdtempSync(join(privateParent, "g17c-"));
+    homeIdentity = lstatSync(home);
+    validateCreatedHome(home);
+    tmp = mkdtempSync(join(publicParent, "agy-critic-tmp-"));
+    tmpIdentity = lstatSync(tmp);
+    const syntheticGitEnv = { PATH: process.env.PATH ?? "/usr/bin:/bin", LANG: "C.UTF-8", HOME: home, TMPDIR: tmp,
+      XDG_CONFIG_HOME: join(root, "empty-xdg"), XDG_CACHE_HOME: join(home, "cache"), XDG_DATA_HOME: join(home, "data"),
+      XDG_STATE_HOME: join(home, "state") };
+    os.userInfo = () => ({ username: "synthetic", uid: 1000, gid: 1000, homedir: home, shell: "/bin/sh" });
+    os.homedir = () => home;
+    os.tmpdir = () => tmp;
+    mkdirSync(join(root, ".agents"), { mode: 0o700 });
+    mkdirSync(join(root, "empty-git-template"), { mode: 0o700 });
+    mkdirSync(join(root, "empty-xdg"), { mode: 0o700 });
+    const gitEnv = Object.fromEntries(Object.entries(syntheticGitEnv).filter(([key]) => !key.startsWith("GIT_")));
+    gitEnv.GIT_CONFIG_NOSYSTEM = "1";
+    gitEnv.GIT_CONFIG_GLOBAL = "/dev/null";
+    gitEnv.GIT_CONFIG_SYSTEM = "/dev/null";
+    gitEnv.GIT_TEMPLATE_DIR = join(root, "empty-git-template");
+    gitEnv.XDG_CONFIG_HOME = join(root, "empty-xdg");
+    writeFileSync(join(root, "review.txt"), "base\n", { mode: 0o600 });
+    command(root, "git", ["init", "-q"], gitEnv);
+    command(root, "git", ["config", "user.name", "Synthetic Fixture"], gitEnv);
+    command(root, "git", ["config", "user.email", "fixture@example.invalid"], gitEnv);
+    command(root, "git", ["add", "review.txt"], gitEnv);
+    command(root, "git", ["commit", "-q", "-m", "synthetic base"], gitEnv);
+    const base = command(root, "git", ["rev-parse", "HEAD"], gitEnv);
+    writeFileSync(join(root, "review.txt"), "candidate\n", { mode: 0o600 });
+    command(root, "git", ["add", "review.txt"], gitEnv);
+    command(root, "git", ["commit", "-q", "-m", "synthetic candidate"], gitEnv);
+    const candidate = command(root, "git", ["rev-parse", "HEAD"], gitEnv);
+    const tree = command(root, "git", ["rev-parse", "HEAD^{tree}"], gitEnv);
+    const diff = command(root, "git", ["diff", "--binary", base, candidate, "--", "review.txt"], gitEnv);
+    fixture = { baseSha256: sha(base), candidateSha256: sha(candidate), treeSha256: sha(tree), diffSha256: sha(diff) };
+    const preHookCommand = `node "${script}" hook-pre "${root}"`;
+    const postHookCommand = `node "${script}" hook-post "${root}"`;
+    writeFileSync(join(root, ".agents", "hooks.json"), `${JSON.stringify({ "synthetic-shape-observer": {
+      PreToolUse: [{ matcher: "invoke_subagent", hooks: [{ type: "command", command: preHookCommand, timeout: 10 }] }],
+      PostToolUse: [{ matcher: "invoke_subagent", hooks: [{ type: "command", command: postHookCommand, timeout: 10 }] }],
+    } })}\n`, { mode: 0o600 });
+    const prompt = "Capability test in this disposable repository only. Invoke exactly one built-in research subagent with Workspace inherit and explicit Model flash. Ask it to read review.txt and return the exact word FAIL. Wait for that one child to finish. Do not write files, read outside this repository, invoke further tools after the child returns, or inspect credentials. Then answer with the exact word FAIL.";
+    const started = Date.now();
+    const runResult = spawnSync("agy", ["-p", prompt, "--output-format", "stream-json", "--print-timeout", "3m", "--sandbox"], {
+      cwd: root, shell: false, encoding: "utf8", timeout: 240_000, maxBuffer: 4 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
+    });
+    launch = { ...launch, exitCode: runResult.status, signal: allowed(runResult.signal, ["SIGTERM", "SIGKILL", "SIGINT"]),
+      errorCode: allowed(runResult.error?.code, ["ETIMEDOUT", "ENOENT", "ENOBUFS"]), elapsedMs: Date.now() - started };
+    stream = streamShape(runResult.stdout, root);
+    try { preHookRows = readFileSync(join(root, "pretool-shapes.ndjson"), "utf8").split("\n").filter(Boolean).slice(0, 4).map(JSON.parse); }
+    catch { /* pretool not called is an explicit observation */ }
+    try { hookRows = readFileSync(join(root, "posttool-shapes.ndjson"), "utf8").split("\n").filter(Boolean).slice(0, 4).map(JSON.parse); }
+    catch { /* hook not called is an explicit observation */ }
+  } catch (error) {
+    failure = allowed(error?.code, ["ENOENT", "EACCES", "EPERM", "ETIMEDOUT", "ENOBUFS"]) ?? "fixture-or-observer-error";
+  } finally {
+    const settlement = assessSettlement({ exitCode: launch.exitCode, signal: launch.signal, errorCode: launch.errorCode, stream, postToolHooks: hookRows });
+    let cleanup = "retained-cleanup-needed";
+    try {
+      const owned = [[root, identity], [home, homeIdentity], [tmp, tmpIdentity]].filter(([path, stat]) => path && stat);
+      const allMatch = owned.length === 3 && owned.every(([path, original]) => {
+        const current = lstatSync(path);
+        return current.dev === original.dev && current.ino === original.ino && current.isDirectory() && !current.isSymbolicLink();
+      });
+      if (allMatch) {
+        if (settlement.proven) { for (const [path] of owned) rmSync(path, { recursive: true, force: true }); cleanup = "removed-after-observed-settlement"; }
+        else writeFileSync(privateCleanup, `${JSON.stringify({ schema: "agy.synthetic-cleanup-pointer.v2", owned: owned.map(([path, stat]) => ({ path, dev: stat.dev, ino: stat.ino })), reason: settlement.reason })}\n`, { flag: "wx", mode: 0o600 });
+      } else cleanup = "retained-inode-changed";
+    } catch { cleanup = "retained-identity-or-cleanup-unavailable"; }
+    const summary = { schema: "agy.synthetic-native-terminal-shape.v2", assurance: "attended-synthetic-capability-observation",
+      fixture, launch, stream, preToolHookCount: preHookRows.length, preToolHooks: preHookRows,
+      postToolHookCount: hookRows.length, postToolHooks: hookRows,
+      diagnosis: classifyObservation({ launch, stream, preToolHooks: preHookRows, postToolHooks: hookRows }),
+      observedNativeChildCount: stream.observedChildCount ?? null, observedChildModel: stream.subagentSteps?.[0]?.children?.[0]?.observedModelSha256 ?? null,
+      settlement, cleanup, failure, nativeIndependentPass: false };
+    writeFileSync(output, `${JSON.stringify(summary, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+    process.stdout.write(`${JSON.stringify({ status: "sanitized", summaryPath: output, cleanupPointerPath: cleanup === "retained-cleanup-needed" ? privateCleanup : null,
+      settlementProven: settlement.proven, nativeIndependentPass: false })}\n`);
+  }
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  if (["hook-pre", "hook-post"].includes(process.argv[2]) && process.argv.length === 4)
+    await hook(process.argv[3], process.argv[2] === "hook-pre" ? "pretool" : "posttool");
+  else if (process.argv[2] === "run" && process.argv.length === 3) run();
+  else { process.stderr.write("usage: node observe-native-terminal-shape-v2.mjs run\n"); process.exitCode = 2; }
+}

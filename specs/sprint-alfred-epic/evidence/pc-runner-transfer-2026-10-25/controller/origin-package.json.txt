@@ -1,0 +1,26 @@
+{
+  "schema": "pipeline.original-controller-fixture-package.v1",
+  "base": "62008d6bd39f68aa849e7257cdc3161b59222ebb",
+  "patch": {
+    "path": "scratch/agent-out/original-controller-completion/fixture.patch",
+    "bytes": 20103,
+    "sha256": "75c2bf5b9e29a1dc809108c1d51c5a2027cd8bb2b84cea78d832763fb0cc0b0c"
+  },
+  "files": [
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "bytes": 594838,
+      "sha256": "d6bac2c0ff21f3c829f9c46ff799d2fbfc2af0f2d2a349b6b7119ab072de1e76"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/original-onboarding-controller-fixture.mjs",
+      "bytes": 2162,
+      "sha256": "464ae3b5644d93a6e96f4ad7231977259009b6cb29eea8a65ff26af35b582fd7"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/original-controller-controlled-os-identity.mjs",
+      "bytes": 1102,
+      "sha256": "33cdced08babf282dd3c4ef96f030808c587b7e345e8099af2e4deef5909d13e"
+    }
+  ]
+}

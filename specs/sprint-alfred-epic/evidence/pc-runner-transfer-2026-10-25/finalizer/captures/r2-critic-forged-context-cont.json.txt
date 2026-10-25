@@ -1,0 +1,18 @@
+command: node --import ./scratch/clones/r2-critic-finalizer-original-20261025/scratch/r2-critic-synthetic-preload.mjs --test --test-name-pattern=copied.or.caller-created.Source.context scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+label: r2-critic-forged-context-cont
+exitCode: 0
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: false
+--- stdout ---
+✔ a copied or caller-created Source context cannot finalize a claimed packet (917.175805ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1265.509138
+
+--- stderr ---

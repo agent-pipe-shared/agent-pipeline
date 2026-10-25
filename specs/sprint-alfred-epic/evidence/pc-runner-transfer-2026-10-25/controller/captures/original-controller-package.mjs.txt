@@ -1,0 +1,29 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+
+const paths = [
+  "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+  "plugins/pipeline-core/lib/original-onboarding-controller-fixture.mjs",
+  "plugins/pipeline-core/lib/original-controller-controlled-os-identity.mjs",
+];
+const git = (args, expected) => {
+  const result = spawnSync("git", args, { cwd: process.cwd(), encoding: "utf8", maxBuffer: 1_000_000 });
+  assert.equal(result.error, undefined, result.error?.message);
+  assert.equal(result.status, expected, result.stderr);
+  return result.stdout;
+};
+let patch = git(["diff", "--binary", "--", paths[0]], 0);
+for (const path of paths.slice(1)) patch += git(["diff", "--no-index", "--binary", "--", "/dev/null", path], 1);
+const out = "scratch/agent-out/original-controller-completion/fixture.patch";
+writeFileSync(out, patch);
+const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const report = {
+  schema: "pipeline.original-controller-fixture-package.v1",
+  base: git(["rev-parse", "HEAD"], 0).trim(),
+  patch: { path: out, bytes: Buffer.byteLength(patch), sha256: sha(patch) },
+  files: paths.map((path) => ({ path, bytes: readFileSync(path).length, sha256: sha(readFileSync(path)) })),
+};
+writeFileSync("scratch/agent-out/original-controller-completion/package.json", `${JSON.stringify(report, null, 2)}\n`);
+console.log(JSON.stringify(report));

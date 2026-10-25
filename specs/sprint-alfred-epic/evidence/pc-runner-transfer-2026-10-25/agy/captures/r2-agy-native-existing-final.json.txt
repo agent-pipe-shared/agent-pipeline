@@ -1,0 +1,45 @@
+command: node --require <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs --test <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
+label: r2-agy-native-existing-final
+exitCode: 0
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+# measured shared preparation deadline: 4503ms
+# measured repository-plus-batch preparation deadline: 4503ms
+✔ ANDC01 valid full array is prepared and revalidated without changing role, prompt, order or workspace (125.801402ms)
+✔ ANDC02 flat and batch forms bind every native field and cannot replay across call shapes (82.564328ms)
+✔ ANDC03 native tiers reject missing, inherited and duty-mismatched Model values (61.28413ms)
+✔ ANDC04 Model and Workspace are bound to the one-use canonical native argument (116.890118ms)
+✔ ANDC05 artifact publication is create-only and cannot replace an outstanding authorization (130.996681ms)
+✔ ANDC06 an authenticated expired authorization is retired so a fresh preparation cannot deadlock (131.099787ms)
+✔ ANDC07 an authenticated stale-candidate authorization is retired for the new exact candidate (151.375753ms)
+✔ ANDC08 a forged expired artifact cannot be retired or replaced (106.608733ms)
+✔ ANDC09 serial repository Git probes share one five-second preparation deadline (4535.845602ms)
+✔ ANDC10 repository and batch-preflight Git probes share one five-second preparation deadline (4530.133804ms)
+✔ ANDC11 CLI prepares a repository-contained request file without launching another CLI or model (408.317102ms)
+✔ ANDC12 public prepare CLI returns the actual flat AGY invocation shape (384.23824ms)
+✔ ANDC13 public prepare CLI rejects mixed flat fields and batch arrays (331.792451ms)
+✔ ANDC14 missing prepared artifact rejects the entire array (33.263476ms)
+✔ ANDC15 a partial array cannot reuse the full-array artifact (67.246227ms)
+✔ ANDC16 a reordered array cannot reuse the prepared artifact (68.646958ms)
+✔ ANDC17 a changed prompt cannot reuse the prepared artifact (71.236388ms)
+✔ ANDC18 a forged artifact digest fails closed (74.397867ms)
+✔ ANDC19 candidate movement makes an otherwise intact artifact stale (77.903214ms)
+✔ ANDC20 required input movement invalidates all entries at revalidation (98.101707ms)
+✔ ANDC21 expired artifacts fail closed (68.032892ms)
+✔ ANDC22 preparation rejects partial packet arrays (46.72935ms)
+✔ ANDC23 preparation rejects non-return native results (58.113882ms)
+✔ ANDC24 preparation rejects a recursive/non-native transport (60.128199ms)
+✔ ANDC25 artifact is private and kept outside the working tree (62.308906ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12224.989119
+
+--- stderr ---

@@ -1,0 +1,51 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 6c2a6ca20..73037d460 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -119,6 +119,7 @@ import { buildPushInitArgv } from "../scripts/push-init.mjs";
+ // exact command push-init.mjs would present to a human is refused for an agent's own Bash
+ // tool call, never reconstructed by hand.
+ import { authorizeCriticalPushCommand } from "../scripts/po-human-approval.mjs";
++import { originalGuardOutsideFixtureRoot } from "./guard-lifecycle-ready.fixture-root.mjs";
+ 
+ const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+ const DRIVER_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
+@@ -270,7 +271,7 @@ function tmpdir() {
+   mkdirSync(root, { recursive: true });
+   return root;
+ }
+-const VAR_TMP = process.platform === "win32" ? tmpdir() : "/var/tmp";
++const VAR_TMP = originalGuardOutsideFixtureRoot() ?? (process.platform === "win32" ? tmpdir() : "/var/tmp");
+ 
+ /**
+  * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.fixture-root.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.fixture-root.mjs
+new file mode 100644
+--- /dev/null
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.fixture-root.mjs
+@@ -0,0 +1,25 @@
++// SPDX-License-Identifier: SUL-1.0
++// Test-only placement port for the two fixtures that require a real outside-Git root.
++import { realpathSync } from "node:fs";
++import { dirname, relative, resolve, sep } from "node:path";
++import { fileURLToPath } from "node:url";
++import { validateCreatedHome, validatePrivateParent } from "../scripts/codex-critic-private-parent-fixture.mjs";
++
++const PRIVATE_PARENT = "/run/user/1000/ap-g17";
++const PROJECT_ROOT = realpathSync(fileURLToPath(new URL("../../../", import.meta.url)));
++
++export function originalGuardOutsideFixtureRoot() {
++  const supplied = process.env.PIPELINE_GUARD_EXTERNAL_FIXTURE_ROOT;
++  if (supplied === undefined) return null;
++  if (!supplied || resolve(supplied) !== supplied || realpathSync(supplied) !== supplied ||
++      dirname(supplied) !== PRIVATE_PARENT) {
++    throw new Error("ORIGINAL-GUARD-FIXTURE-ROOT: expected a direct, normalized, physical private-parent child");
++  }
++  validatePrivateParent(PRIVATE_PARENT);
++  validateCreatedHome(supplied);
++  const fromProject = relative(PROJECT_ROOT, supplied);
++  if (fromProject === "" || (fromProject !== ".." && !fromProject.startsWith(`..${sep}`))) {
++    throw new Error("ORIGINAL-GUARD-FIXTURE-ROOT: outside-Git fixture is inside project root");
++  }
++  return supplied;
++}

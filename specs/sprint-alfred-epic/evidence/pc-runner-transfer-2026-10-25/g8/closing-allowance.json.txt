@@ -1,0 +1,42 @@
+{
+  "schema": "pipeline.dispatch-closing-allowance.v1",
+  "committed": [],
+  "verifiedGreen": [
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern 'both genuine prepared duties' plugins/pipeline-core/scripts/codex-critic-host.test.mjs (outer claimed Source packet before readonly dependency copy)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-outer-session-packet-source-prereq.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern 'active native PREPARE|both genuine prepared duties' plugins/pipeline-core/scripts/codex-critic-host.test.mjs (legacy session packet path before readonly dependency copy)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-session-packet-legacy-cch.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test plugins/pipeline-core/lib/design-review-original-custody.test.mjs plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs (locator continuation)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-locator-source-kernel.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern 'active native PREPARE|both genuine prepared duties' plugins/pipeline-core/scripts/codex-critic-host.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-cch136-137-source-admin-shape.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test harness/scripts/check-consumer-safe-paths.test.mjs (locator continuation)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-locator-consumer-safe.json"},
+    {"command": "node --import scratch/g8-split-test-home.mjs --test plugins/pipeline-core/lib/model-family-host-store.test.mjs (loaded pre-MFHS036 test module: 35 cases, 33 pass, 2 existing TODO, 0 fail)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-model-full-after-terminal.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern 'G8 author lookup' plugins/pipeline-core/lib/model-family-host-store.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-author-source-positive-final.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern 'G8 original request preparation' plugins/pipeline-core/lib/model-family-host-store.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-original-request-positive.json"},
+    {"command": "node --import scratch/g8-split-test-home.mjs --test --test-name-pattern MFHS001-007 plugins/pipeline-core/lib/model-family-host-store.test.mjs (unchanged base with identical fixture isolation correction)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-mfhs001-007-baseline-split.json"},
+    {"command": "node --import scratch/g8-split-test-home.mjs --test --test-name-pattern MFHS001-007 plugins/pipeline-core/lib/model-family-host-store.test.mjs (candidate)", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-mfhs001-007-candidate-split.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test plugins/pipeline-core/lib/design-review-original-custody.test.mjs plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-source-core-after-author.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test harness/scripts/check-consumer-safe-paths.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-consumer-safe-continuation.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test plugins/pipeline-core/lib/design-review-original-custody.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-source-kernel-test-green.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern G8 plugins/pipeline-core/lib/model-family-host-store.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-model-g8-refusal.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test --test-name-pattern MFHS007 plugins/pipeline-core/lib/model-family-host-store.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-model-mfhs007.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test plugins/pipeline-core/scripts/codex-native-critic-host.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-native-host-regression.json"},
+    {"command": "node --import scratch/g8-private-test-home.mjs --test harness/scripts/check-consumer-safe-paths.test.mjs", "exitCode": 0, "artifact": "scratch/agent-out/g8-original-custody/g8-consumer-safe-after-source.json"}
+  ],
+  "remainsUndone": [
+    "The finalizer adapter preload diagnostic runs the focus but exits 1 after 77 seconds with an asynchronous OriginalCriticSourceAdmissionError; its typed rejecting invariant is not captured. No post-copy finalizer adapter positive is qualified.",
+    "The finalizer adapter positive path has not passed: after Parent copied seven readonly dependencies during a live run, focused attempts load zero tests due an ESM initialization cycle at project-onboarding-ready-gate.mjs:94. The overlapping exit-0 capture is unqualified; the pre-copy original outer packet Source positive is separately qualified.",
+    "The finalizer owner owns the three copied finalizer files; G8 does not include or modify them. The copied CGB four are likewise excluded. A cycle-safe finalizer dependency and settled focused rerun are required before an adapter-positive claim.",
+    "The outer packet Source tuple now includes packetId, packetDigest, claimSha256, sessionId, preflightSha256 and diffSha256; prelaunch task/unclaimed negatives were exercised before the copy, while no post-copy adapter-positive is claimed.",
+    "Original author Model Source member and prepared review request readback now have controlled-unit-method positive fixtures with forged-reference, copied-handle and changed-Spec refusals; no independent Critic origin or PASS follows.",
+    "Both present paths and signing now pass report bytes to Source, which resolves the approved locator by exact publication fact and unique current released Model member; the active original positive course remains unqualified because its existing fixture handwrites PASS without any original producer transaction.",
+    "The active route retained 9/14: five original positive cases remain red because buildSubmittedFeature handwrites PASS without a Source producer; setup needs a genuine original author and held native Critic return before active positives can pass.",
+    "No native Critic run or independent PASS was observed.",
+    "The previous broad Model store run failed after old isolation. With corrected isolation and the terminal fact fix, the original 35 loaded cases passed 33 with 2 existing TODOs and 0 failures. MFHS036 was added after that process loaded its module and passed separately; its exact pre-edit test-file SHA is unavailable.",
+    "Codex Host read-only original return inspection is implemented, but the full suite remains 135/137 because CCH136/137 call the preexisting deliberately refusing isolated reconstruct API; the new CCH137 inspection assertions passed before that refusal.",
+    "All 16 source paths in manifest.json remain modified or added and uncommitted."
+  ],
+  "nextBriefingAdjustments": [
+    "Preserve the same G8 owner, base, patch, all captures, and cumulative costs; no reset or native grant is claimed.",
+    "Qualify native terminal publication through an actual original Critic host return; the genuine original author Model/Source member is METHOD-qualified only.",
+    "Scoped exact Source registry terminal-member lookup and both consumer callsites are implemented; qualify a real original review publication and correct only buildSubmittedFeature setup using genuine Source producer prerequisites before integration.",
+    "Preserve the full Model suite 35-case input caveat; run any later integration gates only against their actual final bytes."
+  ]
+}

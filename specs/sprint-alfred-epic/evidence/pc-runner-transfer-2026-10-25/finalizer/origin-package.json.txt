@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.r2-critic-finalizer-method-package.v1",
+  "base": "69643e345443ca4100ab164e0db808d275b2cd78",
+  "ownedFiles": [
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
+      "sha256": "543709a9d1703ce2ab86a2f4aee555f677131be952f4ad359346847a0059fd8d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs",
+      "sha256": "c89d614f50b6b2bde4697b0ce64ea008cc134e857bc5249c9d3539acbe1cb63b"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-critic-original-source-admission.mjs",
+      "sha256": "9aac8580945898d45182af4b97fc7cb3c6b0b169d48ccd10ad80f63ebae3576c"
+    }
+  ],
+  "evidence": [
+    "r2-critic-baseline-cli.json",
+    "r2-critic-cli-refusal-cont.json",
+    "r2-critic-forged-context-cont.json",
+    "r2-critic-original-suite-cont.json",
+    "r2-critic-consumer-paths-cont.json",
+    "r2-critic-finalizer-syntax-cont.json",
+    "r2-critic-agy-prepare-source.json"
+  ],
+  "dependencyOverlay": "scratch/agent-out/finalizer-readonly-dependency-overlay-20261025.json",
+  "integrationStatus": "unbound-original-packet"
+}

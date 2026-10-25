@@ -1,0 +1,19 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test --test-name-pattern "G8 author lookup" ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-author-source-positive-fixed-path
+exitCode: 0
+head: 2f05042e714632dd3ee4d7e2b652ffcdada0682b
+tree: 6ee18f34614595103a303c5b6ac6359495ab33ad
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFHS035 G8 author lookup reads a genuinely released controlled Model member without granting independent review (32543.706394ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32907.996948
+
+--- stderr ---

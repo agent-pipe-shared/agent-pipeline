@@ -1,0 +1,24 @@
+command: node --require ./scratch/r2-agy-synthetic-preload.cjs --test <host-path>
+label: r2-agy-v2-offline-test-final3
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+✔ existing Source validates the private parent and created synthetic home (4.359362ms)
+✔ distinguishes explicit tool absence from a planner choosing no child (1.452379ms)
+✔ records pretool refusal shape and typed error without exporting message (0.359092ms)
+✔ rejects wrong child relation and requires observed child terminal plus posttool (0.81054ms)
+✔ first pretool observation is neutral and a second invocation is denied (1.02645ms)
+✔ hook ignores a foreign tool and caps only matching invocations (110.660332ms)
+✔ timeout, malformed stream, and private values stay bounded (0.761958ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 186.555836
+
+--- stderr ---

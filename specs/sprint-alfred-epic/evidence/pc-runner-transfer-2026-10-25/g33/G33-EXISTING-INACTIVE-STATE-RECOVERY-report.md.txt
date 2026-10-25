@@ -1,0 +1,25 @@
+# G33-EXISTING-INACTIVE-STATE-RECOVERY
+
+## Goal
+Assess deploy-timestamp prevention and safe diagnosis of already-damaged closed/discarded State.
+
+## Context
+Main preflight: `pipeline.start-preflight.v1`, `ready`, ruleset SHA `1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe`; architecture adoption is scoped to `specs/sprint-alfred-epic/`. Model-role bootstrap was unavailable (`MODEL-ROLE-SESSION-IDENTITY-CONFLICT`); no native model claim. Earlier clone preflight denial is retained: `hook-provisioning-required` / `HOOK-READINESS-INSTALL-REQUIRED`; role repair was withheld. This was environment/bootstrap evidence, not a product finding.
+
+## DoD
+Clone root matched `<repo-root>/scratch/clones/g33-existing-state-recovery`; HEAD matched `32b398bf7c5bd03ba9184bea09305893ea4fbd61`. Diff contains only `pipeline-state.mjs` and `pipeline-state.test.mjs`; it matches inert patch SHA `93ae53a53a7f274e7b3a651d7910f86e49e6bde37cfe3eec7ccbca55eda02db5`. Source hashes: `pipeline-state.mjs` `1fa4fb4f0f69c425b4905f5fafea70eb86b73a86ae7b043675867d67d3300c91`; test `e73d434f7dd60c8b31eabcf86639a72c8ab33e789b65f5a7196527ee1acd671e`.
+
+The patch preserves `updatedAt` only when the existing strict closed/discarded validator accepts State; deploy approval keeps its own `approvedAt`. Push approval already uses the same helper. Existing writer capture: exit 0, one top-level test with three internal cases, SHA `92d9172b53849e2e94dcec28dac6f9d41b93802e24da19e023719b43137ad48d`. Consumer-safe capture: exit 0, 9/9, SHA `97630d5795b6fd3fa41b00f8c93aaceef47d2f4b7cb7d6ab61c7453e7c9a38c0`. No tests were rerun because these exact proposal captures already exist and no code changed.
+
+Recovery diagnosis: current continuity planner recognizes shared-close-evidence, invalid resume/active-turn normalization, and established continuity/authority cases. A stale `updatedAt` against strict closure/discard history matches none and returns `unsupported`; the deploy-shaped approval object cannot establish the missing preimage. Existing ADR-0082 repair-record authority is limited to its named collision case. Inert proposal: expose a read-only typed diagnosis for missing, ambiguous, malformed, or approval-shaped-only preimage evidence; accept no repair until an existing sanctioned source independently proves the complete pre-approval State. A future authorized repair would need to bind that proof, root, full State preimage, closure/discard history and existing approvals/consumption records, then preserve audit bytes and use a CAS-bound writer. Negative controls: absent source, multiple/conflicting sources, approval-shaped record, stale/malformed lifecycle history, root drift and State/CAS drift all refuse without writing. No source was established here, so no recovery is proposed as implemented.
+
+Historical broad continuity capture remains exit 1, 268/308 pass, 40 `SP-ADDRESS` environment failures; it is not product qualification. Capture SHA `2aa3fa7b1934409a8bcd1a27f864b085968b701d6bcfbfed8eea1f16b4302b63`. The launcher snapshot SHA is `90f0423875592f6298730a6943d09a6ab5eba5a5fa3e6778acc6db6c5077c31b`; it was inspected, not run. No broad rerun or external `/run` path used.
+
+## Forbidden
+No Main edits, source edits, staging, commits, profiles, keys, anchors, private namespace reads, new authority, receipts, records, or child agents.
+
+## Stop conditions
+Safe recovery is unresolved: evidence does not identify an independently trusted complete preimage source, and adding a recovery case/record shape exceeds the two-file scope. Do not call prevention recovery. Parent-owned Critic, integration, Full Verify, Security and final acceptance remain pending.
+
+## Dispatch metadata
+G33-EXISTING-INACTIVE-STATE-RECOVERY continuation; method-only, no native binding/receipt/dispatch record/budget grant; no commit. Prior clone denial retained. Current-task changes: this report only; source diff unchanged.

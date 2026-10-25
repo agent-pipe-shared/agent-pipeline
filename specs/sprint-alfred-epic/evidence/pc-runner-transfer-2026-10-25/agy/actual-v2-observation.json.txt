@@ -1,0 +1,1253 @@
+{
+  "schema": "agy.synthetic-native-terminal-shape.v2",
+  "assurance": "attended-synthetic-capability-observation",
+  "fixture": {
+    "baseSha256": "fa73bf28bf61f2e150ea6aa6aaa0edfab2a80c0fe74a6739a51790c3660a3d8c",
+    "candidateSha256": "df6e874a7c732643453b771abf32bada631bc1fd6313a174581fcdc17ebcb2f4",
+    "treeSha256": "8ed560ea43ed3de3108d9b0cd806622c5da9086f493e1621952adf5971210b53",
+    "diffSha256": "246cca590328026d8e13433f835e50d263a887eea584322142dd96783fc7898a"
+  },
+  "launch": {
+    "executable": "agy",
+    "onePromptRequested": true,
+    "exitCode": 0,
+    "signal": null,
+    "errorCode": null,
+    "elapsedMs": 22939
+  },
+  "stream": {
+    "status": "shape-only",
+    "eventCount": 18,
+    "parentConversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+    "cwdMatchesExpectedFixture": true,
+    "eventTypes": [
+      "init",
+      "step_update",
+      "result"
+    ],
+    "eventShapes": [
+      {
+        "event": "init",
+        "keys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "event",
+            "string"
+          ],
+          [
+            "sha256:bb54068aea85faa7e487530083366be9962390af822e4c71ef1aca7033c83e66",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "step_update",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ]
+      },
+      {
+        "event": "result",
+        "keys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "result",
+            "object"
+          ]
+        ]
+      }
+    ],
+    "init": {
+      "count": 1,
+      "keys": [
+        [
+          "sha256:6f2f7e6c655803beb2871d98989c75626fcbcccb088841866456739f4eb21aaa",
+          "string"
+        ],
+        [
+          "sha256:7cbf4e1263d39d449c2e8d034ae08c277d66de627bade34ece4831f90b43ea4d",
+          "string"
+        ],
+        [
+          "sha256:f9d35d43770d39092a663e665e82ae1d84a9e0da3d0d10c407acada6a40cd281",
+          "array"
+        ]
+      ],
+      "toolsPresent": true,
+      "toolCount": 60,
+      "invokeSubagentAvailable": true,
+      "toolNames": [
+        "sha256:812287f6ee5b635e575dcc2727c6c26c46247cfc177032896bcdba0671b3d35b",
+        "ask_permission",
+        "sha256:2f5dd588f33afd497567ec0697ca4f2a4a24a942bfef8734f15b4c9307fa79ae",
+        "sha256:f5a9fd195f18342be3da0ec255e4978066539415abf86d68c1ccb3ee942725b4",
+        "sha256:2b5a95f8989d5e3a59ece402f8b5de405e23d6c2412d56d44a2037ceee347107",
+        "sha256:64a5aad3131084a05beb020c13dd1b69fc3ca966e8399b4bfe94ef0cecb40e11",
+        "sha256:738319fd8bfda441962ca5925be8f092d2d5609cb061907f10f6008a7ca756eb",
+        "sha256:143a59f54c97fb8ee6db9440e91de1fb674d0486b267ddaef0f09999c8145a4b",
+        "sha256:f4835a7560359d2476a866e3bb823bd758249cac3a5aba0623878b7c3bec7f5b",
+        "sha256:b80cf323ada5707827897ee246d8cab941dbf0f05d3e05ae9194a31df0ca84a7",
+        "sha256:f836a522e7c194a258cb4a484f2f787bb11f3600eacd4f80b4dab3582c15bf15",
+        "sha256:ab6492c21f667c28421c4b2169b82b8c870a55d2d8530395e9f6345200923d94",
+        "sha256:fc032661e317822483ec7ab4a8c16efa14e38d10fc86c69afe8af016a791de44",
+        "sha256:0696ca1b5a9b3fea4eaf9832b67e98c753129d942db4e47c50601f9fb59e9d5f",
+        "sha256:6c5602d9f86ef7f232f9da018b9f53a607e46384aa5ac1908c230edf3eda30f5",
+        "sha256:0b7c2cb6f860200e2268420cb4d8273a1c52b947391b3076ba77a9009d1eb25b",
+        "sha256:14a8923e89f84bca9561ca158a06e96c215cf17f1ba8ea156b26e50ad8ec3356",
+        "sha256:ae95cc2c58b05bc9006a8903c41c36caf7c2bf8ca7e9255b2211c4ac83637f4f",
+        "sha256:2d27c61d292855ff1249e4914e635afb96cfb2c06f1505c6fdbbe20129c69a20",
+        "sha256:0797bea3a6787fadd5b76b8103d482520ccb8d0a237d7d93fb8a48c1eab0ed40",
+        "sha256:34b48049a98b2064022fb90ed3541b6bd73aa44b3059b2c686d037a7e8fcd2ab",
+        "sha256:3a5bc4aca1bee486b7687ed979ae9d0c9004f75d85cd58917edd2f9f2786fc23",
+        "sha256:efd4ac337ac55164de5b2b496a6c552f7489cf8dbc52cae340a70199770e813a",
+        "sha256:f935a46127259290c315ecd036b0c0f74ed7fcdc49160354706fe16bed7b6c05",
+        "sha256:3279c17c06f0e599ece5d00916cdb7192cdefe8c84ef52d21aab0cb32e60ab54",
+        "sha256:57ca0adc8e2d5d874f5a6a70f044e31b56bfe5583c8df6ac7d58116d13559ee0",
+        "sha256:0b4ea901a6029a7144a94ce2e7a3df942f96b31965eeea5ed7b35a283656034b",
+        "sha256:c30589cea056fa7b60bfb92d896a2a0d3ec91044e6d8e197fd6135c4cfdb24f5",
+        "sha256:42af43e3616eba4a133a755540a88e6c61085dfe66c6e49e6ab8eaf9daf0c0da",
+        "sha256:3fc7c9bc7a526cf2fc004ead2515e08c52934fe324a90b77436b37e30b4a97b2",
+        "grep_search",
+        "invoke_subagent",
+        "sha256:d24c3797610125ceec5308417a2038ae465584cf892015472c48abc7a2cfd05b",
+        "sha256:952d8b06bb08c5d6a147a1a2b159548d95a8b09066c55d61f4d10d10794f06cf",
+        "sha256:af9b619c0a5b68a832008282bd9ba3d5dd7b2b82721e3e836b67e5f8a292886d",
+        "sha256:7b75c736bc06376b5526944eec896cd2264427d352d7a7f58cf81cc022dd7f2e",
+        "sha256:6545100de8acddb2a759701d9fc847e26a585f8f300264fb2d3f57e1e973ee41",
+        "sha256:abe452a53aaf915c4fb0679b9dfdf574f7fcba1a54e30bc4cfaf72327b45cd4c",
+        "sha256:5d6543569bdf3fdabcd3573412e6cc00712682bdf5ce4735aef42aa6389b06e7",
+        "sha256:c4dc63121ff2e85bd3f5393a8aab75c7e610485f6e67c31d1f345e73b4a3451d",
+        "sha256:930e1c9c2ff2fb0d0f6c9a1091aa1c720656c30f0217b79a08c42caee18a4548",
+        "sha256:b4bdeea2546bace4d1ba9687ad4381aa8054288ff5854e735bc1142e7594f53b",
+        "sha256:94233ac25058e1b2ba9aaf8009944c3d77235b45edf77e1abcd4bea8a897406e",
+        "sha256:87e1ee260e3a215e36d5039450dbc0c54232229d6fa86eb085e95c7ffeac1136",
+        "sha256:35eaef82b95cbe5e5516d5aca6d0975413b13e94e6a3659a018ba2243ce13dcc",
+        "sha256:b37096e96f2ca7adf0ed1c2d90978011ac92d2155926110e4dd5e5739ba7389d",
+        "sha256:6974ff2d653e0b45e87a8fa131fccf7bd60de3b24d02c0c239da9a4268f5ec97",
+        "sha256:9914d3046eb50cb21e3cb45955ac53074cd75d358e20224fc441eab09b579753",
+        "run_command",
+        "sha256:cfa086f4bad19fd81403ffe2495da4f475ad3b32c7d9dcdc83ed626088e39dd9",
+        "sha256:5f72005e81c4ecbd5aa3588e80e3daf0df068ce0cf5638944508a0165fea609a",
+        "sha256:41965a190298dab3457d457f1b9d11bc8f27a26564b9484393796c83e3782dcf",
+        "sha256:bb549c955bdb6a1196966ded65ac35f6350499fbc314498f02fe5a0afc0c6e4c",
+        "sha256:2845e88ea5149cccece768e38659011ddfdc7ac35b18402575d52dadf3a61b1c",
+        "sha256:4d1bceaba6c123bfe484df5fef34be6edab9b06a439ffb15d7417d37989195f4",
+        "sha256:527f59e2a65e9a8b1b0db6fab514425e64df3b0a3d9f6488ed5d02adef7036e5",
+        "view_file",
+        "sha256:716ecabb45ac6a88a049398fde2d3d5225c6dd3121ae9bbc5af457eb4baf056a",
+        "sha256:53499548061f6e0f8352bc79f87b235645be59f7eec8f6ce9faa4dcf8e079f69",
+        "sha256:37b56f87a88c7a9bdc4737867c56b54e87f3b6d1f8d93a74401765c9885b4b23"
+      ]
+    },
+    "steps": [
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ]
+        ],
+        "stepIndex": 0,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "DONE",
+        "stepType": "user_input",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+            "number"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ]
+        ],
+        "stepIndex": 1,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "DONE",
+        "stepType": "sha256:b23a6a8439c0dde5515893e7c90c1e3233b8616e634470f20dc4928bcf3609bc",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+            "number"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:0a4e4c29432ecb01b95f87d87ffaff9cb4f36ce4b89ff1a1a136ad1c7392ae07",
+            "object"
+          ]
+        ],
+        "stepIndex": 2,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "DONE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "tool_info",
+            "object"
+          ],
+          [
+            "tool_name",
+            "string"
+          ]
+        ],
+        "stepIndex": 3,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "tool",
+        "toolName": "invoke_subagent",
+        "toolInfoKeys": [
+          [
+            "name",
+            "string"
+          ],
+          [
+            "sha256:f528212a496dc7a0e9a57c129b561aa4609364d70f886c09d668e00797521eb5",
+            "object"
+          ]
+        ],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+            "number"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "subagent_info",
+            "object"
+          ],
+          [
+            "tool_name",
+            "string"
+          ]
+        ],
+        "stepIndex": 3,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "sha256:d98ee0e5f9399db9381014c9f890f896d3fcb272c2a7a521d0a13aa23085a284",
+        "stepType": "sha256:94a168d2da574b00ec6c787377278465271cf2b97e68af076fc3eee87eba8664",
+        "toolName": "invoke_subagent",
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": [
+          [
+            "subagents",
+            "array"
+          ]
+        ]
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+            "number"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ]
+        ],
+        "stepIndex": 4,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "DONE",
+        "stepType": "sha256:b23a6a8439c0dde5515893e7c90c1e3233b8616e634470f20dc4928bcf3609bc",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "ACTIVE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      },
+      {
+        "eventKeys": [
+          [
+            "event",
+            "string"
+          ],
+          [
+            "step_update",
+            "object"
+          ]
+        ],
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+            "number"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "sha256:aa159fb9654ebd537de87ffeaa396f0c4a724af7d637ec52dcc01422942083de",
+            "string"
+          ],
+          [
+            "sha256:0a4e4c29432ecb01b95f87d87ffaff9cb4f36ce4b89ff1a1a136ad1c7392ae07",
+            "object"
+          ]
+        ],
+        "stepIndex": 5,
+        "conversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+        "parentConversation": true,
+        "state": "DONE",
+        "stepType": "agent_response",
+        "toolName": null,
+        "toolInfoKeys": [],
+        "errorKeys": [],
+        "errorType": null,
+        "errorPresent": false,
+        "subagentInfoKeys": []
+      }
+    ],
+    "invokeSubagentToolStepCount": 2,
+    "subagentSteps": [
+      {
+        "stepKeys": [
+          [
+            "conversation_id",
+            "string"
+          ],
+          [
+            "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+            "number"
+          ],
+          [
+            "state",
+            "string"
+          ],
+          [
+            "step_index",
+            "number"
+          ],
+          [
+            "step_type",
+            "string"
+          ],
+          [
+            "subagent_info",
+            "object"
+          ],
+          [
+            "tool_name",
+            "string"
+          ]
+        ],
+        "infoKeys": [
+          [
+            "subagents",
+            "array"
+          ]
+        ],
+        "parentConversation": true,
+        "children": []
+      }
+    ],
+    "observedChildCount": 0,
+    "observedLinkedChildCount": 0,
+    "observedChildTerminalCount": 0,
+    "observedParentTerminalCount": 1,
+    "resultCount": 1,
+    "resultKeys": [
+      [
+        "conversation_id",
+        "string"
+      ],
+      [
+        "sha256:9f3868778cbef9065bb3beb675d0a49cb36485ac160320d3d69e15f23a937d10",
+        "number"
+      ],
+      [
+        "sha256:e63ec88293e93982bec38641330fcd8c0d3c93079231993f24711b92133023d8",
+        "number"
+      ],
+      [
+        "response",
+        "string"
+      ],
+      [
+        "status",
+        "string"
+      ],
+      [
+        "sha256:0a4e4c29432ecb01b95f87d87ffaff9cb4f36ce4b89ff1a1a136ad1c7392ae07",
+        "object"
+      ]
+    ],
+    "terminalStatus": "SUCCESS",
+    "terminalResponseSha256": "7b3a6b845ddc8c8f48af4f230067d152fffedd918e980a69912313205f05983a"
+  },
+  "preToolHookCount": 1,
+  "preToolHooks": [
+    {
+      "schema": "agy.synthetic-posttool-shape.v1",
+      "hookKeys": [
+        [
+          "sha256:cc762680be06fb7092159ac7bebf38ebf6c8b596c32393f6ce8f4953fb71f833",
+          "string"
+        ],
+        [
+          "conversationId",
+          "string"
+        ],
+        [
+          "sha256:7d2ab3979aefcbd438b85449d64b52cdde6afc922ef15d6d9b4f3fbdb7a81add",
+          "string"
+        ],
+        [
+          "modelName",
+          "string"
+        ],
+        [
+          "stepIdx",
+          "number"
+        ],
+        [
+          "toolCall",
+          "object"
+        ],
+        [
+          "transcriptPath",
+          "string"
+        ],
+        [
+          "workspacePaths",
+          "array"
+        ]
+      ],
+      "toolCall": [
+        [
+          "args",
+          "object"
+        ],
+        [
+          "name",
+          "string"
+        ]
+      ],
+      "callArgsSha256": "898ccd355e928cfce39ad6ceb48c1fead5fa7e9ab3603da70943bf547f4e33ff",
+      "stepIdx": 3,
+      "parentConversationSha256": "e55ebc9900052f7d0e8c8cc3751d094cf083644e39380fb96cb2b09da9cac9cc",
+      "errorPresent": false,
+      "errorKind": null,
+      "transcript": {
+        "status": "unavailable"
+      }
+    }
+  ],
+  "postToolHookCount": 0,
+  "postToolHooks": [],
+  "diagnosis": "attempt-or-settlement-incomplete",
+  "observedNativeChildCount": 0,
+  "observedChildModel": null,
+  "settlement": {
+    "proven": false,
+    "reason": "child-terminal-unobserved"
+  },
+  "cleanup": "retained-cleanup-needed",
+  "failure": null,
+  "nativeIndependentPass": false
+}

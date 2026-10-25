@@ -1,0 +1,35 @@
+command: node --import ./scratch/clones/r2-critic-finalizer-original-20261025/scratch/r2-critic-synthetic-preload.mjs --test scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
+label: r2-critic-agy-prepare-source
+exitCode: 1
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs:94
+const BASE_RESULT_KEYS = PROJECT_ONBOARDING_BASE_RESULT_KEYS;
+                         ^
+
+ReferenceError: Cannot access 'PROJECT_ONBOARDING_BASE_RESULT_KEYS' before initialization
+    at file://<repo-root>/scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs:94:26
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.15.0
+✖ scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs (323.932742ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 333.094707
+
+✖ failing tests:
+
+test at scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs:1:1
+✖ scratch/clones/r2-critic-finalizer-original-20261025/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs (323.932742ms)
+  'test failed'
+
+--- stderr ---

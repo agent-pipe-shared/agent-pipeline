@@ -1,0 +1,22 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-synthetic-identity.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs
+label: g8-producer-request
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: false
+--- stdout ---
+✔ G8P01 positive preparation binds criteria and exact sources, with honest proposed assurance (5.65824ms)
+✔ G8P02 candidate, source revision, author, duty and criteria drift refuse without mutation (1.33662ms)
+✔ G8P03 closed request rejects manual provenance/PASS labels, malformed data and third rounds (1.035487ms)
+✔ G8P04 Spec bytes, duplicate/path sources and unsupported criteria refuse (0.886564ms)
+✔ G8P05 real disk/Git preparation and dirty, symlink, absolute and untracked refusals (127.754311ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 486.205947
+
+--- stderr ---

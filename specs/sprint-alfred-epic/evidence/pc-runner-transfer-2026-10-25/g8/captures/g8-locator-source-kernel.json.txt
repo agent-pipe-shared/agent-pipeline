@@ -1,0 +1,24 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs
+label: g8-locator-source-kernel
+exitCode: 0
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: false
+--- stdout ---
+✔ G8 original custody: serialized receipt without Source origin refuses (7.821589ms)
+✔ G8 original custody: explicit fallback remains weaker than independent review (0.573239ms)
+✔ G8P01 positive preparation binds criteria and exact sources, with honest proposed assurance (4.761987ms)
+✔ G8P02 candidate, source revision, author, duty and criteria drift refuse without mutation (1.334465ms)
+✔ G8P03 closed request rejects manual provenance/PASS labels, malformed data and third rounds (0.907604ms)
+✔ G8P04 Spec bytes, duplicate/path sources and unsupported criteria refuse (0.776435ms)
+✔ G8P05 real disk/Git preparation and dirty, symlink, absolute and untracked refusals (130.715829ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 521.751415
+
+--- stderr ---

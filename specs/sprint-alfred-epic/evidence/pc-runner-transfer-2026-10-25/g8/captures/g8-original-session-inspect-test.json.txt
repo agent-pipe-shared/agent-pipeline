@@ -1,0 +1,29 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-split-test-home.mjs --test --test-name-pattern "both genuine prepared duties invoke" <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: g8-original-session-inspect-test
+exitCode: 1
+head: fb18ac6b0af42d1674129bad07a8d15947372e80
+tree: a2b166ec8398c65ad517f9cd81843daa32b5d1a4
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+ℹ Error: A resource generated asynchronous activity after the test ended. This activity created the error "AssertionError [ERR_ASSERTION]: Got unwanted exception: native-goldfish
+Actual message: "domain-ancestor-unsafe"" which triggered an unhandledRejection event, caught by the test runner.
+ℹ Error: A resource generated asynchronous activity after the test ended. This activity created the error "AssertionError [ERR_ASSERTION]: Got unwanted exception: native-goldfish
+Actual message: "domain-ancestor-unsafe"" which triggered an unhandledRejection event, caught by the test runner.
+✖ <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (27803.846843ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27812.416863
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs:1:1
+✖ <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (27803.846843ms)
+  'test failed'
+
+--- stderr ---

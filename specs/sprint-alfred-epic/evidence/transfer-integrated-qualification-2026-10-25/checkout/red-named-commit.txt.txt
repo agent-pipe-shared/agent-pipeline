@@ -1,0 +1,36 @@
+command: node --test --test-name-pattern "Critic evidence for a named earlier commit is bound" plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+label: R2-root-bound-named-commit-RED
+exitCode: 1
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: true
+--- stdout ---
+✖ Critic evidence for a named earlier commit is bound to it, leaves a dirty checkout untouched, and the preflight accepts it (103.968735ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 446.538463
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs:769:1
+✖ Critic evidence for a named earlier commit is bound to it, leaves a dirty checkout untouched, and the preflight accepts it (103.968735ms)
+  Error [VerifyEvidenceError]: VEP-PROJECT-IDENTITY: PCI-ROOT-MISMATCH
+      at fail (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:111:41)
+      at produceVerifyEvidence (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:402:21)
+      at produceVerifyEvidenceForCommit (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:336:28)
+      at produceVerifyEvidence (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.mjs:361:18)
+      at file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs:778:26
+      at withFixture (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs:55:15)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs:771:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17) {
+    code: 'VEP-CALIBRATION'
+  }
+
+--- stderr ---

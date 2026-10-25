@@ -1,0 +1,33 @@
+{
+  "schema": "pipeline.original-guard-attempt-report.v1",
+  "candidate": "0b80f4f0908faf49eec36fcb5549e63ed80c44ea",
+  "targetedDelivery": "blocked",
+  "baseline": { "head": "fcdbd288d3d6b33c8914dd0f8258e727175946c9", "tests": 392, "pass": 376, "fail": 13, "skipped": 3, "exitCode": 1 },
+  "privateTmpProbe": { "head": "fcdbd288d3d6b33c8914dd0f8258e727175946c9", "tests": 390, "pass": 320, "fail": 67, "skipped": 3, "exitCode": 1, "finding": "Private D148 temp root causes intended credential/private-root read denials; unusable as an ordinary public fixture temp root." },
+  "candidateCount": { "head": "0b80f4f0908faf49eec36fcb5549e63ed80c44ea", "tests": 392, "pass": 376, "fail": 13, "skipped": 3, "exitCode": 1 },
+  "nativeWindowsSkips": [
+    { "name": "QP3-2a G8", "reason": "native Windows path words exist only on a win32 host" },
+    { "name": "QP3-2d F-B", "reason": "letter case is irrelevant only on a case-insensitive win32 filesystem" },
+    { "name": "QP4-2 R5", "reason": "native Windows drive paths exist only on a win32 host" }
+  ],
+  "candidateFailingExaminers": [
+    { "line": 312, "name": "ordinary non-governed repositories remain untouched and never inspect lifecycle", "first": "expected exitCode 0, got GUARD-LIFECYCLE-NOT-READY", "classification": "Git/governance ancestor contamination from clone scratch temp; inferred from root() placement" },
+    { "line": 324, "name": "inactive repositories remain silent for session writes and Bash", "first": "Edit expected exitCode 0, got continuity-damaged", "classification": "Git/governance ancestor contamination from clone scratch temp; inferred from root() placement" },
+    { "line": 346, "name": "bare invalid source, calibration, lock, runtime and consent markers stay inactive", "first": "core.lock marker expected exitCode 0, got continuity-damaged", "classification": "Git/governance ancestor contamination from clone scratch temp; inferred from root() placement" },
+    { "line": 434, "name": "evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present", "first": "expected exitCode 0, got GUARD-LIFECYCLE-NOT-READY", "classification": "Git/governance ancestor contamination from clone scratch temp; inferred from root() placement" },
+    { "line": 1765, "name": "only bounded rg search pipelines and platform null redirect are read-only", "first": "rg -l -S ... -g '*.mjs' -g '*.md' | head -n 180 returned predicate true, expected false", "classification": "Source grammar/expectation discrepancy; no examiner changed" },
+    { "line": 5831, "name": "NOVA-XREPO-HGO-6", "first": "HGO-STORAGE required override file is missing", "classification": "HGO fixture storage failure; exact upstream cause unresolved" },
+    { "line": 6230, "name": "NOVA-HGOSIG-ROUTE-1", "first": "expected HGO-GIT, got HGO-ROOT", "classification": "HGO root/fixture context discrepancy; exact upstream cause unresolved" },
+    { "line": 7198, "name": "Claude task output is an exact session-bound passive read file", "first": "D96 ordinary outside sibling expected exitCode 0, got 2", "classification": "Synthetic public file placed below private D148 ancestor" },
+    { "line": 7364, "name": "PASSIVE-READ-ROOT-INTEROP", "first": "Read exact session transcript expected exitCode 0, got 2", "classification": "Synthetic public transcript placed below private D148 ancestor" },
+    { "line": 7659, "name": "NVA-B-READCONTAIN-1", "first": "node -e expected GUARD-LIFECYCLE-NOT-READY, got GUARD-READ-COMMAND-UNSUPPORTED", "classification": "Source grammar/expectation discrepancy; no examiner changed" },
+    { "line": 7887, "name": "TPSHELL-OPAQUEMENTION", "first": "mere mention/run command expected admission, got GUARD-READ-COMMAND-UNSUPPORTED", "classification": "Source grammar/expectation discrepancy; no examiner changed" },
+    { "line": 7924, "name": "IR-4 incident replay", "first": "read-only inventory probe expected admission, got GUARD-READ-COMMAND-UNSUPPORTED", "classification": "Source grammar/expectation discrepancy; no examiner changed" },
+    { "line": 12424, "name": "TR-B T77 rg -g lane", "first": "rg -g '*.test.mjs' predicate true, expected false", "classification": "Source grammar/expectation discrepancy; no examiner changed" }
+  ],
+  "checks": [
+    { "command": "node scratch/original-guard-launch.cjs", "capture": "scratch/agent-out/original-guard-lifecycle-current/original-guard-full-suite-ac168.txt", "exitCode": 1 },
+    { "command": "node scratch/original-guard-launch.cjs consumer", "capture": "scratch/agent-out/original-guard-lifecycle-current/consumer-safe-paths-ac168.txt", "exitCode": 0 }
+  ],
+  "limits": ["No full-suite GREEN on current isolation and Source.", "Native Windows skipped cases are not qualified by this Linux/WSL run.", "Full Verify, independent Critic and PO acceptance remain parent-owned."]
+}

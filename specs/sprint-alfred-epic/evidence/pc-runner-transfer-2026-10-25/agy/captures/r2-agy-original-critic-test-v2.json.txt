@@ -1,0 +1,98 @@
+command: node --require <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs --test <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs
+label: r2-agy-original-critic
+exitCode: 1
+head: fb18ac6b0af42d1674129bad07a8d15947372e80
+tree: a2b166ec8398c65ad517f9cd81843daa32b5d1a4
+dirty: true
+--- stdout ---
+✖ original AGY Critic METHOD return binds prepared packet, diff, candidate and child through an opaque Source handle (76.175599ms)
+✖ missing Critic review, foreign child model and invalid return cannot create Source admission (81.968112ms)
+✖ changed reviewed bytes after return invalidate the Source readback (60.674429ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 542.841753
+
+✖ failing tests:
+
+test at scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:60:1
+✖ original AGY Critic METHOD return binds prepared packet, diff, candidate and child through an opaque Source handle (76.175599ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.antigravity-native-dispatch-verdict.v1","status":"rejected","code":"AGY-CRITIC-REVIEW-DRIFT","field":"criticReview","modelCalls":0,"launcherCalls":0}
+  + actual - expected
+  
+  + 'rejected'
+  - 'prepared'
+  
+      at verified (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:53:10)
+      at file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:61:18
+      at withFixture (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:46:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:60:130)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:82:1
+✖ missing Critic review, foreign child model and invalid return cannot create Source admission (81.968112ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.antigravity-native-dispatch-verdict.v1","status":"rejected","code":"AGY-CRITIC-REVIEW-DRIFT","field":"criticReview","modelCalls":0,"launcherCalls":0}
+  + actual - expected
+  
+  + 'rejected'
+  - 'prepared'
+  
+      at verified (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:53:10)
+      at file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:85:19
+      at withFixture (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:46:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:82:108)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:91:1
+✖ changed reviewed bytes after return invalidate the Source readback (60.674429ms)
+  AssertionError [ERR_ASSERTION]: {"schema":"pipeline.antigravity-native-dispatch-verdict.v1","status":"rejected","code":"AGY-CRITIC-REVIEW-DRIFT","field":"criticReview","modelCalls":0,"launcherCalls":0}
+  + actual - expected
+  
+  + 'rejected'
+  - 'prepared'
+  
+      at verified (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:53:10)
+      at file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:92:19
+      at withFixture (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:46:16)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs:91:82)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'rejected',
+    expected: 'prepared',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

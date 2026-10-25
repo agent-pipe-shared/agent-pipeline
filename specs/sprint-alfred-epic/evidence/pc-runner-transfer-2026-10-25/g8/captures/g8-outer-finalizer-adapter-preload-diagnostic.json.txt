@@ -1,0 +1,35 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --import ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/project-onboarding-v3.mjs --test --test-name-pattern "both genuine prepared duties" ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs
+label: g8-outer-finalizer-adapter-preload-diagnostic
+exitCode: 1
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs:94
+const BASE_RESULT_KEYS = PROJECT_ONBOARDING_BASE_RESULT_KEYS;
+                         ^
+
+ReferenceError: Cannot access 'PROJECT_ONBOARDING_BASE_RESULT_KEYS' before initialization
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs:94:26
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:96:9)
+
+Node.js v24.15.0
+✖ scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (303.722615ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311.751279
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs:1:1
+✖ scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/codex-critic-host.test.mjs (303.722615ms)
+  'test failed'
+
+--- stderr ---

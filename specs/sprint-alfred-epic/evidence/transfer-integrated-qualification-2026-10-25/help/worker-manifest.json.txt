@@ -1,0 +1,97 @@
+{
+  "schema": "pipeline.method-only-patch-handoff.v1",
+  "outcome": "pipeline.greenfield.g23.help.dispatch-helper",
+  "methodOnly": true,
+  "source": {
+    "baseCommit": "183ecfb2ddfc5bd424c88958b0bf60c1d2cda809",
+    "baseTree": "8662ec234032f106c762069fc3916db68215760d",
+    "clone": "scratch/clones/r2-dispatch-help-20261025",
+    "rulesetSha256": "1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe"
+  },
+  "patch": {
+    "path": "complete.patch",
+    "sha256": "12dfba5bf27ef9905656d13924737c86da19ab9c0e7d20d5f2329f639c014407"
+  },
+  "files": [
+    {
+      "path": "plugins/pipeline-core/scripts/dispatch-briefing.mjs",
+      "preimageSha256": "dfc003c45e40e663739c5e80346f2a265be3140b839192c3d016c9a2a10d7e9e",
+      "postimageSha256": "bb859021f060a63ec6c309d0ca7143d9b24c0a74dad43f5fc1b84fe450f258ba"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/dispatch-briefing.test.mjs",
+      "preimageSha256": "72b6c3ff4ce4d4b5a0b6ea52d9aebb08042deb86ff6b7fd71fa9e459a1d02044",
+      "postimageSha256": "d2abece3dc16e92491dc2aedad8f5e80e4173a74486cdebc01596b0914218ca9"
+    }
+  ],
+  "captures": [
+    {
+      "path": "green-cli-help.txt",
+      "sha256": "90bca021d5cfdcf6f563e6868c2112b6fe1f62a2765dedba0c07773ff8e3508d",
+      "exitCode": 0,
+      "counts": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "green-original-and-consumer-safe.txt",
+      "sha256": "e25ac5281c8fc563978932b18b5e4d21372626cdd799e14b005108dfec858cd1",
+      "exitCode": 0,
+      "counts": {
+        "tests": 88,
+        "pass": 88,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "red-cli-flags.txt",
+      "sha256": "3dfe3bce232987d4c0a82fef79515bafff6d2eb261399b1c83db42e02d9840cb",
+      "exitCode": 1,
+      "counts": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "skipped": 0
+      }
+    },
+    {
+      "path": "red-cli-help.txt",
+      "sha256": "db652f1569fed797afee2f5035998badbe42bbf65a79325bbd22d43fba430d3c",
+      "exitCode": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "skipped": 0
+      }
+    }
+  ],
+  "auxiliary": [
+    {
+      "path": "synthetic-preload.mjs",
+      "sha256": "a7267491bf08b380eb9e6d286cb8ac7f812d40dc85d5a475d2f69532c1b26a92"
+    },
+    {
+      "path": "package-handoff.mjs",
+      "sha256": "87f4abe3a859f7e7156387a7cbc2f4260bf5b4ef56d15b167c4c3b4553ac361d"
+    },
+    {
+      "path": "report.md",
+      "sha256": "5aa98fb34920fbc1c526f6b6a2f58953c1fe8ec0d46c71729ec2721dfe5d7136"
+    }
+  ],
+  "pending": [
+    "integrated Verify/Security",
+    "independent batch Critic",
+    "PO acceptance"
+  ],
+  "unknown": [
+    "project-resource measurement/headroom",
+    "quick route",
+    "native platform/store assurance"
+  ]
+}

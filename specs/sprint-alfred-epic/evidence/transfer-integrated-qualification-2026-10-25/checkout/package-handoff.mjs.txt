@@ -1,0 +1,34 @@
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const output = dirname(fileURLToPath(import.meta.url));
+const base = '73afcf74241fd38627161d5a5e9956d12b7e9341';
+const owned = ['plugins/pipeline-core/lib/project-calibration-identity.mjs', 'plugins/pipeline-core/scripts/verify-evidence-producer.mjs', 'plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs'];
+const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+function git(args) {
+  const r = spawnSync('git', args, { encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' } });
+  if (r.status !== 0) throw new Error('isolated Git packaging observation failed');
+  return r.stdout;
+}
+if (git(['rev-parse','HEAD']).trim() !== base) throw new Error('baseline drift');
+const paths = git(['diff','--name-only',base]).trim().split('\n').filter(Boolean);
+if (JSON.stringify(paths.sort()) !== JSON.stringify([...owned].sort())) throw new Error('unexpected owned path');
+if (git(['diff','--cached','--name-only']).trim()) throw new Error('unexpected staging');
+const patch = git(['diff','--binary',base,'--',...owned]);
+writeFileSync(join(output,'complete.patch'),patch);
+const files = owned.map(path => ({ path, preimageSha256: digest(git(['show',`${base}:${path}`])), postimageSha256: digest(readFileSync(path)) }));
+const captures = readdirSync(output).filter(name => name.endsWith('.txt')).sort().map(path => {
+  const bytes = readFileSync(join(output,path));
+  const text = bytes.toString();
+  const count = key => Number(text.match(new RegExp(`ℹ ${key} (\\d+)`))?.[1] ?? 0);
+  return {path, sha256:digest(bytes), exitCode:Number(text.match(/^exitCode: (\d+)$/m)?.[1] ?? -1), counts:{tests:count('tests'),pass:count('pass'),fail:count('fail'),skipped:count('skipped')}};
+});
+const manifest = { schema:'pipeline.method-only-patch-handoff.v1', outcome:'pipeline.greenfield.r2.branch-checkout-runtime-continuity', methodOnly:true,
+  source:{baseCommit:base,baseTree:git(['rev-parse',`${base}^{tree}`]).trim(),clone:'scratch/clones/r2-checkout-identity-20261025',installedRulesetSha256:'1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe'},
+  patch:{path:'complete.patch',sha256:digest(patch)},files,captures,
+  auxiliary:['synthetic-preload.mjs','package-handoff.mjs','report.md'].map(path=>({path,sha256:digest(readFileSync(join(output,path)))})),
+  limits:['No native runner/model/dispatch assurance; optional model identity conflict remains unavailable.','No integrated Verify, independent Critic, Security, PO acceptance or release claim.','Linked root metadata must match a physically registered Git primary project and byte-identical original calibration; arbitrary historical calibration differences remain refused.','No Main writes/staging/commits or protected Verify enrollment changes.','Earlier history-ID search mistake and mid-run implementation edit are retained in the report.'] };
+writeFileSync(join(output,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+console.log(JSON.stringify({patch:manifest.patch,manifestSha256:digest(readFileSync(join(output,'manifest.json'))),files,captures},null,2));

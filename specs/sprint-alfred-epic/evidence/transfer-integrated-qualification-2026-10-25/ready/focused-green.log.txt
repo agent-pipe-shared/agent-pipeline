@@ -1,0 +1,21 @@
+command: <host-path> --test-name-pattern=TPSHELL-OPAQUEMENTION|IR-4|NVA-B-READCONTAIN-1 --test <repo-root>/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+label: focused-green
+exitCode: 0
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: true
+--- stdout ---
+✔ NVA-B-READCONTAIN-1: writes, scripts, and unsupported composition remain refused for their own pre-existing reasons, independent of read-scope containment (2562.713716ms)
+✔ TPSHELL-OPAQUEMENTION: a mere mention is admitted, running a protected suite via rebase --exec is admitted, an unresolved indirection stays refused (76.911448ms)
+✔ IR-4 incident replay: a read-only inventory index probe mentioning a protected suite needs no signature (29.104256ms)
+✔ IR-4 READY inline admission remains literal and leaves credential reads and opaque writes refused (107.679983ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3214.233517
+
+--- stderr ---

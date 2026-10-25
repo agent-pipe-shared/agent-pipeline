@@ -1,0 +1,48 @@
+command: node --require <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs --test <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
+label: r2-agy-source-final-combined
+exitCode: 0
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: false
+--- stdout ---
+✔ original AGY Critic METHOD return binds prepared packet, diff, candidate and child through an opaque Source handle (182.538384ms)
+✔ missing Critic review, foreign child model and invalid return cannot create Source admission (133.57497ms)
+✔ changed reviewed bytes after return invalidate the Source readback (169.980615ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+# measured shared preparation deadline: 4503ms
+# measured repository-plus-batch preparation deadline: 4502ms
+✔ ANDC01 valid full array is prepared and revalidated without changing role, prompt, order or workspace (121.520424ms)
+✔ ANDC02 flat and batch forms bind every native field and cannot replay across call shapes (81.034464ms)
+✔ ANDC03 native tiers reject missing, inherited and duty-mismatched Model values (60.468246ms)
+✔ ANDC04 Model and Workspace are bound to the one-use canonical native argument (119.061572ms)
+✔ ANDC05 artifact publication is create-only and cannot replace an outstanding authorization (136.524582ms)
+✔ ANDC06 an authenticated expired authorization is retired so a fresh preparation cannot deadlock (135.895361ms)
+✔ ANDC07 an authenticated stale-candidate authorization is retired for the new exact candidate (150.404897ms)
+✔ ANDC08 a forged expired artifact cannot be retired or replaced (111.015142ms)
+✔ ANDC09 serial repository Git probes share one five-second preparation deadline (4530.387414ms)
+✔ ANDC10 repository and batch-preflight Git probes share one five-second preparation deadline (4534.976398ms)
+✔ ANDC11 CLI prepares a repository-contained request file without launching another CLI or model (426.426663ms)
+✔ ANDC12 public prepare CLI returns the actual flat AGY invocation shape (392.157293ms)
+✔ ANDC13 public prepare CLI rejects mixed flat fields and batch arrays (336.260808ms)
+✔ ANDC14 missing prepared artifact rejects the entire array (33.785232ms)
+✔ ANDC15 a partial array cannot reuse the full-array artifact (67.737993ms)
+✔ ANDC16 a reordered array cannot reuse the prepared artifact (68.376827ms)
+✔ ANDC17 a changed prompt cannot reuse the prepared artifact (66.949535ms)
+✔ ANDC18 a forged artifact digest fails closed (73.820246ms)
+✔ ANDC19 candidate movement makes an otherwise intact artifact stale (81.001822ms)
+✔ ANDC20 required input movement invalidates all entries at revalidation (98.987482ms)
+✔ ANDC21 expired artifacts fail closed (70.681722ms)
+✔ ANDC22 preparation rejects partial packet arrays (47.551054ms)
+✔ ANDC23 preparation rejects non-return native results (59.764584ms)
+✔ ANDC24 preparation rejects a recursive/non-native transport (60.224213ms)
+✔ ANDC25 artifact is private and kept outside the working tree (61.798558ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12273.551838
+
+--- stderr ---

@@ -1,0 +1,62 @@
+# G8 original Source producer: result and remaining native experiment
+
+## Released author Model member: positive METHOD result
+
+`MFHS035` uses the genuine controlled Model host driver to prepare, launch,
+terminally dispose and release a `duty.deep` author invocation in a uniquely
+owned, Source-validated private test repository. It obtains the original
+released member ref from the controller, then `readOriginalAuthorModelInvocation`
+reopens the current registry member and physical receipt Source fact. The final
+focused capture `g8-author-source-positive-final.json` exits 0. Altered receipt
+digest and altered member ref both refuse. This establishes Model author Source
+readback under `controlled-unit-method`, not an independent Critic review.
+`MFHS036` additionally commits PRD and Spec bytes in the same Source-validated
+private fixture, binds the author invocation to the actual candidate commit and
+tree, and passes its released member ref through `prepareOriginalDesignReview`
+and `readPreparedOriginalDesignReview`. The focused
+`g8-original-request-positive.json` capture exits 0; copied prepared handles
+and changed Spec bytes refuse.
+
+The first two captures, `g8-author-source-positive.json` and
+`g8-author-source-positive-green.json`, failed with `DRE-AUTHOR-SOURCE-DRIFT`.
+`g8-author-source-diagnostic.json` reports only field equality booleans: the
+held and physical receipts matched, but the released member contained only a
+lifetime Source fact. The terminal proof receipt was never added to the member's
+effect facts. `session-authority-domain-owner.mjs` now merges each already
+validated terminal Source fact into those effect facts before member advance;
+same-path unequal facts refuse. No readback equality was weakened. A path-only
+test invocation error was separately captured in
+`g8-author-source-positive-fixed.json`; the corrected command passed in
+`g8-author-source-positive-fixed-path.json` and the final run above.
+
+## Native design-review boundary
+
+The original review publisher requires a genuine `validatedHandle` from the
+existing Codex native Critic host, bound to the same current-artifacts candidate,
+source coverage, reviewer Model invocation and passing verdict. Its terminal
+transaction writes request, report and publication Source facts and returns a
+released Model member locator. The available controlled Model driver cannot
+mint that native handle. A hand-authored PASS receipt, copied handle, JSON
+reconstruction, synthetic app-server result or controlled token is not a native
+positive fixture. The exact next positive experiment is an authorized original
+native child return captured through the existing host, then a single call to
+`publishOriginalDesignReview` with that live validated handle and the now
+verified original author reference. Reopen the returned locator via
+`readOriginalDesignReview`, and only then exercise both active consumers.
+Until that actual host return is available, the publisher returns typed
+`DRE-NATIVE-ORIGIN-UNAVAILABLE`; no independent PASS or Main positive consumer
+claim follows from the METHOD author test.
+
+## Locator handoff needed for both active consumers
+
+The publisher returns the approved public locator, including the original
+released Model `memberRef`. Both active present-plan binding paths and signing
+currently call `readAndAdmitOriginalDesignReviews` with receipt paths and bytes
+only. They have no locator, so they cannot invoke `readOriginalDesignReview`
+against the original registry member. The integration must persist each returned
+locator in the existing design-approval binding and pass it at both call sites,
+or add a Source registry lookup that resolves the exact terminal member from the
+publication Source fact. Either route must reopen current Source before effects;
+a receipt digest or missing fallback field alone cannot discover custody. The
+current active consumer patch therefore remains separately packaged and deny
+only, and must not replace Main's positive route by itself.

@@ -1,0 +1,169 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-split-test-home.mjs --test ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-model-full-after-terminal
+exitCode: 0
+head: fd624219c368cb08f6919d903d889dc62ff0a4ac
+tree: 82d9240f88f09835d3abb3bef29502b73aa1b314
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFHS001 activation marker plus generation index qualify a fresh invocation; failed launch retains its watermark (24568.770666ms)
+✔ MFHS002 trusted asynchronous driver success is awaited while synchronous success remains synchronous (36326.770422ms)
+✔ MFHS003 S4 private driver context carries the original sealed invocation and admitted immutable request once (41134.965623ms)
+✔ MFHS004 K147 an async native driver runs after the BEGIN ticket closed and opens its own live registry boundary (34110.64726ms)
+✔ MFHS005 S4 trusted driver can complete a correlated synthetic profile-main operation from the original handle (34600.188846ms)
+✔ MFHS006 profile-main boundary refuses duty routes and existing-main switches before configured operations (81196.374711ms)
+✔ MFHS007 main launch revalidates the sealed candidate after asynchronous config application (40222.785896ms)
+✔ MFHS008 main launch revalidates signed authority after asynchronous config application (40018.344075ms)
+✔ MFHS009 async driver rejection, malformed results, and unknown dispositions fail closed while unqualified is typed (80633.488245ms)
+✔ MFHS010 ordinary repository candidates reuse signed family authority while receipts and replays retain exact candidate bytes (52765.296545ms)
+✔ MFHS011 current-candidate callback failures and non-closed or invalid OID values refuse before receipt admission (42532.06667ms)
+✔ MFHS012 candidate drift between preparation capture and locked CAS refuses without sealing (26367.970232ms)
+✔ MFHS013 candidate drift at the final prelaunch check prevents the native driver call (31590.194011ms)
+✔ MFHS014 S2 opaque discovery handle is consumed by the host; ordinary JSON and foreign bindings are refused (50961.459305ms)
+✔ MFHS015 freshness accepts a preparation younger than sixty seconds and rejects one older than sixty (32654.751458ms)
+✔ MFHS016 writer contention performs exactly two bounded CAS retries and never launches (21038.916104ms)
+✔ MFHS017 same-key replay returns original held bytes without resolving a newer selection (34291.618381ms)
+✔ MFHS018 expired preparation and a disappeared newer head refuse without lowering the watermark (45181.311007ms)
+✔ MFHS019 policy supersession during locked CAS and source freshness cancel the unlaunched attempt (21875.461118ms)
+✔ MFHS020 pin and unpin decisions changing during CAS cancel both raced selections (28413.360919ms)
+✔ MFHS021 freshly signed authority successor CAS preserves watermarks and held receipt bytes (53638.977782ms)
+✔ MFHS022 unsigned, wrong-predecessor, raced and partial successor transitions fail closed (47695.816399ms)
+✔ MFHS023 a prepare racing transition wins one generation CAS before successor transition retries (20832.963995ms)
+MFHS024 real competing transition and prepare serialize on the stored generation: Error: successor transition process failed (1): file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53
+export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                          ^
+
+Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+    at authorityOwnerFailure (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53:59)
+    at reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:257:503)
+    at Object.reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:260:133)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:3264
+    at Array.map (<anonymous>)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:160)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479 {
+  code: 'SDC-AUTHORITY-UNAVAILABLE',
+  reason: 'model-family-host:unowned-retained-member',
+  repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8-model-family-host-store-fixture-7csZrt: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+}
+
+Node.js v24.15.0
+
+    at ChildProcess.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:942:16)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1124:16)
+    at Socket.<anonymous> (node:internal/child_process:481:11)
+    at Socket.emit (node:events:509:28)
+    at Pipe.<anonymous> (node:net:350:12)
+⚠ MFHS024 real competing transition and prepare serialize on the stored generation (22790.584061ms) # TODO
+✔ MFHS025 missing or corrupt private current state preserves active-family refusal and never falls back (14527.170279ms)
+✔ MFHS026 symlink roots, hard-linked receipts, and malformed private JSON fail closed (24769.206089ms)
+✔ MFHS027 replaced receipt bytes are never repaired or overwritten; tampering blocks offline readback (23466.475277ms)
+✔ MFHS028 schemas are closed and bind unique invocation identity, assignment, candidate, generation and watermarks (1.029346ms)
+MFHS029 real process contention serializes same-key replay and different invocation CAS generations: Error: concurrent writer failed (1): file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53
+export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                          ^
+
+Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+    at authorityOwnerFailure (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53:59)
+    at reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:257:503)
+    at Object.reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:260:133)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:3264
+    at Array.map (<anonymous>)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:160)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479 {
+  code: 'SDC-AUTHORITY-UNAVAILABLE',
+  reason: 'model-family-host:unowned-retained-member',
+  repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8-model-family-host-store-fixture-65TTkb: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+}
+
+Node.js v24.15.0
+
+    at ChildProcess.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:1076:16)
+    at ChildProcess.emit (node:events:509:28)
+    at maybeClose (node:internal/child_process:1124:16)
+    at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+⚠ MFHS029 real process contention serializes same-key replay and different invocation CAS generations (22300.212454ms) # TODO
+✔ MFHS030 a native admission without an admitNativeRequest port refuses synchronously and leaves the registry usable (34223.566853ms)
+✔ MFHS031 D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable (40341.443029ms)
+✔ MFHS032 D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released (40076.047867ms)
+✔ MFHS033 D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock (21715.363504ms)
+✔ MFHS034 G8 original publication rejects a controlled Model token and creates no review artifact (31439.004876ms)
+✔ MFHS035 G8 author lookup reads a genuinely released controlled Model member without granting independent review (38547.606218ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 1237237.168586
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+⚠ MFHS024 real competing transition and prepare serialize on the stored generation (22790.584061ms) # TODO
+  Error: successor transition process failed (1): file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53
+  export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                            ^
+  
+  Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+      at authorityOwnerFailure (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53:59)
+      at reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:257:503)
+      at Object.reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:260:133)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:3264
+      at Array.map (<anonymous>)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:160)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479 {
+    code: 'SDC-AUTHORITY-UNAVAILABLE',
+    reason: 'model-family-host:unowned-retained-member',
+    repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8-model-family-host-store-fixture-7csZrt: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+  }
+  
+  Node.js v24.15.0
+  
+      at ChildProcess.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:942:16)
+      at ChildProcess.emit (node:events:509:28)
+      at maybeClose (node:internal/child_process:1124:16)
+      at Socket.<anonymous> (node:internal/child_process:481:11)
+      at Socket.emit (node:events:509:28)
+      at Pipe.<anonymous> (node:net:350:12)
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+⚠ MFHS029 real process contention serializes same-key replay and different invocation CAS generations (22300.212454ms) # TODO
+  Error: concurrent writer failed (1): file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53
+  export function authorityOwnerFailure(reason){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;throw error;}
+                                                            ^
+  
+  Error [SessionAuthorityError]: model-family-host:unowned-retained-member
+      at authorityOwnerFailure (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53:59)
+      at reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:257:503)
+      at Object.reconcile (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:260:133)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:3264
+      at Array.map (<anonymous>)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:160)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479 {
+    code: 'SDC-AUTHORITY-UNAVAILABLE',
+    reason: 'model-family-host:unowned-retained-member',
+    repair: "model-family-host's reconcile refuses its records (model-family-host:unowned-retained-member). Run node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8-model-family-host-store-fixture-65TTkb: it names the slice that holds each reservation and the command that releases it (cancel --started once its Goldfish no longer runs), then heal"
+  }
+  
+  Node.js v24.15.0
+  
+      at ChildProcess.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:1076:16)
+      at ChildProcess.emit (node:events:509:28)
+      at maybeClose (node:internal/child_process:1124:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:306:5)
+
+--- stderr ---

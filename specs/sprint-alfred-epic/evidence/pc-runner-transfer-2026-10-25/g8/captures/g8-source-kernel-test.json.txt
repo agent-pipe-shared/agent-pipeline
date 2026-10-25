@@ -1,0 +1,32 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs
+label: g8-source-kernel-test
+exitCode: 1
+head: 0b80f4f0908faf49eec36fcb5549e63ed80c44ea
+tree: c593d41a37ac39f6a584c63a036503de021a3272
+dirty: true
+--- stdout ---
+file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs:94
+const BASE_RESULT_KEYS = PROJECT_ONBOARDING_BASE_RESULT_KEYS;
+                         ^
+
+ReferenceError: Cannot access 'PROJECT_ONBOARDING_BASE_RESULT_KEYS' before initialization
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs:94:26
+
+Node.js v24.15.0
+✖ <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs (376.649931ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 385.198619
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs:1:1
+✖ <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/design-review-original-custody.test.mjs (376.649931ms)
+  'test failed'
+
+--- stderr ---

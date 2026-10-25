@@ -1,0 +1,845 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs
+label: g8-model-store-regression
+exitCode: 1
+head: 0b80f4f0908faf49eec36fcb5549e63ed80c44ea
+tree: c593d41a37ac39f6a584c63a036503de021a3272
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFHS001 activation marker plus generation index qualify a fresh invocation; failed launch retains its watermark (24235.046391ms)
+MFHS007 main launch revalidates the sealed candidate after asynchronous config application: SessionAuthorityError: domain-transition-partial-effect-retained
+    at fail (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:83:40)
+    at withSessionAuthorityBoundary (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:1195)
+    at effectTransition (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:271:12)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:366:541
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:366:490)
+    at ownedLifetime (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.mjs:1104:31)
+    at Object.activate (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.mjs:1232:52)
+    at activate (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:233:31)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:478:5
+MFHS008 main launch revalidates signed authority after asynchronous config application: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-WVWF7r/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS009 async driver rejection, malformed results, and unknown dispositions fail closed while unqualified is typed: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-WYyErz/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS010 ordinary repository candidates reuse signed family authority while receipts and replays retain exact candidate bytes: AssertionError [ERR_ASSERTION]: Got unwanted exception: model-family-host
+Actual message: "model-family-host:module-context-drift"
+    at fixture (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:223:35)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:581:13
+    at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:29:24)
+    at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+    at Test.runInAsyncScope (node:async_hooks:227:14)
+    at Test.run (node:internal/test_runner/test:1201:25)
+    at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+    at Test.postRun (node:internal/test_runner/test:1330:19)
+    at Test.run (node:internal/test_runner/test:1258:12)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:831:7)
+MFHS011 current-candidate callback failures and non-closed or invalid OID values refuse before receipt admission: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-FJZ6Ic/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS012 candidate drift between preparation capture and locked CAS refuses without sealing: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-QrLM4E/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS013 candidate drift at the final prelaunch check prevents the native driver call: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-nRdDtk/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS014 S2 opaque discovery handle is consumed by the host; ordinary JSON and foreign bindings are refused: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-U680Pg/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS015 freshness accepts a preparation younger than sixty seconds and rejects one older than sixty: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-Km2kAl/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS016 writer contention performs exactly two bounded CAS retries and never launches: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-TRkT48/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS017 same-key replay returns original held bytes without resolving a newer selection: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-KzO85l/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS018 expired preparation and a disappeared newer head refuse without lowering the watermark: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-8NiihH/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS019 policy supersession during locked CAS and source freshness cancel the unlaunched attempt: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-ECOQRa/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS020 pin and unpin decisions changing during CAS cancel both raced selections: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-RprMt7/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS021 freshly signed authority successor CAS preserves watermarks and held receipt bytes: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-C0jLaB/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS022 unsigned, wrong-predecessor, raced and partial successor transitions fail closed: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-CsKmbi/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS023 a prepare racing transition wins one generation CAS before successor transition retries: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-LucTLU/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS024 real competing transition and prepare serialize on the stored generation: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-So6cFX/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS025 missing or corrupt private current state preserves active-family refusal and never falls back: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-DucbxD/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS026 symlink roots, hard-linked receipts, and malformed private JSON fail closed: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-KCY8Ge/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS027 replaced receipt bytes are never repaired or overwritten; tampering blocks offline readback: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-pQ6bm2/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS029 real process contention serializes same-key replay and different invocation CAS generations: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-INIonN/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS030 a native admission without an admitNativeRequest port refuses synchronously and leaves the registry usable: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-R2Y9oz/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS031 D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-lxo4yJ/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS032 D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-076YN4/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+MFHS033 D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock: Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-TLXkjt/.git/agent-pipeline/session-authority/catalogue.json'
+    at lstatSync (node:fs:1702:25)
+    at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+    at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+    at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+    at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+    at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+    at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+✔ MFHS002 trusted asynchronous driver success is awaited while synchronous success remains synchronous (33055.263747ms)
+✔ MFHS003 S4 private driver context carries the original sealed invocation and admitted immutable request once (42647.369868ms)
+✔ MFHS004 K147 an async native driver runs after the BEGIN ticket closed and opens its own live registry boundary (39783.572866ms)
+✔ MFHS005 S4 trusted driver can complete a correlated synthetic profile-main operation from the original handle (34470.171487ms)
+✔ MFHS006 profile-main boundary refuses duty routes and existing-main switches before configured operations (73091.341836ms)
+✖ MFHS007 main launch revalidates the sealed candidate after asynchronous config application (10188.984142ms)
+✖ MFHS008 main launch revalidates signed authority after asynchronous config application (4133.73257ms)
+✖ MFHS009 async driver rejection, malformed results, and unknown dispositions fail closed while unqualified is typed (4159.19194ms)
+✖ MFHS010 ordinary repository candidates reuse signed family authority while receipts and replays retain exact candidate bytes (1675.024333ms)
+✖ MFHS011 current-candidate callback failures and non-closed or invalid OID values refuse before receipt admission (4206.264065ms)
+✖ MFHS012 candidate drift between preparation capture and locked CAS refuses without sealing (4502.907ms)
+✖ MFHS013 candidate drift at the final prelaunch check prevents the native driver call (4134.9304ms)
+✖ MFHS014 S2 opaque discovery handle is consumed by the host; ordinary JSON and foreign bindings are refused (4052.640765ms)
+✖ MFHS015 freshness accepts a preparation younger than sixty seconds and rejects one older than sixty (4025.157713ms)
+✖ MFHS016 writer contention performs exactly two bounded CAS retries and never launches (4131.35933ms)
+✖ MFHS017 same-key replay returns original held bytes without resolving a newer selection (4094.145364ms)
+✖ MFHS018 expired preparation and a disappeared newer head refuse without lowering the watermark (4293.486158ms)
+✖ MFHS019 policy supersession during locked CAS and source freshness cancel the unlaunched attempt (4119.350536ms)
+✖ MFHS020 pin and unpin decisions changing during CAS cancel both raced selections (4072.274839ms)
+✖ MFHS021 freshly signed authority successor CAS preserves watermarks and held receipt bytes (4011.603596ms)
+✖ MFHS022 unsigned, wrong-predecessor, raced and partial successor transitions fail closed (4524.2618ms)
+✖ MFHS023 a prepare racing transition wins one generation CAS before successor transition retries (4241.22098ms)
+⚠ MFHS024 real competing transition and prepare serialize on the stored generation (4111.877333ms) # TODO
+✖ MFHS025 missing or corrupt private current state preserves active-family refusal and never falls back (4347.639182ms)
+✖ MFHS026 symlink roots, hard-linked receipts, and malformed private JSON fail closed (4392.259218ms)
+✖ MFHS027 replaced receipt bytes are never repaired or overwritten; tampering blocks offline readback (4247.735815ms)
+✔ MFHS028 schemas are closed and bind unique invocation identity, assignment, candidate, generation and watermarks (1.833443ms)
+⚠ MFHS029 real process contention serializes same-key replay and different invocation CAS generations (4133.959816ms) # TODO
+✖ MFHS030 a native admission without an admitNativeRequest port refuses synchronously and leaves the registry usable (4085.497945ms)
+✖ MFHS031 D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable (4100.417925ms)
+✖ MFHS032 D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released (4075.188539ms)
+✖ MFHS033 D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock (4182.17703ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 7
+ℹ fail 24
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 359906.9143
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS007 main launch revalidates the sealed candidate after asynchronous config application (10188.984142ms)
+  Error [SessionAuthorityError]: domain-transition-partial-effect-retained
+      at fail (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:83:40)
+      at withSessionAuthorityBoundary (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:1195)
+      at effectTransition (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:271:12)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:366:541
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:366:490)
+      at ownedLifetime (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.mjs:1104:31)
+      at Object.activate (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.mjs:1232:52)
+      at activate (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:233:31)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:478:5 {
+    code: 'SDC-LOCK-HELD',
+    reason: 'domain-transition-partial-effect-retained'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS008 main launch revalidates signed authority after asynchronous config application (4133.73257ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-WVWF7r/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-WVWF7r/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS009 async driver rejection, malformed results, and unknown dispositions fail closed while unqualified is typed (4159.19194ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-WYyErz/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-WYyErz/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS010 ordinary repository candidates reuse signed family authority while receipts and replays retain exact candidate bytes (1675.024333ms)
+  AssertionError [ERR_ASSERTION]: Got unwanted exception: model-family-host
+  Actual message: "model-family-host:module-context-drift"
+      at fixture (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:223:35)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:581:13
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:29:24)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: SessionAuthorityError: model-family-host:module-context-drift
+        at authorityOwnerFailure (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:53:59)
+        at assertModuleContext (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:440:54)
+        at assertContext (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:210:89)
+        at Object.readBaseline (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:260:110)
+        at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:223:63
+        at getActual (node:assert:611:5)
+        at strict.doesNotThrow (node:assert:779:32)
+        at fixture (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:223:35)
+        at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:581:13
+        at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/model-family-host-store.test.mjs:29:24),
+    expected: undefined,
+    operator: 'doesNotThrow',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS011 current-candidate callback failures and non-closed or invalid OID values refuse before receipt admission (4206.264065ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-FJZ6Ic/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-FJZ6Ic/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS012 candidate drift between preparation capture and locked CAS refuses without sealing (4502.907ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-QrLM4E/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-QrLM4E/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS013 candidate drift at the final prelaunch check prevents the native driver call (4134.9304ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-nRdDtk/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-nRdDtk/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS014 S2 opaque discovery handle is consumed by the host; ordinary JSON and foreign bindings are refused (4052.640765ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-U680Pg/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-U680Pg/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS015 freshness accepts a preparation younger than sixty seconds and rejects one older than sixty (4025.157713ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-Km2kAl/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-Km2kAl/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS016 writer contention performs exactly two bounded CAS retries and never launches (4131.35933ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-TRkT48/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-TRkT48/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS017 same-key replay returns original held bytes without resolving a newer selection (4094.145364ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-KzO85l/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-KzO85l/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS018 expired preparation and a disappeared newer head refuse without lowering the watermark (4293.486158ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-8NiihH/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-8NiihH/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS019 policy supersession during locked CAS and source freshness cancel the unlaunched attempt (4119.350536ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-ECOQRa/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-ECOQRa/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS020 pin and unpin decisions changing during CAS cancel both raced selections (4072.274839ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-RprMt7/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-RprMt7/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS021 freshly signed authority successor CAS preserves watermarks and held receipt bytes (4011.603596ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-C0jLaB/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-C0jLaB/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS022 unsigned, wrong-predecessor, raced and partial successor transitions fail closed (4524.2618ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-CsKmbi/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-CsKmbi/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS023 a prepare racing transition wins one generation CAS before successor transition retries (4241.22098ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-LucTLU/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-LucTLU/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+⚠ MFHS024 real competing transition and prepare serialize on the stored generation (4111.877333ms) # TODO
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-So6cFX/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-So6cFX/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS025 missing or corrupt private current state preserves active-family refusal and never falls back (4347.639182ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-DucbxD/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-DucbxD/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS026 symlink roots, hard-linked receipts, and malformed private JSON fail closed (4392.259218ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-KCY8Ge/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-KCY8Ge/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS027 replaced receipt bytes are never repaired or overwritten; tampering blocks offline readback (4247.735815ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-pQ6bm2/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-pQ6bm2/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+⚠ MFHS029 real process contention serializes same-key replay and different invocation CAS generations (4133.959816ms) # TODO
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-INIonN/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-INIonN/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS030 a native admission without an admitNativeRequest port refuses synchronously and leaves the registry usable (4085.497945ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-R2Y9oz/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-R2Y9oz/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS031 D113 an asynchronous driver does not hold the registry lock across its await; the settled launch leaves the registry usable (4100.417925ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-lxo4yJ/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-lxo4yJ/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS032 D113 a rejecting or declared-async effect is settled by the owner: the rejection surfaces and the registry lock is always released (4075.188539ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-076YN4/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-076YN4/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ MFHS033 D113 the settle step refuses a write the continuation made outside the begin ticket's scope, and still releases the lock (4182.17703ms)
+  Error: ENOENT: no such file or directory, lstat '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-TLXkjt/.git/agent-pipeline/session-authority/catalogue.json'
+      at lstatSync (node:fs:1702:25)
+      at readRaw (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:139:182)
+      at readRecord (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:140:43)
+      at stateRead (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:482:68)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:523
+      at descriptorGuard (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:504:103)
+      at reserveSessionAuthorityMember (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:505:475)
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-domain-owner.mjs:261:479
+      at file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/session-authority-registry.mjs:302:889
+      at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'lstat',
+    path: '<repo-root>/scratch/clones/g8-original-custody-20261025/scratch/native-goldfish-contract-fixtures/model-family-host-store-fixture-TLXkjt/.git/agent-pipeline/session-authority/catalogue.json'
+  }
+
+--- stderr ---

@@ -1,0 +1,14 @@
+import { ONBOARDING_TEST_CASES, runAssignedCases } from "../plugins/pipeline-core/lib/project-onboarding-v3.test.mjs";
+const calibration = process.env.ORIGINAL_CONTROLLER_SELECTION === "calibration";
+const devplan = process.env.ORIGINAL_CONTROLLER_SELECTION === "devplan";
+const handover = process.env.ORIGINAL_CONTROLLER_SELECTION === "handover";
+const count = devplan ? 1 : handover ? 4 : calibration ? 5 : 7;
+const start = handover ? 95 : 94;
+const selected = ONBOARDING_TEST_CASES.filter(({ index }) => index >= start && index < start + count);
+if (selected.length !== count) throw new Error("selected cohort count changed");
+const results = await runAssignedCases(selected);
+const failures = results.filter(({ disposition }) => disposition !== "pass");
+console.log(JSON.stringify({ schema: "pipeline.original-controller-selected-summary.v1", starts: selected.length,
+  ends: results.length, passes: results.length - failures.length, failures: failures.length,
+  failedIndices: failures.map(({ index }) => index) }));
+if (failures.length) process.exitCode = 1;

@@ -1,0 +1,28 @@
+command: node --test --test-name-pattern "Critic evidence for a named earlier commit is bound" plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs
+label: R2-root-bound-named-commit-GREEN
+exitCode: 0
+head: 73afcf74241fd38627161d5a5e9956d12b7e9341
+tree: 29ffb1b7e1441d0c6879fc002337e024b6536293
+dirty: true
+--- stdout ---
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-calibration","index":1,"total":5,"state":"started","startedAt":"2026-10-25T19:56:05.824Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-manifest","index":2,"total":5,"state":"started","startedAt":"2026-10-25T19:56:05.834Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-repository","index":3,"total":5,"state":"started","startedAt":"2026-10-25T19:56:05.842Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-verify-contract","index":4,"total":5,"state":"started","startedAt":"2026-10-25T19:56:05.851Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-manifest","index":2,"total":5,"state":"completed","startedAt":"2026-10-25T19:56:05.834Z","completedAt":"2026-10-25T19:56:06.218Z","receiptSha256":"5f99fae5933d50833dbd540389792abb45f465221bd8d85f8352216f67ab1de0","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-calibration","index":1,"total":5,"state":"completed","startedAt":"2026-10-25T19:56:05.824Z","completedAt":"2026-10-25T19:56:06.224Z","receiptSha256":"d2750f1141687ed8091be6b20646d18d6588b414dbae580949f806ef4cf32d20","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-repository","index":3,"total":5,"state":"completed","startedAt":"2026-10-25T19:56:05.842Z","completedAt":"2026-10-25T19:56:06.231Z","receiptSha256":"2b28c5297b607446b9f5bb659b2497107e8d33caa8a73cc26ce07de3b4be0140","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"baseline-verify-contract","index":4,"total":5,"state":"completed","startedAt":"2026-10-25T19:56:05.851Z","completedAt":"2026-10-25T19:56:06.255Z","receiptSha256":"2732c9e1dab56a046dbf2d3e4d784a1cf83d7f6593d525bc80a5a6f3d29094b9","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"configured-verify","index":5,"total":5,"state":"started","startedAt":"2026-10-25T19:56:06.256Z","completedAt":null,"receiptSha256":null,"diagnosticDigest":null}
+{"schema":"pipeline.verify-progress.v1","runId":"verify-1792958165636-e440d6e5d5b2f929","candidate":{"commit":"213ef28789b08d4098fc584fdfee43b1d106772f","tree":"4024d5cc43ab25d0d116550b766c77d78d509855"},"suite":"configured-verify","index":5,"total":5,"state":"completed","startedAt":"2026-10-25T19:56:06.256Z","completedAt":"2026-10-25T19:56:06.629Z","receiptSha256":"5ee7459e887f160f207f8724febf2c9e9d7d0f9d154b1edcac98426a3b4fbfa5","diagnosticDigest":"f69d109134ee649766c47b8f207f5f6380df4a6785823f718f36eb474d2e2eaa"}
+✔ Critic evidence for a named earlier commit is bound to it, leaves a dirty checkout untouched, and the preflight accepts it (1592.666184ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1950.577846
+
+--- stderr ---

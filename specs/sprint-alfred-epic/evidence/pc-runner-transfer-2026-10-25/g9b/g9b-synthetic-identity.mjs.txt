@@ -1,0 +1,32 @@
+import os from 'node:os';
+import { lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+
+const parent = '/run/user/1000/ap-g17';
+const before = lstatSync(parent);
+if (!before.isDirectory() || before.isSymbolicLink() || before.uid !== process.getuid() || (before.mode & 0o777) !== 0o700 || realpathSync(parent) !== parent) throw new Error('G9B-PRIVATE-PARENT-UNSAFE');
+const root = mkdtempSync(`${parent}/g9b-active-cwd-`);
+const owned = lstatSync(root);
+if (!owned.isDirectory() || owned.isSymbolicLink() || owned.uid !== process.getuid() || (owned.mode & 0o777) !== 0o700 || realpathSync(root) !== root) throw new Error('G9B-PRIVATE-CHILD-UNSAFE');
+process.on('exit', () => {
+  try {
+    const current = lstatSync(root);
+    if (current.dev === owned.dev && current.ino === owned.ino && current.isDirectory() && !current.isSymbolicLink()) rmSync(root, { recursive: true, force: true });
+  } catch { /* never remove an unverified replacement */ }
+});
+const home = `${root}/home`;
+const tmp = `${root}/tmp`;
+mkdirSync(home, { recursive: true, mode: 0o700 });
+mkdirSync(tmp, { recursive: true, mode: 0o700 });
+process.env.HOME = home;
+process.env.USERPROFILE = home;
+process.env.TMPDIR = tmp;
+process.env.TMP = tmp;
+process.env.TEMP = tmp;
+process.env.XDG_CONFIG_HOME = `${home}/.config`;
+process.env.GIT_CONFIG_GLOBAL = '/dev/null';
+process.env.GIT_CONFIG_NOSYSTEM = '1';
+os.homedir = () => home;
+os.tmpdir = () => tmp;
+os.userInfo = () => ({ username: 'synthetic-g9b', uid: 1000, gid: 1000, shell: '/bin/sh', homedir: home });
+syncBuiltinESMExports();

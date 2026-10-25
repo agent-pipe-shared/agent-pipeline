@@ -1,0 +1,73 @@
+{
+  "schema": "pipeline.inert-dependency-overlay.v1",
+  "sourceBase": "62008d6bd39f68aa849e7257cdc3161b59222ebb",
+  "patchSha256": "a26528ebd16f1bddd9209bec64e64508fa53ddbe12a12fdef0caca1af6c2df42",
+  "sourceManifestSha256": "b5bc204066e219b2383b25c610a507037b571f2cdaa776863a8a04e5bb99922d",
+  "reconstructedFromImmutableBaseAndPatch": true,
+  "files": [
+    {
+      "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sha256": "457d76c4d56d2859f7a5b9e8e3670926e4e9447608a50a61317a3599627bec22"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-host-store.test.mjs",
+      "sha256": "d54724a5db0a9a71a7dcc3abc4fc1057349b9903d7f0de2581da93c84e8d44a7"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-invocation.mjs",
+      "sha256": "c82dc03b4147ea1aad879ef79077dd6e671c1265ca04bada97a56059a65851f1"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "sha256": "c1fe372b82946e5354a2bd2ee5d273b574940d35405e3736577847bbb210f33e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "abd22176c176ca3cdf5b83a776ffe294d0ec229a81daf7536e018a48ac97e351"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+      "sha256": "833235693eb3a8ba089ce8c15e04dbc6f484de5ef3f57c53192d637f23e87cc6"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.test.mjs",
+      "sha256": "f8352872c4d7cd57d4e1fb62cc1fcfd6b74953fa53fea2295c256fa5b75b25b7"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+      "sha256": "5df09ec8ce106231632f9dad6a96ad1271b4e1f4a62489c68780c0315ac53e02"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-native-critic-host.mjs",
+      "sha256": "cb8d4c6acb037a621f3cc61156529a6b2f0e1db8132c4bd3cb6ae37cf6e8f517"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-execution-producer.mjs",
+      "sha256": "b886c4f00e58af1ca1e3c60dbd5012f4c1f5516e8858f7800b46033aa59043cb"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-original-custody.mjs",
+      "sha256": "5473d596a796cad50a5e93f2131a8f1946d1c6418e3abab626ca95a0330597ae"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-original-custody.test.mjs",
+      "sha256": "bf607d7924b9216b10bdf441808fd18970043572d93ba81408390df376e6141b"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs",
+      "sha256": "7c61a8fe7afcf925168e7c75ebbdcca787aed9609baffaa3be17ad59c1c63403"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/design-review-dispatch.mjs",
+      "sha256": "bb312f21e7d9654aacd0e438ec6a182294559e6f56e04fc7dd4a8e16555c7da5"
+    }
+  ],
+  "status": "unqualified-dependency-only",
+  "nativeIndependentPass": false,
+  "limits": [
+    "Not Main integration or native/provider attestation.",
+    "Broad Model35loaded/33pass/2todo; exact pre-edit test SHA unavailable, MFHS036 separately green.",
+    "Codex inspector requires live original Source context; JSON reconstruction remains refused.",
+    "Consumer activation is excluded."
+  ]
+}

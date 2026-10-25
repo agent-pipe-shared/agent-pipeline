@@ -1,0 +1,102 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { spawnSync } from "node:child_process";
+import { existsSync, lstatSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { assessSettlement, classifyObservation, preToolDecision, streamShape, summarizeHookInput } from "./observe-native-terminal-shape-v2.mjs";
+import { validatePrivateParent, validateCreatedHome } from "../../clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs";
+
+const parent = "synthetic-parent";
+const child = "synthetic-child";
+const line = (...rows) => rows.map(row => JSON.stringify(row)).join("\n");
+const init = tools => ({ event: "init", conversation_id: parent, init: { tools, cwd: "/private/secret" } });
+const result = (id, status = "SUCCESS") => ({ event: "result", conversation_id: id, result: { conversation_id: id, status, response: "private response" } });
+const step = update => ({ event: "step_update", step_update: { conversation_id: parent, step_index: 1, state: "DONE", ...update } });
+const childStep = id => step({ step_type: "tool", tool_name: "invoke_subagent", subagent_info: { subagents: [{ conversation_id: id, type_name: "research", model: "synthetic-model" }] } });
+
+test("existing Source validates the private parent and created synthetic home", () => {
+  assert.ok(validatePrivateParent("/run/user/1000/ap-g17").bytes <= 107);
+  assert.doesNotThrow(() => validateCreatedHome(process.env.HOME));
+});
+
+test("distinguishes explicit tool absence from a planner choosing no child", () => {
+  const noTool = streamShape(line(init(["view_file"]), result(parent)));
+  assert.equal(noTool.init.invokeSubagentAvailable, false);
+  assert.equal(classifyObservation({ stream: noTool }), "invoke-subagent-absent-from-init");
+  const noChild = streamShape(line(init(["invoke_subagent", "view_file"]), step({ step_type: "agent_response" }), result(parent)));
+  assert.equal(noChild.init.toolCount, 2);
+  assert.equal(classifyObservation({ stream: noChild }), "no-child-attempt-observed");
+});
+
+test("records pretool refusal shape and typed error without exporting message", () => {
+  const stream = streamShape(line(init(["invoke_subagent"]), step({ step_type: "tool", tool_name: "invoke_subagent",
+    tool_info: { name: "invoke_subagent", error: { type: "PermissionDenied", message: "PRIVATE TOKEN abc" } } }), result(parent)));
+  assert.equal(stream.steps[0].errorType, "PermissionDenied");
+  assert.equal(classifyObservation({ stream, preToolHooks: [{}] }), "tool-refusal-shape-observed");
+  assert.doesNotMatch(JSON.stringify(stream), /PRIVATE TOKEN|abc/);
+});
+
+test("rejects wrong child relation and requires observed child terminal plus posttool", () => {
+  const wrong = streamShape(line(init(["invoke_subagent"]), childStep(parent), result(parent)));
+  assert.equal(wrong.observedLinkedChildCount, 0);
+  assert.equal(classifyObservation({ stream: wrong }), "foreign-or-unlinked-child");
+  const good = streamShape(line(init(["invoke_subagent"]), childStep(child), result(child), result(parent)), "/private/secret");
+  assert.equal(good.cwdMatchesExpectedFixture, true);
+  assert.equal(good.observedLinkedChildCount, 1);
+  assert.equal(classifyObservation({ stream: good, postToolHooks: [{}] }), "linked-child-terminal-observed");
+  assert.equal(assessSettlement({ exitCode: 0, stream: good, postToolHooks: [{ errorPresent: false }] }).proven, true);
+  assert.equal(assessSettlement({ exitCode: 0, stream: good, postToolHooks: [] }).proven, false);
+  const wrongCwd = streamShape(line(init(["invoke_subagent"]), childStep(child), result(child), result(parent)), "/different/fixture");
+  assert.equal(classifyObservation({ stream: wrongCwd, postToolHooks: [{}] }), "unexpected-init-cwd");
+  assert.equal(assessSettlement({ exitCode: 0, stream: wrongCwd, postToolHooks: [{ errorPresent: false }] }).proven, false);
+});
+
+test("first pretool observation is neutral and a second invocation is denied", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-v2-marker-"));
+  const identity = lstatSync(root);
+  try {
+    assert.deepEqual(preToolDecision(root), {});
+    assert.deepEqual(preToolDecision(root), { decision: "deny", reason: "synthetic-one-attempt-cap" });
+  } finally {
+    const current = lstatSync(root);
+    if (current.dev === identity.dev && current.ino === identity.ino) rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("hook ignores a foreign tool and caps only matching invocations", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-v2-hook-"));
+  const identity = lstatSync(root);
+  const script = fileURLToPath(new URL("./observe-native-terminal-shape-v2.mjs", import.meta.url));
+  const preload = fileURLToPath(new URL("../../clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs", import.meta.url));
+  const invoke = name => {
+    const call = spawnSync(process.execPath, ["--require", preload, script, "hook-pre", root], {
+      input: JSON.stringify({ toolCall: { name, args: { harmless: true } }, workspacePaths: [root], conversationId: parent }),
+      encoding: "utf8", timeout: 10_000,
+    });
+    assert.equal(call.status, 0);
+    return JSON.parse(call.stdout);
+  };
+  try {
+    assert.deepEqual(invoke("run_command"), {});
+    assert.equal(existsSync(join(root, "invoke-subagent-attempt.marker")), false);
+    assert.deepEqual(invoke("invoke_subagent"), {});
+    assert.deepEqual(invoke("invoke_subagent"), { decision: "deny", reason: "synthetic-one-attempt-cap" });
+  } finally {
+    const current = lstatSync(root);
+    if (current.dev === identity.dev && current.ino === identity.ino) rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("timeout, malformed stream, and private values stay bounded", () => {
+  assert.equal(classifyObservation({ launch: { errorCode: "ETIMEDOUT" }, stream: {} }), "timeout-or-signal");
+  assert.equal(streamShape("not json").status, "unparseable");
+  const sensitive = streamShape(line(init(["invoke_subagent", "secret-tool-name"]), step({ step_type: "secret-step",
+    tool_name: "secret-tool-name", tool_info: { output: "secret output", error: { type: "SECRET_TYPE", message: "secret error" } },
+    text_delta: "secret text", secretKey: "/private/path" }), result(parent)));
+  const hook = summarizeHookInput({ conversationId: parent, toolCall: { name: "invoke_subagent", args: { private: "secret args" } }, error: "secret hook error" });
+  assert.doesNotMatch(JSON.stringify({ sensitive, hook }), /secret|SECRET|private\/path/i);
+  assert.equal(sensitive.steps[0].toolName.startsWith("sha256:"), true);
+  assert.equal(sensitive.steps[0].state, "DONE");
+});

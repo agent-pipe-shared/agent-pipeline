@@ -1,0 +1,54 @@
+command: node --test --test-name-pattern "public --help and -h" plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+label: R2-dispatch-help-public-RED
+exitCode: 1
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: true
+--- stdout ---
+✖ public --help and -h work before setup without private reads, processes or filesystem effects (308.830691ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 630.356601
+
+✖ failing tests:
+
+test at plugins/pipeline-core/scripts/dispatch-briefing.test.mjs:119:1
+✖ public --help and -h work before setup without private reads, processes or filesystem effects (308.830691ms)
+  AssertionError [ERR_ASSERTION]: --help: 
+  HELP-AUDIT:["homedir"]
+  file:///tmp/r2-help-UunywP/dispatch-help-KzwaOa/audit.mjs:17
+  for(const key of ['homedir','userInfo']) os[key]=()=>{calls.push(key);throw new Error('HELP-FORBIDDEN-IDENTITY');};
+                                                                              ^
+  
+  Error: HELP-FORBIDDEN-IDENTITY
+      at os.<computed> (file:///tmp/r2-help-UunywP/dispatch-help-KzwaOa/audit.mjs:17:77)
+      at createGovernanceScopeController (file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:191:69)
+      at file://<repo-root>/plugins/pipeline-core/lib/governance-scope.mjs:439:25
+      at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+      at async node:internal/modules/esm/loader:639:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+  
+  Node.js v24.15.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs:149:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

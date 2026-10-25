@@ -1,0 +1,419 @@
+command: node scratch/original-controller-run.mjs selected
+label: ORIGINAL-CONTROLLER-COMPLETION/selected-after-parent
+exitCode: 1
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+ORIGINAL184 CALLBACK START shard=null index=94 pid=255398 mono_ns=7008991945256
+Plan submitted by "po" on 2026-08-01T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/gated/prd_gated.md(338789a7e38b...)+specs/gated/spec.md(330e5a6e6773...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-01T12:00:00.000Z; bound to submission d91ddef82eb6....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "gated-work",
+  "sources": {
+    "prd": {
+      "path": "specs/gated/prd_gated.md",
+      "sha256": "338789a7e38b8f57ce0c705f4148db05df72ca04ddf1bf7c6179d6935ce34e54"
+    },
+    "spec": {
+      "path": "specs/gated/spec.md",
+      "sha256": "330e5a6e677370ea5b1a01f2ba4e2496c1d36396437e1081a35f5a758e242a4d"
+    },
+    "companions": [
+      {
+        "path": "specs/gated/design.md",
+        "sha256": "f88d9a58504dd394647b439063b4ceb58df5fc8f17e9c076a53bc33314e76546"
+      },
+      {
+        "path": "specs/gated/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/gated/review/design-review-receipt-1.json",
+      "sha256": "4049bb6fa2721a50a01b7772e24284d5c0ced2a1631a11ea39864ef7495af343",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-80019a13de4b971251a9cd51e9c28f54a57103399b23c17e57370ed177d7585a.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-4vP5o9" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-4vP5o9/scratch/design-approval-request-80019a13de4b971251a9cd51e9c28f54a57103399b23c17e57370ed177d7585a.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-gated-work-1" on 2026-08-01T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/gated/prd_gated.md(338789a7e38b...)+specs/gated/spec.md(330e5a6e6773...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+FAIL  the seeded dev-plan gate refuses implementation before approval and admits it after -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=94 pid=255398 mono_ns=7024295218652 elapsed_ms=15303.273 outcome=throw
+ORIGINAL184 CALLBACK START shard=null index=95 pid=255398 mono_ns=7024295350503
+Plan submitted by "po" on 2026-08-30T12:00:01.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/handover-claude/prd_handover.md(761990b22745...)+specs/handover-claude/spec.md(dd213eb57c7c...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-30T12:00:02.000Z; bound to submission f80030510d99....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "handover-claude",
+  "sources": {
+    "prd": {
+      "path": "specs/handover-claude/prd_handover.md",
+      "sha256": "761990b22745c65e044500a40ae6c55056bc2cbb04088d953ae686f74ce52487"
+    },
+    "spec": {
+      "path": "specs/handover-claude/spec.md",
+      "sha256": "dd213eb57c7ca2ab6a1fec255557660a635c7987c1f928aa886b3c4214f241cf"
+    },
+    "companions": [
+      {
+        "path": "specs/handover-claude/design.md",
+        "sha256": "2cd0889c925cc1329a6ae5d745936899b064a3fb4ed33052de8b8c2f2b29ee4c"
+      },
+      {
+        "path": "specs/handover-claude/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/handover-claude/review/design-review-receipt-1.json",
+      "sha256": "a7f1c1d128e73ffbcee25332b26f49d192f050a4de0d0f87748ed1dd9637b110",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-dcce86898ea1043e3b6285d051487a8599ddd90422ddfa08f1662406451a2e56.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-oHebNY" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-oHebNY/scratch/design-approval-request-dcce86898ea1043e3b6285d051487a8599ddd90422ddfa08f1662406451a2e56.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-handover-claude-1" on 2026-08-30T12:00:03.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/handover-claude/prd_handover.md(761990b22745...)+specs/handover-claude/spec.md(dd213eb57c7c...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"ready","areas":[{"area":"application","status":"ready","decisions":[],"findingCount":0}],"unresolvedPaths":[]}
+Design reopened by "po" on 2026-08-30T12:00:05.000Z; lifecycle="draft".
+Plan submitted by "po" on 2026-08-30T12:00:06.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/handover-claude/prd_handover.md(761990b22745...)+specs/handover-claude/spec.md(dd213eb57c7c...) profile=feature change=identical-binding authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-30T12:00:07.000Z; bound to submission 5cfced3eaf1c....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "handover-claude",
+  "sources": {
+    "prd": {
+      "path": "specs/handover-claude/prd_handover.md",
+      "sha256": "761990b22745c65e044500a40ae6c55056bc2cbb04088d953ae686f74ce52487"
+    },
+    "spec": {
+      "path": "specs/handover-claude/spec.md",
+      "sha256": "dd213eb57c7ca2ab6a1fec255557660a635c7987c1f928aa886b3c4214f241cf"
+    },
+    "companions": [
+      {
+        "path": "specs/handover-claude/design.md",
+        "sha256": "2cd0889c925cc1329a6ae5d745936899b064a3fb4ed33052de8b8c2f2b29ee4c"
+      },
+      {
+        "path": "specs/handover-claude/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/handover-claude/review/design-review-receipt-2.json",
+      "sha256": "10e9380f975e2b821213fefa6dbd8c131d49c50485db16346172bc314f651336",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-301bf0c8d0f665b5c069b37e6aa01f4c382fb01d1ecda0ffedd3288fb7afd8ef.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-oHebNY" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-oHebNY/scratch/design-approval-request-301bf0c8d0f665b5c069b37e6aa01f4c382fb01d1ecda0ffedd3288fb7afd8ef.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-handover-claude-1" on 2026-08-30T12:00:08.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/handover-claude/prd_handover.md(761990b22745...)+specs/handover-claude/spec.md(dd213eb57c7c...) profile=feature change=identical-binding authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify claude -- claude: configure verify: 
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=95 pid=255398 mono_ns=7048369168910 elapsed_ms=24073.818 outcome=throw
+ORIGINAL184 CALLBACK START shard=null index=96 pid=255398 mono_ns=7048369269431
+Plan submitted by "po" on 2026-08-30T12:00:01.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/handover-codex/prd_handover.md(f1db35b7f0cb...)+specs/handover-codex/spec.md(1b0bb9e88ca8...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-30T12:00:02.000Z; bound to submission 77b563e16a07....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "handover-codex",
+  "sources": {
+    "prd": {
+      "path": "specs/handover-codex/prd_handover.md",
+      "sha256": "f1db35b7f0cb436a6e88f716bdf9a08f3676aeb5ac01760ebab8da025ae5b5f8"
+    },
+    "spec": {
+      "path": "specs/handover-codex/spec.md",
+      "sha256": "1b0bb9e88ca8b2fc68777d80c93467f32b4aa3becd8688f5ae5b380e9027ce49"
+    },
+    "companions": [
+      {
+        "path": "specs/handover-codex/design.md",
+        "sha256": "4d0bb36df9accc1fbc8829db5dbb5dfde17e81b3cafbe6d21e07e3bc6b2482ff"
+      },
+      {
+        "path": "specs/handover-codex/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/handover-codex/review/design-review-receipt-1.json",
+      "sha256": "7f03602b0d24b0719e01f4ef839d1729bb53a47903f70d383df03587a9a60c1c",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-fac55cb5c24679ffc7adde16e56c9d1203f93fec23bf5a1a9e9d0a3ffcf51be9.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-mK4YF7" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-mK4YF7/scratch/design-approval-request-fac55cb5c24679ffc7adde16e56c9d1203f93fec23bf5a1a9e9d0a3ffcf51be9.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-handover-codex-1" on 2026-08-30T12:00:03.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/handover-codex/prd_handover.md(f1db35b7f0cb...)+specs/handover-codex/spec.md(1b0bb9e88ca8...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"ready","areas":[{"area":"application","status":"ready","decisions":[],"findingCount":0}],"unresolvedPaths":[]}
+Design reopened by "po" on 2026-08-30T12:00:05.000Z; lifecycle="draft".
+Plan submitted by "po" on 2026-08-30T12:00:06.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/handover-codex/prd_handover.md(f1db35b7f0cb...)+specs/handover-codex/spec.md(1b0bb9e88ca8...) profile=feature change=identical-binding authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-30T12:00:07.000Z; bound to submission e827fcf92802....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "handover-codex",
+  "sources": {
+    "prd": {
+      "path": "specs/handover-codex/prd_handover.md",
+      "sha256": "f1db35b7f0cb436a6e88f716bdf9a08f3676aeb5ac01760ebab8da025ae5b5f8"
+    },
+    "spec": {
+      "path": "specs/handover-codex/spec.md",
+      "sha256": "1b0bb9e88ca8b2fc68777d80c93467f32b4aa3becd8688f5ae5b380e9027ce49"
+    },
+    "companions": [
+      {
+        "path": "specs/handover-codex/design.md",
+        "sha256": "4d0bb36df9accc1fbc8829db5dbb5dfde17e81b3cafbe6d21e07e3bc6b2482ff"
+      },
+      {
+        "path": "specs/handover-codex/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/handover-codex/review/design-review-receipt-2.json",
+      "sha256": "0f29491a7eb64c279c1e0e833f9e6cc0032ea1b91cde6e348a627a57c74e248f",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-f97404ab9b26e9c4095815b378460857ee139dd78db34a5d51f01419e62c7127.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-mK4YF7" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-mK4YF7/scratch/design-approval-request-f97404ab9b26e9c4095815b378460857ee139dd78db34a5d51f01419e62c7127.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-handover-codex-1" on 2026-08-30T12:00:08.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/handover-codex/prd_handover.md(f1db35b7f0cb...)+specs/handover-codex/spec.md(1b0bb9e88ca8...) profile=feature change=identical-binding authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify codex -- codex: configure verify: 
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=96 pid=255398 mono_ns=7075686561032 elapsed_ms=27317.292 outcome=throw
+ORIGINAL184 CALLBACK START shard=null index=97 pid=255398 mono_ns=7075686643869
+Plan submitted by "po" on 2026-08-30T12:00:01.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/handover-antigravity/prd_handover.md(116c069ed291...)+specs/handover-antigravity/spec.md(8350d5a798ab...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-30T12:00:02.000Z; bound to submission 9e744c1f7e50....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "handover-antigravity",
+  "sources": {
+    "prd": {
+      "path": "specs/handover-antigravity/prd_handover.md",
+      "sha256": "116c069ed291e5a9adf3bc6b43cdfbcac06bd11f15a3f29ea640ecbe44e1c8d8"
+    },
+    "spec": {
+      "path": "specs/handover-antigravity/spec.md",
+      "sha256": "8350d5a798abc30ca494f3ebd78edbab87e761b7ea89d4202b94f508b59325f3"
+    },
+    "companions": [
+      {
+        "path": "specs/handover-antigravity/design.md",
+        "sha256": "3feb351c9a5b828d307e3fedeae00cc871d1355e0fff139a7d2d837ae74c782c"
+      },
+      {
+        "path": "specs/handover-antigravity/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/handover-antigravity/review/design-review-receipt-1.json",
+      "sha256": "d13609b1ffa3a3b192025e00cd7814a7a2aeb2bfc2b92296170795bc9a999130",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-f6199875fef5780e4b51b2b4fb73a5c31b2941460b8ed5df5e367540cee4c441.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-k3r0oq" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-k3r0oq/scratch/design-approval-request-f6199875fef5780e4b51b2b4fb73a5c31b2941460b8ed5df5e367540cee4c441.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-handover-antigravity-1" on 2026-08-30T12:00:03.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/handover-antigravity/prd_handover.md(116c069ed291...)+specs/handover-antigravity/spec.md(8350d5a798ab...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Phase set: "implementation"; lifecycle="implementing".
+Architecture decisions: {"schema":"pipeline.architecture-planning-decisions.v1","status":"ready","areas":[{"area":"application","status":"ready","decisions":[],"findingCount":0}],"unresolvedPaths":[]}
+Design reopened by "po" on 2026-08-30T12:00:05.000Z; lifecycle="draft".
+Plan submitted by "po" on 2026-08-30T12:00:06.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/handover-antigravity/prd_handover.md(116c069ed291...)+specs/handover-antigravity/spec.md(8350d5a798ab...) profile=feature change=identical-binding authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-30T12:00:07.000Z; bound to submission 6f902d9200db....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "handover-antigravity",
+  "sources": {
+    "prd": {
+      "path": "specs/handover-antigravity/prd_handover.md",
+      "sha256": "116c069ed291e5a9adf3bc6b43cdfbcac06bd11f15a3f29ea640ecbe44e1c8d8"
+    },
+    "spec": {
+      "path": "specs/handover-antigravity/spec.md",
+      "sha256": "8350d5a798abc30ca494f3ebd78edbab87e761b7ea89d4202b94f508b59325f3"
+    },
+    "companions": [
+      {
+        "path": "specs/handover-antigravity/design.md",
+        "sha256": "3feb351c9a5b828d307e3fedeae00cc871d1355e0fff139a7d2d837ae74c782c"
+      },
+      {
+        "path": "specs/handover-antigravity/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/handover-antigravity/review/design-review-receipt-2.json",
+      "sha256": "c216761aa6279e17c70434ddd692263109f4ee98f06faff8d2a67e913bd340af",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-2810b66d3fb433dcefe5cc1cda4639a04e4b45db0a7060d12338e9dc6e0b0d4f.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-k3r0oq" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-k3r0oq/scratch/design-approval-request-2810b66d3fb433dcefe5cc1cda4639a04e4b45db0a7060d12338e9dc6e0b0d4f.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-handover-antigravity-1" on 2026-08-30T12:00:08.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/handover-antigravity/prd_handover.md(116c069ed291...)+specs/handover-antigravity/spec.md(8350d5a798ab...) profile=feature change=identical-binding authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+FAIL  the public onboarding handover is executable for every runner with baseline-only and configured verify antigravity -- antigravity: configure verify: 
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=97 pid=255398 mono_ns=7105192324858 elapsed_ms=29505.681 outcome=throw
+ORIGINAL184 CALLBACK START shard=null index=98 pid=255398 mono_ns=7105192418506
+Plan submitted by "po" on 2026-08-01T12:00:00.000Z; lifecycle="awaiting-approval".
+Briefing: scope=specs/projdrift/prd_projdrift.md(836724311719...)+specs/projdrift/spec.md(3ccf9356dd82...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+Plan presentation recorded by "po" on 2026-08-01T12:00:00.000Z; bound to submission d7505ed4ed00....
+Complete bounded design-workflow review (still pending PO approval):
+{
+  "schema": "pipeline.design-approval-binding.v1",
+  "featureId": "projdrift-work",
+  "sources": {
+    "prd": {
+      "path": "specs/projdrift/prd_projdrift.md",
+      "sha256": "836724311719afd85dd406e58359571dcb2d3c95c56fb804d40f9c647d5c8a16"
+    },
+    "spec": {
+      "path": "specs/projdrift/spec.md",
+      "sha256": "3ccf9356dd82a1dfe3f7c486947c3b41ada39b56fa5e1360f2a877728026e2c2"
+    },
+    "companions": [
+      {
+        "path": "specs/projdrift/design.md",
+        "sha256": "74bd28a17f70fb04f5733d8aebd02c576fe5ac8469ad720aed6ec840a7c0dad8"
+      },
+      {
+        "path": "specs/projdrift/traceability.md",
+        "sha256": "7b61ec94a999cf20b535db42e998c17ffb8cbbb227ed325196ef815056e76e33"
+      }
+    ]
+  },
+  "reviewReceipts": [
+    {
+      "path": "specs/projdrift/review/design-review-receipt-1.json",
+      "sha256": "5ada2e806a4374669690408d7dd5affb9fa535309f512dd782cfa48834f3c0dd",
+      "round": 1
+    }
+  ],
+  "verdict": "pass",
+  "openFindingIds": []
+}
+Exact PO request: scratch/design-approval-request-7d0b30a87f1cdf01d95870c07be483b7c3221374dd0f6d3714cebc3c3d2df52d.json.
+node "<repo-root>/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent --repo-root "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-6FMKV8" --request "/run/user/1000/ap-g17/g17c-enn3B9/project onboarding v3 matrix with spaces-6FMKV8/scratch/design-approval-request-7d0b30a87f1cdf01d95870c07be483b7c3221374dd0f6d3714cebc3c3d2df52d.json"
+The request is pending only; it does not approve the package or unlock implementation.
+Plan approved by "verified:design-review-fixture-projdrift-work-1" on 2026-08-01T12:00:00.000Z; lifecycle="approved".
+Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.
+Briefing: scope=specs/projdrift/prd_projdrift.md(836724311719...)+specs/projdrift/spec.md(3ccf9356dd82...) profile=feature change=initial-submission authorizes=design-to-implementation-transition excludes=push,deploy,publication,scope-beyond-bound-plan-and-spec
+FAIL  NVA-R40-PROJDRIFT: set-phase --phase implementation does not itself cause projection-drift; an untracked pipeline.user.yaml edit does, at the very next inspection -- Expected values to be strictly equal:
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=98 pid=255398 mono_ns=7120402852092 elapsed_ms=15210.434 outcome=throw
+ORIGINAL184 CALLBACK START shard=null index=99 pid=255398 mono_ns=7120402935180
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "po" for commit 5399f0283d470141469ab23211d6dd5c89dbc33b (2026-10-25T15:51:32.681Z).
+FAIL  the seeded push gate refuses an unapproved push and admits it after the shipped commands -- the approved push must be admitted: BLOCKED (guard-push, plugin pipeline-core): Push-Gate check failed (1 finding(s)):
+  1. candidate-bound independent review and Verify are unavailable (private-critic-binding-unavailable)
+
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=99 pid=255398 mono_ns=7141477049571 elapsed_ms=21074.114 outcome=throw
+ORIGINAL184 CALLBACK START shard=null index=100 pid=255398 mono_ns=7141477156073
+Created project/push-threat-model.md from the plugin's shipped template. Review it, then commit it (git add project/push-threat-model.md; git commit) BEFORE running approve-push -- the human's signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an uncommitted file sits only in the working copy and is never part of what git push transmits.
+Push approved by "po" for commit b404ccce66352388763029153cf74d7475d5b832 (2026-10-25T15:51:49.921Z).
+FAIL  the seeded security gate refuses a push with missing security evidence and admits it after the shipped scan command runs (SECGATE-1) -- the fully-satisfied push must be admitted: BLOCKED (guard-push, plugin pipeline-core): Push-Gate check failed (1 finding(s)):
+  1. candidate-bound independent review and Verify are unavailable (private-critic-binding-unavailable)
+
+
+2 !== 0
+
+ORIGINAL184 CALLBACK END shard=null index=100 pid=255398 mono_ns=7159198398947 elapsed_ms=17721.243 outcome=throw
+{"schema":"pipeline.original-controller-selected-summary.v1","starts":7,"ends":7,"passes":0,"failures":7,"failedIndices":[94,95,96,97,98,99,100]}
+ORIGINAL CONTROLLER owned synthetic home cleanup passed after child settlement
+
+--- stderr ---
+Error: set-phase implementation refused calibration commit preflight (CAC-REGISTRATION-INVALID); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CAC-REGISTRATION-INVALID); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CAC-REGISTRATION-INVALID); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CAC-REGISTRATION-INVALID); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.
+Error: set-phase implementation refused calibration commit preflight (CAC-REGISTRATION-INVALID); State and calibration unchanged. Commit the baseline calibration through normal hooks, then retry.

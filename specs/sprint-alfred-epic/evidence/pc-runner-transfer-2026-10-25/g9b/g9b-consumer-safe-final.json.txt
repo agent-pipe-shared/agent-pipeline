@@ -1,0 +1,27 @@
+command: node --import <repo-root>/scratch/clones/g9b-active-hook-view-20261025/scratch/g9b-synthetic-identity.mjs --test <repo-root>/scratch/clones/g9b-active-hook-view-20261025/harness/scripts/check-consumer-safe-paths.test.mjs
+label: g9b-consumer-safe-final
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.577026ms)
+✔ a clean fixture passes (1.133724ms)
+✔ an allowlisted occurrence passes (0.446107ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.301573ms)
+✔ multiple prefix hits on one line each produce a finding (0.237722ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.364712ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (1.868139ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (238.123726ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (15.313934ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 359.540664
+
+--- stderr ---

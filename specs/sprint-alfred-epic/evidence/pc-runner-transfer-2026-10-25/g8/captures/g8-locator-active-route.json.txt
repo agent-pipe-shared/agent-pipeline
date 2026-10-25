@@ -1,0 +1,134 @@
+command: node --import ./scratch/clones/g8-original-custody-20261025/scratch/g8-private-test-home.mjs --test ./scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+label: g8-locator-active-route
+exitCode: 1
+head: 183ecfb2ddfc5bd424c88958b0bf60c1d2cda809
+tree: 8662ec234032f106c762069fc3916db68215760d
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✖ DABC001 compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State (5390.217061ms)
+✖ DABR001 route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (0.477387ms)
+ℹ present-plan exit 2; stderr: Error: State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts); no success is reported. Repair: node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8c-Jkm1cs/design-route-route-cHSORC names the cause and the command that clears it.
+✖ DABR002 route 2: one design proof, approve-plan, and the closed v9 accepted-contract record (0.739886ms)
+ℹ present-plan exit 2; stderr: Error: State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts); no success is reported. Repair: node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8c-Jkm1cs/design-route-route-cHSORC names the cause and the command that clears it.
+✖ DABR003 route 3: the boundary library admits the current approved v9 accepted-contract record (0.23663ms)
+✖ DABR004 route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.199629ms)
+✔ DABV001 decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt (2007.009618ms)
+ℹ approve-plan exit 2; stderr: DWP2-INFLIGHT-PRESENTATION-RETIRED: use present-plan --review-receipt
+✔ DABX001 retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED (1964.160683ms)
+ℹ present-plan exit 2; stderr: DWP-PRESENT-RETIRED: use present-plan --review-receipt
+✔ DABX002 retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan) (1978.768846ms)
+ℹ approve-plan exit 2; stderr: DWP-APPROVAL-REQUEST-RETIRED: use present-plan --review-receipt
+✔ DABX003 retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (310.086918ms)
+ℹ design-advisory-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ DABX004 retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (45.0743ms)
+ℹ design-advisory-admission.mjs exit 2; output: {"ok":false,"code":"DESIGN-ADVISORY-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ DABX005 retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (35.957128ms)
+ℹ design-course-session.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ DABX006 retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (31.665088ms)
+ℹ design-course-coordinator.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ DABX007 retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (291.864634ms)
+ℹ runner-design-readiness-bootstrap.mjs exit 2; output: {"ok":false,"code":"DESIGN-COURSE-RETIRED","hint":"ask an Advisor on demand; run one review; present-plan --review-receipt","implementationAuthority":false}
+✔ DABX008 retired: lib/retired-design-codes.mjs holds the four retirement codes (A4) (1.299419ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 9
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12165.053154
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABC001 compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State (5390.217061ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 0
+  
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:704:10)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR001 route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (0.477387ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0; stderr: Error: State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts); no success is reported. Repair: node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8c-Jkm1cs/design-route-route-cHSORC names the cause and the command that clears it.
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:598:10)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR002 route 2: one design proof, approve-plan, and the closed v9 accepted-contract record (0.739886ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0 first; stderr: Error: State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts); no success is reported. Repair: node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8c-Jkm1cs/design-route-route-cHSORC names the cause and the command that clears it.
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:633:10)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR003 route 3: the boundary library admits the current approved v9 accepted-contract record (0.23663ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0 first; stderr: Error: State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts); no success is reported. Repair: node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8c-Jkm1cs/design-route-route-cHSORC names the cause and the command that clears it.
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:675:10)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR004 route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.199629ms)
+  AssertionError [ERR_ASSERTION]: present-plan --review-receipt must exit 0; stderr: Error: State authority route unavailable (SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts); no success is reported. Repair: node <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/session-authority-repair.mjs inspect --root /run/user/1000/ap-g17/g8c-Jkm1cs/design-route-route-cHSORC names the cause and the command that clears it.
+  
+  2 !== 0
+  
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:694:10)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

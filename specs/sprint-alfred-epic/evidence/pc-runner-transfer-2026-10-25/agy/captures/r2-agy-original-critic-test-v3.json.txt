@@ -1,0 +1,20 @@
+command: node --require <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/scratch/r2-agy-synthetic-preload.cjs --test <repo-root>/scratch/clones/r2-agy-original-critic-return-20261025/plugins/pipeline-core/lib/agy-original-critic-return.test.mjs
+label: r2-agy-original-critic
+exitCode: 0
+head: fb18ac6b0af42d1674129bad07a8d15947372e80
+tree: a2b166ec8398c65ad517f9cd81843daa32b5d1a4
+dirty: true
+--- stdout ---
+✔ original AGY Critic METHOD return binds prepared packet, diff, candidate and child through an opaque Source handle (184.990824ms)
+✔ missing Critic review, foreign child model and invalid return cannot create Source admission (131.695443ms)
+✔ changed reviewed bytes after return invalidate the Source readback (161.339797ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 807.954312
+
+--- stderr ---

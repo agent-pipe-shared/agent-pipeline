@@ -1,0 +1,34 @@
+# R2 checkout identity — method-only handoff
+
+The public named-commit route reproduced `VEP-PROJECT-IDENTITY: PCI-ROOT-MISMATCH` before production edits, with a real root-bound calibration. The owned patch repairs identity resolution through existing Git physical lineage. Original Source: commit `73afcf74241fd38627161d5a5e9956d12b7e9341`, tree `29ffb1b7e1441d0c6879fc002337e024b6536293`. All production changes remain unstaged in the new inert clone `scratch/clones/r2-checkout-identity-20261025`.
+
+## Source behavior
+
+- Calibration root mismatch can resolve only through registered Git worktree membership, an independently observed original primary root/common directory, reciprocal physical `.git`/admin pointers, a resolved original root identity, and byte-identical selected original calibration. Copied hashes, same basename, remote origin and caller JSON/environment do not grant this association.
+- Evidence retains the legitimate original `rootSha256` and records the temporary checkout's separate physical hash. Candidate commit/tree selection remains the existing exact detached-OID route. Candidate calibration bytes are never rewritten.
+- Verify freshly reads identity after the configured command. Original calibration drift refuses success. Named-commit evidence reaches the requested original output only after temporary checkout retirement.
+- Only three owned Source files changed: calibration reader, producer, original producer test suite. Consumer Verify uses its existing shared reader. No new test file or Verify enrollment is required.
+
+## Qualification
+
+`red-named-commit.txt`: public route, 1 test, 0 pass, 1 fail, 0 skipped; exact expected root-mismatch error before the production edit. `green-named-commit.txt`: the same route passes, 1/1, 0 skipped. Complete original affected suites are the producer suite and existing `project-calibration-retains-new-project-placeholder` pin. Final `green-original-suites-complete.txt`: exit0, 87 tests, 87 pass, 0 fail, 0 cancelled, 0 skipped, 0 todo, 65250.640818ms. `git diff --check` passes. All earlier complete attempts remain retained.
+
+Negatives cover unrelated same-basename repository with copied calibration and origin, unbound external directory, copied Git pointer, forged reverse pointer, unrelated common-directory/core.worktree association, changed committed calibration, original calibration drift during Verify, missing/wrong commit, wrong evidence candidate, and dependency failures. The original checkout's branch/HEAD/index/runtime and all non-evidence bytes are compared on named-route success/failure; package preparation additionally compares original package/runtime/index bytes and its existing node_modules marker. Existing public CLI and original calibration contracts remain exercised.
+
+Committed dependency preparation uses the actual Source preparer with the original deterministic local npm fixture, including version and lock validation and install arguments. No registry download or native package-manager assurance is claimed. Cleanup-failure publication ordering is inspected Source behavior; success/failure temporary checkout retirement is behaviorally tested, while an OS cleanup-refusal injection was not performed.
+
+## Fixtures and attempt record
+
+Synthetic `userInfo`, `homedir` and `tmpdir` are installed before capture/test imports and propagated to descendants. Public fixtures are new owner-only directories under `/tmp`, outside Git ancestry; synthetic private homes are unique children of the approved private parent, validated physically for ownership/mode. The preload retains held device/inode facts and deletes only its exact owned roots after the capture child settles. New lineage fixtures likewise check their held parent inode before removal. Existing original suite cleanup behavior remains otherwise intact.
+
+Own installed Goldfish operational preflight ran at the authorized host boundary before the first write: `ready`, matching installed ruleset `1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe`. Optional model bootstrap reported unavailable `MODEL-ROLE-SESSION-IDENTITY-CONFLICT`; this grants no model/native authority. All Node/Git/tests used the host boundary from their first call. No independent clone bootstrap was asserted.
+
+An initial broad read search was refused by the shell guard; narrow reads continued. An accidental small decision-ID search of `docs/state.md` was disclosed to the parent as a role-history prohibition mistake; no raw session stores or full handover/history were read. The first complete affected-suite capture had 80/86 pass and 6 failures: five fixture `CGB-MAIN-INTEGRATION` failures caused by isolated Git lacking a host-dependent default branch, corrected by explicit fixture `main`; one `VEP-DRIFT` caused by my editing production cleanup ordering while that first run was active. The attempt is preserved. Later full runs used settled files. The subsequent 86/86 and 87/87 green captures are also preserved, with a final full run covering the independent original-root topology hardening. D149 continuation preserves approximately50 initial actions and all later actions; it asserts no reset or authenticated native grant.
+
+## Boundaries and pending work
+
+This is Source qualification under D143/D148/D149/D151, existing AC174/274/264, not native report-causality proof or completed lifecycle acceptance. Root-bound linked identity intentionally requires the registered primary project's calibration to match byte-for-byte; arbitrary historical calibration differences and root metadata bound only to a different non-primary worktree are refused. Native Windows behavior and hostile concurrent filesystem races are not established by these Linux controlled checks.
+
+Main, its index and lifecycle state were not written; no staging, commits, child agents, model/provider calls, protected registration changes, stamp/install/push/close or main switch occurred. Full integrated Verify/Security, independent Critic, native runner assurance and PO acceptance remain pending with the parent. Project-resource measurements and quick-route availability remain unknown. Source close custody and Critic requirements remain unchanged.
+
+`complete.patch` is the full cumulative Source patch. `manifest.json` binds its hash, every owned preimage/postimage, all captures and both auxiliary scripts. The fixture preload and packaging script are reviewable scratch artifacts, not shipped production or additional test enrollment.

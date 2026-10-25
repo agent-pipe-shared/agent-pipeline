@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: SUL-1.0
+/** Inert G8 contract prototype. Preparation is a proposal, never review evidence.
+ * No execution port, identity issuer, receipt writer or admission authority is exported.
+ */
+import { createHash } from "node:crypto";
+import { canonical } from "./po-approval-proof.mjs";
+import { inspectSpecCriterionRows } from "./critic-accepted-contract.mjs";
+import { DESIGN_REVIEW_EXECUTION_REQUEST_SCHEMA, DESIGN_REVIEW_EXECUTION_ASSURANCE, validateDesignReviewExecutionRequest } from "./design-review-execution-request.mjs";
+export { DESIGN_REVIEW_EXECUTION_REQUEST_SCHEMA, validateDesignReviewExecutionRequest } from "./design-review-execution-request.mjs";
+
+const sha = value => createHash("sha256").update(value).digest("hex");
+const keys = (value, expected) => value !== null && typeof value === "object" && !Array.isArray(value)
+  && Object.keys(value).length === expected.length && expected.every(key => Object.hasOwn(value, key));
+const refuse = code => ({ ok: false, code });
+const copy = value => structuredClone(value);
+
+/** Inputs are observations, not authenticated identities. The disk preparer obtains source bytes itself. */
+export function prepareDesignReviewExecution(input) {
+  if (!keys(input, ["featureId", "candidate", "sources", "specPath", "specBytes", "authorExecutionSha256", "round", "previousReceiptSha256"])
+    || !(input.specBytes instanceof Uint8Array)) return refuse("DRE-PREPARE-SHAPE");
+  let parsed;
+  try { parsed = inspectSpecCriterionRows(new TextDecoder("utf-8", { fatal: true }).decode(input.specBytes)); }
+  catch { return refuse("DRE-SPEC-BYTES"); }
+  if (!parsed.ok || !parsed.located.length) return refuse("DRE-CRITERIA");
+  const ids = [...parsed.located].sort();
+  const specSha256 = sha(input.specBytes);
+  const request = { schema: DESIGN_REVIEW_EXECUTION_REQUEST_SCHEMA, status: "proposed", featureId: input.featureId,
+    candidate: input.candidate, sources: input.sources, specPath: input.specPath,
+    criteria: { specSha256, ids, sha256: sha(canonical({ specSha256, ids })) },
+    authorExecutionSha256: input.authorExecutionSha256, reviewerDuty: "critic", round: input.round,
+    previousReceiptSha256: input.previousReceiptSha256, assurance: copy(DESIGN_REVIEW_EXECUTION_ASSURANCE) };
+  const checked = validateDesignReviewExecutionRequest(request);
+  return checked.ok ? { ...checked, request: copy(request) } : checked;
+}
+
+/** Pure compare; cannot consume a review, change State or grant independent assurance. */
+export function recheckDesignReviewExecutionRequest({ request, current } = {}) {
+  const original = validateDesignReviewExecutionRequest(request), observed = validateDesignReviewExecutionRequest(current);
+  if (!original.ok) return original;
+  if (!observed.ok) return observed;
+  return original.requestSha256 === observed.requestSha256 ? { ok: true, status: "proposed", independentCriticPass: false }
+    : refuse("DRE-PREPARATION-DRIFT");
+}

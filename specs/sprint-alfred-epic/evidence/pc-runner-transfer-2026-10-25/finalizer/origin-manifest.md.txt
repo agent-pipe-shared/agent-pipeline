@@ -1,0 +1,33 @@
+# R2 original Critic finalizer method package
+
+Base: `69643e345443ca4100ab164e0db808d275b2cd78` in `scratch/clones/r2-critic-finalizer-original-20261025`.
+
+Owned diff:
+
+- `plugins/pipeline-core/scripts/session-critic-finalizer.mjs`: require a same-process original Source admission before result/receipt/event effects; type the refusal at CLI.
+- `plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs`: retain the original caller-verdict positive as baseline evidence and replace that invalid acceptance assertion with a public refusal/no-effect regression (QG-04 rationale in test).
+- `plugins/pipeline-core/lib/session-critic-original-source-admission.mjs`: narrow consumer wrapper; requires an original Source-owned opaque context and an inspection API, which the current producer does not yet export. It never treats serialized JSON as origin.
+
+Only the public refusal slice is green. The baseline `codex-critic-host.mjs` had a private original-custody assertion; the frozen G8 overlay adds an opaque live-context inspector that calls it. The `antigravity-native-dispatch-coordinator.mjs` only prepares/verifies a native call, and has no returned Critic review reader. No native-positive or full original Source admission is claimed. The old positive finalizer tests remain red until actual Source/host callbacks and their controlled mechanics replace caller-authored fixtures without skipping existing result assertions.
+
+## Same-owner D149 continuation
+
+The three owned files remain the only consumer patch. Fourteen frozen G8 producer postimages have been overlaid into the clone as **read-only dependencies**; their exact list and hashes are in `scratch/agent-out/finalizer-readonly-dependency-overlay-20261025.json`. Exclude all fourteen from this consumer patch and authorship.
+
+The owned helper now calls the frozen `inspectOriginalSessionCriticReturn` and `readInspectedOriginalSessionCriticReturn` APIs with a live opaque context, rechecks original custody before each result/receipt/event effect, and compares the original child, dispatch, candidate and verdict. It refuses a missing `sessionPacketBinding` as `SCF-ORIGINAL-PACKET-UNBOUND`. That binding is not in the frozen G8 producer, so no positive original session-packet completion is claimed. G8 is preparing a Source-owned prelaunch association: derive the control root, reopen the already claimed packet, bind packet ID/digest, claim digest, session ID, preflight digest and exact diff digest during native PREPARE, and return/recheck that tuple from the opaque inspector. The consumer compares all six against the current packet/admission. No caller JSON can add it.
+
+The new captured `r2-critic-cli-refusal-cont.json` and `r2-critic-forged-context-cont.json` are green. Both prove rejection before result/receipt effects, not a native positive. Source fixture CCH137 already exercises the genuine controlled native child/opaque inspector in the frozen G8 suite, but the inspector's current output lacks the outer session packet tuple. AGY remains controlled-only and unavailable for independent PASS.
+
+Latest owned checks: `r2-critic-finalizer-syntax-cont.json` exit 0; `r2-critic-consumer-paths-cont.json` exit 0; `r2-critic-original-suite-cont.json` exit 1 with 15 pass and 10 prior positive lifecycle cases red solely because they have no Source context. These are not cleared by the focused negative checks.
+
+Evidence (machine written under the clone's `scratch/`):
+
+- `r2-critic-baseline-cli.json`: original public CLI positive, wrapped exit 0, demonstrates caller-authored verdict acceptance.
+- `r2-critic-cli-refusal.json`: patched public CLI refusal/no-effect regression, wrapped exit 0.
+- `r2-critic-cli-refusal-v2.json`: final public regression adds native-labelled caller JSON and replay attempts; both refuse, wrapped exit 0.
+- `r2-critic-cli-refusal-v3.json`: same final regression after the synthetic preload gained exact inode-checked exit cleanup, wrapped exit 0.
+- `r2-critic-original-suite.json`: existing suite, wrapped exit 1; 14 pass, 10 old positives fail with `SCF-ORIGINAL-SOURCE-REQUIRED`.
+- `r2-critic-consumer-paths.json`: consumer-safe-paths suite, wrapped exit 0.
+- `r2-critic-agy-prepare-source.json`: Agy prepare source suite, wrapped exit 1 before cases due to `project-onboarding-ready-gate.mjs` circular-init `ReferenceError` at line 94 on this pinned baseline.
+
+Every capture was submitted at `host-authorized-wsl` with the synthetic identity preload before capture/test imports and descendants. No paid/native child, dispatch record, stage or commit was made. Optional model-role bootstrap was unavailable (`MODEL-ROLE-SESSION-IDENTITY-CONFLICT`). Project resource headroom is unknown: no candidate-bound measurement/limit observation was supplied. Full Verify, integrated Critic and PO acceptance remain parent-owned.

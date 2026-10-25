@@ -1,0 +1,22 @@
+# G8 original Source transaction proposal (inert)
+
+Base: `62008d6bd39f68aa849e7257cdc3161b59222ebb`. D144 selected the existing Source/Model registry. This document proposes exact integration bytes for review; the current clone patch does not implement the positive transaction or activate it.
+
+## Request and origin
+
+Keep `pipeline.design-review-execution-request.proposed.v1` from the patch as the closed current-artifacts subject: candidate commit/tree, sorted tracked source facts, whole-Spec criteria digest, original author execution digest, Critic duty, round and predecessor. Change its status/schema only in the accepted Source producer package. A caller-supplied `authorExecutionSha256` is a lookup hint; Source must re-read the original author invocation and bind its exact candidate and execution relation before launch.
+
+Use a closed public locator `{schema,requestSha256,receiptSha256,reportSha256,originalInvocationSha256,sourceRevisionSha256,modelMemberRef}`. The locator is an index only. `modelMemberRef` is the current physical `model-family-host` registry member ref; it grants no authority. No key, new principal or independent ledger is introduced.
+
+## Source APIs and transaction
+
+1. `prepareOriginalDesignReview({repository,sourcePaths,specPath,featureId,originalAuthorReference,round,previousOriginalReviewReference})` obtains the request from disk/Git, resolves the original author Source record, rejects round 3, duplicate round and predecessor rebound, and privately retains the request digest before native launch.
+2. `runOriginalDesignReview({preparedHandle})` uses the existing Model invocation and native `reviewScope:{kind:'current-artifacts',paths}` route. Only a host-minted validated native return handle may enter terminal capture. Source projects findings, sanitized report, original report digest and receipt; the presenting caller supplies none of these. Within the same Source-owned Model domain operation, publish those exact file facts, advance/release its registry member, and return a locator bound to its terminal `memberRef`. No client-supplied `trustedSources`, lifecycle fields or JSON-to-handle constructor is an admission route.
+3. `readOriginalDesignReview({repository,locator,expectedSubject})` reopens the actual repository, obtains the Model producer port from Source, calls `inspectSourceOwnedSessionAuthorityMemberRecord` under `withSessionAuthorityBoundary`, and checks current `memberRef`, producer `model-family-host`, terminal release, and source facts for the original invocation, request, report and receipt. Re-read each physical file through the domain Source reader with exact namespace, path and semantic digest. Compare reviewer identity, duty, request/round/predecessor, candidate, source/criteria, receipt/report bytes and original publication. Return `DRE-ORIGIN-UNAVAILABLE` for absent/lost records, typed drift/replay codes for mismatches; never infer stronger assurance from a missing fallback field.
+4. `admitOriginalDesignReview` is Source-only and accepts the private readback handle, not a locator alone. Both `present-plan` binding paths and signing revalidation call it before effects. The pure U3 binding kernel and round-two unreviewed-source-delta behavior stay unchanged; K128 fallback remains visibly weaker.
+
+`readHeldModelFamilyInvocation` currently reads an indexed receipt but cannot by itself prove native terminal publication. `createNativeCriticPreparedContextFactory().reconstruct` explicitly refuses cross-process WeakMap reconstruction. The missing implementation is to retain the original terminal file facts in the Model member and expose its exact member ref from the Source lifecycle; simply comparing serialized hashes would not close G8.
+
+## Current candidate state
+
+The patch contains request preparation and fail-closed consumers only. Its active route examiner reaches real `present-plan` but 5 positive cases fail until the transaction above exists. Native execution, independent Critic PASS, integrated Verify and PO acceptance are unverified. Do not integrate this candidate as an active replacement for the existing route.

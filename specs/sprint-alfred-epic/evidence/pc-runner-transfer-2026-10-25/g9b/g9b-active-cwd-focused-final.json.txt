@@ -1,0 +1,21 @@
+command: node --import <repo-root>/scratch/clones/g9b-active-hook-view-20261025/scratch/g9b-synthetic-identity.mjs --test <repo-root>/scratch/clones/g9b-active-hook-view-20261025/plugins/pipeline-core/lib/pins/antigravity-active-hook-cwd-survives-runner-view-refresh.test.mjs
+label: g9b-active-cwd-focused-final
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+{"case":"active-cwd-refresh","sourceRevision":"684a8d1ca66786afb7c4f38e82c7371fb06291f8","firstSourceSha256":"a1b09d93e569e3106ae03b9cef3c32d12b83dd1fb5d5536cf3189bb91e6b0d38","secondSourceSha256":"5a9d2c6f5f13c24f689cc0af238571c2adef5a89eb611ef93480de43472fbfe0","firstViewSha256":"cca44d045bce2a6b0d9cdeb8ff406407ac4b3bbf4140a92ff5a7ba4e0d1ea70b","secondViewSha256":"7794348d2f96f9bcf0a69df8447fb6236699f16e7644d342086f2be28fbfeb3d","hookExit":0,"laterExit":0,"cliCalls":10,"retainedViewCount":2}
+✔ G9b: old hook cwd and script survive a production refresh from a revised synthetic Source (747.486152ms)
+{"case":"direct-prune-limit","viewSha256":"cca44d045bce2a6b0d9cdeb8ff406407ac4b3bbf4140a92ff5a7ba4e0d1ea70b","removedCount":1,"retainedForeignCount":1,"hookExit":0}
+✔ G9b: direct custody prune without complete liveness observation can remove a live cwd; foreign tree is retained (81.846097ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1228.897762
+
+--- stderr ---

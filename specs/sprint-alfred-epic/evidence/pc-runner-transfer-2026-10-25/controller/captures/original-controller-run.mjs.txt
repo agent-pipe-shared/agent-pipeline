@@ -1,0 +1,47 @@
+// Test-only foreground controller for the owned inert clone.
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { validatePrivateParent, validateCreatedHome } from "../plugins/pipeline-core/scripts/codex-critic-private-parent-fixture.mjs";
+
+const parent = "/run/user/1000/ap-g17";
+validatePrivateParent(parent);
+const parentBefore = lstatSync(parent);
+assert.equal(realpathSync(parent), parent);
+assert.equal(parentBefore.uid, process.getuid());
+assert.equal(parentBefore.mode & 0o777, 0o700);
+const home = mkdtempSync(join(parent, "g17c-"));
+const homeBefore = lstatSync(home);
+let result;
+try {
+  validateCreatedHome(home);
+  const preload = fileURLToPath(new URL("../plugins/pipeline-core/lib/original-controller-controlled-os-identity.mjs", import.meta.url));
+  const env = { ...process.env, ORIGINAL_CONTROLLER_SYNTHETIC_HOME: home, HOME: home, USERPROFILE: home,
+    TMPDIR: home, TMP: home, TEMP: home, XDG_CONFIG_HOME: join(home, "config"),
+    XDG_STATE_HOME: join(home, "state"), XDG_CACHE_HOME: join(home, "cache"),
+    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", NODE_OPTIONS: `--import=${preload}` };
+  const phase = process.argv[2];
+  if (["selected", "calibration", "devplan", "handover"].includes(phase)) {
+    const selected = fileURLToPath(new URL("./original-controller-selected.mjs", import.meta.url));
+    result = spawnSync(process.execPath, [selected], { env: { ...env, ORIGINAL_CONTROLLER_SELECTION: phase }, cwd: process.cwd(), stdio: "inherit", timeout: 360_000 });
+  } else if (phase === "full") {
+    const suite = fileURLToPath(new URL("../plugins/pipeline-core/lib/project-onboarding-v3.test.mjs", import.meta.url));
+    result = spawnSync(process.execPath, [suite], { env, cwd: process.cwd(), stdio: "inherit", timeout: 900_000 });
+  } else throw new Error("unknown phase");
+  if (result.error) throw result.error;
+  if (result.signal) throw new Error(`child signal ${result.signal}`);
+  process.exitCode = result.status;
+} finally {
+  const homeAfter = lstatSync(home);
+  assert.equal(homeAfter.dev, homeBefore.dev);
+  assert.equal(homeAfter.ino, homeBefore.ino);
+  assert.equal(homeAfter.uid, process.getuid());
+  validateCreatedHome(home);
+  rmSync(home, { recursive: true });
+  const parentAfter = lstatSync(parent);
+  assert.equal(parentAfter.dev, parentBefore.dev);
+  assert.equal(parentAfter.ino, parentBefore.ino);
+  console.log("ORIGINAL CONTROLLER owned synthetic home cleanup passed after child settlement");
+}

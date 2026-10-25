@@ -1,0 +1,18 @@
+// Test-only preload: install synthetic identity before any suite/capture imports.
+const os = require("node:os");
+const { syncBuiltinESMExports } = require("node:module");
+const { isAbsolute } = require("node:path");
+const home = process.env.PIPELINE_SYNTH_HOME;
+const temp = process.env.PIPELINE_SYNTH_TMP;
+if (!home || !temp || !isAbsolute(home) || !isAbsolute(temp)) throw new Error("R2-READY-SYNTH-IDENTITY-INVALID");
+process.env.HOME = home;
+process.env.TMPDIR = temp;
+process.env.TMP = temp;
+process.env.TEMP = temp;
+process.env.USER = "ready_fixture";
+process.env.LOGNAME = "ready_fixture";
+process.env.USERNAME = "ready_fixture";
+os.homedir = () => home;
+os.tmpdir = () => temp;
+os.userInfo = () => ({ username: "ready_fixture", uid: 1000, gid: 1000, shell: "/bin/false", homedir: home });
+syncBuiltinESMExports();

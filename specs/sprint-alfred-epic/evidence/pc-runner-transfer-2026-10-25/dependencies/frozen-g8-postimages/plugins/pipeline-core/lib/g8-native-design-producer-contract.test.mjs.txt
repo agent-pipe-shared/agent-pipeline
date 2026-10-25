@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: SUL-1.0
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+const root = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+const baseline = process.argv.indexOf("--baseline-root");
+const targetRoot = baseline < 0 ? root : process.argv[baseline + 1];
+const producer = await import(pathToFileURL(join(targetRoot, "plugins/pipeline-core/lib/design-review-execution-producer.mjs")));
+const disk = await import(pathToFileURL(join(targetRoot, "plugins/pipeline-core/scripts/design-review-dispatch.mjs")));
+const { prepareDesignReviewExecution, validateDesignReviewExecutionRequest, recheckDesignReviewExecutionRequest } = producer;
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const specBytes = Buffer.from("## Acceptance criteria\n\n- **AC-1:** The reviewer receives current sources.\n- **AC-2:** Forged provenance refuses.\n");
+const source = { path: "specs/feat-x/spec.md", sha256: hash(specBytes), blobOid: "c".repeat(40), mode: "100644" };
+const input = () => ({ featureId: "feat-x", candidate: { commit: "a".repeat(40), tree: "b".repeat(40) },
+  sources: [{ path: "specs/feat-x/prd.md", sha256: "d".repeat(64), blobOid: "e".repeat(40), mode: "100644" }, { ...source }],
+  specPath: source.path, specBytes, authorExecutionSha256: "f".repeat(64), round: 1, previousReceiptSha256: null });
+
+test("G8P01 positive preparation binds criteria and exact sources, with honest proposed assurance", () => {
+  const result = prepareDesignReviewExecution(input());
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.request.criteria.ids, ["AC-1", "AC-2"]);
+  assert.deepEqual(result.request.assurance, { class: "proposed-preparation", native: false, independentCriticPass: false });
+  assert.equal(validateDesignReviewExecutionRequest(result.request).requestSha256, result.requestSha256);
+  assert.equal(recheckDesignReviewExecutionRequest({ request: result.request, current: structuredClone(result.request) }).ok, true);
+});
+test("G8P02 candidate, source revision, author, duty and criteria drift refuse without mutation", () => {
+  const request = prepareDesignReviewExecution(input()).request;
+  for (const mutate of [r => r.candidate.commit = "1".repeat(40), r => r.sources[0].sha256 = "1".repeat(64),
+    r => r.authorExecutionSha256 = "1".repeat(64), r => r.reviewerDuty = "advisor", r => r.criteria.ids = ["AC-3"]]) {
+    const current = structuredClone(request); mutate(current);
+    const before = JSON.stringify({ request, current });
+    assert.equal(recheckDesignReviewExecutionRequest({ request, current }).ok, false);
+    assert.equal(JSON.stringify({ request, current }), before);
+  }
+});
+test("G8P03 closed request rejects manual provenance/PASS labels, malformed data and third rounds", () => {
+  const request = prepareDesignReviewExecution(input()).request;
+  for (const value of [null, {}, { ...request, dispatchId: "forged" }, { ...request, independentCriticPass: true },
+    { ...request, assurance: { ...request.assurance, native: true } }, { ...request, round: 3 }, { ...request, assurance: null }]) {
+    assert.equal(validateDesignReviewExecutionRequest(value).ok, false);
+  }
+  const second = input(); second.round = 2; second.previousReceiptSha256 = "1".repeat(64);
+  assert.equal(prepareDesignReviewExecution(second).ok, true);
+  second.previousReceiptSha256 = null;
+  assert.equal(prepareDesignReviewExecution(second).ok, false);
+});
+test("G8P04 Spec bytes, duplicate/path sources and unsupported criteria refuse", () => {
+  const changed = input(); changed.specBytes = Buffer.from("## Acceptance criteria\n\n- **AC-3:** Changed.\n");
+  assert.equal(prepareDesignReviewExecution(changed).ok, false);
+  for (const path of ["../spec.md", "/spec.md", "C:/spec.md", "spec\\x.md"]) {
+    const value = input(); value.sources[0].path = path;
+    assert.equal(prepareDesignReviewExecution(value).ok, false);
+  }
+  const duplicate = input(); duplicate.sources[0] = { ...source };
+  assert.equal(prepareDesignReviewExecution(duplicate).ok, false);
+});
+test("G8P05 real disk/Git preparation and dirty, symlink, absolute and untracked refusals", () => {
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  const fixture = mkdtempSync(join(root, "scratch/g8-contract-test-"));
+  const git = args => execFileSync("git", args, { cwd: fixture, stdio: "pipe" });
+  try {
+    git(["init", "--quiet"]); mkdirSync(join(fixture, "specs/feat-x"), { recursive: true });
+    writeFileSync(join(fixture, "specs/feat-x/prd.md"), "Fixture PRD\n"); writeFileSync(join(fixture, source.path), specBytes);
+    git(["add", "--", "specs/feat-x/prd.md", source.path]);
+    git(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "core.hooksPath=/dev/null", "commit", "--quiet", "-m", "fixture"]);
+    const options = { root: fixture, featureId: "feat-x", sourcePaths: ["specs/feat-x/prd.md", source.path],
+      specPath: source.path, authorExecutionSha256: "f".repeat(64), round: 1, previousReceiptSha256: null };
+    const positive = disk.prepareDesignReviewExecutionFromDisk(options);
+    assert.equal(positive.ok, true); assert.equal(positive.request.sources.find(s => s.path === source.path).sha256, hash(specBytes));
+    const inventory = git(["status", "--porcelain"]).toString();
+    assert.equal(disk.prepareDesignReviewExecutionFromDisk(options).requestSha256, positive.requestSha256);
+    assert.equal(git(["status", "--porcelain"]).toString(), inventory);
+    writeFileSync(join(fixture, source.path), "Changed\n");
+    assert.equal(disk.prepareDesignReviewExecutionFromDisk(options).code, "DRE-SOURCE-DRIFT");
+    writeFileSync(join(fixture, source.path), specBytes);
+    assert.equal(disk.prepareDesignReviewExecutionFromDisk({ ...options, sourcePaths: [join(fixture, source.path), "specs/feat-x/prd.md"] }).ok, false);
+    writeFileSync(join(fixture, "untracked.md"), "untracked\n");
+    assert.equal(disk.prepareDesignReviewExecutionFromDisk({ ...options, sourcePaths: [source.path, "untracked.md"] }).code, "DRE-SOURCE-UNTRACKED");
+    rmSync(join(fixture, source.path)); symlinkSync("prd.md", join(fixture, source.path));
+    assert.equal(disk.prepareDesignReviewExecutionFromDisk(options).code, "DRE-SOURCE-PATH");
+    assert.equal(readFileSync(join(fixture, "specs/feat-x/prd.md"), "utf8"), "Fixture PRD\n");
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});

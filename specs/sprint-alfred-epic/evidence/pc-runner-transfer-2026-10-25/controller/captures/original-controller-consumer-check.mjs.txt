@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { lstatSync, mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+const home = mkdtempSync(join(process.cwd(), "scratch", "original-controller-home-"));
+const before = lstatSync(home);
+try {
+  const preload = fileURLToPath(new URL("./original-controller-local-identity.mjs", import.meta.url));
+  const env = { ...process.env, ORIGINAL_CONTROLLER_SYNTHETIC_HOME: home, HOME: home, USERPROFILE: home,
+    TMPDIR: home, TMP: home, TEMP: home, XDG_CONFIG_HOME: join(home, "config"),
+    XDG_STATE_HOME: join(home, "state"), XDG_CACHE_HOME: join(home, "cache"),
+    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", NODE_OPTIONS: `--import=${preload}` };
+  const argv = process.argv[2] === "registry"
+    ? ["scratch/original-controller-registry.mjs"]
+    : process.argv[2] === "resource"
+    ? ["plugins/pipeline-core/scripts/report-resource-headroom.mjs", "--input", "scratch/resource-observations.json"]
+    : ["--test", "harness/scripts/check-consumer-safe-paths.test.mjs"];
+  const result = spawnSync(process.execPath, argv, {
+    cwd: process.cwd(), env, stdio: "inherit", timeout: 120_000,
+  });
+  if (result.error) throw result.error;
+  if (result.signal) throw new Error(`consumer check signal ${result.signal}`);
+  process.exitCode = result.status;
+} finally {
+  const after = lstatSync(home);
+  assert.equal(after.dev, before.dev);
+  assert.equal(after.ino, before.ino);
+  assert.equal(after.uid, process.getuid());
+  rmSync(home, { recursive: true });
+  console.log("ORIGINAL CONTROLLER local synthetic identity cleanup passed");
+}

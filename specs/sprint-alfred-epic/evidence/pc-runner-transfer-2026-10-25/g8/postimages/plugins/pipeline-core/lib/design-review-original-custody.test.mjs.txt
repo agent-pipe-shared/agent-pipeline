@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: SUL-1.0
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readAndAdmitOriginalDesignReviews } from './design-review-original-custody.mjs';
+import { createDesignReviewReceipt } from './design-review-receipt.mjs';
+
+const fallback = { route: 'fallback-self-dispatch', reasonCode: 'ROUTE-UNAVAILABLE', requestedRoute: 'codex', observedIdentity: 'unknown' };
+const sha = 'a'.repeat(64);
+const receipt = ({ withFallback = false } = {}) => {
+  const produced = createDesignReviewReceipt({ featureId: 'example', previous: null,
+    sources: { prd: { path: 'specs/example/prd.md', sha256: sha },
+      spec: { path: 'specs/example/spec.md', sha256: 'b'.repeat(64) }, companions: [] },
+    reviewer: { runner: 'codex', model: 'gpt-6-sol' },
+    report: { path: 'specs/example/review/report.md', sha256: 'c'.repeat(64) },
+    openFindingIds: [], reviewedAt: '2026-10-25T00:00:00.000Z',
+    ...(withFallback ? { fallback } : {}) });
+  assert.equal(produced.ok, true);
+  return { path: 'specs/example/review/receipt.json', bytes: produced.bytes };
+};
+
+test('G8 original custody: serialized receipt without Source origin refuses', () => {
+  const result = readAndAdmitOriginalDesignReviews({ repository: '/unused', featureId: 'example', receipts: [receipt()] });
+  assert.deepEqual(result, { ok: false, code: 'DRE-ORIGIN-UNAVAILABLE' });
+});
+
+test('G8 original custody: explicit fallback remains weaker than independent review', () => {
+  const result = readAndAdmitOriginalDesignReviews({ repository: '/unused', featureId: 'example', receipts: [receipt({ withFallback: true })] });
+  assert.equal(result.ok, true);
+  assert.equal(result.assurance, 'self-dispatch-fallback');
+  assert.equal(result.independentCriticPass, false);
+});

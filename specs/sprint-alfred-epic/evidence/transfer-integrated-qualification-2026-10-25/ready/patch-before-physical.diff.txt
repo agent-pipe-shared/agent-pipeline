@@ -1,0 +1,178 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 6c2a6ca20..5e6c75c91 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -270,7 +270,9 @@ function tmpdir() {
+   mkdirSync(root, { recursive: true });
+   return root;
+ }
+-const VAR_TMP = process.platform === "win32" ? tmpdir() : "/var/tmp";
++// D151: the original outside-root fixtures use the run's unique public temp
++// child, never the private authority HOME or an existing /var/tmp directory.
++const VAR_TMP = tmpdir();
+ 
+ /**
+  * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the
+@@ -1780,6 +1782,8 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
+       "rg --files . | rg 'guard|deny|permission|settings'",
+       "rg -n -S lifecycle plugins | rg guard",
+       "rg -l '^status: open' backlog/items | sort",
++      // G23 accepts bounded filename-extension globs, including repeated ones.
++      "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
+     ]) {
+       const parsed = parseGuardCommand(command, path, POSIX_PARSE);
+       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
+@@ -1789,7 +1793,6 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
+     // SEC-11: recursive rg keeps default hidden/ignore semantics; globs may expose private paths.
+     for (const command of [
+       "rg --files --hidden --max-depth 3 . | head -n 500",
+-      "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
+       "rg --files -uu . | rg 'guard|deny|permission|settings'",
+     ]) {
+       assert.equal(isBoundedReadOnlyPipeline(parseGuardCommand(command, path, POSIX_PARSE), path), false, command);
+@@ -7935,6 +7938,41 @@ test("IR-4 incident replay: a read-only inventory index probe mentioning a prote
+   } finally { rmSync(path, { recursive: true, force: true }); }
+ });
+ 
++test("IR-4 READY inline admission remains literal and leaves credential reads and opaque writes refused", () => {
++  const path = tpShellFixture();
++  try {
++    for (const command of [
++      `node -e "require('fs').readFileSync('.aws/credentials')"`,
++      `node -e "require('fs').writeFileSync('scratch/note.txt',process.env.SECRET)"`,
++      `node -e "const p='scratch/note.txt'; require('fs').writeFileSync(p,'x')"`,
++      `node -e "require('fs').writeFileSync('scratch/note.txt','x');process.exit(0)"`,
++    ]) {
++      const result = tpShellRun(path, command);
++      assert.equal(result.exitCode, 2, command);
++      assert.match(result.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u, command);
++    }
++    const protectedWrite = tpShellRun(path, `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`);
++    assert.equal(protectedWrite.exitCode, 2);
++    assert.match(protectedWrite.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"));
++    mkdirSync(join(path, "scratch"), { recursive: true });
++    mkdirSync(dirname(join(path, TPSHELL_TARGET)), { recursive: true });
++    writeFileSync(join(path, TPSHELL_TARGET), "protected\n");
++    symlinkSync(join(path, TPSHELL_TARGET), join(path, "scratch", "note.txt"));
++    linkSync(join(path, TPSHELL_TARGET), join(path, "scratch", "linked.txt"));
++    for (const name of ["note.txt", "linked.txt"]) {
++      const alias = tpShellRun(path, `node -e "require('fs').writeFileSync('scratch/${name}','x')"`);
++      assert.equal(alias.exitCode, 2, name);
++      assert.match(alias.stderr, /GUARD-READ-COMMAND-UNSUPPORTED/u, name);
++    }
++    const preReady = evaluateLifecycleReadyGuard(
++      bash(`node -e "require('fs').writeFileSync('scratch/note.txt','x')"`),
++      { projectDir: path, requireProjectOnboardingReadyFn() { deny(NON_PARTIAL_DENIAL_STATUS); } },
++    );
++    assert.equal(preReady.exitCode, 2);
++    assert.match(preReady.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("NVA-B-UNPARSED-CAVEAT-1: a protected-path mention in an unparsed command is conservatively refused without echoing the raw command", () => {
+   const path = tpShellFixture();
+   try {
+@@ -12420,13 +12458,14 @@ test("TR-B T74/T77 control: the already-admitted rg and grep spellings admit an
+   }
+ });
+ 
+-test("TR-B T77 rg -g lane: one bounded basename-extension filter is admitted; multi-dot, path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED (characterisation, GREEN by design -- flip deliberately if TR-B admits one)", () => {
++test("TR-B T77 rg -g lane: bounded basename-extension filters, including *.test.mjs, are admitted; path, recursive and negated filters are refused with GUARD-READ-COMMAND-UNSUPPORTED", () => {
+   const path = trbFixture();
+   try {
+     qp4WithoutAppDataRoots(() => {
+       qp4Admit('rg -n -g "*.md" apply scratch/notes.md', path);
+       qp4Admit('rg -n apply scratch/notes.md --glob "*.md"', path);
+-      for (const glob of ['"*.test.mjs"', '"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
++      qp4Admit('rg -n -g "*.test.mjs" apply scratch/notes.md', path);
++      for (const glob of ['"**/*.md"', '"!*.md"', '"scratch/*.md"']) {
+         qp4RefuseUnsupported(`rg -n -g ${glob} apply scratch/notes.md`, path);
+       }
+     });
+diff --git a/plugins/pipeline-core/lib/guard/evaluate.mjs b/plugins/pipeline-core/lib/guard/evaluate.mjs
+index dbfb015f2..a183d8cad 100644
+--- a/plugins/pipeline-core/lib/guard/evaluate.mjs
++++ b/plugins/pipeline-core/lib/guard/evaluate.mjs
+@@ -1,9 +1,9 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Guard module "evaluate" (layer 6), split out of guard-lifecycle-ready.mjs; declarations moved verbatim (s2-guard-split-plan.md).
+ 
+-import { realpathSync } from "node:fs";
++import { lstatSync, realpathSync } from "node:fs";
+ import { fileURLToPath } from "node:url";
+-import { join, relative, resolve } from "node:path";
++import { basename, join, relative, resolve } from "node:path";
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { findResidualHostPath } from "../../scripts/capture-evidence.mjs";
+ import { isBootstrapAcknowledgementMarkerMutation } from "../onboarding-staging-authoring.mjs";
+@@ -53,6 +53,52 @@ function isHumanOnlyDiscard(command, root) {
+   catch { return false; }
+ }
+ 
++// AC239 / TPSHELL-OPAQUEMENTION / IR-4: two closed, literal inline-script
++// forms have independently classifiable targets. Arbitrary interpreter code
++// (including a computed target, extra statement, or credential read) is not
++// granted by this predicate. The earlier protected-test, gate-strength and
++// cross-repository lanes still decide their own paths before it is consulted.
++function isLiteralReadyNodeInlineCommand(command, root, dependencies) {
++  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
++    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
++  const { executable, argv } = parsed.segments[0];
++  if (!["node", "node.exe"].includes(basename(executable).toLowerCase())
++    || argv.length !== 2 || argv[0] !== "-e") return false;
++  const script = argv[1];
++  // One literal scratch note write, with no escape syntax or further JS. A
++  // physical containment check also excludes a pre-existing symlink escape.
++  const note = /^require\(['"](?:node:)?fs['"]\)\.writeFileSync\(['"](scratch\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.txt)['"],['"]([A-Za-z0-9 ._/-]+)['"]\)$/u.exec(script);
++  if (note) {
++    if (!isProjectWritePath(note[1], root, dependencies)) return false;
++    // Only a fresh file is admitted. Existing links (including hard links)
++    // could alias a protected path even when the typed spelling is benign.
++    let current = root;
++    const parts = note[1].split("/");
++    for (let i = 0; i < parts.length; i += 1) {
++      current = join(current, parts[i]);
++      try {
++        const entry = lstatSync(current);
++        if (entry.isSymbolicLink() || i === parts.length - 1 || !entry.isDirectory()) return false;
++      } catch (error) {
++        if (error?.code !== "ENOENT") return false;
++      }
++    }
++    return true;
++  }
++  // The incident's read-only inventory probe: the sole read is a fixed public
++  // inventory file; the suite name is inert data for indexOf/console.log.
++  return /^const inventory=JSON\.parse\(require\(['"](?:node:)?fs['"]\)\.readFileSync\(['"]docs\/product-capability-inventory\.json['"],['"]utf8['"]\)\); console\.log\(inventory\.suites\.indexOf\(['"][A-Za-z0-9._/-]+['"]\)\)$/u.test(script);
++}
++
++function isNodeInlineCommand(command, root) {
++  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
++  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return false;
++  const { executable, argv } = parsed.segments[0];
++  return ["node", "node.exe"].includes(basename(executable).toLowerCase())
++    && ["-e", "--eval", "-p", "--print"].includes(argv[0]);
++}
++
+ /**
+  * NVA-B-REBWIRE-1 / Requirement 5, the half that is not a relief: EVERY refusal this guard
+  * emits while an authorized rebase is in progress names the route forward.
+@@ -414,6 +460,17 @@ function evaluateLifecycleReadyGuardCore(input, dependencies = {}) {
+   }
+   if (toolName === "Bash"
+     && isRejectedReadFamilyCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
++    const command = input.tool_input.command ?? input.tool_input.CommandLine;
++    if (isNodeInlineCommand(command, root)) {
++      // First ask the normal lifecycle tail. In a non-ready state it supplies
++      // the original lifecycle refusal; in READY it cannot itself authorize an
++      // arbitrary inline script, which still falls into the unsupported row.
++      const phase = evaluateAfterGrammarAdmission(input, root, toolName, consistent);
++      if (phase.exitCode !== 0) return withLifts(lifts, phase);
++      if (isLiteralReadyNodeInlineCommand(command, root, dependencies)) {
++        return withLifts(lifts, withLifecycleReturnedActionTelemetry(phase, input, root, toolName, consistent));
++      }
++    }
+     // ALFRED-QP4: label selection ONLY (both refuse, nothing is admitted here). The scope code requires a target that really resolves outside
+     // the project root; every other rejected single read-family command is an unsupported command.
+     let outsideRoot = false;

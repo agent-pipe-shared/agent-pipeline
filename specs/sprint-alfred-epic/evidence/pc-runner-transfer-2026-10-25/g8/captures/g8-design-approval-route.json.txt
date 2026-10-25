@@ -1,0 +1,314 @@
+command: node --import <repo-root>/scratch/clones/g8-original-custody-20261025/scratch/g8-synthetic-identity.mjs --test <repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+label: g8-design-approval-route
+exitCode: 1
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✖ DABC001 compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State (267.603933ms)
+✖ DABR001 route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (0.282416ms)
+✖ DABR002 route 2: one design proof, approve-plan, and the closed v9 accepted-contract record (0.236038ms)
+✖ DABR003 route 3: the boundary library admits the current approved v9 accepted-contract record (0.197555ms)
+✖ DABR004 route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.224998ms)
+✖ DABV001 decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt (0.995201ms)
+✖ DABX001 retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED (0.845907ms)
+✖ DABX002 retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan) (0.829616ms)
+✖ DABX003 retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (0.709148ms)
+✖ DABX004 retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (0.48418ms)
+✖ DABX005 retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (0.385483ms)
+✖ DABX006 retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (0.383769ms)
+✖ DABX007 retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (0.361176ms)
+✔ DABX008 retired: lib/retired-design-codes.mjs holds the four retirement codes (A4) (0.70581ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 1
+ℹ fail 13
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 369.962256
+
+✖ failing tests:
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABC001 compatibility: the genuine retained v8 envelope projection stays valid without replacing current v9 State (267.603933ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async runRoute (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:559:12)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:702:15)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR001 route 1: present-plan --review-receipt accepts finished sources and hands over ONE ready sign command (0.282416ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async runRoute (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:559:12)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:702:15)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR002 route 2: one design proof, approve-plan, and the closed v9 accepted-contract record (0.236038ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async runRoute (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:559:12)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:702:15)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR003 route 3: the boundary library admits the current approved v9 accepted-contract record (0.197555ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async runRoute (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:559:12)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:702:15)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABR004 route 4: zero continuity-cas -- queueHead.dispatch stays unregistered across a successful present and approve (0.224998ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async runRoute (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:559:12)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:702:15)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABV001 decision V: an in-flight v2 presentation is refused with a typed code naming present-plan --review-receipt (0.995201ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:720:14)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX001 retired: present-plan --design-workflow-package returns DWP-PRESENT-RETIRED (0.845907ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:746:14)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX002 retired: approve-plan --design-workflow-approval-request returns DWP-APPROVAL-REQUEST-RETIRED (A2: mapping from the plan) (0.829616ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at buildSubmittedFeature (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:418:15)
+      at async Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:755:14)
+      at async TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX003 retired: scripts/design-advisory-coordinator.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (0.709148ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:772:17)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX004 retired: scripts/design-advisory-admission.mjs returns DESIGN-ADVISORY-COURSE-RETIRED and names the new route (A3) (0.48418ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:772:17)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX005 retired: scripts/design-course-session.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (0.385483ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:772:17)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX006 retired: scripts/design-course-coordinator.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (0.383769ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:772:17)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ DABX007 retired: scripts/runner-design-readiness-bootstrap.mjs returns DESIGN-COURSE-RETIRED and names the new route (A3) (0.361176ms)
+  AssertionError [ERR_ASSERTION]: fixture must be outside Git discovery
+  
+  true !== false
+  
+      at tmp (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:188:12)
+      at Object.run (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs:772:17)
+      at TestContext.<anonymous> (file://<repo-root>/scratch/clones/g8-original-custody-20261025/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---
