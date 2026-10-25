@@ -160,7 +160,7 @@ function ensureStore(c) {
 }
 function reference(root, commit, p, role = "spec") {
   p = normalizePacketPath(p);
-  if ((p.startsWith(".") && !(role === "guardrail" && p === ".claude/pipeline.yaml"))
+  if ((p.startsWith(".") && !(role === "guardrail" && [".claude/pipeline.yaml", ".claude/pipeline.json"].includes(p)))
     || p.startsWith("scratch/") || p.startsWith("evidence/")) fail("CGB-REFERENCE");
   const row = git(root, ["ls-tree", "-z", commit, "--", p]);
   const match = /^(100644|100755) blob ([a-f0-9]{40}|[a-f0-9]{64})\t([^\0]+)\0$/u.exec(row);
@@ -542,6 +542,40 @@ export function appendGenericCriticBatchCorrection(input) { return invoke(() => 
 export function readGenericCriticBatchAdmission(input) { return invoke(() => readAdmission(input)); }
 export function reserveGenericCriticBatchAdmission(input) { return invoke(() => reserveAdmission(input)); }
 export function readReservedGenericCriticBatchAdmission(input) { return invoke(() => readReservedAdmission(input)); }
+/** Diagnose a held transaction without treating a partial publication as a disposable lock. */
+export function inspectGenericCriticBatchRecovery({ controlRoot }) {
+  return invoke(() => {
+    const c = readContext(controlRoot);
+    const lock = join(c.root, "transaction.lock");
+    if (!existsSync(lock)) fail("CGB-RECOVERY-NOT-HELD");
+    const held = directory(lock);
+    const names = readdirSync(c.root).sort(compare);
+    const lockNames = readdirSync(lock).sort(compare);
+    if (names.length > 4096 || lockNames.length > 4096) fail("CGB-BOUND");
+    if (!eq(stableJson(join(c.root, "repository.json")), c.repository)) fail("CGB-CONTROL");
+    let emptyStore = eq(names, ["logical", "origins", "repository.json", "transaction.lock"]) && lockNames.length === 0;
+    const indexes = {};
+    for (const name of ["logical", "origins"]) {
+      if (!existsSync(join(c.root, name))) { emptyStore = false; indexes[name] = null; continue; }
+      directory(join(c.root, name));
+      indexes[name] = readdirSync(join(c.root, name)).sort(compare);
+      if (indexes[name].length > 4096) fail("CGB-BOUND");
+      if (indexes[name].length !== 0) emptyStore = false;
+    }
+    const snapshot = { repositoryFingerprint: c.fingerprint, root: [directory(c.root).dev, directory(c.root).ino], lock: [held.dev, held.ino, String(held.ctimeMs)], names, lockNames, indexes };
+    return Object.freeze({ schema: "pipeline.critic-generic-batch-recovery.v1", status: emptyStore ? "empty-store-held" : "partial-held", digestSha256: sha256Canonical(snapshot) });
+  });
+}
+/** A digest binds inspection, but cannot attest that the lock owner has exited. */
+export function recoverGenericCriticBatchEmptyStore({ controlRoot, digestSha256 }) {
+  return invoke(() => {
+    if (!SHA.test(digestSha256)) fail("CGB-RECOVERY-SHAPE");
+    const observed = inspectGenericCriticBatchRecovery({ controlRoot });
+    if (observed.digestSha256 !== digestSha256) fail("CGB-RECOVERY-STALE");
+    if (observed.status !== "empty-store-held") fail("CGB-RECOVERY-PARTIAL");
+    fail("CGB-RECOVERY-OWNER-UNPROVEN");
+  });
+}
 /** Shared source-bound declaration reader; presence/bindings do not attest semantic coherence. */
 export function readCriticReviewUnit(input) {
   return invoke(() => {
@@ -604,10 +638,10 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       if(existsSync(deliveryIndex) && (!owned || !eq(stableJson(deliveryIndex).batchRef,owned.batchRef)))fail("CGB-CONFLICT");
       if (!owned) {
         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
-        ensureStore(c);
-        const batchId=randomBytes(16).toString("hex");
         const declaredScope={logicalWorkIds:work,specification:reference(input.repoRoot,packet.candidate.commit,unitRef.specPath),
           guardrails:packet.references.filter(r=>r.kind==="guardrail").map(r=>reference(input.repoRoot,packet.candidate.commit,r.path,"guardrail")),reviewUnit:unit};
+        ensureStore(c);
+        const batchId=randomBytes(16).toString("hex");
         const value={schema:GENERIC_CRITIC_BATCH_V2_SCHEMA,batchId,repositoryFingerprint:c.fingerprint,declaredScope,originTargets:[target]};
         const batchRef={batchId,registrationSha256:sha256Canonical(value)};
         createDirectory(join(c.root,batchId));createDirectory(join(c.root,batchId,"members"));

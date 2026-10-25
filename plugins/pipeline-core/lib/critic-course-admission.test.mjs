@@ -5,7 +5,7 @@ const completionCases = [];
 function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
@@ -315,6 +315,42 @@ test("CCA13 an authority change cannot hide in an evidence registration commit",
   assert.deepEqual(result.correctionCommits, [changedCommit]);
 });
 
+function diagnosticCarryCase() {
+  const fx = registeredFixture();
+  const logPath = `specs/${fx.featureId}/evidence/targeted.log`;
+  const jsonPath = `specs/${fx.featureId}/evidence/diagnostic.json`;
+  const tree = git(fx.root, ["rev-parse", `${fx.candidateCommit}^{tree}`]);
+  const log = "command: node synthetic-check\nlabel: targeted-check\nexitCode: 0\n--- stdout ---\npass\n--- stderr ---\n";
+  const value = { schema: "pipeline.critic-diagnostic-evidence.v1", producer: "critic-diagnostic-evidence",
+    assurance: "captured-process-output-not-host-attested", candidate: {commit:fx.candidateCommit,tree},
+    spec: {path:fx.manifestPath,sha256:hash(readFileSync(join(fx.root,fx.manifestPath)))},
+    guardrails:[], fullVerify:{status:"not-run",evidence:null},
+    targeted:{label:"targeted-check",status:"passed",exitCode:0,log:{path:logPath,sha256:hash(log)}}, pending:["full-verify"] };
+  const json = `${JSON.stringify(value)}\n`;
+  writeFileSync(join(fx.root,logPath),log);
+  writeFileSync(join(fx.root,jsonPath),json);
+  const entries = [fx.entry,
+    {...fx.entry,path:jsonPath,sha256:hash(json)},
+    {...fx.entry,path:logPath,sha256:hash(log)}];
+  writeFileSync(join(fx.root,fx.manifestPath),`${JSON.stringify(fx.manifest(entries))}\n`);
+  git(fx.root,["add","."]); git(fx.root,["commit","-qm","register diagnostic bundle"]);
+  const candidateCommit=git(fx.root,["rev-parse","HEAD"]);
+  const source=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit});
+  assert.deepEqual(source.evidenceOnlyCommits,[fx.candidateCommit,candidateCommit]);
+  assert.deepEqual(source.correctionCommits,[]);
+  writeFileSync(join(fx.root,logPath),"changed diagnostic output\n");
+  git(fx.root,["add","."]); git(fx.root,["commit","-qm","change diagnostic content"]);
+  const changedCommit=git(fx.root,["rev-parse","HEAD"]);
+  const changed=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit:changedCommit});
+  assert.deepEqual(changed.correctionCommits,[changedCommit]);
+  const unrelated=`specs/${fx.featureId}/evidence/unregistered.log`;
+  writeFileSync(join(fx.root,unrelated),"unregistered\n");
+  git(fx.root,["add","."]); git(fx.root,["commit","-qm","add unregistered log"]);
+  const unregisteredCommit=git(fx.root,["rev-parse","HEAD"]);
+  const unregistered=classifyRegisteredEvidenceOnlyCommits({repoRoot:fx.root,featureId:fx.featureId,baseCommit:fx.genesisCommit,candidateCommit:unregisteredCommit});
+  assert.deepEqual(unregistered.correctionCommits,[changedCommit,unregisteredCommit]);
+}
+
 test("CCA14 one full and three successive parent-bound DIFF reviews are admitted", () => {
   for (const retainedCount of [1, 2, 3]) {
     const rows = fourRoundHistory(retainedCount);
@@ -370,4 +406,5 @@ test("CCA18 dropping retained registration cannot create new genesis in the runt
   assert.equal(actual.decision.code, "CCA-REGISTRATION-REMOVED");
 });
 
+test("CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle", diagnosticCarryCase);
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

@@ -195,15 +195,37 @@ function evidenceOnlyCommit(root, commit, manifestPath, featureId) {
     }
     if (old.size !== 0 || added.length === 0 || changed.length !== added.length + 1) return false;
     const newPaths = new Set();
+    const addedByPath = new Map();
     for (const entry of added) {
       if (!object(entry) || entry.authority !== false || entry.mutability !== "immutable"
         || entry.retention !== "retain" || !SHA256.test(entry.sha256)
         || typeof entry.path !== "string" || !entry.path.startsWith(`specs/${featureId}/evidence/`)
-        || !entry.path.endsWith(".json") || newPaths.has(entry.path)) return false;
+        || ![".json", ".log"].some(suffix => entry.path.endsWith(suffix)) || newPaths.has(entry.path)) return false;
       newPaths.add(entry.path);
+      addedByPath.set(entry.path, entry);
       regularBlobAt(root, commit, entry.path);
       if (digest(gitBytes(root, ["show", `${commit}:${entry.path}`], "CCA-EVIDENCE-READ")) !== entry.sha256) return false;
     }
+    const requiredLogs = new Set();
+    const parentTree = gitBytes(root, ["rev-parse", `${parents[1]}^{tree}`], "CCA-RANGE-READ").toString("utf8").trim();
+    for (const entry of added.filter(row => row.path.endsWith(".json"))) {
+      const bytes = gitBytes(root, ["show", `${commit}:${entry.path}`], "CCA-EVIDENCE-READ");
+      let diagnostic;
+      try { diagnostic = JSON.parse(bytes.toString("utf8")); } catch { continue; }
+      if (diagnostic?.schema !== "pipeline.critic-diagnostic-evidence.v1") continue;
+      if (diagnostic.candidate?.commit !== parents[1] || diagnostic.candidate?.tree !== parentTree) return false;
+      const required = [diagnostic.targeted?.log, diagnostic.fullVerify?.evidence].filter(Boolean);
+      for (const ref of required) {
+        if (!object(ref) || addedByPath.get(ref.path)?.sha256 !== ref.sha256) return false;
+        requiredLogs.add(ref.path);
+      }
+      validateCriticDiagnostic(diagnostic, { root, candidate: {commit:parents[1],tree:parentTree},
+        readArtifact: path => {
+          if (!addedByPath.has(path)) throw new Error("unregistered diagnostic member");
+          return gitBytes(root, ["show", `${commit}:${path}`], "CCA-EVIDENCE-READ");
+        } });
+    }
+    if ([...addedByPath.keys()].some(path => path.endsWith(".log") && !requiredLogs.has(path))) return false;
     return changed.every((path) => path === manifestPath || newPaths.has(path));
   } catch { return false; }
 }
