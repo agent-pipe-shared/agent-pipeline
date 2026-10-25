@@ -1,0 +1,16 @@
+[
+  {
+    "source": "scratch/clones/d124-a3-fixture-repair/scratch/agent-out/d124-a3-fixture-repair/report.md",
+    "sourceSha256": "9451ef7f2c5791182da501985ebf0224d7662f65c336da4eb851c447a9b1bd27",
+    "artifact": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-qualified-and-contradicted/method/d124-qualified.md",
+    "sha256": "9451ef7f2c5791182da501985ebf0224d7662f65c336da4eb851c447a9b1bd27",
+    "transformation": "Human-report local path projection only; original retained"
+  },
+  {
+    "source": "scratch/agent-out/g18-agy-model-carrier-consistency/report.md",
+    "sourceSha256": "cc67e56b589f7362d73f81d441628394754c76e3de0a982611ceb4ef3db68d62",
+    "artifact": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-qualified-and-contradicted/method/agy-model-carrier.md",
+    "sha256": "cc67e56b589f7362d73f81d441628394754c76e3de0a982611ceb4ef3db68d62",
+    "transformation": "Human-report local path projection only; original retained"
+  }
+]

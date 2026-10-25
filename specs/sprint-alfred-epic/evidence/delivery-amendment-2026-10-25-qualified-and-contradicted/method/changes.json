@@ -1,0 +1,14 @@
+[
+  {
+    "itemId": "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Latest explicit PO decision October23 tiles row4/34 supersedes older implementation-rejection wording: typed baseline-only carry is admitted at implementation and release remains blocked. Original current pin is6/7; A3 first real-command transition exits2 instead of0. A1/A2 pass. Fixture-first Git/calibration repair is active; no production weakening or original assertion change."
+  },
+  {
+    "itemId": "pipeline.greenfield.g7.model",
+    "from": "75",
+    "to": "50",
+    "previousReason": "Combined model/read synthetic controls 39/39 are counted green for committed K152B; actual native dispatch remains open."
+  }
+]
