@@ -1,0 +1,34 @@
+command: <host-path> --import <repo-root>/plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs --test plugins/pipeline-core/lib/guard/signing-help-delegation-qualification.test.mjs
+label: G9A-LATEST-SOURCE-PROOF-IMPORT-D148
+exitCode: 0
+head: 9f1dc52d3738e1c01f3c17320e000003657ff62f
+tree: 38bad49e18518a702657ab16dfef1970752e1a6c
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+{"schema":"pipeline.signing-help-guard-case.v1","runner":"claude","plan":0,"help":0,"discard":2,"sharedEvaluatorOnly":true}
+{"schema":"pipeline.signing-help-guard-case.v1","runner":"codex","plan":0,"help":0,"discard":2,"sharedEvaluatorOnly":true}
+{"schema":"pipeline.signing-help-guard-case.v1","runner":"antigravity","plan":0,"help":0,"discard":2,"sharedEvaluatorOnly":true}
+{"schema":"pipeline.signing-help-qualification-case.v1","scenario":"valid","entry":"approve-plan","exit":0,"proof":"synthetic-owned-fixture","stateChanged":true,"nativeAttestation":false}
+{"schema":"pipeline.signing-help-qualification-case.v1","scenario":"invalid","entry":"approve-plan","exit":2,"proof":"synthetic-owned-fixture","stateChanged":false,"nativeAttestation":false}
+{"schema":"pipeline.signing-help-qualification-case.v1","scenario":"foreign","entry":"approve-plan","exit":2,"proof":"synthetic-owned-fixture","stateChanged":false,"nativeAttestation":false}
+{"schema":"pipeline.signing-help-qualification-case.v1","scenario":"stale","entry":"approve-plan","exit":2,"proof":"synthetic-owned-fixture","stateChanged":false,"nativeAttestation":false}
+{"schema":"pipeline.signing-help-qualification-case.v1","scenario":"replay","entry":"approve-plan","exit":0,"proof":"synthetic-owned-fixture","stateChanged":true,"nativeAttestation":false}
+{"schema":"pipeline.signing-help-discard-observation.v1","actualExit":2,"expectedExit":2,"readiness":"explicit Source test seam","discardExecuted":false,"stderr":"BLOCKED (guard-lifecycle-ready, plugin pipeline-core): PO-DISCARD-HUMAN-ONLY: discard-feature is a human-terminal action; the agent cannot discard a feature to escape an implementation block or supply --by.\nPO recovery: in the project directory, run node plugins/pipeline-core/scripts/pipeline-state.mjs discard-feature --by \"<your name>\" --reason \"<why this feature is being abandoned>\" in your own terminal, using your own name and reason.\n"}
+✔ SHDQ001 actual Source help CLI and exact read-only admission (597.047193ms)
+✔ SHDQ002 actual owned signed-plan import: valid (16233.073173ms)
+✔ SHDQ003 actual owned signed-plan import: invalid (5373.820013ms)
+✔ SHDQ004 actual owned signed-plan import: foreign (5510.758352ms)
+✔ SHDQ005 actual owned signed-plan import: stale (5544.590351ms)
+✔ SHDQ006 actual owned signed-plan import: replay (15464.438983ms)
+✔ SHDQ007 RED original G23: shared ready evaluator must refuse agent discard (4492.431138ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 53625.557742
+
+--- stderr ---

@@ -1,0 +1,41 @@
+{
+  "schema": "pipeline.g9a-source-qualification.v1",
+  "sourceCommit": "9f1dc52d3738e1c01f3c17320e000003657ff62f",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/lib/guard/signing-help-delegation-qualification.test.mjs",
+      "sha256": "dc8846ec583cbe651c28ea42adc2c08f87aaa81219e53e7bc64c5af05e3bcf45"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs",
+      "sha256": "188dec8a09905cb4a854aec88b1fc0bd0caec5e21fa46ab50d8a76e2d75c9bb9"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/signing-disclosure-sweep/state-owner.fixture.mjs",
+      "sha256": "32f934936fb8972b7db907f7c2019fca0ee924c157becbf96a5e49088924225b"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "sha256": "89f59f82084cd2bbda881ffe049c0b4b03b721a503882245c2bbf8a709188bf8"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "a2e4e03434c39a73f3d44d3bb56b7233fa365be860245afaa4a3b5f664e6e218"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/po-human-approval.mjs",
+      "sha256": "a4c4797dbf5acbc6d3ef1411782dc72406227116bd11e6793bdbac89de3fed81"
+    }
+  ],
+  "capture": {
+    "source": "scratch/agent-out/g9a-current-source/private-parent-latest.log",
+    "sourceSha256": "385f54a2d73eb58151166b7946ebe74cb591547dc33307bca450965e8fc8fc7a",
+    "derivative": "specs/sprint-alfred-epic/evidence/g9a-source-qualified-2026-10-25/actual-source.log.txt",
+    "sha256": "385f54a2d73eb58151166b7946ebe74cb591547dc33307bca450965e8fc8fc7a"
+  },
+  "tests": 7,
+  "pass": 7,
+  "fail": 0,
+  "assurance": "controlled-source-method",
+  "nativeAttestation": false
+}
