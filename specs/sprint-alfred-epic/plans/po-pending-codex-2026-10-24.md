@@ -4,7 +4,7 @@ Current work and next actions have one authority: [docs/state.md](../../../docs/
 
 Resolved: operator Source821cd35c1 and post-close prevention9ed1a2800; normal AGYdc8204a28 and scannere244c7b3d; final inventory/reader0d2c33bf5. No repeated application approval, heal or operator commit is requested. PRD/Spec remain unchanged.
 
-Collected genuine decisions: G8 design-review Source origin/readback versus same-process contract (existing registry recommended); domain-scanner reproduction R3; bounded Reader owner acceptance/policy-transition field when its planned course is ready. G8 proposal is portable and inert, not an accepted ADR or implemented producer. No early duplicate Critic/Reader batch is requested. Optional model-role acknowledgement follows only a fresh actual bootstrap readback; never reuse another session's receipt.
+Resolved direction D144: G8 uses existing Source/Model registry origin/readback, without a new principal, key or ledger. The exact bounded package and its applicable aggregate approval remain to be prepared; the portable prototype is still inert, not an accepted ADR or implemented producer. Collected genuine decisions: domain-scanner reproduction R3; bounded Reader owner acceptance/policy-transition field when its planned course is ready. No early duplicate Critic/Reader batch is requested. Optional model-role acknowledgement follows only a fresh actual bootstrap readback; never reuse another session's receipt.
 
 The PO assigned central nonweakenable Bank/Enterprise signature policy to **Nightwing**, outside0.7.0 and0.7.1 none. General chat remains explicitly weaker; exact overrides still need an explicit PO answer by method.
 

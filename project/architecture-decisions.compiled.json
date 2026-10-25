@@ -1,11 +1,11 @@
 {
   "schema": "pipeline.architecture-decisions-summary.v1",
-  "compiledAt": "2026-09-26T15:54:54.358Z",
+  "compiledAt": "2026-10-25T14:21:28.151Z",
   "authorityStatus": "inventory-only",
   "effectiveProjection": {
     "status": "advisory",
     "code": "ARCH-DECISION-EFFECTIVE-LEGACY-WARNING",
-    "projectionSha256": "8264ab82935874853df5ad388453be57e19785a191b509ffddf754796b92d33b",
+    "projectionSha256": "5935e9fa6c92119d0a2fb2a0283574479a563ccfdca6c87f3fab858b95425852",
     "decisions": [],
     "decisionIds": [],
     "findings": [
@@ -40,10 +40,6 @@
       {
         "code": "legacy-decision-without-sidecar",
         "path": "docs/adr/0008-permissions-worktree-policy.md"
-      },
-      {
-        "code": "module-applicability-awaiting-approval",
-        "path": "docs/adr/0009-session-hygiene-lifecycle.md"
       },
       {
         "code": "legacy-decision-without-sidecar",
@@ -347,11 +343,39 @@
       },
       {
         "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0085-one-review-one-signature-design-approval.md"
+      },
+      {
+        "code": "decision-adoption-unverified",
+        "path": "docs/adr/0086-canonical-dab-windows-course-and-separate-legacy-api-checks.md"
+      },
+      {
+        "code": "decision-adoption-unverified",
+        "path": "docs/adr/0087-owning-verification-authenticated-controller-test-channel.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/0088-test-economy.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
         "path": "docs/adr/draft-b1-worker-pool-superseded-by-workflow-tool.md"
       },
       {
         "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-claude-hook-session-owner.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-criterion-bound-regression-pins.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
         "path": "docs/adr/draft-critic-report-durable-write-location.md"
+      },
+      {
+        "code": "legacy-decision-without-sidecar",
+        "path": "docs/adr/draft-po-acceptance-points.md"
       },
       {
         "code": "legacy-decision-without-sidecar",
@@ -367,7 +391,7 @@
       }
     ]
   },
-  "count": 96,
+  "count": 111,
   "decisions": [
     {
       "id": "0001-distribution-plugin-marketplace",
@@ -392,7 +416,7 @@
       "title": "ADR-0003: Role implementation — Goldfish as subagent, Critic read-only with a `--bare` tier",
       "status": "accepted",
       "scope": "project",
-      "digest": "072e901b03788037a9e003edafd8e4e5075e8a5601989ef001e7d181d73f1b8a",
+      "digest": "964c55c4d5e53fde13f2adbd8e38a89182a29655a3ccbe84738059ed67ae27bd",
       "supersedes": null,
       "exception": null
     },
@@ -448,7 +472,12 @@
       "scope": "module",
       "digest": "a976536902b969b6a3b154fc4f69577f12feaf98014e002fdcf64a13ef208c07",
       "supersedes": null,
-      "exception": null
+      "exception": null,
+      "moduleIds": [
+        "governance",
+        "harness",
+        "pipeline-core"
+      ]
     },
     {
       "id": "0010-session-bootstrap",
@@ -491,7 +520,7 @@
       "title": "ADR-0014: Critic Contract",
       "status": "accepted",
       "scope": "project",
-      "digest": "a184d46c22c2e3ff5a55d2ec7e11d70a97e041490f61fd6ef785694c0b497283",
+      "digest": "c9710854fb690790f7c24bf4e06e115278bbe9ca036e8032ad01eaed4d7f6beb",
       "supersedes": null,
       "exception": null
     },
@@ -887,7 +916,7 @@
       "title": "ADR-0058: a signed, time-boxed maintenance window lets the PO lift a narrow set of self-protecting guard rules, with no in-session activation step",
       "status": "accepted",
       "scope": "project",
-      "digest": "ea7bdf215ba20d899331eb4e1419a019c6e5490c263bcf2df21a994aa9dcc44a",
+      "digest": "c14f32b1abc26e5f7dbb2fcae25143121fc05646ee92110786eacaca2592d454",
       "supersedes": null,
       "exception": null
     },
@@ -932,7 +961,7 @@
       "title": "ADR-0063 — Repository directory contract (lean, Nightwing-pending)",
       "status": "accepted",
       "scope": "project",
-      "digest": "a5ad50119e591c510399ac5419cd52f9757369eed992cbaf2016cf5d1762a574",
+      "digest": "f619f3a851c4cb0732cc35dc874001b6d031f892441639d0e77beaa458504b2b",
       "supersedes": null,
       "exception": null
     },
@@ -1126,11 +1155,47 @@
       "exception": null
     },
     {
+      "id": "0085-one-review-one-signature-design-approval",
+      "title": "ADR-0085 — One review, one signature: simplify the design approval",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "ADR-0086",
+      "title": "Canonical DAB Windows course and separate legacy API checks",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "349069ecba027f79f569456536f7c7843a652cad14cecb448db0ae6f9eb599e6",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "ADR-0087",
+      "title": "Owning verification through an authenticated controller test channel",
+      "status": "accepted",
+      "scope": "global",
+      "digest": "ba2021d83e5221085bff47da1a4beda8bd955511b63880d559e4f90f5e7afb27",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "0088-test-economy",
+      "title": "ADR-0088 — Test economy: a fast gate, a fresh full run, and a test surface that shrinks with the product",
+      "status": "accepted",
+      "scope": "project",
+      "digest": "4e0f3fa40b2ca8b75fd96ff7d0f8b7eaae630a8771332c5adb56bde6ecbbfa53",
+      "supersedes": null,
+      "exception": null
+    },
+    {
       "id": "README",
       "title": "ADR-Index — Agent-Pipeline",
       "status": "superseded",
       "scope": "project",
-      "digest": "7cd6ba6271bed981d8d3eb7129ae08840420742304bd5888c42b1832b729233b",
+      "digest": "2e9fa5a6ebe5efb28d8d515e76c4ffdca30b071d5ccabb2b6cd07f9f60143f44",
       "supersedes": null,
       "exception": null
     },
@@ -1148,7 +1213,7 @@
       "title": "Agy host-observed authorship and portable evidence",
       "status": "proposed",
       "scope": "global",
-      "digest": "85638eb28c67469c3526e60431ae24878c6fec34ffe1682981be68403a1c543d",
+      "digest": "53c2fabcae3e40516eed22a35a0e8ab747594bdab8f62f6469db8b753c2af759",
       "supersedes": null,
       "exception": null
     },
@@ -1171,11 +1236,29 @@
       "exception": null
     },
     {
+      "id": "draft-claude-hook-session-owner",
+      "title": "Draft ADR — Claude hook-observed session owner for governed item admission",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "c7633817796fe78b6aff2c2b34d649ec8367746fbabf75b98778cf93e7e067d9",
+      "supersedes": null,
+      "exception": null
+    },
+    {
       "id": "draft-content-bound-review-before-full-verify",
       "title": "Content-bound review before final verification",
       "status": "proposed",
       "scope": "project",
       "digest": "c18811df68e6f0f50ed634e008d313d4237982f28a392eeec0b62d30a8b5519d",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-criterion-bound-regression-pins",
+      "title": "Draft: Criterion-bound regression tests (\"pins\")",
+      "status": "and",
+      "scope": "project",
+      "digest": "6c06406493e713868ed49071aa3f87b5ce6f6cd6ddf414fbcb4e282e1527d8c0",
       "supersedes": null,
       "exception": null
     },
@@ -1198,6 +1281,15 @@
       "exception": null
     },
     {
+      "id": "draft-design-review-original-source-custody",
+      "title": "Original Source custody for independent design review",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "89c808a89e626f4d0a00695d8e674ad9cce8e56a2155532864d6b3a5b4cfbcbf",
+      "supersedes": null,
+      "exception": null
+    },
+    {
       "id": "draft-design-stage-architecture-materialization",
       "title": "Explicit design-stage architecture materialization",
       "status": "proposed",
@@ -1211,7 +1303,34 @@
       "title": "Functional model roles resolved at session bootstrap",
       "status": "proposed",
       "scope": "global",
-      "digest": "8be37075dd8bb6057c24a7dda9ab0e77a10bfe77b57a891404e1f89d4f608837",
+      "digest": "a4748ae309989299ac4fb1475e6aba51309bfc2559669d9ce09fcdbc87a501a5",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-item-owned-egm-retained-quality-gates",
+      "title": "Item-owned EGM and retained independent quality gates",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "385f657e2e33f7c71a8b4f5179e87184557b0e862445a647184de2a9e047e71f",
+      "supersedes": "0005-quality-gates-dod",
+      "exception": null
+    },
+    {
+      "id": "draft-model-family-approval-and-automatic-version-upgrades",
+      "title": "Approve model families and upgrade versions automatically",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "5c394fb8a1b2d756ea713323f917108f01e53042acc2512ad115a89984efabff",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-po-acceptance-points",
+      "title": "Draft: PO acceptance points hold only their dependent slices",
+      "status": "and",
+      "scope": "project",
+      "digest": "464f6b4ca76fa200b41f116590ea76586152190c5921baa2405b489872cd655d",
       "supersedes": null,
       "exception": null
     },
@@ -1220,7 +1339,25 @@
       "title": "ADR-{{NNNN}}: The read-scope containment boundary for Bash commands",
       "status": "proposed",
       "scope": "project",
-      "digest": "b247f791c685b53366cd7a825e7fc3317b42b3576c2ea79fd6b9212085fc1e5e",
+      "digest": "46fc73e9e8ef87cf1940a42b5bd06548fb1e791e35acb7673099153c2914b80b",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-repair-availability",
+      "title": "Keep recovery available when the in-session verifier is broken",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "1c93838bd749dfa23e53d6a0aaa4a9907cd7dea11d18be957d6763b524741c81",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-scanner-diagnostic-sidecar",
+      "title": "Bounded scanner diagnostic sidecar",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "11f1e4d948c7af1d6cf45a31f509faeb59ae9aef2d491cf728f214c817ef15e1",
       "supersedes": null,
       "exception": null
     },
@@ -1230,6 +1367,33 @@
       "status": "draft",
       "scope": "project",
       "digest": "4dee8f1f599d632b3d2844af9e6e353f268dfad9ff720616dfa6f63f72d30410",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-shared-agent-capacity",
+      "title": "Shared agent capacity and existing-consumer migration",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "022807cba82c142c218aa2d4981f1436777684eab9a1e1bd074e0edc8234a450",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-three-main-update-channels",
+      "title": "Three update channels on the published main line",
+      "status": "proposed",
+      "scope": "global",
+      "digest": "0a3401d235d0fd122f8749456da364ec617545e31ae5fccadb2bc6e8790f021b",
+      "supersedes": null,
+      "exception": null
+    },
+    {
+      "id": "draft-windows-host-acl-boundary",
+      "title": "Windows host ACL observations and private Pipeline authority",
+      "status": "proposed",
+      "scope": "project",
+      "digest": "58a1d3e768903ac6aebf1799c64c8500a3fa9399d827d6edd7f7547e79553a5a",
       "supersedes": null,
       "exception": null
     }

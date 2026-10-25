@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-windows-host-acl-boundary",
+  "title": "Windows host ACL observations and private Pipeline authority",
+  "status": "proposed",
+  "digest": "58a1d3e768903ac6aebf1799c64c8500a3fa9399d827d6edd7f7547e79553a5a",
+  "scope": "project",
+  "date": "2026-10-25"
+}

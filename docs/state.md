@@ -2,6 +2,43 @@
 
 > Current runner-neutral handover. Older state text remains in Git and the [October25 archive](../specs/sprint-alfred-epic/plans/state-archive-before-active-goal-2026-10-25.md). Current human matters: [PO queue](../specs/sprint-alfred-epic/plans/po-pending-codex-2026-10-24.md).
 
+## Current session readback — 2026-10-25
+
+The PO confirmed this is a new session with the new version and is running
+three new Greenfield tests in parallel. The installed Codex preflight actually
+read back `0.7.0+codex.20261025134513.977dad8`, with matching loaded/installed
+content identity `1d11178192a9c68453084d1ae05f4863bf05ebd9e4608e1f52e8c0b926e26dfe`.
+The exact returned hook-refresh action completed, then preflight was ready.
+Onboarding inspection returned runtime `readback-current`, continuity `valid`
+and App-Server `CAS-READY`. Observation governance passed. Optional model-role
+bootstrap returned `MODEL-ROLE-BOOTSTRAP-STORE-UNAVAILABLE`, with no lifecycle
+impact; the implement selector retained legacy V3 `gpt-6-luna` / `high`.
+No Claude or AGY installed-version or Greenfield outcome is inferred from
+this Codex readback. Those operator-run results remain pending.
+
+The current Resume-Hint was read in full as recovered summary context.
+The matrix pointer's snapshot SHA-256 was independently checked and matches;
+all22 rows below75 remain in scope, with no stage promotion. The three existing
+post-stamp clones are being resumed as isolated method-only outcomes under
+D143. Their proposals remain outside the installed candidate. Entry into the
+G33 clone itself refused hook provisioning and reported repository mismatch;
+that is retained as a bootstrap-attempt failure, not a product regression.
+The governed runtime root is Main; scratch clones are inert source workspaces.
+The PO selected G8 Choice A: existing Source/Model registry origin/readback,
+without a new principal, key or ledger. D144 and the proposed
+[custody ADR](adr/draft-design-review-original-source-custody.md) preserve that
+direction. Exact integration bytes and applicable aggregate approval remain
+pending; no producer, independent review or acceptance is inferred.
+
+The PO then requested a bounded Windows quick fix for the next candidate
+(D145). The reported Claude Windows start refuses inherited Authenticated
+Users Modify permissions on the data-drive/project/marketplace chain.
+Source confirms readiness walks the plugin ancestry with strict checks, while
+earlier October17 decisions already exclude human-controlled ancestors.
+The isolated owner follows the [Windows ACL scope plan](../specs/sprint-alfred-epic/plans/windows-host-acl-scope-2026-10-25.md).
+No Windows ACL, installed cache or tested build has been changed. Ordinary
+Alfred integration is held while this focused outcome is prepared.
+
 ## Start here after the Codex host restart
 
 Stay on THIS machine and continue the active goal. The PO cancelled the PC
@@ -98,14 +135,8 @@ Test-isolation incident: earlier signing-help tests accessed real account partic
 
 ## Next action
 
-Concrete attended commands and Greenfield continuation are in the [local installation plan](../specs/sprint-alfred-epic/plans/local-candidate-install-and-greenfield-2026-10-25.md).
+**Lifecycle phase:** feature `sprint-alfred-epic` · phase `implementation`
 
-Evidence, inventory/Reader binding and the three-runner stamp are already committed. Install the build named at the top, restart the host and verify the actual loaded version. Do not wait for later isolated slices or rerun stamping for this restart.
-
-Install the newly stamped local candidate, then fully restart the Codex host and verify the actual loaded candidate. The last actual bootstrap read back0.7.0+codex.20261025125256.b68e22c in the same session; that is now the preceding build, not proof that this new977dad8 build is loaded. Existing local marketplace is $HOME/agent-pipeline-local-marketplace, selector pipeline-core@agent-pipeline-local. See [supported local workflow](codex-local-plugin-development.md) and SETUP.md Codex refresh instructions. A live reload or fresh thread in an old host does not prove the cached skills changed. Do not edit installed caches. Re-entry follows AGENTS/map/concepts/compiled decisions/pipeline-start and actual version/model-role readback.
-
-After runtime readback, resume the active goal on THIS machine and start independent real Greenfield runs in parallel across Codex, Claude and AGY. Record runner, host/CLI version, installed candidate, platform, exact report path and actual blockers. Do not replace these with synthetic agent tests or claim platforms not actually exercised. Continue the22 remaining rows and the operative release plan.
-
-Backup push is optional, only to origin refs/heads/feat/sprint-alfred with a fresh final commit/tree/destination-bound signature. The oldbc7 authorization is stale for this candidate. The sanctioned push-prepare route folded its local pending audit in2ce7475ce; records were retained. Do not discard approval/consumption records, reuse that proof, force, tag or merge. Never stop the local test plan solely to obtain a backup signature.
-
-The private alfred-pc-transfer-20261025 checkpoint is historical. The PO cancelled that transfer; do not advance it to feature-close-prepared or run a release-completion ritual. The feature and goal remain active.
+The plan is approved and the feature is in implementation. Proceed with the
+approved implementation packages; reopen design only through
+`pipeline-state reopen-design --by <name>` if it must change.
