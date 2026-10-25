@@ -1,0 +1,11 @@
+command: <host-path> --import <repo-root>/scratch/codex-push-user-info-preload.mjs plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+label: codex-push-budget-redgreen
+exitCode: 0
+head: bc7dccb43bfc2b7312ce2c13059a519bb92f671e
+tree: 466f6923d0a6908831ab9cbfb44df3c7bad313b3
+dirty: true
+--- stdout ---
+ok 1 - production adapter gives a slow push guard its dedicated share
+1..1
+
+--- stderr ---

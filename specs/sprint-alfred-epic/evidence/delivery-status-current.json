@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-final-interim/snapshot.json",
-  "sha256": "f377e7bc0dab130f114d73c5272da92717dfc8d4bf35b2d05f3532e79fac3a9d",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-g35-local/snapshot.json",
+  "sha256": "6532eca92d6a04987d326b9ed5d0878b3e3a7939ad6c20c2f7a1f0f521e15a31",
   "measuredAt": "2026-10-25",
-  "head": "0d2c33bf55a4611630ae739c770585d539744010",
+  "head": "7502188dad20864399843d08e610686b3ada3f0b",
   "counts": {
     "25": 2,
     "50": 20,
-    "75": 174,
+    "75": 175,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 71.94,
-  "total": 196,
-  "scope": "Same196identities; finalinterim AGY75,postclose50partial. No native/release acceptance; Nightwingenterprisepolicyexcluded."
+  "index": 71.95,
+  "total": 197,
+  "scope": "196 preceding identities/stages preserved plus confirmed P1 G35 at focused75. Local install/restart/parallel Greenfield; no release/native acceptance."
 }

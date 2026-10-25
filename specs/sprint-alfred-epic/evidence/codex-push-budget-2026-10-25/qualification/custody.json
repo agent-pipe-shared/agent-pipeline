@@ -1,0 +1,39 @@
+{
+  "schema": "pipeline.g35-qualification-custody.v1",
+  "sourceCommit": "7502188dad20864399843d08e610686b3ada3f0b",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+      "preSha256": "c7ce8318930f1215918e9023a97172ddea279ee2f3aafb9c40456c54b19a82d0",
+      "postSha256": "3c1048014dc2829c8d1d55fe7a9864efa2f80dcab267c41f8a18ac878aa01ef2"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+      "preSha256": "996b644c18208cfc60a3b27d93ed9d9e78c0978ef433710cd1615cc9fc336153",
+      "postSha256": "51ea61def89f1ab8619e57b61a4c275ce928828f34a46f669c6a1b0de6c08b0d"
+    }
+  ],
+  "captures": [
+    {
+      "path": "qualification/codex-push-budget-redgreen.json",
+      "originalSha256": "599132478d1e5ea1b8714b77a0bac88f122116d0331e3844a0a205d7077e580c",
+      "portableSha256": "599132478d1e5ea1b8714b77a0bac88f122116d0331e3844a0a205d7077e580c",
+      "sameBytes": true,
+      "scope": "Final focused source qualification, exit0"
+    },
+    {
+      "path": "qualification/codex-push-budget-math.json",
+      "originalSha256": "216245fb8b66480d78c98cca650d09f9f166e952dc75317360c063cc148b2e82",
+      "portableSha256": "216245fb8b66480d78c98cca650d09f9f166e952dc75317360c063cc148b2e82",
+      "sameBytes": true,
+      "scope": "Final focused source qualification, exit0"
+    },
+    {
+      "path": "qualification/codex-pretool-full-suite.json",
+      "originalSha256": "fbfb26b2a0f077e992d3e40115c1784cea6eb15d6408222eae272a69ff866ffc",
+      "portableSha256": "fbfb26b2a0f077e992d3e40115c1784cea6eb15d6408222eae272a69ff866ffc",
+      "sameBytes": true,
+      "scope": "Historical pre-final-test revision, exit1, 27/39; not final-suite or baseline proof"
+    }
+  ]
+}

@@ -1,0 +1,205 @@
+command: <host-path> --import <repo-root>/scratch/codex-push-user-info-preload.mjs plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+label: codex-pretool-full-suite
+exitCode: 1
+head: bc7dccb43bfc2b7312ce2c13059a519bb92f671e
+tree: 466f6923d0a6908831ab9cbfb44df3c7bad313b3
+dirty: true
+--- stdout ---
+ok 1 - Codex manifest matches the repository version and has a native hook descriptor
+ok 2 - Codex build-metadata stamp admits timestamp-and-OID and rejects malformed forms
+ok 3 - descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing families
+ok 4 - Human override Git observation keeps a bounded cold-repository budget
+ok 5 - lifecycle guard timeout derives from adapter budget and preserves recovery reserve
+ok 6 - push guard gets a bounded share sized above the recorded run while other guards retain defaults
+ok 7 - production adapter gives a slow push guard its dedicated share
+not ok 8 - Bash, apply_patch, Edit and Write each reach their intended guard family
+not ok 9 - multiple Bash guard denials are aggregated into one Codex decision
+ok 10 - F1: codex adapter recognizes every push shape guard-push.mjs itself recognizes, via shared normalization
+ok 11 - F1: the shared-normalization fix does not widen push detection to non-push commands
+ok 12 - F1 round 2: codex adapter recognizes the directPush and shellWrapperPush shapes guard-push.mjs itself recognizes
+ok 13 - F1 round 3: codex adapter recognizes the escaped-value and unrecognized-global-option push shapes lib/git-cmd.mjs now classifies
+ok 14 - bounded rg-to-rg search filtering remains read-only without an override loop
+not ok 15 - attended Human override admits only the exact next tool call and is then consumed
+not ok 16 - ADR-0059 Decision 4: the continuation names the configured mode's own final step, in both modes
+not ok 17 - Pipeline Author Repair selects one exact source root and consumes one patch
+not ok 18 - local plugin-cache installation offers the human-gated HGO route without an audit retry loop
+not ok 19 - a safe Bash local-plugin-install denial does not expose the original command outside HGO
+not ok 20 - a secret-bearing Bash cross-repository-boundary denial never carries the secret verbatim
+not ok 21 - override persistence failure remains a sanitized fail-closed denial
+not ok 22 - Codex routes a documented Git override prefix to the Push-Gate's actual command
+ok 23 - ordinary ungoverned shell commands do not start heavyweight guards
+ok 24 - runtime-only V3 targets activate lifecycle enforcement in the outer adapter
+ok 25 - Codex outer adapter admits only the exact pre-ready V4 recovery diagnostics
+ok 26 - Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR
+ok 27 - governed bootstrap can read only its loaded pipeline-start skill and current directory
+not ok 28 - Codex adapter records a dispatched agent's receipt from the prescribed bootstrap before its first absolute-path Write
+ok 29 - outer Codex routing admits the exact bounded diagnostic pipeline while non-ready
+ok 30 - lifecycle readiness is additive and aggregates with existing write guards
+ok 31 - Codex adapter blocks consumer-to-source drift for Edit, apply_patch and plugin mutation
+ok 32 - existing write-guard warnings remain warnings in an ungoverned repository
+ok 33 - malformed, unsupported and incomplete tool inputs fail closed
+ok 34 - Codex adapter refuses recursive inventory of an external directory
+ok 35 - GF-060/GF-064: an invalid lifecycle denial has no HGO route and never discloses a secret
+ok 36 - GF-060/GF-094: an invalid lifecycle denial suppresses raw command and copy guidance
+ok 37 - NVA-CROSSREPOGUIDANCE-1: a cross-repository denial prints the TARGET repo in every ceremony line, and the printed plan command actually resolves there
+not ok 38 - NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged
+ok 39 - lifecycle-not-ready denial does not advertise a human override ceremony
+1..39
+
+--- stderr ---
+not ok - attended Human override admits only the exact next tool call and is then consumed
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-jQuGIM","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"d653e9ea4dfaeffbda52bee56217357ce9bbb54944807f1b06666b260ffbd4d3","readbackSha256":"e1dd32c13a3cf13e9ae3804cf8300a9be18c6c271291231be942cc35658a1eea"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-8131f04240de/prd_onboarding-8131f04240de.md","specPath":"specs/onboarding-8131f04240de/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:837:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:836:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - Pipeline Author Repair selects one exact source root and consumes one patch
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-we08AO","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"25c11c9c26528e176f0ab210201021d26d42b3714b87e1a72d0ed3c5c74019be","readbackSha256":"a9da2d414ffe800d9ee62c0e8b27c186a3f1f0825c3a14c4178da5668604cea6"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-93db33f29848/prd_onboarding-93db33f29848.md","specPath":"specs/onboarding-93db33f29848/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:954:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:953:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - local plugin-cache installation offers the human-gated HGO route without an audit retry loop
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-fqMpDE","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"a6d1155aefd2dd05f1709b1dde24415eb0acf4c2d7b48196ef0cfbd34692830c","readbackSha256":"05a3757701102f60864cd63af6583c86660620aa6078d3b7d80097f8c5f97268"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-cb276ee75e7f/prd_onboarding-cb276ee75e7f.md","specPath":"specs/onboarding-cb276ee75e7f/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1006:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1005:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - a safe Bash local-plugin-install denial does not expose the original command outside HGO
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-cvfbpn","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"2958921f258d533dd1c032cfeb615aa296f39af6407529ec522974f56641077e","readbackSha256":"7909ea80ce852105fcf945d3666a992f5353294c0126903252db000ac41b4150"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-a0532767e29d/prd_onboarding-a0532767e29d.md","specPath":"specs/onboarding-a0532767e29d/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1048:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1047:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - a secret-bearing Bash cross-repository-boundary denial never carries the secret verbatim
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-rh3Zwk","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"b4c7c126aa2709ea51057ced05f14b29360df5c786d3bac6c77f517a416aaf98","readbackSha256":"093840f6cb1873bc7399b58d1e5f0b7544f315e6854b1707863228bd16c915f5"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-380b20214c74/prd_onboarding-380b20214c74.md","specPath":"specs/onboarding-380b20214c74/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1064:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1063:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - override persistence failure remains a sanitized fail-closed denial
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-oFEvFY","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"1916ffe4bb5de105efe67a0ec63a91843a49be64275f3c6a8e17a6218cffafe6","readbackSha256":"40cfcd1ca0f28d58cf5678c4395bdee9baaa7fe56533ca9927911c642a70f629"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-a74f435bbe99/prd_onboarding-a74f435bbe99.md","specPath":"specs/onboarding-a74f435bbe99/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1079:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1078:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - Codex routes a documented Git override prefix to the Push-Gate's actual command
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-3tIHwa","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"e7153c630e3504c6547717d12f221d5b69816fda8b60666972dcefb25959022d","readbackSha256":"fbad953e3f89db83ab295fccc54f24a09cf980dd4867b9f24a1cb7aa669a352e"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-689b33f643b0/prd_onboarding-689b33f643b0.md","specPath":"specs/onboarding-689b33f643b0/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1092:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1091:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - Codex adapter records a dispatched agent's receipt from the prescribed bootstrap before its first absolute-path Write
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-qbPxlY","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"3b32accf2c940ad5a0b8c3f090660802fd598abbf5f2e885016fa9a2e94b7ae6","readbackSha256":"3522fa61aff69a4af527939d80cad215cb4eb655ef880b45434439f3613647bf"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-8602513c6743/prd_onboarding-8602513c6743.md","specPath":"specs/onboarding-8602513c6743/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1213:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1212:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-Yc0M0h","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"0c8b84c0fb79d39b4fa1f8d3426751bde39cc4bd359c63ab6cbd182315c86c1c","readbackSha256":"f48bf975aa7485eeb1c03df49734371722f2de6df7ba0d97af52079d31bb60de"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-969d2c02ce66/prd_onboarding-969d2c02ce66.md","specPath":"specs/onboarding-969d2c02ce66/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1485:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:1484:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - multiple Bash guard denials are aggregated into one Codex decision
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-i4hWnU","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"b46dbc6992dc29387ab2eb57cae75a5eaa749828d8553f17c096cca93a58f557","readbackSha256":"a619d9a583fb3b13710f8d9205b3931372ae73ed78de0054e8ea2e02bd52b869"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-74672e8c5922/prd_onboarding-74672e8c5922.md","specPath":"specs/onboarding-74672e8c5922/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:689:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:686:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - ADR-0059 Decision 4: the continuation names the configured mode's own final step, in both modes
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-6Sj9DP","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"94b82f7c3833538f5c038146089a1d4bcd6b0f0e961402396ae9deef662054ff","readbackSha256":"00a45a60e2cd695183145137a3c137b1d7f1fcd1fa2dd9bd25cf5de0e850484d"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-28ef4de7e67b/prd_onboarding-28ef4de7e67b.md","specPath":"specs/onboarding-28ef4de7e67b/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:882:18
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:873:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+not ok - Bash, apply_patch, Edit and Write each reach their intended guard family
+AssertionError [ERR_ASSERTION]: {"schema":"pipeline.project-onboarding.v4","status":"bootstrap-binding-required","root":"/tmp/codex-ready-hgo-tGYUTj","runner":"codex","intent":"onboarding","repository":{"status":"local-valid-writable","mode":"local","gitVersion":"2.53.0","initializesGit":false,"rootWritable":"passed","sessionCapability":"not-required","worktreeCapability":"not-required"},"runtime":{"status":"readback-current","sourceSha256":"64a4f95b86601d493b62a6a6613081971491fe46ad171e14ba075dfbed21b527","targetsSha256":"9958d91b3ffbc38e00e23e2942aeebe0186929011b20f8e0ae953bf7b54909d3","barrierSha256":"d812ea9eb68848db223833f86009e75f74921472ac6cc5d29a8f8d294ab825b9","readbackSha256":"8b3b290ab1dd284f96e7cff977dc89a96b14192c27669efea01d12c93e6ac470"},"continuity":{"status":"absent-pristine","stateSha256":null,"handoverSha256":null,"historySha256":null},"appServer":{"required":false,"status":"not-requested","code":null},"runnerPermissions":{"target":".claude/settings.local.json","status":"not-applicable","lanes":[],"exactEntries":[]},"nextAction":{"kind":"design-authoring-required","mutation":false,"requiresConfirmation":false,"prdPath":"specs/onboarding-12e2636d46db/prd_onboarding-12e2636d46db.md","specPath":"specs/onboarding-12e2636d46db/spec.md","guidance":"Author and review the generated PRD and Spec, then inspect again before bootstrap binding."},"diagnostics":[{"path":"$.continuity","code":"intake_design_authoring_required","message":"the generated PRD and Spec still contain draft framing","guidance":"author both documents before bootstrap-bind-plan"}]}
++ actual - expected
+
++ 'design-authoring-required'
+- 'architecture-design-required'
+
+    at createReadyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:306:10)
+    at readyLifecycleFixture (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:390:16)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:662:16
+    at check (file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:459:5)
+    at file://<repo-root>/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs:661:1
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

@@ -6,7 +6,7 @@ The loaded355dba9 adapter and current Source both allocate42000ms overall, but g
 
 The PO explicitly rejected leaving this as a manual-terminal workaround: the fix, regression and knowledge must be in Source and the next-session handover. Repair G35 through a bounded push-specific budget within the unchanged overall limit, preserving reserve, otherguard defaults, actual verification and failclosed timeout/error behavior. A candidate test must demonstrate actualALLOW, not merely absence ofETIMEDOUT or exit0 (the adapter also exits0 for JSONdenials). Preserve original examiners and unrelated failures honestly. No installedcache patch, bypass, unsigned push or fabricated approval.
 
-A worker owns Source/test changes in an isolatedclone. Status at intake:Sourceconfirmed,repairandqualificationpending. Existing bc7 signature remains tied only tobc7; the corrected candidate needs its own finalstamp/signature. Do not discard the local approval/consumption audit to manufacture a clean tree.
+Status at intake was Source-confirmed with repair pending. The repair is now committed normally as `7502188da`: push-only 24-second cap and eight-second reserve within the unchanged 42-second outer budget. [Focused qualification and limitations](qualification/README.md) preserve exact file hashes, successful controlled ALLOW/hung-child coverage, and the historical broad-suite result of27/39. Twelve fixture-transition failures remain open; no baseline or installed-runtime PASS is claimed. Existing bc7 signature remains tied only tobc7; the corrected candidate needs its own final stamp/signature. Do not discard local approval/consumption audit to manufacture a clean tree.
 
 ## Updated PO direction
 

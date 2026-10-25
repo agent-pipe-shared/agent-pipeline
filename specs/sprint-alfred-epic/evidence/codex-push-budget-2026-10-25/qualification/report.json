@@ -1,0 +1,53 @@
+{
+  "schema": "pipeline.codex-push-guard-budget-export.v1",
+  "cloneHead": "bc7dccb43bfc2b7312ce2c13059a519bb92f671e",
+  "changedPaths": [
+    "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+    "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs"
+  ],
+  "files": [
+    {
+      "path": "plugins/pipeline-core/hooks/codex-pretool-guard.mjs",
+      "preSha256": "c7ce8318930f1215918e9023a97172ddea279ee2f3aafb9c40456c54b19a82d0",
+      "postSha256": "3c1048014dc2829c8d1d55fe7a9864efa2f80dcab267c41f8a18ac878aa01ef2"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs",
+      "preSha256": "996b644c18208cfc60a3b27d93ed9d9e78c0978ef433710cd1615cc9fc336153",
+      "postSha256": "51ea61def89f1ab8619e57b61a4c275ce928828f34a46f669c6a1b0de6c08b0d"
+    }
+  ],
+  "patchSha256": "40c3dee3c2c167fd3620d0643472978c82f74e94daf2948dc4997d36769b61c2",
+  "captures": [
+    {
+      "artifact": "scratch/agent-out/codex-push-budget-redgreen.json",
+      "command": "node scratch/codex-push-budget-test-runner.mjs (require_escalated; runner filter: production adapter gives a slow push guard)",
+      "exitCode": 0,
+      "result": "baseline 8s child denied ETIMEDOUT; 9.2s candidate child implicit-allowed (exit 0, empty stdout/stderr); 30s hung child denied ETIMEDOUT"
+    },
+    {
+      "artifact": "scratch/agent-out/codex-push-budget-math.json",
+      "command": "node scratch/codex-push-budget-test-runner.mjs (require_escalated; runner filter: push guard gets a bounded share)",
+      "exitCode": 0,
+      "result": "42s outer ceiling, 24s push cap, 8s reserve, 8s/5s default, prior-default and exhausted-outer math"
+    },
+    {
+      "artifact": "scratch/agent-out/codex-pretool-full-suite.json",
+      "command": "node scratch/codex-push-budget-test-runner.mjs (require_escalated; runner filter unset)",
+      "exitCode": 1,
+      "result": "27/39 passed; 12 failures share the existing architecture-design-required vs design-authoring-required fixture mismatch. This run preceded the final focused-test assertions and is not baseline-proven."
+    },
+    {
+      "artifact": "git diff --check",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "result": "passed"
+    }
+  ],
+  "limits": [
+    "No real push, signature operation, installed-cache write, or source-tree application was performed.",
+    "The focused adapter test stubs only guard-push.mjs in a disposable copied plugin; Codex adapter code remains the candidate source.",
+    "The broad suite result is not baseline-proven and was not rerun after the final focused-test revision."
+  ],
+  "integratedSourceCommit": "7502188dad20864399843d08e610686b3ada3f0b"
+}
