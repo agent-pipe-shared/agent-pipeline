@@ -1,0 +1,869 @@
+{
+  "schema": "pipeline.greenfield-second-run-ledger.v1",
+  "authority": "D152 explicit all P0/P1/Critical/Important to0.7.0",
+  "reports": [
+    {
+      "runner": "codex",
+      "originalSha256": "2f3eeb200143b545f23ef6abe2b7548eb396decad61cb09888f8e1cf06fe631b",
+      "derivative": "specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/reports/codex.md.txt",
+      "sha256": "2f3eeb200143b545f23ef6abe2b7548eb396decad61cb09888f8e1cf06fe631b",
+      "lines": 308
+    },
+    {
+      "runner": "agy",
+      "originalSha256": "8cd6df142b3000c100d45c0ff904993b9f385b5eaf0722547000a9165534fbf4",
+      "derivative": "specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/reports/agy.md.txt",
+      "sha256": "85af6ba8511c9e46c0e00f6a5df6aa2136cdd0929c0f86f80f21764a285462ba",
+      "lines": 370
+    },
+    {
+      "runner": "claude",
+      "originalSha256": "98251d764d5b8d95c45e9a7a54f41e86dd821e5b96faf59f5c1346f0764d3541",
+      "derivative": "specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/reports/claude.md.txt",
+      "sha256": "471e5f7e7c65209b263c4ab382f75f159f0dfc30ae268d05dfad1de1e013fa12",
+      "lines": 349
+    },
+    {
+      "runner": "control",
+      "originalSha256": "ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1",
+      "derivative": "specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/reports/control.md.txt",
+      "sha256": "ac8f501f58208e657b50bcf48047acbfe2ae684d8438fea86f7e4ef90a8a20c1",
+      "lines": 255
+    }
+  ],
+  "findings": [
+    {
+      "id": "codex2.P0.1.dispatch-readiness",
+      "runner": "codex",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "39-42,99-100,119-129,291-297",
+      "behavior": "Product implementation and green tests were possible, but native host/model/dispatch proof failed record-model; the defect emerged during delivery, and product Critic was never admitted.",
+      "reportedCause": "Unqualified installed dispatch/host route",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g18",
+        "pipeline.role-route-preflight-with-self-dispatch-fallback",
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "relatedACs": [
+        "AC-245",
+        "AC-264"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "codex2.P0.2.checkout-verify",
+      "runner": "codex",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "43-46,109-112,119-129,291-297",
+      "behavior": "Verify in a temporary checkout failed VEP-PROJECT-IDENTITY PCI-ROOT-MISMATCH and the Critic required integration in Main.",
+      "reportedCause": "Root-bound project identity across checkouts",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g18",
+        "pipeline.three-runner-happy-path-with-two-po-approvals",
+        "pipeline.greenfield.r2.branch-checkout-runtime-continuity"
+      ],
+      "relatedACs": [
+        "AC-264",
+        "AC-174",
+        "AC-274"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.branch-checkout-runtime-continuity"
+    },
+    {
+      "id": "codex2.P0.2.branch-runtime",
+      "runner": "codex",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "31-32,43-46,109-112,266-276",
+      "behavior": "Branch change hid runtime files in the Main checkout; integration was stopped by the lifecycle guard and required another terminal restart. The product stayed on delivery branch b1aa482.",
+      "reportedCause": "Runtime authority projected in a branch-sensitive checkout",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g18",
+        "pipeline.worktrees-share-onboarding-private-state-with-root-bound-intake",
+        "pipeline.greenfield.g22",
+        "pipeline.greenfield.r2.branch-checkout-runtime-continuity"
+      ],
+      "relatedACs": [
+        "AC-274",
+        "AC-174",
+        "AC-264"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.branch-checkout-runtime-continuity"
+    },
+    {
+      "id": "codex2.P0.3.audit-export",
+      "runner": "codex",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "partially confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "47-50,5-23,129-133,298-308",
+      "behavior": "A retrospective index could bind Git and main sessions, but child raw/usage coverage, clear dispatch briefings, accepted native authorship, security, final Verify and independent product Critic were unavailable.",
+      "reportedCause": "No complete generated data-minimising auditor export",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g28",
+        "pipeline.greenfield.g23.forensics"
+      ],
+      "relatedACs": [
+        "AC-175"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "codex2.P1.1.repeat-runtime-consent",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "51-54,78-80,134-151",
+      "behavior": "After pipeline consent, the agent asked again to apply the bounded local runtime plan; the report measures 120.119 seconds of PO wait outside active time.",
+      "reportedCause": "Mutation shape conflated with a human decision",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals",
+        "pipeline.greenfield-design-course-cost-and-proportionality"
+      ],
+      "relatedACs": [
+        "AC-264",
+        "AC-191"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "codex2.P1.1.repeat-git-identity",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "51-54,83-84,134-151,276-280",
+      "behavior": "Git identity already answered in intake was asked again after restart.",
+      "reportedCause": "Answered value was not durably reused on resume",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g25",
+        "pipeline.three-runner-happy-path-with-two-po-approvals",
+        "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse"
+      ],
+      "relatedACs": [
+        "AC-264",
+        "AC-258"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse"
+    },
+    {
+      "id": "codex2.P1.1.actor-repetition",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "51-54,84,134-151,280-283",
+      "behavior": "Separate actor labels were sought for submit/present and close/push, then asked again on restart.",
+      "reportedCause": "Existing EL-36 requires exact action-scope attribution; ergonomics and durable bounded reuse are missing",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals",
+        "pipeline.greenfield.g25",
+        "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse"
+      ],
+      "relatedACs": [
+        "AC-264",
+        "AC-258"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse"
+    },
+    {
+      "id": "codex2.P1.2.passive-read",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "55-58,80-81,92-95,110-115",
+      "behavior": "Ordinary read-only rg/stat/plugin diagnostics and protected-name mentions were refused, causing trial-and-error.",
+      "reportedCause": "Closed grammar or scope classifier blocked these observed spellings",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.read-blocks-and-misleading-denial-texts-across-runners",
+        "pipeline.denial-names-a-diagnosis-it-refuses"
+      ],
+      "relatedACs": [
+        "AC-239",
+        "AC-148"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "codex2.P1.2.help-next-action",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "55-58,86-89,101-104",
+      "behavior": "Multiple CLI --help attempts returned argument errors rather than useful schema/usage and safe next action.",
+      "reportedCause": "Help route incomplete for attempted commands",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g23.help",
+        "pipeline.denial-names-a-diagnosis-it-refuses"
+      ],
+      "relatedACs": [
+        "AC-148"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "codex2.P1.3.seed-signature",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "59-62,229-252",
+      "behavior": "Voxel delivery's public seed signature includes seed text and counts but no placements, so a different seed yields a different string without proving different geometry.",
+      "reportedCause": "The delivered product test oracle hashes inputs/counts rather than transforms",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+        "pipeline.greenfield.g24",
+        "pipeline.greenfield.r2.behavioral-evidence-oracle"
+      ],
+      "relatedACs": [
+        "AC-146",
+        "AC-170"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.behavioral-evidence-oracle"
+    },
+    {
+      "id": "codex2.P1.3.seed-alias",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "59-62,245-252",
+      "behavior": "Seeds separated by 2^32 produce identical PRNG streams; accepted seed domain and alias behavior were not stated.",
+      "reportedCause": "32-bit coercion in delivered product PRNG as analyzed in report",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+        "pipeline.greenfield.r2.behavioral-evidence-oracle"
+      ],
+      "relatedACs": [
+        "AC-146",
+        "AC-170"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.behavioral-evidence-oracle"
+    },
+    {
+      "id": "codex2.P1.3.source-pattern-tests",
+      "runner": "codex",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed",
+      "report": "reports/codex.md.txt",
+      "reportLines": "59-62,229-252,276-291",
+      "behavior": "Three contract tests mainly check source markers/syntax and cannot establish interactive scene properties; retrospective browser checks were partial, with 13 PASS, one timing FAIL and two open in a longer run.",
+      "reportedCause": "Behavioral acceptance examiner coverage too narrow",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.declared-product-criteria-need-matching-acceptance-evidence",
+        "pipeline.greenfield.g24",
+        "pipeline.greenfield.r2.behavioral-evidence-oracle"
+      ],
+      "relatedACs": [
+        "AC-146",
+        "AC-170"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.behavioral-evidence-oracle"
+    },
+    {
+      "id": "AGY2-H01",
+      "runner": "agy",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "confirmed-in-reported-run; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "37-46, 93-106, 125-132, 313-316, 346-347",
+      "behavior": "Antigravity main agent authored production code after Goldfish binding refusals; implementation write proceeded without authenticated Goldfish.",
+      "reportedCause": null,
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.agy-el01-write-authorization-gap",
+        "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
+      ],
+      "relatedACs": [
+        "AC-109",
+        "AC-108"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "AGY2-H02",
+      "runner": "agy",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "confirmed-in-reported-run; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "38-45, 104-106, 125-132, 160-170",
+      "behavior": "Handwritten dispatch record and Dispatch trailer could make self-authored implementation look mapped; no observed child proved authorship.",
+      "reportedCause": null,
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.implementation-without-dispatch-escapes-review-coverage"
+      ],
+      "relatedACs": [
+        "AC-204"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "AGY2-H03",
+      "runner": "agy",
+      "priority": "P0",
+      "release": "0.7.0",
+      "status": "confirmed-in-reported-run; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "37-46, 113-116, 125-132, 160-170, 343-344",
+      "behavior": "After Critic child dispatch refusals, main agent wrote verdict JSON and finalizer accepted it without observed independent child.",
+      "reportedCause": null,
+      "verifiedSourceCause": "session-critic-finalizer.mjs:743-744 reads verdict file; lines 458-526 finalize; read-only scan found no native AGY child lookup in that file.",
+      "matrixIds": [
+        "pipeline.role-route-preflight-with-self-dispatch-fallback",
+        "pipeline.agy-driver-dispatch-and-design-routes-incomplete",
+        "pipeline.greenfield.r2.critic-finalizer-original-independence"
+      ],
+      "relatedACs": [
+        "AC-245",
+        "AC-108",
+        "AC-204"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.critic-finalizer-original-independence"
+    },
+    {
+      "id": "AGY2-H04",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "source-cause-confirmed; live candidate outcome untested",
+      "report": "reports/agy.md.txt",
+      "reportLines": "47-55, 113-116, 314-316, 350",
+      "behavior": "Changed .claude/pipeline.json is inserted as required guardrail then generic batch reference rejects it with CGB-REFERENCE.",
+      "reportedCause": null,
+      "verifiedSourceCause": "critic-packet-governance.mjs:98 includes .claude/pipeline.json; critic-generic-batch.mjs:162-164 admits only .claude/pipeline.yaml.",
+      "matrixIds": [
+        "pipeline.greenfield.r2.critic-generated-manifest-reference"
+      ],
+      "relatedACs": [
+        "AC-264",
+        "AC-245"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.critic-generated-manifest-reference"
+    },
+    {
+      "id": "AGY2-H05",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "source-cause-confirmed; live candidate outcome untested",
+      "report": "reports/agy.md.txt",
+      "reportLines": "47-55, 113-116, 314-316",
+      "behavior": "CGB-REFERENCE after ensureStore retains transaction.lock, so retry returns CGB-HELD.",
+      "reportedCause": null,
+      "verifiedSourceCause": "critic-generic-batch.mjs:137-152 retains dirty failed transaction lock by design; lines 606-610 call ensureStore before reference.",
+      "matrixIds": [
+        "pipeline.greenfield.r2.critic-validation-transaction-recovery"
+      ],
+      "relatedACs": [
+        "AC-264",
+        "AC-245"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.critic-validation-transaction-recovery"
+    },
+    {
+      "id": "AGY2-H06",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "source-cause-confirmed; live candidate outcome untested",
+      "report": "reports/agy.md.txt",
+      "reportLines": "47-55, 113-116, 128-132, 310, 314-316, 355",
+      "behavior": "Diagnostic bundle requires targeted.log but evidence-only carry classifier accepts only .json, blocking candidate Verify with VEP-CVL-CARRY-CONTENT-CHANGED and leaving final commit without candidate-bound Verify.",
+      "reportedCause": null,
+      "verifiedSourceCause": "critic-course-admission.mjs:174-218, specifically line 202 .json-only; report cites diagnostic bundle requirement.",
+      "matrixIds": [
+        "pipeline.greenfield.r2.critic-diagnostic-evidence-carry"
+      ],
+      "relatedACs": [
+        "AC-170",
+        "AC-264"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.critic-diagnostic-evidence-carry"
+    },
+    {
+      "id": "AGY2-H07",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed-in-reported-run; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "56-73, 95-96, 108-109, 205-210",
+      "behavior": "GUARD-READ-TARGET denied ordinary plugin scripts/schema and project pipeline-state reads as credential roots.",
+      "reportedCause": null,
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.read-blocks-and-misleading-denial-texts-across-runners"
+      ],
+      "relatedACs": [
+        "AC-239"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "AGY2-H08",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed-in-reported-run; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "56-73, 94, 101, 108-109",
+      "behavior": "Gate-strength shell substring matching denied official diagnostic --guardrail argument and rollback naming pipeline.json.",
+      "reportedCause": null,
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+        "pipeline.read-blocks-and-misleading-denial-texts-across-runners"
+      ],
+      "relatedACs": [
+        "AC-140",
+        "AC-239"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "AGY2-H09",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "confirmed-in-reported-run; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "56-73, 108-109",
+      "behavior": "Read-only git rev-parse <commit>^{tree} was classified as hidden push/shell expansion.",
+      "reportedCause": null,
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.guard-push-refuses-read-only-git-without-push"
+      ],
+      "relatedACs": [
+        "AC-195"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "AGY2-H10",
+      "runner": "agy",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "reported; current-candidate recurrence unverified",
+      "report": "reports/agy.md.txt",
+      "reportLines": "94, 97, 113-116, 37-46",
+      "behavior": "Pipeline model-role-dispatch-select in draft and design-review-receipt create in awaiting-approval were rejected as opaque scripts, obstructing required role setup.",
+      "reportedCause": null,
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.role-route-preflight-with-self-dispatch-fallback",
+        "pipeline.agy-driver-dispatch-and-design-routes-incomplete"
+      ],
+      "relatedACs": [
+        "AC-245",
+        "AC-108"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "C2-P1-WIN-ACL",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        114,
+        263
+      ],
+      "behavior": "Windows private-state ACL refusal caused repeated operator repair and recurred as CVCT-FILE.",
+      "reportedCause": "Windows ACL handling; report proposes hardenWindowsPrivateDirectory as typed nextAction.",
+      "verifiedSourceCause": "Unverified for tested build. D145 and later Source 7d3659ebe relax ordinary Windows host/project/plugin/process-image ACL checks while retaining private custody; native Windows and installed candidate remain unqualified.",
+      "matrixIds": [
+        "pipeline.greenfield.g19",
+        "pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures",
+        "pipeline.claude-windows-greenfield-lifecycle-not-walkable"
+      ],
+      "relatedACs": [
+        "AC-270",
+        "AC-127"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "C2-P1-WIN-MAIN",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "unproven",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        115,
+        263
+      ],
+      "behavior": "Report attributes Windows plugin attestation/main-module detection to argv realpath crash; evidence cited is earlier-session notes, not this run's direct reproduction.",
+      "reportedCause": "phoenix-authority-revision.mjs main guard/realpath normalization.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.claude-windows-greenfield-lifecycle-not-walkable",
+        "pipeline.preflight-with-a-forward-slash-plugin-path-records-no-bootstrap-receipt",
+        "pipeline.greenfield.r2.windows-main-entry-identity"
+      ],
+      "relatedACs": [
+        "AC-127",
+        "AC-230"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.windows-main-entry-identity"
+    },
+    {
+      "id": "C2-P1-WIN-FSYNC",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        121,
+        263
+      ],
+      "behavior": "release-lock returned EPERM on directory fsync although the session lock was free afterward.",
+      "reportedCause": "Windows syncDirectory behavior.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.windows-pre-push-installer-fsync-and-relative-action",
+        "pipeline.greenfield.r2.windows-lock-release-postcondition"
+      ],
+      "relatedACs": [
+        "AC-272",
+        "AC-127"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.windows-lock-release-postcondition"
+    },
+    {
+      "id": "C2-P1-WIN-ORPHAN",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        121,
+        263
+      ],
+      "behavior": "A stale session lock blocked close until manual release was attempted.",
+      "reportedCause": "Orphan PID 9036, proposed automatic holder-pid check.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.hgo-dead-owner-audit-lock-permanently-ambiguous-on-windows",
+        "pipeline.greenfield.r2.windows-session-lock-owner-recovery"
+      ],
+      "relatedACs": [
+        "AC-200",
+        "AC-127"
+      ],
+      "newOutcome": "pipeline.greenfield.r2.windows-session-lock-owner-recovery"
+    },
+    {
+      "id": "C2-P1-CLOSE-CRITIC",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        50,
+        150,
+        215,
+        264,
+        289,
+        290,
+        325
+      ],
+      "behavior": "Feature run stopped before independent implementation Critic; no visible completed verified state.",
+      "reportedCause": "Feature stop lacks abandoned-unverified status.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g22",
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "relatedACs": [
+        "AC-264"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "C2-P1-CLOSE-VERIFY",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        152,
+        217,
+        264,
+        291,
+        324
+      ],
+      "behavior": "Reported verify: null; no final candidate-bound Verify binding before stop.",
+      "reportedCause": "Calibration omitted Verify; report proposes blocking first dispatch or configure-verify in design.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.design-bootstrap-verify-state-contradicts-deferred-contract",
+        "pipeline.configure-verify-output-lacks-a-walkable-commit-route",
+        "pipeline.greenfield.g22"
+      ],
+      "relatedACs": [
+        "AC-150",
+        "AC-140"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "C2-P1-CLOSE-SECURITY",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        50,
+        152,
+        175,
+        216,
+        264,
+        292,
+        324
+      ],
+      "behavior": "No security scan was run before the run stopped.",
+      "reportedCause": "Close path does not visibly preserve unmet gate state.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g22",
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "relatedACs": [
+        "AC-264"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "C2-P1-CLOSE-ACCEPTANCE",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        167,
+        218,
+        264,
+        293,
+        332
+      ],
+      "behavior": "PO acceptance was not obtained, and the project stopped with only an acceptance skeleton.",
+      "reportedCause": "No visible abandoned-unverified close status.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.greenfield.g22",
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "relatedACs": [
+        "AC-264"
+      ],
+      "newOutcome": null
+    },
+    {
+      "id": "C2-P1-SCOPE-BEFORE-SIGN",
+      "runner": "claude",
+      "priority": "P1",
+      "release": "0.7.0",
+      "status": "partial",
+      "report": "reports/claude.md.txt",
+      "reportLines": [
+        118,
+        130,
+        165,
+        166,
+        265,
+        308
+      ],
+      "behavior": "Architecture adoption/scope mismatch was found after first signed design approval, requiring reopen, review and second signature.",
+      "reportedCause": "Neither prior Readiness review nor architecture check validated scope before signing.",
+      "verifiedSourceCause": null,
+      "matrixIds": [
+        "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
+        "pipeline.greenfield.g27.architecture",
+        "pipeline.signature-ceremony-requires-operator-work-and-breaks"
+      ],
+      "relatedACs": [
+        "AC-155",
+        "AC-258"
+      ],
+      "newOutcome": null
+    }
+  ],
+  "userObservations": [
+    {
+      "id": "U01",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Duplicate local setup-plan confirmation after install consent",
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U02",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Explain the optional export choice and its data/scope in setup",
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U03",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Collect mini/feature/epic in the first parameter batch",
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U04",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Reuse supplied Git identity after actual restart",
+      "matrixIds": [
+        "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U05",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Joint Git-name/Pipeline-actor choice and durable scoped reuse",
+      "matrixIds": [
+        "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U06",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Nonmissable design driver: finalize/review before submit/bind",
+      "matrixIds": [
+        "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U07",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Architecture scope/content checked inside the one review before signature",
+      "matrixIds": [
+        "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U08",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Usable generator dispatch and Windows readiness before product work",
+      "matrixIds": [
+        "pipeline.greenfield.g18"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U09",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Close preserves governed runtime without avoidable restart",
+      "matrixIds": [
+        "pipeline.greenfield.r2.branch-checkout-runtime-continuity"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U10",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Product checkout visibility preserved; report confirms files remain on delivery branch",
+      "matrixIds": [
+        "pipeline.greenfield.r2.branch-checkout-runtime-continuity"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U11",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "One worker observed; whether safe parallel decomposition existed is unproven",
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "status": "observation; defect/decomposability unproven"
+    },
+    {
+      "id": "U12",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Excess close/push toil and needed deterministic orchestration",
+      "matrixIds": [
+        "pipeline.greenfield.g22"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U13",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "All three close/push courses stopped or aborted; no delivery acceptance",
+      "matrixIds": [
+        "pipeline.three-runner-happy-path-with-two-po-approvals"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    },
+    {
+      "id": "U14",
+      "source": "explicit PO observations2026-10-25",
+      "behavior": "Compare supplied no-pipeline baseline with explicit metric/causal limits",
+      "matrixIds": [
+        "pipeline.elephant-main-context-spent-on-wake-ups-and-inline-reads"
+      ],
+      "status": "operator-reported; report/candidate correlation retained"
+    }
+  ],
+  "newOutcomeCount": 10,
+  "allHighMapped": true,
+  "unmapped": [],
+  "scopeNote": "AC175-related auditor-export clauses are active under G28/G23.forensics by D152; older deferral does not remove this reported P0. No private/raw transcript access or full unrelated export scope is invented.",
+  "nativeEvidenceLimit": "Operator-supplied analyses are observations, not fabricated native receipts or current-candidate PASS."
+}

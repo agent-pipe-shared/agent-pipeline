@@ -1,0 +1,26 @@
+command: <host-path> --require <repo-root>/scratch/clones/ac168-enforcement-20261025/scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/scripts/elephant-context-measure.test.mjs
+label: AC168-MAIN-c1
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+✔ classifies wake-up, inline read, guard refusal and authoring with shares (2.281364ms)
+✔ admin target flag and empty transcript (0.634795ms)
+✔ sidechain events are excluded from main-thread measurement (1.094499ms)
+✔ attributes events to the five causes of the item (1.18954ms)
+✔ per-cause before/after comparison reports each cause falling (0.720779ms)
+✔ a cause with no events before cannot be reported improved (0.212674ms)
+✔ F5(a): a correctly filled Critic briefing is template-shaped, a freehand Critic prompt is still hand-written (0.452049ms)
+✔ F5(b): the guard cause is named for what it counts: refusals, with the retried-and-admitted subset (0.280643ms)
+✔ F5(c): a falling share at unchanged absolute cost is not improved; the share change is reported separately (0.54178ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 71.504628
+
+--- stderr ---

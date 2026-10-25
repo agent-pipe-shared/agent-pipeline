@@ -1,0 +1,18 @@
+command: <host-path> --require <repo-root>/scratch/clones/ac168-enforcement-20261025/scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+label: AC168-MAIN-grep
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+✔ bounded max-count grep admits an exact passive file and retains denials (48.655147ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 459.42255
+
+--- stderr ---

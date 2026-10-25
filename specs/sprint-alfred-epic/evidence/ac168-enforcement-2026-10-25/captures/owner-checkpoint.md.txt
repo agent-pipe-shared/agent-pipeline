@@ -1,0 +1,37 @@
+# AC168 Source checkpoint 2
+
+Apply `patch.diff` then `followup.patch` to base `62008d6bd39f68aa849e7257cdc3161b59222ebb`. The first patch is unchanged (SHA256 `8f1e153b3e075d108b41249bd8f0cf8cce4f06541f5574e50a393bd496d55681`). Follow-up SHA256 `382ad8c1f1e0fbb4eebf17b6ef0cee9c675307a5a4d92e39ef143d9b5b701620`. An independent inert clone replayed both patches; its complete tracked diff and new test bytes match the working clone exactly. No commit or dispatch record (D143).
+
+Follow-up files: `plugins/pipeline-core/hooks/stop-fanout.mjs` replaces ad hoc recursive marker writes with existing `readPrivateJson`/`writePrivateJsonAtomic` Source path; `stop-fanout.test.mjs` adds a linked `.claude` parent negative within preserved SF07, requiring repeated fail-open advice and zero outside writes; `lib/guard/shell-grammar.mjs` admits only canonical `grep -m|--max-count 1..500` on exact passive files; new `lib/guard/grep-max-count-read.test.mjs` proves the prior refusal and retains credential, redirect, substitution, overlimit and duplicate-option denials. The Source guard callsite is `lib/guard/evaluate.mjs` via `isReadOnlyDiagnosticCommand`. No opaque Node execution or Plan-carrier widening.
+
+| Captured command under synthetic identity preload | Exit | Artifact | SHA256 |
+| --- | ---: | --- | --- |
+| `node --test plugins/pipeline-core/hooks/stop-fanout.test.mjs` after private-writer correction | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-stop-fanout-private-writer-green.log` | `7c265a1f3f6913eaf79b16633015072b0af42ff01f3716dd88f535100db789e8` |
+| `node --test plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs` before grammar fix | 1 (expected RED) | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-grep-max-count-red.log` | `c87bc888cfb61d1232c832b0a696a659ee84642c4241004412399366ab79add1` |
+| Same after grammar fix | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-grep-max-count-green.log` | `d27c000fa78d1984472de88b94f4938fe9c3a1451473d82fb8b205759c48aa0f` |
+| Same with real `evaluateLifecycleReadyGuard` admission | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-grep-source-guard-green.log` | `4664f4168dd4a7692a71d69dbd7fa29771a28203be0878c1226304d9d4ec7b4f` |
+| `node --test plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs` | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-g23-original.log` | `325491bb43ad4fab0f30bf2ee716e182c4fbcb8ad318853100ce1ea33e0f2ac0` |
+| `node --test plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs` | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-g23-cross-runner.log` | `e841ed4181d899aedb1eac3c3bcc58b89cfe4105a1ebe96b6bf6f91f0e61306e` |
+| `node --test harness/scripts/check-consumer-safe-paths.test.mjs` | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-consumer-safe-paths-final.log` | `cf5a7ffed2db0e2540b05358c9bfef2bba8324c4fcd407d3d60204d2684cc4c8` |
+| `git diff --check` | 0 | `scratch/clones/ac168-enforcement-20261025/scratch/ac168-diff-check-final.log` | `fc097f93d046573e19b687d75245ce8f853c85690e1978d559589c3696b59410` |
+
+Each check was run through `plugins/pipeline-core/scripts/capture-evidence.mjs` from the exact clone and `host-authorized-wsl`, with `node --require ./scratch/ac168-safe-preload.cjs` before capture imports and child tests. RED/GREEN is a synthetic guard admission measure: the same bounded command moves from refused to admitted; no observed live token savings or native runner PASS is claimed. Existing generated Goldfish briefing guard and read-only Explore carrier were not altered. The live installed-host 10% criterion, delegation-cost per action, and project resource headroom remain unknown without a sanctioned candidate-bound live capture. The parent owns integration, final Verify/Security, one frozen Critic batch, and PO acceptance.
+
+## Complete changed-file hashes (final isolated clone)
+
+| Repo-relative path | SHA256 |
+| --- | --- |
+| `plugins/pipeline-core/hooks/stop-fanout.mjs` | `49ffcfc55be5c696021723be472feddba79d79c7a6a7dc6c83e031c7f71de5d3` |
+| `plugins/pipeline-core/hooks/stop-fanout.test.mjs` | `d7fb8e60ed3fd09db656145a0e9990558fcf22524f502d454f08162f42246882` |
+| `plugins/pipeline-core/scripts/elephant-context-measure.mjs` | `61c8660ae75fb8dae7cd4c0006c36fd5ad893926be787a78bff890b190627ff6` |
+| `plugins/pipeline-core/scripts/elephant-context-measure.test.mjs` | `63f6fd61d0db9fa71bd31a323e1d30deb3ed19348024bb8c78133bfa6b030dd9` |
+| `plugins/pipeline-core/lib/guard/shell-grammar.mjs` | `9e0b6f85b9a363cee66c3c34080a5f3bbeb5de61f2cc5475f38e14bc19908def` |
+| `plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs` (new) | `f005ab3c35cc03de5401e36633145735adda8200cc2c363de58e1796b71618d8` |
+
+## Existing callsite qualification
+
+`node --test plugins/pipeline-core/hooks/stop-suggest.test.mjs`: exit 0, `scratch/clones/ac168-enforcement-20261025/scratch/ac168-stop-suggest-existing.log`, SHA256 `f1fdfc581f073d619917690f378b926ba8ea196c52babb603d5ec164c58e1963`. `node --test plugins/pipeline-core/scripts/dispatch-briefing.test.mjs`: exit 0, `scratch/clones/ac168-enforcement-20261025/scratch/ac168-dispatch-briefing-existing.log`, SHA256 `e50356b246fffb46acb27fefa35c7eb1364868e5c1118fe08b1085f17c429fd7`. These qualify existing dedup and generated-briefing Source behavior, without attributing new implementation to this patch.
+
+`node --test plugins/pipeline-core/hooks/guard-dispatch.test.mjs`: exit 1, `scratch/clones/ac168-enforcement-20261025/scratch/ac168-guard-dispatch-existing.log`, SHA256 `99443422270dd230322416309b692548fb2cdff8fd4588395e8c454423c46242`. Current carrier refusal conflicts with multiple existing expectations, including Plan/general-purpose and ordinary Codex worker. This suite is RED and is not cleared by the focused grep or briefing checks. No Plan admission or carrier-policy change was made.
+
+Same-unit synthetic callsite counts: SF07 unchanged two consecutive Stops emitted two advisory messages before the fix and one after, with two `stop-eval` ledger events in both cases. A one-command bounded grep case was refused before the fix and admitted after, with credential/redirect/substitution negatives still refused. These are controlled Source checks, not live-session token measurements. The existing `stop-suggest` suite and `dispatch-briefing` suite pass, but no live before/after count for their historic enforcement is available.

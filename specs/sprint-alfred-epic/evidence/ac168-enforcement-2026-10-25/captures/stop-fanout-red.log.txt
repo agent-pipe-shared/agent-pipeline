@@ -1,0 +1,72 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/hooks/stop-fanout.test.mjs
+label: ac168-stop-fanout-red
+exitCode: 1
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ SF01 shadow mode: an orchestrator Stop is silent, exits 0 and records one stop-eval (no block event) (300.182423ms)
+✔ SF02 the default mode (no mode in the config) is shadow: silent (297.363286ms)
+✔ SF03 enforce mode with ready slices and free slots: exit 0, block JSON with <plugin-root> substituted, stop-eval and block recorded (302.986645ms)
+✔ SF04 stop_hook_active: true right after our own block is governed by the loop rule (no output, defied recorded) (674.091738ms)
+✔ SF05 stop_hook_active: true with no block of ours is not our loop: it still blocks (349.049166ms)
+✔ SF06 a subagent payload (agent_id present) gets no output and no ledger line (632.28466ms)
+✖ SF07 advisory mode emits the governor's advisory text as systemMessage/additionalContext (never a block decision, no block event) (611.879519ms)
+✔ SF08 no queue configured: the governor gets 'no queue', the hook is silent (297.835606ms)
+✔ SF09 consumer opt-out (requiresEnforcement false) is silent and never blocks (302.469319ms)
+✔ SF10 fail-open: malformed, empty or non-object stdin exits 0 with no stdout (1767.389196ms)
+✔ SF11 fail-open: a missing queue file exits 0 with no stdout (296.69143ms)
+✔ SF12 fail-open: a malformed config, a missing session id or an unusable common dir exits 0 with no stdout (895.906061ms)
+✔ SF13 fail-open: an unreadable ledger (the ledger path is a directory) exits 0 with no stdout, even in enforce mode (312.436313ms)
+✔ SF14 fail-open: a governor that throws (PIPELINE_FANOUT_TEST_THROW=1 test seam) exits 0 with no stdout (609.39489ms)
+✔ SF15 a launch event after the block resets the loop: the next Stop with stop_hook_active blocks again (628.021678ms)
+✔ SF16 shadow and off stay silent even when the governor would block (advisory text is an advisory/enforce channel only) (1191.303271ms)
+✔ SF17 FANOUT-NO-QUEUE reaches the session in advisory and enforce mode (absent queue while implementing, invalid queue) as advisory output, never a block (1792.883282ms)
+✔ SF18 implementationPhaseActive is derived from the feature state (design 3.10): implementing with no queue -> the NO-QUEUE line, any other phase or unreadable state -> silent (2397.298677ms)
+✔ SF19 a block is emitted only after its block event was durably appended: a refused append, or a result without a block event, fails open (11.684178ms)
+✔ SF20 no config or no queuePath returns silently having spawned nothing; a configured queue with an absolute commonDir flows through without a spawn (295.225255ms)
+✔ SF21 a queuePath without an absolute commonDir fails open silently: nothing spawned, the governor and the ledger are never reached (886.729367ms)
+✔ SF22 an absolute commonDir is the only source of the git common dir: no git spawn, none outside the ledger chain, and the win32 ledger-side PowerShell spawns are a pinned known deviation from design 8 (bound 4, must drop to 0) (304.836608ms)
+ℹ ledger-side spawns pinned (0, bound 0 on linux): []
+✔ SF22b steady state: a second Stop against the same common dir spawns no child process at all, with the same block decision and a real ledger append (the first Stop's one-time directory creation is SF22's) (640.313773ms)
+ℹ first Stop: 0 spawn(s), second Stop: 0 on linux; first Stop spawns: []
+✔ SF23 the spawn tripwire is live: a control module that spawns through an ESM named import is recorded (36.449719ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 23
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16181.476812
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ SF07 advisory mode emits the governor's advisory text as systemMessage/additionalContext (never a block decision, no block event) (611.879519ms)
+  AssertionError [ERR_ASSERTION]: unchanged second Stop stdout must be empty
+  + actual - expected
+  
+  + '{"systemMessage":"FANOUT-ADVISORY: 4 free slot(s), 3 ready slice(s), live 0/4 (0/6 load units).\\nDispatch now, in ONE message: A1 (implementor, light), A2 (implementor, light), A3 (implementor, light)   briefings: specs/unit/briefings/A1.md, specs/unit/briefings/A2.md, specs/unit/briefings/A3.md\\nIf you disagree with a slice, declare it instead of stopping silently:\\n  node <repo-root>/plugins/pipeline-core/scripts/slice-queue.mjs defer <id> --reason \\"<one line>\\"   (or hold <id> --po-question, or depend <id> <dep>)","hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"FANOUT-ADVISORY: 4 free slot(s), 3 ready slice(s), live 0/4 (0/6 load units).\\nDispatch now, in ONE message: A1 (implementor, light), A2 (implementor, light), A3 (implementor, light)   briefings: specs/unit/briefings/A1.md, specs/unit/briefings/A2.md, specs/unit/briefings/A3.md\\nIf you disagree with a slice, declare it instead of stopping silently:\\n  node <repo-root>/plugins/pipeline-core/scripts/slice-queue.mjs defer <id> --reason \\"<one line>\\"   (or hold <id> --po-question, or depend <id> <dep>)"}}\n'
+  - ''
+  
+      at assertSilent (file://<repo-root>/plugins/pipeline-core/hooks/stop-fanout.test.mjs:86:10)
+      at file://<repo-root>/plugins/pipeline-core/hooks/stop-fanout.test.mjs:162:5
+      at withBox (file://<repo-root>/plugins/pipeline-core/hooks/stop-fanout.test.mjs:79:5)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/hooks/stop-fanout.test.mjs:152:3)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '{"systemMessage":"FANOUT-ADVISORY: 4 free slot(s), 3 ready slice(s), live 0/4 (0/6 load units).\\nDispatch now, in ONE message: A1 (implementor, light), A2 (implementor, light), A3 (implementor, light)   briefings: specs/unit/briefings/A1.md, specs/unit/briefings/A2.md, specs/unit/briefings/A3.md\\nIf you disagree with a slice, declare it instead of stopping silently:\\n  node <repo-root>/plugins/pipeline-core/scripts/slice-queue.mjs defer <id> --reason \\"<one line>\\"   (or hold <id> --po-question, or depend <id> <dep>)","hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"FANOUT-ADVISORY: 4 free slot(s), 3 ready slice(s), live 0/4 (0/6 load units).\\nDispatch now, in ONE message: A1 (implementor, light), A2 (implementor, light), A3 (implementor, light)   briefings: specs/unit/briefings/A1.md, specs/unit/briefings/A2.md, specs/unit/briefings/A3.md\\nIf you disagree with a slice, declare it instead of stopping silently:\\n  node <repo-root>/plugins/pipeline-core/scripts/slice-queue.mjs defer <id> --reason \\"<one line>\\"   (or hold <id> --po-question, or depend <id> <dep>)"}}\n',
+    expected: '',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

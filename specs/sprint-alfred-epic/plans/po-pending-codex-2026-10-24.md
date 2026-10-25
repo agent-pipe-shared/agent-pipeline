@@ -1,10 +1,21 @@
 # Collected PO matters — current interim candidate
 
+Latest: D151 permits unique public `/tmp` fixtures with owned cleanup; D152
+requires all second-run P0/P1 in0.7.0 and current matrix207/174at75/22at50/11at25;
+D153 authorizes the next75-ready local stamp and subsequent feature push for
+the other PC. AC168 operator application/commit0b80f4f09 is complete. No repeat
+application or commit is requested. G8 contract D150 is approved for implementation;
+its incomplete/RED kernel is not Main-ready. The new finding ledger and active
+work take precedence over historical installation/PC wording below. Any genuine
+new decision or candidate-bound signature is presented only as a concrete package.
+
 Current work and next actions have one authority: [docs/state.md](../../../docs/state.md). The [historical queue](po-pending-history-before-final-interim-2026-10-25.md) preserves old requests and resolutions; none is a fresh request merely because it appears there.
 
 Resolved: operator Source821cd35c1 and post-close prevention9ed1a2800; normal AGYdc8204a28 and scannere244c7b3d; final inventory/reader0d2c33bf5. No repeated application approval, heal or operator commit is requested. PRD/Spec remain unchanged.
 
 Resolved direction D144: G8 uses existing Source/Model registry origin/readback, without a new principal, key or ledger. The exact bounded package and its applicable aggregate approval remain to be prepared; the portable prototype is still inert, not an accepted ADR or implemented producer. Collected genuine decisions: domain-scanner reproduction R3; bounded Reader owner acceptance/policy-transition field when its planned course is ready. No early duplicate Critic/Reader batch is requested. Optional model-role acknowledgement follows only a fresh actual bootstrap readback; never reuse another session's receipt.
+
+D146 now resolves scanner R3: reproduce and review the exact value before suppression; agent-created sanitized real-scanner evidence is permitted, unknown historical matches remain unresolved and push authority stays separate. D147 explicitly permits the bounded G8 replacement briefing for the same owner and unique Source-validated test homes under the PO-restored `/run/user/1000/ap-g17`; all prior attempts and other boundaries remain. These are recorded in the October25 fix-wave decision file. No new terminal step is pending for that parent: the PO reported owner skar667/mode700 and selected controller callbacks ran.
 
 The PO assigned central nonweakenable Bank/Enterprise signature policy to **Nightwing**, outside0.7.0 and0.7.1 none. General chat remains explicitly weaker; exact overrides still need an explicit PO answer by method.
 

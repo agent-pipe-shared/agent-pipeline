@@ -1,0 +1,37 @@
+{
+  "base": "fcdbd288d",
+  "patch": "guard-only.patch",
+  "patchSha256": "b2cdffbddd34d5936fc97506d565c5db209961f087afc6bf2de311ea4a5c4d36",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/hooks/stop-fanout.mjs",
+      "sha256": "49ffcfc55be5c696021723be472feddba79d79c7a6a7dc6c83e031c7f71de5d3",
+      "mainPreimageSha256": "49ffcfc55be5c696021723be472feddba79d79c7a6a7dc6c83e031c7f71de5d3"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/stop-fanout.test.mjs",
+      "sha256": "d7fb8e60ed3fd09db656145a0e9990558fcf22524f502d454f08162f42246882",
+      "mainPreimageSha256": "d7fb8e60ed3fd09db656145a0e9990558fcf22524f502d454f08162f42246882"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/elephant-context-measure.mjs",
+      "sha256": "61c8660ae75fb8dae7cd4c0006c36fd5ad893926be787a78bff890b190627ff6",
+      "mainPreimageSha256": "61c8660ae75fb8dae7cd4c0006c36fd5ad893926be787a78bff890b190627ff6"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/elephant-context-measure.test.mjs",
+      "sha256": "63f6fd61d0db9fa71bd31a323e1d30deb3ed19348024bb8c78133bfa6b030dd9",
+      "mainPreimageSha256": "63f6fd61d0db9fa71bd31a323e1d30deb3ed19348024bb8c78133bfa6b030dd9"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/shell-grammar.mjs",
+      "sha256": "9e0b6f85b9a363cee66c3c34080a5f3bbeb5de61f2cc5475f38e14bc19908def",
+      "mainPreimageSha256": "3fc29d407495635be918949a73e9efa74b0f1b265ee3f28be34cd7a4c055d843"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs",
+      "sha256": "f005ab3c35cc03de5401e36633145735adda8200cc2c363de58e1796b71618d8",
+      "mainPreimageSha256": null
+    }
+  ]
+}

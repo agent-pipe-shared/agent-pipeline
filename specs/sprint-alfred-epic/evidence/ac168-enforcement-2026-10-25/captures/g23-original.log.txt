@@ -1,0 +1,23 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs
+label: ac168-g23-original
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ G23Q001 original quoted test-file narrowing is admitted through parser and actual guard (462.814723ms)
+✔ G23Q002 quoted operators remain inert regex data in the stdin sink (825.865798ms)
+✔ G23Q003 unsupported filters, executable flags and shell effects stay refused (1068.503225ms)
+✔ G23Q004 external directories, symlink escape and credential operands stay refused (697.588687ms)
+✔ G23Q005 missing target diagnosis stays distinct from grammar and credential refusals (109.762248ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3563.964937
+
+--- stderr ---

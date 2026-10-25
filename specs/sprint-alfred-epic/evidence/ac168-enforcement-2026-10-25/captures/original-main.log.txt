@@ -1,0 +1,41 @@
+command: <host-path> --require <repo-root>/scratch/clones/ac168-enforcement-20261025/scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs
+label: AC168-MAIN-original
+exitCode: 0
+head: fcdbd288d3d6b33c8914dd0f8258e727175946c9
+tree: d6413f1e942f1d6932e598ff6eb0918f2ab299b4
+dirty: true
+--- stdout ---
+✔ P1 in-root passive reads are admitted: native Read, Glob listing, Bash cat/head/rg (incl. -g filter), scratch and docs (1109.90045ms)
+✔ P2 credential roots and out-of-root reads stay denied on every read shape (383.007154ms)
+✔ P3 every denial across the read shapes is a 'BLOCKED (guard ...): GUARD-<code>' text that never implies absence (774.915024ms)
+✔ P4 the A2 detector is meaningful: it flags a misleading 'not found' text and an unblocked-form text (negative control) (0.362789ms)
+✔ P5 a genuinely missing in-root Read is labelled GUARD-READ-TARGET-MISSING while a blocked existing secret is not (93.803898ms)
+✔ UNSATISFIED U1 native Grep on an exact in-repo file with a glob filter is admitted (A1: Grep with glob filters) (75.088288ms)
+✔ U1b the exact-file glob lane is restricted to the project root: an exact file in a SECOND fixture root outside the project is refused with a glob (102.25117ms)
+✔ P7 a glob filter does not widen native Grep: secret file, subtree and out-of-root targets stay denied with a glob (254.73637ms)
+✔ P6 native Grep on an exact in-repo file with a type filter is admitted (A1: Grep with type filters; the type field does not feed the selector) (90.500827ms)
+✔ U2 (PO decision 2026-10-16: REFUSE, SEC-11 exact-file rule stays) native Grep on an in-repo subtree is refused with or without a glob filter; the credential directory stays denied too (783.614404ms)
+✔ A4 a failed child adapter process is not observed as an implicit allow (2.119216ms)
+✔ M1 matrix: ordinary in-root passive shell reads are admitted on Claude, Codex and Antigravity (6877.148308ms)
+✔ M2 matrix: credential and outside-root shell reads are denied on every runner with a 'BLOCKED (guard ...): GUARD-<code>' text that never implies absence (8891.736086ms)
+✔ M3 Codex row: native Read, Grep and Glob are not Codex tools; each is refused by name and never as an absent file (1501.339673ms)
+✔ M4 Antigravity row: in-root native read tools are allowed by the real adapter (2294.992616ms)
+✔ M5 a native view_file of a credential file is denied on Antigravity (A1: credential roots stay denied; D87 gated the native read tools, ea69fe398) (533.320214ms)
+✔ M6 a denial surfaced on Codex does not tell the agent to use native Read, Glob or Grep tools (A2: a truthful, actionable denial; runner-neutral note, operator patch 38) (2602.112824ms)
+✔ M7 a denied credential read never says the refusal is about flags or spelling and not about a path (A2; PO decision 2026-10-23 rows 6/16: own typed code, K96) (175.647807ms)
+✔ M7b an in-root credential read on every shell runner carries GUARD-READ-CREDENTIAL-TARGET, names the path as the cause and gives a repair (6555.479818ms)
+✔ M7c the claude lane's credential refusal also offers the override route text of the other human-liftable refusals, and says plainly when none is offered (115.993558ms)
+✔ M7d negative control: refusals that are not about a credential keep their codes (a flag the grammar does not know, an unsupported recursive grep, a missing file) (4784.679345ms)
+✔ M5b every Antigravity native read tool that takes a path is refused for a credential target with GUARD-READ-CREDENTIAL-TARGET and its repair; a non-credential path stays allowed (PO decision 2026-10-23, rows 6/16, M5) (4347.138558ms)
+✔ M8 Claude native Read, Grep and Glob of a credential target are refused with GUARD-READ-CREDENTIAL-TARGET and its repair; non-credential refusals keep GUARD-READ-TARGET; an in-root file stays allowed (1384.613027ms)
+﹣ U3 (PO decision 2026-10-16: ADMIT) native Read of a user-supplied WSL UNC exact file is admitted; UNC credential roots and secret basenames stay denied (A1: WSL UNC paths) (0.619877ms) # typed host limitation: needs a Linux/WSL host (owner Coordinator, due 2026-10-19, PO decision K7)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 44140.126552
+
+--- stderr ---

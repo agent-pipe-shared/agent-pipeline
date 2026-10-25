@@ -1,17 +1,15 @@
 # Delivery status (current)
 
-**197 items · 21 below75 · index 72.08%.**
+**207items ·33below75 ·index69.69%.**
 
-| Stage | Items |
+|Stage|Items|
 |---|---:|
-|25|2|
-|50|19|
-|75|176|
+|25|11|
+|50|22|
+|75|174|
 |100|0|
 |UNKNOWN|0|
 
-[Current snapshot](delivery-amendment-2026-10-25-g35-local/README.md) adds confirmed P1 G35, the Codex push-guard budget defect, with committed focused qualification at75. All196 preceding rows and stages are preserved. The twelve broad fixture failures remain open; no full-suite or live-installed PASS is claimed. G33 remains50 with recovery of existing damaged State still open.
+[Current snapshot](delivery-amendment-2026-10-25-greenfield-second-run/README.md) adds ten deduplicated second-run high outcomes under existing ACs; all31high report clauses and14POobservations have an explicit disposition. Two current read/help gaps reopen75→50. Compared with the preceding197items (176at75,20at50,1at25), no existing identity disappears. AC168 remains50 after committed0b80f4f09; G8 remains25.
 
-Stay on this machine. The installed intermediate build is unchanged while the PO runs three new Greenfield tests. The next stamped candidate includes later committed Source; no stamp or install is inferred here. There are21rows below75; this is not completion or release. [Operative plan](../plans/plan_0.7.0-completion-and-greenfield-2026-10-24.md). Full Verify/Security, the scheduled frozen Critic batch, native/platform qualification and PO acceptance remain pending. Central Enterprise policy belongs to Nightwing.
-
-Latest amendment: [current G23 qualification](delivery-amendment-2026-10-25-g23-current/README.md). Source62008d6bd integrates the exact observer patch with current original23pass/1nativeU3skip and consumer9/9; one existing row moves50→75 under the native-only rubric. Actual native/installed qualification remains open. The preceding [Windows ACL amendment](delivery-amendment-2026-10-25-windows-acl-session/README.md) binds Source7d3659ebe/D145 with34portablepasses and honest native skips, without adding a denominator item. G17 dependency prose is corrected. Codex fixture38/39 has an unattributed HGO failure; G33 safe recovery remains open. The three new operator Greenfield outcomes have not yet been supplied.
+The installed candidate is unchanged. Main has G24/R3/G27 proposals applied but not yet committed/qualified; no stage credit is given for those proposals. Native/platform qualification, scheduled frozen Critic, final Verify/Security and PO acceptance remain open. After all deliverables reach75, prepare the authorized local stamp and feature-branch push for the PO's PC with the applicable candidate-bound signing step.

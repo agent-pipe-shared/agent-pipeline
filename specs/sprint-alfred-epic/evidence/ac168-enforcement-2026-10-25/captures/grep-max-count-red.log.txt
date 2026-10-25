@@ -1,0 +1,39 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+label: ac168-grep-max-count-red
+exitCode: 1
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+✖ bounded max-count grep admits an exact passive file and retains denials (5.150936ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 381.005601
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs:10:1
+✖ bounded max-count grep admits an exact passive file and retains denials (5.150936ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs:18:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.start (node:internal/test_runner/test:1096:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:385:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

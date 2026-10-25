@@ -1,0 +1,189 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/hooks/stop-suggest.test.mjs
+label: ac168-stop-suggest-existing
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+PASS  PHASE_GATE_MAP maps implementation -> dev-plan gate, no command
+PASS  PHASE_GATE_MAP maps security-scan -> security gate + scan command
+PASS  loadManifestSafe returns null when the manifest file is absent
+PASS  decideOutput: no manifest -> silent (empty stdout)
+PASS  loadManifestSafe returns null for a schema-invalid manifest
+PASS  decideOutput: invalid manifest -> silent (empty stdout)
+PASS  loadStateSafe returns null when the state file is missing
+PASS  decideOutput: no state file -> silent (empty stdout)
+PASS  loadStateSafe returns null on malformed JSON
+PASS  decideOutput: malformed state -> silent (empty stdout)
+PASS  resolveSuggestion: no activeFeature -> null (silent)
+PASS  resolveSuggestion: activeFeature without phase -> null (silent)
+PASS  resolveSuggestion: phase not in active-phase list -> null (silent)
+PASS  resolveSuggestion: implementation -> security-scan exact English message
+PASS  resolveSuggestion: disabled security-scan is skipped -> no mention of it
+PASS  resolveSuggestion: disabled security-scan skipped -> implementation becomes the last active phase (completion message)
+PASS  resolveSuggestion: has_ui false -> ui-design skipped, security-scan is the last active phase
+PASS  resolveSuggestion: has_ui true -> next phase after security-scan is ui-design
+PASS  resolveSuggestion: last active phase -> exact completion message
+PASS  resolveSuggestion: planApproved false -> message mentions the missing approval
+PASS  resolveSuggestion: planApproved false -> gate clause names dev-plan
+PASS  resolveSuggestion: planApproved true -> no missing-approval hint
+PASS  resolveSuggestion: planApproved absent -> treated as not approved (mentions missing approval)
+PASS  resolveSuggestion: unrecognized gate mode string does not throw
+PASS  resolveSuggestion: unrecognized gate mode string is echoed verbatim
+PASS  resolveSuggestion: gate missing from manifest.gates does not throw
+PASS  resolveSuggestion: gate missing from manifest.gates falls back to 'unknown' mode
+PASS  CLI smoke (suggestion case): exit 0
+PASS  CLI smoke (suggestion case): stdout is valid JSON
+PASS  CLI smoke (suggestion case): systemMessage present
+PASS  CLI smoke (suggestion case): systemMessage names security-scan
+PASS  CLI smoke (suggestion case): hookSpecificOutput.hookEventName is Stop
+PASS  CLI smoke (suggestion case): additionalContext mirrors systemMessage
+PASS  CLI smoke (no manifest): exit 0
+PASS  CLI smoke (no manifest): empty stdout (silent)
+PASS  resolveSessionIdFromInput: valid {session_id} -> the string
+PASS  resolveSessionIdFromInput: null input -> null
+PASS  resolveSessionIdFromInput: object without session_id -> null
+PASS  resolveSessionIdFromInput: empty-string session_id -> null
+PASS  resolveSessionIdFromInput: non-string session_id -> null
+PASS  markerPath: builds .claude/.stop-suggest-<session_id>.json under rootDir
+PASS  loadMarkerSafe: missing file -> null
+PASS  writeMarkerSafe: reports success
+PASS  writeMarkerSafe + loadMarkerSafe: round-trips the marker shape
+PASS  writeMarkerSafe: unwritable target never throws
+PASS  writeMarkerSafe: unwritable target reports failure
+PASS  decideDedupedOutput: nothing to say, no prior marker -> silent, marker null
+PASS  decideDedupedOutput: nothing to say now, but a prior marker exists -> silent, fingerprint carried over unchanged
+PASS  decideDedupedOutput: first turn, phase message -> emits
+PASS  decideDedupedOutput: first turn -> marker fingerprint is the phase message
+PASS  decideDedupedOutput: identical phase message as last turn -> silent (dedup)
+PASS  decideDedupedOutput: dedup case still refreshes the marker (same fingerprint)
+PASS  decideDedupedOutput: phase message change -> re-emits
+PASS  decideDedupedOutput: payload has systemMessage
+PASS  decideDedupedOutput: payload hookSpecificOutput mirrors systemMessage
+PASS  decideDedupedOutput: payload NEVER carries a decision field
+PASS  CLI: 1st turn exits 0
+PASS  CLI: 1st turn emits the phase suggestion
+PASS  CLI: 1st turn has no decision field
+PASS  CLI: 2nd turn, unchanged state -> deduped to silence
+PASS  CLI: no session_id -> turn 1 emits
+PASS  CLI: no session_id -> turn 2 (identical state) ALSO emits (no dedup possible)
+PASS  CLI: no session_id -> both turns byte-identical (no marker to diverge on)
+PASS  CLI: malformed stdin -> exit 0 (never crashes)
+PASS  CLI: malformed stdin -> phase suggestion still emitted (fail-open)
+PASS  sweep no-context (usedPct 25): exits 0
+PASS  sweep no-context (usedPct 25): NO decision field
+PASS  sweep no-context (usedPct 25): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 25): stdout never contains "compact"
+PASS  sweep no-context (usedPct 25): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 25): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 25): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 25): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 25): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 25): stdout never contains "Context "
+PASS  sweep no-context (usedPct 25): phase suggestion still present (surviving feature untouched)
+PASS  sweep no-context (usedPct 50): exits 0
+PASS  sweep no-context (usedPct 50): NO decision field
+PASS  sweep no-context (usedPct 50): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 50): stdout never contains "compact"
+PASS  sweep no-context (usedPct 50): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 50): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 50): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 50): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 50): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 50): stdout never contains "Context "
+PASS  sweep no-context (usedPct 50): phase suggestion still present (surviving feature untouched)
+PASS  sweep no-context (usedPct 60): exits 0
+PASS  sweep no-context (usedPct 60): NO decision field
+PASS  sweep no-context (usedPct 60): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 60): stdout never contains "compact"
+PASS  sweep no-context (usedPct 60): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 60): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 60): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 60): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 60): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 60): stdout never contains "Context "
+PASS  sweep no-context (usedPct 60): phase suggestion still present (surviving feature untouched)
+PASS  sweep no-context (usedPct 75): exits 0
+PASS  sweep no-context (usedPct 75): NO decision field
+PASS  sweep no-context (usedPct 75): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 75): stdout never contains "compact"
+PASS  sweep no-context (usedPct 75): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 75): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 75): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 75): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 75): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 75): stdout never contains "Context "
+PASS  sweep no-context (usedPct 75): phase suggestion still present (surviving feature untouched)
+PASS  sweep no-context (usedPct 85): exits 0
+PASS  sweep no-context (usedPct 85): NO decision field
+PASS  sweep no-context (usedPct 85): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 85): stdout never contains "compact"
+PASS  sweep no-context (usedPct 85): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 85): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 85): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 85): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 85): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 85): stdout never contains "Context "
+PASS  sweep no-context (usedPct 85): phase suggestion still present (surviving feature untouched)
+PASS  sweep no-context (usedPct 90): exits 0
+PASS  sweep no-context (usedPct 90): NO decision field
+PASS  sweep no-context (usedPct 90): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 90): stdout never contains "compact"
+PASS  sweep no-context (usedPct 90): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 90): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 90): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 90): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 90): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 90): stdout never contains "Context "
+PASS  sweep no-context (usedPct 90): phase suggestion still present (surviving feature untouched)
+PASS  sweep no-context (usedPct 100): exits 0
+PASS  sweep no-context (usedPct 100): NO decision field
+PASS  sweep no-context (usedPct 100): stdout never contains "/compact"
+PASS  sweep no-context (usedPct 100): stdout never contains "compact"
+PASS  sweep no-context (usedPct 100): stdout never contains "EMERGENCY"
+PASS  sweep no-context (usedPct 100): stdout never contains "mandatory"
+PASS  sweep no-context (usedPct 100): stdout never contains "Mandatory"
+PASS  sweep no-context (usedPct 100): stdout never contains "OVERDUE"
+PASS  sweep no-context (usedPct 100): stdout never contains "overdue"
+PASS  sweep no-context (usedPct 100): stdout never contains "Context "
+PASS  sweep no-context (usedPct 100): phase suggestion still present (surviving feature untouched)
+PASS  sweep standalone (usedPct 85): exits 0
+PASS  sweep standalone (usedPct 85): fully silent (no phase, no context, tier gone)
+PASS  sweep standalone (usedPct 85): stdout never contains "/compact"
+PASS  sweep standalone (usedPct 85): stdout never contains "EMERGENCY"
+PASS  sweep standalone (usedPct 85): stdout never contains "mandatory"
+PASS  sweep standalone (usedPct 85): stdout never contains "OVERDUE"
+PASS  sweep standalone (usedPct 85): stdout never contains "overdue"
+PASS  sweep standalone (usedPct 85): stdout never contains "Context "
+PASS  sweep standalone (usedPct 100): exits 0
+PASS  sweep standalone (usedPct 100): fully silent (no phase, no context, tier gone)
+PASS  sweep standalone (usedPct 100): stdout never contains "/compact"
+PASS  sweep standalone (usedPct 100): stdout never contains "EMERGENCY"
+PASS  sweep standalone (usedPct 100): stdout never contains "mandatory"
+PASS  sweep standalone (usedPct 100): stdout never contains "OVERDUE"
+PASS  sweep standalone (usedPct 100): stdout never contains "overdue"
+PASS  sweep standalone (usedPct 100): stdout never contains "Context "
+PASS  sweep stale usage: exits 0
+PASS  sweep stale usage: no 'stale' wording at all (feature removed)
+PASS  sweep stale usage: phase suggestion still present
+PASS  sweep usage malformed: exits 0
+PASS  sweep usage malformed: no decision field
+PASS  sweep usage malformed: phase suggestion still present
+PASS  H5 Stop discovery reads the exact private coordinator
+PASS  H5 Stop discovery names the durable next transition
+PASS  H5 project State cannot forge a terminal coordinator phase
+PASS  coordinator phase names exact next transition
+PASS  coordinator terminal is silent
+
+169 passed, 0 failed
+✔ plugins/pipeline-core/hooks/stop-suggest.test.mjs (20672.097924ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20679.919433
+
+--- stderr ---

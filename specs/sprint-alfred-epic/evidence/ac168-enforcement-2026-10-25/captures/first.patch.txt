@@ -1,0 +1,168 @@
+diff --git a/plugins/pipeline-core/hooks/stop-fanout.mjs b/plugins/pipeline-core/hooks/stop-fanout.mjs
+index 6d79070af..31927937b 100644
+--- a/plugins/pipeline-core/hooks/stop-fanout.mjs
++++ b/plugins/pipeline-core/hooks/stop-fanout.mjs
+@@ -60,7 +60,8 @@
+  * governor, the ledger append and the configuration for in-process callers. There is no spawn seam: there is
+  * nothing to inject.
+  */
+-import { readFileSync, statSync } from "node:fs";
++import { lstatSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
++import { createHash, randomUUID } from "node:crypto";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -74,6 +75,39 @@ import { loadSliceQueue } from "../lib/slice-queue.mjs";
+ const RUNNER = "claude";
+ const MAX_RECORD_BYTES = 1024 * 1024;
+ const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
++const ADVISORY_MARKER_MAX_BYTES = 4096;
++
++// A session-keyed fingerprint suppresses identical advisory text at consecutive Stops. The
++// marker is advisory state only: any unsafe or failed read/write emits the advice again.
++function advisoryMarker(cwd, sessionId) {
++  const key = createHash("sha256").update(sessionId).digest("hex");
++  return join(cwd, ".claude", `.stop-fanout-${key}.json`);
++}
++
++function priorAdvisoryFingerprint(path) {
++  try {
++    const info = lstatSync(path);
++    if (!info.isFile() || info.size > ADVISORY_MARKER_MAX_BYTES) return null;
++    const record = JSON.parse(readFileSync(path, "utf8"));
++    return typeof record?.fingerprint === "string" && /^[a-f0-9]{64}$/u.test(record.fingerprint) ? record.fingerprint : null;
++  } catch { return null; }
++}
++
++function writeAdvisoryFingerprint(path, fingerprint) {
++  const directory = dirname(path);
++  let temporary;
++  try {
++    mkdirSync(directory, { recursive: true });
++    if (!lstatSync(directory).isDirectory()) return false;
++    temporary = join(directory, `.stop-fanout-${randomUUID()}.tmp`);
++    writeFileSync(temporary, JSON.stringify({ fingerprint }), { flag: "wx", mode: 0o600 });
++    renameSync(temporary, path);
++    return true;
++  } catch {
++    if (temporary) { try { unlinkSync(temporary); } catch { /* no temporary file */ } }
++    return false;
++  }
++}
+ 
+ const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ 
+@@ -180,6 +214,13 @@ export function decideStop(input, options = {}) {
+   // Non-block text is advisory output, and only `advisory` / `enforce` may produce it.
+   const mode = result?.telemetry?.mode;
+   if (result.decision !== "allow" || (mode !== "advisory" && mode !== "enforce")) return "";
++  const marker = advisoryMarker(cwd, sessionId);
++  const fingerprint = createHash("sha256").update(reason).digest("hex");
++  const prior = priorAdvisoryFingerprint(marker);
++  // Only a successfully persisted fingerprint can suppress a later message. Failures
++  // remain visible, and block decisions above never consult this advisory marker.
++  if (prior === fingerprint) return "";
++  writeAdvisoryFingerprint(marker, fingerprint);
+   return `${JSON.stringify({ systemMessage: reason, hookSpecificOutput: { hookEventName: "Stop", additionalContext: reason } })}\n`;
+ }
+ 
+diff --git a/plugins/pipeline-core/hooks/stop-fanout.test.mjs b/plugins/pipeline-core/hooks/stop-fanout.test.mjs
+index e20edbd66..a46003041 100644
+--- a/plugins/pipeline-core/hooks/stop-fanout.test.mjs
++++ b/plugins/pipeline-core/hooks/stop-fanout.test.mjs
+@@ -159,6 +159,11 @@ check("advisory mode emits the governor's advisory text as systemMessage/additio
+     assert.equal(out.systemMessage.includes("<plugin-root>"), false, "the placeholder is substituted");
+     assert.match(out.systemMessage, /node .+slice-queue\.mjs defer <id>/u);
+     assert.deepEqual(ledgerTypes(box), ["stop-eval"], "advisory records the evaluation but never a block");
++    assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) }), "unchanged second Stop");
++    assert.deepEqual(ledgerTypes(box), ["stop-eval", "stop-eval"], "both evaluations remain recorded");
++    writeFileSync(box.queuePath, JSON.stringify(queueOf(2)));
++    const changed = hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) });
++    assert.match(JSON.parse(changed.stdout).systemMessage, /2 ready slice\(s\)/u);
+   });
+ });
+ 
+@@ -257,6 +262,7 @@ check("FANOUT-NO-QUEUE reaches the session in advisory and enforce mode (absent
+       assert.equal(out.systemMessage.includes("<plugin-root>"), false, "the placeholder is substituted");
+       assert.deepEqual(out.hookSpecificOutput, { hookEventName: "Stop", additionalContext: out.systemMessage });
+       assert.deepEqual(ledgerTypes(box), [], "rules 1-4 log nothing");
++      assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: true }) }), `${mode}: unchanged no-queue advice`);
+       assertSilent(hook(box, stopPayload(box), { config: configFor(box, { mode, implementationPhaseActive: false }) }), `${mode}: absent queue, not implementing`);
+     });
+     withBox({ queue: false }, (box) => {
+diff --git a/plugins/pipeline-core/scripts/elephant-context-measure.mjs b/plugins/pipeline-core/scripts/elephant-context-measure.mjs
+index 7c903f541..4b4350ea5 100644
+--- a/plugins/pipeline-core/scripts/elephant-context-measure.mjs
++++ b/plugins/pipeline-core/scripts/elephant-context-measure.mjs
+@@ -8,6 +8,7 @@
+ // hand-written briefings) and compare two measurements per cause.
+ // Metric is a utf8-byte upper bound (not exact model tokens). Claude transcripts only.
+ import { readFileSync } from "node:fs";
++import { createHash } from "node:crypto";
+ import { resolve } from "node:path";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+@@ -75,6 +76,7 @@ function classifyToolUse(block) {
+ const tally = () => ({ events: 0, units: 0 });
+ 
+ export function classifyTranscript(jsonlText) {
++  const inputSha256 = createHash("sha256").update(jsonlText).digest("hex");
+   const totals = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
+   const counts = Object.fromEntries(CATEGORIES.map((c) => [c, 0]));
+   const toolMeta = new Map();
+@@ -189,6 +191,9 @@ export function classifyTranscript(jsonlText) {
+     schema: "pipeline.elephant-context-measurement.v1",
+     metric: "utf8-byte-upper-bound",
+     exactModelTokens: false,
++    inputSha256,
++    sourceClassification: "unverified-input",
++    liveHostTargetQualified: false,
+     runner: "claude",
+     totalUnits,
+     units: totals,
+@@ -223,6 +228,11 @@ export function compareMeasurements(before, after) {
+     schema: "pipeline.elephant-context-comparison.v1",
+     metric: "utf8-byte-upper-bound",
+     exactModelTokens: false,
++    sources: {
++      before: { inputSha256: before?.inputSha256 ?? null, classification: before?.sourceClassification ?? "unknown" },
++      after: { inputSha256: after?.inputSha256 ?? null, classification: after?.sourceClassification ?? "unknown" },
++    },
++    liveHostTargetQualified: false,
+     causes,
+     adminShare: { before: before?.adminShare ?? 0, after: after?.adminShare ?? 0, target: ADMIN_TARGET_SHARE },
+     withinAdminTarget: after?.withinAdminTarget === true,
+diff --git a/plugins/pipeline-core/scripts/elephant-context-measure.test.mjs b/plugins/pipeline-core/scripts/elephant-context-measure.test.mjs
+index 9a04b2077..6c0135e11 100644
+--- a/plugins/pipeline-core/scripts/elephant-context-measure.test.mjs
++++ b/plugins/pipeline-core/scripts/elephant-context-measure.test.mjs
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
+ import test from "node:test";
+ import { classifyTranscript, CATEGORIES } from "./elephant-context-measure.mjs";
+ 
+@@ -26,6 +27,9 @@ const fixture = [
+ test("classifies wake-up, inline read, guard refusal and authoring with shares", () => {
+   const r = classifyTranscript(fixture);
+   assert.equal(r.schema, "pipeline.elephant-context-measurement.v1");
++  assert.equal(r.inputSha256, createHash("sha256").update(fixture).digest("hex"));
++  assert.equal(r.sourceClassification, "unverified-input");
++  assert.equal(r.liveHostTargetQualified, false);
+   assert.equal(r.malformedLines, 1);
+   assert.equal(r.events.inlineRead, 4);
+   assert.equal(r.events.guardRefusal, 1);
+@@ -106,6 +110,11 @@ test("per-cause before/after comparison reports each cause falling", () => {
+   const after = classifyTranscript(afterSession);
+   const cmp = compareMeasurements(before, after);
+   assert.equal(cmp.schema, "pipeline.elephant-context-comparison.v1");
++  assert.deepEqual(cmp.sources, {
++    before: { inputSha256: before.inputSha256, classification: "unverified-input" },
++    after: { inputSha256: after.inputSha256, classification: "unverified-input" },
++  });
++  assert.equal(cmp.liveHostTargetQualified, false);
+   assert.deepEqual(Object.keys(cmp.causes), CAUSES);
+   for (const key of CAUSES) {
+     assert.equal(cmp.causes[key].improved, true, key);

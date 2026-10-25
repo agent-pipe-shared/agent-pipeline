@@ -1,0 +1,93 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+label: ac168-dispatch-briefing-existing
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+✔ binding fields equal the facts of their own sources (155.615903ms)
+✔ effort and tool budget follow the goldfish-deep definition (78.985328ms)
+✔ effort and tool budget follow the goldfish-implementor definition (78.985148ms)
+✔ effort and tool budget follow the goldfish-mechanic definition (73.609585ms)
+✔ the criterion locator validates against the original bytes (71.689228ms)
+✔ the block round-trips the host parser and the skeleton carries the marker once (72.234984ms)
+✔ the skeleton prefills field 6 and leaves judgment fields as placeholders (67.971075ms)
+✔ the skeleton names the slice and write scope the item admission reads (PF-42) (68.769342ms)
+✔ the skeleton names the owning module, its allowed dependencies and contract for the touched paths (FB3-PF-54) (147.684512ms)
+✔ a dispatch id that names a governed queue row must match its write scope, item and state (PF-47) (199.890686ms)
+✔ a scope drift names the cancel with its class argument and teaches each class (D75 S5) (68.954531ms)
+✔ refuses a missing acceptance row names the slug (3.893597ms)
+✔ refuses an unknown agent type (5.459487ms)
+✔ refuses a check that is not a test file (4.640085ms)
+✔ refuses an unknown flag (3.734115ms)
+✔ refuses a repeated single-value flag (4.359739ms)
+✔ refuses a missing required flag (3.638058ms)
+✔ refuses a flag without a value (4.79203ms)
+✔ refuses a model outside the alias family (64.239937ms)
+✔ refuses an unavailable ruleset identity (105.67789ms)
+✔ refuses a preflight without a ruleset source (101.826309ms)
+✔ refuses a dispatch id carrying the binding marker (4.37398ms)
+✔ refuses a path that escapes the repository (3.350335ms)
+✔ refuses an unreadable spec (4.057738ms)
+✔ refuses no spec flag and no authority default (3.614898ms)
+✔ refuses an agent type without a definition (71.881421ms)
+✔ K12 a lock that stays held refuses DBG-RULESET-LOCK-HELD naming the holder instead of falling back to the plugin-root hash (66.389428ms)
+✔ K12 a lock that clears within the wait changes nothing: the identity is read again and the loaded one is used (65.330296ms)
+✔ K12 a preflight that throws SDC-LOCK-HELD is refused typed, never answered with a fallback identity (59.237742ms)
+✔ refuses an unknown subcommand (4.587296ms)
+✔ the binding invariant refuses a check that is not among the allowed paths (64.818541ms)
+✔ a backlog item without an id falls back with a warning (75.372029ms)
+✔ a path matching a protected-baseline rule yields a warning with the rule id (186.520324ms)
+✔ output is deterministic and independent of path order and duplicates (182.438343ms)
+✔ the spec defaults to the project authority state when --spec is absent (59.690989ms)
+✔ real git: HEAD and tree come from the repository, an uncommitted spec warns, nothing is written (175.093562ms)
+✔ the command line prints a typed refusal as JSON and exits 2 (398.633809ms)
+✔ build renders the complete briefing: the binding parses back, the fields match the package, the marker verifies (63.410704ms)
+✔ a one-byte edit or a removed marker fails the generated-briefing verification (64.942162ms)
+✔ build refuses a named path that does not exist unless the package declares it new (69.163792ms)
+✔ build refuses an unknown package key and a missing required field, each naming its repair (11.890859ms)
+✔ build refuses a repository without a calibration and names how to calibrate (5.554753ms)
+✔ build --out writes the verified briefing under scratch/ and refuses any other target (62.175293ms)
+✔ the generated briefing prescribes the test-first order in one dispatch (AC-186, PO 2026-10-21) (62.304365ms)
+✔ the generated briefing carries the targeted, quick and final Verify routes in order and never invents a quick command (AC-187) (58.626239ms)
+✔ a project that calibrates no Verify command still gets targeted -> quick -> final Verify, with the absence stated (AC-187) (64.075845ms)
+✔ an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale (389.36018ms)
+✔ an Evidence cell without a backlog item names the repair (4.959833ms)
+✔ the dispatch admission (D78) admits a generated briefing and refuses an edited or hand-assembled item briefing (109.47944ms)
+✔ a fresh fix wave uses an existing accepted criterion and a missing original row names that route (56.463858ms)
+✔ writable dispatch carrier and generated briefing admission retain a read-only research route (108.305138ms)
+✔ init-dispatch-record prints a valid opening v4 record whose digests come from the generated briefing (AC-163) (62.290709ms)
+✔ D76 a write scope that overlaps a running dispatch is refused DBG-SCOPE-OVERLAP, naming the dispatch, the overlap and the repair (40.109616ms)
+✔ D76 a glob in the running dispatch's scope overlaps a literal path of this one (39.988895ms)
+✔ D76 a disjoint scope is admitted, and so is a call with no running dispatch or only its own earlier record (115.778407ms)
+✔ D76 a running dispatch whose scope cannot be read never blocks and is announced as a warning (42.103057ms)
+✔ D76 the default reader finds a running dispatch from its open record and its generated briefing, and ignores a finished one (242.032884ms)
+✔ D75 A a re-dispatch of a slice whose earlier attempt was cancelled wrong-premise is refused DBG-RECON-REQUIRED without a recon note, naming the slice, the attempt and the repair (39.494274ms)
+✔ D75 A an existing, non-empty recon note admits the re-dispatch and changes nothing else in the binding (103.130978ms)
+✔ D75 A a recon note that does not exist, is empty or sits outside scratch/ and specs/ is refused (76.509162ms)
+✔ D75 A the other cancel classes, an unclassified cancel, another item and a live row do not require a recon note (121.325943ms)
+✔ D75 A a repository without a slice queue is unchanged, with the injected reader and with the default reader (94.620081ms)
+✔ D75 A the package field reconNote is optional and closed: a string path under scratch/ or specs/ that exists (12.755192ms)
+✔ D75 A build: a wrong-premise earlier attempt makes the package field mandatory, and the recon note is then listed as a context file (169.140392ms)
+✔ K106 a wrong-premise cancel plus a delivered successor row of the SAME item no longer requires a recon note, in either row order (108.389868ms)
+✔ K106 a successor row that is merely ready, held, deferred or blocked (not integrated) keeps the duty (39.259617ms)
+✔ K106 a delivered row of a DIFFERENT item, an integrated id with no row, or an unreadable integration reader keeps the duty (6.291673ms)
+✔ K106 pin: the queue lib has no stored delivered state and the derived delivery vocabulary is exactly done; a new state forces a decision here (3.655715ms)
+✔ K142 --runner codex is admitted and the model id is checked against the model the Codex route yields for the role (58.387755ms)
+✔ K142 a Claude-family model under --runner codex is refused DBG-MODEL-FAMILY with a repair that names the route model and the flag (57.063619ms)
+✔ K142 a Codex route that is unavailable refuses typed with a repair, and a custom route source decides the expected model (201.740939ms)
+✔ K142 each agent type maps to its own Codex duty route (163.664019ms)
+✔ K142 an unknown runner and a repeated runner flag are refused with a repair (4.305499ms)
+✔ K142 the Claude default path is unchanged: no --runner and --runner claude yield the identical skeleton and the preflight is observed exactly as before (110.580599ms)
+✔ K142 the Claude family refusal names a repair and keeps naming the alias family (57.386592ms)
+✔ K142 build: a package that names runner codex renders a Codex briefing that parses back and verifies (needs the package-key part of the protected diff) (124.498072ms)
+ℹ tests 76
+ℹ suites 0
+ℹ pass 76
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6495.400365
+
+--- stderr ---

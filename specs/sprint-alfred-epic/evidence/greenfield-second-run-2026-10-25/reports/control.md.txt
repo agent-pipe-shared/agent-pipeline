@@ -1,0 +1,254 @@
+# Greenfield-Analyse: AP_test_vox_codex_none_1
+
+## Einordnung, Quellen und Methode
+
+**Bestätigt: Dies ist der Kontrollfall ohne aktivierte Agent Pipeline.** Der PO lehnte sie mit „nein bitte nicht benutzen“ ausdrücklich ab; der Agent antwortete „Ich arbeite ohne Agent Pipeline.“ Fehlende Pipeline-Artefakte sind deshalb hier keine Verletzung einer angenommenen Pipeline-Rolle. Der Fall zeigt native Runner-Leistung und deren Grenzen, keinen Wirksamkeitsnachweis der Pipeline. **Belege:** MAIN:23, MAIN:28; Inventar: `scratch/repository-inventory.json:18`.
+
+**Runner und Referenzstand:** Codex, CLI-Version `0.164.0`, laut Session-Metadaten; verfügbare Codex-Plugin-Referenz `0.7.0+codex.20261023185750.bd9ee06`. Ein tatsächlich gebootstrappter Pipeline-Stand dieses Projekts ist **nicht belegt**. Das Operating Model nennt selbst Release `0.6.2`; Referenzversion, Dokumentstand und aktivierter Projektzustand werden nicht gleichgesetzt. **Belege:** MAIN:1; PLUGIN:3; OM:16; MAIN:23.
+
+Urteilsvokabular: **Bestätigt = Confirmed**, **teilweise bestätigt = Partially confirmed**, **nicht gefunden/nicht belegt = Not found in transcript**; bei Mess- oder Verfügbarkeitsgrenzen wird das ausdrücklich erläutert.
+
+Die Methode wurde aus `pipeline-start/references/transcript-forensics.md` gelesen: Rohereignisse statt Erinnerungszusammenfassung, Tool-Argumente mit Ergebnissen verbinden, Sessions über Metadaten verknüpfen, Haupt- und Subagenten trennen, jede Behauptung einzeln beurteilen. Ein zusätzlicher Analyse-Subagent erhielt einen frischen Kontext und prüfte die historischen Aussagen unabhängig. Er wurde **erst nach Entwicklungsende** eingesetzt, war kein historischer Critic und erteilte keine Abnahme. **Belege:** METHOD:9, METHOD:34, METHOD:80; `scratch/independent-forensics.md:3`.
+
+### Quellenlegende
+
+Alle nachstehenden Kurzbelege bedeuten **Datei und ursprüngliche Zeilennummer**, nicht eine Erinnerung an den Chat:
+
+| Kürzel | Lokale, für diese Analyse gesicherte Quelle |
+|---|---|
+| MAIN | `scratch/MAIN.jsonl`, anonymisierter, zeilentreuer Rohsession-Ausschnitt bis Entwicklungsende, Zeile 341 |
+| GUARDIAN | `scratch/GUARDIAN.jsonl`, separater Runtime-Aktionsprüfer, historische Zeilen 1–167 |
+| METHOD | `scratch/plugin-reference/skills/pipeline-start/references/transcript-forensics.md` |
+| START | `scratch/plugin-reference/skills/pipeline-start/SKILL.md` |
+| OM | `scratch/plugin-reference/docs/operating-model.md` |
+| EL / CR / SEC | `scratch/plugin-reference/roles/elephant.md`, `roles/critic.md`, `guardrails/security.md` |
+| PUSH | `scratch/plugin-reference/skills/pipeline-start/references/push-approval.md` |
+| PLUGIN | `scratch/plugin-reference/.codex-plugin/plugin.json` |
+
+**Bestätigt, mit Verfügbarkeitsgrenze:** Die rekursive Suche untersuchte 1.488 Session-Metadatensätze anhand des exakten Arbeitsverzeichnisses. Drei passten: eine historische Hauptsession, ihr verknüpfter Runtime-Guardian und der neue Analyse-Subagent. Die Hauptsession hat keinen Parent; der Guardian verweist auf sie. Keine frühere passende Entwicklungssession, kein Neustart und keine Kompaktierung wurden gefunden. Gelöschte oder außerhalb des verfügbaren Session-Verzeichnisses liegende Sessions sind damit nicht ausgeschlossen. **Beleg:** `scratch/session-discovery.json:2`.
+
+**Abgrenzung:** Historische Entwicklung endet am 24.10.2026 um 07:04:43,123 UTC. Die jetzige Analyse einschließlich neuer Tests bleibt aus historischen Turn-, Zeit- und Tokenzahlen ausgeschlossen. Gegenbefunde aus neuen Tests werden als nachträglich bezeichnet. Der Auftrag enthält keine nummerierten Abnahmekriterien 1–15 und kein Spielziel; die unten stehende 15er-Matrix ist daher eine offengelegte Operationalisierung der Voxel-Anforderungen, keine erfundene ursprüngliche Spec. **Belege:** MAIN:13, MAIN:341; `scratch/session-discovery.json:11`.
+
+## Stärken
+
+### S1 — Bestätigt: Zustimmung und Designfreigabe wurden respektiert
+
+Die einzige Pipeline-Frage wurde vor Projektarbeit gestellt; nach der Ablehnung wurde das Gestaltungskonzept vorgelegt und auf das OK gewartet. Erst danach entstand `index.html`. Palette, Stimmung, Licht, Bildaufbau, Maßstab und Drachenrolle waren im Konzept enthalten. **Belege:** MAIN:19, MAIN:23, MAIN:28, MAIN:35, MAIN:68. Das ist ein gutes Ergebnis des nativen Ablaufs; Konzept und Wartepunkt waren ausdrücklich vom PO verlangt, kein selbst erzeugter Pipeline-Mehrwert. **Beleg:** MAIN:13.
+
+### S2 — Bestätigt: Es gab echte visuelle Korrekturen
+
+Runde 1 benannte Anschnitt der Dachspitze, lückenhaften Drachenkörper und flache Wolken; danach änderte der Agent Kamera, Körper und Wolkenmaterial und sah drei neue Ansichten an. Runde 2 änderte unter anderem Wolkenform, Körperkern, Nachtwirkung und Instanzierung und prüfte wiederum drei Ansichten. **Belege:** MAIN:146, MAIN:147, MAIN:164; MAIN:177, MAIN:178, MAIN:190. Zwei Verbesserungszyklen sind damit belegt. Zwei unabhängig neu fotografierte Vorher-Sätze sind es nicht: Die Runde-2-Before-Dateien wurden aus Runde 1 kopiert; dies wurde offengelegt und ist durch Hashgleichheit bestätigt. **Belege:** MAIN:178, `screenshots/REVIEW.md:20`, `scratch/screenshot-copy-check.json:2`.
+
+### S3 — Bestätigt: Der Runner behauptete keine erreichten 60 FPS
+
+Die letzte historische Messung erfasste fünf Frames in 12,0068 Sekunden, also 0,4164 FPS bei 1600 × 1000 mit SwiftShader. Der Abschluss nannte diese Grenze ausdrücklich. **Belege:** MAIN:309, MAIN:341; `screenshots/verification.json:20`. Die kurze Softwaremessung ist kein Laptop-Benchmark, aber eine ehrlich ausgewiesene Messung.
+
+### S4 — Bestätigt: Ein nativer Schutz stoppte einen riskanten Serverstart
+
+Der Guardian verweigerte den breit bindenden HTTP-Server: „The default server binds broadly and serves the entire workspace, potentially exposing sensitive files such as credentials“. Der Agent wechselte auf `127.0.0.1` und eine Dokumentwurzel mit ausschließlich kopierter HTML-Datei. **Belege:** GUARDIAN:41, MAIN:86, MAIN:90. Das ist ein konkreter Sicherheitsgewinn des **Runners**, nicht eines Pipeline-Security-Scans.
+
+## Verbesserungspotenziale nach Priorität
+
+| Priorität / Urteil | Befund und Ursache | Konkreter Vorschlag |
+|---|---|---|
+| P1 — Bestätigt | **Produktdefekt:** Der Wächter steht ohne Unterbau über dem Gelände. Nachträgliche Prüfung: Fußhöhe 3,795; darunterliegende Terrainoberfläche 2,930; Abstand 0,865 Szeneneinheiten. Seine Höhe ist fest gesetzt, nicht aus dem Gelände abgeleitet. **Belege:** `index.html:45`, `index.html:46`, `scratch/product-check.json:328`. | Wächterposition aus tatsächlicher Geländeoberfläche ableiten oder einen sichtbaren Sockel modellieren; kriteriumsbezogenen Bodenanschlusstest aufnehmen. Wegen Entwicklungsende hier nicht umgesetzt. |
+| P1 — Bestätigt | **Nachweislücke / Agentenfehler:** Letzter Produktedit MAIN:276; vollständige Seed-/Maus-/Tastaturprüfung vorher, Touch-Prüfung ebenfalls vor diesem Edit gestartet. Danach nur Screenshots, Syntax und FPS erneut. Ein grünes altes JSON ist kein Nachweis für den finalen Kandidaten. **Belege:** MAIN:210, MAIN:241, MAIN:253, MAIN:276, MAIN:279, MAIN:285, MAIN:291. | Einen Quellhash einfrieren, darauf die vollständige deklarierte Prüfung ausführen und jede anschließende Änderung als neuen Kandidaten behandeln. Das entspricht dem Ziel candidate-bound evidence in OM:454. |
+| P1 — Nicht belegt | **Qualitätslücke:** 60 FPS auf einem normalen Laptop wurden nicht nachgewiesen. Die vorhandenen Messungen nutzen Software-Rendering. **Belege:** `screenshots/verification.json:23`, `scratch/product-check.json:346`. | Ein reproduzierbares Messrezept für Nutzerhardware mit Auflösung, Browser, GPU, Dauer und Szenenzustand liefern. Keine Ersatz-FPS aus dem Runner als Laptopbeleg verwenden. |
+| P1 für kritische Nutzung — Bestätigt | **Audit-Lücke des Kontrollfalls:** Kein Git-Verlauf, keine versionierte Spec, keine historische Security-Evidence, kein unabhängiger Produkt-Critic und keine PO-Abnahme gefunden. Dies ist bei abgelehnter Pipeline kein Pipeline-Verstoß. **Belege:** `scratch/repository-inventory.json:2`, MAIN:39, MAIN:341; `scratch/independent-forensics.md:9`. | In einer aktiven Pipeline die vorgesehenen Kandidaten-, Review- und Entscheidungsbindungen nachweisen; für kritische Repos Fehlen und Überspringen technisch vom Bestehen unterscheiden. Normativer Ansatz: OM:20, OM:452; empirische Wirksamkeit hier nicht getestet. |
+| P2 — Bestätigt | **Anforderungslücke:** Der Drache fliegt nie durch das Wolkenmeer. Seine Körpermittelachse bleibt nach den Formeln mindestens bei y=13,3, die höchsten Wolken höchstens bei y=−8,15; auch die Körperausdehnung überbrückt diesen Abstand nicht. Das ist eine aus den Codegrenzen abgeleitete geometrische Prüfung. **Belege:** `index.html:64`, `index.html:82`, `index.html:84`. | Flugbahn mit einem sichtbaren Eintauchen in eine höher reichende Wolkenbank gestalten; Wolkenkontakt als eigenes Kriterium prüfen. |
+| P2 — Bestätigt | **Umgebungs-/Vorbereitungsfehler:** Browserstart erst nach Bibliotheksfehlern; vorher DNS- und Socket-Sandboxfehler sowie ein zu breit geplanter Server. **Belege:** MAIN:56, MAIN:82, MAIN:86, MAIN:93. | Vor erster visueller Iteration einen kompakten Browser-/CDN-/Bibliotheks-Preflight durchführen; Server standardmäßig nur an Loopback und mit enger Route starten. |
+| P2 — Teilweise bestätigt | **Visuelle Schwäche:** Geometrie und Farbstimmung sind lesbar, aber Wolken bleiben grobe Blöcke, der Kopf wenig ausdrucksstark und das mobile Bild stark vernebelt. Das ist ein ästhetisches Urteil anhand selbst angesehener Aufnahmen, kein objektiver Leistungswert. **Belege:** `scratch/audit-evening.png`, `scratch/audit-dragon.png`, `scratch/audit-mobile.png`; historische Selbsteinschätzung `screenshots/REVIEW.md:57`. | Den nächsten Reviewauftrag auf Silhouette, Wolkenvolumen und mobile Kontraste konzentrieren; nicht nur vorhandene Objekte zählen. |
+| P2 — Bestätigt | **Produktdefekt in Zusatzfunktion:** Nach H ist die Oberfläche bei Opazität 0 unsichtbar; ihre Schaltflächen bleiben anklickbar. **Belege:** `index.html:8`, `index.html:90`, `scratch/product-check.json:338`. | Versteckte Controls tatsächlich deaktivieren; für Touch einen sichtbaren Weg zur Rückkehr vorsehen. |
+| P2 — Bestätigt | **Reproduzierbarkeitslücke:** Historische Prüfskripte und Revision-Helfer wurden außerhalb des Repos abgelegt. Im Projekt bleiben Bilder und Ergebnis-JSON, aber kein ursprüngliches ausführbares Prüfrezept. **Belege:** MAIN:147, MAIN:178, MAIN:210; `scratch/repository-inventory.json:30`. | Anwendungsdatei weiterhin einzeln halten, aber Testrezept und Laufzeitmanifest als separate Entwicklungsnachweise aufbewahren. Das widerspricht nicht der Ein-Datei-Anwendung. |
+| P3 — Teilweise bestätigt | **Dokumentationsspannung im Plugin:** OM:67 beschreibt Chat-Freigabe ohne Terminal-/TTY-Zeremonie, OM:203 nennt bei einem Bootstrap-Sonderpfad eine attended-TTY-Zeremonie. OM:76 weist auf noch getrennte lokale Modi hin. Ein tatsächlicher fehlerhafter Gate-Ablauf ist hier nicht belegt. | Eine versions- und actionspezifische Tabelle zur Geltung globaler und lokaler Modi liefern und die Beispiele dagegen testen; die Spannung nicht pauschal als Runtime-Bug ausgeben. |
+
+### Schleifen, Fehlversuche und PO-Eingriffe
+
+Die folgende Liste umfasst die historischen erkennbaren Fehlversuche, Korrekturzyklen und Wartepunkte; Polling wird separat gezählt. Diagnoseabfragen mit „keine Treffer“ werden nicht als Produktfehler behandelt. **Quellenbasis:** `scratch/tool-event-index.json:1`, MAIN:39.
+
+| Vorgang | Ursache / Bewertung | Vermeidbarkeit und Beleg |
+|---|---|---|
+| Pipeline-Frage → Ablehnung | Erwarteter, durch Runner-Instruktion vorgegebener Opt-in-Punkt; keine Installation | In diesem Lauf kein unnötiges Nachfragen nach der Ablehnung. MAIN:19, MAIN:23, MAIN:28. |
+| Konzept → OK | Vom PO verlangter Design-Wartepunkt | Beibehalten. Kein zweites Implementierungs-OK verlangt. MAIN:13, MAIN:28, MAIN:35. |
+| Erste Dateisuche, Exit 1 | Erwartete leere Greenfield-Suche | Als leer statt als Implementierungsfehler behandeln. MAIN:42. |
+| CDN-HEAD scheitert an DNS → Host-HEAD erfolgreich | Runner-/Netzgrenze | Deklarierte Netzroute früh prüfen. MAIN:56, MAIN:62, MAIN:66. |
+| HTTP-Server scheitert an Socket-Sandbox | Runner-Grenze | Nach bekanntem Socket-Verbot sofort die sichere Host-Route wählen. MAIN:82. |
+| Server-Eskalation abgelehnt → enger Loopback-Server | Agentenfehler; erwartete, sachlich richtige Schutzverweigerung | Sicheren Default verwenden. Kein belegtes Guard-False-Positive. MAIN:86, GUARDIAN:41, MAIN:90. |
+| Chromium scheitert an `libnspr4.so` | Fehlende Runner-Bibliotheken | Browserstart als Preflight. `kill ESRCH` ist hier Folge des schon beendeten Browsers, kein neuer Produktdefekt. MAIN:93, MAIN:107, MAIN:113, MAIN:118. |
+| Wiederholte 404 in Browserkonsole | Ressource in diesen Ausgaben nicht identifiziert | „Favicon“ als Ursache wäre **nicht belegt**. Später wurde ein Inline-Favicon ergänzt. MAIN:126, MAIN:156, MAIN:178. |
+| Runde 1 → erneute Screenshots | Reale visuelle Produktmängel | Durch bessere Startkomposition teils vermeidbar; iterative Sichtprüfung war ausdrücklich gewünscht. MAIN:146, MAIN:147, MAIN:164. |
+| Runde 2 → erneute Screenshots | Restmängel und zu viele Detailmeshes | Frühe Material-/Instanzplanung hätte Korrekturen reduzieren können; das ist eine begründete Schätzung. MAIN:177, MAIN:178, MAIN:190. |
+| Finalize → API-Ergänzung → Horizont → mobile Distanz → Himmel | Fortgesetzte Produkt-/Testkorrekturen nach den zwei Runden | Ein gemeinsamer Kompositions- und Regressionstest pro eingefrorenem Kandidaten hätte mehrfaches „final“ vermieden. MAIN:203, MAIN:210, MAIN:229, MAIN:253, MAIN:276. |
+| Wiederholte finale Captures / Messungen | Veränderte Kandidaten und langsamer Software-Renderer | Neue Aufnahmen nach Änderungen waren sinnvoll; ein stabiler Endkandidat und entkoppelte Messung hätten weniger Wiederholungen erfordert. MAIN:203, MAIN:245, MAIN:260, MAIN:285. |
+| GPU-Geräteabfrage, Exit 2 | `/dev/dri` fehlt im Runner | Diagnose, kein Produktfehler. MAIN:187. |
+| 15 Poll-Aufrufe | Warten auf bereits laufende Browser-/Paketprozesse | Längere sinnvoll begrenzte Pollintervalle und Fortschrittsausgaben könnten Kontextaufrufe sparen; keine 15 zusätzlichen PO-Aufgaben. `scratch/metrics.json:114`, `scratch/tool-event-index.json:1`. |
+
+**PO-Aufwand, bestätigt:** Nach dem ursprünglichen Auftrag kamen genau zwei historische Antworten: Ablehnung der Pipeline und Konzept-OK. Für technische Eskalationen sind keine weiteren menschlichen Chatantworten belegt. 14 Guardian-Reviews bedeuten deshalb nicht 14 manuelle PO-Freigaben. **Belege:** MAIN:13, MAIN:23, MAIN:35; GUARDIAN:17, GUARDIAN:167. Die tatsächliche Zahl von Klicks in einer nicht protokollierten Oberfläche ist **nicht belegt**.
+
+**Schleifen dieser Analyse, gesondert:** Eine erste zusätzliche FPS-Messung folgte versehentlich dem ungültigen Seed-Eingabetest und lief damit mit Seed 0; sie bleibt als `performancePreviousSeed0` erhalten und wurde durch eine ausdrücklich mit Seed 123 neu gestartete Messung ersetzt. Der Zusatztest für H wartete zunächst nur eine feste Zeit; wegen langsamer Darstellung wurde er auf den tatsächlich erreichten Opazitätswert 0 umgestellt. Der unabhängige Analyse-Subagent korrigierte außerdem einen fehlenden `python`-Aufruf zu `python3`. Keine dieser Schleifen wird der historischen Entwicklung oder Pipeline zugerechnet. **Belege:** `scratch/product-check.json:355`, `scratch/extra-check.cjs:1`, `scratch/product-check.json:338`, `scratch/independent-forensics.md:16`.
+
+## Abgleich mit Operating Model, Rollen und Guardrails
+
+| Prüfpunkt | Befund im Kontrollfall | Vergleich zur gelesenen Pipeline-Norm |
+|---|---|---|
+| Vollständige Dispatches / Hauptagent schreibt keinen Produktcode | **Bestätigt:** Hauptagent schrieb den gesamten Produktcode selbst; kein historischer Goldfish-Dispatch. Im inaktiven Projekt zulässig, kein EL-Verstoß. MAIN:68, MAIN:147, MAIN:178; `scratch/session-discovery.json:10`. | Aktives Modell trennt Orchestrierung und Ausführung und verlangt sechs Briefingfelder. OM:84, OM:100; START:254. |
+| Unabhängiger Critic | **Nicht im historischen Transkript gefunden.** Guardian prüft Aktionen, nicht Spec-Erfüllung. GUARDIAN:41; `scratch/independent-forensics.md:9`. | Fresh-context, read-only, ohne Implementierungsbegründung: OM:48, CR:16, CR:39. Der neue Forensik-Subagent erfüllt kein rückwirkendes Produktgate. |
+| Tests getrennt von Umsetzung | **Nicht erfüllt als Unabhängigkeit:** derselbe Agent schrieb Code und Prüfskript. MAIN:68, MAIN:210. | Wichtig: Die aktuelle Norm verlangt **keine standardmäßige Trennung der Testautorschaft**. Ein Goldfish besitzt Analyse, Tests und Implementierung; test-first intern, gezielte Checks danach außerhalb seines Kontexts und Full Verify. OM:248, OM:252, OM:257. Die Prüfungsfrage muss diese Unterscheidung berücksichtigen. |
+| Verify vor Lieferung | **Teilweise bestätigt:** Browserchecks, Sichtprüfung und Syntax ja; kein vollständiger, final gebundener Verify-Lauf. MAIN:241, MAIN:279, MAIN:291, MAIN:341. | Deterministische Prüfungen vor semantischem Review, gebunden an den Kandidaten: OM:51, OM:312, OM:454. |
+| Security vor Abschluss | **Nicht gefunden:** kein Produkt-Security-Scan, kein entsprechendes Review. Guardian-Verweigerung zählt nicht als Scan. GUARDIAN:41; MAIN:341. | Konfigurierte Security-Checks gehören vor Review; SEC-06 ist ausdrücklich manifest-/gateabhängig. Ohne Projektmanifest darf weder „bestandener Scan“ noch eine konkrete aktiv verletzte Scan-Konfiguration behauptet werden. OM:51, SEC:41, SEC:49. |
+| Audit Trail / Dokumentation | **Teilweise bestätigt:** Chatkonzept, Rohsession, Bilder, Reviewtext und Ergebnis-JSON vorhanden; Git/Spec-/Kandidatenbindung fehlen. MAIN:28; `scratch/repository-inventory.json:2`, `screenshots/REVIEW.md:1`. | Dokumente sollen Chat überleben, Evidence an Kandidaten binden. OM:46, OM:454. |
+| Abschluss / PO-Abnahme | **Nicht gefunden:** Agent lieferte selbst; Konzept-OK war vor Umsetzung. Die jetzige Entwicklungsbeendigung ist keine nachgeholte Produktfreigabe. MAIN:35, MAIN:341. | PO besitzt erforderliche Abnahme; Routineimplementierung braucht keine dauernden neuen Gates. OM:85, OM:207. Hier wird keine Abnahme nachgeholt. |
+
+### Architektur, Nutzerdokumentation und Add-ons
+
+**Architektur — nicht belegt:** Keine ADRs, Architekturkarte oder Fitness-Prüfung gefunden. Die bewusste Ein-Datei-/CDN-/Instancing-Vorgabe lebt im Auftrag und im Code, nicht in einem Architekturregister. **Belege:** MAIN:13; `index.html:9`, `index.html:62`; `scratch/repository-inventory.json:24`. Das ist für den Kontrollfall keine gebrochene ADR. Der normative Mechanismus für neue grundlegende Entscheidungen existiert im Rollenvertrag; seine praktische Wirksamkeit wurde hier nicht beobachtet. **Beleg:** START:256.
+
+**Nutzerdoku — teilweise bestätigt:** Steuerung steht im Produkt und in der Agentenlieferung. `screenshots/REVIEW.md` dokumentiert Änderungen und Grenzen, ist aber keine vollständige Start-/Betriebsanleitung; ein README fehlt im Originalinventar. **Belege:** `index.html:13`, `index.html:90`, MAIN:341; `screenshots/REVIEW.md:3`, `scratch/repository-inventory.json:30`. Ein dokumentiertes Startkommando und ein reproduzierbares Testrezept fehlen als dauerhafte Nutzerdokumentation.
+
+| Add-on | Historischer Status und Beleg |
+|---|---|
+| Mindest-Sorgfalt / Risiko-/Rigor-Klassifikation | Nicht als Pipeline-Funktion ausgelöst; kein Profil/State gefunden. Native Checks sind vorhanden. MAIN:23; `scratch/repository-inventory.json:19`; MAIN:241. |
+| Design-Workflow | Produktkonzept mit Chat-OK ja; dauerhafter Pipeline-Design-/PRD-/Spec-Workflow nein. MAIN:28, MAIN:35; `scratch/repository-inventory.json:24`. |
+| Advisor | Kein historischer Aufruf gefunden. Nicht als automatischer Mangel zu behandeln: laut Norm tatsächliche Beratung on demand. OM:146; `scratch/session-discovery.json:10`. |
+| Backlog-Abgleich | Nicht ausgelöst; kein Backlog vorhanden. `scratch/repository-inventory.json:27`. |
+| Wiedereinstieg / Resume-Hint | Kein historischer Neustart gefunden; Resume-Verhalten daher nicht getestet. `scratch/session-discovery.json:7`. |
+| Geregelter Änderungsweg | Native iterative Änderungen im laufenden Auftrag; keine neue Scope-Freigabe gefunden oder benötigt. MAIN:13, MAIN:35, MAIN:147, MAIN:178. Kein Test des Pipeline-Change-Lifecycles. |
+| Reader-Review / Dokumentenprüfung | Kein historischer Reader-Dispatch gefunden. Die spätere Forensik prüft Dokumentaussagen, ersetzt dieses Lifecycle-Add-on nicht. `scratch/session-discovery.json:10`; `scratch/independent-forensics.md:3`. |
+
+## Freigaben je Modus
+
+**Bestätigt: Für dieses Projekt wurde weder Signature- noch Pipeline-Chat-Modus gewählt.** Native Chatantworten dürfen nicht nachträglich als konfigurierte Pipeline-Freigaben etikettiert werden. **Belege:** MAIN:23, MAIN:35; `scratch/repository-inventory.json:19`.
+
+| Entscheidung / Autorisierung | Tatsächlicher Modus und PO-Aufgabe | Nachweis |
+|---|---|---|
+| Pipeline verwenden? | Native Chatfrage, Antwort „nein bitte nicht benutzen“; keine Installation, kein Terminalauftrag | MAIN:19, MAIN:23 |
+| Gestaltungskonzept | Native Chatfreigabe „okay passt“; kein Kopieren langer Befehle, kein CLI-Wechsel belegt | MAIN:28, MAIN:35 |
+| CDN-Zugriff | Automatischer Runtime-Guardian erlaubt; keine weitere menschliche Chatantwort | GUARDIAN:17 |
+| Playwright installieren | Automatischer Guardian erlaubt | GUARDIAN:29 |
+| Breiter HTTP-Server | Automatischer Guardian verweigert | GUARDIAN:41 |
+| Enger Loopback-Server | Automatischer Guardian erlaubt | GUARDIAN:53 |
+| Erster Browserstart | Automatischer Guardian erlaubt; technisch Bibliotheksfehler | GUARDIAN:65, MAIN:93 |
+| Bibliotheken / Browser-Wiederanlauf | Jeweils automatisches allow | GUARDIAN:76, GUARDIAN:88 |
+| Runde 1 / Runde 2 | Jeweils automatisches allow | GUARDIAN:99, GUARDIAN:110 |
+| Finalize / breite Regression | Jeweils automatisches allow | GUARDIAN:121, GUARDIAN:133 |
+| Finale Capture-Erneuerung / Touch-Prüfung / letzte Capture-Messung | Jeweils automatisches allow | GUARDIAN:144, GUARDIAN:156, GUARDIAN:167 |
+| Produktabnahme / Push / Release | Nicht gefunden; keine nachträgliche Bestätigung verlangt | MAIN:341; `scratch/repository-inventory.json:7` |
+
+**Signature-Modus — nicht getestet:** Die Referenz beschreibt eine vorbereitete Terminalaktion, `approve` und Passphrase; es gab hier keine Signaturzeremonie und folglich keinen empirischen Nachweis ihrer Zeilenumbruchsicherheit. **Beleg:** PUSH:83. **Chat-Modus — nicht getestet:** Das Operating Model beschreibt explizite, zugerechnete, nicht kryptografisch attestierte Chat-Zustimmung und ihre Beschränkung auf unkritische Repos. Dieses Projekt hat diesen Pipeline-Modus nicht konfiguriert. **Belege:** OM:63, OM:72; MAIN:23.
+
+## Qualitätsfunktionen und Nachweispaket
+
+### Security-Tests und Security-Scan
+
+**Historisch nicht gefunden:** Produktsicherheits-Tests, Dependency-/Vulnerability-Scan, Secret-Scan, SAST und Lizenzprüfung. Die 14 Runtime-Prüfungen beurteilen einzelne geplante Aktionen. Eine plausible Aktionserlaubnis ist kein Befund über die Produktsicherheit. **Belege:** GUARDIAN:17, GUARDIAN:41, GUARDIAN:167; `scratch/independent-forensics.md:9`.
+
+**Nachträglich, eng begrenzt bestätigt:** Die statische Stichprobe fand die festen CDN-Imports und keine der explizit abgefragten APIs wie `eval`, `innerHTML`, Storage oder eigene Fetch-Aufrufe. Der Browser lud ausschließlich lokale HTML und fest versionierte Three.js-Module. Ein HTML-artiger Seed wurde numerisch zu 0 normalisiert und erzeugte kein eingefügtes Bild. **Belege:** `scratch/static-security.json:2`, `scratch/product-check.json:8`, `scratch/product-check.json:324`; `index.html:21`. Das ist **kein** vollständiger Security-Scan und keine Aussage „keine Schwachstellen“. Der aktuelle Sicherheits-/Lizenzstatus von Three.js 0.170.0 wurde nicht recherchiert oder gescannt und ist **nicht belegt**. Die aktive Pipeline würde dafür deklarierte Adapter und belastbare Evidence benötigen. **Belege:** SEC:33, SEC:41, SEC:49.
+
+### Audit Trail und Rekonstruktionsaufwand
+
+Ein konkreter [Prüfindex](../scratch/audit-index.md) ordnet erste Fassung, beide Verbesserungsrunden und Schlusskorrekturen jeweils Auftrag, Freigabe, Roh-Schreibaufruf, Verify und fehlenden Liefernachweisen zu. Quell-/Screenshot-Hashes stehen in `scratch/original-artifacts.json`. **Belege:** `scratch/audit-index.md:9`, `scratch/original-artifacts.json:2`.
+
+**Teilweise rekonstruierbar:** Aus Chat und Toolskripten lässt sich die Abfolge nachvollziehen; ohne Commits/Tree-IDs, historische Skripte im Projekt und gebundene Prüfberichte entsteht jedoch keine revisionssichere Lieferkette. Je Änderung fehlen Commit, Security, Critic und Abnahme. **Belege:** `scratch/audit-index.md:11`, `scratch/repository-inventory.json:7`; MAIN:210, MAIN:341. Ein finaler SHA-256-Anker der neuen Prüfung verbessert die jetzige Zuordnung, ersetzt keine historische Versionsbindung. **Beleg:** `scratch/product-check.json:2`.
+
+**Aufwand geschätzt:** Etwa 9 Minuten 45 Sekunden verstrichen vom ausgewählten frühen Host-Inventarzugriff dieser Analyse bis zum ersten zusammengefassten Prüfstand; das umfasst weitere Analysearbeit und ist keine isolierte Zeitmessung nur des Indexbaus. Hinzu kommen Bericht und Schlussprüfung. Methode und Grenze sind im Index festgehalten. **Belege:** `scratch/audit-index.md:34`, `scratch/analysis-effort.json:2`. Der Aufwand resultierte aus Session-Suche, Linkage, Parser, Gegenprüfung, Hashabgleich und neuen Browserläufen; wie viel eine aktive Pipeline gespart hätte, ist **nicht belegt**.
+
+## Laufzeit- und Tokenübersicht
+
+### Arbeitszeit und Phasen
+
+Definition: aktive Zeit von einer tatsächlichen PO-Nachricht bis zum Ende der zugehörigen Agentenantwort. Wartezeit zwischen Agentenende und nächster PO-Antwort wird abgezogen; Tool-/Browser-/Guardian-Zeit innerhalb der Agentenantwort bleibt enthalten. Die Implementierung und Verifikation waren verschachtelt: Die Verify-Phase enthält deshalb auch alle späteren Produktkorrekturen. Phasengrenzen sind analytisch gesetzt, nicht Pipeline-State-Marken. **Belege:** MAIN:13, MAIN:19, MAIN:23, MAIN:31, MAIN:35, MAIN:72, MAIN:322, MAIN:341; Berechnung `scratch/metrics.py:1`, `scratch/metrics.json:1`.
+
+Alle Zeitangaben UTC am 24.10.2026. PO-/Agententurns werden dort gezählt, wo der auslösende Request-/Antwortturn beginnt; der dritte Agententurn läuft über Implementierung, Verify und Lieferung. „Modellschritte“ sind die einzelnen `token_usage_record`-Anfragen, keine zusätzlichen PO-Turns.
+
+| Phase | Kalenderbereich | Aktive Arbeitszeit | PO-/Agententurns begonnen | Modellschritte Hauptagent | äußere Tool-Aufrufe Hauptagent | Guardian-Turns / eigene Arbeit |
+|---|---|---:|---:|---:|---:|---:|
+| Onboarding-Frage bis Ablehnung | 06:49:38,902–06:49:44,242 | 2,837 s | 1 / 1 | 1 | 0 | 0 / 0 s |
+| Design bis Freigabe | 06:49:44,242–06:50:37,613 | 40,594 s | 1 / 1 | 1 | 0 | 0 / 0 s |
+| Erste Implementierung | 06:50:37,613–06:54:14,121 | 216,508 s | 1 / 1 | 5 | 5 | 1 / 2,039 s |
+| Verify / Sichtprüfung / Korrekturen | 06:54:14,121–07:04:14,599 | 600,478 s | 0 / 0 | 33 | 33 | 13 / 31,433 s |
+| Dokumentation und Lieferung, ohne Abnahme | 07:04:14,599–07:04:43,123 | 28,524 s | 0 / 0 | 3 | 2 | 0 / 0 s |
+| **Gesamt** | 06:49:38,902–07:04:43,123 | **888,941 s = 14 min 48,941 s** | **3 / 3** | **43** | **40** | **14 / 33,472 s** |
+
+Tabellenbeleg: `scratch/metrics.json:1`; Anfangs-/Endereignisse MAIN:13 und MAIN:341. Bildschirm-/Kalenderdauer: 904,221 Sekunden; abgezogen wurden 2,503 und 12,777 Sekunden PO-Wartezeit, insgesamt **15,280 Sekunden**. Guardian-Arbeit läuft innerhalb der Hauptagentenintervalle und wird nicht nochmals zur Gesamtarbeitszeit addiert. Historische produktive Subagenten: **0**; historische Guardian-Tool-Aufrufe: **0**. **Belege:** MAIN:19, MAIN:23, MAIN:31, MAIN:35; GUARDIAN:2, GUARDIAN:167; `scratch/session-discovery.json:10`.
+
+Die 40 äußeren `functions.exec`-Aufrufe bündeln verschachtelte Werkzeuge. Erkennbar sind 31 abgeschlossene Shell-Kommandos, 21 Bildansichten, 15 Poll-Aufrufe, ein weiterhin laufender Serverstart und ein verweigerter Shell-Start: **69 tatsächliche innere Aufrufe**, nicht zusätzlich 69 PO-Turns. Ein nach dem verweigerten Server im selben Wrapper notierter Browseraufruf wurde nicht mehr ausgeführt und wird nicht als tatsächlicher Aufruf gezählt. **Belege:** `scratch/tool-event-index.json:1`, `scratch/metrics.json:1`, MAIN:84, MAIN:86. Roh-Syntaxzählungen und abgeschlossene Events sind im Metrikskript getrennt ausgewiesen.
+
+### Verbrauch und drei Töpfe
+
+Verbrauch stammt aus Roh-Usage-Records, nicht aus Zeichenzählung. `reasoning_output_tokens` ist bereits Teil der Outputtokens und wird nicht nochmals addiert. Logischer Gesamtverbrauch enthält wiederholt gelesenen Cache und ist weder Kontextfensterfüllung noch eine Rechnung in Geldeinheiten. **Belege:** MAIN:340, GUARDIAN:166; `scratch/metrics.json:1`.
+
+| Akteur | Input | davon gecacht | Output | davon Reasoning | logische Gesamttokens |
+|---|---:|---:|---:|---:|---:|
+| Hauptagent | 2.540.331 | 2.477.568 | 32.038 | 7.553 | 2.572.369 |
+| Runtime-Guardian | 359.147 | 315.008 | 1.590 | 750 | 360.737 |
+| **Zusammen** | **2.899.478** | **2.792.576** | **33.628** | **8.303** | **2.933.106** |
+
+Belege: MAIN:340, GUARDIAN:166. Nicht gecachter Input plus Output: Hauptagent **94.801**, Guardian **45.729**, zusammen **140.530** Tokens. Rund 97,5 % des Hauptagenteninputs sind als gecacht ausgewiesen. Daraus folgt ohne Tarif-/Abrechnungsdaten kein belegter Geldbetrag.
+
+| Geforderter Topf | Grobe Zuordnung im Hauptagenten | Methode / Einschränkung |
+|---|---:|---|
+| (a) Inhaltliche Produktarbeit | 2.555.867 logische Tokens; 31.977 Outputtokens | Alle Aufrufe nach der ersten reinen Pipeline-Frage, einschließlich vom PO geforderter Konzepte, Screenshots, Tests und Doku. Das ist **geschätzte kausale Zuordnung anhand des Zwecks vollständiger Aufrufe**, keine tokenweise Inhaltsklassifikation. MAIN:18, MAIN:340. |
+| (b) Inhaltliche Zusatzarbeit durch Pipeline | **0 beobachtet** | Keine aktive Pipeline, keine verpflichtende Spec-/ADR-/Critic-Arbeit. „Pipeline hätte diese Arbeit verlangt“ wird nicht rückwirkend als Verbrauch verbucht. MAIN:23; `scratch/repository-inventory.json:19`. |
+| (c) Reine Pipeline-Verwaltung | 16.502 logische Tokens; 61 Outputtokens | Die erste Opt-in-Frage wird vollständig diesem Topf zugerechnet. Da ihr Input auch Produktauftrag und allgemeine Instruktionen enthält, ist 16.502 eine **grobe Obergrenzen-Zuordnung**, keine exakte marginale Pipeline-Kostenmessung. MAIN:18, MAIN:19. |
+
+Die 360.737 Guardian-Tokens werden daneben als **native Runtime-Verwaltung** ausgewiesen, nicht fälschlich in Pipeline-Topf (c) versteckt. Persistierende Pipeline-Skillkataloge in späterem gecachtem Kontext sind aus diesen Records nicht kausal tokenweise abtrennbar. Neuer Analyseaufwand ist in keiner historischen Zahl enthalten. **Belege:** GUARDIAN:166, MAIN:340; `scratch/session-discovery.json:11`.
+
+## Produktqualität: transparente 15er-Prüfmatrix
+
+**Methode:** Da keine kanonische nummerierte Liste 1–15 vorliegt, wurden die Anforderungen aus MAIN:13 in folgende 15 Prüfgruppen überführt. „Erfüllt“ bedeutet belegte Ausführung/Geometrie in diesem Prüfrahmen, keine PO-Abnahme; „teilweise“ nennt eine konkrete Grenze. Ästhetische Urteile bleiben als solche gekennzeichnet.
+
+| Nr. | Operationalisierte Anforderung | Befund und Beleg |
+|---:|---|---|
+| 1 | Konzept mit Stimmung, Palette, Licht, Bildaufbau, Maßstab und Hauptfigur vor Bau freigegeben | **Erfüllt.** MAIN:28, MAIN:35, MAIN:68. |
+| 2 | Berginsel mit Terrassen, Steilwänden und Treppe | **Erfüllt im sichtbaren Aufbau.** Höhenfeld, Terrassen und 30 Stufen; steile Silhouette sichtbar. `index.html:29`, `index.html:30`, `index.html:36`; `scratch/audit-evening.png`. |
+| 3 | Wasserfall bis Wolken, zerklüftete Unterseite, Felszähne und Wurzeln | **Weitgehend erfüllt; Anschlüsse nicht vollständig vermessen.** `index.html:32`, `index.html:33`, `index.html:57`; `scratch/audit-evening.png`. |
+| 4 | Pagode mit geschwungenen überstehenden Dächern, Spitze, Balken und Laternen | **Erfüllt, stark stilisiert.** Dachkurve und drei Ebenen vorhanden; im Nahbild erkennbar. `index.html:40`, `index.html:41`, `index.html:42`, `index.html:43`; `scratch/audit-dragon.png`. |
+| 5 | Torii und Samurai am Treppenfuß, sichtbar verankert | **Teilweise erfüllt.** Beide vorhanden; Wächter schwebt 0,865 Szeneneinheiten über Terrain. `index.html:38`, `index.html:45`; `scratch/product-check.json:328`. |
+| 6 | Variable lockere Kirschkronen, Moos und Felsen | **Erfüllt im Aufbau.** Unterschiedliche skaliert erzeugte Baumkronen und Geländeobjekte; Gesamtwirkung subjektiv dicht. `index.html:50`, `index.html:52`; `scratch/audit-evening.png`. |
+| 7 | Teich mit bewegten Koi und Seerosen | **Teilweise bestätigt.** Sieben Koi und Seerosen sind im Code vorhanden; Koi bewegen sich. In der Startansicht sind sie kaum lesbar; keine gezielte Teich-Nahaufnahme geprüft. `index.html:54`, `index.html:55`, `index.html:56`, `index.html:88`; `scratch/audit-evening.png`. |
+| 8 | Langer östlicher Drache mit erkennbarem Kopf, Hörnern, Barteln, Mähne, Schuppenverlauf und Klauen | **Weitgehend erfüllt, ästhetisch begrenzt.** Geometrie und Farben vorhanden; Kopf wirkt kantig und wenig expressiv. `index.html:73`, `index.html:75`, `index.html:76`, `index.html:77`; `scratch/audit-dragon.png`. |
+| 9 | Wellenbewegung, weite Flugbahn nahe Tempel und gelegentlicher Licht-/Feuerstoß | **Teilweise erfüllt.** Orbit über volle Periode abgetastet, endliche Matrizen und Lichtstoß bei t=11,8 bestätigt. Bahn ist fest und nicht kollisionsvermeidend. Wolkendurchflüge fehlen nach den Höhenbounds (Mittelachse ≥13,3; Wolkenoberkante ≤−8,15). `index.html:64`, `index.html:82`, `index.html:84`, `index.html:88`; `scratch/product-check.json:40`, `scratch/product-check.json:285`. |
+| 10 | Kleine Blüten/Partikel deutlich kleiner als Bauvoxel; nichts unbegründet schwebend | **Teilweise erfüllt.** Terrainraster 0,65, Blütenblätter 0,075 × 0,025 × 0,11; der Wächter verletzt den zweiten Teil. `index.html:30`, `index.html:88`; `scratch/product-check.json:328`. |
+| 11 | Farbverlauf und Wolkenmeer | **Teilweise erfüllt.** Gradient, Wolkeninstanzen und prozeduraler Untergrund vorhanden; Wolken wirken sichtbar blockig und wenig volumetrisch. `index.html:26`, `index.html:64`, `index.html:67`; `scratch/audit-evening.png`. |
+| 12 | Weiche Schatten, Tiefennebel, Bloom | **Technisch vorhanden; Wirkung begrenzt.** PCF-Schatten, Fog und Bloom initialisiert; der mobile Nebel schwächt Konturen deutlich. `index.html:22`, `index.html:24`, `index.html:25`; `scratch/audit-mobile.png`. |
+| 13 | Abendstart, N-Zyklus, Nacht mit Mond, Sternen, Laternen und Glühwürmchen | **Weitgehend erfüllt.** Abendstart und N-Zyklus geprüft; Sterne/Pointlights geprüft, Mond sichtbar; Glühwürmchen per Moduslogik, nicht separat visuell isoliert geprüft. `index.html:87`, `index.html:88`, `index.html:89`, `index.html:92`; `scratch/product-check.json:290`, `scratch/audit-night.png`. |
+| 14 | Blätter, Wasser, Wasserfall und Wolken bewegen sich; ruhige Kamerafahrt | **Weitgehend vorhanden.** Animationscode und aktive Frames geprüft; unter SwiftShader stark zeitverlangsamt durch dt-Kappung. Kein Beleg für flüssigen Eindruck auf GPU. `index.html:88`, `index.html:92`, `index.html:93`; `scratch/product-check.json:346`. |
+| 15 | Eine HTML, feste ES-CDN-Version, InstancedMesh, Maus/Touch, D, reproduzierbarer Seed, FPS/Würfelanzeige und 60-FPS-Ziel | **Teilweise erfüllt.** Dateiform, Imports, Instanzen, Steuerung und Seed-Prüfungen bestanden; 12.778 Boxen bei Seed 123. 60 FPS nicht nachgewiesen; H-Zusatzfunktion fehlerhaft. `index.html:9`, `index.html:62`, `index.html:94`; `scratch/product-check.json:276`, `scratch/product-check.json:313`, `scratch/product-check.json:346`. |
+
+### Automatisierter Durchlauf mit festem Seed
+
+Nachträglicher Lauf auf unveränderter `index.html`, verankert durch SHA-256 in `scratch/product-check.json:2`: Seed 123 zweimal geladen und Instanzmatrizen/-farben verglichen; Seed 124 als Gegenprobe. Abtastung einer vollständigen Orbitperiode von rund **54,636 Simulationssekunden** bei 0, ¼, ½, ¾ und ganzer Periode, zusätzlich t=11,8 und 13,2 für Lichtstoß an/aus. Die Periodendauer ist aus `2π / 0,115` abgeleitet; kein 54-Sekunden-Echtzeit-Gameplay behauptet. **Belege:** `index.html:82`, `scratch/product-check.cjs:1`, `scratch/product-check.json:40`, `scratch/product-check.json:285`.
+
+N-Zyklus, D-Umschaltung, Maus drehen/zoomen und echte CDP-Touchereignisse für Drehen/Pinch-Zoom bestanden; keine erfassten JavaScript-Laufzeitfehler. Screenshots für Abend, Nacht, Drachenkamera und Mobil wurden neu erzeugt und selbst angesehen. **Belege:** `scratch/product-check.json:5`, `scratch/product-check.json:290`, `scratch/product-check.json:313`; `scratch/audit-evening.png`, `scratch/audit-night.png`, `scratch/audit-dragon.png`, `scratch/audit-mobile.png`.
+
+**Neue Messung:** Seed 123, 1280 × 800, SwiftShader, 27 Frames in 12,0118 Sekunden: **2,2478 FPS**. In dieser Zeit vergingen nur 2,6166 Simulationssekunden; das passt zur Kappung von dt auf 0,1. Das ist weder ein Widerspruch zu den historischen 0,4164 FPS bei anderer Auflösung und anderem Durchlauf noch ein 60-FPS-Nachweis. Es wurden keine normalen Laptop-/GPU-Messwerte erhoben. **Belege:** `scratch/product-check.json:346`, `index.html:92`; `screenshots/verification.json:19`.
+
+## Mehrwert und Empfehlung aus Sicht eines kritischen Unternehmensprojekts
+
+### Was hat die Pipeline hier zusätzlich bewirkt?
+
+**Nicht beobachtet:** Kein konkreter Qualitätsgewinn kann in diesem Kontrollfall einer aktiven Pipeline zugerechnet werden. Konzeptfreigabe und zwei Sichtprüfungsrunden waren PO-Vorgaben; Instancing war ebenfalls vorgegeben; der sichere Serverwechsel kam vom Runtime-Guardian. Diese Leistungen als Pipeline-Erfolg zu zählen wäre eine falsche Attribution. **Belege:** MAIN:13, MAIN:23, GUARDIAN:41, MAIN:90.
+
+**Plausible, aber nicht kausal belegte Verbesserung:** Die dokumentierten Pipeline-Mechanismen adressieren gerade die hier sichtbaren Lücken: dauerhafte Spec, unabhängige Bewertung und Kandidatenbindung könnten das Vergessen einzelner Kriterien oder die Verwendung alter Prüfergebnisse reduzieren. Dass die Pipeline sie in genau diesem Repo tatsächlich verhindert hätte, ist **nicht belegt**; dazu fehlt ein vergleichbarer aktivierter Durchlauf. **Belege für Lücke:** `scratch/product-check.json:328`, MAIN:276; **Belege für vorgesehenen Mechanismus:** OM:46, OM:48, OM:454.
+
+### Lohnt sich der Einsatz hier und in großen/kritischen Repos?
+
+**Für dieses kleine Repo:** Der native Ablauf lieferte in knapp 15 Minuten eine betrachtbare Szene mit vielen Anforderungen und ehrlicher Messgrenze, ließ aber Bodenanschluss, finale Regression und dauerhafte Prüfrezepte offen. **Belege:** Zeitübersicht `scratch/metrics.json:1`; `scratch/product-check.json:328`; MAIN:276; `scratch/repository-inventory.json:30`. Ob die komplette Pipeline ihren zusätzlichen Aufwand für genau dieses Schaustück amortisiert hätte, ist **nicht belegt**. Ein begrenzter aktiver Vergleichslauf wäre die passende nächste Untersuchung, nicht eine rückwirkende Aktivierung.
+
+**Für Bank-/Versicherungssoftware lautet meine Empfehlung: derzeit keine flächendeckende Einführung auf Basis dieses Tests; nach Behebung relevanter Fehler zunächst kontrollierter Pilot.** Das ist eine risikobasierte Bewertung, keine Messung der nicht benutzten Pipeline. Positiv ist das normative Ziel: Kandidatenbindung, unabhängige Reviews, ausdrückliche Verantwortlichkeit und keine Umdeutung fehlender Evidence in Erfolg. Negativ für eine organisationsweite Entscheidung: Hier wurden weder diese Enforcement-Kette noch Wiederanlauf, Signaturbedienung oder Security-Abdeckung praktisch validiert. **Belege:** OM:20, OM:48, OM:61, OM:454; MAIN:23; `scratch/session-discovery.json:9`.
+
+Vor einer breiten Empfehlung wären aus diesem Befund abgeleitet mindestens folgende Pilotnachweise sinnvoll:
+
+1. Nach jeder Kandidatenänderung werden alte Verify-/Security-/Critic-Ergebnisse tatsächlich zurückgewiesen; fehlende und umgebungsbedingt nicht ausführbare Prüfungen bleiben sichtbar. Ausgangsbefund: MAIN:276; Normziel OM:20 und SEC:91.
+2. Ein unabhängiger Prüfer rekonstruiert Auftrag → Freigabe → Änderung → Prüfungen → Abnahme aus einem standardisierten Index ohne Rohchat-Suche. Ausgangslücke: `scratch/audit-index.md:11`; Normziel OM:454.
+3. Chat-/Signature-Modi werden je unterstütztem Runner tatsächlich durchgespielt, einschließlich Zeilenumbrüchen, Kandidatenwechsel und Wiederanlauf. In diesem Fall ungetestet; Normquellen PUSH:83, METHOD:64.
+4. Sicherheitsfähigkeiten werden pro Anwendungstyp deklariert und gegen eine realistische Fehler-/Manipulationssuite geprüft. Die hier erfolgte native Serververweigerung darf dabei nicht als Produkt-Security-Abdeckung zählen. Ausgangsbefund GUARDIAN:41; Norm SEC:41.
+5. Dokumentierte Rollen, Testunabhängigkeit und Architekturentscheidungen werden mit realen Mehrteam-/Mehrmoduländerungen geprüft. Dieses Ein-Datei-Projekt liefert dafür keine empirische Skalierungsevidenz. Ausgangsinventar `scratch/repository-inventory.json:30`; Norm OM:84 und OM:248.
+
+**Skalierung, als Schätzung gekennzeichnet:** Einrichtungs-/Profil-/Vertrauensanker- und erste Architekturkosten fallen eher pro Repository an; kandidatengebundene Prüfungen, Review, Entscheidungspflege und Änderungsnachweise wachsen mit Änderungszahl, Risiko und betroffenem Umfang. Bereichsbezogenes Verify kann Vollprüfungen begrenzen; die Norm sieht bei unbekannter Zuordnung einen Rückfall auf volle Ausführung vor. **Belege für den vorgesehenen Ablauf:** OM:33, OM:127, OM:184. Quantitative Einsparung, Fehlerrate, Grenzkosten und Durchsatz über viele Teams sind **nicht belegt**. Nach Fehlerbehebung wäre das Produkt deshalb ein ernst zu prüfendes Governance-Werkzeug, kein Ersatz für fachliche Verantwortung oder eine aus diesem Test ableitbare Freigabe kritischer Systeme.
+
+## Gesamtfazit
+
+**Bestätigt:** Der Kontrollfall zeigt, dass der native Runner mit präzisem PO-Auftrag Designfreigabe, zwei visuelle Verbesserungsrunden, Seed-/Steuerungstests und transparente Messung liefern kann. **Belege:** MAIN:28, MAIN:35, MAIN:164, MAIN:190, MAIN:241, MAIN:341. **Ebenfalls bestätigt:** Trotz dieser Sorgfalt blieben ein konkret messbarer Bodenanschlussfehler und die fehlenden Wolkendurchflüge bestehen; der finale Funktionsnachweis war historisch nicht vollständig neu gebunden. **Belege:** `scratch/product-check.json:328`, `index.html:64`, `index.html:82`, MAIN:276.
+
+**Nicht belegt:** Die Wirksamkeit der Pipeline, ihrer Security-/Critic-Kette, ihrer Modi und ihrer Wiederanlauffestigkeit in komplexen kritischen Projekten. Die Pipeline wurde nicht eingesetzt. **Belege:** MAIN:23; `scratch/session-discovery.json:9`. Der faire Nutzen dieses Tests ist daher die Baseline und der konkrete Prüfbedarf für den nächsten aktiven Vergleich. Es wurde keine Abnahme nachgeholt und kein Commit erstellt; die ursprünglichen Produktdateien bleiben unverändert. **Beleg:** `scratch/final-integrity.json:5`.

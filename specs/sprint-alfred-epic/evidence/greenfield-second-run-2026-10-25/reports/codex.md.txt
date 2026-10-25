@@ -1,0 +1,307 @@
+# Pipeline-Analyse Greenfield: AP_test_vox_codex_070_2
+
+Stand: 25.10.2026. Runner: Codex. Aufgelöster Pluginstand: `0.7.0+codex.20261025134513.977dad8`, lokale Entwicklungsdistribution. Beleg: T2:L40/L51 und T3:L52. Diese Analyse beendet die Entwicklung nicht nachträglich durch einen technischen Abschluss; sie untersucht den eingefrorenen Verlauf. Es wurden keine Commits, Abnahmen oder Veröffentlichungsschritte nachgeholt. Prüfskripte und Zwischenbelege liegen ausschließlich unter `scratch/`.
+
+## Quellen, Methode und Grenzen
+
+Die Methode aus `[Plugin]/skills/pipeline-start/references/transcript-forensics.md` wurde angewendet: tatsächliche Aufrufe und Ergebnisse statt Selbsterzählungen prüfen, Haupt- und Subagenten trennen, Aussagen mit **bestätigt**, **teilweise bestätigt** oder **nicht belegt** bewerten. Zwei frische Analyseagenten prüften frühe Sessions beziehungsweise Repository und Produkt; ihre Teilberichte sind `scratch/forensics-early.md` und `scratch/forensics-repo.md`. Diese Analyseagenten gehören nicht zum historischen Entwicklungsaufwand.
+
+**Bestätigte Quellenabdeckung:** Alle drei durch den vorgeschriebenen repositorygebundenen Recovery-Helper angebotenen früheren Hauptsessions wurden vollständig im Speicher eingelesen: 145 + 1.851 + 300 = **2.296 JSONL-Records**, ohne Parsefehler. Die normale Toolausgabe kappte große Antworten; ein Node-Collector ruft dieselben exakten öffentlichen `read`-Argumente auf und verarbeitet deren vollständige Standardausgabe. Er liest keine Runner-Verzeichnisse direkt. Quellenhashes, Redaktionsverfahren und Wiederauffinden der Originalzeilen stehen im [Prüferindex](../scratch/forensics-evidence-index.md:5); Rechenbelege: `scratch/forensics-transcript-metrics.json`, Collector: `scratch/forensics-collect.mjs`.
+
+| Kürzel | Zeitraum UTC | Records | Original-SHA256 |
+|---|---|---:|---|
+| T1 | 13:57:00–14:04:18 | 145 | 3734fe5ba0fb845d89e89c04488f458a4c67e2ff4e11fb43bcaf152cf8ee9fe9 |
+| T2 | 14:04:30–15:45:23 | 1.851 | 25854501460c10bb1c44bb89cd7eee06e9299618c8736a7a7dbabbf58d3d93eb |
+| T3 | 15:46:25–15:53:26 | 300 | cff3e71d21c84abf4f13507d896ccf755b476a0bb071dba46e4c036ec07e6ed3 |
+
+`T2:L170` bezeichnet eine Original-JSONL-Zeile. Der redigierte Export `scratch/forensics-T2-events.json` enthält dafür `line:170`; dessen Pretty-JSON-Zeilennummer ist eine andere. Transcript-Zitate werden hier höchstens einzeilig wiedergegeben. `[Plugin]` bezeichnet die aufgelöste installierte Distribution, ohne privaten Hostpfad.
+
+**Nicht belegt ist eine vollständige Auswertung sämtlicher Child-Rohtranskripte.** Der sichere Helper bot nur die drei Hauptsessions an. Deren Subagenten-Aufrufe und Rückmeldungen sind enthalten, nicht die vollständigen internen Child-Werkzeug- und Verbrauchsverläufe. Mehrere Briefings sind im Rohtranskript verschlüsselt. Die aktuelle vierte Hauptsession ist vom vorgeschriebenen Prior-Read ausgeschlossen; ihre sichtbare Bootstrap-Antwort wird als **C1** zitiert, ohne erfundene Rohmetriken. Die anschließenden beiden Analyseaufträge sind nicht Teil der Entwicklungsbilanz. Das Verbot direkter Runner-Verzeichnissuche begrenzt die verlangte Gesamtabdeckung; „alle Sessions vollständig geprüft“ wäre unzutreffend. Beleg: Recovery-`list`, Quellenmanifest im Prüferindex; T2:L170/L502 verschlüsselte Dispatch-Payloads.
+
+**Vertragskorrektur:** Dieses Repository enthält ein Voxel-Schaustück, kein Strategiespiel. Der freigegebene Vertrag hat **AC-1 bis AC-10**; Persistenz, Backend und Spielaufgaben sind ausgeschlossen. AC-11 bis AC-28, Belagerungsturm, Tempo 1×/4×, Speichern/Laden und Chronikexport sind im Entwicklungsauftrag nicht belegt. Die später eingereichte Erwartungsliste wird vollständig bewertet, ohne daraus rückwirkend Produktanforderungen zu machen. Belege: `specs/onboarding-7afa3d97f8f6/spec.md:7–9,54–63`; PRD `:18`.
+
+**Git-Snapshot:** Der aktuelle `main` endet bei `3def785`; der Lieferbranch beim Commit `b1aa482`. `d8dbb76` enthält HTML und Vertragstest, spätere Commits die Bilder und Produktakzeptanz. Das Produkt wurde nicht gelöscht. Eine bloße Prüfung des aktuellen Arbeitsbaums führte dennoch wiederholt zur Diagnose fehlender Lieferdateien. Belege: Commits `3def785`, `d8dbb76`, `b1aa482`; T3:L180: „Das Ergebnis ist erhalten“; C1: „das Verzeichnis tests/ fehlt im aktuellen Checkout“.
+
+## Stärken
+
+1. **Bestätigt: konkreter unabhängiger Designnutzen.** Der erste Designreview fand den Widerspruch zwischen leerer interner Abhängigkeitsliste und vorgeschriebenen CDN-Modulen sowie die fehlende ADR-Bindung. Die Nachprüfung bestätigte beide Korrekturen. Dies verbessert die prüfbare Architekturdefinition. Dass ein nativer Runner diese Fehler wahrscheinlich übersehen hätte, ist ohne Vergleichslauf **nicht belegt**. Belege: `design/review-1.md:9–19`, `design/review-2.md:16–21` unter dem Feature-Spec-Verzeichnis; T2:L220/L394.
+
+2. **Bestätigt: Ablehnungen wurden nicht in Erfolg umetikettiert.** Fehlende native Modell-/Dispatchattestierung blieb sichtbar; die zusätzliche Drachen-Nacharbeit meldete trotz grüner Vertragstests ausdrücklich `outcome:failed`. Weder das Designreview noch der Critic-Modus von Verify wurden als abgeschlossener Produkt-Critic ausgegeben. Belege: T2:L761, L1292, L1481; `specs/onboarding-7afa3d97f8f6/evidence/runtime-integration.md:7–17`; `evidence/verify-critic.json:79`.
+
+3. **Bestätigt: ursprünglicher Gestaltungsvorbehalt respektiert.** Vor dem Bauen wurden Stimmung, sieben Farben, Licht, Startkomposition, Maßstab und Drachenfigur vorgelegt und das OK abgewartet. Zwei Bildrunden wurden mit Quellenbindung bewahrt. Allerdings waren Konzept und Bildrunden ausdrücklich Nutzerauftrag, deshalb kein ausschließlich durch die Pipeline erzeugter Mehrwert. Belege: T2:L51/L58; `spec.md:69`; Commits `7b788ad`, `5279e00`, `dd04319`, `b1aa482`.
+
+4. **Bestätigt: negative Evidenz blieb erhalten.** Der erste Browserlauf scheiterte bei Resize/Reload-Synchronisation; die Wiederholung änderte die Prüfsynchronisation und bewahrte den Fehlversuch. Runner-FPS und Laptop-Ziel wurden getrennt. Belege: T2:L1373/L1437; `evidence/browser-runtime-attempt-1.json`; `specs/onboarding-7afa3d97f8f6/evidence/local-delivery-report.md:9–20`.
+
+5. **Bestätigt: Designsignatur bindet konkrete Quellen.** Die Terminalrückgabe wurde konsumiert; anschließend wurden Architekturziele materialisiert und die Implementierungsphase geöffnet. Das ist substantieller als ein bloßes „OK“ ohne Kandidatenbindung. Belege: T2:L434/L446/L489; `architecture/design-materialization.json:4–29`; `project/pipeline-state.json`, Felder `planApproval.designApproval` und `acceptedContract`.
+
+## Verbesserungspotenziale nach Priorität
+
+### P0: Ausführbare Integration vor Produktbeginn qualifizieren
+
+**Bestätigt:** Ein Implementierungsagent konnte Produktcode und grüne Tests liefern, aber keinen akzeptierbaren nativen Host-/Dispatchnachweis. Der Recovery-Writer scheiterte an `record-model`. Der Block wurde erst während der Lieferung offensichtlich. **Vorschlag:** Beim Bootstrap einen begrenzten, produktfreien Durchstich für Dispatch → Host-Modellbeobachtung → Rückgabe → Commitbindung → Critic-Aufnahme ausführen; bei fehlender Fähigkeit vor dem Produktdispatch eine konkrete, sichere Recovery zurückgeben. Der Test darf keinen Attestierungsersatz erfinden. Belege: T2:L675/L761/L807; `runtime-integration.md:7–17`; späterer Audit-Commit `d8dbb76`.
+
+### P0: Repository- und Checkout-Identität entkoppeln
+
+**Bestätigt:** Verify im temporären Checkout scheiterte an `VEP-PROJECT-IDENTITY: PCI-ROOT-MISMATCH`. Danach verlangte der Critic Main-Integration. Ein Branchwechsel entfernte im Zielbranch fehlende Runtime-Dateien; die nötige Integration wurde vom Lifecycle-Guard gestoppt, Runtime-Reparatur verlangte einen weiteren echten Neustart. T3 wiederholte diese Abschlusskette. **Vorschlag:** stabile Repo-ID plus separate Checkout-ID; branchunabhängige private Runtime-Autorität oder atomare Projektion beim Branchwechsel. Aufnahmebedingungen für Verify/Critic müssen vor Auswahl des Integrationsweges geprüft werden. Belege: T2:L1682/L1748/L1773/L1813/L1848; T3:L240/L268–L297.
+
+### P0: Prüferexport und Source-Identität automatisch erzeugen
+
+**Teilweise bestätigt:** Ein nachträglicher Index ist aus Git, Evidenz und Haupttranskripten möglich. Child-Rohdaten, Klartextbriefings, akzeptierte native Dispatchnachweise und eine komplette Abschlusskette fehlen. **Vorschlag:** automatisch redigiertes Manifest pro Ergebnis mit Originalauftrag, akzeptierter Spec, Freigaben, Autoren-/Childbelegen, Commit/Tree, tatsächlich ausgeführten Prüfungen, Security-Status, Critic-Finding-Disposition und Abnahme. Rohdatenzugang muss projektspezifisch und datensparsam sein. Belege: [Prüferindex](../scratch/forensics-evidence-index.md:23); T2:L170/L502/L761; `evidence/verify-critic.json:22–29,79`.
+
+### P1: Vermeidbare PO-Arbeit entfernen
+
+**Bestätigt:** Nach bereits erteiltem Pipeline-Consent wurde die Anwendung des lokalen Runtime-Plans erneut gefragt. Git-Identität wurde nach Neustart nochmals erfragt, obwohl sie schon beantwortet war. Actor-Zuordnungen wurden separat für Einreichen/Präsentieren und Close/Push abgefragt, später nochmals nach Neustart. Letzteres entsprach der bestehenden EL-36-Regel; deren Ergonomie ist selbst der Verbesserungsgegenstand. **Vorschlag:** `requiresHumanDecision` getrennt von der mutierenden Aktionsform; beantwortete Werte aus dem Intake verwenden; einmal ausdrücklich freigegebene, projektgebundene Actor-Zuordnung für benannte Aktionsklassen anbieten. Belege: T1:L23/L65/L72/L107/L114; T2:L192/L246/L262/L295/L1501/L1508; T3:L142/L151.
+
+### P1: Diagnostik muss die echten Arbeitsfälle zulassen
+
+**Bestätigt:** lesende `rg`-/`stat`-/Plugin-Diagnosen wurden durch die geschlossene Grammatik verweigert; mehrere CLI-`--help`-Versuche lieferten nur Argumentfehler. Ein generischer Aufruf, der nur ein geschütztes Dateinamensmuster erwähnt, wurde ebenfalls blockiert. **Vorschlag:** getestete strukturierte Read-/Glob-/Grep-APIs, vollständige Schema-/Usage-Ausgabe und konkrete sichere `nextAction` statt Trial-and-Error. Nicht jede Ablehnung ist falsch: direkte Kalibrierungsänderung, Designphasenbindung und Hostattestierung bleiben sinnvolle Schranken. Belege: T2:L86/L94/L473/L493/L559/L1211; T3:L41/L47/L67/L100; `[Plugin]/templates/prompts/agent-obligations.md:21–40`.
+
+### P1: Akzeptanzprüfungen müssen die Eigenschaft messen
+
+**Bestätigt:** Die öffentliche Seed-Signatur enthält den Seedtext und Objektanzahlen, keine Geometriepositionen. Unterschiedlicher Seed garantiert deshalb bereits textuell eine andere Signatur. Zwei um 2³² getrennte Seeds erzeugen identische PRNG-Ströme. Die drei Vertragstests prüfen überwiegend Quellenmuster und Syntax. **Vorschlag:** kanonischer Hash der tatsächlichen Transformationsmatrizen/Positionen/Farben; akzeptierten Seedbereich ausdrücklich festlegen; verhaltensbezogene Prüfungen für die kritischen Eigenschaften. Belege: `b1aa482:index.html:24–25,110`; `b1aa482:tests/scene.test.mjs:15–36`; `scratch/forensics-seed-prng.json:9–14`.
+
+### P2: Zeit-/Tokenbudget, Status und Nutzerdoku konsistent machen
+
+**Bewertung aus den nachstehenden Messwerten:** Ein großer Anteil der Hauptagentenarbeit ging in Status-, Gate- und Recovery-Arbeit. Repeated Bootstrap und Legacy-/Generierungsprojektionen erzeugten Lesekosten, ohne den offenen Abschluss zu lösen. ADR-0001 steht weiter auf `proposed`; die signierte Designfreigabe enthält ihn trotzdem. **Vorschlag:** kurze maschinenlesbare Bootstrap-Rezepte, automatisch projizierter effektiver ADR-Status, aktueller Lieferbranch im Handover, kurze Nutzerdoku sowie explizite Laufzeit-/Kostenbudgets pro Ergebnis. Die Gültigkeit der Designfreigabe wird durch den lesbaren ADR-Status allein nicht widerlegt. Belege: `docs/adr/0001-single-file-voxel-rendering.md:3,18`; T3:L114/L180; Tokenübersicht unten; fehlendes README im Lieferbaum `b1aa482`.
+
+### Inventar identifizierter Schleifen, Fehlversuche und Eingriffe
+
+Klassen: **P** Produktdefekt, **D** Pipeline-/Doku-/Integrationslücke, **A** Agenten-/Prüfskriptfehler, **G** erwartetes Gate oder notwendige Eingabe. Ursachen sind forensische Bewertungen; wo eine interne Ursache nicht beobachtbar ist, wird sie nicht behauptet. Der maschinelle Zusatzledger `scratch/forensics-failures.json` erfasst strukturierte Denials/Exitcodes; die Tabelle ergänzt unstrukturierte Befunde. Quelltexte mit Beispielen von Fehlercodes wurden nicht als echte Fehler gezählt. Ohne Child-Rohdaten ist eine vollständige Zahl aller Child-Fehlversuche **nicht belegt**.
+
+| Quelle | Ereignis / Einordnung | Vermeidung oder sichere Reaktion |
+|---|---|---|
+| T1:L37/L40/L44 | Sandbox-Aufruf → `spawnSync node EPERM`; A | deklarierte Host-Grenze ab erstem Aufruf verwenden |
+| T1:L107/L114 | Runtime-Plan nochmals bestätigen lassen; A | vorhandenen begrenzten Onboarding-Consent anwenden |
+| T1:L142/L145 | erster externer Terminalneustart; G | Runtime-Initialisierung möglichst ohne Prozessschnitt; keine Umgehung der realen Grenze |
+| T2:L86/L94/L119 | lesender Design-/Plugin-Zugriff durch Shell-/Scope-Grammatik blockiert; D/A | strukturierter Read-Kanal und exakt angebotene Recovery |
+| T2:L113 | Modellrollenroute nicht verfügbar; D | Verfügbarkeit vor Designarbeit prüfen; V3-Fallback ehrlich erhalten |
+| T2:L138 | Delete+Add desselben Patchziels abgelehnt; A | echtes Update verwenden |
+| T2:L188/L192/L246 | Git-Konfigurationsprobe leer, Identität erneut gefragt; A/D | bereits beantworteten Intake übernehmen |
+| T2:L210/L342 | ungeborener Main, Plan ohne HEAD eingereicht; A/D | Git-/HEAD-Voraussetzungen atomar vor Einreichen herstellen |
+| T2:L262/L295 | eigener Actor-Dialog für submit/present; G | ausdrückliche dauerhafte Aktionszuordnung als Systemfunktion |
+| T2:L273/L279/L300/L334 | Designprüfung bzw. Zugriff von DEVPLAN gesperrt; D/G | enger lesender Designvalidierungskanal, kein neues PO-Gate |
+| T2:L353 | Scaffold-Commit enthält nicht zugelassene Runtime-Profile; A | Generated-/Lifecycle-Artefakte sauber autorisieren und begrenzen |
+| T2:L456 | Phase verweigert, Architekturmaterialisierung noch offen; G | zurückgegebene Materialisierung vor Phasenwechsel ausführen |
+| T2:L473/L493 | Briefing-CLI-`--help` und Modellfamilienbindung scheitern; A/D | Schema/Usage ausgeben; runnerabhängige Modellfamilien korrekt abbilden |
+| T2:L510/L514/L537 | Probe bzw. lesende Plugin-Diagnose verweigert; A/D | erlaubte Scratch-Probe bzw. strukturierter Plugin-Read |
+| T2:L556/L559 | direkte geschützte Verify-Konfiguration verweigert; A/G | configure-verify-Writer verwenden |
+| T2:L567/L579/L616 | Chromium-Bibliotheken fehlen, danach Software-WebGL verfügbar; D | Browser-Capability vor Dispatch qualifizieren |
+| T2:L641/L675/L761 | Diagnose-/Recovery-Versuche für Dispatchrecord, zuletzt `record-model`; D/A | native Attestierung bereitstellen; keine Ersatzbeweise erfinden |
+| T2:L691 | Screenshot nach 30s Timeout; A/D | beobachteten Renderzustand und begrenzte Fristen nutzen |
+| T2:L733/L737 | ungeeignete administrative Commitbindung; A | passende zurückgegebene stage-0-Bindung verwenden |
+| T2:L755/L956/L1001 | echte Bildschwächen und zwei Verbesserungsrunden; P | frühere Silhouetten-/Verdeckungsprüfung; Nutzerauftrag, keine unnötige Schleife |
+| T2:L802 | Effective-decisions-CLI mit ungültigen Argumenten; A/D | strukturierte Aufrufbeschreibung |
+| T2:L892/L896 | Agententurn abgebrochen; PO „weiter sorry“; G | Abbruchzeit erhalten; tatsächlicher Auslöser nicht belegt |
+| T2:L1103/L1292 | zusätzliche Drachen-Nacharbeit bleibt visuell unzureichend; P | konkrete Form-/Silhouettenkriterien statt nur Objektcheckliste |
+| T2:L1150/L1211/L1265 | Fehleranzeige zu früh geprüft, stat-Flag verweigert, einzelne Diagnoseexitcodes; A/D | auf sichtbaren Zustand warten; lesende Flags zulassen; Exit allein nicht als Produktfehler zählen |
+| T2:L1359/L1373/L1383 | erster Browserlauf Resize/Reload scheitert, synchronisierter Retry grün; A | Zustand statt Wartezeit beobachten; Originalfehler bewahren |
+| T2:L1450/L1461 | Handover-Patchkontext veraltet; A | aktuelle Datei vor Patch lesen |
+| T2:L1501/L1508 | weiterer Actor-Dialog Close/Push; G | gebündelte explizite Actor-Disposition |
+| T2:L1512/L1526/L1530/L1563 | SSH-Agent fehlt, Standardauth scheitert, Schlüsselsuche gesperrt, PO liefert Pfad; D/G | Host-Schlüsselalias-Auswahl ohne Zugriff auf Privatmaterial |
+| T2:L1542 | Close-Koordinator vor Initialisierung inspiziert, ENOENT; A/D | idempotente Inspektion mit typisiertem absent |
+| T2:L1583 | SSH-Test Exit1, aber erfolgreiche Authentisierung; kein P | nicht als Fehlversuch oder Scanbefund zählen |
+| T2:L1663/L1682/L1708/L1717 | Critic-Usage-/Verify-Versuche; temporäre Root-ID kollidiert; A/D | zulässigen Aufruf und stabile Checkoutidentität liefern |
+| T2:L1748/L1773/L1789/L1813 | Main-Integration → Runtimeverlust → erneut verweigerter Review → Restart; D/G | branchfeste Runtime und frühzeitige Aufnahmeprüfung |
+| T2:L1834/L1848 | Resume-Hint-Schemafehler korrigiert, echter Neustart nötig; A/G | Schema beim Schreiben validieren; Anweisungen nicht als Produktkontext kodieren |
+| T3:L41/L47/L67/L100 | sieben strukturierte Read-/Scope-Denials, darunter fehlende Dateien; A/D/G | dokumentierte schmale Reads; fehlende Datei von unerlaubtem Lesen unterscheiden |
+| T3:L114/L118/L180 | fehlende Tests auf Main zunächst als Lieferproblem diagnostiziert; A | vor Wiederherstellungsplan alle lokalen Branches prüfen |
+| T3:L142/L151 | Actor erneut nach Neustart erfragt; G/D | ausdrückliche Zuordnung dauerhaft referenzieren |
+| T3:L159/L213/L222 | Close-Argumente, Sandbox-Git und Critic-Usage scheitern; A/D | deklarierte Host-Grenze und exakte Action verwenden |
+| T3:L184/L188/L193 | Branchwechsel durch ungetrackte Runtime-Dateien blockiert, Indexsicherung, Retry; D/G | branchunabhängige Runtime statt Checkout-Kollision |
+| T3:L231/L240/L268/L286/L297 | Push unqualifiziert, Critic verlangt Main, Merge durch Lifecycle gestoppt, dritter Terminalneustart; D/G | Abschlussfähigkeit vorab und atomar sicherstellen |
+| C1 sichtbarer Verlauf | Onboarding-Treiber von Auto-Review wegen möglicher Mutation abgelehnt; sichere Inspect-Alternative bereit | Hostreview darf nicht als Pipeline-PO-Gate ausgegeben werden |
+| C1 sichtbarer Verlauf | drei weitere geschlossene rg-Grammatikverweigerungen; A/D | bereits verfügbare einfache Reads verwenden |
+| Analyse: `forensics-repo.md` | einmal Plugin-Fitnessquelle außerhalb Read-Scope verweigert | kein Override und keine nachgeholte Freigabe |
+| Analyse: `forensics-browser-partial.json` | lange Suite: 13 PASS, ein 1800ms-Animations-FAIL, zwei offen; Prüflauf beendet | begrenzte exakte Nachprüfung statt unendlich warten |
+| Analyse: `forensics-final-browser.json:16–36` | eventbasierte Animation besteht; erster CDN-Retry hat Timeout | Fehlversuch erhalten, isolierte Diagnose; interne Ursache nicht belegt |
+| Analyse: `forensics-cdn-isolated.json:3–20` | sechs Requests tatsächlich blockiert, Fehleranzeige besteht | kein Produktfix und keine nachträgliche Release-Freigabe |
+
+## Abgleich Operating Model, Rollen und Qualitätsgates
+
+Normativer Bezug ist die geladene Pluginfassung, nicht eine abstrakte ältere Rollenbeschreibung. `[Plugin]/docs/operating-model.md:90–130,282–370,392–449` verlangt getrennte Rollen, vollständig gebriefte Dispatches, autonome Weiterarbeit nach Planfreigabe und ehrliche Gate-Evidenz. `[Plugin]/guardrails/quality-gates.md:69–78` erlaubt demselben Outcome-Owner Testautorschaft und Implementierung; **unabhängige Testausführung und unabhängiger Critic** sind die relevante Trennung. Eine separate Testautoren-Person ist kein generelles Muss.
+
+| Behauptung | Urteil | Beleg und Grenze |
+|---|---|---|
+| Hauptagent schreibt keinen Produktcode | teilweise bestätigt | erste Bauzuweisung T2:L502; weitere Autoren T2:L787/L1142; Rückgabe T2:L1292 „Edited index.html only; nothing committed“. Keine direkte Produktänderung des Hauptagenten in seinen ausgewerteten Aufrufen belegt. Child-Autorschaft/Hostrecord nicht vollständig attestiert. |
+| Saubere vollständige Briefings | teilweise bestätigt | vier frische `fork_turns:none`-Dispatches vorhanden; Briefing-Builder benutzt; T2:L493 zeigt echte Modellfamilienverweigerung. Verschlüsselte Payloads und fehlende Child-Rohdaten verhindern vollständige Sechsfeldprüfung. |
+| Unabhängiger Designreview | bestätigt | eigener frischer Designagent T2:L170, Bericht T2:L220, Nachprüfung T2:L394; Designreview-Dateien mit Quellenhashes |
+| Unabhängiger Produkt-Critic vor Abschluss | nicht belegt / nicht erfüllt | T2:L1748 und T3:L240: `childCreated:false`, Aufnahme verweigert. Kein zurückgekehrtes semantisches Produktreview. Feature blieb offen. |
+| Testautorschaft und Implementierung strikt getrennte Personen | nicht anwendbar als allgemeine Pflicht | QG-04:69–78 erlaubt Outcome-Owner; gefordert ist unabhängige Ausführung. Neue Hostausführung dieses Audits besteht: `scratch/forensics-contract-check.txt:1–11`. Historisch unabhängige Hostchecks dokumentiert, umfassende RED-before-Code-Reihenfolge aus Child-Rohdaten nicht belegt. |
+| Verify und Security vor Abschluss | nicht erfüllt als vollständiger Kurs | Verify-Modus critic am Liefercommit vorhanden, Full Verify und gelaufener Security-Scan nicht belegt. `evidence/verify-critic.json:22–29,72–79`; T3:L297 lässt Close/Push offen. |
+| Audit-Trail, Nachweise und Dokumentation konsistent | teilweise | signierte Designquelle, Git-Trailer und Bildhashes vorhanden; native Dispatchbindung fehlt; Handover auf Main kennt spätere Abnahme nicht. Commits `d8dbb76`, `52346a6`; `docs/state.md:20–26`; Prüferindex |
+| Kein erfundener technischer Abschluss | bestätigt | `project/pipeline-state.json`: Phase implementation; T2:L1848/T3:L297; Close-Coordinator checkpointed |
+
+### Freigaben und tatsächlich verlangte PO-Arbeit
+
+| Entscheidung / Zeitraum | Modus | Tatsächlich verlangt und beobachtet | Urteil |
+|---|---|---|---|
+| Pipeline verwenden | Chat-Consent, noch kein Designgate | explizites Ja; T1:L23 | erwartete Entscheidung |
+| Sprache, Profil, Git-Identität, Signaturmodus, Advisor-Export | Intake | gebündelte Antwort T1:L65/L72 | erwartet; späterer erneuter Autor-Dialog unnötig |
+| lokalen Runtime-Plan anwenden | zusätzliches Chat-OK | T1:L107 „Soll ich diesen Plan anwenden?“ → L114 | unnötiges zweites Onboarding-Gate; 120,119s PO-Wartezeit, aus Aktivzeit entfernt |
+| Gestaltungskonzept | vom Nutzer gefordertes Chat-OK | T2:L51 Vorlage → L58 Zustimmung | erwartetes Produktgate |
+| submit/present-Aktor | explizite Zuordnung, keine Designfreigabe | T2:L262/L295 | regelkonform, zusätzlicher Systemaufwand |
+| gemeinsames PRD-/Spec-/Architekturdesign | Signature | zeilenumbruchsicher zusammengesetzter Terminalbefehl, Intent lesen/Passphrase, Rückgabe im CLI-Chat senden; T2:L427/L434, Konsum L446 | eine signierte Designzeremonie; streng „nur signieren“ teilweise, da Ergebnisrücksendung zusätzlich erforderlich |
+| Produktabnahme und 165 FPS | Chat-Erklärung | T2:L1488 „gut! Dann bitte auch das close“; Abnahme auf Lieferbranch gespeichert | tatsächlich erteilt; kein kryptografischer Ersatz für andere Gates |
+| Close/Push-Aktor und SSH-Dateipfad | Zuordnung / Hostzugang | T2:L1508/L1563; erneut T3:L151 | erster Scopezugang notwendig; erneute Actorfrage vermeidbare Ergonomie |
+| Terminalneustarts | Runtimegrenze, keine Produktfreigabe | T1:L142, T2:L1848, T3:L297 | drei reale PO-Terminalaufgaben; spätere durch Integrationsprobleme ausgelöst |
+| finale Pushsignatur | Signature konfiguriert | wegen offener Qualifikation nicht erreicht; T3:L231/L297 | keine erteilte finale Pushfreigabe behaupten |
+| Design-/Pushfreigabe im Chat-Modus | nicht ausgeführt | `pipeline.user.yaml` wählt signature; kein entsprechender Chatmodus-Durchlauf | nicht anwendbar; aus Produkt-Chatabnahme keinen Chat-Gate-Systemtest ableiten |
+
+Die Terminalkommandos verwenden aneinandergesetzte Zeichenketten beziehungsweise kurze Variablenzuweisungen; ein Bildschirmumbruch innerhalb eines ungeschützten langen Pfades ist in diesen ausgegebenen Befehlen nicht belegt. T2:L427 nutzt allerdings `eval` und verlangt die Rücksendung des Resultats. Ein Hostbutton mit dokumentierter, exakter Intentbindung wäre weniger fehleranfällig, ohne die Entscheidung abzusenken. Belege: T1:L142; T2:L427/L434; T3:L297.
+
+### Architektur und weitere Qualitätsfunktionen
+
+| Funktion | Auslösung / Ergebnis | Beleg |
+|---|---|---|
+| Greenfield-Orientierung und Adoption | als Greenfield vorgeschlagen, scoped adoption in gemeinsamer Designfreigabe, danach feste Ziele materialisiert | PRD:92–117; `architecture/design-materialization.json:4–29`; T2:L456/L489 |
+| Architekturkarte und Fitnessmodell | erstellt; ein zusammenhängendes Szenenmodul, interne Abhängigkeitsliste leer | `architecture/map/voxel-scene.md:1–24`; `architecture/fitness-model.json:3–21` |
+| tatsächlich gemessene Architektur-Fitness | abschließender positiver Nachweis nicht belegt | `architecture/baseline.json:5–8` sind Startwerte 0; keine Gleichsetzung mit bestandenen Tests |
+| KI-Beobachtungsgrenze | im Voxelprodukt nicht definiert, daher nicht qualifiziert | `map/voxel-scene.md:4–18`; kein KI-Agent im Produkt. Leere authorityEffects/Dependencies sind keine Beobachtungsisolation. |
+| ADR-Kontinuität | ADR-0001 gebunden; lesbar weiter proposed | ADR:3/18; `review-2.md:19`; Designfreigabebindung im State |
+| Mindest-Sorgfalt | Profil feature vom PO, voller Design-/Reviewkurs und keine dokumentierte Mini-Absenkung | T1:L72; `project/pipeline-state.json`: selectedProfile, rigorHistory; fehlende Abschlussbelege bleiben offen |
+| Design-Workflow | technische Erstprüfung, Korrekturen, Nachprüfung, eine gemeinsame Signatur | T2:L170/L220/L365/L394/L434 |
+| Vertical-Slice-Gate | kein separates Gate im hier freigegebenen Szenenvertrag | `spec.md:54–73`; PRD:62–68. Bildrunden sind nicht nachträglich zu einem Slice-Abnahmegate umzudeuten. |
+| Advisor | Exportzustimmung ausdrücklich erfragt; tatsächliche Beratung nicht belegt | T1:L65/L72; kein Advisor-Consult-Dispatch unter vier historischen Dispatches. On-demand-Consult ist nicht automatisch Pflicht; Operating Model:165–169. |
+| Wiederaufnahme | Materialhinweis übernommen, aber Branch-/Abnahmestand unvollständig eingeordnet | T1:L130–139; T2:L51; T3:L114/L128/L180; C1 |
+| geregelte Änderungen | visuelle Nacharbeit im akzeptierten Umfang; kein belegter neuer Spielmechanismus | T2:L1103/L1292; PRD:19–21 |
+| Security-Scan / Security-Tests | kein gelaufener Scan und kein spezifisches Security-Testpaket belegt | `project/pipeline.yaml`: security blocking; vorhandene drei Tests `b1aa482:tests/scene.test.mjs:10–38`; Evidence-Index |
+| Backlogabgleich | kein Backlog im Lieferbaum gefunden; kein Abschlussabgleich belegt | Baum `b1aa482`; offener State und Close-Coordinator |
+| Nutzer-README | fehlt; Steuerung im HTML, technische Voraussetzungen in Spec | `b1aa482:index.html:11`; `spec.md:7,33–35`; Baum `b1aa482` |
+| Privatinformationen in Artefakten | Gegenbeispiel vorhanden: persönliches Actorlabel in committed Liefervertrag | `specs/onboarding-7afa3d97f8f6/evidence/accepted-delivery-contract-*.json:1`, Feld submittedBy. Wert bewusst nicht wiedergegeben. |
+
+## Laufzeit- und Tokenübersicht
+
+### Messmethode
+
+Aktivzeit ist die Vereinigung der Intervalle von der echten primären PO-Nachricht bis zum `task_complete`; beim unterbrochenen Turn endet sie am `turn_aborted` **T2:L892, 14:45:30.263 UTC**. Asynchrone PO-Antworten zählen als PO-Nachrichten, erzeugen aber kein zweites überlappendes Zeitintervall. Alle Pausen bis zum nächsten PO-Auftrag werden entfernt. Die Zeit enthält somit Browser-, Tool- und Subagentenwartezeit innerhalb einer laufenden Antwort, wie vom Auftrag definiert; sie ist keine CPU-Zeit. Rechenweg und einzelne Quellintervalle: `scratch/forensics-phase-metrics.mjs`, `scratch/forensics-phase-metrics.json`.
+
+Die Phasenzuordnung ist eine **analytische Einteilung** nach dominanter Tätigkeit, kein rückwirkend behaupteter Pipeline-Phasenwechsel: Design endet an der tatsächlichen Freigabe 14:26:16.630, Implementierung am angekündigten Source-Freeze T2:L1327, der Prüfblock an der Ergebnisantwort, danach folgen Akzeptanz/Abschlussversuche einschließlich Wiedereinstieg. Tests und Gatearbeit gab es auch während der Umsetzung. Quellen: T2:L434/L446/L1327/L1481/L1488; T3:L297.
+
+| Phase, UTC am 25.10. | Start | Ende | aktive Zeit | PO-Nachrichten | Hauptturns gestartet / beendet | Haupt-Toolaufrufe | Haupttokens |
+|---|---|---|---:|---:|---:|---:|---:|
+| Onboarding | 13:57:00.887 | 14:04:18.192 | 214,561s | 4 | 4 / 4 | 15 | 665.869 |
+| Konzept, Design bis Freigabe, inkl. Wiedereinstieg | 14:04:34.377 | 14:26:16.630 | 876,275s | 5 | 3 / 2 | 51 | 4.827.048 |
+| Vertical Slice bis eigener Abnahme | — | — | nicht anwendbar | 0 | 0 / 0 | 0 | 0 |
+| Umsetzung und visuelle Runden | 14:26:16.630 | 15:13:59.689 | 2.859,795s | 1 | 1 / 0 | 100 | 27.683.336 |
+| lokale Prüfungen; Full Verify/Security/Critic nicht abgeschlossen | 15:13:59.689 | 15:25:34.894 | 695,205s | 0 | 0 / 1 | 14 | 5.450.064 |
+| Produktabnahme, Commitintegration, technische Abschlussversuche | 15:27:10.935 | 15:53:26.356 | 1.434,833s | 7 | 3 / 3 | 72 | 17.137.813 |
+| **historische belegte Summe T1–T3** | | | **6.080,669s = 101,34min** | **17** | **11 / 10** | **252** | **55.764.130** |
+
+Ein Turn läuft über mehrere analytische Phasen; deshalb unterscheiden sich Starts und Enden pro Zeile. Ein weiterer Turn wurde abgebrochen. Der Entwicklungszeitraum von erster PO-Nachricht bis T3-Schluss beträgt rund 116,4min; rund 15,1min liegen außerhalb der aktiven Antwortintervalle. Dies ist keine gemessene persönliche Arbeitszeit des PO. C1 und die laufende Analyse fehlen mangels zugänglichem Rohusage im historischen Total. Quellen: Phasen-Metrik, T1:L13/L145; T2:L892; T3:L300.
+
+**Zählebenen:** 252 sind tatsächliche äußere `custom_tool_call`-/`function_call`-Records, einschließlich Koordinator und Agentensteuerung. Ein `functions.exec` kann mehrere Tools bündeln. Statisch in seinen Eingaben erkennbar sind 368 `exec_command`-, 29 `write_stdin`-, 43 `apply_patch`- und 10 `view_image`-Aufrufe; diese **lexikalischen Teilaufrufzahlen sind geschätzt**, weil ein Fehler später stehende Aufrufe verhindern kann. Sie werden nicht zu den 252 Wrappern addiert. Child-interne Toolaufrufe sind nicht belegt. Reproduzierbare Zählung: `scratch/forensics-query.mjs`, Modus metrics; T1/T2/T3-Metrikdateien.
+
+### Historische Subagenten getrennt
+
+| Duty / Instanz | beobachteter Beginn / Rückgabe UTC | gemessene äußere Spanne | Ergebnis | interne Turns, Tools, Tokens |
+|---|---|---|---|---|
+| Designreview | T2:L170 14:17:20 → L220 14:18:01 | ca. 41s | zwei Befunde; Reportwrite vom Lifecycle verweigert | nicht belegt |
+| gleiche Designinstanz, Delta-Nachprüfung | T2:L365 14:22:54 → L394 14:23:31 | ca. 38s | keine offenen Designbefunde | nicht belegt |
+| scene_build | T2:L502 14:28:41 → native Rückgabe im Hauptlauf | genaue Ausführungszeit nicht belegt | HTML/Test geliefert; Host-/Commitrecord fehlt | nicht belegt |
+| visual_refinement | T2:L787 14:40:10 → Rückgabe im Hauptlauf | genaue Ausführungszeit nicht belegt | Bildkorrekturen | nicht belegt |
+| hero_qualification | T2:L1142 14:58:58 → L1292 15:11:35 | ca. 12min38s | eigene Rückgabe failed, AC-5 nicht zertifiziert | nicht belegt |
+
+Spannen zwischen Dispatch und Rückmeldung sind keine reine Rechenzeit und werden nicht nochmals zur Hauptaktivzeit addiert. Es gab vier frische Instanzen, eine Design-Follow-up-Ausführung und 13 Hauptlauf-Agentenmeldungen. Quellen: T2-Records `function_call`, `response_item:agent_message`; `scratch/forensics-T2-events.json`. Ein finaler Produkt-Critic wurde vor dem Aufruf abgewiesen, nicht als fünfter erfolgreicher Agent gezählt.
+
+### Verbrauch und drei Töpfe
+
+Die realen Verbrauchsdaten stammen aus `token_usage_record.usage`, je Response genau einmal summiert. Sie stimmen mit den letzten `thread_token_usage`-Werten überein: T1:L143, T2:L1849, T3:L298. Periodische `token_count`-Meldungen werden **nicht** zusätzlich summiert; nach Compact können ihre Summen anders aussehen. Reasoning ist bereits Teil von Output.
+
+| Quelle | Input | davon gecacht | Output | Total |
+|---|---:|---:|---:|---:|
+| T1 | 661.422 | 626.304 | 4.447 | 665.869 |
+| T2 | 52.204.996 | 51.481.088 | 149.352 | 52.354.348 |
+| T3 | 2.736.125 | 2.613.760 | 7.788 | 2.743.913 |
+| **Summe Hauptagent** | **55.602.543** | **54.721.152** | **161.587** | **55.764.130** |
+
+Damit sind rund **98,4% des Inputs gecacht**; nicht gecachter Input beträgt 881.391 Tokens. Die 55,76 Millionen bedeuten wiederholt verarbeiteten Kontext, nicht ebenso viel neu erzeugten Text. Geldkosten, Child-Verbrauch und eine Gesamtbilanz aller Runnerprozesse sind **nicht belegt**; daraus wird keine Preisrechnung abgeleitet.
+
+Die folgende semantische Aufteilung ist **geschätzt**, nicht vom Runner gemessen. Methode: Jedes reale Usage-Delta wird nach dem letzten sichtbaren Arbeitsaufruf zugeordnet. Bau-/Bild-/Browserarbeit ist (a), weil vom Nutzer verlangt; Designreview, Spec-/ADR-Arbeit und zusätzliche Vertragstests sind (b); Bootstrap, Gates, Zustands-/Integrations-/Recoveryarbeit und nicht eindeutig zuordenbare Schritte sind (c). Die Regeln stehen in `scratch/forensics-statistics.mjs`; jeder Einzelfall mit Originalbeleg in `scratch/forensics-token-allocation.json`. Verschlüsselte Briefings und kontextreiche Mehrzweckaufrufe begrenzen die Genauigkeit; keine erfundene Fehlerspanne.
+
+| Topf | geschätzte Zuordnung realer Haupttokens | Anteil |
+|---|---:|---:|
+| (a) inhaltliche Produktarbeit einschließlich geforderter Bildrunden | 10.180.210 | 18,3% |
+| (b) zusätzliche inhaltliche Pipelinearbeit | 3.788.157 | 6,8% |
+| (c) Pipelineverwaltung / Recovery / nicht eindeutig zuordenbare Schritte | 41.795.763 | 75,0% |
+
+Das sind **keine kausal gemessenen Mehrkosten gegenüber einem nativen Runner**. Die Zuordnung belastet den jeweiligen aktuellen Zweck mit dem gesamten wiederholten Cache-Kontext; produktive Child-Arbeit fehlt. Eine genauere Kostenbilanz benötigt Child-Usage und eine unabhängig geprüfte Annotation jeder Response. Dennoch ist das wiederholte Integrations-/Abschlussproblem unabhängig von dieser Schätzung konkret belegt: T2:L761/L1682/L1748/L1813 und T3:L240/L297.
+
+## Produktqualität und selbst ausgeführte Prüfungen
+
+Der Lieferstand wurde aus `b1aa482` **ohne Branchwechsel** nach `scratch/forensics-runtime/` exportiert. Der exakte HTML-Hash ist `207964ee83f0d5b02f996f2ae5a0645d4fedc1fa30dcb6b166f43481211ea1eb`; Testhash und Prüferindex binden den untersuchten Stand. Eigene Prüfungen sind retrospektive Beobachtungen, kein nachgeholtes Release. Belege: `scratch/forensics-export.mjs`; `scratch/forensics-final-browser.json:3`.
+
+| tatsächliches Kriterium | Bewertung | Befund / Beleg |
+|---|---|---|
+| AC-1 Ein-Datei, pinned ES-Module, Instanzen, Abendstart | erfüllt im geprüften Chromium-Umfang | drei Vertragstests neu bestanden; historische Browserprüfung Abendstart; `scratch/forensics-contract-check.txt:1–11`; `evidence/browser-runtime.json`; `b1aa482:index.html:15–22` |
+| AC-2 Berginsel, Terrassen, Aufstieg, Wasserfall, Unterseite | teilweise visuell bestätigt | selbst betrachtete finale Tag-/Drachenbilder zeigen die Bestandteile; breiter terrassierter Oberbau bleibt eher kompakt als dramatischer Gipfel. Subjektives Bildurteil, keine neue PO-Entscheidung. `b1aa482:screenshots/final/{tag,drache}.png`; `final/review.md:5` |
+| AC-3 Pagode, Torii, Samurai | teilweise | Pagode/Torii klar sichtbar; kleine Wächterdetails aus den drei finalen Ansichten nicht belastbar qualifiziert. Keine vorgetäuschte Detailprüfung. `screenshots/final/drache.png`; `spec.md:56` |
+| AC-4 Vegetation, Wasser, Koi, Partikel | teilweise | Bäume, Teich und Wasserfall sichtbar; sämtliche kleinen Koi-/Partikelmerkmale nicht vollständig neu geprüft. `screenshots/final/drache.png`; `spec.md:57` |
+| AC-5 Hauptfigur, Animation, Flug, Lichtstoß | teilweise objektiv, subjektiv PO-akzeptiert | eigener eventbasierter Bewegungstest grün; Kopf bleibt quaderförmig, Körper bandartig; Lichtstoß nicht separat neu qualifiziert. `scratch/forensics-final-browser.json:16–28`; `b1aa482:screenshots/final/review.md:7`; PO-Akzeptanz `:7` |
+| AC-6 Tageszeiten und Nachtbestandteile | erfüllt im geprüften Umfang | N-Zyklus historisch, N neu auf file://; Nachtbild mit Mond/Sternen/Licht selbst angesehen. `evidence/browser-runtime.json`; `scratch/forensics-final-browser.json:30–31`; `screenshots/final/nacht.png` |
+| AC-7 Maus/Touch/Follow/Resize/Idle | teilweise neu, historisch breiter geprüft | D neu grün; längerer neuer Lauf 13 PASS, ein Timing-FAIL, zwei offen. Kein vollständiger neu grüner 16er-Lauf behauptet. `forensics-browser-partial.json`; `forensics-final-browser.json:30–31`; historisch `evidence/browser-runtime.json` |
+| AC-8 reproduzierbares Layout | teilweise | PRNG-Wiederholung über 1000 Seeds grün; öffentliche Signatur beweist keine realen Positionen; 32bit-Alias. `forensics-seed-prng.json:2–14`; `b1aa482:index.html:110` |
+| AC-9 FPS/Würfelzahl/Messbericht | erfüllt hinsichtlich Anzeige/Bericht; universelle 60 FPS nicht belegt | historisch 31.642 Boxinstanzen und 3,1259 FPS SwiftShader; PO meldet 165 FPS ohne Umgebung. `local-delivery-report.md:16–20`; `b1aa482:.../po-acceptance.md:5` |
+| AC-10 zwei selbst betrachtete Verbesserungsrunden | erfüllt dokumentiert | beide Vorher-/Nachherreihen, je drei Schwächen und Korrekturen erhalten; Commits `7b788ad`, `5279e00`, `dd04319`; T2:L755/L956/L1103 |
+| AC-11 bis AC-28 aus der Analysevorlage | nicht anwendbar / kein Vertragsbeleg | realer Kriterienkatalog endet bei AC-10, `spec.md:54–63` |
+
+**Eigener automatisierter Durchlauf mit Seed 123:** Der byteidentische Lieferstand startet in Chromium 153 über `file://`; Drachenposition ändert sich bei zustandsbasiertem Warten, N und D funktionieren. Der vorangegangene lange Lauf wurde mit 13 PASS, einem Timing-FAIL und zwei offenen Prüfungen beendet; er enthielt einen zusätzlichen abschließenden Zeilenumbruch und wird nicht als byteidentische Vollqualifikation verwendet. Die begrenzte Nachprüfung nutzt den exakten Quellhash. Belege: `scratch/forensics-browser-partial.json`; `scratch/forensics-final-browser.json:3–31`.
+
+**Fehlerpfad:** Der erste neue CDN-Test hatte einen Timeout; seine Ursache ist nicht belegt. Ein isolierter Lauf blockierte nachweislich alle sechs angefragten CDN-Module und zeigte die deutsche Fehlermeldung ohne Canvas/API. Das ist eine Fehlerpfadprüfung, kein Security-Scan. Belege: `forensics-final-browser.json:34–36`; `forensics-cdn-isolated.json:3–20`.
+
+**1.000 Seeds tatsächlich ausgeführt:** Seeds 0–999, je vier PRNG-Ströme mit je 256 Werten, also 1.024 Werten pro Seed, Wiederholung: 0 Abweichungen, 1.000 verschiedene Fingerprints. Dies qualifiziert ausschließlich den Zufallsgenerator. Ein dokumentierter Spiel-/Balancing-Prüfstand mit 1.000 Seeds existiert hier nicht; deshalb kein ehrlicher numerischer Vergleich zu solchen Zielwerten. 1×/4×, Pause und Save/Load lassen sich an dieser Anwendung nicht testen, da sie diese Zustände nicht besitzt. Belege: `scratch/forensics-seeds.mjs:8–10`; `forensics-seed-prng.json:2–14`; `spec.md:9,31`.
+
+**Eigene Bildsicht:** Tag, Nacht und Drachenkamera aus dem Liefercommit wurden erneut angesehen. Tempel und Vegetation sind lesbar; die Wolken wirken aus dieser Perspektive wie getrennte flache Scheiben, der Drachenkopf bleibt schlicht und die große Textüberlagerung konkurriert mit der Silhouette. Das ist ein ausdrücklich subjektives Urteil mit den Bildern als Beleg, kein Widerspruch zur späteren tatsächlichen PO-Abnahme. Belege: `b1aa482:screenshots/final/{tag,nacht,drache}.png`; `po-acceptance.md:3–9`.
+
+**Keine neue FPS-Zahl erfunden:** Aus dem unterbrochenen forensischen Lauf wurde keine belastbare neue numerische FPS-Messung persistiert. Die tatsächlich historisch gemessenen 3,1259 FPS und die getrennte PO-Angabe 165 FPS bleiben die vorhandenen Werte. Beleg: `local-delivery-report.md:16–20`; `po-acceptance.md:5`.
+
+## Erwartungsabgleich E1–E34
+
+„Nicht anwendbar“ bedeutet: der betreffende Spielmechanismus oder Testfall war im tatsächlichen Produktauftrag nicht vorgesehen. Es bedeutet keine erfolgreiche Qualifikation dieser Pipelinefunktion für kritische Projekte. Bei gemischten Punkten wird der zutreffende Teil getrennt erläutert. Abkürzung **Spec**: `specs/onboarding-7afa3d97f8f6/spec.md`; **PRD**: danebenliegende `prd_onboarding-7afa3d97f8f6.md`; Lieferpfade beziehen sich bei auf Main fehlenden Dateien auf `b1aa482`.
+
+| ID | Bewertung | Beleg und Begründung |
+|---|---|---|
+| E1 | **erfüllt** | Sprache, Profil und Git-Identität gemeinsam vor Erstellung des Designpakets gefragt und beantwortet; Profil feature kommt vom PO. T1:L65/L72. Spätere Wiederfrage T2:L192/L246 ist ein eigener Wiederaufnahmefehler. |
+| E2 | **erfüllt** | Originaler mehrzeiliger Input im Scratch-/Intake-Weg übernommen, 3.702 Bytes, SHA256 f92e0022400484903cef29148920c2f98c5640b302faee4716efec41ada27017; T1:L130–139. Öffentliche Zusammenfassung ist ausdrücklich agent-authored, PRD:14, kein falscher Originalersatz. |
+| E3 | **erfüllt** | Advisor-/Export-Zustimmung wurde im Intake gefragt und beantwortet, T1:L65/L72; keine stillschweigende Annahme belegt. |
+| E4 | **erfüllt** | PRD, Spec und Input erstellt/promoted, unabhängige Design-Nachprüfung, eine gemeinsame signierte Freigabe. Commits `6c19207`, `3a3c816`; T2:L434/L446. Separates gestalterisches OK war ausdrücklich Nutzerauftrag. |
+| E5 | **nicht anwendbar** | Zehn offene Spielentscheidungen sind nicht belegt. Das konkrete Konzept wurde vorgelegt und bestätigt; PRD:23–24, T2:L51/L58. Keine erfundene Zehnerliste. |
+| E6 | **teilweise** | `file://`-Lauffähigkeit neu bestätigt und CDN-/Modulabhängigkeit in ADR-0001:12/16 entschieden. Ein spezifisches lokales Mehrdatei-Modulproblem wurde nicht als eigener ADR entschieden; bei Inline-Modul plus externem CDN ist es kein beobachteter Produktfehler. `forensics-final-browser.json:12–14`. |
+| E7 | **nicht anwendbar** | Kein taktbasierter Spielkern oder Save/Load. Spec:9/23/31 definiert zeitabhängige Animation und reproduzierbares Layout; keine feste Spielsimulation gefordert. |
+| E8 | **nicht anwendbar** | Keine KI im Produkt und keine spezifizierte KI-Beobachtungsgrenze. Karte:4–18 und Fitnessmodell:5–20 beweisen keine solche Isolation. Diese Fähigkeit wurde somit nicht getestet. |
+| E9 | **teilweise** | Ein-Datei-/Renderingentscheidung, PRNG- und Testkonzept dokumentiert; keine separate begründete ADR-Disposition für alle genannten Spielinhalts-/Saveversion-/Prüfstandthemen. ADR-0001:12–16, Spec:9/31/67. Die Spielthemen selbst sind außerhalb des Vertrags. |
+| E10 | **erfüllt** | PRD:92 greenfield, Modulgrenzen/Karte und scoped adoption in signierter Designbindung; Materialisierung `architecture/design-materialization.json:4–29`; T2:L434/L489. |
+| E11 | **teilweise** | Zehn prüfbare szenenspezifische Kriterien vorhanden, Spec:54–63. Teilen, robuste Spielstände, Balancing und Kinderinhalte sind kein vereinbarter Auftrag; für diese Eigenschaften gibt es keine Qualifikation. |
+| E12 | **nicht anwendbar** | Kein eigenständiges Vertical-Slice-/E-ART-Gate im freigegebenen Szenenablauf. Stattdessen ausdrücklich Konzept-OK und zwei Bildrunden; PRD:62–68, Spec:69. |
+| E13 | **teilweise** | Erster Bau per frischem Goldfish-/Worker-Dispatch T2:L502; keine direkte Hauptagenten-Produktänderung belegt. Vollständiger nativer Autor-/Modellnachweis fehlt, T2:L761; spätere Commit-only-Integration `d8dbb76`. |
+| E14 | **teilweise** | Profil feature bleibt erhalten; Designreview und definierte Gates vorhanden. Erforderlicher vollständiger Critic-/Verify-/Security-Kurs nicht erreicht. State selectedProfile/rigorHistory; T2:L394/L1481; `verify-critic.json:79`. |
+| E15 | **nicht anwendbar** | Kein separater Simulationskern; Renderer/DOM bewusst im einzigen Szenenmodul. Spec:9; Karte:1–20. Keine testgestützte DOM-freie Spielkern-Abhängigkeitsrichtung behaupten. |
+| E16 | **nicht anwendbar** | Kein Belagerungsturm-Änderungswunsch in T1–T3 oder angenommenem PRD. Belegbarer Umfang ist Voxeltempel/Drache, PRD:19–21. |
+| E17 | **nicht anwendbar** | Kein Turm, Inhaltsregelwerk oder entsprechender Re-Run-Prüfstand im Produkt; Spec:7–9/54–63. |
+| E18 | **teilweise** | Materialinput und Konzept werden aufgenommen; Branch-/Abnahmestand falsch beziehungsweise unvollständig gelesen, Git- und Actor-Antworten erneut gefragt. T1:L130–139; T2:L192/L246; T3:L114/L128/L180; C1. |
+| E19 | **nicht anwendbar** | Eine PO-Aufforderung zur unautorisierten Spec-Abkürzung ist im ausgewerteten Auftrag nicht belegt. T1–T3-PO-Records; Spec-Hashbindung bleibt `0fda8917…`. |
+| E20 | **teilweise** | Verify-Evidenz ist an `b1aa482` gebunden, aber Modus critic; Full Verify und Security-Scan nicht belegt. `evidence/verify-critic.json:22–29,72–79`. |
+| E21 | **nicht erfüllt** | Kein zurückgekehrter unabhängiger Produkt-Critic; Aufnahme verweigert, `childCreated:false`. T2:L1748; T3:L240. Designreview ersetzt Produktreview nicht. |
+| E22 | **nicht anwendbar** | Kein Namen-Teilen-Link und keine Spielstandsimporte, Spec:9/31–35. Query-Seed ist kein entsprechendes Link-/Save-Sicherheitssystem. |
+| E23 | **teilweise** | Fester Seed im Browser geprüft; keine Null-Netzwerk-Zusage, vielmehr CDN ausdrücklich vorgeschrieben. Kein Größenbudget definiert und keine vollständige neue grüne Langsuite. Spec:7; `forensics-final-browser.json:12–31`; `forensics-browser-partial.json`. |
+| E24 | **nicht anwendbar** | Kein Tempo-/Pause-/Save/Load-Spielzustand, Spec:9/31. PRNG-Test bestanden, aber kein Ersatz für diese Determinismustests: `forensics-seed-prng.json:2`. |
+| E25 | **teilweise** | Szenenmessung dokumentiert mit Umgebung und offener Laptopqualifikation; PRNG1000-Test neu reproduzierbar. Kein belegter Spielbalancing-Prüfstand und keine solchen Zielwerte. `local-delivery-report.md:16–20`; `forensics-seed-prng.json:2–14`. |
+| E26 | **nicht anwendbar** | Kein Chronik-Bildexport beauftragt. Spec:7–9/33–35; file://-Test allein qualifiziert keinen Export in allen Zielbrowsern. |
+| E27 | **nicht anwendbar** | Kein Anachronismus-Kriterium/zugehöriges Spielinhaltsformat. Realer Kriterienkatalog Spec:54–63; ein Mutationstest hierfür wurde nicht erfunden. |
+| E28 | **erfüllt** | Explizite PO-Produktabnahme T2:L1488, später T3:L128 bekräftigt; `b1aa482:.../po-acceptance.md:3–9`. Technischer Abschluss bleibt davon getrennt offen. |
+| E29 | **nicht erfüllt** | Kein typisiertes finales Architektur-/Feature-Close-Ergebnis und kein Abschluss-Backlogabgleich; State implementation, Close-Coordinator checkpointed. T3:L297; Lieferbaum `b1aa482` ohne Backlog. |
+| E30 | **teilweise** | Finaler Push beauftragt, aber vor Ausführung qualifikationsbedingt gestoppt, T2:L1488/T3:L231/L297. Kein Checkpoint-Push oder Tag ausgeführt; deren spezielle Bedingungen und origin/main-Erreichbarkeit nicht end-to-end getestet. |
+| E31 | **nicht erfüllt** | Persönliches Actorlabel im committed `accepted-delivery-contract-*.json:1`, Feld submittedBy. Private Runtime enthält außerdem Homepfad im profile-receipt:4; dessen Inhalt wird hier nicht verbreitet. |
+| E32 | **teilweise** | Signature-Befehl zeilenumbruchsicher, jedoch Rückgabe im Chat plus zusätzliche Intake-/Actor-/Restartarbeit erforderlich. T2:L427/L434; T1:L107; T3:L142/L297. Ein entsprechender Chatmodus-Gatedurchlauf ist nicht belegt. |
+| E33 | **teilweise** | Prüferindex aus vorhandenem Git/State/Transkript ohne Gedächtnisrekonstruktion erzeugt; fehlende Childbelege, native Attestierung, Security, Produkt-Critic und Full Verify verhindern vollständige Kette. `scratch/forensics-evidence-index.md:5–23`; T2:L761/L1748. |
+| E34 | **nicht erfüllt** | Kein Nutzer-README im Lieferbaum `b1aa482`; nur HTML-Steuerung und technische Spec. `b1aa482:index.html:11`, Spec:7/33–35. Spielregeln/Levelformat/Grafikexport sind für dieses Produkt nicht anwendbare Unterpunkte. |
+
+## Gesamtfazit
+
+**Für dieses Repository ist ein positiver Nettoaufwand-Nutzen nicht nachgewiesen.** Der technische Designreview hat zwei reale Widersprüche beseitigt; die Pipeline machte fehlende Nachweise sichtbar und unterließ einen falschen Abschluss. Dem stehen 101,34min belegte aktive Hauptantwortzeit, 17 PO-Nachrichten und wiederholte Integrations-/Runtime-Schleifen gegenüber; der technisch vollständige Kurs blieb trotz tatsächlicher Produktakzeptanz offen. Die Nutzerzufriedenheit ist belegt, eine Vergleichsgruppe „nativer Runner ohne Pipeline“ nicht. Belege: Designreview-1/2, Phasenmetrik, T2:L1488, T3:L297.
+
+**Bewertung aus Sicht eines kritischen Senior Developers einer EU-Bank:** Ein begrenzter Pilot mit messbaren Ausstiegskriterien ist vertretbar; ein verpflichtender Rollout für alle Teams wird durch diesen Lauf nicht getragen. Das ist eine Engineering-Bewertung, keine Rechts-/Compliancebescheinigung. Gerade komplexe oder kritische Änderungen benötigen belastbare Autorenschaft, unabhängige Verhaltensprüfung, sichere Änderungs-/Freigabebindung und rekonstruierbare Entscheidungen. Die vorhandenen Designbindungen sind eine brauchbare Basis; nicht verfügbare Hostattestierung, fehlende vollständige Review-/Scan-/Verify-Kette und unvollständiger Prüferexport sind hier P0-Qualifikationslücken. Belege: `runtime-integration.md:7–17`, `evidence/verify-critic.json:79`, T2:L1748, Prüferindex.
+
+**Was voraussichtlich skaliert, ausdrücklich geschätzt:** Einmalige Installation, Browser-/Hostqualifikation und Projektkonfiguration sind eher fixer Projekt-/Runneraufwand. Spec-Pflege, Architekturgrenzen, Review-Evidenz und Freigaben wachsen mit Änderungen und Abhängigkeiten. Wiederholte Bootstrap-/Branch-/Recoveryfehler können sich mit Teams und parallelen Checkouts vervielfachen; eine quantitative Skalierung wurde nicht getestet. Methode dieser Prognose: Zuordnung der beobachteten Fehler zu einmaligen Umgebungszuständen versus je Kandidat/Branch wiederkehrenden Bindungen. Belege für die Kategorien: T1:L40, T2:L567/L761/L1682/L1748, T3:L240/L297.
+
+**Konkrete nächste Systementscheidung:** Vor breiterer Einführung einen vollständigen runnerqualifizierten Happy Path einschließlich Branchwechsel, temporärem Verify-Checkout, unabhängigem Produkt-Critic, Security-Ausführung, finalem Verify, erforderlicher Abnahme und datensparsamem Prüferexport als messbaren Systemtest bestehen lassen. Gezielte Fault-Injection sollte Recovery ohne zusätzliche erfundene PO-Gates prüfen. Das folgt aus den beobachteten Integrationsfehlern und den eigenen Beweisansprüchen des Operating Model; es ist kein Auftrag, diesen Produktlauf jetzt nachträglich zu schließen. Belege: Operating Model:392–449; T2:L1682/L1748/L1813; T3:L297.
+

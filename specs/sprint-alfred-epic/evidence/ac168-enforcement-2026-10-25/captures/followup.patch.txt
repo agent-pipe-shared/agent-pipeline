@@ -1,0 +1,147 @@
+diff --git a/plugins/pipeline-core/hooks/stop-fanout.mjs b/plugins/pipeline-core/hooks/stop-fanout.mjs
+index 31927937b..198fca666 100644
+--- a/plugins/pipeline-core/hooks/stop-fanout.mjs
++++ b/plugins/pipeline-core/hooks/stop-fanout.mjs
+@@ -60,8 +60,8 @@
+  * governor, the ledger append and the configuration for in-process callers. There is no spawn seam: there is
+  * nothing to inject.
+  */
+-import { lstatSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+-import { createHash, randomUUID } from "node:crypto";
++import { readFileSync, statSync } from "node:fs";
++import { createHash } from "node:crypto";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -71,6 +71,7 @@ import { PLUGIN_ROOT_PLACEHOLDER, evaluateFanoutStop } from "../lib/fanout-gover
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { LEGACY_STATE, NEUTRAL_STATE } from "../lib/project-authority.mjs";
+ import { loadSliceQueue } from "../lib/slice-queue.mjs";
++import { readPrivateJson, writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
+ 
+ const RUNNER = "claude";
+ const MAX_RECORD_BYTES = 1024 * 1024;
+@@ -86,27 +87,18 @@ function advisoryMarker(cwd, sessionId) {
+ 
+ function priorAdvisoryFingerprint(path) {
+   try {
+-    const info = lstatSync(path);
++    const info = statSync(path);
+     if (!info.isFile() || info.size > ADVISORY_MARKER_MAX_BYTES) return null;
+-    const record = JSON.parse(readFileSync(path, "utf8"));
++    const record = readPrivateJson(path, "fanout advisory marker");
+     return typeof record?.fingerprint === "string" && /^[a-f0-9]{64}$/u.test(record.fingerprint) ? record.fingerprint : null;
+   } catch { return null; }
+ }
+ 
+ function writeAdvisoryFingerprint(path, fingerprint) {
+-  const directory = dirname(path);
+-  let temporary;
+   try {
+-    mkdirSync(directory, { recursive: true });
+-    if (!lstatSync(directory).isDirectory()) return false;
+-    temporary = join(directory, `.stop-fanout-${randomUUID()}.tmp`);
+-    writeFileSync(temporary, JSON.stringify({ fingerprint }), { flag: "wx", mode: 0o600 });
+-    renameSync(temporary, path);
++    writePrivateJsonAtomic(path, { fingerprint });
+     return true;
+-  } catch {
+-    if (temporary) { try { unlinkSync(temporary); } catch { /* no temporary file */ } }
+-    return false;
+-  }
++  } catch { return false; }
+ }
+ 
+ const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+diff --git a/plugins/pipeline-core/hooks/stop-fanout.test.mjs b/plugins/pipeline-core/hooks/stop-fanout.test.mjs
+index a46003041..6bceab45c 100644
+--- a/plugins/pipeline-core/hooks/stop-fanout.test.mjs
++++ b/plugins/pipeline-core/hooks/stop-fanout.test.mjs
+@@ -4,7 +4,7 @@
+ // (queue, evidence, and a stand-in for the git common dir); the real repository's private state is never touched.
+ import assert from "node:assert/strict";
+ import { devNull, tmpdir } from "node:os";
+-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { spawnSync } from "node:child_process";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -165,6 +165,17 @@ check("advisory mode emits the governor's advisory text as systemMessage/additio
+     const changed = hook(box, stopPayload(box), { config: configFor(box, { mode: "advisory" }) });
+     assert.match(JSON.parse(changed.stdout).systemMessage, /2 ready slice\(s\)/u);
+   });
++  withBox({}, (box) => {
++    const outside = mkdtempSync(join(tmpdir(), "fanout-outside-"));
++    try {
++      symlinkSync(outside, join(box.root, ".claude"), "dir");
++      const config = configFor(box, { mode: "advisory" });
++      assert.match(JSON.parse(hook(box, stopPayload(box), { config }).stdout).systemMessage, /^FANOUT-ADVISORY:/u);
++      assert.match(JSON.parse(hook(box, stopPayload(box), { config }).stdout).systemMessage, /^FANOUT-ADVISORY:/u,
++        "unsafe marker parent fails open and does not suppress real advice");
++      assert.deepEqual(readdirSync(outside), [], "a linked parent receives no marker or temporary write");
++    } finally { rmSync(outside, { recursive: true, force: true }); }
++  });
+ });
+ 
+ check("no queue configured: the governor gets 'no queue', the hook is silent", () => {
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 19e30e136..25fb5a240 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -894,7 +894,14 @@ export function isSafeExactPassiveFile(raw, root, extraRoots = []) {
+ function isSafeExactGrepArgs(args, root, extraRoots = []) {
+   const flags = new Set(["-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-E", "--extended-regexp", "-v", "--invert-match", "-c", "--count", "-H", "--with-filename", "-h", "--no-filename", "-o", "--only-matching"]); // TR-B-F (T74): match-output spellings; the operand loop below is unchanged.
+   let index = 0;
+-  while (flags.has(args[index])) index += 1;
++  let maxCountSeen = false;
++  while (flags.has(args[index]) || args[index] === "-m" || args[index] === "--max-count") {
++    if (flags.has(args[index])) { index += 1; continue; }
++    if (maxCountSeen || !/^[1-9][0-9]{0,2}$/u.test(args[index + 1] ?? "")
++      || Number(args[index + 1]) > 500) return false;
++    maxCountSeen = true;
++    index += 2;
++  }
+   const endedOptions = args[index] === "--";
+   if (endedOptions) index += 1;
+   const pattern = args[index++];
+diff --git a/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs b/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+new file mode 100644
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs
+@@ -0,0 +1,36 @@
++// SPDX-License-Identifier: SUL-1.0
++// A bounded grep read must not spend a guard refusal and a second dispatch turn.
++import assert from "node:assert/strict";
++import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { evaluateLifecycleReadyGuard } from "./evaluate.mjs";
++import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
++
++test("bounded max-count grep admits an exact passive file and retains denials", () => {
++  const base = mkdtempSync(join(tmpdir(), "ac168-grep-"));
++  const root = join(base, "project");
++  try {
++    mkdirSync(root);
++    mkdirSync(join(root, ".aws"));
++    writeFileSync(join(root, "scan.txt"), "needle\nneedle\n");
++    writeFileSync(join(base, "outside.txt"), "needle\n");
++    writeFileSync(join(root, ".aws", "credentials"), "synthetic fixture\n");
++    const admitted = (command) => isReadOnlyDiagnosticCommand(command, root);
++    assert.equal(admitted("grep -n -m 1 needle scan.txt"), true);
++    assert.equal(admitted("grep --max-count 2 -n needle scan.txt"), true);
++    const guard = evaluateLifecycleReadyGuard({ tool_name: "Bash", tool_input: { command: "grep -n -m 1 needle scan.txt" } }, {
++      projectDir: root,
++      observeGovernanceScopeFn: () => ({ requiresEnforcement: true }),
++      requireProjectOnboardingReadyFn() { throw new Error("passive read must not invoke lifecycle admission"); },
++    });
++    assert.equal(guard.exitCode, 0, guard.stderr);
++    assert.equal(admitted("grep -m 0 needle scan.txt"), false);
++    assert.equal(admitted("grep -m 501 needle scan.txt"), false);
++    assert.equal(admitted("grep -m 1 -m 2 needle scan.txt"), false);
++    assert.equal(admitted("grep -m 1 needle .aws/credentials"), false);
++    assert.equal(admitted("grep -m 1 needle scan.txt > output.txt"), false);
++    assert.equal(admitted("grep -m 1 needle $(touch scan.txt)"), false);
++  } finally { rmSync(base, { recursive: true, force: true }); }
++});

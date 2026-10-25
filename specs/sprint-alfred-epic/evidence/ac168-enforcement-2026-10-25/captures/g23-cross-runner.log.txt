@@ -1,0 +1,25 @@
+command: node --require ./scratch/ac168-safe-preload.cjs --test plugins/pipeline-core/lib/guard/g23-cross-runner-passive-matrix.test.mjs
+label: ac168-g23-cross-runner
+exitCode: 0
+head: 62008d6bd39f68aa849e7257cdc3161b59222ebb
+tree: e4c9942436dd4e4e4f6f29c92ea513f590027b35
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ G23PM01 supported fixture enrollment survives fresh-process readback (359.214383ms)
+✔ G23PM02 exact repository and scratch reads: relative and absolute consumer envelopes (9195.640442ms)
+✔ G23PM03 genuinely missing in-root exact file stays denied as missing on every route (4228.737484ms)
+✔ G23PM04 nonexistent credential names stay denied for credentials, never absence (4272.92635ms)
+✔ G23PM05 external exact operand is admitted by real D96 policy and readmitted after restart (4945.981899ms)
+✔ G23PM06 symlink physical credential boundary and safe local alias (4213.991849ms)
+✔ G23PM07 native exact Grep and bounded listing controls retain SEC-11 (3490.471936ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31592.602351
+
+--- stderr ---

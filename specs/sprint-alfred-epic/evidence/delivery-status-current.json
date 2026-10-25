@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-g23-current/snapshot.json",
-  "sha256": "a072e0d0876624cd46926c834f32bcf57b3ed997192d7ef3395763884bf962d8",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-greenfield-second-run/snapshot.json",
+  "sha256": "e3458e13b4513a0945b7f7960fcea4ba57d48ec9db9d502e9f9e372ed81150d8",
   "measuredAt": "2026-10-25",
-  "head": "62008d6bd39f68aa849e7257cdc3161b59222ebb",
+  "head": "0b80f4f0908faf49eec36fcb5549e63ed80c44ea",
   "counts": {
-    "25": 2,
-    "50": 19,
-    "75": 176,
+    "25": 11,
+    "50": 22,
+    "75": 174,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 72.08,
-  "total": 197,
-  "scope": "Same197 identities. G23 current original qualification integrated; one existing row50→75 under the recorded native-only rubric. Native duties, review and acceptance remain open."
+  "index": 69.69,
+  "total": 207,
+  "scope": "D152: all31 second-run high findings+14POobservations mapped; ten distinct new0.7.0 outcomes added at25, two current read/help clauses reopened75→50. Other retained stages unchanged; no promotion from inert code or report prose."
 }

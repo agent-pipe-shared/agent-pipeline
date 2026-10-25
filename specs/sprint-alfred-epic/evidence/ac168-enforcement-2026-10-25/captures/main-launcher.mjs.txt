@@ -1,0 +1,9 @@
+import {spawnSync} from 'node:child_process';
+import {resolve} from 'node:path';
+const preload=resolve('scratch/clones/ac168-enforcement-20261025/scratch/ac168-safe-preload.cjs');
+const suite=process.argv[2];
+const suites={stop:'plugins/pipeline-core/hooks/stop-fanout.test.mjs',c1:'plugins/pipeline-core/scripts/elephant-context-measure.test.mjs',consumer:'harness/scripts/check-consumer-safe-paths.test.mjs',original:'plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs',grep:'plugins/pipeline-core/lib/guard/grep-max-count-read.test.mjs'};
+if(!Object.hasOwn(suites,suite))throw new Error('unknown owned suite');
+const child=spawnSync(process.execPath,['--require',preload,'plugins/pipeline-core/scripts/capture-evidence.mjs','--out',`scratch/agent-out/ac168-main-check/${suite}.log`,'--label',`AC168-MAIN-${suite}`,'--',process.execPath,'--require',preload,'--test',suites[suite]],{encoding:'utf8',timeout:420000,maxBuffer:16*1024*1024});
+if(child.error||child.signal||!Number.isInteger(child.status))throw new Error('capture did not settle');
+process.stdout.write(child.stdout??'');process.stderr.write(child.stderr??'');process.exitCode=child.status;

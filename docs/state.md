@@ -2,6 +2,50 @@
 
 > Current runner-neutral handover. Older state text remains in Git and the [October25 archive](../specs/sprint-alfred-epic/plans/state-archive-before-active-goal-2026-10-25.md). Current human matters: [PO queue](../specs/sprint-alfred-epic/plans/po-pending-codex-2026-10-24.md).
 
+## Latest active goal and matrix — second Greenfield intake
+
+The active PO goal is a local candidate with every deliverable at75, then its
+authorized stamp and feature-branch push for the other PC (D153). An ordinary
+turn interruption does not restart bootstrap or close the feature.
+
+Current authoritative matrix: **207items,174at75,22at50,11at25;33below75,
+index69.69%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
+The second three-runner analyses and no-pipeline control were fully collected.
+All31high report clauses and14POobservations have dispositions and existing AC
+relations. D152 puts every P0/P1/Kritisch/Wichtig/Hoch in0.7.0. Ten distinct
+outcomes are additional rows; current read/help gaps reopen two75rows to50.
+No earlier identity disappears, and lower-priority candidates do not activate0.7.1.
+[Finding ledger and new items](../specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/README.md).
+
+AC168 is integrated at `0b80f4f0908faf49eec36fcb5549e63ed80c44ea`, with exact
+six-file postimages and Main66pass/1typed native skip, supporting25→50.
+The PO applied the protected pair and made the human-only commit after the
+active backstop refused the agent commit. [Custody](../specs/sprint-alfred-epic/evidence/ac168-enforcement-2026-10-25/README.md).
+Live10% and remaining cause/carrier criteria are open.
+
+Main currently has checked G24/R3/G27 proposals applied but not yet committed
+or fully qualified as a combined Main candidate. They get no matrix promotion.
+G8's same-owner clone has a14-path partial D150 Model producer/readback kernel;
+broad Model regression is RED and author/consumer/valid-fixture work remains.
+Do not integrate its deny-only consumer or claim original native review.
+Original controller calibration5/5 is green in its clone; two private-Critic
+bindings remain RED, so the full216 course is unrun.
+
+Full original guard at0b80 counted392/376pass/13fail/3native skips, with eight
+fixture placement errors and five Source/examiner discrepancies. D151 now
+permits unique ordinary `/tmp` fixtures outside Git/credential ancestry; private
+authority homes remain separately validated. Preserve every failed attempt.
+Known repeated-glob/test-filename expectations are stale; READY opaque-mention
+and inventory admission need actual phase-aware reconciliation, not blanket
+expectation flips. The remaining recovery/Source questions and parallel work
+continue under D143/D148/D149 without fabricated host/model/budget receipts.
+
+All material decisions through D153 are in the
+[fix-wave record](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-25-fix-wave.md).
+PRD/Spec, installed build and late single Critic/max3diff-review policy remain.
+The session-entry and earlier counts below are historical readbacks, superseded
+by this section and the current pointer.
+
 ## Current session readback — 2026-10-25
 
 The PO confirmed this is a new session with the new version and is running
@@ -62,8 +106,9 @@ attempts; no synthetic result is installed-runner acceptance.
 
 ## Start here after the Codex host restart
 
-Stay on THIS machine and continue the active goal. The PO cancelled the PC
-transfer. The local test candidate is already committed and stamped:
+Stay on THIS machine and continue the active goal. The initial PC transfer
+was cancelled; D153 now requests a feature push after the next75-ready stamp.
+The earlier local test candidate is already committed and stamped:
 
 | Identity | Value |
 |---|---|
@@ -149,9 +194,11 @@ Historical pre-G35 composed0d2 compatibility was GREEN: original unchanged gener
 
 G33 prevention preserves only a fully validated closed/discarded lifecycle timestamp during push challenge/approval. Safe typed recovery of already-damaged States is NOT implemented/qualified; other post-close audit writers need same-family assessment. Broad continuity307/308 has OBC264 RED with no baseline attribution; a duplicate run was interrupted130. Do not bless drift using an approval-shaped record.
 
-G8 independent design-review producer/active consumer custody is absent. The [portable INERT proposal](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/README.md) preserves the contract/schemas/prototype and pending PO choice: existing Source/model-registry origin readback (recommended; no new principal/key/ledger) versus same-process review/presentation. Preparation5/5 is NOT genuine independent review. No accepted ADR, merged prototype, new design-open or Spec change. Both active design approval consumers eventually need verified producer custody.
+G8 independent design-review producer/active consumer custody is absent from Main. D144 selected existing Source/model-registry origin/readback, with no new principal/key/ledger. The [portable INERT proposal](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/README.md) preserves earlier preparation;5/5 is NOT genuine independent review. The current same-owner clone adds fail-closed consumer admission and continues original producer/readback implementation. Active e2e reached9/14 pass and5 positive custody failures; it is not Main-ready. D147 explicitly permits a fully regenerated same-owner briefing with unique Source-validated test homes under the PO-restored private parent, preserving attempts and all other boundaries. No accepted ADR, merged prototype, design reopen or Spec change follows.
 
-Original controller full run:216 callbacks/12children,201pass15fail. Isolated identity follow-up:15selected,8pass7fail (five calibration bindings/two private-Critic lifecycle bindings). No full216 green and neither fixture-only proposal imported. [Portable partial reports and inert proposals](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/README.md) preserve the actual unresolved cases. Preserve assertions and genuine Source producers; no forged private lifecycle/native PASS. Other open work is in the remaining22 matrix rows, including bounded Reader course/owner fields, G18/G20/G22/G23/G24 and actual native qualification. Do not silently defer it to inflate progress.
+Original controller full run:216 callbacks/12children,201pass15fail. Earlier isolated follow-up:15selected,8pass7fail. The PO restored `/run/user/1000/ap-g17`, readback owner skar667/mode700. Current selected replay settled7/7 callbacks and failed7: five missing public feature-package registrations after genuine committed calibration, two actual private-Critic binding refusals. The same owner is fixing fixture prerequisites and preserves all examiners; full216 only after selected GREEN. No fixture proposal is integrated. [Earlier portable partial reports](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/README.md) remain historical evidence. Other open work is in the remaining21 matrix rows. No forged lifecycle/native PASS or silent deferral.
+
+D146 resolves scanner R3: suppression is gated on reproduction and exact-value review; the agent may run the real local scanner and prepare sanitized evidence. Unknown historical identity stays unresolved, push authority separate. The real gitleaks binary responds locally with build-time version text; no historical reproduction result is inferred. The next scanner fanout briefing is prepared. AC168's partial-green advice/provenance patch is being completed with safe advisory storage and a reproduced bounded grep false-positive repair; Main and matrix remain unchanged until exact package integration. All current work follows the [21-row fanout plan](../specs/sprint-alfred-epic/plans/readiness-fanout-2026-10-25.md).
 
 Test-isolation incident: earlier signing-help tests accessed real account participant namespace, including anchor-byte reads/possible writes; those results are excluded and replaced by synthetic identity/private-root qualification. Six processes/21 owner constructions are known; exact effects/other private-plane access unknown. Human metadata audit found220unattributed entries,contentRead=false,cleanupPermission=false; raw JSON remains ignored/local,SHA256a591ced46ffd8ad835a5905c4ab1e9f4f1b2ad9e4a9114b2fc1d46b129110164. Do not inspect anchors/keys or delete uncertain entries. Later worker Main helper/test scope violation was stopped; exact helper reverted before isolated repair. No absence-of-side-effects assertion is made for that interrupted outer process. Clean Git does not prove private-profile cleanup.
 
