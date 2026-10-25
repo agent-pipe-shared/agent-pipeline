@@ -1,0 +1,15 @@
+# Windows host ACL scope — handover
+
+- Outcome: partial local delivery; no commit. Clone HEAD: `df5926044c3774151931d6a5b8fbcbc73615b66c`.
+- Registered case identities preserved: readiness remains WAR001–WAR009; missing/malformed observation assertions are in WAR007, and WAR003 now returns valid synthetic observations for unaffected paths and asserts each mapped path/reason.
+- Final readiness command: `node --import ./scratch/windows-acl-test-identity.mjs --test ./plugins/pipeline-core/lib/windows-authority-readiness.test.mjs` — exit 0, 9 passed, 0 skipped; [capture](windows-acl-readiness-exact-faults-final.json).
+- Earlier 10-case readiness captures are superseded: [first](windows-acl-readiness-green.json), [registration correction](windows-acl-readiness-registration-final.json). Do not use their identity mapping.
+- Final authority pin: exit 0, 8 native Windows skips; [capture](windows-acl-ancestor-private-negative-final.json). WAA008 creates then explicitly foreign-grants a private state directory; it no longer infers private insecurity from a writable parent.
+- Final requester pin: exit 0, 4 structural passes and 9 native Windows skips; [capture](windows-acl-requester-private-negative-final2.json). Writable `.git` parents are positive controls; private refusals now inject a grant on an existing private state/namespace.
+- Other focused evidence remains unchanged: helper digest exit 0 (4 passes, 1 Windows skip); type-cache exit 0 (4 passes, 9 Windows/PowerShell skips); process observer exit 0 (4 passes, 1 Darwin skip); consumer-safe-paths exit 0 (9 passes); diff check exit 0.
+- Native Windows ACL behavior remains unverified, not PASS; Windows qualification is pending. No additional native suites were rerun for this registration correction.
+- Complete patch: `windows-host-acl-scope-20261025.patch`, SHA256 `58bda1502bbd13ceddb52d9c2b55844fa94039ac490d45aed00bcfb3fd7a9e78`.
+- Per-file custody: [windows-acl-custody-hashes-final3.json](windows-acl-custody-hashes-final3.json).
+- Initial Main preflight used the default sandbox boundary despite the host-boundary-from-first-call requirement. It was not repeated; subsequent Node/Git/tests used the escalated boundary.
+- Preflight returned ready; modelRoleBootstrap was unavailable (`MODEL-ROLE-SESSION-IDENTITY-CONFLICT`). No model/native authority claim is made.
+- W1 native qualification and independent review, integrated Verify, release checks, and PO acceptance remain pending. Resource headroom is unknown; no measurement was supplied. No separate quick route was configured.

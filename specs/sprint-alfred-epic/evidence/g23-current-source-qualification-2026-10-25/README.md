@@ -1,0 +1,9 @@
+# G23 original read matrix — current Source qualification
+
+Integrated Source `62008d6bd39f68aa849e7257cdc3161b59222ebb`, tree `e4c9942436dd4e4e4f6f29c92ea513f590027b35`. The normal active-hook commit succeeded. The exact observer patch was requalified on Source7d3659ebe plus that single test postimage: original23pass/1nativeU3skip,0fail,0todo; consumer-safe-paths9/9. The committed test blob and all artifact derivatives are bound in [custody](custody.json).
+
+The observer now rejects child spawn failures, signals, invalid exits and malformed/partial output instead of treating them as implicit ALLOW. Every original acceptance examiner remains. The retained [post-stamp package](../post-stamp-handoff-2026-10-25/README.md) preserves the original observer RED/GREEN chronology; the earlier original5/5 capture is not substituted for the complete current23/1 result. Main postimage SHA09b63b77 matches the qualified file exactly; no integration conflict was resolved.
+
+Synthetic userInfo/homedir/tmpdir/HOME were preloaded before capture/test imports and descendants with the inspected Source helper; no actual userInfo call is used by that helper and its optional external private-parent override was absent. Exact wrapper/helper bytes are retained as inert text. The new clone preserved the old clone and attempts. Guard grammar refusals are documented in the owner report, not counted as product failures or replaced with fabricated native evidence.
+
+The original item was adjudicated by the PO on2026-10-23 as built except the host clause. This counted current original pin closes its missing focused qualification. Under the operative native-only readiness rubric, the existing row moves50→75; this is focused readiness, not acceptance or close. U3 native Windows/interop, actual installed-host results, the scheduled late Critic batch, final Verify/Security and PO acceptance remain open. No Windows, native model, resource-headroom, or release PASS is claimed.

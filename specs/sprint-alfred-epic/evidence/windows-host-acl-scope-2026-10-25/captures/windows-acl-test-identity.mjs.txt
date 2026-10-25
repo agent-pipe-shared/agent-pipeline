@@ -1,0 +1,19 @@
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const syntheticHome = resolve(process.cwd(), 'scratch', 'test-home');
+const syntheticTemp = resolve(process.cwd(), 'scratch', 'test-temp');
+mkdirSync(syntheticHome, { recursive: true });
+mkdirSync(syntheticTemp, { recursive: true });
+process.env.HOME = syntheticHome;
+process.env.USERPROFILE = syntheticHome;
+process.env.HOMEDRIVE = process.platform === 'win32' ? syntheticHome.slice(0, 2) : '';
+process.env.HOMEPATH = process.platform === 'win32' ? syntheticHome.slice(2) : '';
+process.env.TMP = syntheticTemp;
+process.env.TEMP = syntheticTemp;
+const observed = os.userInfo();
+os.userInfo = () => ({ ...observed, username: 'pipeline-test-user', homedir: syntheticHome });
+os.homedir = () => syntheticHome;
+syncBuiltinESMExports();

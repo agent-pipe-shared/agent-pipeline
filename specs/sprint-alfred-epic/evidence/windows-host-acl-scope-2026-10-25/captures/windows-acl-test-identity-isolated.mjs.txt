@@ -1,0 +1,38 @@
+import os from 'node:os';
+import { syncBuiltinESMExports } from 'node:module';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const preloadPath = fileURLToPath(import.meta.url);
+const scratch = dirname(preloadPath);
+const syntheticHome = join(scratch, 'isolated-test-home');
+const syntheticTemp = join(scratch, 'isolated-test-temp');
+mkdirSync(syntheticHome, { recursive: true });
+mkdirSync(syntheticTemp, { recursive: true });
+
+process.env.HOME = syntheticHome;
+process.env.USERPROFILE = syntheticHome;
+process.env.HOMEDRIVE = process.platform === 'win32' ? syntheticHome.slice(0, 2) : '';
+process.env.HOMEPATH = process.platform === 'win32' ? syntheticHome.slice(2) : '';
+process.env.TMPDIR = syntheticTemp;
+process.env.TMP = syntheticTemp;
+process.env.TEMP = syntheticTemp;
+
+const syntheticUser = Object.freeze({
+  uid: process.platform === 'win32' ? -1 : 42420,
+  gid: process.platform === 'win32' ? -1 : 42420,
+  username: 'pipeline-test-user',
+  homedir: syntheticHome,
+  shell: process.platform === 'win32' ? null : '/bin/sh',
+});
+os.userInfo = () => ({ ...syntheticUser });
+os.homedir = () => syntheticHome;
+os.tmpdir = () => syntheticTemp;
+syncBuiltinESMExports();
+
+const inheritedOptions = process.env.NODE_OPTIONS ?? '';
+const preloadOption = `--import=${import.meta.url}`;
+if (!inheritedOptions.includes(preloadOption)) {
+  process.env.NODE_OPTIONS = [inheritedOptions, preloadOption].filter(Boolean).join(' ');
+}

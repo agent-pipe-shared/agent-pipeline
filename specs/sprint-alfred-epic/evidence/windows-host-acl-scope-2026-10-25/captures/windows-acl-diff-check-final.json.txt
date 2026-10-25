@@ -1,0 +1,9 @@
+command: git diff --check
+label: windows-acl-diff-whitespace-check-final
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+
+--- stderr ---

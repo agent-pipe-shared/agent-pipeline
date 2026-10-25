@@ -1,0 +1,23 @@
+command: node --import ./scratch/windows-acl-test-identity-isolated.mjs --test ./plugins/pipeline-core/lib/native-platform-process-observer.test.mjs
+label: windows-acl-process-observer-isolated-identity
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ NPO001 shared native adapter retains actual Linux observation and negative identity controls (4.887649ms)
+✔ NPO002 native Windows observer rejects JSON/native-platform claims on foreign hosts (0.690221ms)
+﹣ NPO003 live native shared observer selects actual Darwin kernel; Linux API stays Linux-only (0.198477ms) # SKIP
+✔ NPO004 actual Windows program branch keeps executable/module/argv/cwd custody and rejects drift (1.01071ms)
+✔ NPO005 Darwin program bridge consumes observed argv/cwd and keeps prerequisite/drift failures closed (0.696132ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 112.637929
+
+--- stderr ---

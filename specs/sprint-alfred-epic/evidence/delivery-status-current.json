@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-agy-install-matcher/snapshot.json",
-  "sha256": "e574755d1f5691ecc23a24073ed2c35d8c1dbf44b19f1294bbab38609eeb9b14",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-g23-current/snapshot.json",
+  "sha256": "a072e0d0876624cd46926c834f32bcf57b3ed997192d7ef3395763884bf962d8",
   "measuredAt": "2026-10-25",
-  "head": "0b1fc7699f5d677693756759acf1e7d342667135",
+  "head": "62008d6bd39f68aa849e7257cdc3161b59222ebb",
   "counts": {
     "25": 2,
-    "50": 20,
-    "75": 175,
+    "50": 19,
+    "75": 176,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 71.95,
+  "index": 72.08,
   "total": 197,
-  "scope": "Same197 identities/stages; existing G6 actual AGY install matcher regression qualified. Native retry pending."
+  "scope": "Same197 identities. G23 current original qualification integrated; one existing row50→75 under the recorded native-only rubric. Native duties, review and acceptance remain open."
 }

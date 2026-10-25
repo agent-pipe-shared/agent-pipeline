@@ -1,0 +1,26 @@
+command: node --import ./scratch/windows-acl-test-identity.mjs --test ./plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
+label: windows-acl-native-authority-ancestor-pin-private-negative
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+﹣ WAA001 control: the fixture ancestor really grants a foreign principal write and ordinary observation accepts it (1.740867ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA002 an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts (0.438242ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA003 foreign write grants at and below the repository root remain observed but do not gate ordinary paths (0.436328ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA004 a reparse point or a non-directory ancestor above the root is still refused (0.710009ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA005 the boundary input is closed: unknown keys and relative or malformed roots are refused before any native call (4.86315ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA006 the native helper re-proves the relation itself: a path that is not strictly above the root is refused even if the JS layer is bypassed (1.734335ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA007 verify-journal registration (the Full Verify journal step) accepts a foreign-writable ancestor above the repository root (0.650676ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ WAA008 verify-journal still refuses foreign grants inherited by Pipeline-owned private state (0.835087ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and reparse fixtures need a win32 host; owner: ALF-C-WIN-ANCESTOR Windows qualification; due: 2026-10-31; runs on: any native Windows host
+ℹ tests 8
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 160.498731
+
+--- stderr ---

@@ -1,0 +1,30 @@
+command: node --import ./scratch/windows-acl-test-identity-isolated.mjs --test ./plugins/pipeline-core/lib/windows-native-type-cache.test.mjs
+label: windows-acl-type-cache-isolated-identity
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+✔ both native helpers carry the identical loader block and compile only through it (3.402691ms)
+✔ the loader loads only verified bytes and never uses the temp directory (0.589229ms)
+﹣ first call compiles and publishes a verified cache entry; the second call loads it without compiling (0.147881ms) # fixed Windows PowerShell is unavailable on this platform
+﹣ a cached DLL whose bytes do not match its name is refused, the call falls back, and the result is unchanged (0.153963ms) # fixed Windows PowerShell is unavailable on this platform
+﹣ an insecure cache directory is never trusted or written to; the call falls back to the in-memory compile (0.193869ms) # fixed Windows PowerShell is unavailable on this platform
+﹣ the PowerShell directory policy agrees with assessWindowsPrivatePath on secure and insecure directories (0.145156ms) # fixed Windows PowerShell is unavailable on this platform
+﹣ two parallel first calls both succeed and leave only verified entries and no build files (0.169362ms) # fixed Windows PowerShell is unavailable on this platform
+✔ the loader demands the source stamp before it loads anything and never turns a mismatch into a persistent denial (0.47936ms)
+✔ both backends pin the exact digest of the helper they execute (1.243943ms)
+﹣ a freshly published entry carries the sha256 of the exact source it was compiled from (0.378919ms) # host-limitation: fixed Windows PowerShell is unavailable on this host; owner Coordinator, due 2026-10-19; a native Windows host runs this case
+﹣ a planted entry with a valid self-hash and key but a different source digest is not loaded; the call falls back (0.191914ms) # host-limitation: fixed Windows PowerShell is unavailable on this host; owner Coordinator, due 2026-10-19; a native Windows host runs this case
+﹣ a planted entry with a valid self-hash and key but no source stamp at all is not loaded; the call falls back (0.114819ms) # host-limitation: fixed Windows PowerShell is unavailable on this host; owner Coordinator, due 2026-10-19; a native Windows host runs this case
+﹣ a planted valid-hash entry that lacks the expected type falls back instead of failing persistently (0.182777ms) # host-limitation: fixed Windows PowerShell is unavailable on this host; owner Coordinator, due 2026-10-19; a native Windows host runs this case
+ℹ tests 13
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 9
+ℹ todo 0
+ℹ duration_ms 114.620541
+
+--- stderr ---

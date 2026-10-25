@@ -1,0 +1,18 @@
+# Windows host ACL scope — evidence handover
+
+- Source was integrated by the parent as `as7d3659ebe`; no production changes were made in this evidence correction. Qualification clone base: `df5926044c3774151931d6a5b8fbcbc73615b66c`.
+- Earlier captures are isolation-limited and retained: the old preload called real `os.userInfo()` before replacement, did not propagate itself through `NODE_OPTIONS`, and did not isolate `TMPDIR`/Linux `os.tmpdir()`. Do not claim those runs had no real user-info read.
+- Corrected preload: `scratch/windows-acl-test-identity-isolated.mjs`. It constructs synthetic userInfo without calling the original; sets HOME/USERPROFILE/TMPDIR/TMP/TEMP; overrides and syncs `os.userInfo`, `os.homedir`, and `os.tmpdir` before tests; propagates its encoded `import.meta.url` via NODE_OPTIONS.
+- Corrected preload SHA256: `2935b840993c8a3de11d8c242979ecacb9dae0178477d8e489897212d300dc11`; [machine capture](windows-acl-identity-preload-hash.json).
+- Seven final focused suites were rerun with the corrected preload before both capture runner and test process:
+  - Readiness: exit 0, 9 passed, 0 skipped; [capture](windows-acl-readiness-isolated-final.json). Registered IDs remain WAR001–WAR009.
+  - Authority pin: exit 0, 8 native Windows skips; [capture](windows-acl-ancestor-isolated-final.json).
+  - Requester pin: exit 0, 4 structural passes, 9 native Windows skips; [capture](windows-acl-requester-isolated-final.json).
+  - Helper digest: exit 0, 4 passed, 1 Windows skip; [capture](windows-acl-helper-digest-isolated-final.json).
+  - Native type-cache: exit 0, 4 passed, 9 Windows/PowerShell skips; [capture](windows-acl-type-cache-isolated-final.json).
+  - Process observer: exit 0, 4 passed, 1 Darwin skip; [capture](windows-acl-process-observer-isolated-final.json).
+  - Consumer-safe-paths: exit 0, 9 passed, 0 skipped; [capture](windows-acl-consumer-safe-isolated-final.json).
+- Native Windows ACL behavior remains unverified, not PASS. Windows qualification, independent review, integrated Verify, release checks, and PO acceptance remain pending.
+- Complete patch and per-file custody remain unchanged: [patch](windows-host-acl-scope-20261025.patch), SHA256 `58bda1502bbd13ceddb52d9c2b55844fa94039ac490d45aed00bcfb3fd7a9e78`; [hash manifest](windows-acl-custody-hashes-final3.json).
+- Initial Main preflight used the default sandbox boundary despite the host-boundary-from-first-call requirement. It was not repeated; subsequent Node/Git/tests used the escalated boundary.
+- Preflight returned ready; modelRoleBootstrap was unavailable (`MODEL-ROLE-SESSION-IDENTITY-CONFLICT`). No model/native authority claim is made. Resource headroom remains unknown; no project measurement was supplied.

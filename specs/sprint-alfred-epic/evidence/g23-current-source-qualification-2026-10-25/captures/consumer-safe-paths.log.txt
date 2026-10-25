@@ -1,0 +1,27 @@
+command: <host-path> --import <repo-root>/plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs --test <repo-root>/harness/scripts/check-consumer-safe-paths.test.mjs
+label: consumer-safe-paths9
+exitCode: 0
+head: 7d3659ebe32778d4a8edf0852cab43972950a652
+tree: 27018583532b6e3a837c7f75210ea88117c6df6d
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.630237ms)
+✔ a clean fixture passes (0.957419ms)
+✔ an allowlisted occurrence passes (0.412373ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.43193ms)
+✔ multiple prefix hits on one line each produce a finding (0.242801ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.358481ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (2.388327ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (285.267145ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (22.296427ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 441.845843
+
+--- stderr ---

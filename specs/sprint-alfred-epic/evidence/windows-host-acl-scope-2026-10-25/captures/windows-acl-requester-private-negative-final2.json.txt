@@ -1,0 +1,30 @@
+command: node --import ./scratch/windows-acl-test-identity.mjs --test ./plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+label: windows-acl-native-requester-pin-private-negative-final
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+﹣ control: the fixture base really grants a foreign principal write and ordinary observation accepts it (0.817223ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ requester storage walks the ancestors of a repository path with the repository root as boundary and keeps its CAS deterministic (0.123945ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ createControlledMethodRuntimeFixture is not refused by a foreign-writable ancestor strictly above the repository root (0.110951ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ a foreign write grant at the repository root does not block requester storage or the controlled fixture (0.104819ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ a foreign-writable common directory is accepted but an explicit private-state grant is refused (0.178259ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ case A: readAuthorityNamespace is not refused by a foreign-writable ancestor strictly above the repository root (0.187736ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+﹣ case A control: private authority remains strict while paths outside its namespace remain refused (0.160885ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+✔ case B (structural): the OSV bridge bounds only osvWindowsPrivate with the repository root, after a lexical containment check (2.561215ms)
+✔ case C (structural): the host-process journal bounds only the three repository-bearing verification readers (8.390832ms)
+✔ case D (structural): readModuleContext bounds its ancestor walk only with the plugin root derived from the module location, after a lexical containment check (1.904489ms)
+﹣ case D2: the session power record is written although a path above the plugin root grants a foreign principal write (0.117102ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+✔ case D3 (structural): readRaw on win32 lstat()s the safe path before the strict native read, so an absent record is a plain ENOENT as on POSIX (0.68417ms)
+﹣ case D2: a source module outside the plugin root is not rejected solely for an ordinary foreign write grant (0.165554ms) # HOST-LIMITATION(windows-only): native Windows DACL, owner and requester-storage fixtures need a win32 host; owner: ALF-C-ANCESTOR-CALLERS Windows qualification; due: 2026-10-31; runs on: any native Windows host
+ℹ tests 13
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 9
+ℹ todo 0
+ℹ duration_ms 85.80749
+
+--- stderr ---

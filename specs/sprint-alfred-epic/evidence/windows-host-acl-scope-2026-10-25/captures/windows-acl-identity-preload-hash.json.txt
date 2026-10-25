@@ -1,0 +1,10 @@
+command: sha256sum scratch/windows-acl-test-identity-isolated.mjs
+label: windows-acl-identity-preload-sha256
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+2935b840993c8a3de11d8c242979ecacb9dae0178477d8e489897212d300dc11  scratch/windows-acl-test-identity-isolated.mjs
+
+--- stderr ---

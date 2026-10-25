@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.g23-current-qualification-custody.v1",
+  "qualificationBase": "7d3659ebe32778d4a8edf0852cab43972950a652",
+  "integratedCommit": "62008d6bd39f68aa849e7257cdc3161b59222ebb",
+  "integratedTree": "e4c9942436dd4e4e4f6f29c92ea513f590027b35",
+  "testPath": "plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs",
+  "testSha256": "09b63b7742144e5f23644f76ee3973b10be548f1b112004c3a6beb54834882bf",
+  "testBlob": "0e04863b248b5b66576a885f839d8268a40af5fb",
+  "patchSha256": "8bca872f6496c15a31289c01072446667c434ece779762443cd30fb7c68a3c50",
+  "artifacts": [
+    {
+      "originalLocalPath": "scratch/clones/g23-current-source-qualification-20261025/scratch/agent-out/g23-original-m7/full-current-source.txt",
+      "originalSha256": "d6d17832e480ef64afad4089eb3b4a23130a9d2ed61faa8b3a3cd9f51344a6f5",
+      "derivative": "captures/full-original.log.txt",
+      "derivativeSha256": "d6d17832e480ef64afad4089eb3b4a23130a9d2ed61faa8b3a3cd9f51344a6f5"
+    },
+    {
+      "originalLocalPath": "scratch/clones/g23-current-source-qualification-20261025/scratch/agent-out/g23-original-m7/consumer-safe-paths9.txt",
+      "originalSha256": "6425c7210b36d71ed570edab2e79f5e5b9d290b386e7e1fe0ba23174a5841070",
+      "derivative": "captures/consumer-safe-paths.log.txt",
+      "derivativeSha256": "6425c7210b36d71ed570edab2e79f5e5b9d290b386e7e1fe0ba23174a5841070"
+    },
+    {
+      "originalLocalPath": "scratch/clones/g23-current-source-qualification-20261025/scratch/agent-out/g23-current-source-qualification/qualification-report.md",
+      "originalSha256": "26a3be69f4790ddc88e854e32989d849ae49b7ca7ad1de88a2713c4a97c2f933",
+      "derivative": "captures/owner-report.md.txt",
+      "derivativeSha256": "26a3be69f4790ddc88e854e32989d849ae49b7ca7ad1de88a2713c4a97c2f933"
+    },
+    {
+      "originalLocalPath": "scratch/clones/g23-current-source-qualification-20261025/scratch/agent-out/g23-current-source-qualification/safe-capture.mjs",
+      "originalSha256": "5f5da2421f0361f31a210ad5e34c4c8330e6613de54d7111117a5943f8f42c06",
+      "derivative": "captures/safe-capture.mjs.txt",
+      "derivativeSha256": "5f5da2421f0361f31a210ad5e34c4c8330e6613de54d7111117a5943f8f42c06"
+    },
+    {
+      "originalLocalPath": "scratch/clones/g23-current-source-qualification-20261025/scratch/agent-out/g23-current-source-qualification/safe-consumer-capture.mjs",
+      "originalSha256": "bf292825a7a663b0a92f07e6d82c4dd7505d5cd8c56c2149ee5fddff8f4ad592",
+      "derivative": "captures/safe-consumer-capture.mjs.txt",
+      "derivativeSha256": "bf292825a7a663b0a92f07e6d82c4dd7505d5cd8c56c2149ee5fddff8f4ad592"
+    },
+    {
+      "originalLocalPath": "scratch/clones/g23-current-source-qualification-20261025/plugins/pipeline-core/lib/po-discard-fixture-isolation.fixture.mjs",
+      "originalSha256": "188dec8a09905cb4a854aec88b1fc0bd0caec5e21fa46ab50d8a76e2d75c9bb9",
+      "derivative": "captures/identity-helper.mjs.txt",
+      "derivativeSha256": "188dec8a09905cb4a854aec88b1fc0bd0caec5e21fa46ab50d8a76e2d75c9bb9"
+    }
+  ],
+  "nativeWindowsQualified": false
+}

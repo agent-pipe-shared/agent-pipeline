@@ -1,0 +1,22 @@
+command: node --import ./scratch/windows-acl-test-identity.mjs --test ./plugins/pipeline-core/lib/pins/digest-pinned-powershell-helpers-check-out-as-lf.test.mjs
+label: windows-acl-helper-digest-pins-final
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+✔ windows-native-process-observer.ps1 working copy hashes to the pinned digest (1.46868ms)
+✔ windows-native-process-observer.ps1 is attributed eol=lf (5.862729ms)
+✔ windows-owned-authority-native.ps1 working copy hashes to the pinned digest (0.41061ms)
+✔ windows-owned-authority-native.ps1 is attributed eol=lf (4.713545ms)
+﹣ native observer is no longer refused by its helper digest on win32 (0.303707ms) # win32 only
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 83.688007
+
+--- stderr ---

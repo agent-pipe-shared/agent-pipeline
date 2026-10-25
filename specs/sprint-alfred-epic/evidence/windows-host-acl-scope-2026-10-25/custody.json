@@ -1,0 +1,239 @@
+{
+  "schema": "pipeline.windows-host-acl-fix-custody.v1",
+  "sourceCommit": "7d3659ebe32778d4a8edf0852cab43972950a652",
+  "sourceTree": "27018583532b6e3a837c7f75210ea88117c6df6d",
+  "workerBase": "df5926044c3774151931d6a5b8fbcbc73615b66c",
+  "patchSha256": "58bda1502bbd13ceddb52d9c2b55844fa94039ac490d45aed00bcfb3fd7a9e78",
+  "sourceFiles": [
+    {
+      "path": "SETUP.md",
+      "sha256": "95882b2ca6826489ccbbc0e22e6f6683832b0ef5e346e3e36c99c9117c4a833a",
+      "blob": "f459abed9213abe23ea085c57ee5364ec042ed79"
+    },
+    {
+      "path": "docs/windows-authority-boundaries.md",
+      "sha256": "1338d5980db63fc868413a1a14474e18c51576418f260891d3b8d134dec1f970",
+      "blob": "4314b2c958ace176750fae8997b1cf25d22c69be"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs",
+      "sha256": "6f914525ddda8d307c1bf52b684f6be85b1f790f789c466138b1e491161ead0c",
+      "blob": "26719b6aff59debcc67be29480922023dc56d4fd"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs",
+      "sha256": "03b0697570858bccaa69d74fb24b0959df46848f6f50fdc6ac4a73f0824d39b2",
+      "blob": "47b43dd6e750126b902babfec60c9a409466dc4d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-authority-readiness.mjs",
+      "sha256": "531b03db0a20a122100740e312da76ae679e597faed6407c7ceda7132579a76a",
+      "blob": "7c5afa5828acab1d2eb33e786307918950080bee"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-authority-readiness.test.mjs",
+      "sha256": "11ed484653ccb1a3ecb0e7c3682a7671e532c2d0b5648f87aca090b6bdac2377",
+      "blob": "fff8aa3a4619dc350a7b3d5e470b29d1401df4a0"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-native-process-observer.mjs",
+      "sha256": "fd3f7e2ef06a38ac92517f03a13fc308b16bc509df9223e325841c8e3be65018",
+      "blob": "a61bc2b6e8e657b44f4949ce81695ce647ec532d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-native-process-observer.ps1",
+      "sha256": "feb0f64ac2290b094c262b62d5334d894c0ce7c91c401b6b8fb23a1decd1c348",
+      "blob": "ad295b6e1a3f2cf335f8c07d3c039bbcb611c32c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-owned-authority-backend.mjs",
+      "sha256": "05d38ea9b36ee3c2e328aaa4debabca84194077f101337af257d6b9ad7eab045",
+      "blob": "7344234ff6e06a43767d37e272ddcef30bcbfd4e"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/windows-owned-authority-native.ps1",
+      "sha256": "d7d910b1da43260399c5f8e75c65c3b17e58b2ca2dc4deddb9afa37f946ba25c",
+      "blob": "e2da0ef3c2e75d3a8aefcf2c2051a4ff7c5f3dec"
+    }
+  ],
+  "artifacts": [
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-readiness-exact-faults-final.json",
+      "originalSha256": "ee09fd66c53fc764efef9d2943129e0d5ddc508751f2e7d640aa4cca153ede7e",
+      "derivative": "captures/windows-acl-readiness-exact-faults-final.json.txt",
+      "derivativeSha256": "ee09fd66c53fc764efef9d2943129e0d5ddc508751f2e7d640aa4cca153ede7e",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-ancestor-private-negative-final.json",
+      "originalSha256": "31babbc1d6d2e95a8e7004721089ee300c4674a17e83be28c9af562a1e53f0b9",
+      "derivative": "captures/windows-acl-ancestor-private-negative-final.json.txt",
+      "derivativeSha256": "31babbc1d6d2e95a8e7004721089ee300c4674a17e83be28c9af562a1e53f0b9",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-requester-private-negative-final2.json",
+      "originalSha256": "68cda8ac5a1a3658e0e19e7020608a9cf913b65a78113ed347d4859e3b3717f3",
+      "derivative": "captures/windows-acl-requester-private-negative-final2.json.txt",
+      "derivativeSha256": "68cda8ac5a1a3658e0e19e7020608a9cf913b65a78113ed347d4859e3b3717f3",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-helper-digest-pin-final.json",
+      "originalSha256": "6c2b6f8b40a3416713cdd58bdff8b9a6147d0a7c93ddba9f540e64452823bbd7",
+      "derivative": "captures/windows-acl-helper-digest-pin-final.json.txt",
+      "derivativeSha256": "6c2b6f8b40a3416713cdd58bdff8b9a6147d0a7c93ddba9f540e64452823bbd7",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-native-type-cache-final.json",
+      "originalSha256": "4908936899f3a7cdf9960abe028aa5ee8c1d23f0be6a4bc7b241767e431a79fe",
+      "derivative": "captures/windows-acl-native-type-cache-final.json.txt",
+      "derivativeSha256": "4908936899f3a7cdf9960abe028aa5ee8c1d23f0be6a4bc7b241767e431a79fe",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-process-observer-final.json",
+      "originalSha256": "60fe324b7d3c5702e61d8e95788a3f3e62c618ffd616b4e5918532ccc60c81b1",
+      "derivative": "captures/windows-acl-process-observer-final.json.txt",
+      "derivativeSha256": "60fe324b7d3c5702e61d8e95788a3f3e62c618ffd616b4e5918532ccc60c81b1",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-consumer-safe-paths-final.json",
+      "originalSha256": "0343450d74b1e5d70f761270881a56865961009c46e1d1d2df20513a296a9d41",
+      "derivative": "captures/windows-acl-consumer-safe-paths-final.json.txt",
+      "derivativeSha256": "0343450d74b1e5d70f761270881a56865961009c46e1d1d2df20513a296a9d41",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-diff-check-final.json",
+      "originalSha256": "b84746bd91e13168274ed854d9cd58bdb5bd76ef13aefc3a4b72646d82ee0b73",
+      "derivative": "captures/windows-acl-diff-check-final.json.txt",
+      "derivativeSha256": "b84746bd91e13168274ed854d9cd58bdb5bd76ef13aefc3a4b72646d82ee0b73",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-custody-hashes-final3.json",
+      "originalSha256": "09f63c83b0a4e2aaad736473da166b56398227e8a99487e54afb051fb4ff85bd",
+      "derivative": "captures/windows-acl-custody-hashes-final3.json.txt",
+      "derivativeSha256": "09f63c83b0a4e2aaad736473da166b56398227e8a99487e54afb051fb4ff85bd",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-readiness-test.json",
+      "originalSha256": "2187b21c9c1c308c725cad2f17fa38e60366c969f190a69d141baa017e317dfc",
+      "derivative": "captures/windows-acl-readiness-test.json.txt",
+      "derivativeSha256": "2187b21c9c1c308c725cad2f17fa38e60366c969f190a69d141baa017e317dfc",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-readiness-test-rerun.json",
+      "originalSha256": "50895a04f6384f7e796100caa767e380a3c006e69977d3e6d8d7ac57930b3768",
+      "derivative": "captures/windows-acl-readiness-test-rerun.json.txt",
+      "derivativeSha256": "50895a04f6384f7e796100caa767e380a3c006e69977d3e6d8d7ac57930b3768",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-readiness-green.json",
+      "originalSha256": "1e1f86b39c5d7d6f81f3a2a1be5f500a175097f2bf866cd6cf2e191a55b96b5a",
+      "derivative": "captures/windows-acl-readiness-green.json.txt",
+      "derivativeSha256": "1e1f86b39c5d7d6f81f3a2a1be5f500a175097f2bf866cd6cf2e191a55b96b5a",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-readiness-registration-final.json",
+      "originalSha256": "90fc466d77243271443a1bb44e5d4b5b10a0cce015f54678b2607d2973ff19fd",
+      "derivative": "captures/windows-acl-readiness-registration-final.json.txt",
+      "derivativeSha256": "90fc466d77243271443a1bb44e5d4b5b10a0cce015f54678b2607d2973ff19fd",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-host-acl-scope-20261025-report.md",
+      "originalSha256": "e10d926f40efaae0b54f61a1ba236f3f64af093733a4551d8382750131f1ad58",
+      "derivative": "captures/windows-host-acl-scope-20261025-report.md.txt",
+      "derivativeSha256": "e10d926f40efaae0b54f61a1ba236f3f64af093733a4551d8382750131f1ad58",
+      "qualification": "superseded-isolation-limited-or-binding-only"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-readiness-isolated-final.json",
+      "originalSha256": "3cb3cd923e8e03c71240fe7ef5e1d0866a57c50bcbcfdf7437cf7133e063bfbb",
+      "derivative": "captures/windows-acl-readiness-isolated-final.json.txt",
+      "derivativeSha256": "3cb3cd923e8e03c71240fe7ef5e1d0866a57c50bcbcfdf7437cf7133e063bfbb",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-ancestor-isolated-final.json",
+      "originalSha256": "061f6af3a484a9dc769e0ddacf3570901fe69ee917c3b141a45ff7a85028473c",
+      "derivative": "captures/windows-acl-ancestor-isolated-final.json.txt",
+      "derivativeSha256": "061f6af3a484a9dc769e0ddacf3570901fe69ee917c3b141a45ff7a85028473c",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-requester-isolated-final.json",
+      "originalSha256": "f55db2f506305f985c838fe7a5d53ebf8174def3ef4fb7b9a528a3e9a34e14a1",
+      "derivative": "captures/windows-acl-requester-isolated-final.json.txt",
+      "derivativeSha256": "f55db2f506305f985c838fe7a5d53ebf8174def3ef4fb7b9a528a3e9a34e14a1",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-helper-digest-isolated-final.json",
+      "originalSha256": "6f1a5615072f9783c23c1682ea6478f39baccc331e71c83c304278a6e11a8433",
+      "derivative": "captures/windows-acl-helper-digest-isolated-final.json.txt",
+      "derivativeSha256": "6f1a5615072f9783c23c1682ea6478f39baccc331e71c83c304278a6e11a8433",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-type-cache-isolated-final.json",
+      "originalSha256": "cc52cb411b60997caad9063926d1a5907d2bc511ab85462cab87b77f9c53bc9d",
+      "derivative": "captures/windows-acl-type-cache-isolated-final.json.txt",
+      "derivativeSha256": "cc52cb411b60997caad9063926d1a5907d2bc511ab85462cab87b77f9c53bc9d",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-process-observer-isolated-final.json",
+      "originalSha256": "ba671d825a93ad985786a130c73bdc8ca6a2ce17e7a9c8c3b7feb8a471b0e8cd",
+      "derivative": "captures/windows-acl-process-observer-isolated-final.json.txt",
+      "derivativeSha256": "ba671d825a93ad985786a130c73bdc8ca6a2ce17e7a9c8c3b7feb8a471b0e8cd",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-consumer-safe-isolated-final.json",
+      "originalSha256": "2c3ce68f305c235f0e66a779629042fa3c4a8d4f88a5cd8520c204a731eb1852",
+      "derivative": "captures/windows-acl-consumer-safe-isolated-final.json.txt",
+      "derivativeSha256": "2c3ce68f305c235f0e66a779629042fa3c4a8d4f88a5cd8520c204a731eb1852",
+      "qualification": "focused-with-native-skips"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-identity-preload-hash.json",
+      "originalSha256": "81dcaebb45d1c4ebf161345541cf761fa94e9eb950fabd9de577bdc61608bc68",
+      "derivative": "captures/windows-acl-identity-preload-hash.json.txt",
+      "derivativeSha256": "81dcaebb45d1c4ebf161345541cf761fa94e9eb950fabd9de577bdc61608bc68",
+      "qualification": "configuration-or-hash-record"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-test-identity-isolated.mjs",
+      "originalSha256": "2935b840993c8a3de11d8c242979ecacb9dae0178477d8e489897212d300dc11",
+      "derivative": "captures/windows-acl-test-identity-isolated.mjs.txt",
+      "derivativeSha256": "2935b840993c8a3de11d8c242979ecacb9dae0178477d8e489897212d300dc11",
+      "qualification": "configuration-or-hash-record"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-acl-test-identity.mjs",
+      "originalSha256": "b62222fbaebb9e3e110baeeffa2139f8e5a567b5d87e01c8a6b80802b18312f2",
+      "derivative": "captures/windows-acl-test-identity.mjs.txt",
+      "derivativeSha256": "b62222fbaebb9e3e110baeeffa2139f8e5a567b5d87e01c8a6b80802b18312f2",
+      "qualification": "superseded-isolation-limited-configuration"
+    },
+    {
+      "originalLocalPath": "scratch/clones/windows-host-acl-scope-20261025/scratch/windows-host-acl-scope-20261025-report.md",
+      "originalSha256": "c458e46c1c231f2f3d2fd5690e0416208d7679197c334b7cece5efa7e0011e5a",
+      "derivative": "captures/windows-host-acl-scope-isolated-report.md.txt",
+      "derivativeSha256": "c458e46c1c231f2f3d2fd5690e0416208d7679197c334b7cece5efa7e0011e5a",
+      "qualification": "focused-with-native-skips"
+    }
+  ],
+  "nativeWindowsQualified": false,
+  "independentReview": "scheduled-late-batch",
+  "releaseVerify": "pending"
+}

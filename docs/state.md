@@ -18,7 +18,7 @@ this Codex readback. Those operator-run results remain pending.
 
 The current Resume-Hint was read in full as recovered summary context.
 The matrix pointer's snapshot SHA-256 was independently checked and matches;
-all22 rows below75 remain in scope, with no stage promotion. The three existing
+all22 initially measured rows below75 remained in scope at entry. The three existing
 post-stamp clones are being resumed as isolated method-only outcomes under
 D143. Their proposals remain outside the installed candidate. Entry into the
 G33 clone itself refused hook provisioning and reported repository mismatch;
@@ -36,8 +36,29 @@ Users Modify permissions on the data-drive/project/marketplace chain.
 Source confirms readiness walks the plugin ancestry with strict checks, while
 earlier October17 decisions already exclude human-controlled ancestors.
 The isolated owner follows the [Windows ACL scope plan](../specs/sprint-alfred-epic/plans/windows-host-acl-scope-2026-10-25.md).
-No Windows ACL, installed cache or tested build has been changed. Ordinary
-Alfred integration is held while this focused outcome is prepared.
+Source `7d3659ebe32778d4a8edf0852cab43972950a652` now contains that fix;
+the normal active-hook commit succeeded. [Bound evidence and limits](../specs/sprint-alfred-epic/evidence/windows-host-acl-scope-2026-10-25/README.md):
+34 executable passes,27 Windows/PowerShell skips and1 Darwin skip. Native
+Windows ACL/requester/process-image qualification is still open. No real
+Windows ACL, installed cache or installed test build was changed; the fix is
+for the next stamped candidate. Reader inputs and the inventory baseline are
+mechanically rebound to this actual Source commit, not independently reviewed.
+
+The first matrix amendment preserved197 identities and all stages. The later
+G23 amendment now records176at75,19at50,2at25;21below75,index72.08%.
+G17 stale integration prose is corrected without promotion. G23's exact
+test-only patch is integrated at62008d6bd39f68aa849e7257cdc3161b59222ebb:
+current Source original23pass/1nativeU3skip and consumer9/9 qualify its one
+50→75 change under the native-only rubric. [Bound evidence](../specs/sprint-alfred-epic/evidence/g23-current-source-qualification-2026-10-25/README.md)
+preserves old and new clone history, synthetic identity and actual remaining
+native duties. The earlier focused6/6 is historical, not a substituted full run.
+The Windows fix was requalified with a corrected identity preload; earlier
+isolation-limited captures are explicitly excluded from that final claim.
+The Codex
+fixture39-case suite reached38pass/1HGO examiner failure, attribution unknown;
+the corrected-launcher full suite is unrun. G33 diagnosis still lacks a trusted
+complete preimage and remains50. Preserve all three clone reports and earlier
+attempts; no synthetic result is installed-runner acceptance.
 
 ## Start here after the Codex host restart
 
@@ -71,7 +92,8 @@ handover update changes no plugin, PRD, Spec or matrix stage.
 3. Once each runner has its matching installed build, start the real Codex,
    Claude and AGY Greenfield tests in parallel. Preserve distinct project
    roots, versions, platforms, reports, blockers and human interventions.
-4. Continue the22 unfinished matrix items in isolated slices concurrently.
+4. Continue the21 matrix items below75 in isolated slices concurrently
+   (22at session entry; G23 focused content has since qualified).
    First inspect the [post-stamp work checkpoint](../specs/sprint-alfred-epic/plans/post-stamp-work-checkpoint-2026-10-25.md)
    before restarting any worker or running tests. Its unintegrated patches
    are NOT in the installed candidate. Check actual handles/processes before
@@ -115,7 +137,7 @@ PRD/Spec changes require separate explicit PO authorization; existing ACs, no de
 
 Source commits: human821cd35c1 (36-path custody/runner/help/diagnostic/generator composition); normale244c7b3d (truthful scanner summary); human9ed1a2800 (post-close prevention); normaldc8204a28 (AGY native tiers/public flat CLI/carrier). G35 push-budget repair7502188da and its evidence/inventory/Reader bindingb68e22c10 follow those packages; stampd4d294977 includes that Source plus AGY installer repair0b1fc7699 and final binding977dad8b0. The0d2c33bf5 compatibility captures below are historical pre-G35 evidence, not a full final-candidate run. All operator requirements for those Source packages are resolved. No repeat heal, application question or no-verify agent commit.
 
-The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md) has **197 identities:25=2,50=20,75=175,100=0,UNKNOWN=0;22below75,index71.95%**. The original194 identities and original22 three-runner P0/P1 traces remain; the additional Burg report added G33/G34 and the actual checkpoint failure added G35. Historical cuts/reasons are immutable. Generator,G6,G17,G23help andG34 have committed focused readiness; G7.model is now75 after original/publicCLI/FD qualification; G33 remains50 because recovery is incomplete. Never equate75 with native/release acceptance.
+The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md) has **197 identities:25=2,50=19,75=176,100=0,UNKNOWN=0;21below75,index72.08%**. The original194 identities and original22 three-runner P0/P1 traces remain; the additional Burg report added G33/G34 and the actual checkpoint failure added G35. Historical cuts/reasons are immutable. Generator,G6,G17,G23help andG34 have committed focused readiness; G7.model is now75 after original/publicCLI/FD qualification, and G23.reads is75 after current original23/1 qualification; G33 remains50 because recovery is incomplete. Never equate75 with native/release acceptance.
 
 Portable evidence: [base composition](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25/README.md), [AGY final carrier](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/README.md), [scanner](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/README.md), [post-close partial repair](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/post-close-prevention/README.md), [final compatibility](../specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/README.md). Sanitized derivatives have separate original/derivative hashes and never replace approval-bound originals.
 

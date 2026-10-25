@@ -1,0 +1,20 @@
+command: sha256sum SETUP.md docs/windows-authority-boundaries.md plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs plugins/pipeline-core/lib/windows-authority-readiness.mjs plugins/pipeline-core/lib/windows-authority-readiness.test.mjs plugins/pipeline-core/lib/windows-native-process-observer.mjs plugins/pipeline-core/lib/windows-native-process-observer.ps1 plugins/pipeline-core/lib/windows-owned-authority-backend.mjs plugins/pipeline-core/lib/windows-owned-authority-native.ps1 scratch/windows-host-acl-scope-20261025.patch
+label: windows-acl-final-source-and-patch-sha256
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+95882b2ca6826489ccbbc0e22e6f6683832b0ef5e346e3e36c99c9117c4a833a  SETUP.md
+1338d5980db63fc868413a1a14474e18c51576418f260891d3b8d134dec1f970  docs/windows-authority-boundaries.md
+6f914525ddda8d307c1bf52b684f6be85b1f790f789c466138b1e491161ead0c  plugins/pipeline-core/lib/pins/windows-authority-ancestors-above-repository-are-human-controlled.test.mjs
+03b0697570858bccaa69d74fb24b0959df46848f6f50fdc6ac4a73f0824d39b2  plugins/pipeline-core/lib/pins/windows-requester-ancestors-above-repository-are-human-controlled.test.mjs
+531b03db0a20a122100740e312da76ae679e597faed6407c7ceda7132579a76a  plugins/pipeline-core/lib/windows-authority-readiness.mjs
+11ed484653ccb1a3ecb0e7c3682a7671e532c2d0b5648f87aca090b6bdac2377  plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+fd3f7e2ef06a38ac92517f03a13fc308b16bc509df9223e325841c8e3be65018  plugins/pipeline-core/lib/windows-native-process-observer.mjs
+feb0f64ac2290b094c262b62d5334d894c0ce7c91c401b6b8fb23a1decd1c348  plugins/pipeline-core/lib/windows-native-process-observer.ps1
+05d38ea9b36ee3c2e328aaa4debabca84194077f101337af257d6b9ad7eab045  plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+d7d910b1da43260399c5f8e75c65c3b17e58b2ca2dc4deddb9afa37f946ba25c  plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+58bda1502bbd13ceddb52d9c2b55844fa94039ac490d45aed00bcfb3fd7a9e78  scratch/windows-host-acl-scope-20261025.patch
+
+--- stderr ---

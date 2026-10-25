@@ -1,0 +1,27 @@
+command: node --import ./scratch/windows-acl-test-identity.mjs --test ./plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+label: windows-acl-readiness-mapped-faults
+exitCode: 0
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ WAR001 a synthetic valid project-root observation advances readiness without losing its boundary (6.20573ms)
+✔ WAR002 synthetic valid project, plugin and private observations advance readiness without mutation (1.232091ms)
+✔ WAR003 ordinary observation faults and private custody failures remain unavailable (1.059383ms)
+✔ WAR004 a synthetic valid plugin-ancestor observation advances readiness without refusing dispatch (0.475984ms)
+✔ WAR005 missing private namespace does not manufacture an ACL failure, while its parent is inspected (0.699158ms)
+✔ WAR006 missing plugin prerequisite remains unavailable (1.256385ms)
+✔ WAR007 unknown native failures close without copying arbitrary exception text (1.779599ms)
+✔ WAR008 a pristine project can inspect existing roots before Git creates its private namespace (0.615249ms)
+✔ WAR009 direct consumers receive only closed native causes (0.706737ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114.844191
+
+--- stderr ---

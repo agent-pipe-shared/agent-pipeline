@@ -1,0 +1,53 @@
+command: node --import ./scratch/windows-acl-test-identity.mjs --test ./plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+label: windows-acl-readiness-focused
+exitCode: 1
+head: df5926044c3774151931d6a5b8fbcbc73615b66c
+tree: 5dfa6b83c6d7b718321c9212c957aa0e4bd19c56
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ WAR001 ordinary inherited Modify at the repository root is observed without blocking readiness (3.483829ms)
+✔ WAR002 trusted project, plugin and private path observations stay ready without mutation (0.749134ms)
+✔ WAR003 ordinary observation faults and private custody failures remain unavailable (0.601934ms)
+✖ WAR004 an ordinary writable plugin ancestor is observed without refusing dispatch (1.251728ms)
+✔ WAR005 missing private namespace does not manufacture an ACL failure, while its parent is inspected (0.47389ms)
+✔ WAR006 missing plugin prerequisite remains unavailable (0.370313ms)
+✔ WAR007 unknown native failures close without copying arbitrary exception text (0.732501ms)
+✔ WAR008 a pristine project can inspect existing roots before Git creates its private namespace (0.261377ms)
+✔ WAR009 direct consumers receive only closed native causes (0.455315ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 8
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 82.28018
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ WAR004 an ordinary writable plugin ancestor is observed without refusing dispatch (1.251728ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unavailable'
+  - 'ready'
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs:59:10)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unavailable',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

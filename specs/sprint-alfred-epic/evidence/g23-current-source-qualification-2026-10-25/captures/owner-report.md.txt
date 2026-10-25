@@ -1,0 +1,34 @@
+# G23 current-Source qualification — bounded report
+
+## 1. Result
+
+Targeted delivery: green on the isolated clone at Source `7d3659ebe32778d4a8edf0852cab43972950a652`. The exact test-only observer patch passed the complete original suite and consumer-safe-paths9 under synthetic identity. No native Windows/U3, installed-host, or Main integration claim.
+
+## 2. Evidence
+
+- Full original suite: `node scratch/agent-out/g23-current-source-qualification/safe-capture.mjs current-source-full full-current-source.txt`; exit 0; 23 passed, 0 failed, 1 skipped (U3 Linux/WSL typed host limitation), 0 todo. Machine capture: `scratch/agent-out/g23-original-m7/full-current-source.txt`.
+- Consumer-safe paths: `node scratch/agent-out/g23-current-source-qualification/safe-consumer-capture.mjs consumer-safe-paths9 consumer-safe-paths9.txt`; exit 0; 9 passed, 0 failed, 0 skipped, 0 todo. Machine capture: `scratch/agent-out/g23-original-m7/consumer-safe-paths9.txt`.
+- Both captures bind HEAD `7d3659ebe32778d4a8edf0852cab43972950a652`, tree `27018583532b6e3a837c7f75210ea88117c6df6d`, dirty `true`.
+
+## 3. Changed files
+
+- Inert clone diff only: `plugins/pipeline-core/lib/pins/read-blocks-and-misleading-denial-texts-across-runners.test.mjs` — exact custody-bound observer patch.
+- Clone scratch only: copied safe-capture launcher, consumer-safe capture launcher, machine captures, and this report. No tracked Main or previous-clone changes; no staging or commit.
+
+## 4. Deliberately not changed
+
+No production source, Main, matrix, registry, spec, private profile, or prior clone. Original examiners remain intact. Focused6/6 was not repeated on this Source because the complete original suite includes those cases.
+
+## 5. Hashes and deviations
+
+- Test preimage SHA-256: `097f6c74883d5e9c0b7dd357e0c3d0f1afe7f65a648c1c2100f0646e797acb48`; final test SHA-256: `09b63b7742144e5f23644f76ee3973b10be548f1b112004c3a6beb54834882bf`.
+- Safe-capture launcher SHA-256: `5f5da2421f0361f31a210ad5e34c4c8330e6613de54d7111117a5943f8f42c06`; current and prior identity helper SHA-256: `188dec8a09905cb4a854aec88b1fc0bd0caec5e21fa46ab50d8a76e2d75c9bb9`.
+- Exact inert patch SHA-256: `8bca872f6496c15a31289c01072446667c434ece779762443cd30fb7c68a3c50`.
+- The launcher’s optional private-parent override was absent; its helper preloads synthetic userInfo, homedir, tmpdir and HOME before capture/test imports and descendants.
+- Read-only `ls -d` was denied by the closed grammar; `stat` confirmed the target path did not exist. `git rev-parse 'HEAD^{tree}'` was denied by guard-push as ambiguous, so the tree is taken from capture-evidence output. A Node `-e` copy was denied; the launcher was placed through the workspace patch tool and its hash matches the custody-bound original.
+
+## 6. Open items
+
+- Resource headroom: unknown; no project resource observations were supplied. `report-resource-headroom.mjs` was not run before the 30-call work budget guidance was reached. This is not a PASS.
+- Verify: parent-owned integrated Verify/Security pending. Independent review: parent-owned batch Critic pending. Manual/browser check: not applicable to this test-only qualification. PO acceptance: open.
+- Native U3/Windows and genuine installed-host behavior remain unqualified. Nothing committed.
