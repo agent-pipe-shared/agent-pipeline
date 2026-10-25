@@ -63,6 +63,11 @@
       "disposition": "required"
     },
     {
+      "name": "architecture-close-disposition-tests",
+      "path": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "architecture-decision-waiver-store-tests",
       "path": "plugins/pipeline-core/lib/architecture-decision-waiver-store.test.mjs",
       "disposition": "required"
@@ -679,8 +684,18 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "g23-quoted-pipeline-reads-tests",
+      "path": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "g23-read-help-tests",
       "path": "plugins/pipeline-core/lib/guard/g23-read-help.test.mjs",
+      "disposition": "required"
+    },
+    {
+      "name": "g29-public-handover-admission-tests",
+      "path": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
       "disposition": "required"
     },
     {
@@ -1518,6 +1533,11 @@
       "path": "plugins/pipeline-core/scripts/public-baseline-diagnose.test.mjs",
       "disposition": "legacy-process-only",
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
+    },
+    {
+      "name": "public-handover-duty-tests",
+      "path": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+      "disposition": "required"
     },
     {
       "name": "publication-authority-tests",

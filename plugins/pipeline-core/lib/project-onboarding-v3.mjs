@@ -12,6 +12,7 @@ import { CONSUMER_VERIFY_ADAPTER, CONSUMER_VERIFY_ADAPTER_PATH } from "./consume
 import { buildRootProjectCalibrationIdentity } from "./project-calibration-identity.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldDecisionRecordTargets, initialGreenfieldMapTargets } from "./architecture-map-scaffold.mjs";
 import { inspectArchitectureDesign, parseArchitectureDesign, isArchitectureDesignReopenCode } from "./architecture-design.mjs";
+import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
 // Behavioural seam for the criterion-bound AC-174 pin: the handover decision is exercised through the
 // real function with the module's existing `fs.inspectArchitectureDesign` injection, not by reading source text.
 export { designToImplementationHandoverAction };
@@ -3685,6 +3686,14 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       // final package proof is verified by pipeline-state.mjs.
       const checkpointProfile = checkpoint.value?.values?.profile ?? null;
       const finalPackageProfile = new Set(["epic", "feature"]).has(checkpointProfile);
+      if (acknowledgement === null) {
+        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
+          repository, runtime, continuity, appServer, nextAction: null,
+          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_observation_unavailable",
+            "the generated design could not be inspected before binding",
+            "repair the generated PRD and Spec observation, then inspect again")],
+        });
+      }
       const needsAcknowledgement = !finalPackageProfile && acknowledgement !== null
         && acknowledgement.acknowledged === false;
       // The generated Spec marker is a technical hash binding, not a PO
@@ -3742,6 +3751,31 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
               "apply the returned digest-bound mechanical repair, then inspect again before requesting PO acknowledgement")],
           });
         }
+      }
+      let draftIncomplete;
+      try {
+        draftIncomplete = stagingDesignNeedsAuthoring(
+          readFileSync(join(root, acknowledgement.prd.path), "utf8"),
+          readFileSync(join(root, acknowledgement.spec.path), "utf8"),
+        );
+      } catch {
+        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
+          repository, runtime, continuity, appServer, nextAction: null,
+          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_observation_unavailable",
+            "the generated design could not be inspected before binding",
+            "repair the generated PRD and Spec observation, then inspect again")],
+        });
+      }
+      if (draftIncomplete) {
+        return lifecycleResult({ status: "bootstrap-binding-required", root, runner, intent,
+          repository, runtime, continuity, appServer,
+          nextAction: { kind: "design-authoring-required", mutation: false, requiresConfirmation: false,
+            prdPath: acknowledgement.prd.path, specPath: acknowledgement.spec.path,
+            guidance: "Author and review the generated PRD and Spec, then inspect again before bootstrap binding." },
+          diagnostics: [lifecycleDiagnostic("$.continuity", "intake_design_authoring_required",
+            "the generated PRD and Spec still contain draft framing",
+            "author both documents before bootstrap-bind-plan")],
+        });
       }
       let signatureObservation = null;
       let signatureMode = false;

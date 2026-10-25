@@ -1131,7 +1131,8 @@
         "caseIds": [
           "DAU001",
           "DAU002",
-          "DAU003"
+          "DAU003",
+          "DAU004"
         ],
         "maxBytes": 65536
       }

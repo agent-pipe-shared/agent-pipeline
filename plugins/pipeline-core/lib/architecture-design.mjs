@@ -288,7 +288,7 @@ export function inspectArchitectureDesign(rootDir, taskScope = null, deps = {}) 
     // (a system message, a path, a stack fragment) never reaches it.
     const code = architectureDesignFailureCode(error);
     return { ok: false, status: "design-required", code,
-      ...(code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && prdPath ? { prdPath } : {}),
+      ...(prdPath ? { prdPath } : {}),
       ...(error?.field && code === error.message ? { field: error.field, expected: error.expected, rejectedValue: error.rejectedValue } : {}) };
   }
 }

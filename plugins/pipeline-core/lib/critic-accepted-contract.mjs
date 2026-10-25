@@ -334,7 +334,7 @@ export function inspectSpecCriterionRows(source) {
   const why = {id: `not a criterion id (${CRITERION_ID_RULE}; a leading zero is not allowed)`, shape: 'row shape the parser does not locate', duplicate: 'stated more than once'};
   const named = unsupported.slice(0, 8).map(entry => `${entry.id}${entry.line ? ` (line ${entry.line}` : ' ('}${entry.line ? ', ' : ''}${why[entry.reason]})`).join('; ');
   return {ok: false, code: 'CAC-CRITERION-UNSUPPORTED', located, unsupported,
-    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
+    message: `acceptance criterion rows the registration and dispatch parser cannot locate: ${named}${unsupported.length > 8 ? '; ...' : ''}. Supported shapes: ${SUPPORTED_CRITERION_SHAPES.join('; ')}. Example: | # | Criterion | Evidence | with | AC-1 | WHEN an event occurs, the system SHALL respond. | tests/example.test.mjs |. ${CRITERION_ID_RULE}; a leading zero is not allowed. Re-render the row; the criterion text itself need not change.`};
 }
 
 /** Pure original-byte interpretation only. Locators and parser success confer no authority. */

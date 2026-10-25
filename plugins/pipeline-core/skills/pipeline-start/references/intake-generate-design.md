@@ -112,6 +112,11 @@ afterwards.
 - `spec.md` — a first-draft Spec with the same `Source:` line, needing EARS
   acceptance criteria and implementation detail authored before binding.
 
+Use the accepted criterion table header `| # | Criterion | Evidence |` and a
+row such as `| AC-1 | WHEN the project is submitted, the system SHALL retain
+its reviewed sources. | tests/submission.test.mjs |`. An `AC-01` identifier
+has a leading zero and is not accepted by the criterion parser.
+
 **These are drafts, not the finished design.** They are provenance plus
 scaffolding, not the captured material — the agent is expected to author them
 into a real PRD and Spec against the quality bar in `kickoff-design.md`

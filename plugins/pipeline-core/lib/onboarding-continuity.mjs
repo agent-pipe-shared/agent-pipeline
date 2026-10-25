@@ -20,6 +20,7 @@ import {
 } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { isSuccessfulSpawn } from "./successful-spawn.mjs";
+import { stagingDesignNeedsAuthoring } from "./design-authoring.mjs";
 import {inspectSourceOwnedControlledMethodDispatchHandle} from "./controlled-continuity-method-dispatch.mjs";
 import {executeSourceOwnedAfkHostTransaction,readSourceOwnedAfkProjectionSettlementSelector,readSourceOwnedAfkProjectionSettlement,isCurrentSourceOwnedAfkProjectionAttempt} from "./afk-transaction-host.mjs";
 import {parseAfkLedgerGeneration,createAfkLedgerAuthorityProducerPort} from "./afk-ledger.mjs";
@@ -580,6 +581,7 @@ function closedEntryStaticShape(entry) {
   if (entry?.planCancellation !== undefined) expectedKeys.add("planCancellation");
   if (entry?.planMixedStateRecovery !== undefined) expectedKeys.add("planMixedStateRecovery");
   if (entry?.architectureImpact !== undefined) expectedKeys.add("architectureImpact");
+  if (entry?.architectureFitness !== undefined) expectedKeys.add("architectureFitness");
   if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
   if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
   if (entry?.auditReference !== undefined) expectedKeys.add("auditReference");
@@ -600,6 +602,26 @@ function closedEntryStaticShape(entry) {
     || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
     || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
   if (!validClosedEntryRigorFields(entry)) return false;
+  if (entry.architectureFitness !== undefined) {
+    const fitness = entry.architectureFitness;
+    if (!exactKeys(fitness, new Set(["schema", "status", "rigorObservationSha256", "fitnessProjectionSha256", "candidate", "dispositions"]))
+      || fitness.schema !== "pipeline.close-architecture-fitness.v1"
+      || !["unavailable", "observed-open", "observed-pass", "source-drift"].includes(fitness.status)
+      || fitness.rigorObservationSha256 !== entry.rigorObservationSha256
+      || !(fitness.fitnessProjectionSha256 === null || SHA256_RE.test(fitness.fitnessProjectionSha256 ?? ""))
+      || !Array.isArray(fitness.dispositions)
+      || (fitness.status === "unavailable" && (fitness.fitnessProjectionSha256 !== null || fitness.dispositions.length !== 10))
+      || (fitness.status === "observed-open" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length === 0))
+      || (fitness.status === "observed-pass" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length !== 0))
+      || (fitness.status === "source-drift" && (fitness.fitnessProjectionSha256 === null || fitness.dispositions.length !== 10))
+      || !(fitness.candidate === null || validRigorCandidate(fitness.candidate))) return false;
+    for (const row of fitness.dispositions) if (!exactKeys(row, new Set(["classId", "propertyId", "observedOutcome", "disposition", "reason"]))
+      || !Number.isSafeInteger(row.classId) || row.classId < 1
+      || typeof row.propertyId !== "string" || row.propertyId.length === 0
+      || !["pass", "finding", "unavailable", "unsupported", "unknown"].includes(row.observedOutcome)
+      || (row.observedOutcome === "pass" && fitness.status !== "source-drift")
+      || row.disposition !== "open" || typeof row.reason !== "string" || row.reason.length < 1 || row.reason.length > 1024) return false;
+  }
   try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
   if (entry.continuityClose !== undefined) {
     const close = entry.continuityClose;
@@ -4608,7 +4630,7 @@ export function replaceNextActionSection(markdown, sectionText) {
  * than throwing, since this sync is advisory and must never gate the
  * caller's already-committed State write.
  */
-export function syncStateMdNextAction(dir, state) {
+export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
   let handoverPath = "docs/state.md";
   try {
     const root = physicalRoot(dir);
@@ -4641,9 +4663,18 @@ export function syncStateMdNextAction(dir, state) {
   const path = join(dir, handoverPath);
   let markdown;
   try {
+    // Public publication must never follow a configured private path or a
+    // physical alias, even when the caller invokes the helper explicitly.
+    if (handoverPath.split("/").some(part => [".git", ".claude", ".codex", ".agents", ".agent-pipeline", ".pipeline", ".ssh", ".aws"].includes(part))) {
+      return { ok: false, reason: "public handover path is private", handoverPath };
+    }
+    const root = physicalRoot(dir);
+    assertPhysicalChain(root, path, { leafMayBeAbsent: false });
+    const info = lstatSync(path);
+    if (!info.isFile() || info.nlink !== 1 || info.size > 4 * 1024 * 1024) return { ok: false, reason: "public handover is not a bounded regular file", handoverPath };
     markdown = readFileSync(path, "utf8");
   } catch {
-    return { ok: false, reason: "docs/state.md is absent or unreadable" };
+    return { ok: false, reason: "public handover is absent, unsafe or unreadable", handoverPath };
   }
   let sectionText;
   try {
@@ -4656,14 +4687,87 @@ export function syncStateMdNextAction(dir, state) {
     return { ok: false, reason: 'no recognizable "## Next action" heading' };
   }
   if (updated === markdown) {
-    return { ok: true, changed: false };
+    return { ok: true, changed: false, handoverPath };
   }
+  if (!apply) return { ok: true, changed: true, handoverPath };
   try {
     writeFileSync(path, updated, "utf8");
   } catch (error) {
     return { ok: false, reason: `write failed: ${error?.message ?? error}` };
   }
-  return { ok: true, changed: true };
+  return { ok: true, changed: true, handoverPath };
+}
+
+/** Inspect the public projection without publishing private runtime data. */
+export function inspectPublicHandoverDuty(dir, state) {
+  const preview = syncStateMdNextAction(dir, state, { apply: false });
+  const path = preview.handoverPath ?? "docs/state.md";
+  if (!preview.ok) return { schema: "pipeline.public-handover-duty.v1", status: "unavailable", path,
+    reason: preview.reason, nextAction: { kind: "agent-public-handover-update", path,
+      instruction: "Repair the public handover layout while preserving unrelated prose, then retry the explicit update." } };
+  const feature = state?.activeFeature;
+  const marker = feature && typeof feature.id === "string" && typeof feature.phase === "string"
+    ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\``
+    : "**Lifecycle phase:** no active feature";
+  let markdown;
+  try { markdown = readFileSync(join(dir, path), "utf8"); }
+  catch { markdown = null; }
+  const lines = markdown === null ? [] : markdown.split("\n");
+  const bounds = publicNextActionBounds(lines);
+  const markers = bounds === null ? [] : lines.slice(bounds.start + 1, bounds.end)
+    .filter(line => line.startsWith("**Lifecycle phase:**"));
+  const markerCurrent = markers.length === 1 && markers[0] === marker;
+  const withoutMarker = markdown === null ? null : stripPublicPhaseMarkers(markdown);
+  const sectionCurrent = withoutMarker !== null && replaceNextActionSection(withoutMarker, nextActionSection(state)) === withoutMarker;
+  const status = !preview.ok ? "unavailable" : sectionCurrent && markerCurrent ? "current" : "stale";
+  return { schema: "pipeline.public-handover-duty.v1", status, path,
+    reason: preview.ok ? (markerCurrent ? null : "structured lifecycle phase is absent or stale") : preview.reason,
+    nextAction: status === "current" ? null : {
+      kind: "agent-public-handover-update", path,
+      instruction: "Inspect current lifecycle State and update the tracked handover through an explicit agent action; preserve unrelated prose." } };
+}
+
+function publicNextActionBounds(lines) {
+  const start = lines.findIndex(line => line.trim() === "## Next action");
+  if (start < 0) return null;
+  const next = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+  return { start, end: next < 0 ? lines.length : next };
+}
+
+function stripPublicPhaseMarkers(markdown) {
+  const lines = markdown.split("\n");
+  const bounds = publicNextActionBounds(lines);
+  if (bounds === null) return markdown;
+  for (let index = bounds.end - 1; index > bounds.start; index -= 1) {
+    if (!lines[index].startsWith("**Lifecycle phase:**")) continue;
+    lines.splice(index, index + 1 < bounds.end && lines[index + 1] === "" ? 2 : 1);
+  }
+  return lines.join("\n");
+}
+
+/** Explicit agent action. The runtime's private projection never calls this. */
+export function updatePublicHandoverDuty(dir, state) {
+  const before = inspectPublicHandoverDuty(dir, state);
+  if (before.status === "unavailable") return before;
+  if (before.status === "current") return before;
+  const sync = syncStateMdNextAction(dir, state, { apply: true });
+  if (!sync.ok) return inspectPublicHandoverDuty(dir, state);
+  const path = join(dir, before.path);
+  let markdown;
+  try { markdown = readFileSync(path, "utf8"); }
+  catch { return inspectPublicHandoverDuty(dir, state); }
+  const feature = state?.activeFeature;
+  const marker = feature && typeof feature.id === "string" && typeof feature.phase === "string"
+    ? `**Lifecycle phase:** feature \`${feature.id}\` · phase \`${feature.phase}\``
+    : "**Lifecycle phase:** no active feature";
+  const lines = stripPublicPhaseMarkers(markdown).split("\n");
+  const heading = lines.findIndex(line => line.trim() === "## Next action");
+  if (heading < 0) return inspectPublicHandoverDuty(dir, state);
+  const insertion = lines[heading + 1] === "" ? heading + 2 : heading + 1;
+  lines.splice(insertion, 0, marker, "");
+  try { writeFileSync(path, lines.join("\n"), "utf8"); }
+  catch { return inspectPublicHandoverDuty(dir, state); }
+  return inspectPublicHandoverDuty(dir, state);
 }
 
 /**
@@ -5673,6 +5777,13 @@ function buildCoordinatorSourcedPromotionPlan({
   const checkMarkers = !allowAppliedReplay;
   const checkAcknowledgement = !new Set(["epic", "feature"]).has(input.profile);
   const authority = promotionArtifacts(observed.root, input, { checkMarkers, checkAcknowledgement });
+  // Generated scaffold bytes remain editable until the actual design is authored.
+  // This also runs during apply's fresh plan reconstruction before any write.
+  if (stagingDesignNeedsAuthoring(
+    readFileSync(join(observed.root, authority.prd.path), "utf8"),
+    readFileSync(join(observed.root, authority.spec.path), "utf8"))) {
+    fail("BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED", "author the generated PRD and Spec before binding their bytes");
+  }
   const featureId = input.featureId;
   // NVA-R1-LANGWIRE: a coordinator-sourced binding has no kickoff predecessor to
   // inherit an operator-facing default from (plan.kickoff === null; unlike the

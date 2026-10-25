@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const cases = [];
+function test(name, run) { cases.push({ id: `ACD${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { run, statePath } from "../scripts/pipeline-state.mjs";
+import { PROPERTY_CLASSES } from "../scripts/architecture-fitness.mjs";
+import { collectRigorJournalEntry, closeArchitectureFitnessDisposition, readCurrentArchitectureFitnessBindings } from "./rigor-lifecycle.mjs";
+
+const root = fileURLToPath(new URL("../../..", import.meta.url));
+const [commit, tree] = execFileSync("git", ["-C", root, "rev-parse", "HEAD", "HEAD^{tree}"], { encoding: "utf8" }).trim().split("\n");
+const candidate = { commit, tree };
+const state = { activeFeature: { id: "fixture-feature", planPath: "specs/fixture/plan.md" }, rigorHistory: [] };
+const available = value => ({ value, status: "available", sourceContract: "fixture" });
+const deps = {
+  currentCandidate: () => candidate,
+  inferInputs: () => ({ actualPaths: available([]) }),
+  planningSurface: () => ({ planPath: state.activeFeature.planPath, paths: [] }),
+  protectedBaseline: () => ({ status: "unavailable" }),
+  interruptionReport: () => ({ ok: false }),
+  evaluateFitness: () => ({ schema: "pipeline.fitness-evidence.v1", outcomes: PROPERTY_CLASSES.map(row => ({
+    classId: row.classId, propertyId: row.propertyId, outcome: row.classId === 7 ? "finding" : row.classId === 10 ? "unavailable" : "pass",
+    details: `Fixture detail ${row.classId}` })) }),
+};
+
+test("pre-close producer retains each nonpass property and close consumer qualifies exact source", () => {
+  const entry = collectRigorJournalEntry({ rootDir: root, state, boundary: "pre-close", selectedProfile: "epic",
+    observedAt: "2026-10-24T00:00:00.000Z" }, deps);
+  assert.equal(entry.body.fitnessProjection.dispositions.length, 2);
+  const projection = entry.body.fitnessProjection;
+  const bindings = readCurrentArchitectureFitnessBindings(root);
+  assert.deepEqual(bindings, { model: projection.model, baseline: projection.baseline, map: projection.map });
+  const close = closeArchitectureFitnessDisposition([entry], state.activeFeature.id, { candidate, bindings });
+  assert.equal(close.status, "observed-open");
+  assert.deepEqual(close.dispositions.map(row => [row.classId, row.observedOutcome, row.disposition]),
+    [[7, "finding", "open"], [10, "unavailable", "open"]]);
+  assert.equal(close.rigorObservationSha256, entry.entrySha256);
+  assert.equal(closeArchitectureFitnessDisposition([entry], state.activeFeature.id,
+    { candidate: { ...candidate, tree: "0".repeat(40) }, bindings }).status, "source-drift");
+  assert.equal(closeArchitectureFitnessDisposition([entry], state.activeFeature.id,
+    { candidate, bindings: { ...bindings, map: [] } }).dispositions.length, 10);
+});
+
+test("missing evaluator evidence stays unavailable with all ten open properties", () => {
+  const entry = collectRigorJournalEntry({ rootDir: root, state, boundary: "pre-close", selectedProfile: "epic",
+    observedAt: "2026-10-24T00:00:00.000Z" }, { ...deps, evaluateFitness: () => { throw new Error("fixture unavailable"); } });
+  const close = closeArchitectureFitnessDisposition([entry], state.activeFeature.id, { candidate });
+  assert.equal(close.status, "unavailable");
+  assert.equal(close.fitnessProjectionSha256, null);
+  assert.equal(close.dispositions.length, 10);
+  assert.ok(close.dispositions.every(row => row.observedOutcome === "unavailable" && row.disposition === "open"));
+});
+
+test("actual State close producer persists the nonblocking unavailable fitness disposition", () => {
+  const fixture = mkdtempSync(join(root, "scratch/g26-close-producer-"));
+  try {
+    execFileSync("git", ["init", "-q", fixture]);
+    mkdirSync(join(fixture, "project"));
+    const current = { schema: "pipeline.state.v0", planApproved: false, selectedProfile: "mini",
+      activeFeature: { id: "close-producer", planPath: "specs/close-producer/prd.md", phase: "design" },
+      updatedAt: "2026-10-24T00:00:00.000Z" };
+    writeFileSync(statePath(fixture), JSON.stringify(current));
+    // The existing controlled writer seam admits a legacy fixture close only;
+    // production coordinator/audit admission remains covered by its originals.
+    assert.equal(run(["close-feature", "--by", "Synthetic fixture operator", "--architecture-impact", "no-architecture-impact"], {
+      dir: fixture, now: () => "2026-10-24T01:00:00.000Z", gitHead: () => ({ ok: false, error: "fixture unborn HEAD" }),
+    }), 0);
+    const closed = JSON.parse(readFileSync(statePath(fixture), "utf8"));
+    assert.equal(closed.activeFeature, undefined);
+    assert.equal(closed.closedFeatures[0].architectureFitness.status, "unavailable");
+    assert.equal(closed.closedFeatures[0].architectureFitness.dispositions.length, 10);
+    assert.equal(closed.closedFeatures[0].architectureFitness.rigorObservationSha256, closed.rigorHistory.at(-1).entrySha256);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+if (cases.length !== 3) throw new Error("architecture-close-disposition-tests case count drift");
+registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

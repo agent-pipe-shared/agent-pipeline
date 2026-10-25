@@ -92,6 +92,19 @@ test("missing design block preserves its exact PRD action before scaffold-map va
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("incomplete greenfield design keeps the PRD authoring action instead of estate adoption", () => {
+  const root = fixture();
+  const prdPath = "specs/feature/prd.md";
+  try {
+    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: {
+      inspectArchitectureDesign: () => ({ ok: false, status: "design-required",
+        code: "ARCHITECTURE-DESIGN-SCOPE-MISMATCH", prdPath }),
+    } });
+    assert.equal(result.nextAction.kind, "architecture-design-required");
+    assert.equal(result.nextAction.prdPath, prdPath);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("a materialized map without a project-owned AGENTS pointer has an actionable typed refusal", () => {
   const root = fixture();
   try {

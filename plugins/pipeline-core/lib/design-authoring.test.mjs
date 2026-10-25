@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { openSync as openCompletionDescriptor } from "node:fs";
 import { parseArchitectureDesign } from "./architecture-design.mjs";
-import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, compactActionReadback } from "./design-authoring.mjs";
+import { renderArchitectureDesignSkeleton, renderDesignTraceabilitySkeleton, hasGeneratedCriterionPlaceholder, stagingDesignNeedsAuthoring, compactActionReadback } from "./design-authoring.mjs";
 import { createHash } from "node:crypto";
 import { inspectSpecCriterionRows, parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from "./critic-accepted-contract.mjs";
 import { devNull } from "node:os";
@@ -67,6 +67,7 @@ test("generated criterion uses the accepted parser shape while draft and legacy 
   assert.equal(rows[0].text, "WHEN <trigger>, the system SHALL <observable result>.");
   const malformed = draft.replace("| AC-1 |", "| AC-01 |");
   assert.equal(inspectSpecCriterionRows(malformed).code, "CAC-CRITERION-UNSUPPORTED");
+  assert.match(inspectSpecCriterionRows(malformed).message, /\| # \| Criterion \| Evidence \|.*\| AC-1 \| WHEN/u);
   const badHeader = draft.replace("| # | Criterion | Evidence |", "| ID | Criterion | Evidence |");
   assert.equal(inspectSpecCriterionRows(badHeader).code, "CAC-CRITERION-UNSUPPORTED");
 
@@ -87,7 +88,12 @@ test("generated criterion uses the accepted parser shape while draft and legacy 
   assert.equal(result.status, "explicit-actual-independent-pass");
 });
 
-if (completionCases.length !== 3) throw new Error("case completion count drift: expected 3, got " + completionCases.length);
+test("staging authoring distinguishes generated placeholders from reviewed source", () => {
+  assert.equal(stagingDesignNeedsAuthoring(renderArchitectureDesignSkeleton(), renderDesignTraceabilitySkeleton()), true);
+  assert.equal(stagingDesignNeedsAuthoring("# Product brief\nReviewed goals.\n", "## Acceptance criteria\n| # | Criterion | Evidence |\n|---|---|---|\n| AC-1 | WHEN submitted, the system SHALL retain sources. | tests/submission.test.mjs |\n"), false);
+});
+
+if (completionCases.length !== 4) throw new Error("case completion count drift: expected 4, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { deriveMinimumRigor, deriveLifecycleRigorObservation, inferInputsFromRepo, normalizeInputs } from "../scripts/rigor-floor.mjs";
 import { resolveProtectedBaseline } from "./protected-baseline.mjs";
 import { deriveArchitecturePlanningSurface } from "./architecture-entry-readiness.mjs";
-import { evaluateArchitectureFitness } from "../scripts/architecture-fitness.mjs";
+import { evaluateArchitectureFitness, PROPERTY_CLASSES } from "../scripts/architecture-fitness.mjs";
 import { generateInterruptionReport } from "../scripts/report-interruptions.mjs";
 import { LEGACY_STATE, NEUTRAL_STATE, resolveAuthorityArtifactPath, resolveProjectAuthorityPaths } from "./project-authority.mjs";
 import { parseStrictJson } from "./governance-event.mjs";
@@ -93,10 +93,65 @@ export function validateRigorHistory(history) {
     if (normalized.fitnessOutcomes.status === "available"
       && (!body.fitnessProjection || hash(body.fitnessProjection) !== normalized.fitnessOutcomes.value.sourceSha256
         || canonical(body.fitnessProjection.outcomes) !== canonical(normalized.fitnessOutcomes.value.outcomes))) throw new Error("RIGOR-HISTORY-FITNESS");
+    if (body.fitnessProjection?.dispositions !== undefined) {
+      const projection = body.fitnessProjection;
+      const expected = projection.outcomes.filter(row => row.outcome !== "pass");
+      if (!Array.isArray(projection.dispositions) || projection.dispositions.length !== expected.length
+        || !expected.every((row, index) => {
+          const disposition = projection.dispositions[index];
+          return disposition?.classId === row.classId && disposition.propertyId === row.propertyId
+            && disposition.observedOutcome === row.outcome && disposition.disposition === "open"
+            && typeof disposition.reason === "string" && disposition.reason.length > 0
+            && disposition.reason.length <= 1024;
+        })) throw new Error("RIGOR-HISTORY-FITNESS-DISPOSITION");
+    }
     floors.set(body.featureId, { featureId: body.featureId, minProfile: checked.retainedProfile, inputDigest: checked.derivation.inputDigest });
     preceding = row.entrySha256;
   }
   return history;
+}
+
+/** A report-only close account of the last owner-recorded pre-close observation. */
+export function closeArchitectureFitnessDisposition(history, featureId, { candidate: closeCandidate = null, bindings: closeBindings = null } = {}) {
+  const rows = validateRigorHistory(history);
+  const entry = rows.filter(row => row.body.featureId === featureId && row.body.boundary === "pre-close").at(-1);
+  if (!entry) throw new Error("RIGOR-CLOSE-OBSERVATION-MISSING");
+  const { body } = entry;
+  const projection = body.fitnessProjection;
+  const sourceSha256 = projection ? hash(projection) : null;
+  const candidateCurrent = closeCandidate !== null && body.candidate !== null && canonical(closeCandidate) === canonical(body.candidate);
+  const sourceCurrent = closeBindings !== null && projection !== null
+    && canonical(closeBindings) === canonical({ model: projection.model, baseline: projection.baseline, map: projection.map });
+  const status = projection === null ? "unavailable" : candidateCurrent && sourceCurrent
+    ? (projection.outcomes.every(row => row.outcome === "pass") ? "observed-pass" : "observed-open") : "source-drift";
+  const dispositions = projection === null
+    ? PROPERTY_CLASSES.map(({ classId, propertyId }) => ({ classId, propertyId, observedOutcome: "unavailable",
+      disposition: "open", reason: "Pre-close fitness evidence was unavailable; this property remains unverified." }))
+    : projection.outcomes.filter(row => status === "source-drift" || row.outcome !== "pass").map(row => {
+      const original = projection.dispositions?.find(item => item.classId === row.classId && item.propertyId === row.propertyId);
+      return { classId: row.classId, propertyId: row.propertyId, observedOutcome: row.outcome,
+        disposition: "open", reason: status === "source-drift"
+          ? "The pre-close candidate or architecture source changed; this observation requires revalidation."
+          : original?.reason ?? `Pre-close fitness reported ${row.outcome}; this property remains unresolved.` };
+    });
+  return { schema: "pipeline.close-architecture-fitness.v1", status, rigorObservationSha256: entry.entrySha256,
+    fitnessProjectionSha256: sourceSha256, candidate: body.candidate, dispositions };
+}
+
+/** Re-read exactly the source set carried by a fitness projection. */
+export function readCurrentArchitectureFitnessBindings(rootDir, deps = {}) {
+  try {
+    const root = resolve(rootDir), read = deps.physicalBytes ?? physicalBytes;
+    const model = { path: "architecture/fitness-model.json", sha256: hash(read(root, "architecture/fitness-model.json")) };
+    const baseline = { path: "architecture/baseline.json", sha256: hash(read(root, "architecture/baseline.json")) };
+    const directory = join(root, "architecture/map");
+    const info = lstatSync(directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) return null;
+    const names = (deps.mapEntries ?? readdirSync)(directory).filter(name => name.endsWith(".md")).sort();
+    if (!names.includes("index.md") || names.length > 256) return null;
+    const map = names.map(name => ({ path: `architecture/map/${name}`, sha256: hash(read(root, `architecture/map/${name}`)) }));
+    return { model, baseline, map };
+  } catch { return null; }
 }
 function observation(body, previous) {
   if (body.candidate !== null) return deriveLifecycleRigorObservation({ boundary: body.boundary,
@@ -212,8 +267,14 @@ export function collectRigorJournalEntry({ rootDir, state, boundary, selectedPro
       // Existing ratchet exceptions alone do not establish owner-valid approval.
       if (value.schema === "pipeline.fitness-evidence.v1" && Array.isArray(outcomes) && outcomes.length === 10
         && !outcomes.some(row => row.outcome === "excepted") && inputs.actualPaths.status === "available") {
+        const dispositions = outcomes.filter(row => row.outcome !== "pass").map(row => {
+          const original = value.outcomes.find(entry => entry.classId === row.classId && entry.propertyId === row.propertyId);
+          return { classId: row.classId, propertyId: row.propertyId, observedOutcome: row.outcome,
+            disposition: "open", reason: typeof original?.details === "string" && original.details.trim()
+              ? original.details.slice(0, 1024) : `Evaluator reported ${row.outcome}; property remains unresolved.` };
+        });
         fitnessProjection = { schema: "pipeline.rigor-fitness-projection.v1", candidate: observedCandidate,
-          model: bindings.fitnessModel, baseline: bindings.architectureBaseline, map: bindings.architectureMap, boundary, outcomes };
+          model: bindings.fitnessModel, baseline: bindings.architectureBaseline, map: bindings.architectureMap, boundary, outcomes, dispositions };
         inputs.fitnessOutcomes = envelope({ sourceSha256: hash(fitnessProjection), outcomes }, "available", "pipeline.rigor-fitness-projection.v1");
       }
     } catch { inputs.fitnessOutcomes = absent("pipeline.fitness-evidence.v1"); }

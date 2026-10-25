@@ -488,7 +488,8 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
-import { collectRigorJournalEntry, rigorVerifyRows } from "../lib/rigor-lifecycle.mjs";
+import { collectRigorJournalEntry, rigorVerifyRows, closeArchitectureFitnessDisposition, readCurrentArchitectureFitnessBindings } from "../lib/rigor-lifecycle.mjs";
+import { inspectPublicHandoverDuty, updatePublicHandoverDuty } from "../lib/onboarding-continuity.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
 import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
@@ -737,7 +738,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // that exact command as the way out of a stuck approval.
 const PIPELINE_STATE_COMMANDS = Object.freeze([
   "materialize-architecture", "afk-project",
-  "inspect", "rebind-approval",
+  "inspect", "update-public-handover", "rebind-approval",
   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
@@ -9632,6 +9633,28 @@ function designWorkflowGitCandidate(dir, deps = {}) {
   return candidate?.ok === true ? { commit: candidate.commit, tree: candidate.tree } : null;
 }
 
+// Submission binds physical authoring sources before taking the State writer
+// lock, and repeats the same observation at its commit boundary. Review receipt
+// provenance remains the separate present-plan admission.
+function inspectSubmissionSources(dir, authority, deps) {
+  const candidate = designWorkflowGitCandidate(dir, deps);
+  if (!candidate || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.commit ?? "")
+    || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate.tree ?? "")) return { ok: false, code: "PLAN-SUBMIT-HEAD-UNAVAILABLE" };
+  const prd = physicalRebindFile(dir, authority.planPath);
+  const spec = physicalRebindFile(dir, authority.specPath);
+  if (!prd || !spec || prd.sha256 !== authority.planSha256 || spec.sha256 !== authority.specSha256) {
+    return { ok: false, code: "PLAN-SUBMIT-SOURCE-DRIFT" };
+  }
+  let source;
+  try {
+    new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(prd.bytes);
+    source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(spec.bytes);
+  } catch { return { ok: false, code: "PLAN-SUBMIT-SOURCE-ENCODING" }; }
+  const criteria = inspectSpecCriterionRows(source);
+  if (!criteria.ok) return criteria;
+  return { ok: true, candidate, sources: [{ path: authority.planPath, sha256: prd.sha256 }, { path: authority.specPath, sha256: spec.sha256 }] };
+}
+
 function writeDesignWorkflowApprovalRequest(dir, request) {
   const root = realpathSync(resolve(dir));
   const scratch = join(root, "scratch");
@@ -11287,6 +11310,11 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         }
       }
       const submitHandoff = planHandoffRefusal("submit-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 })); if (submitHandoff) { console.error(submitHandoff); return 2; } // AC-264/D30/D85: refused before any write
+      const submitSources = inspectSubmissionSources(dir, authority.value, deps);
+      if (!submitSources.ok) {
+        console.error(`Error: submit-plan refused (${submitSources.code}); ${submitSources.message ?? "restore and validate the authored source before submission."} Zero State mutation.`);
+        return 2;
+      }
       const profileSha256 = sha256CanonicalJson(profile.value);
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
@@ -11334,6 +11362,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
             planApprovalBriefing: submittedBriefing, rigorHistory: [...(observed.rigorHistory ?? []), submittedRigor] } };
         },
         beforeCommit: () => {
+          const sourceReadback = inspectSubmissionSources(dir, authority.value, deps);
+          if (!sourceReadback.ok) return sourceReadback;
+          if (sha256CanonicalJson(sourceReadback) !== sha256CanonicalJson(submitSources)) return { ok: false, code: "PLAN-SUBMIT-SOURCE-DRIFT" };
           const currentSelection = inspectSelectedPlanProfile(dir, base);
           if (!currentSelection.ok) return currentSelection;
           if (currentSelection.profile !== null && currentSelection.profile !== profileName) {
@@ -12791,6 +12822,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         next.rigorHistory = [...(base.rigorHistory ?? []), closedRigor];
         closedEntry.rigorObservationSha256 = closedRigor.entrySha256;
         closedEntry.rigorVerifyRows = rigorVerifyRows(next).filter(row => row.featureId === activeFeature.id);
+        closedEntry.architectureFitness = closeArchitectureFitnessDisposition(next.rigorHistory, activeFeature.id, {
+          candidate: designWorkflowGitCandidate(dir, deps), bindings: readCurrentArchitectureFitnessBindings(dir),
+        });
       } catch {
         console.error("Error: RIGOR-HISTORY-INVALID: existing floor history cannot be authenticated; zero State mutation.");
         return 2;
@@ -12799,7 +12833,12 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         beforeCommit: () => {
           const readback = collectRigorJournalEntry({ rootDir: dir, state: base, boundary: "pre-close",
             selectedProfile: base.selectedProfile ?? base.planSubmission?.profile, observedAt: closedAt });
-          return readback.entrySha256 === closedRigor.entrySha256 ? { ok: true } : { ok: false, code: "RIGOR-INPUT-STALE" };
+          const disposition = closeArchitectureFitnessDisposition([...(base.rigorHistory ?? []), readback], activeFeature.id, {
+            candidate: designWorkflowGitCandidate(dir, deps), bindings: readCurrentArchitectureFitnessBindings(dir),
+          });
+          return readback.entrySha256 === closedRigor.entrySha256
+            && sha256CanonicalJson(disposition) === sha256CanonicalJson(closedEntry.architectureFitness)
+            ? { ok: true } : { ok: false, code: "RIGOR-INPUT-STALE" };
         },
         requirePhysicalReadback: true,
       }))) {
@@ -13191,8 +13230,15 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     // the SAME pure renderer those mutating commands call before writing to
     // `docs/state.md`, so the returned text is byte-identical to what a fresh
     // read of that file's section would show, without a second read.
+    case "update-public-handover": {
+      if (rest.length !== 0) return 2;
+      const result = updatePublicHandoverDuty(dir, base);
+      console.log(JSON.stringify(result, null, 2));
+      return result.status === "current" ? 0 : 2;
+    }
     case "inspect": {
       const lifecycle = inspectPlanLifecycle(dir, base);
+      const publicHandoverDuty = inspectPublicHandoverDuty(dir, base);
       const drift = base.continuity == null ? null : projectContinuityAuthorityDrift(base.continuity, (p) => physicalRebindFile(dir, p)?.sha256 ?? null);
       const payload = {
         schema: INSPECT_SCHEMA,
@@ -13219,6 +13265,14 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
           ? reopenDesignNextActionText(dir)
           : nextActionSection(base),
         continuityAuthorityDrift: drift,
+        publicHandoverDuty: {
+          ...publicHandoverDuty,
+          nextAction: publicHandoverDuty.status === "current" ? null : {
+            kind: "command", executable: process.execPath,
+            argv: [fileURLToPath(import.meta.url), "update-public-handover"],
+            mutation: true, requiresConfirmation: false, executionBoundary: "local-process",
+          },
+        },
       };
       console.log(JSON.stringify(payload, null, 2));
       return 0;

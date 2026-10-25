@@ -163,3 +163,54 @@ test("AC-231 host-limitation: POSIX branch does not consult the seams (chmod 070
   assert.equal(report.seen.length, 0, "seams are not consulted off win32");
   assert.equal(report.first.code, null);
 });
+
+// Additional Linux-reachable logical witnesses; original native cases above
+// retain their skips. Both adapters are injected before any controlled call.
+// This process view establishes no native Windows permission assurance.
+async function controlledScenario(url) {
+  const { privateMkdtemp } = await import(MODULE_URL);
+  const fixture = privateMkdtemp(`ac231-controlled-${randomUUID()}-`);
+  const parentPlatform = process.platform;
+  try {
+    const source = [
+      `for (const key of ["TMPDIR", "TMP", "TEMP"]) process.env[key] = ${JSON.stringify(fixture)};`,
+      'Object.defineProperty(process, "platform", { value: "win32" });',
+      SCENARIO,
+    ].join("\n");
+    const report = run(url, source);
+    assert.equal(process.platform, parentPlatform, "controlled view must stay in the child");
+    for (const root of report.seen) assert.equal(dirname(root), fixture, "all roots belong to this nonce fixture");
+    return report;
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+function assertControlledScenario(report) {
+  assertGuardedScenario(report, "controlled child");
+  assert.equal(report.seen.length, 3, "each refusal and later success must harden a fresh root");
+  assert.equal(new Set(report.seen).size, 3, "refusals must not memoize a root");
+  assert.equal(report.third.code, null, "secure retry after refusals must succeed");
+  assert.equal(report.fourth.value, report.third.value, "success is memoized despite a later insecure seam");
+}
+
+const CONTROLLED_ONLY = process.platform !== "linux" && "controlled Linux branch witness only; native cases retained separately";
+test("AC-231 controlled production: actual refusal, cleanup and retry/memoization", { skip: CONTROLLED_ONLY }, async () => {
+  assertControlledScenario(await controlledScenario(MODULE_URL));
+});
+test("AC-231 controlled mirror: unchanged helper satisfies the same examiner", { skip: CONTROLLED_ONLY }, async () => {
+  assertControlledScenario(await controlledScenario(mirror("controlled-control", null)));
+});
+test("AC-231 controlled mutation: removing refusal is rejected by the same examiner", { skip: CONTROLLED_ONLY }, async () => {
+  const url = mirror("controlled-no-refusal", text => text.replace('if (state?.status !== "secure") {', 'if (false) {'));
+  const report = await controlledScenario(url);
+  assert.equal(report.first.code, null, "mutation must actually accept the insecure root");
+  assert.throws(() => assertControlledScenario(report), { name: "AssertionError", message: /must not return a root/ });
+});
+test("AC-231 controlled mutation: removing cleanup is rejected by the same examiner", { skip: CONTROLLED_ONLY }, async () => {
+  const url = mirror("controlled-no-cleanup", text => text.replace("    discard(root);\n    throw error;", "    throw error;"));
+  const report = await controlledScenario(url);
+  assert.equal(report.first.code, "PRIVATE_TMP_ROOT_NOT_SECURE", "refusal remains active in cleanup mutant");
+  assert.equal(report.firstRootGone, false, "mutation must leave the refused root behind");
+  assert.throws(() => assertControlledScenario(report), { name: "AssertionError", message: /rejected root must be removed/ });
+});

@@ -380,6 +380,9 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === SESSION_CRITIC_FINALIZER_SCRIPT) return sanctionedSessionCriticFinalizerArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {
+    // Explicit public prose publication; exact no-argument form only. This
+    // remains subject to READY and all outer command/write policies.
+    if (args[0] === "update-public-handover") return args.length === 1;
     return sanctionedPipelineStateArgs(args, root);
   }
   if (script === PO_PROFILE_REPAIR_SCRIPT) return sanctionedPoProfileRepairArgs(args, root);

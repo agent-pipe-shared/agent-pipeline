@@ -100,7 +100,7 @@ function capture(fn) {
   finally { console.log = beforeLog; console.error = beforeError; }
 }
 /** A submitted feature-profile root whose Spec is `spec`; the PRD carries the matching marker. */
-function submittedRoot(spec, { governed = true } = {}) {
+function submittedRoot(spec, { governed = true, legacySubmission = false, expectSubmissionRefusal = false } = {}) {
   const scratch = resolve(pluginRoot, "../../scratch");
   mkdirSync(scratch, { recursive: true });
   const root = mkdtempSync(join(scratch, "alf-k11-d64-"));
@@ -129,11 +129,23 @@ function submittedRoot(spec, { governed = true } = {}) {
     gitUserName: () => "Fixture", poGateProfile: () => ({ ok: true, value: evidence }),
     poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: sha(plan), specPath, specSha256: sha(spec) } }),
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex" };
-  const submitted = capture(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
-  assert.equal(submitted.code, 0, submitted.stderr);
+  const beforeSubmission = readFileSync(statePath(root), "utf8");
+  let submitted;
+  if (legacySubmission) {
+    // Historical State may predate submit-plan's source validation. Keep the
+    // independent present-plan defense reachable without weakening submission.
+    const state = JSON.parse(beforeSubmission);
+    state.planSubmission = { schema: "pipeline.plan-submission.v1", featureId: FEATURE,
+      planPath, planSha256: sha(plan), specPath, specSha256: sha(spec), profile: "feature",
+      profileSha256: sha("profile"), submittedBy: "coordinator", submittedAt: now };
+    writeFileSync(statePath(root), JSON.stringify(state));
+  } else {
+    submitted = capture(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+    if (!expectSubmissionRefusal) assert.equal(submitted.code, 0, submitted.stderr);
+  }
   mkdirSync(join(root, "evidence"), { recursive: true });
   writeFileSync(join(root, "evidence/review-1.json"), "{}\n");
-  return { root, deps, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  return { root, deps, submitted, beforeSubmission, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 function presentPlan(spec, options) {
   const f = submittedRoot(spec, options);
@@ -142,9 +154,17 @@ function presentPlan(spec, options) {
 }
 const SUPPORTED_SHAPE_NAMES = [/\| # \| Criterion \| Evidence \|/u, /AC-<n>/u, /leading zero/u];
 
-test("D64 present-plan: an unsupported criterion shape or id is refused before present-plan with the supported shapes named", () => {
+test("D64 submit-plan: unsupported criteria refuse before State mutation; legacy present-plan retains the same defense", () => {
   for (const [label, spec, id] of [["four-column table", FOUR_COLUMN, "AC-1"], ["leading-zero id", LEADING_ZERO, "AC-01"]]) {
-    const refused = presentPlan(spec, { governed: false });
+    const f = submittedRoot(spec, { governed: false, expectSubmissionRefusal: true });
+    try {
+      assert.equal(f.submitted.code, 2, label);
+      assert.match(f.submitted.stderr, /submit-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u);
+      assert.equal(readFileSync(statePath(f.root), "utf8"), f.beforeSubmission, "refusal preserves exact State bytes");
+      assert.ok(f.submitted.stderr.includes(id), label);
+      for (const shape of SUPPORTED_SHAPE_NAMES) assert.match(f.submitted.stderr, shape);
+    } finally { f.cleanup(); }
+    const refused = presentPlan(spec, { governed: false, legacySubmission: true });
     assert.equal(refused.code, 2, label);
     assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, `${label}: ${refused.stderr}`);
     assert.ok(refused.stderr.includes(id), `${label}: names the offending id`);
@@ -161,16 +181,22 @@ test("D64 present-plan (RED mirror): the refusal is scoped; a supported Spec and
   }
 });
 
-// AC-264 / D85 (PO decision 2026-10-22): a GOVERNED project's submit-plan also checks the delivery hand-off, so a Spec with no admitted row never reaches
-// present-plan there (the cases above run an ungoverned root, with the Spec bytes and assertions unchanged). D64 stays reachable in a governed root when
-// the Spec has at least one admitted row beside the unsupported one, and an unready hand-off is refused at submit-plan with its typed code.
-test("D64 present-plan with the delivery hand-off wired: governed root, one admitted row beside an unsupported one is still refused by D64; a Spec with no admitted row is refused at submit-plan", () => {
+// AC-264 / D85 still refuses no-row governed Specs first. Mixed rows now fail
+// submit-plan's stronger source check; historical submissions retain D64's defense.
+test("D64 governed submission: mixed unsupported rows refuse without mutation and legacy present-plan still defends them", () => {
   const mixed = `${LEADING_ZERO}\n| # | Criterion |\n| --- | --- |\n| 1 | A supported row beside the unsupported AC-01 |\n`;
   assert.deepEqual(scanAcceptedCriterionRows(mixed).map((row) => row.id), ["AC-1"], "control: exactly one row is admitted, AC-01 is not");
-  const refused = presentPlan(mixed);
+  for (const [spec, code] of [[mixed, "CAC-CRITERION-UNSUPPORTED"], [FOUR_COLUMN, "PLR-HANDOFF-NO-CRITERION"]]) {
+    const f = submittedRoot(spec, { expectSubmissionRefusal: true });
+    try {
+      assert.equal(f.submitted.code, 2);
+      assert.ok(f.submitted.stderr.includes(code), f.submitted.stderr);
+      assert.equal(readFileSync(statePath(f.root), "utf8"), f.beforeSubmission);
+    } finally { f.cleanup(); }
+  }
+  const refused = presentPlan(mixed, { legacySubmission: true });
   assert.equal(refused.code, 2);
   assert.match(refused.stderr, /present-plan refused \(CAC-CRITERION-UNSUPPORTED\)/u, refused.stderr);
-  assert.throws(() => presentPlan(FOUR_COLUMN), /PLR-HANDOFF-NO-CRITERION/u, "submit-plan stops a governed Spec with no admitted row, before present-plan");
 });
 
 test("D64 criterion inspection: the located and the unsupported rows come from the parser's own scan", () => {

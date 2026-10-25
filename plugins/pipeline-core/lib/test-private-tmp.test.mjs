@@ -345,3 +345,38 @@ test("B-S1-T2: PRIVATE_TMP_PREFIX_ESCAPES_ROOT refuses a prefix that resolves ou
     for (const path of leaked()) rmSync(path, { recursive: true, force: true });
   }
 });
+
+// Controlled branch execution only: this does not qualify native Windows DACLs.
+test("TEMP-SEAM-CONTROLLED: child-only win32 view refuses insecure roots before cleanup and retries without memoization", { skip: process.platform !== "linux" && "controlled Linux child witness" }, async () => {
+  const sandbox = await child("temp-seam-controlled-");
+  const hostPlatform = process.platform;
+  const report = runModuleChild([
+    'import { existsSync, readdirSync } from "node:fs";',
+    'import { tmpdir } from "node:os";',
+    'Object.defineProperty(process, "platform", { value: "win32" });',
+    'const { privateTempRoot } = await import(process.argv[1]);',
+    'const hardened = [], assessed = [];',
+    'const harden = root => { hardened.push(root); };',
+    'const assess = root => { assessed.push(root); return { status: "insecure", reason: "controlled-insecure" }; };',
+    'const failures = [];',
+    'for (let i = 0; i < 2; i++) {',
+    '  try { privateTempRoot({ harden, assess }); failures.push({ code: null }); }',
+    '  catch (error) { failures.push({ code: error.code, message: error.message, entries: readdirSync(tmpdir()) }); }',
+    '}',
+    'const root = privateTempRoot({ harden, assess: path => { assessed.push(path); return { status: "secure" }; } });',
+    'const same = privateTempRoot({ harden: () => { throw Error("memoized harden called"); }, assess: () => { throw Error("memoized assess called"); } }) === root;',
+    'console.log(JSON.stringify({ failures, hardened, assessed, root, same, exists: existsSync(root) }));',
+  ].join("\n"), sandbox);
+  assert.equal(process.platform, hostPlatform, "the parent platform must remain unchanged");
+  for (const failure of report.failures) {
+    assert.equal(failure.code, "PRIVATE_TMP_ROOT_NOT_SECURE");
+    assert.match(failure.message, /status=insecure, reason=controlled-insecure/);
+    assert.deepEqual(failure.entries, [], "cleanup must precede the surfaced refusal");
+  }
+  assert.equal(report.hardened.length, 3);
+  assert.deepEqual(report.assessed, report.hardened, "both seams see the same fresh roots in order");
+  assert.equal(new Set(report.hardened).size, 3, "refusals must not memoize");
+  for (const root of report.hardened) assert.equal(isInside(sandbox, root), true);
+  assert.equal(report.exists && report.same, true, "a secure attempt succeeds and is memoized");
+  assert.deepEqual(readdirSync(sandbox), [], "exit cleanup removes the successful root too");
+});

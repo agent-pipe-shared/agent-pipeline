@@ -3978,6 +3978,70 @@
         ],
         "maxBytes": 65536
       }
+    },
+    {
+      "name": "g23-quoted-pipeline-reads-tests",
+      "file": "plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs",
+      "invariantPinned": "Quoted test-module narrowing passes the real parser and guard while malicious filters, credentials and aliases remain refused.",
+      "nonOverlapNote": "Dedicated G23 quoted pipeline witness, distinct from the original read-option and parser suites.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G23Q001",
+          "G23Q002",
+          "G23Q003",
+          "G23Q004",
+          "G23Q005"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "architecture-close-disposition-tests",
+      "file": "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs",
+      "invariantPinned": "Close retains source-bound architecture findings and unavailable properties through the actual State writer.",
+      "nonOverlapNote": "Dedicated G26 close disposition producer and consumer witness; existing fitness suites retain their original duties.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "ACD001",
+          "ACD002",
+          "ACD003"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "public-handover-duty-tests",
+      "file": "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+      "invariantPinned": "Explicit public handover updates preserve other prose and State while refusing physical aliases.",
+      "nonOverlapNote": "Dedicated public handover producer and State consumer witness, separate from lifecycle command admission.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "PHD001",
+          "PHD002",
+          "PHD003",
+          "PHD004",
+          "PHD005",
+          "PHD006"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
+      "name": "g29-public-handover-admission-tests",
+      "file": "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs",
+      "invariantPinned": "Only the exact explicit public handover command clears the real lifecycle guard in relative and absolute forms.",
+      "nonOverlapNote": "Dedicated G29 catalogue and actual guard witness, distinct from handover document behavior.",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "G29P001",
+          "G29P002"
+        ],
+        "maxBytes": 65536
+      }
     }
   ]
 }

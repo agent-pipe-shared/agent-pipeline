@@ -1244,6 +1244,35 @@ function attendedFeaturePlanDeps(root, deps) {
   return { ...deps, isattyFn: () => true, readLineFn: () => confirmation };
 }
 
+// G25: the real submit producer must reject before any State mutation.
+for (const scenario of ["missing-head", "malformed-criterion", "missing-source", "drifted-source", "candidate-drift-before-commit", "source-drift-before-commit", "authored"]) {
+  const fixture = planAuthorityFixture({ featureId: `g25-${scenario}`, planPath: `specs/g25-${scenario}/prd.md`, specPath: `specs/g25-${scenario}/spec.md` });
+  const { root, deps, specPath } = fixture;
+  try {
+    const originalAuthority = deps.poGateAuthority().value;
+    const spec = "# Technical Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n|---|---|---|\n| " + (scenario === "malformed-criterion" ? "AC-01" : "AC-1") + " | WHEN submitted, the system SHALL bind authored source. | evidence |\n";
+    writeFileSync(join(root, specPath), spec);
+    const authority = { ...originalAuthority, specSha256: sha256Hex(Buffer.from(spec)) };
+    const selectedDeps = { ...deps, poGateAuthority: () => ({ ok: true, value: authority }),
+      ...(scenario === "missing-head" ? { gitCandidate: () => ({ ok: false }) } : {}) };
+    if (scenario.endsWith("before-commit")) {
+      let observations = 0;
+      selectedDeps.gitCandidate = () => {
+        observations += 1;
+        if (observations === 2 && scenario === "source-drift-before-commit") writeFileSync(join(root, specPath), spec + "Concurrent edit.\n");
+        return { ok: true, ...candidate, ...(observations === 2 && scenario === "candidate-drift-before-commit" ? { commit: "f".repeat(40) } : {}) };
+      };
+    }
+    if (scenario === "missing-source") rmSync(join(root, specPath));
+    if (scenario === "drifted-source") writeFileSync(join(root, specPath), spec + "Unexpected edit.\n");
+    const before = readFileSync(statePath(root), "utf8");
+    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "mini"], selectedDeps));
+    assert.equal(attempt.result, scenario === "authored" ? 0 : 2, `${scenario}: ${attempt.lines.join(" ")}`);
+    if (scenario !== "authored") assert.equal(readFileSync(statePath(root), "utf8"), before, scenario);
+    else assert.equal(JSON.parse(readFileSync(statePath(root), "utf8")).planSubmission.specSha256, authority.specSha256);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
 // Scenario 1: submit-plan is refused when the plan path resolves inside the
 // staging directory (both plan and spec staged -- the exact live shape).
 {

@@ -36,6 +36,17 @@ export function hasGeneratedCriterionPlaceholder(text) {
   return matches(text.replace(legacy, `- **AC-1:** ${placeholder}`));
 }
 
+/** Read-only draft signal for the coordinator; binding still validates the exact source bytes. */
+export function stagingDesignNeedsAuthoring(prdText, specText) {
+  const unfinished = text => typeof text === "string" && (
+    text.includes("<!-- DRAFT TEMPLATE: replace every REPLACE value and all example paths.")
+    || /^\s*[-|].*REPLACE: (?:input reference|requirement|test path and case)/mu.test(text)
+    || /"(?:responsibility|rationale|profileId)"\s*:\s*"REPLACE: /u.test(text)
+    || hasGeneratedCriterionPlaceholder(text)
+  );
+  return unfinished(prdText) || unfinished(specText);
+}
+
 /** Keep full evidence on disk; avoid repeating document payloads in the action readback. */
 export function compactActionReadback(result) {
   if (!result || typeof result !== "object" || Array.isArray(result)) return result;

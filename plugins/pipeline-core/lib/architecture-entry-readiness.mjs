@@ -87,7 +87,7 @@ function proposalAction(root, inspectedDesign = null, deps = {}) {
     mutation: true, requiresConfirmation: false,
     expected: { schema: "pipeline.architecture-design-materialization.v1", statuses: ["materialized"] },
   };
-  if (!design.ok && design.code === "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED" && typeof design.prdPath === "string") return {
+  if (!design.ok && design.status === "design-required" && typeof design.prdPath === "string") return {
     kind: "architecture-design-required",
     prdPath: design.prdPath,
     guidance: "Complete the architecture design block in this exact PO-bound PRD, then present and approve a new final design-workflow package before materialization.",

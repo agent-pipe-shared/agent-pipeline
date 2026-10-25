@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+const cases = [];
+function test(name, run) { cases.push({ id: `PHD${String(cases.length + 1).padStart(3, "0")}`, name, run }); }
+import { inspectPublicHandoverDuty, nextActionSection, updatePublicHandoverDuty } from "./onboarding-continuity.mjs";
+import { run, statePath } from "../scripts/pipeline-state.mjs";
+
+const repo = fileURLToPath(new URL("../../..", import.meta.url));
+const scratch = join(repo, "scratch");
+const state = { schema: "pipeline.state.v0", activeFeature: { id: "demo", planPath: "specs/demo/plan.md", phase: "design" }, planApproved: false };
+function fixture(run) {
+  mkdirSync(scratch, { recursive: true });
+  const root = mkdtempSync(join(scratch, "public-handover-duty-"));
+  mkdirSync(join(root, "docs"));
+  try { run(root, join(root, "docs/state.md")); }
+  finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+test("missing structured public state is unavailable with an explicit agent update action", () => fixture((root, path) => {
+  writeFileSync(path, "# State\n\n## Goal\n\nHuman notes.\n", "utf8");
+  const before = readFileSync(path, "utf8");
+  const duty = inspectPublicHandoverDuty(root, state);
+  assert.equal(duty.status, "unavailable");
+  assert.equal(duty.nextAction.kind, "agent-public-handover-update");
+  assert.equal(readFileSync(path, "utf8"), before);
+  assert.equal(updatePublicHandoverDuty(root, state).status, "unavailable");
+  assert.equal(readFileSync(path, "utf8"), before);
+}));
+
+test("an explicit update follows feature and phase while preserving other handover prose", () => fixture((root, path) => {
+  const prose = "## Goal\n\nHuman notes stay byte for byte.\n\n";
+  writeFileSync(path, `# State\n\n${prose}## Next action\n\nOld lifecycle text.\n\n## Decisions\n\nKeep this.\n`, "utf8");
+  assert.equal(inspectPublicHandoverDuty(root, state).status, "stale");
+  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
+  const first = readFileSync(path, "utf8");
+  assert.ok(first.includes(prose));
+  assert.ok(first.includes("## Decisions\n\nKeep this.\n"));
+  assert.ok(first.includes("**Lifecycle phase:** feature `demo` · phase `design`"));
+  assert.ok(first.includes("## Next action\n\n**Lifecycle phase:**"));
+  assert.ok(!first.includes("Old lifecycle text"));
+  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
+  assert.equal(readFileSync(path, "utf8"), first);
+  const implementing = { ...state, activeFeature: { ...state.activeFeature, phase: "implementation" } };
+  assert.equal(inspectPublicHandoverDuty(root, implementing).status, "stale");
+  assert.equal(updatePublicHandoverDuty(root, implementing).status, "current");
+  const second = readFileSync(path, "utf8");
+  assert.ok(second.includes("phase `implementation`"));
+  assert.ok(!second.includes("phase `design`"));
+  assert.ok(second.includes(prose));
+}));
+
+test("marker-like prose outside Next action remains byte-for-byte intact", () => fixture((root, path) => {
+  const before = "# State\n\n## Notes\n\n**Lifecycle phase:** feature `historic` · phase `design`\n\nKeep the following blank line.\n\n";
+  const after = "## Decisions\n\n**Lifecycle phase:** no active feature\n\nHuman decision remains.\n";
+  writeFileSync(path, `${before}## Next action\n\nOld lifecycle text.\n\n${after}`, "utf8");
+  assert.equal(inspectPublicHandoverDuty(root, state).status, "stale");
+  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
+  const first = readFileSync(path, "utf8");
+  assert.ok(first.startsWith(before));
+  assert.ok(first.endsWith(after));
+  assert.ok(first.includes("**Lifecycle phase:** feature `demo` · phase `design`"));
+  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
+  assert.equal(readFileSync(path, "utf8"), first);
+}));
+
+test("a matching marker in Notes cannot make an unmarked Next action current", () => fixture((root, path) => {
+  const notes = "## Notes\n\n**Lifecycle phase:** feature `demo` · phase `design`\n\n";
+  writeFileSync(path, `# State\n\n${notes}${nextActionSection(state)}## Decisions\n\nKeep.\n`, "utf8");
+  assert.equal(inspectPublicHandoverDuty(root, state).status, "stale");
+  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
+  const updated = readFileSync(path, "utf8");
+  assert.ok(updated.includes(notes));
+  assert.equal(updated.split("**Lifecycle phase:**").length - 1, 2);
+}));
+
+test("State inspection offers the explicit public update and the consumer preserves State", () => fixture((root, path) => {
+  mkdirSync(join(root, "project"));
+  writeFileSync(join(root, "project/pipeline-state.json"), JSON.stringify(state));
+  writeFileSync(path, "# State\n\n## Notes\n\nKeep.\n\n## Next action\n\nStale.\n");
+  const before = readFileSync(statePath(root), "utf8");
+  const original = console.log;
+  let payload;
+  try {
+    console.log = text => { payload = JSON.parse(text); };
+    assert.equal(run(["inspect"], { dir: root }), 0);
+    assert.equal(payload.publicHandoverDuty.status, "stale");
+    assert.equal(payload.publicHandoverDuty.nextAction.argv.at(-1), "update-public-handover");
+    assert.ok(readFileSync(path, "utf8").includes("Stale."));
+    assert.equal(run(["update-public-handover"], { dir: root }), 0);
+    assert.equal(payload.status, "current");
+    assert.equal(run(["update-public-handover", "--publish-private"], { dir: root }), 2);
+    assert.equal(readFileSync(statePath(root), "utf8"), before);
+    assert.ok(readFileSync(path, "utf8").includes("## Notes\n\nKeep.\n\n"));
+  } finally { console.log = original; }
+}));
+
+test("an explicit public update refuses physical aliases without changing their target", () => fixture((root, path) => {
+  const target = join(root, "private-fixture.md");
+  const bytes = "# Private fixture\n\n## Next action\n\nMust remain unchanged.\n";
+  writeFileSync(target, bytes);
+  symlinkSync(target, path);
+  assert.equal(inspectPublicHandoverDuty(root, state).status, "unavailable");
+  assert.equal(updatePublicHandoverDuty(root, state).status, "unavailable");
+  assert.equal(readFileSync(target, "utf8"), bytes);
+}));
+
+if (cases.length !== 6) throw new Error("public-handover-duty-tests case count drift");
+registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
