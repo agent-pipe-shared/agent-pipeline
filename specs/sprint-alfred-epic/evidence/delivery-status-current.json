@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-qualified-and-contradicted/snapshot.json",
-  "sha256": "5e1420a633f966857dc74ebace9238cfc64eb22c1c0d2ccdced135b1aceadc9a",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-burg-intake/snapshot.json",
+  "sha256": "cf54d2603a8237507ca20757500503ba5d01316efe4b4099a5e9b1ff389190b1",
   "measuredAt": "2026-10-25",
-  "head": "5f3bec25bbe5d4ac5ee0df51dee20d9446272047",
+  "head": "821cd35c103e30a027ff5ea8f0a30f0362f40b8d",
   "counts": {
-    "25": 2,
+    "25": 4,
     "50": 24,
     "75": 168,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 71.39,
-  "total": 194,
-  "scope": "Same194identities; D124qualified75, G7modelcontradicted50; netcountsunchanged"
+  "index": 70.92,
+  "total": 196,
+  "scope": "Previous194identities/stages preserved; Source-confirmed Burg G33/G34 added25. Central enterprise policy Nightwing."
 }

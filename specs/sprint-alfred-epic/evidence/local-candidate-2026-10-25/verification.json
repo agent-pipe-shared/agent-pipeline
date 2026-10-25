@@ -1,0 +1,182 @@
+{
+  "schema": "pipeline.portable-candidate-evidence-verification.v1",
+  "command": "node scratch/agent-out/portable-candidate-evidence/verify.mjs",
+  "scope": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25",
+  "owner": "portable-candidate-evidence task worker",
+  "exitCode": 0,
+  "checkCount": 34,
+  "passCount": 34,
+  "failCount": 0,
+  "checks": [
+    {
+      "id": "index-schema",
+      "status": "pass",
+      "detail": "pipeline.portable-candidate-evidence-index.v1"
+    },
+    {
+      "id": "source-binding",
+      "status": "pass",
+      "detail": "Source commit/tree/path count"
+    },
+    {
+      "id": "matrix-binding",
+      "status": "pass",
+      "detail": "matrix commit/tree"
+    },
+    {
+      "id": "agy-attribution",
+      "status": "pass",
+      "detail": "user attribution and unobserved runtime fields"
+    },
+    {
+      "id": "pending-gates",
+      "status": "pass",
+      "detail": "Verify, independent review, PO acceptance"
+    },
+    {
+      "id": "original-hash:reports/po-discard-never-liftable.md",
+      "status": "pass",
+      "detail": "scratch/agent-out/po-discard-never-liftable-completion/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/po-discard-never-liftable.md",
+      "status": "pass",
+      "detail": "reports/po-discard-never-liftable.md"
+    },
+    {
+      "id": "redaction:reports/po-discard-never-liftable.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/g13-current-session-artifact-export.md",
+      "status": "pass",
+      "detail": "scratch/agent-out/g13-current-session-artifact-export/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/g13-current-session-artifact-export.md",
+      "status": "pass",
+      "detail": "reports/g13-current-session-artifact-export.md"
+    },
+    {
+      "id": "redaction:reports/g13-current-session-artifact-export.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/cross-runner-diagnostic-toil.md",
+      "status": "pass",
+      "detail": "scratch/agent-out/cross-runner-diagnostic-toil/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/cross-runner-diagnostic-toil.md",
+      "status": "pass",
+      "detail": "reports/cross-runner-diagnostic-toil.md"
+    },
+    {
+      "id": "redaction:reports/cross-runner-diagnostic-toil.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/expanded-po-suite-registration.md",
+      "status": "pass",
+      "detail": "scratch/agent-out/expanded-po-suite-registration/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/expanded-po-suite-registration.md",
+      "status": "pass",
+      "detail": "reports/expanded-po-suite-registration.md"
+    },
+    {
+      "id": "redaction:reports/expanded-po-suite-registration.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/g17-enrollment-integration.md",
+      "status": "pass",
+      "detail": "scratch/clones/g17-enrollment-integration/scratch/agent-out/g17-enrollment-integration/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/g17-enrollment-integration.md",
+      "status": "pass",
+      "detail": "reports/g17-enrollment-integration.md"
+    },
+    {
+      "id": "redaction:reports/g17-enrollment-integration.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/g6-aggregate-fixture-repair.md",
+      "status": "pass",
+      "detail": "scratch/clones/g6-aggregate-fixture-repair/scratch/agent-out/g6-aggregate-fixture-repair/final-report.md"
+    },
+    {
+      "id": "derivative-hash:reports/g6-aggregate-fixture-repair.md",
+      "status": "pass",
+      "detail": "reports/g6-aggregate-fixture-repair.md"
+    },
+    {
+      "id": "redaction:reports/g6-aggregate-fixture-repair.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/composed-enrollment-kernel-c28.md",
+      "status": "pass",
+      "detail": "scratch/clones/composed-enrollment-kernel-c28/scratch/agent-out/composed-enrollment-kernel-c28/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/composed-enrollment-kernel-c28.md",
+      "status": "pass",
+      "detail": "reports/composed-enrollment-kernel-c28.md"
+    },
+    {
+      "id": "redaction:reports/composed-enrollment-kernel-c28.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "original-hash:reports/generator-guidance-condensation.md",
+      "status": "pass",
+      "detail": "scratch/clones/generator-guidance-condensation/scratch/agent-out/generator-guidance-condensation/report.md"
+    },
+    {
+      "id": "derivative-hash:reports/generator-guidance-condensation.md",
+      "status": "pass",
+      "detail": "reports/generator-guidance-condensation.md"
+    },
+    {
+      "id": "redaction:reports/generator-guidance-condensation.md",
+      "status": "pass",
+      "detail": "no common absolute home path or labeled correlation ID"
+    },
+    {
+      "id": "link:README.md:evidence-index.json",
+      "status": "pass",
+      "detail": "resolves within package"
+    },
+    {
+      "id": "link:README.md:user-agy-decision.md",
+      "status": "pass",
+      "detail": "resolves within package"
+    },
+    {
+      "id": "no-machine-path:README.md",
+      "status": "pass",
+      "detail": "no common absolute home path"
+    },
+    {
+      "id": "link:user-agy-decision.md:evidence-index.json",
+      "status": "pass",
+      "detail": "resolves within package"
+    },
+    {
+      "id": "no-machine-path:user-agy-decision.md",
+      "status": "pass",
+      "detail": "no common absolute home path"
+    }
+  ]
+}

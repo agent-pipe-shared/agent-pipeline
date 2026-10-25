@@ -1,0 +1,11 @@
+{
+  "reportSha256": "6f9fddd4af5e7457c22848e7de16b9267b9f9d3474d49fcf91a0594399f613fc",
+  "intake": "specs/sprint-alfred-epic/plans/greenfield-burg-intake-2026-10-25.md",
+  "addedIds": [
+    "pipeline.greenfield.g33.post-close-push-continuity",
+    "pipeline.greenfield.g34.scanner-summary-truth"
+  ],
+  "sourceHead": "821cd35c103e30a027ff5ea8f0a30f0362f40b8d",
+  "productRerun": false,
+  "previousSnapshotUnchanged": true
+}

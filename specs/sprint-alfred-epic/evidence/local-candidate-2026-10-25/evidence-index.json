@@ -1,0 +1,133 @@
+{
+  "schema": "pipeline.portable-candidate-evidence-index.v1",
+  "createdFor": "local-candidate-2026-10-25",
+  "candidate": {
+    "source": {
+      "commit": "821cd35c103e30a027ff5ea8f0a30f0362f40b8d",
+      "tree": "375d3dfc3f9e9abb477ce8756fd749a7d77e76b8",
+      "sourcePathCount": 36,
+      "bindingBasis": "Read-only Git object lookup in the current repository plus the assigned task brief."
+    },
+    "matrix": {
+      "commit": "61589901f9318ef0cf5c9eb8b45bc51830208bd1",
+      "tree": "062a95fdf0b7c9f8680be0760e058f0e0876870d",
+      "bindingBasis": "Read-only Git object lookup in the current repository plus the assigned task brief."
+    }
+  },
+  "userAttributedAGYDecision": {
+    "source": "User-provided decision summarized in the assigned task brief; not a native runtime observation.",
+    "schemaVersion": "AGY 1.4.7",
+    "recordShape": "Flat TypeName / Role / Prompt fields.",
+    "optionalModelEnum": [
+      "inherit",
+      "flash_lite",
+      "flash",
+      "pro"
+    ],
+    "workspaceEnum": [
+      "inherit",
+      "branch",
+      "share"
+    ],
+    "approvedRouting": "worker: efficient/flash tier; frontier/deep/critic: pro tier.",
+    "inheritAllowed": false,
+    "concreteModelObserved": false,
+    "effortObserved": false,
+    "nativeExecutionEvidence": false
+  },
+  "evidenceLimits": {
+    "originalReportsRemainInIgnoredScratch": true,
+    "publicReportsAreSanitizedDerivatives": true,
+    "noRawPrivateMetadataAuditIncluded": true,
+    "noProviderAccountOrSessionCorrelationIncluded": true,
+    "sourceCandidateTestsRetestedHere": false,
+    "actualNativeProviderInstalledOrPlatformAcceptance": false,
+    "integratedVerifyAndSecurity": "pending parent",
+    "independentBatchReview": "pending parent",
+    "poAcceptance": "open",
+    "resourceHeadroom": "unknown; no supplied project resource observations",
+    "quickCheck": "not configured; no PASS claimed"
+  },
+  "reports": [
+    {
+      "sourcePath": "scratch/agent-out/po-discard-never-liftable-completion/report.md",
+      "sourceBytes": 6028,
+      "sourceSha256": "fd46a6b7d1cd5fd8327674f2fb795cb896d0345290d5728ddd255d8c5f2d3f08",
+      "derivativePath": "reports/po-discard-never-liftable.md",
+      "derivativeBytes": 6035,
+      "derivativeSha256": "bbd2ec5b1041670b0c999c0c15e8afc5823c640f7406c19e7235421e8f5cd428",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/agent-out/g13-current-session-artifact-export/report.md",
+      "sourceBytes": 5082,
+      "sourceSha256": "13e373631835bbb8b80639e708e1cb73201ddd04f22f360d7b2698453edebcc5",
+      "derivativePath": "reports/g13-current-session-artifact-export.md",
+      "derivativeBytes": 5082,
+      "derivativeSha256": "13e373631835bbb8b80639e708e1cb73201ddd04f22f360d7b2698453edebcc5",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/agent-out/cross-runner-diagnostic-toil/report.md",
+      "sourceBytes": 2520,
+      "sourceSha256": "da291b3328d269a7a691391264b20f018b1fbdca10a5e5c73cddc460d076cc56",
+      "derivativePath": "reports/cross-runner-diagnostic-toil.md",
+      "derivativeBytes": 2520,
+      "derivativeSha256": "da291b3328d269a7a691391264b20f018b1fbdca10a5e5c73cddc460d076cc56",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/agent-out/expanded-po-suite-registration/report.md",
+      "sourceBytes": 4198,
+      "sourceSha256": "f9e341dd0538f471072d17543bfc1cdf22994cb8fc86bceae77d6ed54ea552e5",
+      "derivativePath": "reports/expanded-po-suite-registration.md",
+      "derivativeBytes": 4198,
+      "derivativeSha256": "f9e341dd0538f471072d17543bfc1cdf22994cb8fc86bceae77d6ed54ea552e5",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/clones/g17-enrollment-integration/scratch/agent-out/g17-enrollment-integration/report.md",
+      "sourceBytes": 5068,
+      "sourceSha256": "f645ad0dbb493d5bf6c819236949d6d3db9f222db899544360115dc99cfb1cf6",
+      "derivativePath": "reports/g17-enrollment-integration.md",
+      "derivativeBytes": 5088,
+      "derivativeSha256": "78378621ce12b27d902246dd479234f58ee86ff394cc9f1830b1ed72eefbf3a9",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/clones/g6-aggregate-fixture-repair/scratch/agent-out/g6-aggregate-fixture-repair/final-report.md",
+      "sourceBytes": 4278,
+      "sourceSha256": "80060641f559adb9d6d1cc81e5d0ee35286e9d53bba25bcdfdb2357bfe3d9d49",
+      "derivativePath": "reports/g6-aggregate-fixture-repair.md",
+      "derivativeBytes": 4288,
+      "derivativeSha256": "bd38f57a509c303a05679f973ac6821057f5a94a19886018188019a170754366",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/clones/composed-enrollment-kernel-c28/scratch/agent-out/composed-enrollment-kernel-c28/report.md",
+      "sourceBytes": 3955,
+      "sourceSha256": "2ecdd5af760236c88e4c1b7743793aea0c1862197d6a0a4e2648de0ce7d8e9c1",
+      "derivativePath": "reports/composed-enrollment-kernel-c28.md",
+      "derivativeBytes": 3955,
+      "derivativeSha256": "2ecdd5af760236c88e4c1b7743793aea0c1862197d6a0a4e2648de0ce7d8e9c1",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    },
+    {
+      "sourcePath": "scratch/clones/generator-guidance-condensation/scratch/agent-out/generator-guidance-condensation/report.md",
+      "sourceBytes": 4477,
+      "sourceSha256": "4a9eb441262dbc6a08766dbc78e992b04fbd6aaa0983b1a258f9b8df0b87458e",
+      "derivativePath": "reports/generator-guidance-condensation.md",
+      "derivativeBytes": 4477,
+      "derivativeSha256": "4a9eb441262dbc6a08766dbc78e992b04fbd6aaa0983b1a258f9b8df0b87458e",
+      "derivativeIsOriginalBytes": false,
+      "sanitization": "UTF-8 report copied; repository and home paths redacted; session/account/user ID-shaped values redacted when labeled."
+    }
+  ]
+}
