@@ -1,0 +1,24 @@
+{
+  "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
+  "command": [
+    "node",
+    "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs"
+  ],
+  "exit": 0,
+  "previousPolicyRejected": "VERIFY-CASE-COMPLETION-DECLARATION",
+  "receipt": {
+    "schema": "pipeline.verify-case-completion-attestation.v1",
+    "status": "complete",
+    "policySha256": "d7277ba2a60967f30c0fab61d0c8dec3a71b77c57d712db6f979104d36f95431",
+    "caseSetSha256": "1d0570d496c72ae03f14380370c8e5cf75b4bec26b4f899583dea6ab30a8cac9",
+    "dispositionsSha256": "e72175a240d0b4aed41aaa76f9bfaaf9aa3a4423f692e229f8b2d7719ff191e1",
+    "declaredCount": 8,
+    "disposedCount": 8,
+    "counts": {
+      "pass": 8,
+      "fail": 0,
+      "skip": 0,
+      "todo": 0
+    }
+  }
+}

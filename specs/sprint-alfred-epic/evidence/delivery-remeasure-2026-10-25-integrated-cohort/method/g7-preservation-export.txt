@@ -1,0 +1,10 @@
+command: node scratch/agent-out/g7-required-completion-source-corrected/work.mjs export
+label: preservation-export
+exitCode: 0
+head: 5e939278bf41fce6d190707a49bacfd3d0f988ef
+tree: 96eaa8e7d8ffc56a30257f1610d0f780659b74d1
+dirty: true
+--- stdout ---
+Exported exact two-path candidate; original examiner lines, registry bytes and unrelated augmentation bytes retained.
+
+--- stderr ---

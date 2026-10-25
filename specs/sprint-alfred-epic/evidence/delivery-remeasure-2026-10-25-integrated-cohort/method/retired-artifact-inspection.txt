@@ -1,0 +1,86 @@
+command: node scratch/agent-out/retired-course-content-adjudication/inspect.mjs
+label: retired-course-read-only-artifact-check
+exitCode: 0
+head: 5e939278bf41fce6d190707a49bacfd3d0f988ef
+tree: 96eaa8e7d8ffc56a30257f1610d0f780659b74d1
+dirty: true
+--- stdout ---
+{
+  "scope": "read-only artifact existence and snapshot hash; no behavior execution",
+  "owner": "RETIRED-COURSE-CONTENT-ADJUDICATION",
+  "artifacts": [
+    {
+      "path": "scratch/agent-out/retired-course-content-adjudication/report.md",
+      "bytes": 8903,
+      "sha256": "96e55d353bddfe0b6ae2ca3566e13749a2a4b101b081915abc084ec36a81f2c5"
+    },
+    {
+      "path": "scratch/agent-out/retired-course-content-adjudication/bootstrap.md",
+      "bytes": 5077,
+      "sha256": "38b0b836eb49191aa60422aa9f9ce42f5263dc4672509e768ce0745649bb8159"
+    },
+    {
+      "path": "scratch/agent-out/retired-course-content-adjudication/routes.md",
+      "bytes": 4130,
+      "sha256": "fbcca15fc3b19aaba9e39ef0b80b87e47602028142bde022076101111318abb8"
+    },
+    {
+      "path": "scratch/agent-out/retired-course-content-adjudication/generator.md",
+      "bytes": 10879,
+      "sha256": "83fcc792c511747c1ca56cb28c708eb1f7ed9281df423f5685353f63a8397caa"
+    },
+    {
+      "path": "scratch/agent-out/retired-course-content-adjudication/resource-observations.json",
+      "bytes": 245,
+      "sha256": "7a1fce80cd6219c58ccb65dcaec47bd360bae7e2486605c5169381ee6b6a3399"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/snapshot.json",
+      "bytes": 268155,
+      "sha256": "4ccaf5542d360cd7590f7510463d0cde07ee2f32ea3b491cca2f7ed8634845c8"
+    },
+    {
+      "path": "docs/adr/0085-one-review-one-signature-design-approval.md",
+      "bytes": 6091,
+      "sha256": "8deca9c157604fb28b6803bfb83118d8ffa6ad6766cc8e3b0f6ca444b43b79aa"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md",
+      "bytes": 86123,
+      "sha256": "26033895d782c193d70a195bf3ac09d1bbd011bbde8f7f71bfa00d132eb6aad3"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/plans/po-decisions-2026-10-23-tiles.md",
+      "bytes": 20804,
+      "sha256": "eb3028d47409b68d210bd4258f83e93b1eb48cc02b648b921bd559d5538eb93a"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-22.md",
+      "bytes": 18969,
+      "sha256": "57ddf73248c5be43ecc369879a00cf460c18c62c99c4c934f28810861c456ccd"
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/pin-counted-results-2026-10-23-e.md",
+      "bytes": 12530,
+      "sha256": "37b9422edac1d3700c3d9e87419d962a2216f6f0f5a80fd715d46e9881b41355"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/codex-bootstrap-in-the-typed-next-action.test.mjs",
+      "bytes": 8902,
+      "sha256": "72795b3b3c569a20f53e5f6a87051e32c3a6d32c73c083805d5ee9bb9e8c5085"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs",
+      "bytes": 17762,
+      "sha256": "c0f0aed38611e1b0ca0a6631bae969ed136428e9ed14afdd1d65403a000b0c4d"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/pins/design-generator-repeats-large-source-material.test.mjs",
+      "bytes": 23045,
+      "sha256": "8a4f5b2ba67472dd4f28a02c7038af7e511a86aa82295b8ac48a691e42a101d4"
+    }
+  ],
+  "pointerIntegrity": "pass"
+}
+
+--- stderr ---

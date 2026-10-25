@@ -1,0 +1,26 @@
+command: <host-path> scratch/agent-out/g7-required-completion-source-corrected/work.mjs qualify
+label: eight-case-fd-corrected
+exitCode: 0
+head: 5e939278bf41fce6d190707a49bacfd3d0f988ef
+tree: 96eaa8e7d8ffc56a30257f1610d0f780659b74d1
+dirty: true
+--- stdout ---
+✔ K152C001 K152: model-role-bootstrap is admitted with exactly its documented argv shapes (3.370744ms)
+✔ K152C002 K152: model-role-bootstrap stays refused for any other argv shape (3.039635ms)
+✔ K152C003 K152: antigravity-native-dispatch-prepare is admitted with exactly `prepare --root <root> --request <json>` (0.822803ms)
+✔ K152C004 K152: antigravity-native-dispatch-prepare stays refused for any other argv shape (3.395561ms)
+✔ K152C005 K152: no other script of the plugin is admitted by these pins (design-review-receipt keeps its own closed grammar) (1.23176ms)
+✔ K152C006 G7: complete receipt-create is admitted by the actual catalogue (12.219574ms)
+✔ K152C007 G7: all three complete forms pass actual draft lifecycle admission (36.029727ms)
+✔ K152C008 G7: malformed and foreign forms remain refused through actual draft lifecycle (57.922477ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 127.968809
+Canonical inherited-FD eight-case receipt passes; unchanged five-case preimage rejects that stream.
+
+--- stderr ---

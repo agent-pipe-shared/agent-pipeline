@@ -1,0 +1,136 @@
+[
+  {
+    "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+    "from": "50",
+    "to": "75",
+    "previousReason": "a8284bae2 records counts for git-null-device-sites 8/8, the R7-1a ratchets 81/81 and the Node-v24 pin 14/14 (also 14/14 on 756248e0d), but 109ce619f later added the real git status case GND009 with no stated count, and the item says it closes only on the Windows git 2.56.0.windows.2.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/git-null-device-sites.txt",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/node-null-pin.txt",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/gnd-r71a-ratchets.txt"
+    ]
+  },
+  {
+    "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+    "from": "50",
+    "to": "75",
+    "previousReason": "The PO released S1-S8 with S4 following R1; 91b42c0f2 implements alias refusal with a source-checkout exemption and 7e40ce00a restates its pin. The 28/28 count predates those changed cases and no later counted result is established at pinned 31db7853a.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/calibration.txt"
+    ]
+  },
+  {
+    "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Set e counts route pin 25/25, library 18/18 and recovery suites 8/8 plus 2/2. Later 3a4dc80e5 restates the single-review fallback pin and d2f3ed764 carries the typed receipt field; no post-change counted run qualifies that final clause, and the live Codex boundary check remains open.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/role-route.txt"
+    ]
+  },
+  {
+    "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Batch 10 D133 removes the native Windows file-permission demand and keeps the Linux count. The existing pin counts only 2 passes and 6 typed Windows skips; no counted Linux-reachable NOT_SECURE seam at the pinned ref establishes the original seam clause.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/targeted.txt"
+    ]
+  },
+  {
+    "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Set e counts 73 pass, 1 typed Windows drive-spelling skip after the read-grammar changes. The original independent security Critic with mutation probes remains an explicit acceptance clause, so targeted GREEN alone does not move this row to 75.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/final-suite.txt"
+    ]
+  },
+  {
+    "itemId": "pipeline.greenfield.g25",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Nine-path helper work remains inert/partial and uncommitted at candidate; existing code or helper checks cannot establish final consumer integration.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-onboarding-focused.json"
+    ]
+  },
+  {
+    "itemId": "pipeline.greenfield.g26",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Four-path architecture/handover helpers remain inert/partial; conformance must not label unexamined report-only findings/unavailable as passed.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json"
+    ]
+  },
+  {
+    "itemId": "pipeline.greenfield.g27.design",
+    "from": "50",
+    "to": "75",
+    "previousReason": "G2/Claude1.5 early-binding correction remains partial/inert; parser repair does not fix binding/discard loop.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-onboarding-focused.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc-result.json"
+    ]
+  },
+  {
+    "itemId": "pipeline.greenfield.g29",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Four-path helper proposal remains inert/partial; ability to edit handover is not automatic transition synchronization.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json",
+      "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-guard.json"
+    ]
+  },
+  {
+    "itemId": "pipeline.codex-bootstrap-in-the-typed-next-action",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Closed as obsolete after its fresh-host premise was refuted and ADR-0085 retired the producer. The refutation pin is counted GREEN 8/8, but it does not implement the original inclusion proposal, so the original-rubric stage stays 50.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/retired-course-report.md"
+    ]
+  },
+  {
+    "itemId": "pipeline.design-course-run-v2-refuses-its-own-documented-routes",
+    "from": "50",
+    "to": "75",
+    "previousReason": "51db763f1 counts a zero-override single-review revision chain GREEN 10/10; D125 retires the old course. Original failed-stage resumption and native-Windows Advisor fixture clauses are not qualified by that pin; retain 50.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/retired-course-report.md"
+    ]
+  },
+  {
+    "itemId": "pipeline.greenfield.g7.catalogue",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Committed adapter repair does not prove every original draft catalogue/argument route. Retain this distinct clause rather than alias the old general AGY happy path.",
+    "evidence": [
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-report.md",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-completion-receipt.json",
+      "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-export.json"
+    ]
+  }
+]

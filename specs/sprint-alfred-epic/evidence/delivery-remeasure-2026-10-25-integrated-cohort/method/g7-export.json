@@ -1,0 +1,20 @@
+{
+  "schema": "g7-required-completion.export.v1",
+  "baseCommit": "5e939278bf41fce6d190707a49bacfd3d0f988ef",
+  "changedPaths": [
+    "harness/config/verify-case-completion-augmentations.v1.json",
+    "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs"
+  ],
+  "patchSha256": "2b29f917ffcd57ae9722910f5df952ad04b5c2ce88ed355266ba6d5f57715733",
+  "previousPolicySha256": "4ef076249c3e809c8a7baf6645768c2b854c867254bffc583f7aa02e75988a99",
+  "postimages": {
+    "harness/config/verify-case-completion-augmentations.v1.json": "95436c67b7a338a00b88c40625d35b6f228d0636df1d4a7680eebececb316fb5",
+    "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs": "42a6e88516cd1ed97b3ea273aef47e64df5645c0cbd94c8e9ad01d7afe2fe6bc"
+  },
+  "originalExaminerLinesRetained": true,
+  "baseRegistriesUnchanged": true,
+  "otherAugmentationsBytesRetained": true,
+  "nativeAuthority": false,
+  "modelOrReceiptCommandsExecuted": false,
+  "resourceHeadroom": "unknown"
+}

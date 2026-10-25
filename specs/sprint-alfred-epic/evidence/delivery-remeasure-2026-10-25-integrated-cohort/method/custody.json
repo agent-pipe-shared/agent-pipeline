@@ -1,0 +1,107 @@
+{
+  "schema": "pipeline.fix-wave-artifact-custody.v1",
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/committed-5e-cohort-adjudication/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-report.md",
+      "bytes": 5263,
+      "sha256": "cf78840806eecb7cacf417929524b7d8e8d39e2964542d064026607754b93da3"
+    },
+    {
+      "source": "scratch/agent-out/committed-5e-cohort-adjudication/proposals.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-proposals.json",
+      "bytes": 13213,
+      "sha256": "9ecea7c716313789f5f6dcd4e40fc76a2fe8a7f579923bc65ac3aee0d27aa295"
+    },
+    {
+      "source": "scratch/agent-out/committed-5e-cohort-adjudication/binding.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-binding.json",
+      "bytes": 162596,
+      "sha256": "da7f42874f3d6f12ce5eac59c4bf390f550e313bcadfc4265cce33d91dc276fb"
+    },
+    {
+      "source": "scratch/agent-out/committed-5e-cohort-adjudication/final-inspection.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/cohort-binding-capture.txt",
+      "bytes": 5089,
+      "sha256": "1eec26a58b17e7cc221e91eca60c4e961165da44a4d6dcd7d6cedc373a56c959"
+    },
+    {
+      "source": "scratch/agent-out/retired-course-content-adjudication/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/retired-course-report.md",
+      "bytes": 8903,
+      "sha256": "96e55d353bddfe0b6ae2ca3566e13749a2a4b101b081915abc084ec36a81f2c5"
+    },
+    {
+      "source": "scratch/agent-out/retired-course-content-adjudication/inspect.log",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/retired-artifact-inspection.txt",
+      "bytes": 3364,
+      "sha256": "eb0699ff2a721f57975ae0b0491280d63ff72a98fe95bdee8da9ccbc1fe445ca"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/report.md",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-report.md",
+      "bytes": 4176,
+      "sha256": "5879e442432b058770c027b0711abb48d8ba0c5e365ba09836f72c4d387c3c5d"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/export.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-export.json",
+      "bytes": 1023,
+      "sha256": "ad04a5c691c3647636bea5df5d874cebf7bb14447baf315dd8e040cf8f62373a"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/candidate.patch",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-candidate.patch",
+      "bytes": 6788,
+      "sha256": "2b29f917ffcd57ae9722910f5df952ad04b5c2ce88ed355266ba6d5f57715733"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/eight-case-fd-corrected.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-eight-case-fd-corrected.txt",
+      "bytes": 1359,
+      "sha256": "c8ba3bfa4bd28533ae328988c7aeb434b164eedcf8ad2082f113190f9abd905b"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/completion-stream.jsonl",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-completion-stream.jsonl",
+      "bytes": 1593,
+      "sha256": "bd36f84b936f30acb31cb09d444b749289565d33af25e9a7ff6cac819e237bfc"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/completion-receipt.json",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-completion-receipt.json",
+      "bytes": 801,
+      "sha256": "0434918f58d875c854bcf935494a22aa2e6604e1cb744fbc5a8621723d21c81d"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/completion-policy.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-completion-policy.txt",
+      "bytes": 334,
+      "sha256": "f0518de00e71a428302b12a081c565141dc008274fe54185a60a3bda1910e8e9"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/augmentation-policy.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-augmentation-policy.txt",
+      "bytes": 3600,
+      "sha256": "6bb80a7d4badf315c9652480fa0df008f772f66bbdee6515aa5ac1dd5f3b5aae"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/suite-append.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-suite-append.txt",
+      "bytes": 315,
+      "sha256": "cb2ee25a9269205fc757db20de383b307fb7f4c732a6e5ee9fee088512b2228f"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/consumer-safe-paths.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-consumer-safe-paths.txt",
+      "bytes": 1123,
+      "sha256": "50d5ca0bebe0b2c26084466c70791d566f2cd4b71f94a30783124e11366ad6ec"
+    },
+    {
+      "source": "scratch/clones/g7-required-completion-source-corrected/scratch/agent-out/g7-required-completion-source-corrected/preservation-export.txt",
+      "artifact": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-25-integrated-cohort/method/g7-preservation-export.txt",
+      "bytes": 382,
+      "sha256": "055178d24056eafd5ec5b741712b4914c0259ece9bc4e90fc43a7a945f7f797f"
+    }
+  ]
+}

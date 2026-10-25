@@ -1,0 +1,10 @@
+command: <host-path> harness/scripts/check-verify-suite-append.mjs
+label: suite-append
+exitCode: 0
+head: 5e939278bf41fce6d190707a49bacfd3d0f988ef
+tree: 96eaa8e7d8ffc56a30257f1610d0f780659b74d1
+dirty: true
+--- stdout ---
+{"ok":true,"code":"VSA-HISTORY-APPEND-ONLY-RECORDED-RESTORATION","checked":31}
+
+--- stderr ---

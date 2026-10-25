@@ -1,0 +1,125 @@
+command: node scratch/agent-out/committed-5e-cohort-adjudication/inspect.mjs
+label: COMMITTED-5E-STATIC-CLOSURE
+exitCode: 0
+head: 5e939278bf41fce6d190707a49bacfd3d0f988ef
+tree: 96eaa8e7d8ffc56a30257f1610d0f780659b74d1
+dirty: true
+--- stdout ---
+{
+  "candidateCommit": "5e939278bf41fce6d190707a49bacfd3d0f988ef",
+  "composedPaths": 27,
+  "composedMismatches": [],
+  "staticClosurePaths": 431,
+  "closureUnbound": [],
+  "artifacts": [
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/git-null-device-sites.txt",
+      "sha256": "10ee3d76e0fa51d8b5af6b5c721a7ceb08dcfd27c0dc93d90f7daf65e65db5d7",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/node-null-pin.txt",
+      "sha256": "c502d3b3af8e7edf7fbaa53ed24c16ce752c9d0c5f3002f696d9f71ca9b6fcbd",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/gnd-r71a-ratchets.txt",
+      "sha256": "54bccf3fa6525d3323db5ca41a995ce7d1b99c9f972c5a9fba26e9687643bca1",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/calibration.txt",
+      "sha256": "cd4bdd349efe0c379a4979c837539914cf838f66ee10533977ea9bc89c76b456",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/role-route.txt",
+      "sha256": "2246ff23af2fd48ae0151ace386fc722f967a60d98204e89a41e269cd06116f0",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json",
+      "sha256": "483d27bc502ea0ef7735b790bac3ab412e948d03be7b79ef592d1cebf34e0e5a",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-onboarding-focused.json",
+      "sha256": "c5adb943982af2ba53bfd4a973bc8ec4e4e93632b0c96277e6b36f990b96b0d1",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc.json",
+      "sha256": "93e4bec816f29b7c4227c1281253b70e11124e9da7441494f775cac97da028d5",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc-result.json",
+      "sha256": "6f2a6ac6b150d053dd5f065be0735236c2ba43ec6594cd3fb9718dc71a93ae74",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-closure-consumer.json",
+      "sha256": "4daa8049acd833bf1dd02b4b6cda104e1e9dce3e2ee7bb72857d654492ad375a",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-guard.json",
+      "sha256": "aea7752b4db9340090d6b772250ecbed110bc2d15587953b02c1ae5dc05b137f",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/targeted.txt",
+      "sha256": "40424406553dacfe9638bc3a502718ab4b05839198b03d9c3f4d90119b8a4434",
+      "exists": true
+    },
+    {
+      "path": "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/final-suite.txt",
+      "sha256": "3c3979d71c8f1c092c5eab87421c5dfcf96feed95e587672f352b62aecfa424e",
+      "exists": true
+    }
+  ],
+  "rows": [
+    {
+      "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.greenfield.g25",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.greenfield.g26",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.greenfield.g27.design",
+      "stage": "50"
+    },
+    {
+      "itemId": "pipeline.greenfield.g29",
+      "stage": "50"
+    }
+  ]
+}
+
+--- stderr ---
+fatal: path 'plugins/pipeline-core/architecture-entry-readiness.mjs' does not exist in '5e939278bf41fce6d190707a49bacfd3d0f988ef'
+fatal: path 'plugins/pipeline-core/scripts/actual-support.mjs' does not exist in '5e939278bf41fce6d190707a49bacfd3d0f988ef'
+fatal: path 'plugins/pipeline-core/lib/pins/windows-private-state.mjs' does not exist in '5e939278bf41fce6d190707a49bacfd3d0f988ef'
+fatal: path 'plugins/pipeline-core/lib/change.mjs' does not exist in '5e939278bf41fce6d190707a49bacfd3d0f988ef'

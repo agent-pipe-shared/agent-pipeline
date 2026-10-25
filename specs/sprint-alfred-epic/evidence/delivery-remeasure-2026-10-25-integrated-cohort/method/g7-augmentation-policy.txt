@@ -1,0 +1,46 @@
+command: <host-path> --test harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs harness/scripts/verify-case-completion-augmentation.test.mjs
+label: augmentation-policy
+exitCode: 0
+head: 5e939278bf41fce6d190707a49bacfd3d0f988ef
+tree: 96eaa8e7d8ffc56a30257f1610d0f780659b74d1
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ BCP01 literal builtin policy survives exact digest-bound extension without rewriting the preimage (12.296322ms)
+✔ BCP02 the real SQ01 through SQ34 generator preserves every ID and underscore byte budget (7.228243ms)
+✔ BCP03 wrong hashes and exact-prior budget or ID drift remain denied (16.349992ms)
+✔ BCP04 shrinking, replacement, equal case sets and budget reductions remain non-monotone (22.144746ms)
+✔ BCP05 boolean and invalid present policies cannot be treated as absent or a bindable baseline (26.760244ms)
+✔ BCP06 static parsing never executes unsupported generator callbacks or arbitrary expressions (5.323613ms)
+✔ BCP07 existing valid policies and supplementary policy for genuinely absent registrations retain admission (9.986763ms)
+✔ BCP08 duplicate or unordered IDs and unbounded generators stay closed before allocation (27.048527ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ VAC001 exact augmentation fills absent policy without changing any original row or order (3.563641ms)
+✔ VAC002 absent optional file preserves historical rows while present unknown policies cannot remain unconsumed (4.093968ms)
+✔ VAC003 augmentation binds exact existing name and file and refuses ambiguous targets (0.45768ms)
+✔ VAC004 even an equal existing policy cannot be shadowed or rewritten (0.470795ms)
+✔ VAC005 duplicate augmentation IDs are refused before composition (0.3471ms)
+✔ VAC006 closed root and row schemas reject extra or missing keys (0.261005ms)
+✔ VAC007 full canonical completion-policy checks refuse unknown keys and case coverage drift (0.260435ms)
+✔ VAC008 unsafe, path-shaped and wildcard target files never match an existing row (0.307074ms)
+✔ VAC009 physical JSON rejects duplicate keys, malformed bytes, directories and outside aliases (5.736999ms)
+✔ VAC010 actual two-case FD completion cannot be weakened by a one-case supplementary policy (61.732512ms)
+✔ VAC011 actual candidate reads bind augmentation bytes and historical absence despite worktree changes (71.795658ms)
+✔ VAC012 candidate symlink/tree and unbound refs cannot borrow a regular worktree policy (74.119564ms)
+✔ VAC013 exact previous-policy binding permits a strict ordered case-ID superset without mutating source rows (0.64205ms)
+✔ VAC014 removing IDs, adding no new ID, or reducing maxBytes refuses a bound replacement (0.478149ms)
+✔ VAC015 wrong previous-policy preimage digest refuses an otherwise monotone extension (0.210139ms)
+✔ VAC016 existing-policy shadowing remains a conflict without exact binding and binding cannot target an absent policy (0.158752ms)
+✔ VAC017 ordered superset may interleave new IDs while retaining every old ID in order (0.164613ms)
+✔ VAC018 an augmentation targeting a hard-coded absolute-path suite is applied on the normalised repo-relative form (2.92638ms)
+✔ VAC019 a hard-coded suite whose previous-policy digest does not match, or an unbound shadow, is still refused (3.255525ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 27
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 315.728489
+
+--- stderr ---

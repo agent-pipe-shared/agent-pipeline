@@ -1,0 +1,122 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index 559b576f2..c7696fa2b 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -1455,6 +1455,25 @@
+         ],
+         "maxBytes": 65536
+       }
++    },
++    {
++      "name": "pin-antigravity-design-phase-scripts-refused-in-draft-tests",
++      "file": "plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs",
++      "previousPolicySha256": "4ef076249c3e809c8a7baf6645768c2b854c867254bffc583f7aa02e75988a99",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "K152C001",
++          "K152C002",
++          "K152C003",
++          "K152C004",
++          "K152C005",
++          "K152C006",
++          "K152C007",
++          "K152C008"
++        ],
++        "maxBytes": 65536
++      }
+     }
+   ]
+ }
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+index d0a24df15..29cddcc18 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-design-phase-scripts-refused-in-draft.test.mjs
+@@ -12,6 +12,10 @@ import nodeTest from "node:test";
+ import { registerTestCaseCompletion } from "../test-case-completion.mjs";
+ import { fileURLToPath } from "node:url";
+ import { isSanctionedLifecycleCommand } from "../guard/command-catalogue.mjs";
++import { mkdirSync, writeFileSync } from "node:fs";
++import { evaluateLifecycleReadyGuard } from "../guard/evaluate.mjs";
++import { devPlanGateVerdict } from "../guard-devplan-policy.mjs";
++import { ProjectOnboardingReadyError } from "../project-onboarding-ready-gate.mjs";
+ 
+ const scripts = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "scripts");
+ const bootstrap = join(scripts, "model-role-bootstrap.mjs");
+@@ -74,4 +78,76 @@ test("K152: no other script of the plugin is admitted by these pins (design-revi
+ });
+ 
+ if (cases.length !== 5) throw new Error("K152 admission case count drift");
++
++// Supplementary controlled Source tests. The original five examiners and their
++// order remain above. Fixture state and readiness dependencies are test doubles,
++// never native bootstrap, model, receipt, signature or approval authority.
++function draftFixture() {
++  const owned = join(scripts, "..", "..", "..", "scratch", "agent-out", "g7-draft-route-qualification");
++  mkdirSync(owned, { recursive: true });
++  const base = mkdtempSync(join(owned, "fixture-"));
++  const project = join(base, "project"), home = join(base, "home"), common = join(base, "common");
++  for (const dir of [join(project, ".claude"), join(project, "specs", "g7"), join(project, "evidence"), home, common]) mkdirSync(dir, { recursive: true });
++  writeFileSync(join(project, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n");
++  writeFileSync(join(project, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "g7", planPath: "specs/g7/prd.md", phase: "design" }, planApproved: false }));
++  for (const name of ["report.md", "prd.md", "spec.md"]) writeFileSync(join(project, "specs", "g7", name), "synthetic fixture input\n");
++  const dependencies = {
++    projectDir: project, homedirFn: () => home, resolveGitCommonDirFn: () => common,
++    observeGovernanceScopeFn: () => ({ requiresEnforcement: true }),
++    resolveRebaseAuthorityFn: () => null,
++    inspectProjectOnboardingV3Fn: () => ({ status: "ready", lifecycleStatus: "draft" }),
++    requireProjectOnboardingReadyFn: () => { throw new ProjectOnboardingReadyError("PORG-NOT-READY", "synthetic draft", { intent: "session", lifecycleStatus: "draft" }); },
++    consumeHumanGuardOverrideFn: () => ({ status: "absent" }),
++    recordHumanGuardDenialFn: () => ({ status: "unavailable" }),
++    readHumanApprovalModeFn: () => ({ mode: "signature" }),
++  };
++  return {
++    project,
++    receiptCommand: `node ${receipt} create --repo ${project} --feature g7 --report specs/g7/report.md --prd specs/g7/prd.md --spec specs/g7/spec.md --out evidence/g7.json`,
++    run(command) { return evaluateLifecycleReadyGuard({ tool_name: "Bash", cwd: project, tool_input: { command } }, dependencies); },
++    cleanup() { rmSync(base, { recursive: true, force: true }); },
++  };
++}
++
++test("G7: complete receipt-create is admitted by the actual catalogue", () => {
++  const fx = draftFixture();
++  try { assert.equal(isSanctionedLifecycleCommand(fx.receiptCommand, fx.project), true); }
++  finally { fx.cleanup(); }
++});
++
++test("G7: all three complete forms pass actual draft lifecycle admission", () => {
++  const fx = draftFixture();
++  try {
++    const blocked = devPlanGateVerdict({ filePath: "src/control.mjs", projectDir: fx.project });
++    assert.equal(blocked.verdict, "block");
++    assert.equal(blocked.lifecycleStatus, "draft");
++    for (const command of [
++      `node ${bootstrap} --repo-root ${fx.project} --runner antigravity --host-session-id g7-session`,
++      `node ${prepare} prepare --root ${fx.project} --request scratch/request.json`,
++      fx.receiptCommand,
++    ]) assert.deepEqual(fx.run(command), { exitCode: 0, stderr: "" }, command);
++  } finally { fx.cleanup(); }
++});
++
++test("G7: malformed and foreign forms remain refused through actual draft lifecycle", () => {
++  const fx = draftFixture();
++  try {
++    for (const command of [
++      `node ${bootstrap} --repo-root ${fx.project}/foreign --runner antigravity`,
++      `node ${bootstrap} --repo-root ${fx.project} --runner bogus`,
++      `node ${prepare} prepare --root ${fx.project}/foreign --request scratch/request.json`,
++      `node ${prepare} prepare --root ${fx.project} --request ../outside.json`,
++      `node ${receipt} create`,
++      fx.receiptCommand.replace(`--repo ${fx.project}`, `--repo ${fx.project}/foreign`),
++      fx.receiptCommand.replace("--spec specs/g7/spec.md ", ""),
++      fx.receiptCommand.replace("specs/g7/report.md", "../outside.md"),
++      `${fx.receiptCommand} --extra value`,
++    ]) {
++      assert.equal(isSanctionedLifecycleCommand(command, fx.project), false, command);
++      const result = fx.run(command);
++      assert.equal(result.exitCode, 2, command);
++      assert.match(result.stderr, /GUARD-DEVPLAN-SHELL/u, command);
++    }
++  } finally { fx.cleanup(); }
++});
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });

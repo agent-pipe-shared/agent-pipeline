@@ -1,0 +1,245 @@
+{
+  "schema": "pipeline.committed-cohort-stage-proposals.v1",
+  "authority": "inert-content-readiness-proposal-only",
+  "candidateCommit": "5e939278bf41fce6d190707a49bacfd3d0f988ef",
+  "canonicalSnapshot": "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-24-native-rubric/snapshot.json",
+  "denominator": 194,
+  "noStageMutation": true,
+  "no100Claim": true,
+  "items": [
+    {
+      "itemId": "pipeline.git-for-windows-2-56-rejects-git-config-global-nul",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Shared Git null constant, all Git spawn sites, real Git status GND009 and production/fixture/single-source ratchets; Node sinks remain separate.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/git-null-device.mjs",
+        "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+        "plugins/pipeline-core/lib/git-null-device-sites.test.mjs",
+        "plugins/pipeline-core/lib/pins/node-v24-on-windows-creates-a-real-nul-file.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/git-null-device-sites.txt",
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/node-null-pin.txt",
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/gnd-r71a-ratchets.txt"
+      ],
+      "countedQualification": "9/9 + 14/14 + 5/5; exits 0",
+      "remaining": [
+        "Native Git for Windows 2.56.0.windows.2 real-git qualification",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.project-calibration-retains-new-project-placeholder",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "PO-released S1-S8, R1 alias refusal, typed two-tracked-file source-checkout exemption and fail-closed consumer propagation.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/project-calibration-identity.mjs",
+        "plugins/pipeline-core/lib/consumer-verify.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "plugins/pipeline-core/lib/pins/project-calibration-retains-new-project-placeholder.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/calibration.txt"
+      ],
+      "countedQualification": "43/43; exit 0",
+      "remaining": [
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.role-route-preflight-with-self-dispatch-fallback",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Typed role route/reason, canonical fallback and independence, stderr/exit surfacing, no Coordinator action for child roles, first-call host route, atomic same-owner recovery, present-plan single-review fallback receipt points 7a-f.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/role-route-preflight.mjs",
+        "plugins/pipeline-core/scripts/pipeline-start-preflight.mjs",
+        "plugins/pipeline-core/lib/pins/role-route-preflight-with-self-dispatch-fallback.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/original-qualification/role-route.txt"
+      ],
+      "countedQualification": "31/31; exit 0",
+      "remaining": [
+        "Actual live Codex host-boundary session qualification",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.private-temp-root-not-secure-branch-has-no-test-seam",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Injected harden/assess seam reaches real NOT_SECURE branch; cleanup, no failed-root memoization, successful retry and refusal/cleanup mutation sensitivity.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/test-private-tmp.mjs",
+        "plugins/pipeline-core/lib/test-private-tmp.test.mjs",
+        "plugins/pipeline-core/lib/pins/private-temp-root-not-secure-branch-has-no-test-seam.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/private-tmp-controlled/targeted.txt"
+      ],
+      "countedQualification": "29 total, 20 pass, 9 typed native skips; exit 0",
+      "remaining": [
+        "D133 release limitation: Windows file-permission checks verified on Linux/WSL only; controlled process.platform is not native DACL evidence",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.read-only-guard-admits-execution-and-output-options",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Closed command-specific execution/output grammar across shell/native/PowerShell lanes, external Markdown positive control, direct/aliased credential and scan refusals; hermetic default private lookups.",
+      "sourcePaths": [
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+        "plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/parallel-followups-2026-10-24/unsafe-options-hermetic/final-suite.txt"
+      ],
+      "countedQualification": "75 total, 74 pass, 1 Windows spelling skip; exit 0",
+      "remaining": [
+        "Native Windows drive spelling",
+        "Explicit original independent security Critic with concrete mutation/execution negative probes before acceptance",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.greenfield.g25",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Actual submit consumer validates HEAD, criteria and physical source closure before mutation and again at commit; fresh intake retains answered values.",
+      "sourcePaths": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json",
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-onboarding-focused.json"
+      ],
+      "countedQualification": "Callsite module green plus 3/3 original exported intake/binding callbacks; exits 0",
+      "remaining": [
+        "Supported native Greenfield walkthrough",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.greenfield.g26",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Actual close writer persists source/candidate-bound per-property findings and unavailable dispositions; report-only properties remain nonblocking and never silently PASS.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/rigor-lifecycle.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "plugins/pipeline-core/lib/architecture-close-disposition.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json"
+      ],
+      "countedQualification": "3 actual producer/consumer/State close cases included in 11-test green capture; exit 0",
+      "remaining": [
+        "Supported native close walkthrough",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.greenfield.g27.design",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "Generated staging design remains editable and cannot bind/apply as authored; authoring precedes policy-selected acknowledgement; hand-authored PRD binds with one chat PO decision.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/design-authoring.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+        "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-onboarding-focused.json",
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc.json",
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-authored-parent-ipc-result.json"
+      ],
+      "countedQualification": "3/3 original callbacks plus 18/18 real parent IPC child callbacks including authored index 198; exits 0",
+      "remaining": [
+        "Native Greenfield editable-design walkthrough; full onboarding suite remains historical RED 103/108 attempted with five failures, not superseded by focused qualification",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    },
+    {
+      "itemId": "pipeline.greenfield.g29",
+      "baselineStage": 50,
+      "stageProposal": 75,
+      "originalSurvivingClauses": "State inspect diagnoses stale/unavailable public Next action and offers sanctioned explicit updater; updater follows feature/phase, preserves surrounding prose and State, and refuses aliases; actual guard admits the action.",
+      "sourcePaths": [
+        "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+        "plugins/pipeline-core/scripts/pipeline-state.mjs",
+        "plugins/pipeline-core/lib/public-handover-duty.test.mjs",
+        "plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs"
+      ],
+      "artifacts": [
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-callsite.json",
+        "specs/sprint-alfred-epic/evidence/verify-fixes/content-wave-2026-10-24/p1-lifecycle/p1-finalization-guard.json"
+      ],
+      "countedQualification": "6 public duty cases plus guard command/actual lifecycle admission; exits 0",
+      "remaining": [
+        "Agent must execute explicit public update after lifecycle transitions; private advisory projection never automatically rewrites public prose",
+        "Supported native transition walkthrough",
+        "Coordinator integrated Full Verify/Security",
+        "Scheduled independent frozen-batch Critic (preserve existing review lineage/costs)",
+        "PO acceptance"
+      ],
+      "newImplementationGap": null,
+      "newFocusedQualificationGap": null
+    }
+  ],
+  "qualificationBinding": {
+    "composedPostimages": 27,
+    "mismatches": 0,
+    "staticLocalImportClosure": 431,
+    "unboundChanges": 0,
+    "artifact": "scratch/agent-out/committed-5e-cohort-adjudication/binding.json",
+    "capture": "scratch/agent-out/committed-5e-cohort-adjudication/final-inspection.txt",
+    "limitation": "Static imports only; archived dirty candidate headers retained; no full runtime closure/native/model attestation."
+  },
+  "rubric": "Existing PO content/focused qualification readiness at 75, not acceptance; native-only duties and later independent review do not alone retain 50.",
+  "resourceHeadroom": "unknown-no-supplied-project-observations",
+  "integratedVerify": "pending-coordinator",
+  "independentReview": "pending",
+  "poAcceptance": "open",
+  "committed": []
+}
