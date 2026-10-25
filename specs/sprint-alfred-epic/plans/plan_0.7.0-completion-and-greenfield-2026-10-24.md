@@ -8,16 +8,17 @@ authority or review budget.
 
 ## Current machine/session course — PO update2026-10-25
 
-Continue on this machine; PC transfer/interruption is cancelled. G35 is repaired
-and qualified in Source7502188da; evidence/bindingsb68e22c10 and the
-three-runner stamp32b398bf7 are committed. Install build suffix
-20261025125256.b68e22c, fully restart the host, read back the loaded runtime,
-then run the real Greenfield projects in parallel. Do not restamp or wait for
-later isolated fixes to start this informative candidate. See
-[restart handover](../../../docs/state.md) and its post-stamp checkpoint.
-Backup feature push remains optional through its proof route. This implements
-the informative installed-candidate runs in step1; the remaining matrix
-content, final Full Verify/Security and frozen review batch remain required.
+Continue on this machine; PC transfer/interruption is cancelled. G35 is fixed,
+and the actual AGY installation blocker is repaired in0b1fc7699, qualified
+with host19/19, completion17/17, installer28pass1todo and consumers9/9.
+Evidence/bindings977dad8b0 and stampd4d294977 are committed. Install build
+suffix20261025134513.977dad8, read back the actual loaded runner versions and run
+real Greenfield projects in parallel. The last observed Codex b68e22c ran
+in the same session; do not claim a fresh host from that observation.
+See [restart handover](../../../docs/state.md) and its checkpoint. Backup
+push remains optional through its proof route. The remaining matrix content,
+preparatory/final Verify/Security and the scheduled frozen review batch remain
+required; this is the informative installed-candidate course in step1.
 
 ## Release scope and matrix
 

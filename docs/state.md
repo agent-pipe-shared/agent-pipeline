@@ -10,11 +10,11 @@ transfer. The local test candidate is already committed and stamped:
 | Identity | Value |
 |---|---|
 | Branch | feat/sprint-alfred |
-| Stamp commit | 32b398bf7c5bd03ba9184bea09305893ea4fbd61 |
-| Shared build suffix | 20261025125256.b68e22c |
-| Codex | 0.7.0+codex.20261025125256.b68e22c |
-| Claude | 0.7.0+claude.20261025125256.b68e22c |
-| AGY | 0.7.0+antigravity.20261025125256.b68e22c |
+| Stamp commit | d4d29497729b7e7ff655a0b4bbcb3654307b28cb |
+| Shared build suffix | 20261025134513.977dad8 |
+| Codex | 0.7.0+codex.20261025134513.977dad8 |
+| Claude | 0.7.0+claude.20261025134513.977dad8 |
+| AGY | 0.7.0+antigravity.20261025134513.977dad8 |
 
 G35 is fixed in Source7502188da and included in that candidate. Do not repair
 it again or stamp again merely to resume. The earlier bc7 stamp and its push
@@ -28,8 +28,9 @@ handover update changes no plugin, PRD, Spec or matrix stage.
    receipt or infer loaded skills from checkout manifests alone.
 2. If the build above is not actually installed/loaded, follow the
    [attended installation plan](../specs/sprint-alfred-epic/plans/local-candidate-install-and-greenfield-2026-10-25.md).
-   The last observed registry still had the older355dba9 build. Installation
-   and a complete host restart have NOT yet been observed by this handover.
+   The last actual bootstrap loaded the preceding b68e22c build in the SAME
+   session. Neither installation of this new977dad8 build nor a fresh session
+   or complete host restart is established by that observation.
 3. Once each runner has its matching installed build, start the real Codex,
    Claude and AGY Greenfield tests in parallel. Preserve distinct project
    roots, versions, platforms, reports, blockers and human interventions.
@@ -44,6 +45,27 @@ tested while remaining content is completed. No PC transfer, feature close,
 release or fresh operator commit is requested. Backup feature push is optional
 and separately signature-bound; it must not delay local installation/tests.
 
+## Latest actual hotfix and runtime facts
+
+The PO's AGY global install refused ATR-WIRING-MATCHER-UNVERIFIABLE on the
+owned PreInvocation wildcard carrier. Source0b1fc7699 fixes this without
+changing foreign or matcher bytes. [Final evidence](../specs/sprint-alfred-epic/evidence/g6-agy-installer-lifecycle-matcher-2026-10-25/README.md):
+host19/19, actual completion17/17, installer28pass/1existingtodo, consumers9/9.
+The normal active-hook commit succeeded; no operator commit was needed.
+The PO explicitly confirmed a new stamp: d4d294977, suffix20261025134513.977dad8.
+Retry the installer from this checkout, choose approved source1 then global
+refresh2; the exact command is in the installation plan. Actual retry success
+and native acceptance remain unobserved until the PO supplies the result.
+
+Codex b68e22c was genuinely loaded/current, continuity valid and CAS-READY;
+mandatory local Git hooks were refreshed through the bootstrap's exact action.
+The PO clarified this was STILL THE SAME SESSION. Do not claim a fresh session
+or complete host restart. The new build above supersedes that loaded version.
+The stale October23 Resume-Hint was replaced through sanctioned capture and
+read back as available; its summary digest is
+87c377e89d754f4ef092f18c8231e948b9b7e183b8d566ca1d94a608d39eaedb.
+Read its actual content on the next bootstrap, not the older card.
+
 ## Intent and boundaries
 
 Deliver the planned0.7.0 local candidate for the next Greenfield series with all active items. The goal is NOT complete. The PO requests a qualified INTERIM candidate on this machine, followed by local installation, actual Codex host restart and parallel genuine Greenfield tests. Preserve the unfinished feature/goal; never close-feature, pause for the abandoned PC transfer, or claim0.7.0 released. A feature-branch backup push is permitted with its own current proof.
@@ -54,7 +76,7 @@ PRD/Spec changes require separate explicit PO authorization; existing ACs, no de
 
 ## Committed candidate and evidence
 
-Source commits: human821cd35c1 (36-path custody/runner/help/diagnostic/generator composition); normale244c7b3d (truthful scanner summary); human9ed1a2800 (post-close prevention); normaldc8204a28 (AGY native tiers/public flat CLI/carrier). G35 push-budget repair7502188da and its evidence/inventory/Reader bindingb68e22c10 follow those packages; stamp32b398bf7 installs that composed Source. The0d2c33bf5 compatibility captures below are historical pre-G35 evidence, not a full final-candidate run. All operator requirements for those Source packages are resolved. No repeat heal, application question or no-verify agent commit.
+Source commits: human821cd35c1 (36-path custody/runner/help/diagnostic/generator composition); normale244c7b3d (truthful scanner summary); human9ed1a2800 (post-close prevention); normaldc8204a28 (AGY native tiers/public flat CLI/carrier). G35 push-budget repair7502188da and its evidence/inventory/Reader bindingb68e22c10 follow those packages; stampd4d294977 includes that Source plus AGY installer repair0b1fc7699 and final binding977dad8b0. The0d2c33bf5 compatibility captures below are historical pre-G35 evidence, not a full final-candidate run. All operator requirements for those Source packages are resolved. No repeat heal, application question or no-verify agent commit.
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md) has **197 identities:25=2,50=20,75=175,100=0,UNKNOWN=0;22below75,index71.95%**. The original194 identities and original22 three-runner P0/P1 traces remain; the additional Burg report added G33/G34 and the actual checkpoint failure added G35. Historical cuts/reasons are immutable. Generator,G6,G17,G23help andG34 have committed focused readiness; G7.model is now75 after original/publicCLI/FD qualification; G33 remains50 because recovery is incomplete. Never equate75 with native/release acceptance.
 
@@ -80,7 +102,7 @@ Concrete attended commands and Greenfield continuation are in the [local install
 
 Evidence, inventory/Reader binding and the three-runner stamp are already committed. Install the build named at the top, restart the host and verify the actual loaded version. Do not wait for later isolated slices or rerun stamping for this restart.
 
-Install the newly stamped local candidate, then fully restart the Codex host and verify the actual loaded candidate. Current registry readback still reports the old0.7.0+codex.20261024154452.355dba9. Existing local marketplace is $HOME/agent-pipeline-local-marketplace, selector pipeline-core@agent-pipeline-local. See [supported local workflow](codex-local-plugin-development.md) and SETUP.md Codex refresh instructions. A live reload or fresh thread in an old host does not prove the cached skills changed. Do not edit installed caches. Re-entry follows AGENTS/map/concepts/compiled decisions/pipeline-start and actual version/model-role readback.
+Install the newly stamped local candidate, then fully restart the Codex host and verify the actual loaded candidate. The last actual bootstrap read back0.7.0+codex.20261025125256.b68e22c in the same session; that is now the preceding build, not proof that this new977dad8 build is loaded. Existing local marketplace is $HOME/agent-pipeline-local-marketplace, selector pipeline-core@agent-pipeline-local. See [supported local workflow](codex-local-plugin-development.md) and SETUP.md Codex refresh instructions. A live reload or fresh thread in an old host does not prove the cached skills changed. Do not edit installed caches. Re-entry follows AGENTS/map/concepts/compiled decisions/pipeline-start and actual version/model-role readback.
 
 After runtime readback, resume the active goal on THIS machine and start independent real Greenfield runs in parallel across Codex, Claude and AGY. Record runner, host/CLI version, installed candidate, platform, exact report path and actual blockers. Do not replace these with synthetic agent tests or claim platforms not actually exercised. Continue the22 remaining rows and the operative release plan.
 

@@ -12,21 +12,37 @@ The current matrix has197 items:175 at75,20 at50,two at25. The22 remaining
 content items remain in scope. No PRD/Spec change, Enterprise policy change,
 Full Verify PASS or Critic acceptance is implied.
 
-Already completed: evidence/bindings commit `b68e22c10`, then three-manifest
-stamp commit `32b398bf7`. Expected shared suffix: `20261025125256.b68e22c`;
-Codex version: `0.7.0+codex.20261025125256.b68e22c`. Do not stamp again for
-this installation. A subsequent documentation-only handover HEAD does not
-change that plugin build. Never substitute the previous `bc7dccb43` stamp or
-its proof. Later isolated patches are described in the
-[post-stamp checkpoint](post-stamp-work-checkpoint-2026-10-25.md) and are not
-part of this installed test candidate.
+Already completed: G35 fix7502188da, G6 installer hotfix0b1fc7699,
+final evidence/bindings977dad8b0 and new stampd4d294977. Expected shared
+suffix is 20261025134513.977dad8; Codex is0.7.0+codex.20261025134513.977dad8.
+The previous32b398bf7/b68e22c candidate is superseded for installation by
+this hotfix. Do not stamp again merely to resume. A later documentation-only
+handover HEAD does not change the build. The three unintegrated proposals
+still originate at32b398bf7; verify their Source preimages before later work.
+
+## Retry the failed AGY global installation now
+
+The owned PreInvocation matcher failure is fixed in the new stamped Source.
+From the approved checkout, run:
+
+```sh
+node plugins/pipeline-core/install-agy.mjs
+```
+
+Select approved plugin directory1, then global topology refresh2, as in the
+failed attempt. Expect the installer's actual final status refreshed and the
+new Antigravity version0.7.0+antigravity.20261025134513.977dad8. If it refuses again,
+preserve the complete result; do not hand-edit hooks or bypass ownership.
+The agent has not performed this installation. Restart the actual AGY host
+and verify its loaded version before Greenfield acceptance.
 
 ## Attended local Codex installation
 
 Registry readback before this candidate confirmed the existing selector
 `pipeline-core@agent-pipeline-local`, local marketplace root
-`$HOME/agent-pipeline-local-marketplace`, and the old installed version
-`0.7.0+codex.20261024154452.355dba9`.
+`$HOME/agent-pipeline-local-marketplace`, and the preceding installed version
+`0.7.0+codex.20261025125256.b68e22c`. The PO clarified this was the
+existing session, not a fresh session or complete host restart.
 
 The existing [local development guide](../../../docs/codex-local-plugin-development.md)
 requires an attended operation outside affected Codex sessions because the

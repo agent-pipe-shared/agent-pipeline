@@ -8,20 +8,25 @@ a full Codex host restart, then parallel real Greenfield tests.
 ## Candidate to install and test
 
 - Branch: `feat/sprint-alfred`.
-- Existing stamp commit: `32b398bf7c5bd03ba9184bea09305893ea4fbd61`.
-- Shared build suffix: `20261025125256.b68e22c`.
-- Codex version: `0.7.0+codex.20261025125256.b68e22c`.
-- Claude version: `0.7.0+claude.20261025125256.b68e22c`.
-- AGY version: `0.7.0+antigravity.20261025125256.b68e22c`.
+- Existing stamp commit: `d4d29497729b7e7ff655a0b4bbcb3654307b28cb`.
+- Shared build suffix: `20261025134513.977dad8`.
+- Codex version: `0.7.0+codex.20261025134513.977dad8`.
+- Claude version: `0.7.0+claude.20261025134513.977dad8`.
+- AGY version: `0.7.0+antigravity.20261025134513.977dad8`.
 
 A later documentation-only handover commit may be HEAD. It changes no plugin
 file or installed build. Do not stamp again merely to resume this session.
 Install/restart instructions are in the
 [local plan](local-candidate-install-and-greenfield-2026-10-25.md).
-The last observed registry showed the older355dba9 version. A successful
+The last observed loaded Codex build was the preceding b68e22c in the SAME session. A successful
 installation, complete host restart and actual loaded new version are not
 yet verified by this checkpoint. A manifest or registry entry alone does not
 prove the running host has refreshed its cached skills.
+
+The G6 global installer wildcard migration is now repaired in0b1fc7699 and
+included in stampd4d294977. Follow the AGY retry in the installation plan.
+[New focused evidence](../evidence/g6-agy-installer-lifecycle-matcher-2026-10-25/README.md).
+The three later slices below remain unintegrated and based on the older32b398bf7.
 
 ## First actions in the new session
 
@@ -114,7 +119,7 @@ Suggested new-session instruction:
 
 > Continue on this machine. Read AGENTS.md and the calibrated re-entry
 > authorities, then docs/state.md and this checkpoint. Verify the loaded
-> 20261025125256.b68e22c candidate. Resume parallel real Greenfield tests and
+> 20261025134513.977dad8 candidate. Resume parallel real Greenfield tests and
 > all22 remaining matrix items; inspect the three unintegrated post-stamp
 > slices before repeating work. Keep PRD/Spec unchanged, preserve the late
 > review/final Verify sequence, and do not close the active feature or goal.

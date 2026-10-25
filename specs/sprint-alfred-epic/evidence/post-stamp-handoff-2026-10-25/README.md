@@ -1,5 +1,7 @@
 # Post-stamp handoff: later work is not installed
 
+Historical package based on32b398bf7, before the AGY installer hotfix. Current installation identity is in docs/state.md; this package does not override it. Its three proposals are still unintegrated.
+
 Installation candidate remains32b398bf7, build suffix20261025125256.b68e22c. All three later slices are inert, based on that commit, and absent from Main's plugin files. No matrix stages changed. Worker calls/tests were terminal at handoff; no live child handle remains. Recheck actual process state on re-entry before starting anything.
 
 [Custody](custody.json) binds original/portable captures, exact pre/post Source hashes and the three inert text patches. These text derivatives are review artifacts, not application-ready authorization or native receipts. Never infer that patch contents are already installed.
