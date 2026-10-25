@@ -1,0 +1,40 @@
+{
+  "schema": "pipeline.alfred-reentry-observation.v1",
+  "observedAt": "2026-10-26",
+  "head": "0c9887b5dc9347605e9a27bf3807c9f802ab0809",
+  "probe": "checkPoGateAuthority({repoRoot}) and observeCurrentPlanApprovalForCalibration({rootDir}) from plugins/pipeline-core/scripts/pipeline-state.mjs, read-only",
+  "currentAuthority": {
+    "ok": true,
+    "code": "PO-GATE-AUTHORITY-VALID",
+    "divergences": [],
+    "value": {
+      "schema": "pipeline.po-gate-authority.v2",
+      "humanFacing": "en",
+      "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16",
+      "runtimeSha256": "4c287d572f49806e587e0c1264e33b1c1b6fcde64bc634b2d7b3bdbf6b93e086",
+      "receiptSha256": "3ff41155c300d29129a7b8143676812b15f6b6a8d766b74e73dc78d1937fa964",
+      "repositoryFingerprint": "c21a7dc8f280983fa7016324b7c701334df1fad9cfc5294fbb3fa15995c4f912",
+      "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+      "planSha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e",
+      "specPath": "specs/sprint-alfred-epic/spec.md",
+      "specSha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6"
+    }
+  },
+  "approvedAuthority": {
+    "schema": "pipeline.po-gate-authority.v2",
+    "humanFacing": "en",
+    "sourceSha256": "6372139d7eee108d2c90df4638e23d4f05533cf88601115e9c57b526e20efc16",
+    "runtimeSha256": "4c287d572f49806e587e0c1264e33b1c1b6fcde64bc634b2d7b3bdbf6b93e086",
+    "receiptSha256": "e9a39a2d036437620720707c249494b35cd84d5ecdea0313dbc7a2af24175852",
+    "repositoryFingerprint": "3752bc3d65b0cce61a8d7b2ac3a5b4f3f1e4939e5a9f38dde52a8a235ae01eff",
+    "planPath": "specs/sprint-alfred-epic/prd_sprint-alfred-epic.md",
+    "planSha256": "c7e99188e9c6e0e4455b267a6c07755fdb868721599be4be2c5710c46f6d9d8e",
+    "specPath": "specs/sprint-alfred-epic/spec.md",
+    "specSha256": "6c0840cd218f4207f52bdd03bdaec4401a2937e539ffd8650fcda57cf0b85ab6"
+  },
+  "differingFields": ["receiptSha256", "repositoryFingerprint"],
+  "calibrationObservation": {
+    "status": "unavailable",
+    "code": "CVCT-AUTHORITY-STALE"
+  }
+}
