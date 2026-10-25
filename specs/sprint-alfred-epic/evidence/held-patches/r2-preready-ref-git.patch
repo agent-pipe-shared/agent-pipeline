@@ -1,0 +1,117 @@
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index 25fb5a240..b5906b58d 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -1400,18 +1400,9 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
+       arg === "-a" || arg === "-r" || arg === "-v" || arg === "-vv" || arg === "--list" || arg === "--show-current" || arg === "--contains" || arg.startsWith("--format="));
+   }
+   if (subcommand === "remote") return subargs.length === 0 || (subargs.length === 1 && subargs[0] === "-v");
+-  // Fetch updates only remote-tracking/object state; it never changes the
+-  // index or working tree.  A stale or migration-required lifecycle must not
+-  // prevent an operator from observing the current upstream.  Destructive
+-  // adoption remains separately guarded at checkout/switch time.
+-  // Only closed boolean flags and plain remote/ref names: --upload-pack, -u, --server-option,
+-  // -c, ext::/URL-style transports and refspecs can name an executable or helper.
+-  if (subcommand === "fetch") {
+-    return subargs.every((arg) =>
+-      ["--all", "--prune", "-p", "--tags", "-t", "--no-tags", "--dry-run", "-n", "--quiet", "-q",
+-        "--verbose", "-v"].includes(arg)
+-      || /^[A-Za-z0-9][A-Za-z0-9._/@-]*$/u.test(arg));
+-  }
++  // AC-123 / PO decision Q18: fetch writes remote-tracking refs, FETCH_HEAD and the object database, so it is
++  // a write, not a passive read.  It is deliberately NOT admitted here: before a ready bootstrap the pre-ready
++  // lane must refuse it (with the typed bootstrap recovery), and after readiness it follows the ordinary lifecycle gate.
+   if (subcommand !== "config") return false;
+   const isListMode = subargs.includes("--list") || subargs.includes("-l");
+   const isGetMode = subargs.length >= 2 && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 45a8f909b..0fdd5a7c9 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -1190,10 +1190,6 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
+       "git diff --check",
+       "git rev-parse HEAD",
+       "git config --get branch.main.remote",
+-      // AC-197 group F (QG-04 justification, bounded to this list entry): e02c40247 (AC-240) admits a
+-      // fetch only with plain remote and ref names, so the plain-name fetch stands in for the refspec
+-      // spelling here; the refspec spelling keeps its examiner as a refusal asserted before this loop.
+-      "git fetch origin main",
+     ]) {
+       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+@@ -1208,6 +1204,12 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
+       "find . -delete",
+       "git branch new-branch",
+       "git config user.name changed",
++      // AC-123 / PO decision Q18 (QG-04 justification, bounded to this list entry): "git fetch origin main"
++      // moves here from the admitted list above. Fetch writes remote-tracking refs, FETCH_HEAD and the object
++      // database, so it is a write and is refused before a ready bootstrap; the refusal assertion is the same
++      // examiner the entry had, now asserting the opposite verdict the PO decided. Not weakened: the
++      // refspec refusal asserted before the loop stays, and the new pre-ready case adds fetch/pull/remote update.
++      "git fetch origin main",
+       "git status && touch bypass",
+       "node --check harness/scripts/verify.mjs --eval bypass",
+       "node -e 'process.exit(0)'",
+@@ -1241,6 +1243,43 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
+   }
+ });
+ 
++// AC-123 / PO decision Q18 (pipeline.greenfield.r2.ref-updating-git-runs-before-bootstrap): before a ready
++// bootstrap only genuinely read-only actions run. A ref-updating Git subcommand writes refs, FETCH_HEAD or the
++// object database, so the pre-ready lane refuses it and names pipeline-start as the typed recovery.
++test("pre-ready ref-updating git (fetch, pull, remote update) is refused with the typed bootstrap recovery; local reads stay admitted", () => {
++  const path = root();
++  try {
++    markGovernedFixture(path);
++    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
++    const notReady = () => deny("repository-control-path-invalid");
++    for (const command of ["git fetch", "git fetch origin", "git fetch origin main", "git fetch --all --prune", "git pull", "git pull origin main", "git remote update"]) {
++      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
++      const result = evaluateLifecycleReadyGuard(bash(command), {
++        projectDir: path,
++        requireProjectOnboardingReadyFn: notReady,
++        readCodexHostRepositoryInitAdmissionFn: () => null,
++        hasCodexExistingGitControlMountFn: () => false,
++      });
++      assert.equal(result.exitCode, 2, command);
++      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
++      // Canonical non-ready recovery: the typed project-onboarding-v3 inspection, which is exactly what pipeline-start runs.
++      assert.match(result.stderr, /project-onboarding-v3 inspection/u, command);
++    }
++    for (const command of ["git status", "git log", "git diff", "git rev-parse HEAD"]) {
++      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
++      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
++        projectDir: path,
++        requireProjectOnboardingReadyFn: notReady,
++      }), { exitCode: 0, stderr: "" }, command);
++    }
++    // post-ready admission is unchanged
++    assert.equal(evaluateLifecycleReadyGuard(bash("git fetch origin"), {
++      projectDir: path,
++      requireProjectOnboardingReadyFn: readyStub,
++    }).exitCode, 0);
++  } finally { rmSync(path, { recursive: true, force: true }); }
++});
++
+ test("non-ready write denials surface only the typed lifecycle status and recovery route", () => {
+   const path = root();
+   try {
+diff --git a/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs b/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+index 618859952..44e06c9bb 100644
+--- a/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
++++ b/plugins/pipeline-core/lib/pins/read-only-guard-admits-execution-and-output-options.test.mjs
+@@ -156,9 +156,12 @@ test("A1 git fetch: helper/executable-naming options and URL transports stay ref
+   for (const command of ["git fetch -u calc", "git fetch --server-option=x", "git fetch -c core.x=y",
+     "git fetch ext::calc", "git fetch origin main:other"]) assert.equal(guard(command), false, command);
+ });
+-test("A1 git fetch: plain fetches stay admitted (control)", () => {
++// AC-123 / PO decision Q18 (QG-04 justification): this control flips from admitted to refused. A plain fetch
++// writes remote-tracking refs, FETCH_HEAD and the object database, so it is a write, not a passive read; the
++// same four commands remain the examiner, now asserting the verdict the PO decided.
++test("A1 git fetch: plain fetches are refused as ref-updating writes (Q18)", () => {
+   for (const command of ["git fetch", "git fetch origin", "git fetch --all --prune", "git fetch origin main"]) {
+-    assert.equal(guard(command), true, command);
++    assert.equal(guard(command), false, command);
+   }
+ });
+ test("A1 git -C: a directory inside the project stays admitted (control); missing arg refused", () => {
