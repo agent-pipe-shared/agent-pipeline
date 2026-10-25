@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 
 import { classifyVerifyCommand, run } from "../../scripts/pipeline-state.mjs";
 import { checkVerifyContractConfigured } from "../../scripts/push-gate-satisfiability.mjs";
+import { prepareDesignBootstrapVerifyFixture } from "../test-design-bootstrap-verify-fixture.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -46,12 +47,7 @@ function fixture({ verify, withCalibration = true }) {
   const root = join(FIXTURES, `f${counter += 1}`);
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, ".claude"), { recursive: true });
-  if (withCalibration) {
-    const calibration = { project: "fresh-testless", verify, handover: "docs/state.md" };
-    for (const path of [join(root, "project", "pipeline.json"), join(root, ".claude", "pipeline.json")]) {
-      writeFileSync(path, `${JSON.stringify(calibration, null, 2)}\n`);
-    }
-  }
+  if (withCalibration) return prepareDesignBootstrapVerifyFixture({ root, verify, now: NOW });
   writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
     schema: "pipeline.state.v0",
     activeFeature: { id: "design-bootstrap", planPath: "specs/design-bootstrap/prd.md", phase: "design" },
