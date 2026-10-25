@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-burg-intake/snapshot.json",
-  "sha256": "cf54d2603a8237507ca20757500503ba5d01316efe4b4099a5e9b1ff389190b1",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-committed-source-credit/snapshot.json",
+  "sha256": "0eb0383f96dc7fe9187df31ce237ef95010e250c311910ba5bb5519f0ccc21f4",
   "measuredAt": "2026-10-25",
-  "head": "821cd35c103e30a027ff5ea8f0a30f0362f40b8d",
+  "head": "e244c7b3d2efd8927646bb892958f376b8827738",
   "counts": {
-    "25": 4,
-    "50": 24,
-    "75": 168,
+    "25": 3,
+    "50": 20,
+    "75": 173,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 70.92,
+  "index": 71.68,
   "total": 196,
-  "scope": "Previous194identities/stages preserved; Source-confirmed Burg G33/G34 added25. Central enterprise policy Nightwing."
+  "scope": "Same196identities; five actual committed Source/focused readiness promotions. Nightwing enterprise policy excluded."
 }

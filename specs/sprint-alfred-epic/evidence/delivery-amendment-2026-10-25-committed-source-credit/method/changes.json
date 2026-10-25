@@ -1,0 +1,37 @@
+[
+  {
+    "itemId": "pipeline.design-generator-repeats-large-source-material",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Original current13-case pin is12 pass/1 fail: actual Codex driver15230 bytes exceeds unchanged15000 budget. The14047-byte source request is measured; source copies0/0/0 and other preservation checks pass. Narrow output repair is active; native host display/token qualification remains absent. Cross-call compaction remains deferred.",
+    "evidence": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25/reports/generator-guidance-condensation.md"
+  },
+  {
+    "itemId": "pipeline.greenfield.g6",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Actual user-level installer matcher omission is reproduced. Frozen cumulative Source correction has green matcher/ownership/source-script/final-readback controls; aggregate12 primary write/edit denials remain unqualified because fixture mutates readiness inputs after binding. Fixture repair/enrollment is active; package remains inert and uncommitted.",
+    "evidence": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25/reports/g6-aggregate-fixture-repair.md"
+  },
+  {
+    "itemId": "pipeline.greenfield.g17",
+    "from": "50",
+    "to": "75",
+    "previousReason": "PO-approved clone host correction now has focused GREEN managed positive with actual receipt hashes, nonvacuous settlement gap, inventory/root mutations and custody/replay compatibility. Exact nine-path patch8366bc8bc21599456c77c927af54aff2a498ee62e41877b074debab08641523a remains unintegrated. Automatic review refused Main import beyond clone-only approval; explicit Main tile pending. Enrollment, C28 re-pin and native qualification remain.",
+    "evidence": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25/reports/g17-enrollment-integration.md"
+  },
+  {
+    "itemId": "pipeline.greenfield.g23.help",
+    "from": "50",
+    "to": "75",
+    "previousReason": "K23 improves read/help admission, but actual original po-human-approval help and discard recovery content lacks separately counted full proof here.",
+    "evidence": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25/reports/po-discard-never-liftable.md"
+  },
+  {
+    "itemId": "pipeline.greenfield.g34.scanner-summary-truth",
+    "from": "25",
+    "to": "75",
+    "previousReason": "Source confirms legacy console CLEAN from exit0 despite missing scanner execution; current V2 blocking-mode completeness remains separate. Narrow reporting repair/qualification is pending.",
+    "evidence": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/README.md"
+  }
+]

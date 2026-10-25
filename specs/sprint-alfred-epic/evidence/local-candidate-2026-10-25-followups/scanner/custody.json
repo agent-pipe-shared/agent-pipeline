@@ -1,0 +1,75 @@
+{
+  "schema": "pipeline.portable-followup-custody.v1",
+  "sourceCommit": "e244c7b3d",
+  "patchSha256": "5c0d1b3c29b034881a83d52f6b163bd19eaf0c67df10655236401f555f08a95c",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.mjs",
+      "preSha256": "f5084c8ab70d94ab0ae8fade2f635c4f2bd33681a313565cc3fbf72aec945daa",
+      "postSha256": "4a0864a937b89e9604e87c71bcd28f26e88253f2dcf6fe123ceaad829db2ce88"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-scan.test.mjs",
+      "preSha256": "f036f3864e8db57752c942297cb35b1e9a7887673649e42a200384b4e6fcb459",
+      "postSha256": "09030347733f53ad6a916b9a74d865aa4775a6b1cb4b930dcafaf3c58908495d"
+    }
+  ],
+  "files": [
+    {
+      "source": "scratch/clones/scanner-summary-truth/scratch/evidence/scanner-summary-original-all-skipped.txt",
+      "sourceSha256": "66a54c5d77150bade122a2f0879abc11cc04aeb288ba87d4618ca5168936ba7c",
+      "sourceBytes": 11906,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/scanner-summary-original-all-skipped.txt",
+      "derivativeSha256": "66a54c5d77150bade122a2f0879abc11cc04aeb288ba87d4618ca5168936ba7c",
+      "derivativeBytes": 11906,
+      "byteExactOriginal": false,
+      "transformation": "Repository-root and home-prefix redaction only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/scanner-summary-truth/scratch/evidence/scanner-summary-truth-red.txt",
+      "sourceSha256": "fce57af4c3d270259bc47764b9ca847f1c266bdb23069e437d72a57e018fdf52",
+      "sourceBytes": 13576,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/scanner-summary-truth-red.txt",
+      "derivativeSha256": "fce57af4c3d270259bc47764b9ca847f1c266bdb23069e437d72a57e018fdf52",
+      "derivativeBytes": 13576,
+      "byteExactOriginal": false,
+      "transformation": "Repository-root and home-prefix redaction only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/scanner-summary-truth/scratch/evidence/scanner-summary-truth-green-final.txt",
+      "sourceSha256": "5fb175608b3b0267d2d3e3a77fb1a895534cb166e01002939d5d5d1f37b6a112",
+      "sourceBytes": 12536,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/scanner-summary-truth-green-final.txt",
+      "derivativeSha256": "5fb175608b3b0267d2d3e3a77fb1a895534cb166e01002939d5d5d1f37b6a112",
+      "derivativeBytes": 12536,
+      "byteExactOriginal": false,
+      "transformation": "Repository-root and home-prefix redaction only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/scanner-summary-truth/scratch/evidence/security-scan-v2-integration-green.txt",
+      "sourceSha256": "425fa712aafd0e2aebd0016b6faced012a47c9d4bb9bf1481e518339f9b7cd99",
+      "sourceBytes": 1404,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/security-scan-v2-integration-green.txt",
+      "derivativeSha256": "425fa712aafd0e2aebd0016b6faced012a47c9d4bb9bf1481e518339f9b7cd99",
+      "derivativeBytes": 1404,
+      "byteExactOriginal": false,
+      "transformation": "Repository-root and home-prefix redaction only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/scanner-summary-truth/scratch/evidence/consumer-safe-paths-green.txt",
+      "sourceSha256": "a77013af1c1f3a89dceeb85f7c055b22c1f9968ae5c9be9bd87b8dcb9aec771b",
+      "sourceBytes": 1144,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/scanner/consumer-safe-paths-green.txt",
+      "derivativeSha256": "a77013af1c1f3a89dceeb85f7c055b22c1f9968ae5c9be9bd87b8dcb9aec771b",
+      "derivativeBytes": 1144,
+      "byteExactOriginal": false,
+      "transformation": "Repository-root and home-prefix redaction only; original retained in ignored Scratch."
+    }
+  ],
+  "rootProductRerun": false,
+  "ownerReported": {
+    "scannerCases": 170,
+    "v2IntegrationCases": 9,
+    "consumerCases": 9
+  }
+}

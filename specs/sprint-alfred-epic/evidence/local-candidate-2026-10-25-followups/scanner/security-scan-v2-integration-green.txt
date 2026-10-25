@@ -1,0 +1,26 @@
+command: node <repo-root>/plugins/pipeline-core/scripts/security-scan-v2-integration.test.mjs
+label: security-scan-v2-consumer-regression-green
+exitCode: 0
+head: 821cd35c103e30a027ff5ea8f0a30f0362f40b8d
+tree: 375d3dfc3f9e9abb477ce8756fd749a7d77e76b8
+dirty: true
+--- stdout ---
+✔ v2 envelope is valid for a real clean Git candidate and captures all three capabilities (257.875853ms)
+✔ package-source-free repositories make SCA not-applicable without exempting missing tooling (240.707491ms)
+✔ EXIT-NEUTRALITY: exit code matches pre-CYB-2E v1 behavior across representative classes (676.822246ms)
+✔ EXIT-NEUTRALITY divergence: all-skipped is v1 exit 0 while the v2 policy-complete verdict blocks (reporting-only) (126.109548ms)
+✔ per-capability RUN_OUTCOMES mapping: pass, findings, required-capability-missing (394.374243ms)
+✔ license-check control lane: PASS -> met, and its run-outcome mirrors the sanctioned evaluator (166.617842ms)
+✔ license-check control lane: SKIPPED (no declared file) -> not-applicable (122.804789ms)
+✔ dirty/uncertain candidate: v1 exit 2 and v2 marks every capability invalid (candidate-binding poisoning) (61.667459ms)
+✔ v1 evidence + on-disk security-latest.json stay byte-shape-identical (no v2 field leakage) (125.978929ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2190.194618
+
+--- stderr ---
