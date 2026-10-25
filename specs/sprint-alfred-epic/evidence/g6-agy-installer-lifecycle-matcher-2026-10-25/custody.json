@@ -1,0 +1,65 @@
+{
+  "schema": "pipeline.g6-installer-lifecycle-matcher-custody.v1",
+  "sourceCommit": "0b1fc7699f5d677693756759acf1e7d342667135",
+  "base": "623e24b8955659cc2caee75e656a9f16076109fd",
+  "fileHashes": {
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs": {
+      "beforeSha256": "31397ba4ea094ec0396ede3c6b4d2a19fb3abdc5f0ca7046d452a90f8dd78725",
+      "afterSha256": "ae12b1466aced5986458457c999a406892f8c1cd686f9e9d8f7338e3536bb984"
+    },
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs": {
+      "beforeSha256": "96c6e1c452604bd2c989aa9cc66cd4164eb2e549d0af50fbe584fd9b68751b07",
+      "afterSha256": "9504860246b79faf36a06a5faca39b1bd175fa8cac31e71dcb216e2286d0e44a"
+    }
+  },
+  "captures": [
+    {
+      "path": "captures/host-red.log.txt",
+      "originalSha256": "2128bccf3ab5c5ecb28ff7aef6a335c3f6669a1d18bcf08daeaed4dcf97c0e36",
+      "portableSha256": "2128bccf3ab5c5ecb28ff7aef6a335c3f6669a1d18bcf08daeaed4dcf97c0e36",
+      "scope": "Original verifier19tests:17pass2fail; observed lifecycle refusal reproduced."
+    },
+    {
+      "path": "captures/host-green.log.txt",
+      "originalSha256": "661d40b6f101547f20ad1315c985deeb08d6a824977c483db52b6588b128cb82",
+      "portableSha256": "661d40b6f101547f20ad1315c985deeb08d6a824977c483db52b6588b128cb82",
+      "scope": "Final narrowed Source19/19 TAP, including original15 and2 new completion cases plus2 existing focused cases."
+    },
+    {
+      "path": "captures/host-fd-green.log.txt",
+      "originalSha256": "950e7945930d159ed6cfe4b1b685fba3618351ded41e88990893aa1cec27e96b",
+      "portableSha256": "950e7945930d159ed6cfe4b1b685fba3618351ded41e88990893aa1cec27e96b",
+      "scope": "Successful direct-node completion-qualified final Source."
+    },
+    {
+      "path": "captures/host-fd-records.log.txt",
+      "originalSha256": "b6bd50f6f99f8e5dab2ba8e3ac8be20ef4ced58917e0b2b529040bdac3953e65",
+      "portableSha256": "b6bd50f6f99f8e5dab2ba8e3ac8be20ef4ced58917e0b2b529040bdac3953e65",
+      "scope": "Actual DECLARED/DISPOSED/TERMINAL17/17pass; no skipped/todo."
+    },
+    {
+      "path": "captures/installer.log.txt",
+      "originalSha256": "f11705126139744bb849992c7fc7fb933b85eec6d3bbc57c6b6027ac78a96a43",
+      "portableSha256": "f11705126139744bb849992c7fc7fb933b85eec6d3bbc57c6b6027ac78a96a43",
+      "scope": "Exit0,28pass/1existingtodo; not29pass."
+    },
+    {
+      "path": "captures/consumers.log.txt",
+      "originalSha256": "c47b8f879957341e420891aa7e281cfe8510dee73869164f6591e0a4af5475b8",
+      "portableSha256": "c47b8f879957341e420891aa7e281cfe8510dee73869164f6591e0a4af5475b8",
+      "scope": "Exit0,9/9."
+    },
+    {
+      "path": "captures/fd-transport-failed.log.txt",
+      "originalSha256": "f15a7b378d17690c4bd8f21a851671e8eadbfef9c5d6b32d539957b4add2c63c",
+      "portableSha256": "f15a7b378d17690c4bd8f21a851671e8eadbfef9c5d6b32d539957b4add2c63c",
+      "scope": "Earlier node --test descriptor transport failed TCC-FD-WRITE; superseded by successful direct-node transport, not erased."
+    },
+    {
+      "path": "captures/live-wiring-diagnostic.log.txt",
+      "originalSha256": "c8fa8d6599220c84744b3580d6c6aae75f7844a4e26d00af48391f6c228dfe73",
+      "portableSha256": "c8fa8d6599220c84744b3580d6c6aae75f7844a4e26d00af48391f6c228dfe73",
+      "scope": "Read-only actual metadata only; config bytes/foreign command contents not published."
+    }
+  ]
+}

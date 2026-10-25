@@ -1,9 +1,9 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-g35-local/snapshot.json",
-  "sha256": "6532eca92d6a04987d326b9ed5d0878b3e3a7939ad6c20c2f7a1f0f521e15a31",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-agy-install-matcher/snapshot.json",
+  "sha256": "e574755d1f5691ecc23a24073ed2c35d8c1dbf44b19f1294bbab38609eeb9b14",
   "measuredAt": "2026-10-25",
-  "head": "7502188dad20864399843d08e610686b3ada3f0b",
+  "head": "0b1fc7699f5d677693756759acf1e7d342667135",
   "counts": {
     "25": 2,
     "50": 20,
@@ -13,5 +13,5 @@
   },
   "index": 71.95,
   "total": 197,
-  "scope": "196 preceding identities/stages preserved plus confirmed P1 G35 at focused75. Local install/restart/parallel Greenfield; no release/native acceptance."
+  "scope": "Same197 identities/stages; existing G6 actual AGY install matcher regression qualified. Native retry pending."
 }

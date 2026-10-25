@@ -1,0 +1,14 @@
+command: node scratch/diagnose-agy-wiring-matcher-20261025.mjs
+label: agy-install-live-wiring-metadata
+exitCode: 0
+head: 623e24b8955659cc2caee75e656a9f16076109fd
+tree: f3e4e5c6ac3fe31aa3e195af013aed4be1334355
+dirty: false
+--- stdout ---
+{"label":"approved-source","status":"read","sha256":"25e9e6ee50cfdc74ca03f08c6884ede844c74b989ae1370ad270d902cb307e13","groups":[{"location":"pipeline-core.PreToolUse.0","hasMatcher":true,"matcherType":"string","matcher":"run_command|write_to_file|replace_file_content|write_file|edit_file|read_file|invoke_subagent","scripts":["antigravity-slicing-hint.mjs observe","antigravity-pretool-guard.mjs"]}]}
+{"label":"global-hooks","status":"read","sha256":"d6c22df82a3be7f783d35cb5ca752bb5259fc1d610f15002dea8b2c4f342cc6c","groups":[{"location":"pipeline-core.PreToolUse.0","hasMatcher":true,"matcherType":"string","matcher":"run_command","scripts":["antigravity-pretool-guard.mjs"]},{"location":"pipeline-core.PreInvocation.0","hasMatcher":true,"matcherType":"string","matcher":"*","scripts":["antigravity-start-hint.mjs"]}]}
+{"label":"global-external","status":"absent"}
+{"label":"workspace-hooks","status":"absent"}
+{"label":"workspace-external","status":"absent"}
+
+--- stderr ---

@@ -1,0 +1,27 @@
+command: env HOME=<repo-root>/scratch/synthetic-home USERPROFILE=<repo-root>/scratch/synthetic-home node --test harness/scripts/check-consumer-safe-paths.test.mjs
+label: check-consumer-safe-paths
+exitCode: 0
+head: 623e24b8955659cc2caee75e656a9f16076109fd
+tree: f3e4e5c6ac3fe31aa3e195af013aed4be1334355
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.051488ms)
+✔ a clean fixture passes (0.618064ms)
+✔ an allowlisted occurrence passes (0.395181ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.28408ms)
+✔ multiple prefix hits on one line each produce a finding (0.156066ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.203928ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (0.529276ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (156.693829ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (12.026989ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 240.090317
+
+--- stderr ---

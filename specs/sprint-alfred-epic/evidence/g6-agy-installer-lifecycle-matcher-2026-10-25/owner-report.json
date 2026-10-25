@@ -1,0 +1,110 @@
+{
+  "schema": "pipeline.agy-install-lifecycle-matcher-handoff.v1",
+  "baseCommit": "623e24b8955659cc2caee75e656a9f16076109fd",
+  "changedPaths": [
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs",
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs"
+  ],
+  "fileHashes": {
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.mjs": {
+      "beforeSha256": "31397ba4ea094ec0396ede3c6b4d2a19fb3abdc5f0ca7046d452a90f8dd78725",
+      "afterSha256": "ae12b1466aced5986458457c999a406892f8c1cd686f9e9d8f7338e3536bb984"
+    },
+    "plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs": {
+      "beforeSha256": "96c6e1c452604bd2c989aa9cc66cd4164eb2e549d0af50fbe584fd9b68751b07",
+      "afterSha256": "9504860246b79faf36a06a5faca39b1bd175fa8cac31e71dcb216e2286d0e44a"
+    }
+  },
+  "patch": {
+    "path": "scratch/agy-install-lifecycle-matcher.patch",
+    "sha256": "6bf77010063994e3c863e4cc5a04c47908e726c7837e00f95f358e465a2f2c78"
+  },
+  "evidence": {
+    "red": {
+      "artifact": "scratch/agy-topology-refresh-host-red.json",
+      "exitCode": 1,
+      "tests": 19,
+      "pass": 17,
+      "fail": 2,
+      "skipped": 0,
+      "todo": 0,
+      "expectedFailure": "RC05C016 refused with ATR-WIRING-MATCHER-UNVERIFIABLE against original verifier"
+    },
+    "focusedHost": {
+      "artifact": "scratch/agy-topology-refresh-host-focused.json",
+      "exitCode": 0,
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "focusedHostCompletion": {
+      "artifact": "scratch/host-suite-completion.ndjson",
+      "captureArtifact": "scratch/agy-topology-refresh-host-fd.json",
+      "declaredCount": 17,
+      "disposedCount": 17,
+      "ids": [
+        "RC05C001",
+        "RC05C002",
+        "RC05C003",
+        "RC05C004",
+        "RC05C005",
+        "RC05C006",
+        "RC05C007",
+        "RC05C008",
+        "RC05C009",
+        "RC05C010",
+        "RC05C011",
+        "RC05C012",
+        "RC05C013",
+        "RC05C014",
+        "RC05C015",
+        "RC05C016",
+        "RC05C017"
+      ],
+      "counts": {
+        "pass": 17,
+        "fail": 0,
+        "skip": 0,
+        "todo": 0
+      },
+      "caseSetSha256": "489184a5e10cd2dd27fdf4f59a106713804312f4071d57706ffbf35e21da9d11",
+      "dispositionsSha256": "680e077e51dcb41bb3b8a23fca0c62f1e076f9cb404d8def7f73a6c4ee9b5cb0"
+    },
+    "installerConsumer": {
+      "artifact": "scratch/install-agy-regression.json",
+      "exitCode": 0,
+      "tests": 29,
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 1
+    },
+    "consumerSafePaths": {
+      "artifact": "scratch/check-consumer-safe-paths.json",
+      "exitCode": 0,
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "whitespace": {
+      "artifact": "scratch/git-diff-check.json",
+      "exitCode": 0,
+      "tests": 0,
+      "pass": 0,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "command": "git diff --check"
+    },
+    "failedNodeTestFdAttempt": {
+      "artifact": "scratch/agy-topology-refresh-host-fd-test-runner-failed.json",
+      "exitCode": 1,
+      "reason": "Node --test reserves/invalidates the forwarded completion descriptor (TCC-FD-WRITE); retained separately from the successful direct-node capture"
+    }
+  },
+  "integratedSourceCommit": "0b1fc7699f5d677693756759acf1e7d342667135"
+}

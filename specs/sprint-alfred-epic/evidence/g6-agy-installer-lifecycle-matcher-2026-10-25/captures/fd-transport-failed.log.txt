@@ -1,0 +1,51 @@
+command: node scratch/run-host-suite-test-runner-fd.cjs
+label: agy-topology-refresh-host-fd-test-runner-failed
+exitCode: 1
+head: 623e24b8955659cc2caee75e656a9f16076109fd
+tree: f3e4e5c6ac3fe31aa3e195af013aed4be1334355
+dirty: true
+--- stdout ---
+node:internal/test_runner/harness:122
+      throw err;
+      ^
+
+Error: completion descriptor is missing or unwritable
+    at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:83:21)
+    at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:145:21)
+    ... 5 lines matching cause stack trace ...
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  code: 'TCC-FD-WRITE',
+  [cause]: Error: EINVAL: invalid argument, write
+      at writeSync (node:fs:917:3)
+      at writeTestCaseCompletionBytes (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:75:23)
+      at emit (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:145:21)
+      at buildRecorder (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:147:3)
+      at registerTestCaseCompletion (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:214:20)
+      at file://<repo-root>/plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs:264:1
+      at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+      at async node:internal/modules/esm/loader:639:26
+      at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+    errno: -22,
+    syscall: 'write',
+    code: 'EINVAL'
+  }
+}
+
+Node.js v24.15.0
+✖ plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs (49.393284ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57.63293
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs:1:1
+✖ plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs (49.393284ms)
+  'test failed'
+
+--- stderr ---

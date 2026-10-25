@@ -1,0 +1,68 @@
+command: env HOME=<repo-root>/scratch/synthetic-home USERPROFILE=<repo-root>/scratch/synthetic-home node --test plugins/pipeline-core/install-agy.test.mjs
+label: install-agy-regression
+exitCode: 0
+head: 623e24b8955659cc2caee75e656a9f16076109fd
+tree: f3e4e5c6ac3fe31aa3e195af013aed4be1334355
+dirty: true
+--- stdout ---
+Cloning into '/tmp/agy-release-tag-checkout-TVoaqP/installed'...
+warning: --depth is ignored in local clones; use file:// instead.
+done.
+Note: switching to '2d0f625042e3dafc46f03b7135bb9934e04016f3'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+fatal: ref HEAD is not a symbolic ref
+Switched to a new branch 'pipeline-release-v0.7.0'
+✔ G6: installer refresh expands an owned user-level matcher to native file tools (59.807586ms)
+✔ G6: host matcher ownership, approval, manifest and preimage controls (166.639933ms)
+✔ G6: missing and aliased Source scripts refuse before any wiring mutation (4.398106ms)
+✔ Agy release-tag checkout creates a named branch without changing the tag commit (66.883178ms)
+✔ Agy installer guidance verifies the host PATH without normalizing sudo or yolo (0.316832ms)
+✔ Agy installer checks Git source before a managed copy can be bound or refreshed (0.578319ms)
+✔ Agy optional autonomous settings preserve unrelated keys and refuse malformed input (1.917113ms)
+✔ Agy optional autonomous settings never follow file or parent aliases (0.76322ms)
+✔ Agy installer defaults to the approved script directory and makes local development explicit (0.439996ms)
+✔ Agy installer shows an invalid source choice as a refusal before touching the consumer registry (304.745163ms)
+✔ Agy source install writes a receipt readable by the first preflight in an empty non-Git workspace (531.378755ms)
+✔ Agy installer discovery finds the Git source from the invoking directory when its own directory is gitless (152.062045ms)
+✔ Agy installer discovery never accepts a locator whose bytes differ and names the repair (101.496707ms)
+✔ Agy upgrade replaces the old physical root and survives its removal (17.896746ms)
+✔ Agy upgrade refuses an unverifiable deleted Pipeline-shaped registration (2.061266ms)
+✔ D79: the tracked workspace registry never gains a machine path: relative entries stay, outside sources are refused, the global file keeps the absolute root (2.374782ms)
+✔ Agy installer refuses malformed existing registry without changing bytes (1.374782ms)
+✔ Agy installer rejects unsafe new roots and resolver retains exact non-symlink binding (13.796782ms)
+✔ Agy installer rejects directories without a valid physical Pipeline manifest before registry publication (1.598096ms)
+✔ AM-W-T: the installer accepts source kind central-snapshot as choice 3, after approved-directory 1 and local-marketplace 2 (0.17885ms)
+✔ AM-W-T: install-agy.mjs calls installAgyFromCentralSnapshot imported from the central refresh module (structural stand-in) (0.515219ms)
+✔ AM-W-T: selecting central-snapshot runs installAgyFromCentralSnapshot with global scope against a fixture-bound config root (0.119507ms) # missing seam: runInteractiveInstaller() reads process.stdin, process.cwd() and the user home directly and exposes no way to inject installAgyFromCentralSnapshot, a home function or a CLI runner; a subprocess drive would resolve the real agy CLI by PATH. The wiring slice must export an injectable entry (for example runCentralSnapshotInstall({ deps, runCli, installAgyFromCentralSnapshot })) before this call can be pinned without touching a real home or a real agy installation.
+✔ Agy installer never follows registry-file or parent aliases while updating (1.232461ms)
+✔ Agy --refresh prints the exact plan before any change, then syncs, remediates and reads back in order (0.898487ms)
+✔ Agy --refresh without confirmation changes nothing and names the repair (0.160214ms)
+✔ Agy --refresh --yes skips only the question; a refused plan changes nothing (7.46872ms)
+✔ Agy --yes without --refresh is refused with a repair, before any interactive prompt (297.386106ms)
+✔ Agy --refresh readback reports the physical topology and never claims a loaded path (0.377567ms)
+✔ Agy marketplace sync replaces the copy with path APIs and refuses an unsafe target (1.293848ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 2083.949798
+
+--- stderr ---

@@ -1,0 +1,13 @@
+# G6 follow-up: AGY global installation lifecycle matcher
+
+Actual PO installation selected approved local source and global refresh, then refused ATR-WIRING-MATCHER-UNVERIFIABLE with completed:[]. The read-only live diagnostic confirmed an owned PreInvocation group with matcher '*' while Source declares the same hook unconditional and flat; PreToolUse still had the older run_command matcher. This belongs to existing G6 installer/wiring coverage, not a duplicate matrix item.
+
+Committed Source 0b1fc7699f5d677693756759acf1e7d342667135 records unconditional bindings by known event and script. It admits the exact existing '*' carrier only for those bindings when every hook entry is Source-owned. Matcher bytes remain unchanged, owned command paths are rebound through the existing byte rewriter, and tool coverage is expanded from the shipped matcher. Unsupported conditional matchers, wrong events, mixed ownership and ambiguous Source declarations still refuse. No extra JSON parser, guard bypass, new policy, PRD or Spec change.
+
+Final host TAP19/19 and actual completion17/17pass; the two existing focused G6 tests are not counted as FD cases. Installer28pass/1existingtodo, exit0; consumers9/9. [Owner report](owner-report.json) and [custody](custody.json) bind exact final Source hashes, original/portable captures and the meaningful original-verifier RED. The failed node --test FD transport is retained separately; direct-node transport succeeded. These are controlled Source fixtures, not actual native installation acceptance.
+
+Registration uses the existing augmentation15→17; base11 and its previous-policy hash remain unchanged. An initial parent base-registration edit was detected by AUG-PREIMAGE and VSA-HISTORY, restored exactly, and replaced with the correct augmentation. Final completion385entries/364classified and append-history32 are green. Do not misreport the earlier11/15 split as missing registration: it was already supplied by the augmentation.
+
+The regular active-hook Source commit succeeded; no operator commit was required. User explicitly requested a new stamp after this fix and still performs installation. Actual global configuration was read, not edited by the agent. Host refusal occurs before host topology lifecycle writes; installer runner-view publication may precede it, so no blanket claim that the entire user profile was unchanged is made.
+
+Current Codex bootstrap observed b68e22c loaded/current with valid continuity, CAS-READY and refreshed mandatory local hooks. The PO explicitly says this is the SAME session, not a fresh session; no complete host restart is claimed. New build installation/readback remains required after the forthcoming stamp.

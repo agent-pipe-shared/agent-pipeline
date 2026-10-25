@@ -1,0 +1,37 @@
+command: env HOME=<repo-root>/scratch/synthetic-home USERPROFILE=<repo-root>/scratch/synthetic-home node --test plugins/pipeline-core/lib/antigravity-topology-refresh-host.test.mjs
+label: agy-topology-refresh-host-focused
+exitCode: 0
+head: 623e24b8955659cc2caee75e656a9f16076109fd
+tree: f3e4e5c6ac3fe31aa3e195af013aed4be1334355
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ G6: final matcher drift is refused after the real wiring write and before receipt (111.262122ms)
+✔ G6: final observer accepts only a function and cannot replace authorization (13.093467ms)
+✔ RC05C001 sealed fixture refresh converges managed/import/global/workspace/wiring and preserves foreign metadata (140.971013ms)
+✔ RC05C002 workspace intent refuses stale global retirement; explicit global approval enables registry-only retirement (96.951654ms)
+✔ RC05C003 empty workspace binds an existing matching managed copy and attests its exact source (201.36342ms)
+✔ RC05C004 CLI interruption stops after actual partial uninstall; new explicit invocation recovers without hand-editing import metadata (73.038992ms)
+✔ RC05C005 lying CLI success cannot replace physical managed-copy readback or attestation (111.353003ms)
+✔ RC05C006 source drift during lifecycle is detected before additional registry/wiring writes (22.320956ms)
+✔ RC05C007 unknown pipeline-shaped wiring, shell expansion, alias and oversized configuration fail closed without destructive CLI (55.144767ms)
+✔ RC05C008 arbitrary JSON callback and unknown CLI version never authorize refresh (12.890449ms)
+✔ RC05C009 observed Antigravity 1.2.13 admits the same bounded plugin refresh route (85.868397ms)
+✔ RC05C010 Antigravity 1.2.13 stale managed copy is refresh-required and the plan replaces it, never reports current (114.930811ms)
+✔ RC05C011 PO decision 2026-10-14: live Antigravity 1.3.5 is admitted at prepare and refresh; lower or non-semver output stays refused (94.132958ms)
+✔ RC05C012 actual incident hooks.json surfaces and newly CLI-created wiring converge with untouched foreign command bytes (100.024652ms)
+✔ RC05C013 CLI foreign registry/import drift is terminal partial failure, no subsequent compensation or receipt (87.69425ms)
+✔ RC05C014 prepare is read-only and apply accepts only the originating live plan once (72.640232ms)
+✔ RC05C015 prepared source, actual hook bytes and registry preimages are bound before any mutation (63.325429ms)
+✔ RC05C016 owned unconditional PreInvocation wildcard migrates through prepare/apply with exact foreign bytes and converges (119.757957ms)
+✔ RC05C017 unconditional lifecycle migration refuses wrong events, conditional matchers, mixed ownership, and ambiguous source events (64.95803ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1729.331637
+
+--- stderr ---
