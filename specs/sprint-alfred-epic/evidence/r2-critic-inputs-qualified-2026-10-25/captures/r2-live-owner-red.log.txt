@@ -1,0 +1,53 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+label: r2-live-owner-red
+exitCode: 1
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CGB001 singleton requires explicit substantial or urgent rationale; duplicates cannot game membership (1351.790575ms)
+✔ CGB002 one full and shared-limit changed diff corrections use consumed immediate parent and refuse budget reset (5153.522077ms)
+✔ CGB003 genuinely consumed PASS stops corrections before the remaining budget (1261.210226ms)
+✔ CGB004 miniitem without committed review purpose is refused; delivered record alone does not launch review (156.325401ms)
+✔ CGB005 predeclared integrated coherent purpose admits and exact replay retains budget identity (498.018163ms)
+✔ CGB006 fixed membership and range cannot drift on replay (526.635234ms)
+✔ CGB007 worker branch completion requires Main integration before first full review (221.300199ms)
+✔ CGB008 purpose declared after work is refused (203.487681ms)
+✔ CGB009 finalizer CLI versioned registration requires bound purpose and exposes no completion auto-trigger (389.721079ms)
+✔ CGB010 legacy sealed accounting remains readable but cannot grant a new method admission (637.960256ms)
+✔ CGB011 feature ownership shares sealed generic work IDs; unrelated declared work remains unclaimed (475.902875ms)
+✔ CGB012 generated pipeline JSON is an exact committed guardrail reference (409.921687ms)
+✔ CGB013 rejected guardrail leaves no held transaction and retry can register (387.796458ms)
+✖ CGB014 live owner and partial effects keep a digest-bound transaction hold (261.271067ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12278.18604
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ CGB014 live owner and partial effects keep a digest-bound transaction hold (261.271067ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.test.mjs:269:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:9)
+      at async Test.run (node:internal/test_runner/test:1208:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

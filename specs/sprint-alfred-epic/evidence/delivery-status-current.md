@@ -1,15 +1,15 @@
 # Delivery status (current)
 
-**207 items ·29 below75 ·index70.17%.**
+**207items ·27below75 ·index70.77%.**
 
 | Stage | Items |
 |---|---:|
-|25|11|
-|50|18|
-|75|178|
+|25|8|
+|50|19|
+|75|180|
 |100|0|
 |UNKNOWN|0|
 
-[Current snapshot](delivery-amendment-2026-10-25-g9a-qualified/README.md). G9a moves50→75 after its original actual Source7/7 course; earlier G24/R3/G27 qualifications remain. Native, human and review limits are preserved. All high second-run findings remain in0.7.0.
+[Current snapshot](delivery-amendment-2026-10-25-r2-critic-inputs/README.md). Exact generated manifest and registered diagnostic carry move25→75; pre-mutation transaction validation moves25→50. Unknown-owner recovery remains open. Earlier G24/R3/G27/G9a qualifications remain. All high findings remain in0.7.0.
 
-The active goal remains all deliverables at75, then stamp the local candidate and push the feature branch for the PO’s PC. Final Verify/Security, frozen Critic and PO acceptance remain pending.
+The goal remains all deliverables at75, then local stamp and feature-branch push for the PO’s PC. No native/finalizer/Verify/Critic/PO-acceptance claim follows from focused qualification.

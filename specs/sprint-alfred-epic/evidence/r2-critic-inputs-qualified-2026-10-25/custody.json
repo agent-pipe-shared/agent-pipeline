@@ -1,0 +1,110 @@
+{
+  "schema": "pipeline.r2-critic-inputs-qualification.v1",
+  "sourceCommit": "73afcf74241fd38627161d5a5e9956d12b7e9341",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "ec2f6feee7679ec83776513427c39b566318135c73da952f07f7462e0357c4a8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "sha256": "a36aa1a0e6e8867bcb85be050b292139138f3b0d3022459a56c9002ddf876341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "sha256": "914bee757426fec6a3f0f3ffe6465cfdb9354bd39c7b5481c89cc1e1bb846dff"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "sha256": "d46297dbca165dfb96c9e09ade7b362f3e9cbb633c799eae7fcc97952883128f"
+    }
+  ],
+  "artifacts": [
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-generic-red.log",
+      "sourceSha256": "600700d813a475857be27dbcc79e5fd3659a6248ded7da5a1f645806f8b54627",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-generic-red.log.txt",
+      "sha256": "600700d813a475857be27dbcc79e5fd3659a6248ded7da5a1f645806f8b54627",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-course-red.log",
+      "sourceSha256": "03c689d05fbed446e4fca2bfd880ec11e2d43406e3842251917119ea3d4b1d5d",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-course-red.log.txt",
+      "sha256": "03c689d05fbed446e4fca2bfd880ec11e2d43406e3842251917119ea3d4b1d5d",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-live-owner-red.log",
+      "sourceSha256": "34b579d06f03d13a87c7d3eba32fa7f0b9340cc7de5b678bc6e346598ff6ce8e",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-live-owner-red.log.txt",
+      "sha256": "34b579d06f03d13a87c7d3eba32fa7f0b9340cc7de5b678bc6e346598ff6ce8e",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-live-owner-green.log",
+      "sourceSha256": "e3960b2eef92c2dc939528837e50eeb06f21c58ff4f7bd53b2b331eeccb690c8",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-live-owner-green.log.txt",
+      "sha256": "e3960b2eef92c2dc939528837e50eeb06f21c58ff4f7bd53b2b331eeccb690c8",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-feature-reserve-red.log",
+      "sourceSha256": "64ac5434f2fe3e5d311b59645e9b492d69073973013393dace498548cb072030",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-feature-reserve-red.log.txt",
+      "sha256": "64ac5434f2fe3e5d311b59645e9b492d69073973013393dace498548cb072030",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-all-targeted-green.log",
+      "sourceSha256": "429595af8140eac7afb413da8ead58d67cf6e1b77af162522d05545407fa58e5",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-all-targeted-green.log.txt",
+      "sha256": "429595af8140eac7afb413da8ead58d67cf6e1b77af162522d05545407fa58e5",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/r2-all-consumer-safe.log",
+      "sourceSha256": "88cea267c78e8e6ab33c8953f52470e78769bed18b7f197213ec7ee25cabbbcd",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/r2-all-consumer-safe.log.txt",
+      "sha256": "88cea267c78e8e6ab33c8953f52470e78769bed18b7f197213ec7ee25cabbbcd",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/r2-critic-close-inputs/manifest.json",
+      "sourceSha256": "e169af4d007cfe07e289f4e25530bf9a4e5234846e6a7ad338bcf3c74b9169e9",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/worker-manifest.json.txt",
+      "sha256": "e169af4d007cfe07e289f4e25530bf9a4e5234846e6a7ad338bcf3c74b9169e9",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/r2.log",
+      "sourceSha256": "49e1d2c0bf91c2aadc1e5100759b372e81d28a10e876087e64974252c9567048",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/main.log.txt",
+      "sha256": "49e1d2c0bf91c2aadc1e5100759b372e81d28a10e876087e64974252c9567048",
+      "sanitizedDerivative": true
+    },
+    {
+      "source": "scratch/agent-out/main-candidate-qualification-20261025/r2-custody.json",
+      "sourceSha256": "84b339b56ebd2e178c087d5840476cd55cf31197b6b941182bc5df3df7515dbc",
+      "derivative": "specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/captures/main-custody.json.txt",
+      "sha256": "84b339b56ebd2e178c087d5840476cd55cf31197b6b941182bc5df3df7515dbc",
+      "sanitizedDerivative": true
+    }
+  ],
+  "main": {
+    "exitCode": 0,
+    "pass": 49,
+    "fail": 0
+  },
+  "worker": {
+    "exitCode": 0,
+    "pass": 40,
+    "fail": 0
+  },
+  "assurance": "controlled-source-method",
+  "limits": [
+    "method-only Source evidence; no native or provider attestation",
+    "ambiguous live or legacy transaction holds receive digest-bound inspection and remain held pending established owner or approved quiescence proof",
+    "Main integration, Full Verify, Critic, and PO acceptance are parent-owned"
+  ]
+}

@@ -1,0 +1,49 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+label: r2-generic-red
+exitCode: 1
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CGB001 singleton requires explicit substantial or urgent rationale; duplicates cannot game membership (1337.683695ms)
+✔ CGB002 one full and shared-limit changed diff corrections use consumed immediate parent and refuse budget reset (5182.688387ms)
+✔ CGB003 genuinely consumed PASS stops corrections before the remaining budget (1217.582893ms)
+✔ CGB004 miniitem without committed review purpose is refused; delivered record alone does not launch review (146.124779ms)
+✔ CGB005 predeclared integrated coherent purpose admits and exact replay retains budget identity (473.492458ms)
+✖ CGB006 generated pipeline JSON is an exact committed guardrail reference (176.318929ms)
+✔ CGB007 rejected guardrail leaves no held transaction and retry can register (383.194509ms)
+✔ CGB008 fixed membership and range cannot drift on replay (523.05598ms)
+✔ CGB009 worker branch completion requires Main integration before first full review (223.692821ms)
+✔ CGB010 purpose declared after work is refused (199.499689ms)
+✔ CGB011 finalizer CLI versioned registration requires bound purpose and exposes no completion auto-trigger (379.254795ms)
+✔ CGB012 legacy sealed accounting remains readable but cannot grant a new method admission (596.227729ms)
+✔ CGB013 feature ownership shares sealed generic work IDs; unrelated declared work remains unclaimed (419.758266ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11592.645662
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ CGB006 generated pipeline JSON is an exact committed guardrail reference (176.318929ms)
+  Error [GenericCriticBatchError]: Generic Critic batch is unavailable or refused.
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:41:29)
+      at reference (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:164:63)
+      at file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:192:51
+      at Array.map (<anonymous>)
+      at declarationSource (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:192:42)
+      at registerBatch (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:302:13)
+      at file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:540:73
+      at invoke (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:530:16)
+      at registerGenericCriticBatch (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.mjs:540:60)
+      at register (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.test.mjs:83:10) {
+    code: 'CGB-REFERENCE'
+  }
+
+--- stderr ---

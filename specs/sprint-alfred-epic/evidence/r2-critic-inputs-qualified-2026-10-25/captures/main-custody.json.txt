@@ -1,0 +1,71 @@
+{
+  "schema": "pipeline.main-focused-qualification.v1",
+  "subjectFiles": [
+    {
+      "path": "plugins/pipeline-core/scripts/capture-evidence.mjs",
+      "sha256": "f1006ad4455d52ac383ed841ccf9b504ab2a18ea67a1976138158f3e511c35fa"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/publish-evidence-run.mjs",
+      "sha256": "9be5828cb283c123e3c9da5d411f957657e69efb455a90c75297f00021fc4e4d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/publish-evidence-run.test.mjs",
+      "sha256": "1b5ada04b39d872059aea14d2198a1f9eacbd6d70a7806a66fe8d413c96c1dfb"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/gitleaks-repair-ignore.mjs",
+      "sha256": "81da508574eafeaac4eebd4e7f291d9ecbec4ffa24ce2d44a7bf7515e9b9e48e"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/gitleaks-reproduction-gate.cli.test.mjs",
+      "sha256": "4a8aa3b019db0598cbb82684f58565c8a570164469c0663389dddbe50a33bd0d"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.mjs",
+      "sha256": "d6c7091b01eace2fe89e86cb596b732a33f8c970054ff1cdc53e6ad58743ac63"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks-reproduction-gate.test.mjs",
+      "sha256": "c751f66a18867094d3fdc3602e3e00ba180def26152dd1313566b4242f1b97fe"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+      "sha256": "ae45a7c034c0e7b8982dcd9e9cebae073b1664175814324e62a793a69b741d00"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/architecture-public-greenfield-route.test.mjs",
+      "sha256": "34f45b91ba1838eb02d36fbe6e3498a74bf630aa6c68488b86378abd812ca711"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.mjs",
+      "sha256": "ec2f6feee7679ec83776513427c39b566318135c73da952f07f7462e0357c4a8"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+      "sha256": "a36aa1a0e6e8867bcb85be050b292139138f3b0d3022459a56c9002ddf876341"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.mjs",
+      "sha256": "914bee757426fec6a3f0f3ffe6465cfdb9354bd39c7b5481c89cc1e1bb846dff"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+      "sha256": "d46297dbca165dfb96c9e09ade7b362f3e9cbb633c799eae7fcc97952883128f"
+    }
+  ],
+  "preloadSha256": "578630e1315fd099b5b7d179af22f9da5132755cace3912e4dd1ffcc34c0ed0e",
+  "suiteFiles": [
+    "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+    "plugins/pipeline-core/lib/critic-course-admission.test.mjs",
+    "plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs",
+    "plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs",
+    "plugins/pipeline-core/lib/critic-packet-governance.test.mjs",
+    "harness/scripts/check-consumer-safe-paths.test.mjs"
+  ],
+  "settled": true,
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "ownedRootsCleaned": true
+}

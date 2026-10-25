@@ -1,7 +1,7 @@
 # Collected PO matters — current interim candidate
 
 Latest: D151 permits unique public `/tmp` fixtures with owned cleanup; D152
-requires all second-run P0/P1 in0.7.0. Current matrix207/178at75/18at50/11at25;
+requires all second-run P0/P1 in0.7.0. Current matrix207/180at75/19at50/8at25;
 D153 authorizes the next75-ready local stamp and subsequent feature push for
 the other PC. AC168 operator application/commit0b80f4f09 is complete. No repeat
 application or commit is requested. G8 contract D150 is approved for implementation;

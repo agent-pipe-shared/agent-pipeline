@@ -1,0 +1,77 @@
+command: <host-path> --import <repo-root>/scratch/main-candidate-synthetic-preload-20261025.mjs --test plugins/pipeline-core/lib/critic-generic-batch.test.mjs plugins/pipeline-core/lib/critic-course-admission.test.mjs plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs plugins/pipeline-core/lib/critic-packet-governance.test.mjs harness/scripts/check-consumer-safe-paths.test.mjs
+label: MAIN-CANDIDATE-r2
+exitCode: 0
+head: 2f05042e714632dd3ee4d7e2b652ffcdada0682b
+tree: 6ee18f34614595103a303c5b6ac6359495ab33ad
+dirty: true
+--- stdout ---
+check-consumer-safe-paths: fixture and repository checks passed
+✔ a fixture naming a source-only path fails (1.485071ms)
+✔ a clean fixture passes (1.023554ms)
+✔ an allowlisted occurrence passes (0.419898ms)
+✔ a stale allowlist entry (never matches) is itself reported (0.385973ms)
+✔ multiple prefix hits on one line each produce a finding (0.318195ms)
+✔ SOURCE_ONLY_PREFIXES carries the backlog item's minimum set (0.282567ms)
+✔ every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason (2.044454ms)
+✔ current repository passes with the real ALLOWLIST (AC-11) (173.870495ms)
+✔ real allowlisted (file, match) entries still exist and still contain the allowlisted substring (13.357357ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CCA001 CCA01 genesis derives round one and rejects invented course counters (2.092495ms)
+✔ CCA002 CCA02 correction derives round and cumulative commits from the validated parent (3.388768ms)
+✔ CCA003 CCA03 rejects changed parent, missing correction and override-shaped delta (1.553041ms)
+✔ CCA004 CCA04 an exhausted retained course yields a PO gate, never another review (3.510409ms)
+✔ CCA005 CCA05 a caller-omitted history can look like genesis, so this pure helper is not spawn authority (2.508666ms)
+✔ CCA006 CCA06 Git resolver retains the registered immutable Critic record (75.702449ms)
+✔ CCA007 CCA07 a later manifest cannot erase a prior Critic registration to reset the course (84.191949ms)
+✔ CCA008 CCA08 a retained registration fails if the evidence bytes drift (89.434255ms)
+✔ CCA009 CCA09 unrelated historical candidate-evidence amendment does not erase the Critic course (107.40088ms)
+✔ CCA010 CCA10 registered course source derives the real candidate range and rejects a mismatched parent (366.212623ms)
+✔ CCA011 CCA11 genesis course source derives exact Git commits and changed paths (106.837896ms)
+✔ CCA012 CCA12 a mixed evidence-and-source commit still consumes correction budget (144.588307ms)
+✔ CCA013 CCA13 an authority change cannot hide in an evidence registration commit (148.674843ms)
+✔ CCA014 CCA14 one full and three successive parent-bound DIFF reviews are admitted (4.788668ms)
+✔ CCA015 CCA15 a new full review cannot be admitted after retained findings (1.124907ms)
+✔ CCA016 CCA16 retained finding prose and replayed candidates never substitute for a consumed journal (268.398001ms)
+✔ CCA017 CCA17 a renamed feature without a registered counterpart cannot reset the retained course (65.73532ms)
+✔ CCA018 CCA18 dropping retained registration cannot create new genesis in the runtime reader (90.143875ms)
+✔ CCA019 CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle (506.429011ms)
+✔ producer captures real failed targeted result while full Verify remains explicitly not-run (157.083869ms)
+✔ failed canonical Verify diagnostics preserve selection validation and cannot qualify final boundaries (94.662509ms)
+✔ CLI emits honest evidence and refuses missing execution, stale/dirty input and output overwrite (270.620835ms)
+✔ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (321.56434ms)
+✔ packet refuses malformed source/digest before creation and snapshot mutation before claim (325.644079ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CGB001 singleton requires explicit substantial or urgent rationale; duplicates cannot game membership (1224.407085ms)
+✔ CGB002 one full and shared-limit changed diff corrections use consumed immediate parent and refuse budget reset (4925.738003ms)
+✔ CGB003 genuinely consumed PASS stops corrections before the remaining budget (1098.725494ms)
+✔ CGB004 miniitem without committed review purpose is refused; delivered record alone does not launch review (130.34536ms)
+✔ CGB005 predeclared integrated coherent purpose admits and exact replay retains budget identity (419.836717ms)
+✔ CGB006 fixed membership and range cannot drift on replay (456.658259ms)
+✔ CGB007 worker branch completion requires Main integration before first full review (191.495366ms)
+✔ CGB008 purpose declared after work is refused (183.361412ms)
+✔ CGB009 finalizer CLI versioned registration requires bound purpose and exposes no completion auto-trigger (352.448375ms)
+✔ CGB010 legacy sealed accounting remains readable but cannot grant a new method admission (599.792254ms)
+✔ CGB011 feature ownership shares sealed generic work IDs; unrelated declared work remains unclaimed (416.512357ms)
+✔ CGB012 generated pipeline JSON is an exact committed guardrail reference (363.516864ms)
+✔ CGB013 rejected guardrail leaves no held transaction and retry can register (333.417733ms)
+✔ CGB014 live owner and partial effects keep a digest-bound transaction hold (210.591086ms)
+✔ CGB015 feature reserve validates packet guardrails before store effects and can retry (1718.012077ms)
+PASS CPG01 derives manifest governance contents and every changed critical surface with candidate blob OIDs
+PASS CPG02 recognizes dynamic governance roots even when they live outside the default governance tree
+PASS CPG03 rejects an omitted required changed role path and a stale packet blob binding
+PASS CPG04 fails closed when required candidate content is absent or unreadable
+PASS CPG05 fails closed on an incomplete governance declaration and a missing policy checklist
+PASS CPG06 rejects handover and scratchpad packet paths without rejecting ordinary candidate state files
+PASS CPG07 supports a candidate with no manifest while still binding changed critical packet paths
+7/7 checks passed.
+✔ plugins/pipeline-core/lib/critic-packet-governance.test.mjs (41.916615ms)
+ℹ tests 49
+ℹ suites 0
+ℹ pass 49
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12992.823929
+
+--- stderr ---

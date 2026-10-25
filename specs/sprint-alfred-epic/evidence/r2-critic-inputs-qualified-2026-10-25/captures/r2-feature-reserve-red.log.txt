@@ -1,0 +1,58 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+label: r2-feature-reserve-red
+exitCode: 1
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CGB001 singleton requires explicit substantial or urgent rationale; duplicates cannot game membership (1313.987579ms)
+✔ CGB002 one full and shared-limit changed diff corrections use consumed immediate parent and refuse budget reset (4997.510819ms)
+✔ CGB003 genuinely consumed PASS stops corrections before the remaining budget (1213.170018ms)
+✔ CGB004 miniitem without committed review purpose is refused; delivered record alone does not launch review (153.135272ms)
+✔ CGB005 predeclared integrated coherent purpose admits and exact replay retains budget identity (472.242967ms)
+✔ CGB006 fixed membership and range cannot drift on replay (537.646254ms)
+✔ CGB007 worker branch completion requires Main integration before first full review (232.323779ms)
+✔ CGB008 purpose declared after work is refused (214.635342ms)
+✔ CGB009 finalizer CLI versioned registration requires bound purpose and exposes no completion auto-trigger (402.018204ms)
+✔ CGB010 legacy sealed accounting remains readable but cannot grant a new method admission (629.532387ms)
+✔ CGB011 feature ownership shares sealed generic work IDs; unrelated declared work remains unclaimed (444.742887ms)
+✔ CGB012 generated pipeline JSON is an exact committed guardrail reference (413.020208ms)
+✔ CGB013 rejected guardrail leaves no held transaction and retry can register (398.051593ms)
+✔ CGB014 live owner and partial effects keep a digest-bound transaction hold (256.642885ms)
+✖ CGB015 feature reserve validates packet guardrails before store effects and can retry (996.838764ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 14
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13002.001853
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ CGB015 feature reserve validates packet guardrails before store effects and can retry (996.838764ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/critic-generic-batch.test.mjs:334:12)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:831:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+--- stderr ---

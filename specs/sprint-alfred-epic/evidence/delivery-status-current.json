@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-g9a-qualified/snapshot.json",
-  "sha256": "84059503cba9385c16a8ffa63247617bd79740add57cc20bdd2b32e8e68d2ccb",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-r2-critic-inputs/snapshot.json",
+  "sha256": "7fdb6d84f1066d6c3315c7c75eb985b418d605ee12cfdce9826f1d69cd148cbe",
   "measuredAt": "2026-10-25",
-  "head": "9f1dc52d3738e1c01f3c17320e000003657ff62f",
+  "head": "73afcf74241fd38627161d5a5e9956d12b7e9341",
   "counts": {
-    "25": 11,
-    "50": 18,
-    "75": 178,
+    "25": 8,
+    "50": 19,
+    "75": 180,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 70.17,
+  "index": 70.77,
   "total": 207,
-  "scope": "Same207 identities. G9a50→75 after original actual Source delegation course7/7. Native/human/final-Verify/acceptance boundaries and other open findings remain."
+  "scope": "Same207 identities; two Critic preparation outcomes25→75 and transaction validation25→50 after committed Source/Main49passes. Unknown-owner recovery remains open; no native finalizer/Verify/acceptance inference."
 }

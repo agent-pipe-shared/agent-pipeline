@@ -8,8 +8,8 @@ The active PO goal is a local candidate with every deliverable at75, then its
 authorized stamp and feature-branch push for the other PC (D153). An ordinary
 turn interruption does not restart bootstrap or close the feature.
 
-Current authoritative matrix: **207items,178at75,18at50,11at25;29below75,
-index70.17%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
+Current authoritative matrix: **207items,180at75,19at50,8at25;27below75,
+index70.77%**. [Current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
 The second three-runner analyses and no-pipeline control were fully collected.
 All31high report clauses and14POobservations have dispositions and existing AC
 relations. D152 puts every P0/P1/Kritisch/Wichtig/Hoch in0.7.0. Ten distinct
@@ -36,6 +36,13 @@ including actual signed-plan import and invalid/foreign/stale proof controls.
 G9a moves50→75; disposable signer assurance is Source-method only, with no
 native runner or real human attestation. Dispatch-helper help remains separate.
 [G9a custody](../specs/sprint-alfred-epic/evidence/g9a-source-qualified-2026-10-25/README.md).
+Critic preparation is committed at `73afcf74241fd38627161d5a5e9956d12b7e9341`:
+Main40 original/focused cases plus9consumer cases pass. Generated-manifest
+reference and immutable diagnostic carry advance25→75. Validation before
+store mutation plus typed held-state inspection advance recovery25→50;
+unknown/live-owner locks remain held, not falsely recovered. The finalizer's
+original-independent-return P0 remains open.
+[Qualification and exact limits](../specs/sprint-alfred-epic/evidence/r2-critic-inputs-qualified-2026-10-25/README.md).
 G8's same-owner clone has a14-path partial D150 Model producer/readback kernel;
 broad Model regression is RED and author/consumer/valid-fixture work remains.
 Do not integrate its deny-only consumer or claim original native review.

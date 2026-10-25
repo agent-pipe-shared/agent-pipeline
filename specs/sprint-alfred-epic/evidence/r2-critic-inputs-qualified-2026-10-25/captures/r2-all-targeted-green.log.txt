@@ -1,0 +1,67 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/lib/critic-generic-batch.test.mjs plugins/pipeline-core/lib/critic-course-admission.test.mjs plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs plugins/pipeline-core/lib/critic-diagnostic-packet.test.mjs plugins/pipeline-core/lib/critic-packet-governance.test.mjs
+label: r2-all-targeted-green
+exitCode: 0
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CCA001 CCA01 genesis derives round one and rejects invented course counters (2.027432ms)
+✔ CCA002 CCA02 correction derives round and cumulative commits from the validated parent (3.472588ms)
+✔ CCA003 CCA03 rejects changed parent, missing correction and override-shaped delta (1.775313ms)
+✔ CCA004 CCA04 an exhausted retained course yields a PO gate, never another review (3.153191ms)
+✔ CCA005 CCA05 a caller-omitted history can look like genesis, so this pure helper is not spawn authority (3.222632ms)
+✔ CCA006 CCA06 Git resolver retains the registered immutable Critic record (105.79268ms)
+✔ CCA007 CCA07 a later manifest cannot erase a prior Critic registration to reset the course (126.537723ms)
+✔ CCA008 CCA08 a retained registration fails if the evidence bytes drift (125.975521ms)
+✔ CCA009 CCA09 unrelated historical candidate-evidence amendment does not erase the Critic course (156.779902ms)
+✔ CCA010 CCA10 registered course source derives the real candidate range and rejects a mismatched parent (433.326731ms)
+✔ CCA011 CCA11 genesis course source derives exact Git commits and changed paths (128.535614ms)
+✔ CCA012 CCA12 a mixed evidence-and-source commit still consumes correction budget (185.687609ms)
+✔ CCA013 CCA13 an authority change cannot hide in an evidence registration commit (186.898163ms)
+✔ CCA014 CCA14 one full and three successive parent-bound DIFF reviews are admitted (5.681845ms)
+✔ CCA015 CCA15 a new full review cannot be admitted after retained findings (1.086765ms)
+✔ CCA016 CCA16 retained finding prose and replayed candidates never substitute for a consumed journal (284.670733ms)
+✔ CCA017 CCA17 a renamed feature without a registered counterpart cannot reset the retained course (88.83346ms)
+✔ CCA018 CCA18 dropping retained registration cannot create new genesis in the runtime reader (114.707443ms)
+✔ CCA019 CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle (478.576244ms)
+✔ producer captures real failed targeted result while full Verify remains explicitly not-run (167.072402ms)
+✔ failed canonical Verify diagnostics preserve selection validation and cannot qualify final boundaries (117.095168ms)
+✔ CLI emits honest evidence and refuses missing execution, stale/dirty input and output overwrite (352.457434ms)
+✔ native packet exports exact failed/not-run diagnostic refs to a fresh Codex reviewer without verdict prose (442.317839ms)
+✔ packet refuses malformed source/digest before creation and snapshot mutation before claim (421.259651ms)
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CGB001 singleton requires explicit substantial or urgent rationale; duplicates cannot game membership (1596.807138ms)
+✔ CGB002 one full and shared-limit changed diff corrections use consumed immediate parent and refuse budget reset (5408.186539ms)
+✔ CGB003 genuinely consumed PASS stops corrections before the remaining budget (1340.118989ms)
+✔ CGB004 miniitem without committed review purpose is refused; delivered record alone does not launch review (166.785481ms)
+✔ CGB005 predeclared integrated coherent purpose admits and exact replay retains budget identity (507.51534ms)
+✔ CGB006 fixed membership and range cannot drift on replay (523.17539ms)
+✔ CGB007 worker branch completion requires Main integration before first full review (226.130047ms)
+✔ CGB008 purpose declared after work is refused (210.826071ms)
+✔ CGB009 finalizer CLI versioned registration requires bound purpose and exposes no completion auto-trigger (405.238644ms)
+✔ CGB010 legacy sealed accounting remains readable but cannot grant a new method admission (643.394373ms)
+✔ CGB011 feature ownership shares sealed generic work IDs; unrelated declared work remains unclaimed (502.040667ms)
+✔ CGB012 generated pipeline JSON is an exact committed guardrail reference (446.340517ms)
+✔ CGB013 rejected guardrail leaves no held transaction and retry can register (417.874436ms)
+✔ CGB014 live owner and partial effects keep a digest-bound transaction hold (263.056456ms)
+✔ CGB015 feature reserve validates packet guardrails before store effects and can retry (1850.100838ms)
+PASS CPG01 derives manifest governance contents and every changed critical surface with candidate blob OIDs
+PASS CPG02 recognizes dynamic governance roots even when they live outside the default governance tree
+PASS CPG03 rejects an omitted required changed role path and a stale packet blob binding
+PASS CPG04 fails closed when required candidate content is absent or unreadable
+PASS CPG05 fails closed on an incomplete governance declaration and a missing policy checklist
+PASS CPG06 rejects handover and scratchpad packet paths without rejecting ordinary candidate state files
+PASS CPG07 supports a candidate with no manifest while still binding changed critical packet paths
+7/7 checks passed.
+✔ plugins/pipeline-core/lib/critic-packet-governance.test.mjs (47.500183ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14946.391561
+
+--- stderr ---

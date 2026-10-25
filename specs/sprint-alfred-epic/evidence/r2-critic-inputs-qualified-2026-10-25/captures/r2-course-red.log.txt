@@ -1,0 +1,55 @@
+command: node --import ./scratch/synthetic-test-entry.mjs --test plugins/pipeline-core/lib/critic-course-admission.test.mjs
+label: r2-course-red
+exitCode: 1
+head: 69643e345443ca4100ab164e0db808d275b2cd78
+tree: c7d0d9de1ff452bd0c95e2765540205c41875fa4
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ CCA001 CCA01 genesis derives round one and rejects invented course counters (1.851197ms)
+✔ CCA002 CCA02 correction derives round and cumulative commits from the validated parent (3.114107ms)
+✔ CCA003 CCA03 rejects changed parent, missing correction and override-shaped delta (1.406542ms)
+✔ CCA004 CCA04 an exhausted retained course yields a PO gate, never another review (3.002454ms)
+✔ CCA005 CCA05 a caller-omitted history can look like genesis, so this pure helper is not spawn authority (2.835126ms)
+✔ CCA006 CCA06 Git resolver retains the registered immutable Critic record (86.599914ms)
+✔ CCA007 CCA07 a later manifest cannot erase a prior Critic registration to reset the course (96.041981ms)
+✔ CCA008 CCA08 a retained registration fails if the evidence bytes drift (102.287356ms)
+✔ CCA009 CCA09 unrelated historical candidate-evidence amendment does not erase the Critic course (132.726194ms)
+✔ CCA010 CCA10 registered course source derives the real candidate range and rejects a mismatched parent (377.340389ms)
+✔ CCA011 CCA11 genesis course source derives exact Git commits and changed paths (120.463928ms)
+✔ CCA012 CCA12 a mixed evidence-and-source commit still consumes correction budget (162.389344ms)
+✔ CCA013 CCA13 an authority change cannot hide in an evidence registration commit (162.875833ms)
+✖ CCA014 CCA24 registered diagnostic JSON and required log carry as one immutable candidate bundle (123.518396ms)
+✔ CCA015 CCA14 one full and three successive parent-bound DIFF reviews are admitted (3.664652ms)
+✔ CCA016 CCA15 a new full review cannot be admitted after retained findings (0.675904ms)
+✔ CCA017 CCA16 retained finding prose and replayed candidates never substitute for a consumed journal (258.590196ms)
+✔ CCA018 CCA17 a renamed feature without a registered counterpart cannot reset the retained course (82.578522ms)
+✔ CCA019 CCA18 dropping retained registration cannot create new genesis in the runtime reader (110.264732ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 18
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2175.981858
+
+✖ failing tests:
+
+test at plugins/pipeline-core/lib/test-case-completion.mjs:219:5
+✖ CCA014 CCA24 registered diagnostic JSON and required log carry as one immutable candidate bundle (123.518396ms)
+  Error [CriticCourseAdmissionError]: Critic course admission is invalid.
+      at fail (file://<repo-root>/plugins/pipeline-core/lib/critic-course-admission.mjs:34:32)
+      at deriveRegisteredCriticCourseSource (file://<repo-root>/plugins/pipeline-core/lib/critic-course-admission.mjs:158:95)
+      at classifyRegisteredEvidenceOnlyCommits (file://<repo-root>/plugins/pipeline-core/lib/critic-course-admission.mjs:213:18)
+      at Object.run (file://<repo-root>/plugins/pipeline-core/lib/critic-course-admission.test.mjs:338:16)
+      at TestContext.<anonymous> (file://<repo-root>/plugins/pipeline-core/lib/test-case-completion.mjs:237:21)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1201:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:831:18)
+      at Test.postRun (node:internal/test_runner/test:1330:19)
+      at Test.run (node:internal/test_runner/test:1258:12) {
+    code: 'CCA-PARENT'
+  }
+
+--- stderr ---
