@@ -1,0 +1,14 @@
+{
+  "phase": "final",
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "durationMs": 404.236782,
+  "callbackStarts": 0,
+  "callbackEnds": 0,
+  "callbackPasses": 0,
+  "callbackFailures": 0,
+  "childStarts": 0,
+  "childEnds": 0,
+  "fixtureIdentityCleanup": "passed"
+}

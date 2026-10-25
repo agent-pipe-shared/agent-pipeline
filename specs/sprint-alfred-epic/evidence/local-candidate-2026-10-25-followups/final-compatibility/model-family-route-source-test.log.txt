@@ -1,0 +1,23 @@
+command: node --test plugins/pipeline-core/lib/model-family-route-source.test.mjs
+label: model-family-route-source-test
+exitCode: 0
+head: 0d2c33bf55a4611630ae739c770585d539744010
+tree: 2324536f710bea40a237fff24694984b4cfbdfa0
+dirty: false
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+✔ MFR001 family inventory is the complete 46-cell projection and leaves historical inventory untouched (11.579339ms)
+✔ MFR002 Codex mechanic target lowers only the proposed Luna effort to medium (1.516361ms)
+✔ MFR003 Codex normal Critic target raises only its proposed Sol effort to xhigh (1.872086ms)
+✔ MFR004 only Codex advisory and high-risk Critic selectors change to Astra (1.203767ms)
+✔ MFR005 missing, duplicate, or incomplete historic cells cannot yield a partial target (0.928274ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 85.293234
+
+--- stderr ---

@@ -1,0 +1,14 @@
+[
+  {
+    "itemId": "pipeline.greenfield.g7.model",
+    "from": "50",
+    "to": "75",
+    "previousReason": "Reproduced actual producer-to-adapter contradiction disproves prior39/39 synthetic-only readiness: coordinator permits noModel and guard refuses DISPATCH-MODEL-MISSING; every demanded enum is rejected by closed coordinator ENTRY_KEYS. Five original Task/Critic assertions fail. Native exposed Model carrier and concrete-ID/tier binding remain unproved; opening keys alone is unsound. CatalogueG7 is separate and remains qualified."
+  },
+  {
+    "itemId": "pipeline.greenfield.g33.post-close-push-continuity",
+    "from": "25",
+    "to": "50",
+    "previousReason": "Source confirms writer timestamp mutation invalidates exact closed/discarded continuity checks; isolated causal repair/qualification is pending."
+  }
+]

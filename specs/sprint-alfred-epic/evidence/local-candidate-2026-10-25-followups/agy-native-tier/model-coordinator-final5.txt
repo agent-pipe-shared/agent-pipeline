@@ -1,0 +1,57 @@
+command: node --test plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs
+label: AGY native tiers: model, coordinator, and public prepare CLI
+exitCode: 0
+head: 5f3bec25bbe5d4ac5ee0df51dee20d9446272047
+tree: 46352f60ade814535b1b17b3cb59a5341b5b9ff0
+dirty: true
+--- stdout ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)
+# measured shared preparation deadline: 4505ms
+# measured repository-plus-batch preparation deadline: 4504ms
+✔ ANDC01 valid full array is prepared and revalidated without changing role, prompt, order or workspace (132.527772ms)
+✔ ANDC02 flat and batch forms bind every native field and cannot replay across call shapes (91.610716ms)
+✔ ANDC03 native tiers reject missing, inherited and duty-mismatched Model values (68.944573ms)
+✔ ANDC04 Model and Workspace are bound to the one-use canonical native argument (128.832742ms)
+✔ ANDC05 artifact publication is create-only and cannot replace an outstanding authorization (140.087843ms)
+✔ ANDC06 an authenticated expired authorization is retired so a fresh preparation cannot deadlock (142.931256ms)
+✔ ANDC07 an authenticated stale-candidate authorization is retired for the new exact candidate (158.550049ms)
+✔ ANDC08 a forged expired artifact cannot be retired or replaced (117.695903ms)
+✔ ANDC09 serial repository Git probes share one five-second preparation deadline (4544.77763ms)
+✔ ANDC10 repository and batch-preflight Git probes share one five-second preparation deadline (4543.44496ms)
+✔ ANDC11 CLI prepares a repository-contained request file without launching another CLI or model (404.429015ms)
+✔ ANDC12 public prepare CLI returns the actual flat AGY invocation shape (383.328047ms)
+✔ ANDC13 public prepare CLI rejects mixed flat fields and batch arrays (328.173124ms)
+✔ ANDC14 missing prepared artifact rejects the entire array (44.034569ms)
+✔ ANDC15 a partial array cannot reuse the full-array artifact (79.132168ms)
+✔ ANDC16 a reordered array cannot reuse the prepared artifact (80.387975ms)
+✔ ANDC17 a changed prompt cannot reuse the prepared artifact (79.641711ms)
+✔ ANDC18 a forged artifact digest fails closed (82.072028ms)
+✔ ANDC19 candidate movement makes an otherwise intact artifact stale (90.605075ms)
+✔ ANDC20 required input movement invalidates all entries at revalidation (106.667576ms)
+✔ ANDC21 expired artifacts fail closed (78.733115ms)
+✔ ANDC22 preparation rejects partial packet arrays (54.666187ms)
+✔ ANDC23 preparation rejects non-return native results (69.438051ms)
+✔ ANDC24 preparation rejects a recursive/non-native transport (70.907653ms)
+✔ ANDC25 artifact is private and kept outside the working tree (72.844972ms)
+✔ DME01 a dispatch without a model parameter is refused with the configured selectors and a runnable repair (1.413786ms)
+✔ DME02 an empty or non-string model counts as missing (0.201764ms)
+✔ DME03 a generic agent type accepts any configured, available Claude selector (0.296603ms)
+✔ DME04 a model that no configured route names is refused as unrouted (0.309037ms)
+✔ DME05 a pipeline-core agent type is bound to its duty's selector (0.371506ms)
+✔ DME06 an unavailable route is never an accepted selector (0.25292ms)
+✔ DME07 an unreadable route source yields no opinion, never a refusal that cannot be repaired (0.117894ms)
+✔ DME08 a runner without a tool-layer model parameter is not judged (0.113225ms)
+✔ DME09 a model id selector matches only exactly (0.265635ms)
+✔ DME10 Antigravity requires an explicit native Model enum on each entry (0.40541ms)
+✔ DME11 a directly comparable Antigravity duty selector binds the role (0.184651ms)
+✔ DME12 approved Antigravity tiers are projected beside, not substituted for, V3 selectors (7.986031ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12427.625463
+
+--- stderr ---

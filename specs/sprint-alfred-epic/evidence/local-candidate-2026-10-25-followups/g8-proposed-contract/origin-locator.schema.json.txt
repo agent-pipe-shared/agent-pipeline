@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.design-review-origin-locator.proposed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "requestSha256",
+    "receiptSha256",
+    "reportSha256",
+    "originalInvocationSha256",
+    "sourceRevisionSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.design-review-origin-locator.proposed.v1"
+    },
+    "requestSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "receiptSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reportSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "originalInvocationSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sourceRevisionSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "description": "Proposed locator only. Requires independent Source registry original-publication readback; never an admission credential."
+}

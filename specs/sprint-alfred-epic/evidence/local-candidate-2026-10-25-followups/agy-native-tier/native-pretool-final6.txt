@@ -1,0 +1,29 @@
+command: node plugins/pipeline-core/hooks/antigravity-native-dispatch-pretool.test.mjs
+label: AGY public flat CLI to native pretool adapter chain
+exitCode: 0
+head: 5f3bec25bbe5d4ac5ee0df51dee20d9446272047
+tree: 46352f60ade814535b1b17b3cb59a5341b5b9ff0
+dirty: true
+--- stdout ---
+✔ ANDP01 an unrelated write-capable host-defined array requires a Pipeline carrier (1232.023102ms)
+✔ ANDP02 missing preparation is denied by the immediate native hook (1173.846382ms)
+✔ ANDP03 one complete prepared batch is allowed once (2255.292342ms)
+✔ ANDP04 the actual flat tool form is prepared and admitted with the same one-use binding (2246.581034ms)
+✔ ANDP05 mixed flat fields and batch array are rejected as ambiguous (840.579822ms)
+✔ ANDP06 undeclared flat fields such as effort are rejected (811.218901ms)
+✔ ANDP07 an expired unconsumed batch is replaced before the immediate hook admits the fresh batch (1236.163525ms)
+✔ ANDP08 a mixed host and Pipeline array remains subject to Pipeline carrier admission (2675.54548ms)
+✔ ANDP09 preparing only the Pipeline member cannot authorize a mixed array (1566.168386ms)
+✔ ANDP10 a mutated native prompt has zero eligibility (1206.932248ms)
+✔ ANDP11 candidate movement invalidates the prepared batch at the hook (1196.992424ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16448.475565
+
+--- stderr ---
+test-case-completion: running outside Verify, completion records are not written (no descriptor was announced)

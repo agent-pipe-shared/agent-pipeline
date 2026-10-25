@@ -1,0 +1,40 @@
+PROPOSED ONLY — REVIEW SKETCH, NOT AN APPLYABLE SOURCE PATCH.
+No symbol below exists in production. Select the contract and qualify its Source producer first.
+
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ active present-plan after readDesignApprovalInputs, before createDesignApprovalBinding (current line 11544)
++ const provenance = readAndAdmitOriginalDesignReviews({repository: dir,
++   featureId: submitted.featureId, receipts: inputs.receipts,
++   approvalCandidate: designWorkflowGitCandidate(dir, deps)});
++ if (!provenance.ok) { console.error(provenance.code); return 2; }
+  const binding = createDesignApprovalBinding({ featureId: submitted.featureId,
+    receipts: inputs.receipts, currentSources: inputs.currentSources });
+@@ active State companion present-plan before createDesignApprovalBinding (current line 14133)
++ const provenance = readAndAdmitOriginalDesignReviews({repository: frame.repository.primaryRoot,
++   featureId: submitted.featureId, receipts: inputs.receipts,
++   approvalCandidate: designWorkflowGitCandidate(frame.repository.primaryRoot,{})});
++ if (!provenance.ok) stateAuthorityFailure("SDC-AUTHORITY-UNAVAILABLE", provenance.code);
+  const binding=createDesignApprovalBinding({featureId:submitted.featureId,
+    receipts:inputs.receipts,currentSources:inputs.currentSources});
+@@ shared request-verification entry after physical receipt/source read, before verifyDesignApprovalRequest
++ const provenance = readAndAdmitOriginalDesignReviews({repository:dir,
++   featureId:submission.featureId,receipts:inputs.receipts,
++   approvalCandidate:request.approvalIntent.value.candidate});
++ if (!provenance.ok) return provenance;
+  // Pure U3 create/verify API and closed signed binding shape remain unchanged.
+
+--- a/plugins/pipeline-core/scripts/design-review-receipt.mjs
++++ b/plugins/pipeline-core/scripts/design-review-receipt.mjs
+@@ original producer route (new source-owned entry, not a flag accepting JSON proof)
++ // Only runOriginalDesignReview owns projection of actual returned findings/report.
++ // createReceiptFromDisk remains an observation/fallback path, never origin authority.
++ // Source publishes receipt and locator only after original execution settlement.
+
+Frozen native/Model/registry owner follow-up required for Choice A:
+  prepare a design current-artifacts subject without implementation Verify fiction;
+  retain the original request + author relation at existing Source invocation admission;
+  capture actual reviewer answer/report/receipt through original terminal handles;
+  register/read original publication through existing authority and settlement;
+  expose a Source-only design origin reader without a JSON-to-handle constructor.
+These are unimplemented obligations, not APIs inferred to exist.

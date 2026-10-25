@@ -22,3 +22,7 @@ The PO explicitly assigned a centrally enforced, non-weakenable Bank/Enterprise 
 ## Matrix accounting
 
 All194 previous identities and their stages remain intact; G33 and G34 are two additional Source-confirmed repair outcomes. Initial additional-report cut:196 total,25=4,50=24,75=168,100=0,28below75,index70.92%. The lower index reflects explicitly added work, not regression of the original194. All22 original three-runner P0/P1 traces and exclusions remain preserved. Focused repair commits may promote the two new rows later; no native/finalVerify/Critic/acceptance is inferred.
+
+## Additional detailed-section observations
+
+ReportF9–F11 also describe close command/help toil, result.md precommit protection and mode0600 private evidence production. These are retained occurrences for existing G21/G22/G23.help close/recovery owners, not permission to bypass result protection, hand-author gate proof or add a new orchestration authority. The older build observation alone does not establish a current missing producer. ReportF2 architecture-baseline help overlaps existing scoped read/help admission; general arbitrary-script help is not automatically safe. Product balancing/playtest fixes and a PO-waived separate visual stop do not create new pipeline release gates.

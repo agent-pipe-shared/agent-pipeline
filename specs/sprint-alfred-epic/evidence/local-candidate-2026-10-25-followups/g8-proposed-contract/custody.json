@@ -1,0 +1,72 @@
+{
+  "schema": "pipeline.portable-proposal-custody.v1",
+  "status": "proposed-not-approved-not-integrated",
+  "files": [
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/report.md",
+      "sourceSha256": "6b30467b06a2071fac55ae86b342c29d082c44426e7753f7a1c070a6c57cceaf",
+      "sourceBytes": 5633,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/report.md.txt",
+      "derivativeSha256": "a5b7aa7f44492b0094ba299a0cbeb27846989b45eedd523c546dab4ad9eb377e",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/binding.json",
+      "sourceSha256": "e6fc91fe2d0603d75908d3ee61e7873d5e1027660388a9e85d84725e7bbf9342",
+      "sourceBytes": 5365,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/binding.json.txt",
+      "derivativeSha256": "e6fc91fe2d0603d75908d3ee61e7873d5e1027660388a9e85d84725e7bbf9342",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/proposed-contract.md",
+      "sourceSha256": "81c96a63335ab4f475358efac79271d5563cd406a5bcd1d46fdfcb2d7e7c92e0",
+      "sourceBytes": 10975,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/proposed-contract.md.txt",
+      "derivativeSha256": "81c96a63335ab4f475358efac79271d5563cd406a5bcd1d46fdfcb2d7e7c92e0",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/decision.proposed.json",
+      "sourceSha256": "e24251311e40158aa43b4b8e4f6ca3a7393d65c834903436c55d1690d403cc0d",
+      "sourceBytes": 332,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/decision.proposed.json.txt",
+      "derivativeSha256": "e24251311e40158aa43b4b8e4f6ca3a7393d65c834903436c55d1690d403cc0d",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/request.schema.json",
+      "sourceSha256": "fa9595b77c6ae1d0823cbf29f611b686e4d0a84191d95109554deb69dfd0a8e8",
+      "sourceBytes": 3864,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/request.schema.json.txt",
+      "derivativeSha256": "fa9595b77c6ae1d0823cbf29f611b686e4d0a84191d95109554deb69dfd0a8e8",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/origin-locator.schema.json",
+      "sourceSha256": "8884b5ad4f4417b48736ea7aaf024521de0197061c24256934b3ec4a51bf046e",
+      "sourceBytes": 1046,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/origin-locator.schema.json.txt",
+      "derivativeSha256": "8884b5ad4f4417b48736ea7aaf024521de0197061c24256934b3ec4a51bf046e",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/proposed-integration.diff",
+      "sourceSha256": "6f1cf1538a0f14cb72272d3d814a91b18d7286e0fe948500629064758e0708ce",
+      "sourceBytes": 2830,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/proposed-integration.diff.txt",
+      "derivativeSha256": "6f1cf1538a0f14cb72272d3d814a91b18d7286e0fe948500629064758e0708ce",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/agent-out/g8-native-producer-contract-draft/prototype.patch",
+      "sourceSha256": "90dfb79f748a9055468df7e908552b999d862c5ebcaeed222deab2d0dd8ea897",
+      "sourceBytes": 16819,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/g8-proposed-contract/prototype.patch.txt",
+      "derivativeSha256": "90dfb79f748a9055468df7e908552b999d862c5ebcaeed222deab2d0dd8ea897",
+      "byteExactOriginal": false
+    }
+  ],
+  "nativeReviewPositive": false,
+  "activeConsumerIntegrated": false
+}

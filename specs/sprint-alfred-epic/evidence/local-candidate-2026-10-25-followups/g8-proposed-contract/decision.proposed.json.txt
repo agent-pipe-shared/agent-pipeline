@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.architecture-decision.v1",
+  "id": "draft-original-design-review-producer-custody",
+  "title": "Original design review subject and existing Source custody",
+  "status": "proposed",
+  "digest": "81c96a63335ab4f475358efac79271d5563cd406a5bcd1d46fdfcb2d7e7c92e0",
+  "scope": "project",
+  "date": "2026-10-25"
+}

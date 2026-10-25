@@ -1,0 +1,160 @@
+{
+  "schema": "pipeline.portable-followup-custody.v1",
+  "sourceCommit": "dc8204a28d62b0aa38c9f90d2e3f4b97c36941b0",
+  "patchSha256": "e5231cbc2d07125d362c7c168e5528e0d282a8c4645dccec15e6a0a7dbd2bbf2",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/lib/model-role-route-source.mjs",
+      "preSha256": "768d8f5800d96ff33e4a7e75e03782ffa581e967cd3952912c0e602607942182",
+      "postSha256": "fcad6ecfb1232e86fc10957b550522ce9bda44420d7c43126237ccfabe69f336"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-model-enforcement.mjs",
+      "preSha256": "f0071ed71f4512cced9a7185469d8fd1b26ec0f6e2485b48bdd6f26b1816be5b",
+      "postSha256": "a2a2d2196a509e56af5c4dd62a7deb0ce16a55da02f1478eb70e0191bb30cf6c"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/dispatch-model-enforcement.test.mjs",
+      "preSha256": "6be900763990f251678edbef96dd938da45414f39b0328f2508cfa07d4bc062c",
+      "postSha256": "dfed2ea4cb4ac151820e33312d5fc2c7915d5bb811980e357d3fe33088ee33be"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.mjs",
+      "preSha256": "7bb8c486564d05e8164ac4560b6aab5b052ede1287c0c78cc1ff860ca776b1e5",
+      "postSha256": "434b1e8b90d92b78a7be92e874a68ffafae98257ebce55e7dd657618fb318dfe"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/antigravity-native-dispatch-coordinator.test.mjs",
+      "preSha256": "7bfc5fe262b43bcb6d0ab05acc1898b95059a4f3d12d6967e262ca79657ee044",
+      "postSha256": "d6d60cf800ffee0e5c82d5202ad272dea3f865574abd1b33c7ad7e19b0155dbe"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+      "preSha256": "11308b1102c7c6f5519269bab897a1de46a12bcba11fb152cf5a3c97791a9876",
+      "postSha256": "f59d9e8bb6bf491b7737222773f32ff15ca7b8264580439458c7c7351a8b792d"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-native-dispatch-pretool.test.mjs",
+      "preSha256": "dee4f248b0abd5115784b9ae5ab4d1ebe5811a4e90f62186da8e5e5fed68a8ee",
+      "postSha256": "216ff2057b0f5589a5e5f41f7d9b6b405d13597f6eeb8da1a6c8e0e8b4988e8e"
+    },
+    {
+      "path": "plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs",
+      "preSha256": "54478c13b898d5fcd882db19d4ec50b37ad9fc4193235468cb741ef29f07fcdb",
+      "postSha256": "18e3446207163c2d246cf256e78b2558dc000516aa4eefac052cc99ec486b454"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/antigravity-native-dispatch-prepare.mjs",
+      "preSha256": "f68a6b73500f0dccc26089aa0b2981c80a0e44c514c425a5264cb18ecd8094a5",
+      "postSha256": "4d402a874bc31baecf99566370502abb8f7be4478e22ef0691e9754739e71375"
+    }
+  ],
+  "files": [
+    {
+      "source": "scratch/agent-out/agy-native-tier-repair-fresh/report.md",
+      "sourceSha256": "0455c0730ba3d5d9f861bc3305e45c1b658c576664a56f42491a43a663f21625",
+      "sourceBytes": 8105,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/owner-report.md",
+      "derivativeSha256": "0455c0730ba3d5d9f861bc3305e45c1b658c576664a56f42491a43a663f21625",
+      "derivativeBytes": 8105,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/model-coordinator-final5.json",
+      "sourceSha256": "7a55c514ff5e068506578f3b9774c64a9a91d9791196c10483edede53ba7faa7",
+      "sourceBytes": 4015,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/model-coordinator-final5.txt",
+      "derivativeSha256": "7a55c514ff5e068506578f3b9774c64a9a91d9791196c10483edede53ba7faa7",
+      "derivativeBytes": 4015,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/native-pretool-final6.json",
+      "sourceSha256": "8be8ad62d455690660141fc716a708b987d571de9c20a941788774ca0cf29456",
+      "sourceBytes": 1528,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/native-pretool-final6.txt",
+      "derivativeSha256": "8be8ad62d455690660141fc716a708b987d571de9c20a941788774ca0cf29456",
+      "derivativeBytes": 1528,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/original-pretool-adapter-final3.json",
+      "sourceSha256": "5325cfb398c21e49e5b24fc9b332ee7aa95f1296e929611b3eb855f2a41c2bad",
+      "sourceBytes": 6496,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/original-pretool-adapter-final3.txt",
+      "derivativeSha256": "5325cfb398c21e49e5b24fc9b332ee7aa95f1296e929611b3eb855f2a41c2bad",
+      "derivativeBytes": 6496,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/fd-coordinator.json",
+      "sourceSha256": "d18a99d30261714c9a79a133c5264bda5741dc36cc175e4967d3e7d9960957fe",
+      "sourceBytes": 4163,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/fd-coordinator.txt",
+      "derivativeSha256": "d18a99d30261714c9a79a133c5264bda5741dc36cc175e4967d3e7d9960957fe",
+      "derivativeBytes": 4163,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/fd-pretool.json",
+      "sourceSha256": "fb77cd3231f08754619c83c7e37757189fa42718433b71fc5a1f9d8535f4de6b",
+      "sourceBytes": 2323,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/fd-pretool.txt",
+      "derivativeSha256": "fb77cd3231f08754619c83c7e37757189fa42718433b71fc5a1f9d8535f4de6b",
+      "derivativeBytes": 2323,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/suite-registration-final.json",
+      "sourceSha256": "c7207cf87704fa0228124ed85cdfa51ea8515ab5f3e778121d514bf4c61b8c1a",
+      "sourceBytes": 360,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/suite-registration-final.txt",
+      "derivativeSha256": "c7207cf87704fa0228124ed85cdfa51ea8515ab5f3e778121d514bf4c61b8c1a",
+      "derivativeBytes": 360,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/case-completion-final2.json",
+      "sourceSha256": "1681a018cdcd69a17835f85ee74c1ef6749ea89c99aa9f8fadc2fa869deba2e4",
+      "sourceBytes": 351,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/case-completion-final2.txt",
+      "derivativeSha256": "1681a018cdcd69a17835f85ee74c1ef6749ea89c99aa9f8fadc2fa869deba2e4",
+      "derivativeBytes": 351,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/consumer-safe-paths-final.json",
+      "sourceSha256": "e4d918c800223a7906afda0ef409fbf3dc392b0745530a40fb26289883069b1b",
+      "sourceBytes": 1128,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/consumer-safe-paths-final.txt",
+      "derivativeSha256": "e4d918c800223a7906afda0ef409fbf3dc392b0745530a40fb26289883069b1b",
+      "derivativeBytes": 1128,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    },
+    {
+      "source": "scratch/clones/agy-native-tier-repair-fresh/scratch/agent-out/agy-native-tier-repair-fresh/prepost-hashes-final2.json",
+      "sourceSha256": "3b1ae4f751597a51c80103e96418726fd7228757b647b915c35f3fd68b8f9519",
+      "sourceBytes": 2787,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/agy-native-tier/prepost-hashes-final2.txt",
+      "derivativeSha256": "3b1ae4f751597a51c80103e96418726fd7228757b647b915c35f3fd68b8f9519",
+      "derivativeBytes": 2787,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    }
+  ],
+  "rootProductRerun": false,
+  "rootAdministrativeFDDispositionCheck": {
+    "coordinator": 25,
+    "nativePretool": 11,
+    "allPass": true
+  }
+}

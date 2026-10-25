@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.portable-open-controller-custody.v1",
+  "status": "partial-red-not-integrated",
+  "files": [
+    {
+      "source": "scratch/clones/original-onboarding-controller-cohort/scratch/agent-out/original-onboarding-controller-cohort/report.md",
+      "sourceSha256": "586e912c1590b8dce4af4587a32caff2b3c73ab7157fa43c56b591dace1c7b89",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/full-report.md.txt",
+      "derivativeSha256": "586e912c1590b8dce4af4587a32caff2b3c73ab7157fa43c56b591dace1c7b89",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-onboarding-controller-cohort/scratch/agent-out/original-onboarding-controller-cohort/controller-summary.json",
+      "sourceSha256": "3ce8132f91269ab19db5c4b6a9f6e6ea4fd9ef995c88111b54ca54ec46f018e3",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/full-controller-summary.json.txt",
+      "derivativeSha256": "3ce8132f91269ab19db5c4b6a9f6e6ea4fd9ef995c88111b54ca54ec46f018e3",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-onboarding-controller-cohort/scratch/agent-out/original-onboarding-controller-cohort/final-summary.json",
+      "sourceSha256": "ea2ec868c0798e7ca121857c97ff34f9bbbdec83d387f92bd1c79b3d4dfd1d54",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/full-final-summary.json.txt",
+      "derivativeSha256": "ea2ec868c0798e7ca121857c97ff34f9bbbdec83d387f92bd1c79b3d4dfd1d54",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-onboarding-controller-cohort/scratch/agent-out/original-onboarding-controller-cohort/fixture-only.patch",
+      "sourceSha256": "ed157191190ecafbc9f9c5727c18bb829e5977b26893b13af036abeb41ba431e",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/full-fixture-only.patch.txt",
+      "derivativeSha256": "ed157191190ecafbc9f9c5727c18bb829e5977b26893b13af036abeb41ba431e",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-controller-controlled-identity/scratch/agent-out/original-controller-controlled-identity/report.md",
+      "sourceSha256": "e209a294270430747ab35648052babc9b52dbe9b6dbb314f02c3dbd87eb066ab",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/identity-report.md.txt",
+      "derivativeSha256": "07d09ec26cc3156b83e20a36ee44077918ba0f1dc465e54ac3ec0b6b9524cc52",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-controller-controlled-identity/scratch/agent-out/original-controller-controlled-identity/selected-summary.json",
+      "sourceSha256": "f54bc62647f0edb483ef66bd60bcab807ac8df779ec527cc11257df1337929c2",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/identity-selected-summary.json.txt",
+      "derivativeSha256": "f54bc62647f0edb483ef66bd60bcab807ac8df779ec527cc11257df1337929c2",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-controller-controlled-identity/scratch/agent-out/original-controller-controlled-identity/final-bindings.json",
+      "sourceSha256": "47d48c823a3ee9d1fc1697ad37c2f7b2928fc21e421bf674232b81f612e4fd10",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/identity-final-bindings.json.txt",
+      "derivativeSha256": "47d48c823a3ee9d1fc1697ad37c2f7b2928fc21e421bf674232b81f612e4fd10",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/original-controller-controlled-identity/scratch/agent-out/original-controller-controlled-identity/fixture-only.patch",
+      "sourceSha256": "709f8df81d61a12161e060fd8d85a7da68d2fa1c48b38235e44b5c9566f46a16",
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/original-controller-open/identity-fixture-only.patch.txt",
+      "derivativeSha256": "709f8df81d61a12161e060fd8d85a7da68d2fa1c48b38235e44b5c9566f46a16",
+      "byteExactOriginal": false
+    }
+  ],
+  "rawOriginalsRemainInIgnoredScratch": true,
+  "derivativePatchExecutable": false
+}

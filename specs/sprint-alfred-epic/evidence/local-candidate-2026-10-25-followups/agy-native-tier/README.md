@@ -1,0 +1,9 @@
+# AGY explicit native tiers and public flat preparation
+
+Committed normallydc8204a28. PO-approved Model tiers are explicit; Model inherit is forbidden. Workspace inherit remains a supported workspace selector. Flat and batch forms are closed and shape-bound, with Model/Workspace/candidate/expiry/source/replay protection. Concrete CLI IDs remain separate; actual native concrete model/effort were not observed.
+
+Public CLI flat request → prepared flat invocation → actual hook allow-once/replay-denial is qualified. Owner counts: routing/coordinator/CLI37, native pretool11, original shared adapter66. Genuine completion FD streams25+11 are preserved, with parent administrative count/uniqueness/pass checks. [Owner report](owner-report.md) and [custody](custody.json) retain exact source bindings and capture derivatives.
+
+Earlier seven-path proposal8752bf1b5c17e9222d26a3ca8b69c23a2b1742adcdae6fda25eded14bf3addfa was not imported: publicCLI flat output and the original five failures were then unqualified. Final nine-path overlaye5231cbc2d07125d362c7c168e5528e0d282a8c4645dccec15e6a0a7dbd2bbf2 resolves those gaps. Original assertions remain; legitimate fixture inputs now supply explicit tier/canonical type. Three unrelated unsupported write-carrier expectations use the stronger existing refusal.
+
+Qualification limits: no installed/native provider invocation, concrete model/effort attestation, integrated FullVerify/Security, frozen Critic batch or acceptance. Governed plan-verifier remains fail-closed where no approved native task route exists; no guessed route is granted. Source JSON schema files were not edited, but the internal one-shot artifact shape now includes callShape; stale preparations must be regenerated. This clarification limits the owner report's generic statement about unchanged schemas. Sealed implementation consent remains required.

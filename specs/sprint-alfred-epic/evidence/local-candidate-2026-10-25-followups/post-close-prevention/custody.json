@@ -1,0 +1,47 @@
+{
+  "schema": "pipeline.portable-followup-custody.v1",
+  "sourceCommit": "9ed1a2800",
+  "patchSha256": "bdd37019c8f9aa460378e06b2d4b397ef204ad99d14ef3d65454e75df057acc2",
+  "sourceFiles": [
+    {
+      "path": "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+      "preSha256": "c5a5f4896193deefceec24c7e916e5bee5131f19d293b1f9dbecd819a2ec6a72",
+      "postBlob": "4e5cb0b91ba5aa1268c9369a108568b868967b16",
+      "postSha256": "5735a27fabf6e91969362bb57d30bcbae44e7627f890244f5a72862ce52c415b"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "preSha256": "ad1fa0b6e14e5433b72695048af670c414069f7cca871e72e702a33bdcb8f42f",
+      "postBlob": "93e20dc71331e000d80e3d04a2edc9b5cab23751",
+      "postSha256": "a2e4e03434c39a73f3d44d3bb56b7233fa365be860245afaa4a3b5f664e6e218"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.test.mjs",
+      "preSha256": "62a19a61c796b50e950a599f9260f959496758f6423b80b8cb5a087baf3d9042",
+      "postBlob": "b3e6610d801e158d319bfffdbbd9349d190f9037",
+      "postSha256": "802e354b0052b8b6b1e35b54b13d2a838f7eb8fe9e73b2af92af062cace0685e"
+    }
+  ],
+  "files": [
+    {
+      "source": "scratch/clones/post-close-push-continuity/scratch/post-close-push-continuity-pipeline-state-test.txt",
+      "sourceSha256": "8fdfad797925c06cd540db30ea8fcc70d0a36a848e1d4755a1dd8460fd9e0284",
+      "sourceBytes": 53673,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/post-close-prevention/focused-state.txt",
+      "derivativeSha256": "8fdfad797925c06cd540db30ea8fcc70d0a36a848e1d4755a1dd8460fd9e0284",
+      "derivativeBytes": 53673,
+      "byteExactOriginal": false,
+      "transformation": "Repository/home/runtime path projection only; original retained in ignored Scratch."
+    }
+  ],
+  "rootProductRerun": false,
+  "broadResult": {
+    "basis": "Owner tool readback; no named broad capture artifact available",
+    "cases": 308,
+    "pass": 307,
+    "fail": 1,
+    "failingCase": "OBC264",
+    "baselineAttribution": "not established"
+  },
+  "recovery": "already-damaged-State recovery unimplemented/unqualified"
+}

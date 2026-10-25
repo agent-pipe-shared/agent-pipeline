@@ -1,0 +1,14 @@
+{
+  "phase": "selected",
+  "exit": 1,
+  "signal": null,
+  "error": null,
+  "durationMs": 196692.972449,
+  "callbackStarts": 15,
+  "callbackEnds": 15,
+  "callbackPasses": 8,
+  "callbackFailures": 7,
+  "childStarts": 0,
+  "childEnds": 0,
+  "fixtureIdentityCleanup": "passed-after-settlement"
+}

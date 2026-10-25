@@ -1,0 +1,60 @@
+# Original design-review producer and active presentation admission
+
+Status: proposed. Date: 2026-10-25. No choice selected, no approval, no activation.
+
+## Context and inherited authority
+
+G8/P1-1 requires genuine separation of design authorship and reviewer execution. Spec §12's design-phase review duty and the runner route contract around lines 1600–1750 supply the existing duty; canonical findings row G8 describes the accepted defect. The latest follow-up plan explicitly leaves independent design provenance open after G20's synthetic checks. ADR-0085 U1/U2/U3 requires one design review with at most two rounds, the unchanged closed receipt/binding shapes, complete findings and a visible unreviewed delta after round two. October 23 tile row 12/41 requires K128's optional honest fallback record. A fallback is never independent reviewer proof. These requirements coexist: provenance cannot silently turn the accepted fallback into independent assurance or add Advisor/Readiness reviews.
+
+The previous audit remains the prior failed attempt, not this stage's progress. Exact reconstruction base and thirty-path input patch are recorded in binding.json. Inherited ADR-0063 controls artifact placement; ADR-0069 reserves numbering for acceptance. The compiled decision summary contains proposed functional-model and content-review decisions; their proposed status supplies no activation authority. Organization guidance was not supplied and is unknown.
+
+## Architecture significance
+
+Axis 1 fires: a design execution request/admission API crosses producer and lifecycle consumer boundaries. Axis 2 fires: original custody must survive separate CLI processes through the existing Source/Model registry, or dispatch/presentation must become one transaction. Axis 3 fires for the new design entry into the existing native host, without changing the runner or host policy. Axis 4 fires because author/reviewer separation, replay and forged evidence are security/reliability properties. Axis 5 fires for the public subject/custody contract and its signed binding compatibility. Existing accepted authority supplies the principal, review duty and single-review policy; it does not select this missing adapter or authorize a new public wire format. Therefore the integration decision remains material and proposed. The read-only architecture-baseline command reports no material decision from its default metadata scan; that does not assess this new untracked proposed API and does not override the five-axis assessment.
+
+## Choice A — existing Source registry readback (recommended)
+
+Extend the existing original native Critic/Model invocation route with a design-current-artifacts subject. Reuse its actual route, original invocation handle, readonly child, publication captures and registered host member. Add no principal, key family, ledger, METHOD promotion or caller-injected trustedSources claim. The prepared subject is the closed request described below. Source privately retains the request digest and the original author execution relation before launch. Host terminal observation binds the actual child answer bytes, report projection bytes and receipt bytes to that exact subject and observed reviewer identity.
+
+Subsequent present-plan and signature revalidation resolve original provenance through the existing registry and its source-owned original-writer/readback mechanism. Serialized sidecar bytes are a locator and bounded projection only; independently re-reading a file with a matching hash is insufficient. A missing/lost original publication witness returns DRE-ORIGIN-UNAVAILABLE and requires reprepare, preserving current G17 refusal semantics. This is an extension of existing Source custody, not a newly trusted issuer. It supports the existing separate CLI workflow but requires an additional bounded scope for the frozen native/registry integration surfaces. No change to those surfaces is in this patch.
+
+## Choice B — same-process original handle
+
+Launch one original design Critic and present its result within one sanctioned Source transaction using the live original context. No cross-process replay of a JSON token. Signing may verify the already sealed approval subject and original Source transaction; any consumer that must regenerate the binding later requires reprepare or original registry readback. This is smaller only if that CLI behavior change is selected. It cannot be advertised as a drop-in repair for today's separate create/present/verify commands. The controller must not implement it as a subprocess that serializes a WeakMap handle.
+
+## Exact proposed subject and API
+
+The inert implementation exports `prepareDesignReviewExecution(input)`, `validateDesignReviewExecutionRequest(request)` and `recheckDesignReviewExecutionRequest({request,current})`. Its closed request schema is `pipeline.design-review-execution-request.proposed.v1`; fields are schema/status/featureId/candidate/sources/specPath/criteria/authorExecutionSha256/reviewerDuty/round/previousReceiptSha256/assurance. Candidate is commit+tree. Sources are sorted unique regular tracked path+sha256+blobOid+mode records, including PRD, Spec and companions. Criteria holds Spec digest, located sorted IDs and the canonical digest of both. Entire Spec bytes bind the actual criterion wording, not just IDs. Author execution digest is an untrusted reference until Source resolves the original author record. Round 1 has null predecessor; round 2 has the exact first receipt digest; round 3 refuses. Preparation assurance is always proposed-preparation/native=false/independentCriticPass=false. Preparation neither reserves nor consumes a review.
+
+`scripts/design-review-dispatch.mjs prepare-proposal <input.json>` obtains the candidate and source bytes from disk/Git, rejects symlink/traversal/untracked/dirty selected sources and emits only a proposed request to stdout. It accepts absolute repository root input but source paths stay relative. It never launches a model or writes a receipt. No active lifecycle caller imports the prototype.
+
+The following production API is proposed, not exported or callable in this patch:
+
+```
+prepareOriginalDesignReview({repository, sourcePaths, specPath, featureId,
+  originalAuthorReference, round, previousOriginalReviewReference})
+  -> {ok:true, preparedHandle, request, requestSha256} | refusal
+runOriginalDesignReview({preparedHandle})
+  -> {ok:true, originalReviewHandle, reportBytes, receiptBytes, locator} | refusal
+readOriginalDesignReview({repository, locator, expectedSubject})
+  -> {ok:true, originalReviewHandle} | refusal
+admitOriginalDesignReview({originalReviewHandle, receiptBytes, reportBytes,
+  candidate, reviewedSources, criteria, originalAuthorReference})
+  -> {ok:true, admissionHandle, receiptSha256, reportSha256, requestSha256} | refusal
+```
+
+Handles are private Source capabilities, never schema fields, constructor arguments from chat, or JSON. The existing native host's `readValidatedNativeCriticReturn` only accepts an internally minted handle; its current invocation does not return that handle. `captureNativeCriticPreparedReturn` and `readNativeCriticCapturedReturn` require the original prepared context. The present implementation-review `prepareNativeCritic` also binds Verify evidence and cannot be repurposed by fabricating preimplementation Verify PASS. The lower native host already accepts `reviewScope:{kind:'current-artifacts',paths:[...]}` and source records; reuse this subject coverage rather than inventing a backend. A design-specific original preparation/capture/readback wiring is still required. Host and registry owners must qualify it before claiming a genuine independent positive.
+
+The proposed public locator is closed: `{schema:'pipeline.design-review-origin-locator.proposed.v1',requestSha256,receiptSha256,reportSha256,originalInvocationSha256,sourceRevisionSha256}`. Its digests locate existing registered original invocation/publication facts; possession grants no admission. It has no signature, key ID, new ledger path or purported provider attestation. Source rejects stale revision, candidate, author/reviewer identity equality, wrong duty, report/receipt projection changes, missing original publication, duplicate round execution and predecessor replay before any State effect. A completed origin may be read repeatedly for deterministic verification of the same subject; replay means rebinding to another subject/round or launching a second execution under a consumed reservation. Read-only verification is not consumption.
+
+## Exact integration boundaries
+
+The separate `proposed-integration.diff` identifies both active createDesignApprovalBinding callsites and request revalidation. Keep the pure U3 kernel and its import list unchanged: provenance admission belongs to the Source wrapper before pure binding construction. Scope reservations and original execution belong to the dispatch transaction; present-plan revalidation is read-only and runs before request/State writes, including its companion effect preparation. Existing U1 source-delta behavior remains authoritative: validate provenance against each receipt's reviewed sources, then let U1/U3 disclose a later round-two delta rather than incorrectly refusing every current-source difference. Candidate identity must describe the review subject while the later approval candidate remains separately bound by the approval intent.
+
+The source receipt CLI's raw report inputs remain a fallback/observation route until original Source admission is available. Preserve K128 exactly and visibly disclose assurance; do not infer independence from absent fallback, runner environment, observed model name, reviewerRole or an agent-written PASS. Native output findings are projected by Source, never supplied by the presenting author. Published sanitized report bytes and unpublished original digest remain separately bound.
+
+## Qualification and limits
+
+The inert prototype's five behavioral tests cover actual disk/Git source preparation, positive canonical subject creation, candidate/source/criteria/duty/author drift, closed-schema forged labels, dirty/untracked/symlink paths and two-round shape. The baseline RED proves this preparation API was absent, not that genuine G8 provenance was fixed. Original U2/U3/consumer-safe examiners remain unchanged. Native reviewer execution, original publication admission, cross-process Source readback, replay reservation transaction and both actual present-plan behavior tests remain pending production wiring; a pure compare or negative refusal is not their PASS. No actual model/Critic run, no native assurance and no independent positive are claimed.
+
+Once the material choice is selected, include its exact digest-bound record and schema/API/integration bytes in the existing aggregate design package for the configured common approval. No separate ADR approval, new design-open, Spec/PRD mutation or agent acceptance is proposed here.

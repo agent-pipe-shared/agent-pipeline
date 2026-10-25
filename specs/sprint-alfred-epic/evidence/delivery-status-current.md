@@ -1,15 +1,15 @@
 # Delivery status (current)
 
-**196 items ·23 below75 · index71.68%.**
+**196 items ·22 below75 · index71.94%.**
 
 | Stage | Items |
 |---|---:|
-|25|3|
+|25|2|
 |50|20|
-|75|173|
+|75|174|
 |100|0|
 |UNKNOWN|0|
 
-[Current committed-Source snapshot](delivery-amendment-2026-10-25-committed-source-credit/README.md) credits five qualified repairs against actual commits. Historical reasons and snapshots remain immutable; all196 identities and original22 three-runner P0/P1 traces remain. Pending AGY public-carrier qualification and G33 protected prevention/recovery are not marked complete. Native/platform, finalVerify/Security, frozen Critic batch and PO acceptance remain separately open.
+[Final interim snapshot](delivery-amendment-2026-10-25-final-interim/README.md): AGY public native-tier preparation/adapter is qualified at75; post-close prevention is committed at50 with existing-damage recovery open. Final composed Source compatibility is green. All196 identities, original22 three-runner P0/P1 traces and historical snapshots are retained.
 
-[Additional report dispositions](../plans/greenfield-burg-intake-2026-10-25.md) · [operative plan](../plans/plan_0.7.0-completion-and-greenfield-2026-10-24.md). Central Bank/Enterprise policy belongs to Nightwing, outside0.7.0 and0.7.1 none.
+This is a local intermediate candidate, not full0.7.0 completion or release. Native/platform Greenfield, integrated preparatory/finalVerify/Security, scheduled frozen Critic batch and PO acceptance remain open. [Operative plan](../plans/plan_0.7.0-completion-and-greenfield-2026-10-24.md) · [additional report dispositions](../plans/greenfield-burg-intake-2026-10-25.md). Central Bank/Enterprise policy belongs to Nightwing, outside0.7.0 and0.7.1 none.

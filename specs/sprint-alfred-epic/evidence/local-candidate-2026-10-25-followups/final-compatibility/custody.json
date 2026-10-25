@@ -1,0 +1,75 @@
+{
+  "schema": "pipeline.portable-followup-custody.v1",
+  "sourceCommit": "0d2c33bf55a4611630ae739c770585d539744010",
+  "sourceTree": "2324536f710bea40a237fff24694984b4cfbdfa0",
+  "sourceUnchanged": true,
+  "captures": [
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/generator-pin.log",
+      "sourceSha256": "c0fe3284d8e9739cd9e4d4f99754f92fa4c306cab0e7ee81da152802c32b7b2f",
+      "sourceBytes": 1999,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/generator-pin.log.txt",
+      "derivativeSha256": "c0fe3284d8e9739cd9e4d4f99754f92fa4c306cab0e7ee81da152802c32b7b2f",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/model-family-route-source-test.log",
+      "sourceSha256": "ba125b415a9d30c8160bd81983c1532f50d887afb57764a80b1ba8168548eabd",
+      "sourceBytes": 997,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/model-family-route-source-test.log.txt",
+      "derivativeSha256": "ba125b415a9d30c8160bd81983c1532f50d887afb57764a80b1ba8168548eabd",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/suite-registration.log",
+      "sourceSha256": "8df220c3a7b123dd18711673eb81777bc2a7731208c85a370fdb53dac0d096d6",
+      "sourceBytes": 339,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/suite-registration.log.txt",
+      "derivativeSha256": "8df220c3a7b123dd18711673eb81777bc2a7731208c85a370fdb53dac0d096d6",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/suite-append.log",
+      "sourceSha256": "2c9afc8c5ab8bd34ed45489ebc67d72e867f23b93fd30eda0bb4a950ca0054c5",
+      "sourceBytes": 309,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/suite-append.log.txt",
+      "derivativeSha256": "2c9afc8c5ab8bd34ed45489ebc67d72e867f23b93fd30eda0bb4a950ca0054c5",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/case-completion.log",
+      "sourceSha256": "edb779e63e9682e8b9ebe6b66eba41767fc2a3bc4a750f5f43592c8a29ab306e",
+      "sourceBytes": 326,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/case-completion.log.txt",
+      "derivativeSha256": "edb779e63e9682e8b9ebe6b66eba41767fc2a3bc4a750f5f43592c8a29ab306e",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/capability-inventory.log",
+      "sourceSha256": "e816d6faf3d3897322bdd2782f0aff990f58190623e1797b458263fb055fc6d2",
+      "sourceBytes": 294,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/capability-inventory.log.txt",
+      "derivativeSha256": "e816d6faf3d3897322bdd2782f0aff990f58190623e1797b458263fb055fc6d2",
+      "byteExactOriginal": false
+    },
+    {
+      "source": "scratch/clones/candidate-final-compatibility-check/scratch/agent-out/final-interim-compatibility/reader-input-check.log",
+      "sourceSha256": "7bfed82bb3376bc48baa2f3487d7279f4f43eabc54988347076395ba806bd9b0",
+      "sourceBytes": 309,
+      "derivative": "specs/sprint-alfred-epic/evidence/local-candidate-2026-10-25-followups/final-compatibility/reader-input-check.log.txt",
+      "derivativeSha256": "7bfed82bb3376bc48baa2f3487d7279f4f43eabc54988347076395ba806bd9b0",
+      "byteExactOriginal": false
+    }
+  ],
+  "ownerReported": {
+    "generator": 13,
+    "syntheticFamilyRouteProjection": 5,
+    "registeredSuites": 1117,
+    "unregistered": 0,
+    "excluded": 0,
+    "completionEntries": 385,
+    "classifiedSuites": 364
+  },
+  "preflight": "empty stdout; exit not retained; no native-ready claim",
+  "rootProductRerun": false
+}

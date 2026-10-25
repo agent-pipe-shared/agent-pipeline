@@ -1,0 +1,30 @@
+command: node scratch/agent-out/generator-guidance-condensation/run.mjs suite
+label: generator-pin
+exitCode: 0
+head: 0d2c33bf55a4611630ae739c770585d539744010
+tree: 2324536f710bea40a237fff24694984b4cfbdfa0
+dirty: false
+--- stdout ---
+✔ measured before/after: no tracked target and no plan output carries the source material (219.205328ms)
+✔ provenance coverage: summary references bind the full plan's exact bytes; design-input records the source digest, not the text (204.017876ms)
+✔ a fresh reviewer can reach the source: apply writes provenance only; the authoring copy and the private store hold the material (279.477635ms)
+✔ without an ignore rule for scratch/ no authoring copy is written and the plan and apply result say so with a typed code (292.319503ms)
+✔ output budget: summary and full plan sizes are independent of the input size (352.024808ms)
+✔ argument contract: --summary/--verbose are exclusive and plan-only (105.972157ms)
+✔ RED mirror: the no-source-material assertion fails against a mutant that embeds the request in a target (115.315142ms)
+✔ [pendingAsks compaction] routine inspect repeats no request text and is size-independent (895.357802ms)
+✔ [pendingAsks compaction] the driver prints each published ask once for the collect-input outcome and stays within its size bound (16961.569879ms)
+✔ [pendingAsks compaction] the collect-input primary action is printed once; final.nextAction is a resolvable reference (8456.599001ms)
+✔ printed shape round-trips to the library shape for collect-input and pending-asks, and ignores other outcomes (0.883729ms)
+✔ RED mirror: the once-only assertion fails for an output that repeats an ask in collectInput (0.397255ms)
+✔ [generated banner] the staging banner permits the elaboration the design flow requires and still says the draft is not project authority (143.31221ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28385.396667
+
+--- stderr ---

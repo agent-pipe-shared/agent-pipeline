@@ -1,17 +1,17 @@
 {
   "schema": "pipeline.alfred-delivery-status-pointer.v1",
-  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-committed-source-credit/snapshot.json",
-  "sha256": "0eb0383f96dc7fe9187df31ce237ef95010e250c311910ba5bb5519f0ccc21f4",
+  "snapshot": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-final-interim/snapshot.json",
+  "sha256": "f377e7bc0dab130f114d73c5272da92717dfc8d4bf35b2d05f3532e79fac3a9d",
   "measuredAt": "2026-10-25",
-  "head": "e244c7b3d2efd8927646bb892958f376b8827738",
+  "head": "0d2c33bf55a4611630ae739c770585d539744010",
   "counts": {
-    "25": 3,
+    "25": 2,
     "50": 20,
-    "75": 173,
+    "75": 174,
     "100": 0,
     "UNKNOWN": 0
   },
-  "index": 71.68,
+  "index": 71.94,
   "total": 196,
-  "scope": "Same196identities; five actual committed Source/focused readiness promotions. Nightwing enterprise policy excluded."
+  "scope": "Same196identities; finalinterim AGY75,postclose50partial. No native/release acceptance; Nightwingenterprisepolicyexcluded."
 }

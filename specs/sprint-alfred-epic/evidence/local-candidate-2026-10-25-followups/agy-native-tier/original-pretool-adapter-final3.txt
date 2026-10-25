@@ -1,0 +1,77 @@
+command: node plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+label: Original shared Antigravity pretool adapter corpus
+exitCode: 0
+head: 5f3bec25bbe5d4ac5ee0df51dee20d9446272047
+tree: 46352f60ade814535b1b17b3cb59a5341b5b9ff0
+dirty: true
+--- stdout ---
+ok 1 - normalizeAntigravityToolInput: translates run_command
+ok 2 - normalizeAntigravityToolInput: translates write_to_file
+ok 3 - normalizeAntigravityToolInput: translates replace_file_content
+ok 4 - normalizeAntigravityToolInput: identifies read-only tools
+ok 5 - Antigravity pretool guard allows ordinary read-only tools immediately and refuses credential-root reads
+ok 6 - Antigravity pretool guard rejects invalid JSON
+ok 7 - Antigravity pretool guard blocks chained commands (&&, ;, pipes)
+ok 8 - Antigravity run_command uses its absolute Cwd instead of the first workspace
+ok 9 - Antigravity run_command resolves a relative Cwd from the adapter working directory
+ok 10 - Antigravity run_command falls back to workspacePaths when Cwd is missing
+ok 11 - Antigravity run_command fails closed for a malformed explicit Cwd
+ok 12 - Antigravity run_command admits a relative passive read outside the selected project root
+ok 13 - Antigravity pretool guard blocks writes outside project root (GUARD-CROSS-REPO-MUTATION)
+ok 14 - Antigravity pretool guard blocks write when Dev-Plan is not approved
+ok 15 - Antigravity pretool guard refuses an Elephant-role production write via the EL-01 tripwire
+ok 16 - Antigravity pretool guard does not refuse an admitted (open-dispatch) write via the EL-01 tripwire
+ok 17 - Antigravity pretool guard blocks unapproved git push
+ok 18 - Antigravity pretool guard blocks invoke_subagent missing mandatory template fields
+ok 19 - Antigravity native implementation dispatch is refused even when candidate-bound
+ok 20 - Antigravity pretool guard blocks direct writes to pipeline-state.json
+ok 21 - Antigravity pretool guard blocks replace_file_content outside project root
+ok 22 - Antigravity pretool guard blocks shell redirects (> and >>)
+ok 23 - Antigravity pretool guard blocks replace_file_content to pipeline.user.yaml (GS-1)
+ok 24 - Antigravity GS-1 is liftable through its ordinary HGO path only after real lifecycle readiness
+ok 25 - Antigravity signature guidance assigns only sign-intent to the external PO/operator
+ok 26 - Antigravity GS-1 widening of pipeline.user.yaml stays denied without an armed capability (k92 negative control)
+ok 27 - Antigravity pretool guard blocks agent self-approval for approve-push
+ok 28 - Antigravity pretool guard admits approve-push when external cryptographic --proof is provided
+ok 29 - Antigravity admits approve-plan on the proof-bearing design-approval-request route (K153 G9a)
+ok 30 - Antigravity still refuses approve-plan without a proof-bearing request or with an unsanctioned spelling (K153 G9a)
+ok 31 - Antigravity honors the explicit global chat attribution route for plan and push approval
+ok 32 - Antigravity keeps legacy action-local chat approval terminal-gated
+ok 33 - Antigravity pretool guard blocks a critic subagent defined with write tools enabled
+ok 34 - Antigravity pretool guard allows a non-critic subagent defined with write tools enabled (neighbour case)
+ok 35 - Antigravity pretool guard allows a critic subagent correctly defined with enable_write_tools: false
+ok 36 - Antigravity pretool guard blocks a critic dispatch prompt carrying prose (Contamination Rule)
+ok 37 - Antigravity Critic template carries a guard-admissible native envelope
+ok 38 - Antigravity pretool guard admits the actual rendered Critic envelope
+ok 39 - Antigravity pretool guard still rejects copying the full canonical Critic body into Prompt
+ok 40 - Antigravity pretool guard does not treat a paths-only critic dispatch as prose (neighbour case)
+ok 41 - Antigravity pretool guard allows a Critic dispatch naming the canonical templates/prompts/critic-review.md path (D2)
+ok 42 - Antigravity pretool guard still blocks genuine prose 'please review the code' after the D2 regex tightening
+ok 43 - Antigravity pretool guard blocks a critic prompt with the trigger word inside markdown bold emphasis (F1)
+ok 44 - Antigravity pretool guard blocks a critic prompt with the trigger word inside quotes (F1)
+ok 45 - Antigravity pretool guard blocks a critic dispatch carrying prose at index 1 of a multi-subagent envelope (D3)
+ok 46 - Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)
+ok 47 - Antigravity pretool guard denies a multi-subagent envelope when guard-dispatch.mjs's own check (not the local regex) flags the critic entry at index 1 (F2)
+ok 48 - Antigravity pretool guard blocks inline node -e execution (containment)
+ok 49 - Antigravity pretool guard blocks inline python -c execution (containment)
+ok 50 - Antigravity pretool guard allows running a node script file, not inline code (neighbour case)
+ok 51 - Antigravity start hint never creates .git before Git initialization
+ok 52 - Antigravity pretool guard blocks inline sh -c execution (containment, D6)
+ok 53 - Antigravity pretool guard blocks inline bash -c execution (containment, D6)
+ok 54 - Antigravity pretool guard blocks inline node --eval execution (containment, D6)
+ok 55 - Antigravity pretool guard blocks inline node -p execution (containment, D6)
+ok 56 - Antigravity pretool guard blocks inline node -pe execution (containment, D6)
+ok 57 - Antigravity pretool guard blocks inline env node -e execution (containment, already covered pre-D6)
+ok 58 - Antigravity pretool guard blocks inline bash -lc execution (containment, F6)
+ok 59 - Antigravity pretool guard blocks inline sh -ec execution (containment, F6)
+ok 60 - Antigravity pretool guard blocks inline zsh -c execution (containment, F6)
+ok 61 - Antigravity pretool guard blocks inline dash -c execution (containment, F6)
+ok 62 - Antigravity pretool guard allows a plain bash script invocation, not inline exec (neighbour case, F6)
+ok 63 - Antigravity scratch script inspection blocks Git indirection and keeps safe scripts usable
+ok 64 - Antigravity pretool guard blocks inline bash --login -c execution, a flag before -c (containment, delta-4 F4)
+ok 65 - Antigravity pretool guard blocks inline bash -o pipefail -c execution, an option+argument before -c (containment, delta-4 F4)
+ok 66 - lifecycle-not-ready denial does not advertise a human override ceremony
+
+All 66 antigravity-pretool-guard tests passed.
+
+--- stderr ---

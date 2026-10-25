@@ -1,0 +1,141 @@
+{
+  "schema": "pipeline.g8-design-producer-proposal-binding.v1",
+  "status": "proposed",
+  "base": "5f3bec25bbe5d4ac5ee0df51dee20d9446272047",
+  "sourcePatchSha256": "2805e293a48721796f1294f5160fd2ad1ae401a8fe62529f3e6e4ac50e333ecd",
+  "sourcePathCount": 30,
+  "frozenSourceUnchanged": true,
+  "prototypePatchSha256": "90dfb79f748a9055468df7e908552b999d862c5ebcaeed222deab2d0dd8ea897",
+  "files": [
+    {
+      "path": "plugins/pipeline-core/lib/design-review-execution-producer.mjs",
+      "sha256": "b886c4f00e58af1ca1e3c60dbd5012f4c1f5516e8858f7800b46033aa59043cb"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/g8-native-design-producer-contract.test.mjs",
+      "sha256": "7c61a8fe7afcf925168e7c75ebbdcca787aed9609baffaa3be17ad59c1c63403"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/design-review-dispatch.mjs",
+      "sha256": "84ea7b5d3694f82c828a720c2c2b66a63ad9d70a5193e7e37f425ed4c1c27c46"
+    }
+  ],
+  "dependencies": [
+    {
+      "path": "plugins/pipeline-core/lib/model-family-runtime-host.mjs",
+      "sha256": "a4421692e9a835dc2ce8b4b394adf832a6522b1a1df48117b198f3dd6e197699"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/model-family-host-store.mjs",
+      "sha256": "e12f80a1e9187171d7ed27054dfb8d070488433fd585ee68a9417907aa305f88"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-registry.mjs",
+      "sha256": "8ca98fcc031efd4784fa0a4930ba0e264c3fe0fe023ae10d40f4cae8898db865"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/session-authority-domain-owner.mjs",
+      "sha256": "c0bea54d105d13ffda3d52755995b02cb6e6e6896a8e7fb89b7c25059b3e4f9e"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
+      "sha256": "ebb58efeffc47a7f343e32d97ac2bc63fec9403979ac81b98fc7da8212f525d4"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-native-critic-host.mjs",
+      "sha256": "2bae892d8f5a2637bef740d8542ccb52971c358a182d21177058dd1963f6eb3a"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/codex-critic-session-route.mjs",
+      "sha256": "7f335a3f01a76a5ece112f7aa32b4d8b2fe7437a838120c0b6ebdaad37bc964f"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/codex-native-critic-policy.mjs",
+      "sha256": "68050c80c07bc19d0edad3cd93bd80c9e082ae8424ca45a7819617dfd5e53d29"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/critic-accepted-contract.mjs",
+      "sha256": "eaa621671b5b20353f743b760ab4c07f22ac0bf8c160372f1e7fc80986606ec9"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-review-receipt.mjs",
+      "sha256": "0a44fde079e19d4da4b3fb9fdea8e848897dd8ed74dd744049e9bc096fd3f709"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/design-approval-binding.mjs",
+      "sha256": "2309a8bbab7882e48536467e3a67540d2173f0f67e9bcca6274ed06c2c810056"
+    },
+    {
+      "path": "plugins/pipeline-core/scripts/pipeline-state.mjs",
+      "sha256": "f62566171e5f9de659bddfccf71d816e1456c7520fa9b4f7c4a82f090b1f03d1"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "proposed-contract.md",
+      "sha256": "81c96a63335ab4f475358efac79271d5563cd406a5bcd1d46fdfcb2d7e7c92e0"
+    },
+    {
+      "path": "proposed-integration.diff",
+      "sha256": "6f1cf1538a0f14cb72272d3d814a91b18d7286e0fe948500629064758e0708ce"
+    },
+    {
+      "path": "decision.proposed.json",
+      "sha256": "e24251311e40158aa43b4b8e4f6ca3a7393d65c834903436c55d1690d403cc0d"
+    },
+    {
+      "path": "request.schema.json",
+      "sha256": "fa9595b77c6ae1d0823cbf29f611b686e4d0a84191d95109554deb69dfd0a8e8"
+    },
+    {
+      "path": "origin-locator.schema.json",
+      "sha256": "8884b5ad4f4417b48736ea7aaf024521de0197061c24256934b3ec4a51bf046e"
+    },
+    {
+      "path": "prototype.patch",
+      "sha256": "90dfb79f748a9055468df7e908552b999d862c5ebcaeed222deab2d0dd8ea897"
+    },
+    {
+      "path": "actual-source-preparation.json",
+      "sha256": "9be6804d93d01ba07501d3459d0c3124a7f7d8b1e4ce2c8a06cd738b7418a0fd"
+    },
+    {
+      "path": "report.md",
+      "sha256": "6b30467b06a2071fac55ae86b342c29d082c44426e7753f7a1c070a6c57cceaf"
+    },
+    {
+      "path": "resource-observations.json",
+      "sha256": "a82300a197c8094ffe58a31cf6799a1488fc0e608e9be4519be9a81aaa12120e"
+    },
+    {
+      "path": "resource-report.json",
+      "sha256": "529f3686f0899bfc0ac03837dfa9c8ac21e49f42e5a3a242dba1c044bb68c81a"
+    },
+    {
+      "path": "red-preparation.json",
+      "sha256": "f6353e68c59e89749ff24c58aeaceed6ae282736d000380777c24b2f118e1fba"
+    },
+    {
+      "path": "prototype-tests.json",
+      "sha256": "1c3784ca2af0842467518c11460f0fd4c0eb03c317945c1e3ab216a9f6ab7126"
+    },
+    {
+      "path": "compatibility-tests.json",
+      "sha256": "6c5197d36dc1161fa6e804bf831ef59a3c5131f62d99d55ab2fe40b918779035"
+    },
+    {
+      "path": "receipt-cli-tests.json",
+      "sha256": "91dc0b4c10b0eea27a66d1c416bfa64b28268a40bc5467bcb52f31720f39f7a2"
+    },
+    {
+      "path": "architecture-baseline.json",
+      "sha256": "4f599a6749e03b28ace011c17868811b0cdfec32a7ff1c2272118bf8afb8939f"
+    }
+  ],
+  "productionActivated": false,
+  "independentPositiveQualified": false,
+  "nativeCalls": 0,
+  "criticCalls": 0,
+  "priorAttempt": "scratch/agent-out/g8-design-review-provenance/report.md",
+  "assurance": "Inert proposal preparation only; original native producer/admission and active consumer integration remain unimplemented."
+}

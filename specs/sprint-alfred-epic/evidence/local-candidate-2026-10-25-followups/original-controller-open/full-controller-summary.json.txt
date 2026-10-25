@@ -1,0 +1,15 @@
+{
+  "phase": "controller",
+  "exit": 1,
+  "signal": null,
+  "error": null,
+  "durationMs": 547118.578906,
+  "callbackStarts": 216,
+  "callbackEnds": 216,
+  "callbackPasses": 201,
+  "callbackFailures": 15,
+  "childStarts": 12,
+  "childEnds": 12,
+  "fixtureIdentityCleanup": "passed",
+  "completionSha256": "025b755b78647a01250bbee78f86cb190a0134861b817816e87cb9fdebc60e34"
+}

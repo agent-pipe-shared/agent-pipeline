@@ -1,0 +1,118 @@
+{
+  "schema": "pipeline.original-controller-controlled-identity-final-binding.v1",
+  "base": "5f3bec25bbe5d4ac5ee0df51dee20d9446272047",
+  "frozen30": "2805e293a48721796f1294f5160fd2ad1ae401a8fe62529f3e6e4ac50e333ecd",
+  "priorFixture": "ed157191190ecafbc9f9c5727c18bb829e5977b26893b13af036abeb41ba431e",
+  "patch": {
+    "paths": [
+      "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "plugins/pipeline-core/lib/original-onboarding-controller-fixture.mjs",
+      "plugins/pipeline-core/lib/original-controller-controlled-os-identity.mjs"
+    ],
+    "sha256": "709f8df81d61a12161e060fd8d85a7da68d2fa1c48b38235e44b5c9566f46a16",
+    "bytes": 7033
+  },
+  "files": [
+    {
+      "path": "plugins/pipeline-core/lib/project-onboarding-v3.test.mjs",
+      "sha256": "4c7e20fb5ab500e19c54de6511a44d8b4ecbb9db0fd6bd3e1099bc0fab87dfe7"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/original-onboarding-controller-fixture.mjs",
+      "sha256": "d832f4c6437af1f9a4eb4c70dfe82bcef9e038402f1b4467509af6a11c158157"
+    },
+    {
+      "path": "plugins/pipeline-core/lib/original-controller-controlled-os-identity.mjs",
+      "sha256": "ee545989ed6b9fc9ab82114b46af735ff878abc9166aece130dcf96b001318bc"
+    }
+  ],
+  "orchestration": [
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/run.mjs",
+      "sha256": "4a0dc27c4b5b51a3f7ab7a758a5982e92aa2c632a7ef0371fcc29600ca4425a5"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/selected.mjs",
+      "sha256": "143df84bdfa2251082979c2fdb818503aaf6e9465f946feef04d51c1ef4c40be"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/registry.mjs",
+      "sha256": "ae2ae561fb8148fe11c30af0a1c8533f268a10e1c03cc91800ec5afdd362773a"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/inspect.mjs",
+      "sha256": "e74e9b6b1ffe8403afb9e731549aeef3ed2550bb819dad897810495078833d7a"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/analyze-selected.mjs",
+      "sha256": "4487396afbc285aaa6c38e506baf087b7fe104ad40c0b0daa2212f59b60adb18"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/selected.log",
+      "sha256": "f154d1c116b94e7b0fe17a3cf8813a19ecda61cf96e34558b5339e7cefda5592"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/selected-summary.json",
+      "sha256": "f54bc62647f0edb483ef66bd60bcab807ac8df779ec527cc11257df1337929c2"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/focused-terminal-audit.log",
+      "sha256": "14e005a5644c9d8a8169fa952e02dbf949ebfa32c6547c20525ba1e6c24cd82e"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/focused-terminal-audit.json",
+      "sha256": "b0886bbda300448954148511855e134675d907187d4502b773ecea591bd832f1"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/registry-qualified.log",
+      "sha256": "1deb2cc14a85ad68bc84d2740e317b1fa17008b0ac6d06f2c333edfe7bdd0374"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/registry-and-source-audit.json",
+      "sha256": "c96ef9ccdac11f2915be48ad143f8ccdba32c5e2d818c95a3c4512662cb16a8f"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/inspection.log",
+      "sha256": "49640d99908a2da98dec580750d1a25ad9b88dd068b555494fe0f2618f70ee2d"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/final-inspection.json",
+      "sha256": "a66317d271d3ed4d1dedc1b3e6eb7a5406facd66be0cbf9194bebc107ac32244"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/consumer-paths.log",
+      "sha256": "c7814279d14b3ed01ae8447e3006f5150f2e00d2b05a4f6c17211402eca28d0b"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/resource.log",
+      "sha256": "171853901a8e5bf90a7715dba4bdc4bdb1fe07c341e5a112051331f2305f1ec6"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/fixture-only.patch",
+      "sha256": "709f8df81d61a12161e060fd8d85a7da68d2fa1c48b38235e44b5c9566f46a16"
+    },
+    {
+      "path": "scratch/agent-out/original-controller-controlled-identity/source-binding.json",
+      "sha256": "efb57b6291477b2560f405e41426ea4d25f3e81f3cdbab811abe323e1d5bdd92"
+    }
+  ],
+  "selected": {
+    "phase": "selected",
+    "exit": 1,
+    "signal": null,
+    "error": null,
+    "durationMs": 196692.972449,
+    "callbackStarts": 15,
+    "callbackEnds": 15,
+    "callbackPasses": 8,
+    "callbackFailures": 7,
+    "childStarts": 0,
+    "childEnds": 0,
+    "fixtureIdentityCleanup": "passed-after-settlement"
+  },
+  "fullCourseRun": false,
+  "native": false,
+  "committed": false
+}
