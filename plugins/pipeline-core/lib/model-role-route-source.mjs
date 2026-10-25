@@ -31,6 +31,21 @@ const DUTY_ROLES = Object.freeze({
   advisory: ["frontier", "frontier", "frontier"],
   read: ["efficient", "efficient", "efficient"],
 });
+// Antigravity's native Model enum is independent of the concrete V3 model IDs.
+// This PO-approved projection is explicit and never treats inherit as a route.
+const AGY_NATIVE_TIERS = Object.freeze({
+  "profile.frontier": "pro",
+  "profile.worker": "flash",
+  "duty.implement": "flash",
+  "duty.mechanic": "flash",
+  "duty.deep": "pro",
+  "duty.test_author": "flash",
+  "duty.critic_normal": "pro",
+  "duty.critic_high_risk": "pro",
+  "duty.readiness": "flash",
+  "duty.advisory": "pro",
+  "duty.read": "flash",
+});
 export const CLAUDE_ADVISORY_FALLBACK_TASK_ROUTE = "duty.advisory.fallback";
 
 function exactKeys(value, keys) {
@@ -81,10 +96,14 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
     if (!exactKeys(registry.profiles[profile][phase], RUNNERS)) {
       return { ok: false, code: "MODEL-ROLE-ROUTE-SOURCE-INVALID", taskRoute };
     }
-    RUNNERS.forEach((runner, index) => taskRoutes.push({
-      taskRoute, runner, role: PROFILE_ROLES[profile][phase][index],
+    RUNNERS.forEach((runner, index) => {
+      const role = PROFILE_ROLES[profile][phase][index];
+      taskRoutes.push({
+      taskRoute, runner, role,
+      ...(runner === "antigravity" ? { nativeTier: AGY_NATIVE_TIERS[`profile.${role}`] } : {}),
       cell: cellForTask(registry, taskRoute, runner),
-    }));
+    });
+    });
   }
   for (const duty of DUTIES) {
     const taskRoute = `duty.${duty}`;
@@ -93,10 +112,14 @@ export function registeredFunctionalTaskRoutes(registry = loadRunnerProfilesV3Re
     if (!exactKeys(cells, keys)) {
       return { ok: false, code: "MODEL-ROLE-ROUTE-SOURCE-INVALID", taskRoute };
     }
-    RUNNERS.forEach((runner, index) => taskRoutes.push({
-      taskRoute, runner, role: DUTY_ROLES[duty][index],
+    RUNNERS.forEach((runner, index) => {
+      const role = DUTY_ROLES[duty][index];
+      taskRoutes.push({
+      taskRoute, runner, role,
+      ...(runner === "antigravity" ? { nativeTier: AGY_NATIVE_TIERS[taskRoute] } : {}),
       cell: cellForTask(registry, taskRoute, runner),
-    }));
+    });
+    });
   }
   // Claude's native Advisor has no applicable effort tier, while its fresh
   // consult fallback has its own governed max-effort V3 cell. Model/effort

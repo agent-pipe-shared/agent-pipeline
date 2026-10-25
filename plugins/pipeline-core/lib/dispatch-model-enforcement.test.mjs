@@ -3,6 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateDispatchModel, dispatchModelRefusalText, dispatchModelWarningText } from "./dispatch-model-enforcement.mjs";
+import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
 
 const claudeSelectors = {
   implement: "sonnet", mechanic: "haiku", deep: "sonnet", test_author: "opus",
@@ -106,8 +107,21 @@ test("DME10 Antigravity requires an explicit native Model enum on each entry", (
 
 test("DME11 a directly comparable Antigravity duty selector binds the role", () => {
   const routeSource = { ok: true, taskRoutes: [{ taskRoute: "duty.implement", runner: "antigravity",
-    state: "opt-in", selector: { kind: "alias", value: "flash" } }] };
+    state: "opt-in", nativeTier: "flash", selector: { kind: "model-id", value: "gemini-3.7" } }] };
   assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model: "flash", routeSource }).ok, true);
   const mismatch = evaluateDispatchModel({ runner: "antigravity", subagentType: "goldfish-implementor", model: "pro", routeSource });
   assert.equal(mismatch.findings[0].code, "DISPATCH-MODEL-DUTY-MISMATCH");
+});
+
+test("DME12 approved Antigravity tiers are projected beside, not substituted for, V3 selectors", () => {
+  const source = registeredFunctionalTaskRoutes();
+  assert.equal(source.ok, true);
+  const routes = source.taskRoutes.filter((route) => route.runner === "antigravity" && route.taskRoute.startsWith("duty."));
+  assert.equal(routes.find((route) => route.taskRoute === "duty.implement").nativeTier, "flash");
+  assert.equal(routes.find((route) => route.taskRoute === "duty.deep").nativeTier, "pro");
+  assert.equal(routes.find((route) => route.taskRoute === "duty.critic_normal").nativeTier, "pro");
+  assert.equal(routes.find((route) => route.taskRoute === "duty.advisory").nativeTier, "pro");
+  assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "consult-advisor", model: "pro", routeSource: source }).ok, true);
+  assert.equal(evaluateDispatchModel({ runner: "antigravity", subagentType: "plan-verifier", model: "pro", routeSource: source }).findings[0].code, "DISPATCH-MODEL-ROUTE-UNAVAILABLE");
+  assert.notEqual(routes.find((route) => route.taskRoute === "duty.implement").selector.value, "flash");
 });

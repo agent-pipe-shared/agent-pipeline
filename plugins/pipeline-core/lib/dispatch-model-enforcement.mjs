@@ -9,6 +9,7 @@
  * configuration can never leave a dispatch that no caller can repair.
  */
 import { registeredFunctionalTaskRoutes } from "./model-role-route-source.mjs";
+import { isShippedPipelineAgentType } from "./dispatch-policy.mjs";
 
 /** Runners whose dispatch tool carries a tool-layer `model` parameter this guard can observe. */
 const ENFORCED_RUNNERS = Object.freeze(["claude"]);
@@ -16,6 +17,7 @@ const ANTIGRAVITY_MODELS = Object.freeze(["flash_lite", "flash", "pro"]);
 
 /** Plugin agent types that exist to serve exactly one configured duty. */
 const AGENT_TYPE_DUTIES = Object.freeze({
+  "pipeline-core:afk-claude-worker": ["read"],
   "pipeline-core:goldfish-implementor": ["implement"],
   "pipeline-core:goldfish-mechanic": ["mechanic"],
   "pipeline-core:goldfish-deep": ["deep"],
@@ -36,9 +38,18 @@ function selectorMatches(selector, model) {
 
 export function evaluateDispatchModel({ runner, subagentType, model, routeSource = registeredFunctionalTaskRoutes() } = {}) {
   if (runner === "antigravity") {
-    // Native invoke_subagent exposes a small Model enum per Subagents entry. V3 currently
-    // stores concrete Gemini IDs, which cannot be equated to that enum without an approved
-    // mapping. Only an exact enum selector in V3 is directly comparable.
+    // Antigravity's enum is routed through the explicit PO-approved nativeTier projection
+    // in model-role-route-source. Concrete V3 model IDs remain a separate CLI route.
+    const type = typeof subagentType === "string" && subagentType.startsWith("pipeline-core:")
+      ? subagentType : `pipeline-core:${subagentType}`;
+    const duties = AGENT_TYPE_DUTIES[type];
+    if (!duties) {
+      if (isShippedPipelineAgentType(type)) return { ok: false, skipped: null, findings: [{
+        code: "DISPATCH-MODEL-ROUTE-UNAVAILABLE",
+        message: `No approved Antigravity native tier is registered for ${subagentType}; do not infer one from a concrete V3 model ID.`,
+      }] };
+      return { ok: true, findings: [], skipped: "agent-type-not-governed" };
+    }
     if (!ANTIGRAVITY_MODELS.includes(model)) {
       return { ok: false, skipped: null, findings: [{
         code: model === undefined || model === null || model === "" || model === "inherit"
@@ -46,14 +57,17 @@ export function evaluateDispatchModel({ runner, subagentType, model, routeSource
         message: `Antigravity Subagents[].Model must be explicitly set to "flash_lite", "flash", or "pro" for each entry; "inherit" and omitted values inherit the session model. Re-issue the same invoke_subagent call with each entry's Model set explicitly.`,
       }] };
     }
-    const type = typeof subagentType === "string" && subagentType.startsWith("pipeline-core:")
-      ? subagentType : `pipeline-core:${subagentType}`;
-    const duties = AGENT_TYPE_DUTIES[type];
     const routes = routeSource?.ok && Array.isArray(routeSource.taskRoutes) && duties
-      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity" && route.state !== "unavailable"
-        && duties.includes(route.taskRoute.slice("duty.".length))) : [];
-    const expected = [...new Set(routes.map((route) => route.selector?.value).filter((value) => ANTIGRAVITY_MODELS.includes(value)))];
-    if (expected.length > 0 && !expected.includes(model)) {
+      ? routeSource.taskRoutes.filter((route) => route.runner === "antigravity"
+        && duties.includes(route.taskRoute.startsWith("duty.") ? route.taskRoute.slice("duty.".length) : "")
+        && ANTIGRAVITY_MODELS.includes(route.nativeTier)) : [];
+    const expected = [...new Set(routes.map((route) => route.nativeTier))];
+    if (expected.length === 0) {
+      return { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-ROUTE-UNAVAILABLE",
+        message: `No approved Antigravity native tier is registered for ${subagentType}; do not infer one from a concrete V3 model ID.`,
+      }] };
+    }
+    if (!expected.includes(model)) {
       return { ok: false, skipped: null, findings: [{ code: "DISPATCH-MODEL-DUTY-MISMATCH",
         message: `Antigravity Subagents[].Model for ${subagentType} must match its configured duty selector (${expected.map((value) => `"${value}"`).join(" or ")}). Re-issue that entry with Model set to the configured selector.`,
       }] };

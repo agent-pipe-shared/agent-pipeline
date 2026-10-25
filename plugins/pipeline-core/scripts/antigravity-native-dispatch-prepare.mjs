@@ -8,14 +8,30 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { prepareAntigravityNativeDispatch } from "../lib/antigravity-native-dispatch-coordinator.mjs";
 
 export function prepareFromRequest(value, root = value?.root) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)
-    || ![
-      JSON.stringify(["packets", "root", "Subagents"].sort()),
-      JSON.stringify(["packets", "Subagents"].sort()),
-    ].includes(JSON.stringify(Object.keys(value).sort()))) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return { status: "rejected", code: "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
   }
-  return prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents: value.Subagents });
+  const flatFields = ["TypeName", "Role", "Prompt", "Model", "Workspace"];
+  const hasBatch = Object.hasOwn(value, "Subagents");
+  const hasFlat = flatFields.some((field) => Object.hasOwn(value, field));
+  const shapeKeys = Object.keys(value).sort();
+  const baseKeys = ["packets", ...(Object.hasOwn(value, "root") ? ["root"] : [])].sort();
+  let nativeSubagents;
+  let callShape;
+  if (hasBatch && !hasFlat
+    && [JSON.stringify([...baseKeys, "Subagents"].sort())].includes(JSON.stringify(shapeKeys))) {
+    nativeSubagents = value.Subagents;
+    callShape = "batch";
+  } else if (!hasBatch && ["TypeName", "Role", "Prompt"].every((field) => Object.hasOwn(value, field))
+    && shapeKeys.length === baseKeys.length + flatFields.filter((field) => Object.hasOwn(value, field)).length
+    && baseKeys.every((key) => shapeKeys.includes(key))
+    && flatFields.every((field) => !Object.hasOwn(value, field) || shapeKeys.includes(field))) {
+    nativeSubagents = [Object.fromEntries(flatFields.filter((field) => Object.hasOwn(value, field)).map((field) => [field, value[field]]))];
+    callShape = "flat";
+  } else {
+    return { status: "rejected", code: hasBatch && hasFlat ? "AGY-NATIVE-SHAPE-MIXED" : "AGY-NATIVE-REQUEST-SHAPE", modelCalls: 0, launcherCalls: 0 };
+  }
+  return prepareAntigravityNativeDispatch({ root, packets: value.packets, nativeSubagents, callShape });
 }
 
 function requestFromArgv(argv) {

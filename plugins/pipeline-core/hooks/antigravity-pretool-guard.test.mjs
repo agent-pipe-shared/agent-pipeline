@@ -120,6 +120,12 @@ function nativeFixture() {
 }
 
 function prepareNative(root, nativeSubagents) {
+  for (const entry of nativeSubagents) {
+    if (entry.Model !== undefined) continue;
+    const type = String(entry.TypeName ?? "").replace(/^pipeline-core:/u, "");
+    if (["goldfish-deep", "critic", "consult-advisor"].includes(type)) entry.Model = "pro";
+    else if (["goldfish-implementor", "goldfish-mechanic", "readiness-reviewer"].includes(type)) entry.Model = "flash";
+  }
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   const tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
   const digest = createHash("sha256").update("input\n").digest("hex");
@@ -842,15 +848,12 @@ check("Antigravity pretool guard blocks invoke_subagent missing mandatory templa
 
 check("Antigravity native implementation dispatch is refused even when candidate-bound", () => {
   const root = nativeFixture();
-  // A productive Goldfish dispatch is refused SQ-AUTHORITY-UNAVAILABLE (resolveGovernedItemQueue, the shipped
-  // productive-course default) in a governed project that carries no project authority files, before the
-  // adapter's own native-implementation refusal is reached. Same enrolled-but-not-item-governed shape as the
-  // shared fixture of guard-dispatch.test.mjs: the two authority files, no active feature, no slice queue.
-  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+  // Keep this fixture outside item-governed lifecycle so the ordinary write-briefing
+  // boundary does not mask the specific native-implementation consent denial.
   const nativeSubagents = [{
-    TypeName: "goldfish-implementor",
+    TypeName: "pipeline-core:goldfish-implementor",
     Role: "Goldfish Implementor",
+    Model: "flash",
     Prompt: [
       "## 1. Goal\nImplement the bounded change.",
       "## 2. Context files\n- input.txt",
@@ -1401,8 +1404,8 @@ check("Antigravity pretool guard blocks a critic dispatch carrying prose at inde
 check("Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)", () => {
   const root = nativeFixture();
   const nativeSubagents = [
-    { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
-    { TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
+    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT, Model: "pro" },
+    { TypeName: "pipeline-core:critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT, Model: "pro" },
   ];
   prepareNative(root, nativeSubagents);
   const res = decision(run({

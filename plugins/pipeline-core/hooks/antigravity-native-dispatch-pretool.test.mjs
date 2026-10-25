@@ -32,7 +32,7 @@ function fixture() {
   const enrollment = planGovernanceScopeDecision({ rootDir: root, decision: "enroll", by: "Antigravity native fixture" });
   assert.equal(applyGovernanceScopeDecision(enrollment, { activate: true, planSha256: enrollment.planSha256 }).state, "active");
   assert.equal(observeGovernanceScope({ rootDir: root }).requiresEnforcement, true);
-  const nativeSubagents = [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "input.txt\nmodel: gemini-3.7\nruleset-sha: local" }];
+  const nativeSubagents = [{ TypeName: "consult-advisor", Role: "Advisor", Prompt: "input.txt\nnative tier: pro\nruleset-sha: local", Model: "pro" }];
   const packets = [{
     schema: ROLE_DISPATCH_REQUEST_SCHEMA,
     dispatchId: "agy-native-hook-0",
@@ -47,19 +47,20 @@ function fixture() {
   return { root, nativeSubagents, packets };
 }
 
-function invoke(root, nativeSubagents) {
+function invoke(root, nativeSubagents, callShape = "batch") {
+  const args = callShape === "flat" ? nativeSubagents[0] : { Subagents: nativeSubagents };
   return spawnSync(process.execPath, [hook], {
     cwd: root,
     env: { ...process.env, CLAUDE_PROJECT_DIR: root },
     encoding: "utf8",
     shell: false,
-    input: JSON.stringify({ workspacePaths: [root], toolCall: { name: "invoke_subagent", args: { Subagents: nativeSubagents } } }),
+    input: JSON.stringify({ workspacePaths: [root], toolCall: { name: "invoke_subagent", args } }),
     timeout: 8_000,
   });
 }
 
 function foreignEntry() {
-  return { TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Inspect the customer fixture." };
+  return { TypeName: "customer-researcher", Role: "Customer Researcher", Prompt: "Read input.txt and return a short summary. Do not edit or create files." };
 }
 
 function packetFor(value, entry, dispatchId) {
@@ -77,9 +78,10 @@ function packetFor(value, entry, dispatchId) {
 }
 
 const cases = [
-  ["an unrelated host-defined array remains outside Pipeline artifact authority", ({ root }) => {
+  ["an unrelated write-capable host-defined array requires a Pipeline carrier", ({ root }) => {
     const result = invoke(root, [foreignEntry()]);
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /DISPATCH-WRITE-CARRIER-REQUIRED/u);
     assert.doesNotMatch(result.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
   }],
   ["missing preparation is denied by the immediate native hook", ({ root, nativeSubagents }) => {
@@ -109,27 +111,63 @@ const cases = [
     assert.equal(replay.status, 2);
     assert.match(replay.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
   }],
+  ["the actual flat tool form is prepared and admitted with the same one-use binding", (value) => {
+    const nativeSubagents = [structuredClone(value.nativeSubagents[0])];
+    const packets = [structuredClone(value.packets[0])];
+    const requestPath = join(value.root, "agy-flat-dispatch-request.json");
+    writeFileSync(requestPath, `${JSON.stringify({ packets, ...nativeSubagents[0] })}\n`);
+    const prepared = spawnSync(process.execPath, [prepareScript, "prepare", "--root", value.root, "--request", "agy-flat-dispatch-request.json"], {
+      cwd: value.root, encoding: "utf8", shell: false,
+    });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const output = JSON.parse(prepared.stdout);
+    assert.equal(output.status, "prepared");
+    assert.deepEqual(output.invocation, nativeSubagents[0]);
+    assert.equal(invoke(value.root, [output.invocation], "flat").status, 0);
+    assert.equal(invoke(value.root, [output.invocation], "flat").status, 2);
+  }],
+  ["mixed flat fields and batch array are rejected as ambiguous", (value) => {
+    assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+    const result = spawnSync(process.execPath, [hook], {
+      cwd: value.root, encoding: "utf8", shell: false,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: value.root },
+      input: JSON.stringify({ workspacePaths: [value.root], toolCall: { name: "invoke_subagent", args: { ...value.nativeSubagents[0], Subagents: value.nativeSubagents } } }),
+      timeout: 8_000,
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /AGY-NATIVE-SHAPE-MIXED/u);
+  }],
+  ["undeclared flat fields such as effort are rejected", (value) => {
+    const result = spawnSync(process.execPath, [hook], {
+      cwd: value.root, encoding: "utf8", shell: false,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: value.root },
+      input: JSON.stringify({ workspacePaths: [value.root], toolCall: { name: "invoke_subagent", args: { ...value.nativeSubagents[0], Effort: "deep" } } }),
+      timeout: 8_000,
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /AGY-NATIVE-SHAPE-INVALID/u);
+  }],
   ["an expired unconsumed batch is replaced before the immediate hook admits the fresh batch", (value) => {
     assert.equal(prepareAntigravityNativeDispatch({ ...value, nowEpochMs: 1_000, ttlMs: 1_000 }).status, "prepared");
     assert.equal(prepareAntigravityNativeDispatch({ ...value, nowEpochMs: Date.now() }).status, "prepared");
     assert.equal(invoke(value.root, value.nativeSubagents).status, 0);
   }],
-  ["a mixed host and Pipeline array requires one preparation for the complete array", (value) => {
+  ["a mixed host and Pipeline array remains subject to Pipeline carrier admission", (value) => {
     const foreign = foreignEntry();
     const nativeSubagents = [foreign, ...value.nativeSubagents];
     const packets = [packetFor(value, foreign, "agy-native-hook-foreign"), ...value.packets];
     const missing = invoke(value.root, nativeSubagents);
     assert.equal(missing.status, 2);
-    assert.match(missing.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
+    assert.match(missing.stderr, /DISPATCH-WRITE-CARRIER-REQUIRED/u);
     assert.equal(prepareAntigravityNativeDispatch({ root: value.root, packets, nativeSubagents }).status, "prepared");
-    assert.equal(invoke(value.root, nativeSubagents).status, 0);
+    assert.match(invoke(value.root, nativeSubagents).stderr, /DISPATCH-WRITE-CARRIER-REQUIRED/u);
   }],
   ["preparing only the Pipeline member cannot authorize a mixed array", (value) => {
     assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
     const foreign = foreignEntry();
     const result = invoke(value.root, [foreign, ...value.nativeSubagents]);
     assert.equal(result.status, 2);
-    assert.match(result.stderr, /AGY-NATIVE-ARTIFACT-MISSING/u);
+    assert.match(result.stderr, /DISPATCH-WRITE-CARRIER-REQUIRED/u);
   }],
   ["a mutated native prompt has zero eligibility", (value) => {
     assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
@@ -158,7 +196,7 @@ for (const entry of cases) {
     finally { rmSync(value.root, { recursive: true, force: true }); }
   };
 }
-assert.equal(cases.length, 8, "the complete Antigravity native pretool corpus must register before execution");
+assert.equal(cases.length, 11, "the complete Antigravity native pretool corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

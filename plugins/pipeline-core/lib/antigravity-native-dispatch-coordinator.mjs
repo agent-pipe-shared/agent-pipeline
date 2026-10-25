@@ -16,6 +16,8 @@ import {
 import { dirname, join, resolve } from "node:path";
 
 import { prepareRoleDispatchBatch } from "./role-dispatch-preflight.mjs";
+import { evaluateDispatchModel } from "./dispatch-model-enforcement.mjs";
+import { isShippedPipelineAgentType } from "./dispatch-policy.mjs";
 
 export const AGY_NATIVE_BATCH_ARTIFACT_SCHEMA = "pipeline.antigravity-native-dispatch-batch.v1";
 export const AGY_NATIVE_BATCH_PREPARATION_SCHEMA = "pipeline.antigravity-native-dispatch-preparation.v1";
@@ -27,8 +29,9 @@ const MAX_ARTIFACT_BYTES = 1024 * 1024;
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 // Keep subprocess teardown overhead inside the externally visible five-second PREPARE bound.
 const PREPARE_DEADLINE_MS = 4_500;
-const ARTIFACT_KEYS = ["artifactSha256", "candidate", "expiresAtEpochMs", "nativeSubagents", "packets", "repositoryRootSha256", "schema"];
-const ENTRY_KEYS = new Set(["Prompt", "Role", "TypeName"]);
+const ARTIFACT_KEYS = ["artifactSha256", "callShape", "candidate", "expiresAtEpochMs", "nativeSubagents", "packets", "repositoryRootSha256", "schema"];
+const ENTRY_KEYS = new Set(["Model", "Prompt", "Role", "TypeName", "Workspace"]);
+const NATIVE_WORKSPACES = new Set(["inherit", "branch", "share"]);
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
@@ -71,16 +74,28 @@ function validNativeSubagents(value) {
   return Array.isArray(value) && value.length > 0 && value.length <= 64
     && value.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry)
       && Object.keys(entry).every((key) => ENTRY_KEYS.has(key))
-      && Object.keys(entry).includes("TypeName") && Object.keys(entry).includes("Prompt")
+      && ["TypeName", "Role", "Prompt"].every((key) => Object.hasOwn(entry, key))
       && typeof entry.TypeName === "string" && entry.TypeName.trim() === entry.TypeName && entry.TypeName !== ""
+      && typeof entry.Role === "string" && entry.Role.trim() === entry.Role && entry.Role !== ""
       && typeof entry.Prompt === "string" && entry.Prompt.trim() !== ""
-      && (!Object.hasOwn(entry, "Role") || (typeof entry.Role === "string" && entry.Role.trim() === entry.Role && entry.Role !== "")));
+      && (!Object.hasOwn(entry, "Model") || typeof entry.Model === "string")
+      && (!Object.hasOwn(entry, "Workspace") || (typeof entry.Workspace === "string" && NATIVE_WORKSPACES.has(entry.Workspace))));
 }
 
 function bareRole(value) {
   return typeof value === "string" && value.startsWith("pipeline-core:")
     ? value.slice("pipeline-core:".length)
     : value;
+}
+
+function nativeTierRefusal(nativeSubagents) {
+  for (const entry of nativeSubagents) {
+    const type = bareRole(entry.TypeName);
+    if (!isShippedPipelineAgentType(type)) continue;
+    const evaluation = evaluateDispatchModel({ runner: "antigravity", subagentType: type, model: entry.Model });
+    if (!evaluation.ok) return evaluation.findings[0]?.code ?? "DISPATCH-MODEL-UNROUTED";
+  }
+  return null;
 }
 
 function entriesMatchPackets(nativeSubagents, packets) {
@@ -105,11 +120,11 @@ function artifactDirectory(commonDir) {
   return join(commonDir, "agent-pipeline", "run", "antigravity-native-dispatch-batches");
 }
 
-function artifactPath(commonDir, nativeSubagents, physicalRoot) {
-  return join(artifactDirectory(commonDir), `${sha256(physicalRoot)}-${sha256(JSON.stringify(nativeSubagents))}.json`);
+function artifactPath(commonDir, nativeSubagents, physicalRoot, callShape = "batch") {
+  return join(artifactDirectory(commonDir), `${sha256(physicalRoot)}-${sha256(JSON.stringify({ callShape, nativeSubagents }))}.json`);
 }
 
-function parseAuthenticatedRetirableArtifact(raw, { state, nativeSubagents, nowEpochMs }) {
+function parseAuthenticatedRetirableArtifact(raw, { state, nativeSubagents, callShape, nowEpochMs }) {
   let artifact;
   try { artifact = JSON.parse(raw); }
   catch { return null; }
@@ -119,6 +134,7 @@ function parseAuthenticatedRetirableArtifact(raw, { state, nativeSubagents, nowE
   const { artifactSha256, ...body } = artifact;
   if (sha256(JSON.stringify(body)) !== artifactSha256
     || artifact.repositoryRootSha256 !== sha256(state.physicalRoot)
+    || artifact.callShape !== callShape
     || JSON.stringify(artifact.nativeSubagents) !== JSON.stringify(nativeSubagents)) return null;
   return artifact.expiresAtEpochMs < nowEpochMs
     || artifact.candidate.commit !== state.head
@@ -127,7 +143,7 @@ function parseAuthenticatedRetirableArtifact(raw, { state, nativeSubagents, nowE
     : null;
 }
 
-function publishReplacingRetirable({ temporary, path, state, nativeSubagents, nowEpochMs }) {
+function publishReplacingRetirable({ temporary, path, state, nativeSubagents, callShape, nowEpochMs }) {
   try {
     linkSync(temporary, path);
     return "published";
@@ -138,7 +154,7 @@ function publishReplacingRetirable({ temporary, path, state, nativeSubagents, no
   let observedRaw;
   try { observedRaw = readFileSync(path, "utf8"); }
   catch { return "exists"; }
-  const observedDigest = parseAuthenticatedRetirableArtifact(observedRaw, { state, nativeSubagents, nowEpochMs });
+  const observedDigest = parseAuthenticatedRetirableArtifact(observedRaw, { state, nativeSubagents, callShape, nowEpochMs });
   if (observedDigest === null) return "exists";
 
   const retired = join(dirname(path), `.${randomUUID()}.retired`);
@@ -147,7 +163,7 @@ function publishReplacingRetirable({ temporary, path, state, nativeSubagents, no
     renameSync(path, retired);
     claimed = true;
     const claimedRaw = readFileSync(retired, "utf8");
-    const claimedDigest = parseAuthenticatedRetirableArtifact(claimedRaw, { state, nativeSubagents, nowEpochMs });
+    const claimedDigest = parseAuthenticatedRetirableArtifact(claimedRaw, { state, nativeSubagents, callShape, nowEpochMs });
     if (claimedRaw !== observedRaw || claimedDigest !== observedDigest) {
       try { linkSync(retired, path); } catch { /* another publisher owns the canonical name */ }
       return "exists";
@@ -172,11 +188,15 @@ function publishReplacingRetirable({ temporary, path, state, nativeSubagents, no
  * Prepare, but never launch, one native Antigravity invoke_subagent batch.
  * The caller passes the returned Subagents array unchanged to the runner's built-in tool.
  */
-export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagents, nowEpochMs = Date.now(), ttlMs = DEFAULT_TTL_MS } = {}) {
+export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagents, callShape = "batch", nowEpochMs = Date.now(), ttlMs = DEFAULT_TTL_MS } = {}) {
   const prepareDeadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS;
   const state = repositoryState(root, prepareDeadlineEpochMs);
   if (state === null) return rejected("AGY-NATIVE-ROOT", "root");
   if (!validNativeSubagents(nativeSubagents)) return rejected("AGY-NATIVE-SUBAGENTS", "nativeSubagents");
+  if (!["flat", "batch"].includes(callShape)) return rejected("AGY-NATIVE-CALL-SHAPE", "callShape");
+  if (callShape === "flat" && nativeSubagents.length !== 1) return rejected("AGY-NATIVE-CALL-SHAPE", "nativeSubagents");
+  const tierRefusal = nativeTierRefusal(nativeSubagents);
+  if (tierRefusal !== null) return rejected(tierRefusal, "nativeSubagents.Model");
   if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0 || !Number.isSafeInteger(ttlMs) || ttlMs < 1_000 || ttlMs > DEFAULT_TTL_MS) {
     return rejected("AGY-NATIVE-TTL", "ttlMs");
   }
@@ -194,15 +214,15 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
   }
   if (!entriesMatchPackets(nativeSubagents, packets)) return rejected("AGY-NATIVE-ARRAY-MISMATCH", "nativeSubagents");
 
-  const body = artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs: nowEpochMs + ttlMs });
+  const body = { ...artifactBody({ state, nativeSubagents, packets, expiresAtEpochMs: nowEpochMs + ttlMs }), callShape };
   const artifact = { ...body, artifactSha256: sha256(JSON.stringify(body)) };
   const directory = artifactDirectory(state.commonDir);
-  const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot);
+  const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot, callShape);
   const temporary = join(directory, `.${randomUUID()}.tmp`);
   try {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     writeFileSync(temporary, `${JSON.stringify(artifact)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
-    const publication = publishReplacingRetirable({ temporary, path, state, nativeSubagents, nowEpochMs });
+    const publication = publishReplacingRetirable({ temporary, path, state, nativeSubagents, callShape, nowEpochMs });
     if (publication !== "published") return rejected(
       publication === "exists" ? "AGY-NATIVE-ARTIFACT-EXISTS" : "AGY-NATIVE-ARTIFACT-WRITE",
       "artifact",
@@ -218,19 +238,26 @@ export function prepareAntigravityNativeDispatch({ root, packets, nativeSubagent
     code: "AGY-NATIVE-PREPARED",
     artifactSha256: artifact.artifactSha256,
     nativeSubagentsSha256: sha256(JSON.stringify(nativeSubagents)),
-    invocation: { Subagents: structuredClone(nativeSubagents) },
+    callShape,
+    invocation: callShape === "flat"
+      ? structuredClone(nativeSubagents[0])
+      : { Subagents: structuredClone(nativeSubagents) },
     modelCalls: 0,
     launcherCalls: 0,
   };
 }
 
 /** Validate the exact native call against its candidate-bound prepared artifact. */
-export function verifyAntigravityNativeDispatch({ root, nativeSubagents, nowEpochMs = Date.now() } = {}) {
+export function verifyAntigravityNativeDispatch({ root, nativeSubagents, callShape = "batch", nowEpochMs = Date.now() } = {}) {
   const prepareDeadlineEpochMs = performance.now() + PREPARE_DEADLINE_MS;
   const state = repositoryState(root, prepareDeadlineEpochMs);
   if (state === null) return rejected("AGY-NATIVE-ROOT", "root");
   if (!validNativeSubagents(nativeSubagents)) return rejected("AGY-NATIVE-SUBAGENTS", "Subagents");
-  const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot);
+  if (!["flat", "batch"].includes(callShape)) return rejected("AGY-NATIVE-CALL-SHAPE", "callShape");
+  if (callShape === "flat" && nativeSubagents.length !== 1) return rejected("AGY-NATIVE-CALL-SHAPE", "Subagents");
+  const tierRefusal = nativeTierRefusal(nativeSubagents);
+  if (tierRefusal !== null) return rejected(tierRefusal, "Subagents.Model");
+  const path = artifactPath(state.commonDir, nativeSubagents, state.physicalRoot, callShape);
   const claimedPath = join(dirname(path), `.${randomUUID()}.consume`);
   let raw;
   try {
@@ -258,9 +285,12 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, nowEpoc
   const { artifactSha256, ...body } = artifact;
   if (sha256(JSON.stringify(body)) !== artifactSha256) return rejected("AGY-NATIVE-ARTIFACT-DIGEST", "artifactSha256");
   if (artifact.repositoryRootSha256 !== sha256(state.physicalRoot)) return rejected("AGY-NATIVE-ARTIFACT-ROOT", "repositoryRootSha256");
+  if (artifact.callShape !== callShape) return rejected("AGY-NATIVE-CALL-SHAPE", "callShape");
   if (artifact.expiresAtEpochMs < nowEpochMs) return rejected("AGY-NATIVE-ARTIFACT-EXPIRED", "expiresAtEpochMs");
   if (artifact.candidate.commit !== state.head || artifact.candidate.tree !== state.tree) return rejected("AGY-NATIVE-ARTIFACT-STALE", "candidate");
   if (JSON.stringify(artifact.nativeSubagents) !== JSON.stringify(nativeSubagents)) return rejected("AGY-NATIVE-ARRAY-MUTATED", "Subagents");
+  const artifactTierRefusal = nativeTierRefusal(artifact.nativeSubagents);
+  if (artifactTierRefusal !== null) return rejected(artifactTierRefusal, "Subagents.Model");
   if (!entriesMatchPackets(nativeSubagents, artifact.packets)) return rejected("AGY-NATIVE-ARRAY-MISMATCH", "Subagents");
 
   const batch = prepareRoleDispatchBatch({
@@ -280,6 +310,7 @@ export function verifyAntigravityNativeDispatch({ root, nativeSubagents, nowEpoc
     artifactSha256,
     packets: structuredClone(artifact.packets),
     nativeSubagents: structuredClone(nativeSubagents),
+    callShape,
     workspace: state.physicalRoot,
     modelCalls: 0,
     launcherCalls: 0,

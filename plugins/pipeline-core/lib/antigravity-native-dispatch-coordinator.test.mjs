@@ -42,8 +42,8 @@ function request(root) {
   const commit = git(root, "rev-parse", "HEAD");
   const tree = git(root, "rev-parse", "HEAD^{tree}");
   const nativeSubagents = [
-    { TypeName: "consult-advisor", Role: "Advisor", Prompt: "Inspect input-a.txt. Model: gemini-3.7; Ruleset-SHA: local." },
-    { TypeName: "afk-claude-worker", Role: "Worker", Prompt: "Inspect input-b.txt. Model: gemini-3.7; Ruleset-SHA: local." },
+    { TypeName: "consult-advisor", Role: "Advisor", Prompt: "Inspect input-a.txt. Model: gemini-3.7; Ruleset-SHA: local.", Model: "pro" },
+    { TypeName: "afk-claude-worker", Role: "Worker", Prompt: "Inspect input-b.txt. Model: gemini-3.7; Ruleset-SHA: local.", Model: "flash" },
   ];
   const packets = nativeSubagents.map((entry, index) => ({
     schema: ROLE_DISPATCH_REQUEST_SCHEMA,
@@ -67,16 +67,51 @@ function withFixture(run) {
 
 test("valid full array is prepared and revalidated without changing role, prompt, order or workspace", () => withFixture((value) => {
   const prepared = prepareAntigravityNativeDispatch({ ...value, nowEpochMs: 1000 });
-  assert.equal(prepared.status, "prepared");
+  assert.equal(prepared.status, "prepared", JSON.stringify(prepared));
   assert.deepEqual(prepared.invocation, { Subagents: value.nativeSubagents });
   const verified = verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: prepared.invocation.Subagents, nowEpochMs: 1001 });
-  assert.equal(verified.status, "prepared");
+  assert.equal(verified.status, "prepared", JSON.stringify(verified));
   assert.deepEqual(verified.nativeSubagents, value.nativeSubagents);
   assert.deepEqual(verified.packets, value.packets);
   assert.equal(verified.workspace, value.root);
   assert.equal(verified.modelCalls, 0);
   assert.equal(verified.launcherCalls, 0);
   assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: value.nativeSubagents, nowEpochMs: 1002 }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("flat and batch forms bind every native field and cannot replay across call shapes", () => withFixture((value) => {
+  const nativeSubagents = [structuredClone(value.nativeSubagents[0])];
+  const packets = [structuredClone(value.packets[0])];
+  nativeSubagents[0].Workspace = "branch";
+  const flat = prepareAntigravityNativeDispatch({ ...value, packets, nativeSubagents, callShape: "flat", nowEpochMs: 1000 });
+  assert.equal(flat.status, "prepared");
+  assert.deepEqual(flat.invocation, nativeSubagents[0]);
+  const verified = verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents, callShape: "flat", nowEpochMs: 1001 });
+  assert.equal(verified.code, "AGY-NATIVE-PREPARED", JSON.stringify(verified));
+  assert.equal(verified.status, "prepared", JSON.stringify(verified));
+  assert.deepEqual(verified.nativeSubagents, nativeSubagents);
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents, callShape: "batch", nowEpochMs: 1001 }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
+test("native tiers reject missing, inherited and duty-mismatched Model values", () => withFixture((value) => {
+  for (const model of [undefined, "inherit", "flash_lite", "flash"]) {
+    const entries = structuredClone(value.nativeSubagents);
+    if (model === undefined) delete entries[0].Model;
+    else entries[0].Model = model;
+    assert.equal(prepareAntigravityNativeDispatch({ ...value, nativeSubagents: entries }).status, "rejected");
+  }
+}));
+
+test("Model and Workspace are bound to the one-use canonical native argument", () => withFixture((value) => {
+  value.nativeSubagents[0].Workspace = "branch";
+  assert.equal(prepareAntigravityNativeDispatch(value).status, "prepared");
+  const changedWorkspace = structuredClone(value.nativeSubagents);
+  changedWorkspace[0].Workspace = "share";
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: changedWorkspace }).code, "AGY-NATIVE-ARTIFACT-MISSING");
+  const changedModel = structuredClone(value.nativeSubagents);
+  changedModel[0].Model = "flash";
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: changedModel }).code, "DISPATCH-MODEL-DUTY-MISMATCH");
+  assert.equal(verifyAntigravityNativeDispatch(value).status, "prepared");
 }));
 
 test("artifact publication is create-only and cannot replace an outstanding authorization", () => withFixture((value) => {
@@ -194,6 +229,33 @@ test("CLI prepares a repository-contained request file without launching another
   assert.equal(verifyAntigravityNativeDispatch(value).status, "prepared");
 }));
 
+test("public prepare CLI returns the actual flat AGY invocation shape", () => withFixture((value) => {
+  const native = structuredClone(value.nativeSubagents[0]);
+  native.Workspace = "branch";
+  const requestPath = join(value.root, "agy-flat-dispatch-request.json");
+  writeFileSync(requestPath, `${JSON.stringify({ packets: [value.packets[0]], ...native })}\n`);
+  const result = spawnSync(process.execPath, [prepareScript, "prepare", "--root", value.root, "--request", "agy-flat-dispatch-request.json"], {
+    cwd: value.root, encoding: "utf8", shell: false,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.status, "prepared");
+  assert.deepEqual(output.invocation, native);
+  assert.equal(output.callShape, "flat");
+  assert.equal(verifyAntigravityNativeDispatch({ root: value.root, nativeSubagents: [native], callShape: "flat" }).status, "prepared");
+}));
+
+test("public prepare CLI rejects mixed flat fields and batch arrays", () => withFixture((value) => {
+  const requestPath = join(value.root, "agy-mixed-dispatch-request.json");
+  writeFileSync(requestPath, `${JSON.stringify({ packets: value.packets, Subagents: value.nativeSubagents, ...value.nativeSubagents[0] })}\n`);
+  const result = spawnSync(process.execPath, [prepareScript, "prepare", "--root", value.root, "--request", "agy-mixed-dispatch-request.json"], {
+    cwd: value.root, encoding: "utf8", shell: false,
+  });
+  assert.equal(result.status, 2);
+  assert.equal(JSON.parse(result.stdout).code, "AGY-NATIVE-SHAPE-MIXED");
+  assert.equal(verifyAntigravityNativeDispatch(value).code, "AGY-NATIVE-ARTIFACT-MISSING");
+}));
+
 test("missing prepared artifact rejects the entire array", () => withFixture((value) => {
   assert.equal(verifyAntigravityNativeDispatch(value).code, "AGY-NATIVE-ARTIFACT-MISSING");
 }));
@@ -269,7 +331,7 @@ test("artifact is private and kept outside the working tree", () => withFixture(
   assert.equal(path.startsWith(join(common, "agent-pipeline", "run")), true);
 }));
 
-assert.equal(cases.length, 20, "the complete Antigravity native dispatch coordinator corpus must register before execution");
+assert.equal(cases.length, 25, "the complete Antigravity native dispatch coordinator corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

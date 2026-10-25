@@ -265,7 +265,18 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
       };
     }
     if (name === "invoke_subagent") {
-      const subagentsRaw = Array.isArray(args.Subagents) ? args.Subagents : [];
+      const nativeEntryKeys = ["TypeName", "Role", "Prompt", "Model", "Workspace"];
+      const hasBatch = Object.hasOwn(args, "Subagents");
+      const hasFlat = nativeEntryKeys.some((key) => Object.hasOwn(args, key));
+      const mixedNativeShape = hasBatch && hasFlat;
+      const callShape = hasBatch ? "batch" : "flat";
+      const allowedTopLevelKeys = hasBatch ? new Set(["Subagents", "model"]) : new Set(nativeEntryKeys);
+      const unknownTopLevelKey = Object.keys(args).some((key) => !allowedTopLevelKeys.has(key));
+      const flatEntry = hasBatch ? null : Object.fromEntries(nativeEntryKeys
+        .filter((key) => Object.hasOwn(args, key)).map((key) => [key, args[key]]));
+      const subagentsRaw = hasBatch
+        ? (Array.isArray(args.Subagents) ? args.Subagents : [])
+        : (Object.keys(flatEntry).length > 0 ? [flatEntry] : []);
       // D3 fix: carry every entry's type+prompt, not only index 0, so the Contamination Rule
       // check below can reach a Critic subagent sitting anywhere in a multi-subagent envelope.
       // Additive: kept OFF toolInput so canonicalPayload (built from toolInput, forwarded to
@@ -273,6 +284,9 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
       const subagents = subagentsRaw.map((entry) => ({
         subagent_type: entry?.TypeName ?? entry?.Role ?? "",
         prompt: entry?.Prompt ?? "",
+        model: entry?.Model,
+        workspace: entry?.Workspace,
+        role: entry?.Role,
       }));
       const firstSubagent = subagentsRaw.length > 0 ? subagentsRaw[0] : null;
       return {
@@ -280,12 +294,18 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
         toolInput: firstSubagent ? {
           subagent_type: firstSubagent.TypeName ?? firstSubagent.Role ?? "",
           prompt: firstSubagent.Prompt ?? "",
-          ...args,
+          ...(hasBatch ? args : { ...args, Subagents: subagentsRaw }),
+          ...(firstSubagent?.Model === undefined ? {} : { model: firstSubagent.Model }),
+          ...(firstSubagent?.Workspace === undefined ? {} : { workspace: firstSubagent.Workspace }),
         } : args,
         filePath: null,
         command: "",
         isReadOnly: false,
         subagents,
+        nativeSubagents: subagentsRaw,
+        nativeCallShape: callShape,
+        nativeShapeError: mixedNativeShape ? "AGY-NATIVE-SHAPE-MIXED"
+          : unknownTopLevelKey ? "AGY-NATIVE-SHAPE-INVALID" : null,
       };
     }
     // Read-only or unmanaged tool calls in Antigravity
@@ -320,6 +340,13 @@ export function antigravityGuardPayload(input, normalized, projectRoot) {
     tool_use_id: input?.tool_use_id ?? input?.toolUseId,
     antigravity_artifact_host: antigravityArtifactHostContext(input),
   };
+}
+
+function isNativeImplementationSubagent(entry) {
+  const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
+    ? entry.TypeName.slice("pipeline-core:".length)
+    : entry?.TypeName;
+  return type === "goldfish-implementor" || type === "goldfish-mechanic";
 }
 
 // PO decision D87 (kept) and D96 (2026-10-22: reading outside the repository is allowed except for credentials): the
@@ -488,6 +515,13 @@ export async function runAntigravityPreToolGuard(rawInput) {
   catch { deny("Antigravity PreToolUse input is not valid JSON; pipeline guards fail closed."); }
 
   const normalized = normalizeAntigravityToolInput(input);
+  if (input?.toolCall?.name === "invoke_subagent" && normalized.nativeShapeError) {
+    deny(`BLOCKED (Antigravity dispatch preflight): ${normalized.nativeShapeError}: use only the declared TypeName/Role/Prompt/Model/Workspace flat fields or the Subagents batch field.`);
+  }
+  if (input?.toolCall?.name === "invoke_subagent"
+    && normalized.nativeSubagents?.some(isNativeImplementationSubagent)) {
+    deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding; use elephant-implementation-dispatch.mjs.");
+  }
 
   // --- Antigravity Hardening Layer: Enforced Read-Only Critic ---
   // define_subagent is classified as a read-only tool call below (it defines
@@ -761,6 +795,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
           ...toolInput,
           subagent_type: entry?.subagent_type,
           prompt: entry?.prompt,
+          ...(entry?.model === undefined ? {} : { model: entry.model }),
+          ...(entry?.workspace === undefined ? {} : { workspace: entry.workspace }),
         };
         const entryPayload = JSON.stringify({
           tool_name: toolName,
@@ -780,25 +816,13 @@ export async function runAntigravityPreToolGuard(rawInput) {
   // native array to match one batch prepared against this exact checkout. A policy denial
   // keeps its more useful diagnosis; a structurally valid but unprepared launch fails here.
   const nativeContainsPipelineRole = input?.toolCall?.name === "invoke_subagent"
-    && Array.isArray(input?.toolCall?.args?.Subagents)
-    && input.toolCall.args.Subagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName));
+    && Array.isArray(normalized.nativeSubagents)
+    && normalized.nativeSubagents.some((entry) => isShippedPipelineAgentType(entry?.TypeName));
   if (denials.length === 0 && nativeContainsPipelineRole) {
-    const nativeImplementationRole = input.toolCall.args.Subagents.some((entry) => {
-      const type = typeof entry?.TypeName === "string" && entry.TypeName.startsWith("pipeline-core:")
-        ? entry.TypeName.slice("pipeline-core:".length)
-        : entry?.TypeName;
-      return type === "goldfish-implementor" || type === "goldfish-mechanic";
-    });
-    // `invoke_subagent` exposes only a prompt/type carrier. It cannot prove
-    // the live Codex session, PO consent, selected AGY route or effective
-    // identity. Productive implementation therefore enters only through the
-    // sealed Elephant-owned dispatch script; never infer consent here.
-    if (nativeImplementationRole) {
-      deny("BLOCKED (Antigravity dispatch preflight): AGY-NATIVE-IMPLEMENTATION-CONSENT-UNAVAILABLE: native invoke_subagent cannot prove the required live session and consent binding; use elephant-implementation-dispatch.mjs.");
-    }
     const nativeVerdict = verifyAntigravityNativeDispatch({
       root: projectRoot,
-      nativeSubagents: input?.toolCall?.args?.Subagents,
+      nativeSubagents: normalized.nativeSubagents,
+      callShape: normalized.nativeCallShape,
     });
     if (nativeVerdict.status !== "prepared") {
       deny(`BLOCKED (Antigravity dispatch preflight): ${nativeVerdict.code}: the complete invoke_subagent batch must be prepared and candidate-bound before launch.\n${nativeDispatchPreparationGuidance(projectRoot, nativeVerdict.code)}`);
