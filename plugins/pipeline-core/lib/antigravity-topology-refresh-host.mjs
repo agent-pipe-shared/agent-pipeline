@@ -26,13 +26,17 @@ function command(value){
  const m=/^node (?:"([^"\r\n$`]+)"|'([^'\r\n$`]+)'|([^\s"';&|<>$`]+))(?: (observe|deliver))?$/.exec(value);
  if(!m)return null;return {path:m[1]??m[2]??m[3],arg:m[4]??null};
 }
+const HOOK_EVENTS=new Set(['PreToolUse','Stop','PreInvocation']);
+function hookEvent(location){const event=location[0]==='pipeline-core'?location[1]:null;return typeof event==='string'&&HOOK_EVENTS.has(event)?event:null;}
 function templates(root){
- const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();
+ const f=read(join(root,'hooks.json'));if(f.status!=='observed')throw Error('ATR-HOOK-MANIFEST');const set=new Set();set.matchers=new Map();set.unconditional=new Set();
  function visit(v,location=[],group=null){if(v&&typeof v==='object'){
    if(Object.hasOwn(v,'matcher')){if(typeof v.matcher!=='string'||!v.matcher.length||!Array.isArray(v.hooks))throw Error('ATR-HOOK-MATCHER');group={event:location.filter(k=>typeof k==='string').at(-1),matcher:v.matcher};}
    if(typeof v.command==='string'){const c=command(v.command);if(!c||!/^hooks\/[a-z0-9-]+\.mjs$/.test(c.path))throw Error('ATR-HOOK-TEMPLATE');
     const path=join(root,c.path);const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||realpathSync(path)!==path)throw Error('ATR-HOOK-SCRIPT');const key=c.path+'\0'+(c.arg??'');set.add(key);
-    if(group){const binding=group.event+'\0'+key;if(set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}}
+    const event=hookEvent(location),binding=event+'\0'+key;
+    if(group){if(set.unconditional.has(binding)||set.matchers.has(binding)&&set.matchers.get(binding)!==group.matcher)throw Error('ATR-HOOK-MATCHER');set.matchers.set(binding,group.matcher);}
+    else{if(set.matchers.has(binding))throw Error('ATR-HOOK-MATCHER');set.unconditional.add(binding);}}
     for(const [key,value] of Object.entries(v))visit(value,[...location,Array.isArray(v)?Number(key):key],group);}}
  visit(f.value);return set;
 }
@@ -57,11 +61,15 @@ function wiring(observation,configRoot,workspaceRoot){
    if(value===null||typeof value!=='object')return value;
    if(Array.isArray(value.hooks)){
     const keys=value.hooks.map(ownedKey),owned=keys.filter(key=>key!==null&&desired.has(key));
-    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),matchers=owned.map(key=>desired.matchers.get(event+'\0'+key));
+    if(owned.length){const event=location.filter(k=>typeof k==='string').at(-1),bindings=owned.map(key=>event+'\0'+key),matchers=bindings.map(binding=>desired.matchers.get(binding));
      if(!Object.hasOwn(value,'matcher')&&matchers.every(m=>m===undefined)){for(const [key,v] of Object.entries(value))transform(v,[...location,key]);return;}
      if(!Object.hasOwn(value,'matcher'))throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
+     if(matchers.every(m=>m===undefined)&&bindings.every(binding=>desired.unconditional.has(binding))&&value.matcher==='*'){
+      if(keys.some(key=>key===null)||owned.length!==keys.length)throw Error('ATR-WIRING-MIXED-OWNERSHIP');
+     }else{
      if(matchers.some(m=>typeof m!=='string')||new Set(matchers).size!==1)throw Error('ATR-WIRING-MATCHER-UNVERIFIABLE');
      if(value.matcher!==matchers[0]){if(keys.some(key=>key===null))throw Error('ATR-WIRING-MIXED-OWNERSHIP');changes++;replacements.push({path:[...location,'matcher'],value:matchers[0]});}
+     }
     }
    }
    if(Object.hasOwn(value,'command')){
