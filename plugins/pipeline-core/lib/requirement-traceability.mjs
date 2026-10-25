@@ -11,7 +11,22 @@ export const REQUIREMENT_CRITERIA_MAX = 64;
 const PATH_MAX = 240;
 const ID = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){1,7}$/;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
-const PREDICATES = new Set(["file-contains-literal", "path-exists"]);
+// `behavioral-output` declares that a criterion is a BEHAVIORAL one: it names the product path whose produced
+// output is claimed, nothing is executed or parsed here, and it is present/absent exactly like `path-exists`.
+// What may later be associated with such a criterion as behavioral evidence is decided by the acceptance
+// coverage report (declared-criteria-evidence-report.mjs), never by this predicate.
+const PREDICATES = new Set(["file-contains-literal", "path-exists", "behavioral-output"]);
+
+// The kind of evidence each predicate can ever be. Source text, markers, syntax and bare presence are
+// structural: they cannot establish what a product produces, so they are never behavioral evidence.
+const EVIDENCE_CLASS = Object.freeze({
+  "path-exists": "structural-presence",
+  "file-contains-literal": "source-marker",
+  "behavioral-output": "behavioral-declared",
+});
+export function requirementEvidenceClass(predicate) {
+  return Object.hasOwn(EVIDENCE_CLASS, predicate) ? EVIDENCE_CLASS[predicate] : "unclassified";
+}
 
 export class RequirementTraceabilityError extends Error {
   constructor(code, message) {
