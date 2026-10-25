@@ -10,7 +10,7 @@ import {readWindowsAuthoritySourceModule,observeWindowsAuthorityAncestor} from '
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 import {parseStrictJson} from './governance-event.mjs';
 
-const HELPER_SHA256='db43cfe5b1624ff459f065ef0de622e527dccb1b8a8621e4a4b76a26066585da';
+const HELPER_SHA256='feb0f64ac2290b094c262b62d5334d894c0ce7c91c401b6b8fb23a1decd1c348';
 const HELPER=fileURLToPath(new URL('./windows-native-process-observer.ps1',import.meta.url));
 const SHA=/^[a-f0-9]{64}$/u,SID=/^S-1-(?:[0-9]+-){1,14}[0-9]+$/u,TICKS=/^[1-9][0-9]{0,18}$/u;
 const nativeKeys=['status','pid','parentPid','start','parentStart','sessionId','principalSid','parentPrincipalSid','executable','executableSha256','executableFactsSha256','argv','commandLineSha256','bootIdentity'];

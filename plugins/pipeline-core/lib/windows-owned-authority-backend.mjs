@@ -8,7 +8,7 @@ import {isAbsolute,resolve} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 
-const HELPER_SHA256='09cc5f5eee1991704b0824688d8f87284a904f86c0029056cd15118abd33dd9b';
+const HELPER_SHA256='d7d910b1da43260399c5f8e75c65c3b17e58b2ca2dc4deddb9afa37f946ba25c';
 const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);

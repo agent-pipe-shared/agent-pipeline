@@ -3,9 +3,8 @@
 // pipeline.host-crash-during-verify-leaves-a-descriptor-no-recovery-verb-can-clear, governing criterion AC-203
 // (specs/sprint-alfred-epic/spec.md, bytes 216884..217056), applying the PO decision of 2026-10-17
 // (specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md, "Windows authority ancestors above the repository"):
-// directories STRICTLY ABOVE the repository root are human-controlled. Their owner/ACL are still observed and bound into the
-// native facts, but a foreign owner or foreign write grant there no longer refuses. The repository root, every directory below
-// it and the private state keep every strict check.
+// Ordinary host/project/source owner and write ACLs are observed and bound into native facts, not used as hardening gates.
+// Pipeline-owned private state keeps its strict owner and protected-DACL checks; path containment and physical alias checks remain.
 //
 // Commit b554c495c applied the decision to verify-journal only. The requester/controller callers walked the ancestor chain of a
 // repository path without the repository root as boundary, so the real controlled-method fixture refused with
@@ -69,7 +68,7 @@ function makeRepository(name, {rootClean, gitClean}) {
   return {root, dotGit};
 }
 function refusal(error) {
-  return error?.code === 'SDC-AUTHORITY-UNAVAILABLE' && /^WIN-AUTH-ANCESTOR-(?:MUTATION|OWNER)$/u.test(error.reason ?? '');
+  return error?.code === 'SDC-AUTHORITY-UNAVAILABLE' && /^WIN-AUTH-(?:OWNER|DACL)$/u.test(error.reason ?? '');
 }
 function custody(repository) {
   return loaded.lifecycle.inspectSignedDescriptorCustodyRepository(repository.root);
@@ -102,9 +101,9 @@ const winTest = (name, fn) => test(name, {skip: isWindows ? false : HOST_LIMITAT
 const fixtureRootFor = (repository, name) => join(repository.dotGit, 'agent-pipeline', 'controlled-method-fixtures', name);
 const sessionId = 'ancestor-pin-session';
 
-winTest('control: the fixture base really grants a foreign principal write and the strict ancestor check refuses it', async () => {
+winTest('control: the fixture base really grants a foreign principal write and ordinary observation accepts it', async () => {
   const {backend} = await load();
-  assert.throws(() => backend.observeWindowsAuthorityAncestor({path: fixture.base}), refusal);
+  assert.equal(typeof backend.observeWindowsAuthorityAncestor({path: fixture.base}).nativeFactsSha256, 'string');
 });
 
 winTest('requester storage walks the ancestors of a repository path with the repository root as boundary and keeps its CAS deterministic', async () => {
@@ -136,24 +135,31 @@ winTest('createControlledMethodRuntimeFixture is not refused by a foreign-writab
   }
 });
 
-winTest('control: a foreign write grant at the repository root still refuses requester storage and the controlled fixture', async () => {
+winTest('a foreign write grant at the repository root does not block requester storage or the controlled fixture', async () => {
   const {runtime, bridge} = await load();
   const repository = custody(fixture.rootBad);
-  assert.throws(() => runtime.ensureWindowsRequesterNamespace(runtime.createWindowsRequesterStorage({repository})), refusal);
-  assert.throws(() => bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.rootBad, 'fx-ancestor-pin'), sessionId}), refusal);
+  const storage = runtime.createWindowsRequesterStorage({repository});
+  assert.equal(typeof runtime.ensureWindowsRequesterNamespace(storage).namespaceSha256, 'string');
+  const controlled = bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.rootBad, 'fx-root-acl'), sessionId});
+  try { assert.equal(typeof controlled.run, 'function'); } finally { await controlled.dispose(); }
 });
 
-winTest('control: a foreign write grant below the repository root (the common directory) still refuses requester storage and the controlled fixture', async () => {
+winTest('a foreign-writable common directory is accepted but an explicit private-state grant is refused', async () => {
   const {runtime, bridge} = await load();
   const repository = custody(fixture.belowBad);
-  assert.throws(() => runtime.ensureWindowsRequesterNamespace(runtime.createWindowsRequesterStorage({repository})), refusal);
+  const storage = runtime.createWindowsRequesterStorage({repository});
+  assert.equal(typeof runtime.ensureWindowsRequesterNamespace(storage).namespaceSha256, 'string');
+  const privateRoot = join(repository.commonDir, 'agent-pipeline');
+  grantForeignWrite(privateRoot);
+  assert.throws(() => runtime.ensureWindowsRequesterNamespace(storage), refusal);
   assert.throws(() => bridge.createControlledMethodRuntimeFixture({repository, fixtureRoot: fixtureRootFor(fixture.belowBad, 'fx-ancestor-pin'), sessionId}), refusal);
 });
 
 // ---- ALF-C-ANCESTOR-CALLERS4: the remaining repository-path walkers (domain owner, OSV bridge, host-process journal) ------------
-// Decided design: each walker derives or receives the repository root and passes it as boundaryRoot to
-// observeWindowsAuthorityAncestor, which relaxes only paths lexically STRICTLY ABOVE it. Case A drives the real domain-owner
-// namespace read on the real fixture. Cases B and C are structural: the bridge and journal readers need a full signed
+// Each walker derives or receives the repository root and passes it as boundaryRoot to
+// observeWindowsAuthorityAncestor so the observed path relation remains explicit. Ordinary ancestor owner/write ACLs do not gate
+// regardless of relation; Pipeline-owned private entries are checked separately. Case A drives the real domain-owner namespace
+// read on the real fixture. Cases B and C are structural: the bridge and journal readers need a full signed
 // session-authority catalogue and a live Codex task origin that no cheap fixture reproduces, so the call graph is pinned instead.
 const NAMESPACE_ID = 'domain-ancestor-pin';
 const NAMESPACE_RECORD = {schema: 'ancestor-pin-record'};
@@ -176,12 +182,12 @@ winTest('case A: readAuthorityNamespace is not refused by a foreign-writable anc
   assert.deepEqual(read.entries.map((entry) => ({...entry.value})), [NAMESPACE_RECORD]); // parseStrictJson returns null-prototype objects
 });
 
-winTest('case A control: readAuthorityNamespace still refuses at and below the repository root and outside any .git/agent-pipeline', async () => {
+winTest('case A control: private authority remains strict while paths outside its namespace remain refused', async () => {
   const owner = await ownerModule();
-  // A foreign write grant on the common directory (below the root), on the root itself, and a directory directly under the
-  // foreign-writable base that is not inside any <repository>/.git/agent-pipeline (no boundary is derived, so it stays strict).
-  assert.throws(() => readNamespace(owner, join(fixture.belowBad.dotGit, 'agent-pipeline', NAMESPACE_ID)), refusal);
-  assert.throws(() => readNamespace(owner, join(fixture.rootBad.dotGit, 'agent-pipeline', NAMESPACE_ID)), refusal);
+  // The root's foreign grant is ordinary. Inject a separate grant onto an existing private namespace to test strict custody.
+  const privateNamespace = seedNamespace(fixture.rootBad);
+  grantForeignWrite(privateNamespace);
+  assert.throws(() => readNamespace(owner, privateNamespace), refusal);
   const outside = join(fixture.base, 'outside-any-agent-pipeline');
   mkdirSync(outside);
   assert.throws(() => readNamespace(owner, outside), refusal);
@@ -226,7 +232,7 @@ function callsOf(source, name) {
 
 test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the repository root, after a lexical containment check', () => {
   const source = libSource('session-requester-bridge.mjs');
-  assert.match(source, /function osvWindowsBoundary\(path,root\)\{/u); // lexical, case-insensitive containment inside the root, else null (strict)
+  assert.match(source, /function osvWindowsBoundary\(path,root\)\{/u); // lexical, case-insensitive containment inside the root, else no bound root
   assert.match(source, /function osvWindowsAncestors\(path,boundaryRoot=null\)\{/u);
   assert.match(source, /function osvWindowsRead\(path,maxBytes,privateFile=false,boundaryRoot=null\)\{/u);
   // osvWindowsRead forwards the identical boundary to the before and the after ancestor read, so its CAS stays deterministic.
@@ -241,31 +247,29 @@ test('case B (structural): the OSV bridge bounds only osvWindowsPrivate with the
 
 test('case C (structural): the host-process journal bounds only the three repository-bearing verification readers', () => {
   const source = libSource('codex-host-process-journal.mjs');
-  assert.match(source, /function verificationWindowsBoundary\(path,repository\)\{/u); // contained in repository.primaryRoot, else null (strict)
+  assert.match(source, /function verificationWindowsBoundary\(path,repository\)\{/u); // contained in repository.primaryRoot, else no bound root
   assert.match(source, /function verificationWindowsRead\(path,maxBytes,repository=null\)\{/u);
   assert.equal(callsOf(source, 'verificationWindowsBoundary').length, 1);
   // The boundary is computed once per read and reused by the before and the after ancestry, so the CAS stays deterministic.
-  // rootIdentity keeps the strict single-path ancestor check; only verificationWindowsRead can pass a boundary.
+  // rootIdentity observes a single path; repository-bearing reads additionally bind their proven boundary into ancestry facts.
   assert.deepEqual(callsOf(source, 'observeWindowsAuthorityAncestor').map(({caller, args}) => [caller, args.join('|')]), [['rootIdentity', '{path}'], ['verificationWindowsRead', 'boundaryRoot?{path:cursor,boundaryRoot}:{path:cursor}']]);
-  const reads = callsOf(source, 'verificationWindowsRead').map(({caller, args}) => [caller, args.length === 3 ? args[2] : args.length === 2 ? 'strict' : `${args.length} arguments`]);
+  const reads = callsOf(source, 'verificationWindowsRead').map(({caller, args}) => [caller, args.length === 3 ? args[2] : args.length === 2 ? 'no-boundary' : `${args.length} arguments`]);
   assert.deepEqual(reads.sort((a, b) => a[0].localeCompare(b[0])), [
     ['managedWindowsRegistryRecord', 'repository'],
-    ['readHostJournal', 'strict'],
-    ['verificationReadTask', 'strict'],
+    ['readHostJournal', 'no-boundary'],
+    ['verificationReadTask', 'no-boundary'],
     ['verificationWindowsCatalogueRef', 'repository'],
     ['verificationWindowsRecord', 'repository'],
-    ['writeHostJournal', 'strict'],
+    ['writeHostJournal', 'no-boundary'],
   ]);
 });
 
 // ---- ALF-C-ANCESTOR-CALLERS5: the plugin-module walk of the domain owner (readModuleContext) ---------------------------------
 // readModuleContext walks the ancestors of a plugin SOURCE MODULE, not of a repository path, so the repository-root boundary of
-// cases A-C does not apply. The decided boundary is the plugin root that contains lib/, derived once from this module's own
-// location (never caller-supplied) and consumed by readModuleContext alone, and only for a module lexically inside it. The plugin
-// root and every directory below it stay strict; POSIX behaviour is unchanged. Case D pins the call graph, case D2 replays the
-// real session power record write that the host-crash recovery path needs, and its control keeps a module outside the plugin root
-// strict. Case D2 is RED on the original code on any host whose path above the plugin root grants a foreign principal write
-// (a default Windows drive root or first-level directory does); elsewhere it is a positive control.
+// cases A-C does not apply. The plugin root is still derived from this module's own location and consumed by readModuleContext
+// alone as provenance input. Ordinary owner/write ACLs at or above that root are observations, not gates; physical containment,
+// directory type, reparse rejection and POSIX checks remain. Case D pins the call graph, while D2 exercises source observation
+// beneath an ordinary foreign-writable ancestor.
 
 test('case D (structural): readModuleContext bounds its ancestor walk only with the plugin root derived from the module location, after a lexical containment check', () => {
   const source = libSource('session-authority-domain-owner.mjs');
@@ -276,7 +280,7 @@ test('case D (structural): readModuleContext bounds its ancestor walk only with 
   assert.deepEqual(callsOf(source, 'pluginRootBoundary').map(({caller, args}) => [caller, args.join('|')]), [['readModuleContext', 'filePath']]);
   const body = source.match(/^function pluginRootBoundary\(filePath\)\{$[\s\S]*?^\}$/mu)?.[0] ?? '';
   assert.match(body, /process\.platform!=='win32'\|\|typeof filePath!=='string'\)return null;/u); // POSIX never produces a boundary
-  assert.match(body, /filePath\.toLowerCase\(\)\.startsWith\(base\.toLowerCase\(\)\+sep\)\?PLUGIN_ROOT:null/u); // lexical, case-insensitive, separator-delimited, else strict
+  assert.match(body, /filePath\.toLowerCase\(\)\.startsWith\(base\.toLowerCase\(\)\+sep\)\?PLUGIN_ROOT:null/u); // lexical, case-insensitive, separator-delimited, else no plugin-root binding
   // The win32 module walk passes the boundary; the POSIX module walk and every other walker keep their call shape unchanged.
   assert.deepEqual(callsOf(source, 'chain').filter(({caller}) => caller === 'readModuleContext').map(({args}) => args.join('|')), ['dirname(filePath)|pluginRootBoundary(filePath)', 'dirname(filePath)']);
   assert.deepEqual(callsOf(source, 'chain').filter(({caller}) => caller !== 'readModuleContext').map(({caller, args}) => `${caller}:${args.join('|')}`).sort(), [
@@ -294,8 +298,8 @@ test('case D (structural): readModuleContext bounds its ancestor walk only with 
 winTest('case D2: the session power record is written although a path above the plugin root grants a foreign principal write', async () => {
   const power = await import(pathToFileURL(join(pluginRoot, 'lib', 'session-power.mjs')).href);
   const {lifecycle} = await load();
-  // The fixture repository lives in the pin's protected fixture area, not under os.tmpdir(): a temp directory may inherit a sandbox
-  // group's Modify grant onto the repository root itself, which the strict check rightly refuses (the root is the boundary).
+  // The fixture repository lives in the pin's protected fixture area, not under os.tmpdir(), so this case controls the exact
+  // ordinary foreign-writable ancestor independently of incidental host temp policy.
   const root = realpathSync(mkdtempSync(join(fixture.base, 'power-')));
   protect(root);
   const ceiling = {had: Object.hasOwn(process.env, 'GIT_CEILING_DIRECTORIES'), value: process.env.GIT_CEILING_DIRECTORIES};
@@ -331,11 +335,11 @@ test('case D3 (structural): readRaw on win32 lstat()s the safe path before the s
   assert.match(line, /const abs=safePath\(repo,path\);let fd;try\{const before=lstatSync\(abs\);/u);
 });
 
-winTest('case D2 control: a source module outside the plugin root is still refused by the strict ancestor walk', async () => {
+winTest('case D2: a source module outside the plugin root is not rejected solely for an ordinary foreign write grant', async () => {
   const owner = await ownerModule();
-  // fixture.base grants a foreign principal write and lies outside the plugin root, so it must stay refused whatever the host above it.
+  // fixture.base grants a foreign principal write; source integrity is established by stable physical identity and content digest.
   const outside = join(fixture.base, 'outside-plugin-module.mjs');
   writeFileSync(outside, '// ancestor pin control module\n');
-  const unreachable = () => { throw new Error('refused before any owner callback'); };
-  assert.throws(() => owner.createDomainAuthorityOwner({repository: custody(fixture.clean), producerId: 'ancestor-pin', kinds: [], namespaceIds: [NAMESPACE_ID], scan: unreachable, terminalObservation: unreachable, transitionScope: unreachable, sourceModulePaths: [outside]}), refusal);
+  const unreachable = () => { throw new Error('not called by source context observation'); };
+  assert.doesNotThrow(() => owner.createDomainAuthorityOwner({repository: custody(fixture.clean), producerId: 'ancestor-pin', kinds: [], namespaceIds: [NAMESPACE_ID], scan: unreachable, terminalObservation: unreachable, transitionScope: unreachable, sourceModulePaths: [outside]}));
 });

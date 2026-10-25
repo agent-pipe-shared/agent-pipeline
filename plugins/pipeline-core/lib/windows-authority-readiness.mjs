@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: SUL-1.0
 // Read-only Windows custody diagnosis. The native authority backend remains the sole policy oracle.
 import { win32 } from 'node:path';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from './windows-owned-authority-backend.mjs';
 
 export const WINDOWS_AUTHORITY_READINESS_SCHEMA = 'pipeline.windows-authority-readiness.v1';
 const NATIVE_REASON = /^WIN-AUTH-[A-Z-]{1,64}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
+
+function observed(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)
+    || Object.keys(value).sort().join(',') !== 'committed,helperSha256,nativeFacts,nativeFactsSha256'
+    || typeof value.nativeFacts !== 'string' || value.nativeFacts.length === 0
+    || !SHA256.test(value.nativeFactsSha256) || !SHA256.test(value.helperSha256)
+    || value.committed !== false) return false;
+  return createHash('sha256').update(value.nativeFacts).digest('hex') === value.nativeFactsSha256;
+}
 
 function chain(path) {
   const root = win32.parse(path).root;
@@ -21,15 +32,9 @@ export function windowsAuthorityCause(error) {
 }
 
 function guidance(pathClass, reason) {
-  if (reason === 'WIN-AUTH-ANCESTOR-MUTATION') return {
-    kind: 'operator-review', mutation: false,
-    summary: `Inspect the inherited or explicit foreign write ACE on the ${pathClass} directory. Record the actual SID and ACE source; review a single-directory SID-targeted removal or move the repository into a private user-profile directory, then rerun readiness.`,
-    inspection: ['whoami /user', 'Get-Acl -LiteralPath <exact directory> | Format-List Owner,Access'],
-    repairPreview: 'At the reviewed ACE source only: icacls <exact directory> /remove:g *<observed SID>. If the ACE is inherited, review inheritance at that one directory before editing; never apply /T.',
-  };
   return { kind: 'operator-review', mutation: false,
-    summary: `Inspect ${pathClass} custody for ${reason}; repair only the named directory after review, or relocate the repository into a private user-profile directory, then rerun readiness.`,
-    inspection: ['whoami /user', 'Get-Acl -LiteralPath <exact directory> | Format-List Owner,Access'],
+    summary: `Inspect the ${pathClass} path for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
+    inspection: ['Confirm the exact path exists and is a physical non-reparse directory.', 'For private Pipeline authority, inspect its owner and protected DACL.'],
     repairPreview: null,
   };
 }
@@ -65,7 +70,10 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
       const key = `${path.toLowerCase()}|${privatePath ? 'private' : 'ancestor'}|${boundaryRoot?.toLowerCase() ?? 'strict'}`;
       let reason = seen.get(key);
       if (reason === undefined) {
-        try { probe({ path, boundaryRoot, privatePath, pathClass }); reason = null; }
+        try {
+          const result = probe({ path, boundaryRoot, privatePath, pathClass });
+          reason = observed(result) ? null : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
+        }
         catch (error) { reason = windowsAuthorityCause(error); }
         seen.set(key, reason);
       }

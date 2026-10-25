@@ -93,6 +93,12 @@ the runner's supported integration and follow its setup path. See
 [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for exact controls,
 prerequisites, and manual responsibilities.
 
+On Windows, ordinary drive, project, source, installed-plugin, and runtime
+image owner or write ACLs are observed but do not block Pipeline readiness. Pipeline-owned
+private authority keeps its stricter custody checks. Read
+[`docs/windows-authority-boundaries.md`](docs/windows-authority-boundaries.md)
+for the Windows guarantee and the scoped POSIX comparison.
+
 <a id="consumer-onboarding-details"></a>
 
 ### 0. Bind the supported runner integration and fully restart its host

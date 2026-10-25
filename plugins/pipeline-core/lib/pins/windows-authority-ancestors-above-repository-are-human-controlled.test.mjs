@@ -3,9 +3,9 @@
 // pipeline.windows-os-temp-root-dacl-fails-private-state-assurance-for-test-fixtures,
 // governing criterion AC-270 (specs/sprint-alfred-epic/spec.md, bytes 233790..233964), narrowed by the PO decision of
 // 2026-10-17 (specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md, "Windows authority ancestors above the repository"):
-// directories STRICTLY ABOVE the repository root are human-controlled. They are still observed and their owner/ACL facts stay
-// bound into the native facts, but a foreign owner or foreign write grant there no longer refuses. The repository root, every
-// directory below it and the private state keep every existing strict check; reparse points and non-directories stay refused.
+// Ordinary host, project and plugin ownership/ACLs are integrity observations, not host-hardening gates. Owner/ACL facts stay
+// bound into native observations while foreign ownership/write grants at or below the repository root are accepted. Pipeline-
+// owned private state keeps strict current-user owner and protected-DACL checks; reparse points and non-directories stay refused.
 //
 // Cases drive the real backend, the real native helper and the real verify-journal registration path on a real NTFS fixture.
 // PIPELINE_ANCESTOR_PIN_CODE_ROOT is a replay seam only: it points the pin at a scratch mirror of an earlier source state
@@ -98,9 +98,12 @@ const winTest = (id, name, fn) => cases.push({
   },
 });
 
-winTest('WAA001', 'control: the fixture ancestor really grants a foreign principal write and the strict ancestor check refuses it', async () => {
+winTest('WAA001', 'control: the fixture ancestor really grants a foreign principal write and ordinary observation accepts it', async () => {
   const {backend} = await load();
-  assert.throws(() => backend.observeWindowsAuthorityAncestor({path: fixture.base}), refusal('WIN-AUTH-ANCESTOR-MUTATION'));
+  const observed = backend.observeWindowsAuthorityAncestor({path: fixture.base});
+  assert.match(observed.nativeFacts, FACTS);
+  assert.equal(observed.nativeFactsSha256, sha256(observed.nativeFacts));
+  assert.equal(observed.committed, false);
 });
 
 winTest('WAA002', 'an ancestor strictly above the repository root that grants a foreign principal write is accepted and its ACL stays bound into the facts', async () => {
@@ -119,15 +122,18 @@ winTest('WAA002', 'an ancestor strictly above the repository root that grants a 
   run(systemExe('icacls.exe'), [fixture.base, '/remove:g', '*S-1-1-0']);
 });
 
-winTest('WAA003', 'the same foreign write grant at or below the repository root is still refused with the existing code', async () => {
+winTest('WAA003', 'foreign write grants at and below the repository root remain observed but do not gate ordinary paths', async () => {
   const {backend} = await load();
   for (const [path, boundaryRoot] of [
     [fixture.rootBad.root, fixture.rootBad.root], // the root itself
     [fixture.belowBad.git, fixture.belowBad.root], // below the root
-    [fixture.belowBad.git, fixture.clean.root], // unrelated to the root: no proof, no relaxation
+    [fixture.belowBad.git, fixture.clean.root], // unrelated to the root: descriptor remains observable without granting authority
   ]) {
-    assert.throws(() => backend.observeWindowsAuthorityAncestor({path}), refusal('WIN-AUTH-ANCESTOR-MUTATION'), `strict ${path}`);
-    assert.throws(() => backend.observeWindowsAuthorityAncestor({path, boundaryRoot}), refusal('WIN-AUTH-ANCESTOR-MUTATION'), `bounded ${path}`);
+    for (const input of [{path}, {path, boundaryRoot}]) {
+      const observed = backend.observeWindowsAuthorityAncestor(input);
+      assert.match(observed.nativeFacts, FACTS, path);
+      assert.equal(observed.nativeFactsSha256, sha256(observed.nativeFacts), path);
+    }
   }
 });
 
@@ -183,15 +189,20 @@ winTest('WAA007', 'verify-journal registration (the Full Verify journal step) ac
   assert.ok(existsSync(records));
 });
 
-winTest('WAA008', 'verify-journal registration still refuses a foreign write grant at the repository root or below it', async () => {
-  const {journal} = await load();
+winTest('WAA008', 'verify-journal still refuses foreign grants inherited by Pipeline-owned private state', async () => {
+  const {backend, journal} = await load();
   for (const repository of [fixture.rootBad, fixture.belowBad]) {
+    const privateRoot = join(repository.git, 'agent-pipeline');
+    backend.createWindowsOwnedAuthorityDirectory({path: privateRoot});
+    grantForeignWrite(privateRoot);
+    let registered = false;
     assert.throws(() => journal.registerRunRecordOwner({
       gitCommonDir: repository.git,
       runId: 'ancestor-pin-refused',
       runPath: join(repository.git, 'agent-pipeline', 'verify', 'runs', 'ancestor-pin-refused'),
-      registerRecord: ({ensureDirectory}) => { ensureDirectory(join(repository.git, 'agent-pipeline', 'verify', 'records')); return {recordSha256: 'a'.repeat(64)}; },
-    }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED \(cause: WIN-AUTH-ANCESTOR-MUTATION\)/u, repository.root);
+      registerRecord: ({ensureDirectory}) => { registered = true; ensureDirectory(join(repository.git, 'agent-pipeline', 'verify', 'records')); return {recordSha256: 'a'.repeat(64)}; },
+    }), /VERIFY-CLEANUP-REGISTRATION-REQUIRED \(cause: WIN-AUTH-(?:OWNER|DACL)\)/u, repository.root);
+    assert.equal(registered, true, 'the failure must reach private-directory creation/inspection');
   }
 });
 
