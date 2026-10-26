@@ -82,3 +82,18 @@ Unit cases to add (`lib/critic-course-admission.test.mjs` unless noted):
 - `readCriticReviewUnit default declarationCommit equals base` (`critic-generic-batch` test file)
 
 Not changed in this slice: `lib/critic-course-admission.test.mjs` (no case added: research-only; adding RED cases would break the candidate before the implementation exists). The last two cases live in test files outside this slice's write scope.
+
+## 7. Coordinator addendum 2026-10-26: the base must already list the feature manifest
+
+Slice B's mandatory pre-check (dispatch W6-D165-PF75-B-20261026, stopped as designed) showed a gap in sections 2 and 3:
+`lib/critic-course-admission.mjs:432` reads the feature manifest at `genesisCandidate.base` for `originalManifestSha256`,
+which is part of the course key. A base before the manifest exists (a plain merge base with main when the feature
+branch added `specs/<id>/lifecycle.json`) is refused with `CCA-MANIFEST-READ` before `featureReviewUnit` runs.
+
+Decision (Elephant, D164 authority, option (a)): the course identity is not changed. The first review of a course
+with a late unit takes as base the commit that first added the feature manifest
+(`git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json`, last line) or any later commit on the candidate
+history that lists the manifest. The manifest need not list the unit there; the introducing-commit rule of section 2
+finds it later in the range. The delivered feature code lies after the registration commit and is in the range.
+Rejected, option (b): defining the course key for an absent manifest (first commit that lists it, or a sentinel); it
+changes stored identities and is a separate decision. The repair text for `CCA-MANIFEST-READ` names the git command.
