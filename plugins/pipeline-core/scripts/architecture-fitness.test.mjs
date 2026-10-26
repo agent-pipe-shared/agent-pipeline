@@ -777,3 +777,159 @@ describe("architecture-fitness evaluator & ratchet store (WP-D3, Issue #106, AC-
     });
   });
 });
+
+describe("D162 S1 architecture measure", () => {
+  const NOW = new Date("2026-10-26T12:00:00.000Z");
+  const measureUrl = "./architecture-measure.mjs";
+  const git = (cwd, ...args) => {
+    const r = spawnSync("git", args, { cwd, encoding: "utf8" });
+    assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+    return r.stdout;
+  };
+  const initRepo = (files, { commit = true } = {}) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "arch-measure-"));
+    git(root, "init", "-q");
+    git(root, "config", "user.name", "Fixture");
+    git(root, "config", "user.email", "fixture@example.invalid");
+    for (const [name, body] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+      fs.writeFileSync(path.join(root, name), body);
+    }
+    if (commit) {
+      git(root, "add", "-A");
+      git(root, "commit", "-q", "-m", "fixture");
+    }
+    return root;
+  };
+  const cycleFiles = () => ({
+    "README.md": "# fixture\n",
+    "a/x.mjs": 'import { y } from "../b/y.mjs";\nexport const x = y;\n',
+    "b/y.mjs": 'import { x } from "../a/x.mjs";\nexport const y = x;\n',
+    "c/z.mjs": "export const z = 1;\n",
+  });
+  const snapshot = (root) => {
+    const out = {};
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === ".git") continue;
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else out[path.relative(root, full)] = fs.readFileSync(full, "utf8");
+      }
+    };
+    walk(root);
+    return JSON.stringify(out);
+  };
+
+  it("plan lists modules a, b, c, root with measured dependencies and writes nothing", async () => {
+    const { planArchitectureMeasure } = await import(measureUrl);
+    const root = initRepo(cycleFiles());
+    const before = snapshot(root);
+    const res = planArchitectureMeasure(root, { now: () => NOW });
+    assert.equal(res.schema, "pipeline.architecture-measure.v1");
+    assert.equal(res.status, "planned");
+    assert.equal(res.acceptedViolationCount, null);
+    assert.deepEqual(res.modules.map((m) => m.id), ["a", "b", "c", "root"]);
+    const dep = (id) => res.modules.find((m) => m.id === id).allowedDependencies;
+    assert.deepEqual(dep("a"), ["b"]);
+    assert.deepEqual(dep("b"), ["a"]);
+    assert.deepEqual(dep("c"), []);
+    assert.deepEqual(res.modules.find((m) => m.id === "root").ownedPaths, ["README.md"]);
+    assert.equal(snapshot(root), before);
+  });
+
+  it("apply writes the targets, the map loads and the cycle is an excepted baseline entry", async () => {
+    const { applyArchitectureMeasure } = await import(measureUrl);
+    const root = initRepo(cycleFiles());
+    const res = applyArchitectureMeasure(root, { now: () => NOW });
+    assert.equal(res.status, "written", JSON.stringify(res));
+    assert.ok(res.acceptedViolationCount > 0);
+    for (const t of ["architecture/map/index.md", "architecture/map/a.md", "architecture/map/root.md", "architecture/fitness-model.json", "architecture/baseline.json"]) {
+      assert.ok(res.targets.includes(t), t);
+      assert.ok(fs.existsSync(path.join(root, t)), t);
+    }
+    assert.equal(loadMapBundle(root).ok, true);
+    const evaluated = evaluateArchitectureFitness({ rootDir: root, mode: "candidate", now: NOW });
+    assert.equal(evaluated.outcomes.some((o) => o.outcome === "finding"), false);
+    assert.equal(evaluated.outcomes.find((o) => o.classId === 3).outcome, "excepted");
+    assert.deepEqual(res.pendingClasses, [9, 10]);
+    const baseline = JSON.parse(fs.readFileSync(path.join(root, "architecture/baseline.json"), "utf8"));
+    assert.ok(baseline.acceptedViolations.some((v) => v.ruleId === "dependency-cycle"));
+    assert.equal(baseline.origin, "brownfield-measure");
+    assert.equal(baseline.baselineCommit, git(root, "rev-parse", "HEAD").trim());
+    assert.equal(baseline.ratchetMetrics.totalAcceptedViolations, baseline.acceptedViolations.length);
+    assert.ok(baseline.ratchetMetrics.cycleCount >= 1);
+    assert.ok(res.followUps.includes("adoption record not written: run the adoption step"));
+    assert.ok(res.followUps.includes("AGENTS.md has no link to architecture/map/index.md"));
+    assert.equal(fs.existsSync(path.join(root, "architecture/adoption-state.json")), false);
+    assert.equal(fs.existsSync(path.join(root, "AGENTS.md")), false);
+  });
+
+  it("entry readiness on the measured fixture is not blocked by map, fitness model or baseline codes", async () => {
+    const { applyArchitectureMeasure } = await import(measureUrl);
+    const { inspectArchitectureEntryReadiness } = await import("../lib/architecture-entry-readiness.mjs");
+    const root = initRepo(cycleFiles());
+    assert.equal(applyArchitectureMeasure(root, { now: () => NOW }).status, "written");
+    const text = JSON.stringify(inspectArchitectureEntryReadiness({ rootDir: root, now: NOW }));
+    for (const code of ["ARCHITECTURE-MAP-MISSING", "ARCHITECTURE-MAP-INVALID", "ARCHITECTURE-FITNESS-MODEL-INVALID", "ARCHITECTURE-BASELINE-INVALID"]) {
+      assert.equal(text.includes(code), false, code);
+    }
+  });
+
+  describe("refusals leave the tree byte-unchanged", () => {
+    const refuses = async (root, code) => {
+      const { planArchitectureMeasure, applyArchitectureMeasure } = await import(measureUrl);
+      const before = snapshot(root);
+      for (const run of [planArchitectureMeasure, applyArchitectureMeasure]) {
+        const res = run(root, { now: () => NOW });
+        assert.equal(res.status, "refused");
+        assert.equal(res.code, code);
+      }
+      assert.equal(snapshot(root), before);
+    };
+    it("ARCHITECTURE-MEASURE-NO-COMMIT for a non-repository and for a repository without HEAD", async () => {
+      await refuses(fs.mkdtempSync(path.join(os.tmpdir(), "arch-measure-plain-")), "ARCHITECTURE-MEASURE-NO-COMMIT");
+      await refuses(initRepo({ "a/x.mjs": "export {};\n" }, { commit: false }), "ARCHITECTURE-MEASURE-NO-COMMIT");
+    });
+    it("ARCHITECTURE-MEASURE-TARGET-EXISTS when any target exists", async () => {
+      await refuses(initRepo({ ...cycleFiles(), "architecture/baseline.json": "{}\n" }), "ARCHITECTURE-MEASURE-TARGET-EXISTS");
+      await refuses(initRepo({ ...cycleFiles(), "architecture/map/index.md": "x\n" }), "ARCHITECTURE-MEASURE-TARGET-EXISTS");
+    });
+    it("ARCHITECTURE-MEASURE-DIRTY-TREE for untracked and for modified tracked files", async () => {
+      const untracked = initRepo(cycleFiles());
+      fs.writeFileSync(path.join(untracked, "new.txt"), "x");
+      await refuses(untracked, "ARCHITECTURE-MEASURE-DIRTY-TREE");
+      const modified = initRepo(cycleFiles());
+      fs.appendFileSync(path.join(modified, "README.md"), "edit");
+      await refuses(modified, "ARCHITECTURE-MEASURE-DIRTY-TREE");
+    });
+    it("ARCHITECTURE-MEASURE-EMPTY when nothing is tracked outside the exclusions", async () => {
+      await refuses(initRepo({ ".claude/settings.json": "{}\n", "architecture/notes.md": "n\n" }), "ARCHITECTURE-MEASURE-EMPTY");
+    });
+  });
+
+  it("re-running apply after a successful run refuses TARGET-EXISTS", async () => {
+    const { applyArchitectureMeasure } = await import(measureUrl);
+    const root = initRepo(cycleFiles());
+    assert.equal(applyArchitectureMeasure(root, { now: () => NOW }).status, "written");
+    git(root, "add", "-A");
+    git(root, "commit", "-q", "-m", "measured");
+    const before = snapshot(root);
+    const res = applyArchitectureMeasure(root, { now: () => NOW });
+    assert.equal(res.status, "refused");
+    assert.equal(res.code, "ARCHITECTURE-MEASURE-TARGET-EXISTS");
+    assert.equal(snapshot(root), before);
+  });
+
+  it("CLI --json prints one parseable result and exits 0 for plan, 1 for refusal", () => {
+    const script = fileURLToPath(new URL("./architecture-measure.mjs", import.meta.url));
+    const root = initRepo(cycleFiles());
+    const ok = spawnSync(process.execPath, [script, "--root", root, "--json"], { encoding: "utf8" });
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(JSON.parse(ok.stdout).status, "planned");
+    const plain = fs.mkdtempSync(path.join(os.tmpdir(), "arch-measure-plain-"));
+    const bad = spawnSync(process.execPath, [script, "--root", plain, "--json"], { encoding: "utf8" });
+    assert.equal(bad.status, 1);
+    assert.equal(JSON.parse(bad.stdout).code, "ARCHITECTURE-MEASURE-NO-COMMIT");
+  });
+});
