@@ -48,6 +48,13 @@ reproduction is still owed for every entry.
   on its first and only stop, and no commit followed (host committed as orchestrator,
   `29d4b4619`). The same happened for identity C6. So the first-stop hypothesis is wrong;
   the SubagentStop route itself does not complete.
+  Cause found the same day (transcript shape, read via a scratch diagnostic): the current
+  Claude runtime ends a background child with a `SubagentHandback` tool call whose
+  `input.message` carries the return contract; the last assistant record is that tool call,
+  not text. `observeClaudeSubagentStop` (`lib/native-goldfish-host-finalizer.mjs`) validates
+  only `input.last_assistant_message`, so the contract is never seen, and the hook reports the
+  failure on stderr only, which SubagentStop does not surface. The child's meta file and
+  pending state were present and matched (`toolUseId` correlation intact).
 
 ## Progress
 
