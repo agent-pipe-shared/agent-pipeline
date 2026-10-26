@@ -1,0 +1,167 @@
+diff --git a/plugins/pipeline-core/lib/architecture-adoption-authority.mjs b/plugins/pipeline-core/lib/architecture-adoption-authority.mjs
+index a99cfdc85..3e4d99ff7 100644
+--- a/plugins/pipeline-core/lib/architecture-adoption-authority.mjs
++++ b/plugins/pipeline-core/lib/architecture-adoption-authority.mjs
+@@ -64,6 +64,13 @@ export function scopeValue(scope) {
+   return [...new Set(normalized)].sort();
+ }
+ 
++export const CLASS9_REQUIRED_SCOPE = Object.freeze(["architecture/map", "pipeline.user.yaml", "project/pipeline.json"]);
++
++export function withClass9RequiredScope(scope) {
++  const given = scope === undefined || scope === null ? [] : Array.isArray(scope) ? scope : [scope];
++  return [...new Set([...given, ...CLASS9_REQUIRED_SCOPE])].sort();
++}
++
+ export function adoptionSnapshot(rootDir) {
+   const root = resolve(rootDir);
+   const profileBytes = existsSync(join(root, "project/pipeline.json")) ? readFileSync(join(root, "project/pipeline.json"), "utf8") : null;
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index a84129550..e3529d388 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -21,6 +21,7 @@ import { evaluateArchitectureFitness, evaluateNavigationCurrency } from "../scri
+ import { inspectArchitectureReentryPointer, loadMapBundle, resolveModuleForPath } from "../scripts/module-inventory.mjs";
+ import { readCheckpointArchitectureDebt } from "./checkpoint-push-audit.mjs";
+ import { inspectArchitectureDesign } from "./architecture-design.mjs";
++import { withClass9RequiredScope } from "./architecture-adoption-authority.mjs";
+ import { loadPhysicalArchitectureMap } from "./architecture-effective-decisions.mjs";
+ import { inspectArchitectureDecisionContinuity } from "./architecture-decision-continuity.mjs";
+ 
+@@ -335,7 +336,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
+     const scopeEntries = Array.isArray(disposition.scope) ? disposition.scope
+       : (typeof disposition.scope === "string" && disposition.scope ? [disposition.scope] : []);
+     const prepareArgs = ["--root", root, "--decision", "approved-scoped"];
+-    for (const entry of scopeEntries) prepareArgs.push("--scope", String(entry));
++    for (const entry of withClass9RequiredScope(scopeEntries.map(String))) prepareArgs.push("--scope", entry);
+     prepareArgs.push("--rationale", "D162 migration of a legacy deferred adoption to the measured baseline",
+       "--decision-ref", "D162-migration");
+     const steps = [];
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index cc25b6011..e362ec585 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -184,6 +184,22 @@ test("D162 S3: a deferred disposition over a valid map, fitness model and baseli
+   assert.equal(typeof result.nextAction.guidance, "string");
+ });
+ 
++import * as class9Authority from "./architecture-adoption-authority.mjs";
++
++test("D165-S3: the migration prepare arguments carry the legacy scope unioned with the class 9 inputs", () => {
++  const result = inspectArchitectureEntryReadiness({
++    rootDir: repoRoot,
++    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
++    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: deferredDisposition },
++  });
++  const args = result.nextAction.steps[0].args;
++  const scopes = args.flatMap((a, i) => (args[i - 1] === "--scope" ? [a] : []));
++  for (const required of ["architecture/map", "project/pipeline.json", "pipeline.user.yaml", ARCHITECTURE_ENTRY_SCOPE]) {
++    assert.ok(scopes.includes(required), `${required} missing from ${JSON.stringify(scopes)}`);
++  }
++  assert.deepEqual(scopes, class9Authority.withClass9RequiredScope([ARCHITECTURE_ENTRY_SCOPE]));
++});
++
+ test("D162 S3: a deferred disposition requires migration for a net-new path as well, not the fitness refusal", () => {
+   const result = inspectArchitectureEntryReadiness({
+     rootDir: repoRoot,
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 0acd88443..f74da362c 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -25,6 +25,7 @@ import {
+   verifyAdoptionAuthority,
+   atomicWriteAdoptionState,
+   scopeValue,
++  withClass9RequiredScope,
+   loadAdoptionMap,
+ } from "../lib/architecture-adoption-authority.mjs";
+ 
+@@ -268,7 +269,7 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
+     steps.push({
+       step: "prepare",
+       script: "scripts/architecture-adoption.mjs",
+-      args: ["prepare", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, ...legacyScope.flatMap((s) => ["--scope", s]), "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]
++      args: ["prepare", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, ...withClass9RequiredScope(legacyScope).flatMap((s) => ["--scope", s]), "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]
+     });
+     steps.push({
+       step: "confirm-and-apply",
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index 235c9f9ea..3c1abfae0 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -12,6 +12,7 @@ import os from "node:os";
+ import { spawnSync } from "node:child_process";
+ import { applyAdoptionDecision as rawApply } from "./architecture-adoption.mjs";
+ import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
++import * as class9Authority from "../lib/architecture-adoption-authority.mjs";
+ import { setupAdoptionFixture, signAdoptionRequest, fixtureGit } from "./architecture-adoption-test-fixture.mjs";
+ 
+ import {
+@@ -678,7 +679,7 @@ describe("D162 S2: adoption retires the new deferral and names the migration", (
+     assert.deepEqual(proposal.migration.steps.map((s) => s.step), ["measure", "prepare", "confirm-and-apply"]);
+     assert.deepEqual(proposal.migration.steps[0].args, ["--root", root, "--apply"]);
+     assert.equal(proposal.migration.steps[0].script, "scripts/architecture-measure.mjs");
+-    assert.deepEqual(proposal.migration.steps[1].args, ["prepare", "--root", root, "--decision", "approved-scoped", "--scope", "lib/", "--scope", "src/", "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]);
++    assert.deepEqual(proposal.migration.steps[1].args, ["prepare", "--root", root, "--decision", "approved-scoped", "--scope", "architecture/map", "--scope", "lib/", "--scope", "pipeline.user.yaml", "--scope", "project/pipeline.json", "--scope", "src/", "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]);
+     assert.equal(proposal.migration.steps[1].script, "scripts/architecture-adoption.mjs");
+     assert.deepEqual(proposal.migration.steps[2].args, ["apply", "--root", root, "--decision", "approved-scoped", "--request", "<request file>", "--proof", "<proof file>"]);
+     assert.ok(proposal.migration.steps[2].note.includes("ADR-0056"));
+@@ -695,6 +696,31 @@ describe("D162 S2: adoption retires the new deferral and names the migration", (
+     assert.equal(generateAdoptionProposal(root).migration, undefined);
+   });
+ 
++  const CLASS9 = ["architecture/map", "pipeline.user.yaml", "project/pipeline.json"];
++  const prepareScopes = (proposal) => {
++    const args = proposal.migration.steps.find((s) => s.step === "prepare").args;
++    return args.flatMap((a, i) => (args[i - 1] === "--scope" ? [a] : []));
++  };
++
++  it("D165-S3: a legacy scope without the class 9 inputs migrates to a prepare scope that contains them", () => {
++    applyLegacyDeferred(["src/"]);
++    assert.deepEqual(prepareScopes(generateAdoptionProposal(root)), [...CLASS9, "src/"].sort());
++  });
++
++  it("D165-S3: a legacy scope that already contains the class 9 inputs is unchanged", () => {
++    const scope = [...CLASS9, "src/"].sort();
++    applyLegacyDeferred(scope);
++    assert.deepEqual(prepareScopes(generateAdoptionProposal(root)), scope);
++  });
++
++  it("D165-S3: the constant is frozen and exact, and the union is sorted, de-duplicated and stable", () => {
++    assert.ok(Object.isFrozen(class9Authority.CLASS9_REQUIRED_SCOPE));
++    assert.deepEqual([...class9Authority.CLASS9_REQUIRED_SCOPE], CLASS9);
++    const once = class9Authority.withClass9RequiredScope(["z/", "a/", "a/", "project/pipeline.json"]);
++    assert.deepEqual(once, ["a/", "architecture/map", "pipeline.user.yaml", "project/pipeline.json", "z/"]);
++    assert.deepEqual(class9Authority.withClass9RequiredScope(once), once);
++  });
++
+   for (const command of ["prepare", "apply"]) {
+     it(`D162 S2: CLI ${command} --decision deferred is refused before anything is built or written`, () => {
+       fs.mkdirSync(path.join(root, "scratch"), { recursive: true });
+diff --git a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+index 4e6356cef..d01444a16 100644
+--- a/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-fitness.test.mjs
+@@ -57,6 +57,22 @@ it("physical fitness rejects empty and whitespace-only contract and verification
+   } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+ });
+ 
++import * as class9Authority from "../lib/architecture-adoption-authority.mjs";
++
++it("D165-S3: class 9 is evaluable, not unavailable, for a scope that carries the class 9 constant", () => {
++  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-d165s3-"));
++  try {
++    fs.mkdirSync(path.join(rootDir, "architecture"));
++    fs.cpSync(path.join(REPO_ROOT, "architecture/map"), path.join(rootDir, "architecture/map"), { recursive: true });
++    fs.mkdirSync(path.join(rootDir, "project"));
++    fs.writeFileSync(path.join(rootDir, "project/pipeline.json"), "{}\n");
++    const evaluate = () => evaluateArchitectureFitness({ rootDir, profileDrift: false }).outcomes.find(o => o.classId === 9);
++    fixtureAdoption({ rootDir, decision: "approved-scoped", scope: class9Authority.withClass9RequiredScope(["src/"]), rationale: "Legacy scope widened" });
++    assert.notEqual(evaluate().outcome, OUTCOME_UNAVAILABLE);
++    assert.equal(evaluate().outcome, OUTCOME_PASS);
++  } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
++});
++
+ it("actual fitness compares the durable accepted snapshot and refuses absent authority", () => {
+   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-accepted-"));
+   try {
