@@ -13,7 +13,16 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **218 items:190 at75,16 at50,12 at25;28 below75;index70.41%** (D167 adds
+contains **221 items:193 at75,16 at50,12 at25;28 below75;index70.48%** (D172,
+2026-10-27: PO rule "75 counts when technically delivered in the candidate"; Full
+Verify, Critic, native Windows runs and PO acceptance are the gates AFTER 75.
+D25, PF-78 and S7b moved to75 on held patches applied in `304365b68` and
+installed as `0.7.0+claude.20261026222010.17e002a`; D7 moved to50 on D170
+`17e002a67` and D171 `bff5c444e` (D171 is in source, not yet stamped); Wanted 2
+to 4 of D7 open. The Glossover findings PF-79 (P0: Critic packet admission
+demands a dispatch record, see the backlog item for the two possible causes and
+the open PO questions Q1 to Q3 of the D172 recon), PF-80 and PF-81 (P1) join at25.
+D167 adds
 the P0 row for PF-78, Critic diagnostic evidence producer versus registrar
 location; D166 adds
 seven Toolbox rows: P0 D25, D6 at50 and D7 with D15/D16/D17/D24, P1 D8, D9,

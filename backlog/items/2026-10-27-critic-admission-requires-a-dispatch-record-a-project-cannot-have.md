@@ -20,8 +20,17 @@ done_when: manual
   critic mode green, diagnostic evidence produced and registered (consumer commit 6b731be), preflight says
   `packet-ready` with a base before the Epic 1 code.
 - The next step, admission of the packet, refuses: it wants a dispatch record (`evidence/dispatch-record-<taskId>.json`)
-  that every Goldfish dispatch should have written. The project has none, because Epic 1 code was delivered before any
-  dispatch existed in it.
+  that every Goldfish dispatch should have written. The project has none.
+- TWO DIFFERENT CAUSES fit that sentence, and they need different fixes (Elephant correction 2026-10-27 after the
+  D172 recon; the first version of this item assumed the second):
+  (a) dispatches DID happen but no record was ever written. In this very repository a background `Agent` dispatch ends in
+  `NGHF-PENDING-UNAVAILABLE` and the hook tells the Elephant to commit with the `Dispatch:` trailer and "write the
+  dispatch record via scripts/dispatch-record-write.mjs"; that route is documented nowhere a consumer reads and needs
+  host-observed pending state, so an Elephant that follows the briefing never produces a record. The repository's own
+  wave dispatches of 2026-10-26/27 have trailers and no records either.
+  (b) the range was never dispatched (human or undispatched agent code).
+  The consumer's wording ("die jeder Goldfish-Auftrag hätte schreiben sollen") points to (a); only the consumer can
+  confirm. Fix (a) needs a documented, executable record route; fix (b) needs the new shape of Wanted 2.
 - The review-unit route and the historical route need such records too.
 - How a record is written is described nowhere; the consumer handover had already listed that as a side finding.
 - The consumer will not invent a record afterwards. That is correct: a retro-fitted record is a forged record.
@@ -32,10 +41,15 @@ done_when: manual
    the record (`critic-packet-preflight.mjs` `localDispatchEvidence`, `historical-fresh-review-admission.mjs`,
    `critic-generic-batch.mjs`, `session-critic-finalizer.mjs`). Name the full set of facts the record is asked to
    prove, so a replacement can prove the same facts honestly.
-2. A sanctioned, honest route for a candidate range that has NO dispatch history: the packet binds the range to
+2. (Only if the consumer confirms cause (b); BLOCKED on a PO decision, see the D172 recon notes Q1 to Q3: who may declare
+   "no dispatch history", mixed ranges, unknown model/effort.) A sanctioned, honest route for a candidate range that has NO dispatch history: the packet binds the range to
    what is observable (commit list, authorship from git, the fact that no dispatch existed) and says so, instead of
    demanding a record that would be invented. It must be visibly distinguishable from a dispatched range in the
    evidence the Critic and the PO read, and it must not weaken the dispatched case.
+3a. (Cause (a)) Recon, then make the post-hoc record route for a BACKGROUND dispatch real: what `dispatch-record-write.mjs`
+   needs (request shape, host-observed pending state), whether an Elephant can produce it from the real briefing and the
+   real hand-back, and one documented command sequence in the pipeline-start references and the dispatch skill. A record
+   written this way states what was observed (briefing binding, hand-back, commit) and nothing it cannot know.
 3. Where records are legitimately wanted, the producer is documented where the consumer looks: the pipeline-start
    references and the critic-review skill name `init-dispatch-record.mjs`, its input (a generated briefing) and the
    target path, and the refusal text names that route.
