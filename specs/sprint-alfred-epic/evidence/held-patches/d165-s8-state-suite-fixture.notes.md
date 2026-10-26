@@ -1,42 +1,41 @@
-# D165 S8 - pipeline-state suite fixture (BLOCKED, no patch produced)
+# D165 S8 - pipeline-state suite fixture (PARTIAL patch, suite still red)
 
-Status: blocked at the second fixture failure; no `.patch` was written (a partial fixture edit would leave the suite red).
+Status: the patch `d165-s8-state-suite-fixture.patch` is a verified PARTIAL fixture. It moves the suite strictly further (from the fixture's own abort at the first call, line 2192 region, to the assertion at pipeline-state.test.mjs:2218 in the "phase-calibration neutral-only" case) but the suite is NOT green. Do not apply it as a completed fix; a design decision is needed first (see the continuation card). Test-only: the patch touches only plugins/pipeline-core/scripts/pipeline-state.test.mjs.
 
 ## Cause
-`prepareCalibrationArchitectureFixture` (pipeline-state.test.mjs, line 47 region; call at line 2192 on top of S1-S4) applies a `deferred` adoption. Since D162 S3, `lib/architecture-entry-readiness.mjs` (line 334) answers a deferred adoption with `ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED`. `architecture-adoption.mjs` also retires new `deferred` creation on its CLI (line 552).
+`prepareCalibrationArchitectureFixture` applied a `deferred` adoption over a copy of this repository's `architecture/` tree. Since D162 S3 `lib/architecture-entry-readiness.mjs` (line 334) answers a deferred adoption with `ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED`; approved-scoped over the copied tree fails fitness (`ARCHITECTURE-FITNESS-NOT-READY`).
 
-## Attempted fix (drift-class, in the scratch clone only)
-1. `decision: "deferred"` -> `"approved-scoped"` (the fixture line 51-52; rationale text adjusted). Result: the abort moves to `ARCHITECTURE-FITNESS-NOT-READY`. Reason: the fixture copies this repository's whole `architecture/` tree into a tiny fixture repo; under an enforced (non-deferred) adoption, fitness is blocking and finds `src/change.mjs` outside any module plus 157 missing contracts of this repo's modules.
-2. Probe (scratch/agent-out/w8/probe.mjs, same steps as the fixture): replacing the `cpSync(architecture)` with the sanctioned `applyArchitectureMeasure(root)` (scripts/architecture-measure.mjs, D162 S1; measures the fixture repo itself: modules specs, src, root) clears fitness. Result: the next block is `ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED`, area `src`, `ARCH-CONTINUITY-SOURCE-UNRESOLVED` (lib/architecture-decision-continuity.mjs line 18-27: `local` or `inherited` decision source is blocked/absent in the fixture repo).
+## Fixture lines changed (in the patch)
+1. `prepareCalibrationArchitectureFixture(root, calibrationBytes = null)` now calls the sanctioned test-only `materializeArchitectureDesignFixture({ rootDir, planPath: "specs/unit/prd_unit.md", sourcePath: "src/change.mjs", decisionRef: "TEST-K156", by: "Synthetic fixture PO" })` (lib/architecture-design-test-fixture.mjs: measured map, fitness model, baseline, `docs/adr/`, real approved-scoped chat adoption; the other suites' ready fixture) instead of copying `architecture/`, AGENTS.md and applying a deferred adoption. The `readiness ready` assertion stays.
+2. When `calibrationBytes` is given, project/pipeline.json is written BEFORE the materialization, because the adopted profile binds project/pipeline.json: a calibration committed after the adoption is `profile-drift` (fitness `profile-drift`, module identity, `profileSha256 differs from the accepted authority snapshot`) and set-phase then aborts with ARCHITECTURE-FITNESS-NOT-READY (measured at 2204 before this step).
+3. The phase-calibration loop passes the baseline bytes as `calibrationBytes` for layouts with a neutral calibration.
+4. Import `applyAdoptionDecision` replaced by `materializeArchitectureDesignFixture`.
 
-## Reading (stop reason)
-Under an enforced adoption the fixture now needs a resolvable architecture decision source (local and/or inherited continuity) for area `src`, which a bare fixture repo does not have. That is a changed intended behaviour (enforced entry propagates decision applicability; deferral used to keep it observable only, readiness.mjs lines 406-417), not stale input alone. I did not hand-write decision or map files. Not determined: which sanctioned producer (local decision source, inherited/org policy source, or a waiver) satisfies `composeArchitectureDecisionContinuity` for a fixture; that needs a read of the decision-source loaders feeding `inspectPlanningDecisionApplicability`.
+## Preimage SHA-256 of pipeline-state.test.mjs
+- At HEAD f8184482f: 802e354b0052b8b6b1e35b54b13d2a838f7eb8fe9e73b2af92af062cace0685e
+- After S1-S4: 7c683ca3e36879f508a8b4ca6f1bf7a23f525ddb715f70f91a21af47d088e68c
+- After this partial patch: bbeb85a7c47ff503965b77fdcb7b0ebaa6b956d7dc24af711d06a07474d7a051
 
 ## Suite result
-- Before (at HEAD+S1-S4): abort `ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED` at fixture line 59, call at 2192.
-- After my attempted edit: abort `ARCHITECTURE-FITNESS-NOT-READY` (same line 59). Tests run/passed counts: the suite is a sequential script without counts; no case after 2192 ran.
-- Preimage SHA-256 of pipeline-state.test.mjs after S1-S4 applied: 7c683ca3e36879f508a8b4ca6f1bf7a23f525ddb715f70f91a21af47d088e68c (HEAD preimage not separately measured).
+- Before (HEAD+S1-S4): abort ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED inside the fixture at the first call.
+- After the partial patch: exit 1 at pipeline-state.test.mjs:2218, `neutral-only must not invent an effective decision for the unowned planned path` (assert.deepEqual(decisionSummary.areas, [])). The earlier 2204 set-phase success assertion now passes. The suite has no counts (sequential script).
 
-## push-init.test.mjs measurement (stacked clone, exit 1; 32 tests, 23 pass, 9 fail; not fixed)
-Failing cases (all `drivePushInit:`):
-1. chains all three steps (reconciliation, gate-satisfiability, push-prepare) in one call, reaches signature-required
-2. signature preparation keeps the existing signature-required output
-3. reconciliation accepts WSL EPERM only after status zero, while non-zero and status-less results stop fail-closed (push-init.test.mjs:540; outcome precondition-unmet, check critic-bound-verify `CBV-ROOT` "candidate qualification unavailable")
-4. layer 1b is skipped, not failed, when the project has no harness/scripts/check-doc-reconciliation.mjs (:591, same CBV-ROOT)
-5. the signature-required outcome never carries a driver-executable action, for the real authorize-critical command (:656)
-6. dirty working tree stops at push-prepare's own check, named, even though gate-satisfiability does not check it (:691)
-7. stale verify evidence is reported by the cheap preflight while push-prepare still collects its independent checks (extra blocker critic-bound-verify CBV-ROOT)
-8. an onboarding-set machine-plane anchor resolves the key directory without disclosing it in the signature instructions
-9. real repo -- an explicit candidate distinct from the record-ref lets layer 1b actually pass (NVA-B-PUSHINIT-1 regression)
-Common visible cause: the new `critic-bound-verify` check fails with CBV-ROOT in the fixture roots (raw output in the scratch clone, deleted; reproduce with the driver).
+## Reading of the remaining failure (not fixed)
+The case asserts that the planned path `src/change.mjs` is UNOWNED (areas `[]`, unresolvedPaths `["src/change.mjs"]`). Under an enforced approved-scoped adoption with a measured map, the fixture's module owns `src/**` (the materializer is hardcoded to module `application`, ownedPaths `src/**`), so the path resolves to area `application` and unresolvedPaths is empty. An unowned planned path under an enforced adoption is itself a fitness finding (module-identity-ownership), so the old assertion cannot hold with a ready enforced fixture. This looks like a changed intended behaviour (the case's premise belongs to the deferred era), not stale fixture input alone; I did not weaken the assertion. Needs a decision: either the case's expectation changes to the owned-path result (areas `[application]`, unresolvedPaths `[]`) as a deliberate spec-bound update, or the case gets a map that leaves the planned path outside any module while fitness stays non-blocking (not possible with the shared materializer without a production-side helper change, out of scope here). Later sequential cases (legacy-only, matching-dual, the final refused case and everything after line 2218) were not reached.
+
+## push-init.test.mjs measurement (earlier run, stacked clone; not fixed)
+32 tests, 23 pass, 9 fail, all `drivePushInit:` cases, common visible cause: critic-bound-verify check fails CBV-ROOT in fixture roots (cases: chains all three steps; signature preparation; WSL EPERM reconciliation; layer 1b skipped; signature-required without driver-executable action; dirty working tree; stale verify evidence; machine-plane anchor; explicit candidate distinct from record-ref). Not re-measured in this run.
+
+## Apply check
+Fresh clone of HEAD with S1-S4 applied first: `git apply --check` exit 0.
 
 ## Proposed commit message (once complete)
 `test(state): align the calibration architecture fixture with the adoption migration rule`
 
-## Operator flow (once a patch exists)
-Apply after S1-S4 in the same install run: apply-diff, `git add -u`, `--no-verify` commit, stamp, install. The change is test-only (pipeline-state.test.mjs).
+## Operator flow (once complete)
+Apply after S1-S4 in the same install run: apply-diff, `git add -u`, `--no-verify` commit, stamp, install. The change is test-only.
 
 ## CONTINUATION CARD
-done: cause identified; two fixture failures measured; sanctioned measure route clears fitness; push-init list captured.
-remaining: satisfy decision continuity for area `src` in the fixture via a sanctioned source; run suite to the end; write patch; apply-check in fresh clone.
-next step: read the loaders behind `inspectPlanningDecisionApplicability` (architecture-entry-readiness.mjs ~line 404) to find the sanctioned local decision source; then edit the fixture to call `applyArchitectureMeasure(root)` instead of copying `architecture/`, with `approved-scoped`.
+done: fixture reaches ready via materializeArchitectureDesignFixture; calibration-before-adoption ordering found (profile drift); 2204 passes; apply-check ok; partial patch written.
+remaining: decide the neutral-only/legacy-only/matching-dual expectation at :2218 (owned vs unowned planned path under enforced adoption); then run the rest of the suite for further failures; re-write the patch; push-init CBV-ROOT slice separate.
+next step: with the decision, change :2216-2219 expectations (areas/unresolvedPaths) as an explicit spec-bound update, re-run through scratch/agent-out/w8c/driver.mjs (setup, apply the partial patch to the clone, state), continue sequentially.
