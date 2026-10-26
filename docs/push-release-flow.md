@@ -658,6 +658,7 @@ whatever ref
 | 4 | `pipeline-state.mjs approve-push` | Agent |
 | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
 | 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
+| 5c | `push-prepare.mjs --close` — the last step after a signed push: folds the push-approval record into one local commit once the remote is proven to hold the signed commit (D161) | Agent |
 | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
 | 7 | `gh release create` (tag + release) | Agent |
 
@@ -684,7 +685,13 @@ narrowing.
   names and voids the approval. Verify has to run *before* the approval, and the
   state record's write is committed *after* the push -- not by this push
   itself (which only ever pushes the already-signed `HEAD`, unchanged), but by
-  the **next** `push-prepare.mjs` run, automatically. This is finding 7c of
+  the close step, `push-prepare.mjs --close` (D161), run as the LAST step after
+  the signed push. It folds immediately, leaving the tree clean, but only after
+  a bounded read-only `git ls-remote` shows the remote holds `forCommit` at the
+  record's destination; otherwise it refuses and writes nothing. The fold
+  commit stays unpushed until the next signed push. If the close step is
+  skipped, the **next** `push-prepare.mjs` run still folds it, automatically
+  (the earlier behavior, unchanged). This is finding 7c of
   `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`;
   as of NVA-PUSHFOLD-1
   (`backlog/items/2026-08-26-push-approval-record-always-trails-the-signed-commit.md`,

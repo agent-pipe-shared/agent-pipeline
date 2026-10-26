@@ -1641,6 +1641,7 @@ export function observePipelineStartPreflight({
   // map-first proposal when that artifact is absent; do not ask for a new
   // adoption decision merely because the map still needs materializing.
   const architectureOrientationAction = architectureOrientation.status === "adoption-required"
+    || architectureOrientation.status === "migration-required"
     || (architectureOrientation.status === "decision-recorded"
       && architectureOrientation.physicalMap?.status === "missing")
     ? {

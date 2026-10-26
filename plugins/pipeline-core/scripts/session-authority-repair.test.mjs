@@ -17,8 +17,8 @@ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHoo
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
-import { initializeSessionAuthorityRegistry } from "../lib/session-authority-registry.mjs";
-import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { initializeSessionAuthorityRegistry, inspectSessionAuthorityLock, judgeSessionAuthorityLockOwner, releaseSessionAuthorityLock, sessionAuthorityLockOwner } from "../lib/session-authority-registry.mjs";
+import { inspectSignedDescriptorCustodyRepository, loadSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
@@ -356,6 +356,114 @@ const cases = [
     } finally { leaveClaudeHookSessionOwner(); process.chdir(cwd); }
     assert.equal(governedRow(root, "ITEM-AC-0").cancelClass, "superseded");
     assert.equal(governedRow(root, "ITEM-AC-0").state, "cancelled");
+  }) },
+  // W2-R2 (AC-127; C2-P1-WIN-FSYNC, C2-P1-WIN-ORPHAN): the Windows branches of the registry lock, driven on any host through the
+  // module's injected seams (judge options, io, owner observer). Native Windows qualification stays pending.
+  { id: "SAR12", name: "release-lock reports the real postcondition: removed with directory durability unsupported (an EPERM fsync after removal), removed and synced, or retained, each with a typed next action (AC-127, C2-P1-WIN-FSYNC)", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    mkdirSync(join(repository.commonDir, "agent-pipeline/session-authority"), { recursive: true, mode: 0o700 });
+    const lockPath = join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
+    const sha = (text) => createHash("sha256").update(text).digest("hex");
+    const writeLock = () => writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "e".repeat(64),
+      owner: { pid: 9036, hostSha256: sha(hostname()), process: null, acquiredAt: new Date(Date.now() - 3600000).toISOString() } }), { mode: 0o600, flag: "wx" });
+    const eperm = () => { const error = new Error("EPERM: operation not permitted, fsync"); error.code = "EPERM"; throw error; };
+
+    writeLock();
+    const unsupported = releaseSessionAuthorityLock({ repository, reason: "orphan", io: { syncDirectory: eperm } });
+    assert.equal(unsupported.status, "released", JSON.stringify(unsupported));
+    assert.equal(existsSync(lockPath), false, "the lock is gone, so the release must not report a failure");
+    assert.deepEqual(unsupported.postcondition, { lock: "removed", durability: "unsupported", syncErrorCode: "EPERM" });
+    assert.equal(unsupported.nextAction.kind, "none");
+    assert.equal(existsSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", unsupported.aside.split("/").pop(), "registry.lock")), true, "retained aside, never deleted");
+
+    writeLock();
+    const synced = releaseSessionAuthorityLock({ repository, reason: "orphan" });
+    assert.equal(synced.status, "released"); assert.deepEqual(synced.postcondition, { lock: "removed", durability: "synced" }); assert.equal(synced.nextAction.kind, "none");
+
+    writeLock();
+    const retained = releaseSessionAuthorityLock({ repository, reason: "orphan", io: { rename: () => { const error = new Error("EPERM: operation not permitted, rename"); error.code = "EPERM"; throw error; } } });
+    assert.equal(retained.status, "retained", JSON.stringify(retained));
+    assert.equal(existsSync(lockPath), true, "the lock is still there, so no removal and no rollback is claimed");
+    assert.deepEqual(retained.postcondition, { lock: "retained", durability: "not-attempted", errorCode: "EPERM" });
+    assert.equal(retained.nextAction.kind, "inspect"); assert.match(retained.nextAction.command, / inspect --root /u);
+  }) },
+  { id: "SAR13", name: "a Windows lock owner is judged by pid plus process start: gone is dead, the same start is live, a reused pid is dead, and an unknown, unavailable or foreign-host owner is never reclaimable (AC-127, C2-P1-WIN-ORPHAN)", run: () => fixture(({ root }) => {
+    const host = createHash("sha256").update(hostname()).digest("hex");
+    const win = (observeWindows) => (value) => judgeSessionAuthorityLockOwner(value, { platform: "win32", host, observeWindows });
+    const lock = (owner) => ({ schema: "pipeline.session-authority-lock.v2", owner });
+    const stamped = { pid: 9036, hostSha256: host, process: { start: "win32-133000000000000000" }, acquiredAt: "2026-10-25T10:00:00.000Z" };
+    const absent = win(() => ({ status: "absent", pid: 9036 }));
+    assert.equal(absent(lock(stamped)), "dead", "the recorded pid is gone");
+    assert.equal(absent(lock({ ...stamped, process: null })), "dead", "a pid that no longer exists cannot be the owner, recorded start or not");
+    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000000" }))(lock(stamped)), "live");
+    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000001" }))(lock(stamped)), "dead", "pid reused by a later process");
+    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000000" }))(lock({ ...stamped, process: null })), "unknown", "a present pid with no recorded start is not provably the owner");
+    assert.equal(win(() => ({ status: "present", pid: 9036, processStart: "win32-133000000000000001" }))(lock({ ...stamped, process: { start: "12345", bootSha256: "b".repeat(64) } })), "unknown", "a start of another platform's shape is not comparable");
+    assert.equal(win(() => ({ status: "unavailable", reason: "native-query-failed" }))(lock(stamped)), "unknown");
+    assert.equal(win(() => { throw new Error("boom"); })(lock(stamped)), "unknown");
+    let called = false;
+    assert.equal(judgeSessionAuthorityLockOwner(lock({ ...stamped, hostSha256: "f".repeat(64) }), { platform: "win32", host, observeWindows: () => { called = true; return { status: "absent" }; } }), "unknown", "a foreign host is never judged");
+    assert.equal(called, false);
+    assert.equal(absent({ schema: "pipeline.session-authority-lock.v1" }), "unknown", "an owner-less lock stays unjudgeable");
+    assert.equal(absent(lock({ ...stamped, pid: 0 })), "unknown");
+
+    // The owner a Windows process writes names its start, so the next reader can tell a reused pid.
+    assert.equal(sessionAuthorityLockOwner({ platform: "win32", observeWindows: () => ({ status: "present", processStart: "win32-777" }) }).process.start, "win32-777");
+    assert.equal(sessionAuthorityLockOwner({ platform: "win32", observeWindows: () => ({ status: "unavailable", reason: "x" }) }).process, null);
+
+    if (process.platform !== "linux") return;
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    mkdirSync(join(repository.commonDir, "agent-pipeline/session-authority"), { recursive: true, mode: 0o700 });
+    const lockPath = join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
+    writeFileSync(lockPath, JSON.stringify(lock(stamped)), { mode: 0o600, flag: "wx" });
+    const seen = inspectSessionAuthorityLock({ repository, judge: absent });
+    assert.equal(seen.owner, "dead"); assert.equal(seen.pid, 9036);
+    assert.equal(inspectSessionAuthorityLock({ repository, judge: win(() => ({ status: "unavailable", reason: "x" })) }).owner, "unknown");
+    const released = releaseSessionAuthorityLock({ repository, reason: "orphan", judge: absent });
+    assert.equal(released.status, "released"); assert.equal(released.owner, "dead"); assert.equal(existsSync(lockPath), false);
+  }) },
+  { id: "SAR14", name: "a session-cleanup manifest lock left by a gone writer is named by the dispatch refusal and by inspect, heal retires it aside and the next dispatch runs; a live or foreign lock is kept (P0 2026-10-26)", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    assert.equal(cancelUnstartedGovernedItemSlice({ root, sliceId: "ITEM-AC-1", reason: "its Goldfish stopped", started: true, cancelClass: "budget" }).status, "cancelled");
+    const active = join(repository.commonDir, "agent-pipeline/session-cleanup/active");
+    const sessions = readdirSync(join(repository.commonDir, "agent-pipeline/session-descriptors/active")).filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5));
+    assert.ok(sessions.length > 0, "the course binds at least one session descriptor");
+    const sha = (text) => createHash("sha256").update(text).digest("hex");
+    const plant = (sessionId, pid, processStartId, nonceSha256) => { mkdirSync(active, { recursive: true, mode: 0o700 });
+      writeFileSync(join(active, `${sessionId}.json.lock`), JSON.stringify({ schema: "pipeline.session-cleanup-lock.v1", sessionId, ownerNonceSha256: nonceSha256, pid, processStartId }), { mode: 0o600, flag: "wx" }); };
+    const nonce = (sessionId) => sha(loadSessionDescriptor(root, sessionId).ownerNonce);
+    // A hook process killed inside custody leaves the lock of its own session behind; its writer is gone.
+    const gone = spawnSync(process.execPath, ["-e", ""]).pid;
+    for (const sessionId of sessions) plant(sessionId, gone, "1", nonce(sessionId));
+    const refused = dispatch("ITEM-AC-2", "DELIVER-AC-2", "native-tool-two");
+    assert.equal(refused.ok, false); assert.equal(refused.code, "SDC-LOCK-HELD");
+    assert.match(String(refused.reason), /manifest lock/u, "the refusal names its cause instead of no reason");
+    const found = repair("inspect", "--root", root).result;
+    assert.ok(found.cleanupLocks.some((row) => row.owner === "dead" && sessions.includes(row.sessionId)), JSON.stringify(found.cleanupLocks));
+    assert.ok(found.next.some((row) => / heal --root /u.test(row.command) && /session-cleanup lock/u.test(row.why)), JSON.stringify(found.next));
+    const healed = repair("heal", "--root", root);
+    assert.equal(healed.code, 0, JSON.stringify(healed.result));
+    assert.equal(healed.result.retiredCleanupLocks.length, sessions.length, JSON.stringify(healed.result));
+    assert.deepEqual(readdirSync(active).filter((name) => name.endsWith(".lock")), [], "every dead lock is gone from active");
+    const kept = healed.result.retained.find((name) => name.endsWith("-session-cleanup-lock"));
+    assert.ok(kept, JSON.stringify(healed.result.retained));
+    assert.equal(readdirSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", kept)).filter((name) => name.endsWith(".json.lock")).length, sessions.length, "retired locks are retained aside, not deleted");
+    const resumed = dispatch("ITEM-AC-2", "DELIVER-AC-2", "native-tool-three");
+    assert.equal(resumed.ok, true, `the next dispatch runs: ${JSON.stringify(resumed)}`);
+    // A live writer and a lock whose nonce does not match the session's descriptor are never retired.
+    const own = observeLinuxProcess(process.pid);
+    plant(sessions[0], process.pid, own.start, nonce(sessions[0]));
+    const foreign = "foreign-session-lock";
+    plant(foreign, gone, "1", "f".repeat(64));
+    const live = repair("inspect", "--root", root).result;
+    assert.equal(live.cleanupLocks.find((row) => row.sessionId === sessions[0]).owner, "live");
+    assert.equal(live.cleanupLocks.find((row) => row.sessionId === foreign).owner, "untrusted");
+    const again = repair("heal", "--root", root);
+    assert.deepEqual(again.result.retiredCleanupLocks ?? [], []);
+    assert.equal(existsSync(join(active, `${sessions[0]}.json.lock`)), true); assert.equal(existsSync(join(active, `${foreign}.json.lock`)), true);
   }) },
 ];
 

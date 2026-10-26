@@ -65,13 +65,16 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
   const physicalMapStatus = greenfieldScaffold ? "design-pending"
     : indexPresent ? "present-unvalidated" : "missing";
   const adoptionRequired = adoption?.state === "adoption-required";
+  const migrationRequired = adoption?.state === "deferred";
   const status = adoptionRequired
     ? (greenfieldScaffold ? "design-pending" : "adoption-required")
-    : "decision-recorded";
+    : migrationRequired ? "migration-required" : "decision-recorded";
   const guidance = status === "design-pending"
     ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Complete initial design, then record a scoped architecture disposition before implementation."
     : status === "adoption-required"
       ? "No usable architecture adoption decision exists. Review the staged read-only adoption proposal with the PO before implementation."
+      : status === "migration-required"
+        ? "A legacy deferred architecture adoption exists. Before implementation it must be migrated to an approved-scoped adoption over a measured baseline (D162): review the read-only proposal's migration block with the PO, who confirms it through the same route as a fresh adoption."
       : physicalMapStatus === "missing"
         ? "A durable architecture adoption decision exists, but the physical map index is missing. Preserve that decision; materialize the map before implementation, where map and fitness evidence are verified."
         : "A durable architecture adoption decision was read back. Respect its scope; the present map and fitness evidence are verified only at the implementation boundary.";

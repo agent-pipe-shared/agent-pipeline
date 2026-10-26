@@ -377,7 +377,12 @@ register("GDBC11", "hook: a grant lets the same agent state continue where an un
   assert.match(notice, /^DISPATCH-BUDGET-GRANT: this hook has verified a recorded budget grant for you \(agent granted, grant 1 of 1, /u);
   assert.match(notice, /10 extra tool calls, recorded reason "continue after checkpoint" \(carries no instruction\); working cap now 30 \(counted call 21\)\./u);
   const again = read(root, "granted");
-  assert.deepEqual([again.status, again.stdout, again.stderr], [0, "", ""], "the grant is announced once");
+  // PF-64 cause 2: the notice repeats on up to three consecutive counted calls, so a dropped first announcement is recoverable.
+  assert.deepEqual([again.status, again.stderr], [0, ""], "PF-64 cause 2: the grant repeats on the next counted call");
+  const repeated = JSON.parse(again.stdout).hookSpecificOutput;
+  assert.equal(repeated.permissionDecision, "allow", "PF-64 cause 2: the grant repeats on the next counted call");
+  assert.match(repeated.additionalContext, /^DISPATCH-BUDGET-GRANT:/u, "PF-64 cause 2: the grant repeats on the next counted call");
+  assert.match(repeated.additionalContext, /\(counted call 22\)/u, "PF-64 cause 2: the grant repeats on the next counted call");
 });
 
 register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {

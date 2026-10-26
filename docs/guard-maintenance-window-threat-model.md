@@ -600,6 +600,7 @@ kernel authority, so a maintenance window cannot lift them:
 `plugins/pipeline-core/scripts/architecture-baseline.mjs`,
 `plugins/pipeline-core/scripts/check-critic-bound-verify.mjs`,
 `plugins/pipeline-core/scripts/dispatch-record-write.mjs`,
+`plugins/pipeline-core/lib/pipeline-actor-assignment.mjs`,
 `plugins/pipeline-core/scripts/onboarding-init.mjs`,
 `plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs`,
 `plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs`,

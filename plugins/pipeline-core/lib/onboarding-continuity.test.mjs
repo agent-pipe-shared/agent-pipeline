@@ -5332,7 +5332,118 @@ check("planOnboardingBootstrapAcknowledgementChat refuses a placeholder under ti
   expectKickoffError("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", () => planOnboardingBootstrapAcknowledgementChat({ rootDir: root }));
 });
 
-assert.equal(cases.length, 308, "the complete onboarding continuity corpus must be registered before execution begins");
+// AC-115 / RV-7 (ADR-0082 level 1): a State damaged only because a pre-9ed1a2800 `approve-push` wrote
+// `updatedAt: approvedAt` on an inactive State must be repairable by one bounded repair that restores the
+// lifecycle timestamp and changes nothing else. Anything the State itself does not prove to be
+// push-audit-shaped stays refused.
+const POST_CLOSE_DRIFT = "2026-10-01T10:00:00.000Z";
+const POST_CLOSE_COMMIT = "a".repeat(40);
+
+function postClosePushDriftState(root, {
+  kind = "closed",
+  cause = "approval",
+  drift = POST_CLOSE_DRIFT,
+  approvedAt = drift,
+  expiresAt = "2026-10-01T10:10:00.000Z",
+  mutate = () => {},
+} = {}) {
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "closed handover\n");
+  const closedEntry = {
+    id: "closed-feature",
+    planPath: "specs/closed-feature/prd.md",
+    phaseAtClose: "implementation",
+    closedAt: "2026-09-06T12:00:00.000Z",
+    closedBy: "PO",
+    forCommit: null,
+  };
+  const state = { schema: "pipeline.state.v0", planApproved: false };
+  if (kind === "closed") {
+    state.closedFeatures = [closedEntry];
+    state.lifecycleTimestamp = closedEntry.closedAt;
+  } else {
+    state.discardedFeatures = [{ ...baseDiscardEntry(), discardedAt: "2026-09-07T09:00:00.000Z" }];
+    state.lifecycleTimestamp = "2026-09-07T09:00:00.000Z";
+  }
+  const lifecycleTimestamp = state.lifecycleTimestamp;
+  delete state.lifecycleTimestamp;
+  state.updatedAt = drift;
+  if (cause === "approval") {
+    state.pushApproval = { lastApproved: {
+      approvedBy: "PO",
+      approvedAt,
+      forCommit: POST_CLOSE_COMMIT,
+      criticalProof: null,
+      remote: "origin",
+      destination: "refs/heads/main",
+      threatModel: { path: "docs/threat-model.md", sha256: "b".repeat(64) },
+      pendingAuditWrite: true,
+    } };
+    state.criticalProofConsumption = [];
+  } else if (cause === "challenge") {
+    state.pendingPushChallenge = {
+      code: "PO-ABCD",
+      forCommit: POST_CLOSE_COMMIT,
+      remote: "origin",
+      destination: "refs/heads/main",
+      expiresAt,
+    };
+  }
+  mutate(state);
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  return { statePath, lifecycleTimestamp, state };
+}
+
+for (const kind of ["closed", "discarded"]) {
+  for (const cause of ["approval", "challenge"]) {
+    check(`post-close push audit timestamp drift on a ${kind} State from a push ${cause} is diagnosed and repaired with updatedAt as the only change`, () => {
+      const root = fixture(`post-close-drift-${kind}-${cause}`);
+      const damaged = postClosePushDriftState(root, { kind, cause });
+      const before = readFileSync(damaged.statePath);
+      const classified = classifyOnboardingContinuity({ rootDir: root });
+      assert.equal(classified.status, "damaged");
+      assert.equal(classified.diagnosis.status, "repairable");
+      assert.equal(classified.diagnosis.code, "CONTINUITY-POST-CLOSE-AUDIT-TIMESTAMP-DRIFT");
+      const plan = planOnboardingContinuityRepair({ rootDir: root });
+      assert.equal(plan.status, "ready");
+      assert.equal(plan.reason, "repair-post-close-audit-timestamp-drift");
+      assert.deepEqual(plan.target.value, { ...JSON.parse(before), updatedAt: damaged.lifecycleTimestamp },
+        "the proposal restores the lifecycle timestamp and changes nothing else");
+      assert.deepEqual(planOnboardingContinuityRepair({ rootDir: root }), plan);
+      const applied = applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+      assert.equal(applied.status, "applied");
+      assert.equal(applied.continuity.status, "valid");
+      const after = readFileSync(damaged.statePath);
+      assert.equal(digest(after), plan.target.afterSha256);
+      assert.deepEqual(JSON.parse(after), { ...JSON.parse(before), updatedAt: damaged.lifecycleTimestamp });
+      assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+      assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+    });
+  }
+}
+
+for (const [label, options] of Object.entries({
+  "unrelated drift with no push audit record": { cause: "none" },
+  "drift that matches neither the approval time nor a consumption": { cause: "approval", approvedAt: "2026-10-02T10:00:00.000Z" },
+  "a pending challenge whose drift is not later than the lifecycle timestamp": { cause: "challenge", drift: "2026-09-01T10:00:00.000Z", expiresAt: "2026-09-01T10:10:00.000Z" },
+  "a malformed closed entry": { cause: "approval", mutate: (state) => { delete state.closedFeatures[0].closedBy; } },
+  "an active feature": { cause: "approval", mutate: (state) => { state.activeFeature = { id: "active-feature", planPath: "specs/active-feature/prd.md", phase: "implementation" }; } },
+  "an ambiguous closed and discarded tie": { cause: "approval", kind: "closed", mutate: (state) => { state.discardedFeatures = [{ ...baseDiscardEntry(), discardedAt: "2026-09-07T09:00:00.000Z" }]; } },
+})) {
+  check(`post-close push audit drift repair refuses ${label}`, () => {
+    const root = fixture(`post-close-drift-refuse-${label.replaceAll(/[^a-z]+/gu, "-").slice(0, 30)}`);
+    const damaged = postClosePushDriftState(root, options);
+    const before = readFileSync(damaged.statePath);
+    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+    const plan = planOnboardingContinuityRepair({ rootDir: root });
+    assert.equal(plan.status, "unsupported");
+    assert.notEqual(plan.code, "CONTINUITY-POST-CLOSE-AUDIT-TIMESTAMP-DRIFT");
+    assert.deepEqual(readFileSync(damaged.statePath), before, "a refusal mutates nothing");
+  });
+}
+
+assert.equal(cases.length, 318, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

@@ -560,6 +560,29 @@ export function criticalArtifactPaths(dir, deps = {}) {
   return build(dir, gitCommonDir);
 }
 
+const REMOTE_OBJECT_ID_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
+
+/**
+ * D161: the commit the remote holds at `destination`, or `null` for anything short of one
+ * unambiguous answer. A bounded, read-only `git ls-remote`; it never fetches and never writes a
+ * ref. A remote-tracking ref is deliberately NOT consulted: it only moves on a fetch, and a
+ * repository whose fetch configuration is broken keeps a stale one forever.
+ */
+export function remoteCommit(dir, remote, destination, deps = {}) {
+  if (!REMOTE_RE.test(remote ?? "") || String(remote).startsWith("-")) return null;
+  if (!DESTINATION_RE.test(destination ?? "")) return null;
+  const spawn = deps.lsRemoteSpawn ?? spawnSync;
+  try {
+    const result = spawn("git", ["-C", dir, "ls-remote", "--", remote, destination],
+      { encoding: "utf8", shell: false, timeout: 15000, maxBuffer: 65536, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+    if (result?.status !== 0 || typeof result.stdout !== "string") return null;
+    const matches = result.stdout.split("\n").filter((line) => line !== "").map((line) => line.split("\t"))
+      .filter((fields) => fields.length === 2 && fields[1] === destination);
+    if (matches.length !== 1 || !REMOTE_OBJECT_ID_RE.test(matches[0][0])) return null;
+    return matches[0][0];
+  } catch { return null; }
+}
+
 /**
  * NVA-PUSHFOLD-1: `approve-push` (`pipeline-state.mjs`) writes `pushApproval.lastApproved`
  * to the project's state file strictly AFTER the signed subject was computed, so that write
@@ -598,7 +621,7 @@ export function criticalArtifactPaths(dir, deps = {}) {
  * it here without clearing it would leave a permanently stale `true` in history the moment it
  * lands.
  */
-export function foldPendingPushApprovalWrite(dir, deps = {}) {
+export function foldPendingPushApprovalWrite(dir, deps = {}, options = {}) {
   // Deliberately NOT `gitOutput()` (used by `checkWorkingTreeClean` below): that helper
   // `.trim()`s the whole string, which silently eats porcelain's leading status-code column
   // (" M path" -> "M path") and shifts every fixed-offset slice below by one. Harmless for
@@ -635,7 +658,17 @@ export function foldPendingPushApprovalWrite(dir, deps = {}) {
   const headCommit = resolveHeadCommit(dir, deps);
   if (!headCommit) return { folded: false, reason: "head-unavailable" };
   if (parsedState.pushApproval.lastApproved.forCommit === headCommit) {
-    return { folded: false, reason: "approval-outstanding" };
+    if (options?.close !== true) return { folded: false, reason: "approval-outstanding" };
+    // D161 close: HEAD may still equal forCommit only once the push provably landed -- the remote
+    // itself must hold forCommit at the record's own remote and destination.
+    const { remote, destination } = parsedState.pushApproval.lastApproved;
+    if (!REMOTE_RE.test(remote ?? "") || String(remote).startsWith("-") || !DESTINATION_RE.test(destination ?? "")) {
+      return { folded: false, reason: "landing-unverified" };
+    }
+    let landed = null;
+    try { landed = (deps.remoteCommit ?? remoteCommit)(dir, remote, destination); } catch { landed = null; }
+    if (typeof landed !== "string" || landed === "") return { folded: false, reason: "landing-unverified" };
+    if (landed !== headCommit) return { folded: false, reason: "approval-outstanding" };
   }
 
   parsedState.pushApproval.lastApproved.pendingAuditWrite = false;
@@ -865,7 +898,20 @@ export function printReport(result, io = {}) {
   }
 }
 
-if (isDirectInvocation(import.meta.url)) {
+export const PUSH_CLOSE_SCHEMA = "pipeline.push-close-report.v1";
+
+/** D161: `push-prepare.mjs --close` -- the last step after a signed push; runs ONLY the fold. */
+export function pushCloseReport(deps = {}) {
+  const dir = deps.dir ?? projectDir();
+  const result = foldPendingPushApprovalWrite(dir, deps, { close: true });
+  return { schema: PUSH_CLOSE_SCHEMA, folded: result.folded === true, reason: result.folded === true ? null : (result.reason ?? "unknown") };
+}
+
+if (isDirectInvocation(import.meta.url) && process.argv.length === 3 && process.argv[2] === "--close") {
+  const report = pushCloseReport();
+  process.stdout.write(`${JSON.stringify(report)}\n`);
+  process.exit(report.folded ? 0 : 1);
+} else if (isDirectInvocation(import.meta.url)) {
   const result = pushPrepareReport(process.argv.slice(2));
   if (!result.ok) {
     process.stderr.write(`${result.error}\n`);

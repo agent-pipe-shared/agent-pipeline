@@ -80,6 +80,7 @@ export function sanctionedDriverArgs(args, root) {
     optionalValue: {
       "--git-author-name": (value) => nonEmpty(value) && value.length <= 320,
       "--git-author-email": (value) => nonEmpty(value) && value.length <= 320,
+      "--pipeline-actor": (value) => value === "none" || (nonEmpty(value) && value.length <= 320),
       "--trust-anchor-mode": (value) => value === "existing" || value === "new",
       "--trust-anchor-directory": externalAbsolute,
       "--trust-anchor-human-name": (value) => nonEmpty(value) && value.length <= 512,

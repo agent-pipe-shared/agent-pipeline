@@ -27,6 +27,8 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import * as pushPrepareModule from "./push-prepare.mjs";
+
 import {
   checkCriticalHumanProofPolicy,
   checkEvidenceFreshness,
@@ -1439,6 +1441,165 @@ test("foldPendingPushApprovalWrite: non-zero or status-less git write remains fa
     const outcome = foldPendingPushApprovalWrite(FIXTURE_DIR, { spawn: () => result });
     assert.equal(outcome.reason, "status-unavailable");
   }
+});
+
+// ---------------------------------------------------------------------------
+// D161 -- the push-approval record is folded at push close. `approve-push` writes
+// its trailing record after the signed subject, so right after the push it still
+// names HEAD as `forCommit` and gate 2 above refuses it. `push-prepare.mjs --close`
+// (the `close` option) admits exactly that shape, and only when the remote
+// provably holds `forCommit` at the recorded destination. The remote read is an
+// injected seam (`deps.remoteCommit`); a remote-tracking ref is never evidence.
+// ---------------------------------------------------------------------------
+
+const D161_OTHER = "2".repeat(40);
+
+function d161Fixture(overrides = {}, recordExtra = {}) {
+  const calls = [];
+  const writes = [];
+  const reads = [];
+  const record = { pendingAuditWrite: true, forCommit: HEAD, remote: "origin", destination: "refs/heads/main", approvedBy: "PO", ...recordExtra };
+  const deps = {
+    gitStatus: () => " M project/pipeline-state.json\n",
+    readFile: () => JSON.stringify({ pushApproval: { lastApproved: record } }),
+    gitHead: () => HEAD,
+    writeFile: (...args) => { writes.push(args); },
+    spawn: (...args) => { calls.push(args); return { status: 0 }; },
+    remoteCommit: (dir, remote, destination) => { reads.push([remote, destination]); return HEAD; },
+    ...overrides,
+  };
+  return { deps, calls, writes, reads };
+}
+
+test("D161 (a): close option with forCommit === HEAD and a landed push folds, one commit with the existing message shape", () => {
+  const { deps, calls, writes, reads } = d161Fixture();
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, deps, { close: true });
+  assert.equal(result.folded, true, `expected a successful fold: ${JSON.stringify(result)}`);
+  assert.deepEqual(reads, [["origin", "refs/heads/main"]], "the remote is read for the record's own remote and destination");
+  assert.equal(writes.length, 1);
+  assert.equal(JSON.parse(writes[0][1]).pushApproval.lastApproved.pendingAuditWrite, false, "the hint is cleared when folded");
+  assert.equal(calls.length, 2, "exactly one git add and one git commit");
+  const message = calls[1][1][calls[1][1].indexOf("-m") + 1];
+  assert.match(message, /^chore\(pipeline-state\): fold pending push-approval record\n/);
+  assert.match(message, /AI-Assisted: true/);
+  assert.match(message, /Dispatch: stage-0 \(elephant\)/);
+});
+
+test("D161 (b): a remote that does not hold forCommit refuses and writes nothing", () => {
+  for (const [label, remoteCommit, reason] of [
+    ["another commit", () => D161_OTHER, "approval-outstanding"],
+    ["no such ref", () => null, "landing-unverified"],
+    ["read throws", () => { throw new Error("network down"); }, "landing-unverified"],
+  ]) {
+    const { deps, calls, writes } = d161Fixture({ remoteCommit });
+    const result = foldPendingPushApprovalWrite(FIXTURE_DIR, deps, { close: true });
+    assert.equal(result.folded, false, label);
+    assert.equal(result.reason, reason, label);
+    assert.equal(writes.length, 0, `${label}: nothing written`);
+    assert.equal(calls.length, 0, `${label}: no git add or commit`);
+  }
+});
+
+test("D161 (b): a record without a usable remote or destination cannot be verified and refuses", () => {
+  for (const extra of [{ remote: undefined }, { destination: "main" }, { remote: "--upload-pack=x" }]) {
+    const { deps, calls, writes, reads } = d161Fixture({}, extra);
+    const result = foldPendingPushApprovalWrite(FIXTURE_DIR, deps, { close: true });
+    assert.equal(result.folded, false);
+    assert.equal(result.reason, "landing-unverified");
+    assert.equal(reads.length + writes.length + calls.length, 0);
+  }
+});
+
+test("D161 (c): without the close option the behaviour is today's, and the remote is never read", () => {
+  const { deps, calls, writes, reads } = d161Fixture();
+  for (const options of [undefined, {}, { close: false }]) {
+    const result = options === undefined
+      ? foldPendingPushApprovalWrite(FIXTURE_DIR, deps)
+      : foldPendingPushApprovalWrite(FIXTURE_DIR, deps, options);
+    assert.deepEqual(result, { folded: false, reason: "approval-outstanding" });
+  }
+  assert.equal(reads.length + writes.length + calls.length, 0);
+});
+
+test("D161 (c): with the close option a forCommit that is not HEAD folds as today, with no remote read", () => {
+  const { deps, calls, reads } = d161Fixture({ gitHead: () => D161_OTHER });
+  const result = foldPendingPushApprovalWrite(FIXTURE_DIR, deps, { close: true });
+  assert.equal(result.folded, true);
+  assert.equal(reads.length, 0);
+  assert.equal(calls.length, 2);
+});
+
+test("D161 (c): the close option does not loosen the other gates", () => {
+  const dirty = d161Fixture({ gitStatus: () => " M project/pipeline-state.json\n M other.txt\n" });
+  assert.equal(foldPendingPushApprovalWrite(FIXTURE_DIR, dirty.deps, { close: true }).reason, "other-dirty-paths");
+  const notPending = d161Fixture({}, { pendingAuditWrite: false });
+  assert.equal(foldPendingPushApprovalWrite(FIXTURE_DIR, notPending.deps, { close: true }).reason, "not-pending");
+  const noHead = d161Fixture({ gitHead: () => null });
+  assert.equal(foldPendingPushApprovalWrite(FIXTURE_DIR, noHead.deps, { close: true }).reason, "head-unavailable");
+  for (const fixture of [dirty, notPending, noHead]) assert.equal(fixture.reads.length + fixture.calls.length, 0);
+});
+
+/** A fixture repo plus a local bare remote named origin; the state file is left in the post-approve-push shape for HEAD. */
+function d161RealRepo({ pushed }) {
+  const root = foldFixtureRepo();
+  const bare = mkdtempSync(join(SCRATCH, "push-prepare-d161-bare-"));
+  after(() => rmSync(bare, { recursive: true, force: true }));
+  gitAtFold(bare, "init", "-q", "--bare");
+  gitAtFold(root, "remote", "add", "origin", bare);
+  if (pushed) assert.equal(gitAtFold(root, "push", "-q", "origin", "HEAD:refs/heads/main").status, 0);
+  const head = gitAtFold(root, "rev-parse", "HEAD").stdout.trim();
+  const statePathAbs = join(root, "project", "pipeline-state.json");
+  const baseline = JSON.parse(readFileSync(statePathAbs, "utf8"));
+  writeFileSync(statePathAbs, JSON.stringify({
+    ...baseline,
+    pushApproval: { lastApproved: { approvedBy: "PO", forCommit: head, remote: "origin", destination: "refs/heads/main", pendingAuditWrite: true } },
+  }, null, 2));
+  return { root, head };
+}
+
+function d161RunCli(root, argv) {
+  const script = fileURLToPath(new URL("./push-prepare.mjs", import.meta.url));
+  return spawnSync(process.execPath, [script, ...argv], {
+    cwd: root, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+  });
+}
+
+test("D161 (d): push-prepare.mjs --close folds right after a landed push and leaves the tree clean", () => {
+  const { root, head } = d161RealRepo({ pushed: true });
+  const run = d161RunCli(root, ["--close"]);
+  assert.equal(run.status, 0, run.stderr);
+  const printed = JSON.parse(run.stdout);
+  assert.deepEqual(printed, { schema: "pipeline.push-close-report.v1", folded: true, reason: null });
+  assert.equal(run.stdout.trim().split("\n").length, 1, "one JSON result");
+  assert.equal(checkWorkingTreeClean(root).ok, true);
+  assert.equal(gitAtFold(root, "rev-list", "--count", `${head}..HEAD`).stdout.trim(), "1", "exactly one fold commit on top of the signed commit");
+  const committed = JSON.parse(gitAtFold(root, "show", "HEAD:project/pipeline-state.json").stdout);
+  assert.equal(committed.pushApproval.lastApproved.pendingAuditWrite, false);
+  assert.equal(committed.pushApproval.lastApproved.forCommit, head);
+});
+
+test("D161 (d): --close refuses when the push did not land, and with a dirty tree beyond the state file", () => {
+  const unpushed = d161RealRepo({ pushed: false });
+  const refused = d161RunCli(unpushed.root, ["--close"]);
+  assert.notEqual(refused.status, 0);
+  assert.deepEqual(JSON.parse(refused.stdout), { schema: "pipeline.push-close-report.v1", folded: false, reason: "landing-unverified" });
+  assert.equal(checkWorkingTreeClean(unpushed.root).ok, false, "nothing was committed");
+
+  const pushed = d161RealRepo({ pushed: true });
+  writeFileSync(join(pushed.root, "other.txt"), "dirty\n");
+  gitAtFold(pushed.root, "add", "--", "other.txt");
+  const dirty = d161RunCli(pushed.root, ["--close"]);
+  assert.notEqual(dirty.status, 0);
+  assert.deepEqual(JSON.parse(dirty.stdout), { schema: "pipeline.push-close-report.v1", folded: false, reason: "other-dirty-paths" });
+});
+
+test("D161 (d): the default remoteCommit read is exact-match, hex-checked and fail-closed", () => {
+  const { root, head } = d161RealRepo({ pushed: true });
+  assert.equal(pushPrepareModule.remoteCommit(root, "origin", "refs/heads/main"), head);
+  assert.equal(pushPrepareModule.remoteCommit(root, "origin", "refs/heads/absent"), null);
+  assert.equal(pushPrepareModule.remoteCommit(root, "no-such-remote", "refs/heads/main"), null);
+  assert.equal(pushPrepareModule.remoteCommit(root, "--upload-pack=x", "refs/heads/main"), null);
+  assert.equal(pushPrepareModule.remoteCommit(root, "origin", "main"), null);
 });
 
 // ---------------------------------------------------------------------------

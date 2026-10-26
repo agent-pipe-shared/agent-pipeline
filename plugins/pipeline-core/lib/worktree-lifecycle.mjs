@@ -1424,6 +1424,56 @@ function acquireManifestLock(repo, sessionId, nonce, { noReclamation = false } =
   };
 }
 
+// P0 2026-10-26: custody never reclaims a session-cleanup manifest lock (noReclamation above), so a hook process
+// killed between acquiring and releasing one refused every later custody entry of that session with SDC-LOCK-HELD.
+// The repair route observes such locks and retires only one that passes the checks the non-custody path applies
+// before it reclaims: a private regular file, the lock schema, its own session id, the owner nonce of that
+// session's descriptor, and a writer that is provably gone.
+function cleanupLockFindings(repo) {
+  const dir = join(localRoot(repo.commonDir), "session-cleanup", "active");
+  if (!existsSync(dir)) return [];
+  const findings = [];
+  for (const name of readdirSync(dir).sort()) {
+    if (!name.endsWith(".json.lock")) continue;
+    const sessionId = name.slice(0, -".json.lock".length);
+    const path = join(dir, name);
+    const finding = { sessionId, path: `.git/${relative(repo.commonDir, path).split(sep).join("/")}`, owner: "untrusted", pid: null };
+    findings.push(finding);
+    try {
+      ensureSafeId(sessionId, "session ID");
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (process.platform !== "win32" && (stat.mode & 0o077) !== 0)) continue;
+      const lock = JSON.parse(readFileSync(path, "utf8"));
+      if (lock?.schema !== "pipeline.session-cleanup-lock.v1" || lock.sessionId !== sessionId || !Number.isSafeInteger(lock.pid) || lock.pid < 1
+        || typeof lock.processStartId !== "string") continue;
+      finding.pid = lock.pid;
+      if (processIdentityAlive(lock.pid, lock.processStartId)) { finding.owner = "live"; continue; }
+      let nonce = null;
+      try { nonce = ownerDigest(loadSessionDescriptor(repo.primaryRoot, sessionId).ownerNonce); } catch { nonce = null; }
+      if (nonce !== null && nonce === lock.ownerNonceSha256) finding.owner = "dead";
+    } catch { /* an unreadable lock stays untrusted */ }
+  }
+  return findings;
+}
+/** Read-only: every session-cleanup manifest lock with its owner verdict (live, dead or untrusted). */
+export function inspectSessionCleanupManifestLocks(startPath) {
+  return cleanupLockFindings(discoverRepository(startPath));
+}
+/** Moves every lock whose owner is dead into `asideDir` (retained, never deleted); a live or untrusted one stays. */
+export function retireDeadSessionCleanupManifestLocks(startPath, { asideDir }) {
+  const repo = discoverRepository(startPath);
+  const retired = [];
+  for (const finding of cleanupLockFindings(repo)) {
+    if (finding.owner !== "dead") continue;
+    const path = `${cleanupManifestPath(repo, finding.sessionId)}.lock`;
+    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
+    try { renameSync(path, join(asideDir, basename(path))); } catch (error) { if (error?.code === "ENOENT") continue; throw error; }
+    fsyncDirectory(dirname(path));
+    retired.push({ sessionId: finding.sessionId, pid: finding.pid });
+  }
+  return retired;
+}
+
 function newManifest(repo, sessionId, nonce, now) {
   return {
     schema: CLEANUP_MANIFEST_SCHEMA,

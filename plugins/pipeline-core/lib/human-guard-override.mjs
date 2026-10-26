@@ -6081,6 +6081,22 @@ export function sweepHumanGuardOverrideRequests({rootDir} = {}) {
   }
   finally { hgoSweepBoundsLifted = lifted; }
 }
+// AC-160: one-shot sweep. Repeats the same bounded, audited single-batch sweep (at most 61 requests
+// per publication) until nothing eligible remains or HGO_SWEEP_ALL_MAX_RUNS publications ran.
+// Only requests the single-batch selection already deems eligible (expired, not named by an armed
+// capability) are ever removed; every batch keeps its own CAS, audit entry and validation.
+const HGO_SWEEP_ALL_MAX_RUNS = 100;
+export function sweepHumanGuardOverrideRequestsAll({rootDir} = {}) {
+  let runs = 0, removed = 0, last = null;
+  while (runs < HGO_SWEEP_ALL_MAX_RUNS) {
+    last = sweepHumanGuardOverrideRequests({rootDir});
+    if (last.status !== "swept") break;
+    runs += 1; removed += last.removed;
+    if (last.remainingEligible === 0) break;
+  }
+  const status = removed === 0 ? "absent" : last.remainingEligible === 0 ? "swept" : "partial";
+  return Object.freeze({status, runs, removed, retained: last.retained, remainingEligible: last.remainingEligible});
+}
 
 function hgoAuthorityDirectory(path) {
   const info = lstatSync(path);
@@ -6106,7 +6122,7 @@ function hgoAuthorityScopePresent(repository, path) {
 }
 const HGO_AUTHORITY_SOURCE_BOUND = 1048576, HGO_AUTHORITY_JOURNAL_BOUND = 67108864, HGO_AUTHORITY_INVENTORY_BOUND = 16777216;
 const HGO_AUTHORITY_JOURNALS = Object.freeze(["audit.jsonl", "command-offers.jsonl"]);
-const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root>, repeated until it reports remainingEligible 0";
+const HGO_SWEEP_REPAIR = "remove expired requests with: node <plugin-root>/scripts/guard-human-override.mjs sweep-requests --repo <absolute-root> --all (one invocation; reports removed, retained and remainingEligible)";
 // New requests stop below the inventory bound, so the namespace never reaches a state that
 // only a lifted-bound sweep can read (PF-53, Critic F2).
 const HGO_REQUEST_SOFT_CAP = 3072;

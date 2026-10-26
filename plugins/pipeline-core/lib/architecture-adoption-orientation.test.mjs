@@ -79,3 +79,29 @@ test("a valid durable adoption decision is shown as a readback, never as physica
   assert.equal(result.physicalMap.status, "missing");
   assert.match(result.guidance, /physical map index is missing/u);
 });
+
+test("D162 S4: a legacy deferred adoption yields migration-required with the migration guidance", () => {
+  const root = fixtureRoot("d162s4-deferred-");
+  const result = observeArchitectureAdoptionOrientation({
+    rootDir: root,
+    deps: { resolveAdoptionState: () => ({ state: "deferred", scope: null, decisionRef: "po-deferral-3", coverageClass: "unavailable", confidence: "estimated" }) },
+  });
+  assert.equal(result.status, "migration-required");
+  assert.equal(result.adoption.state, "deferred");
+  assert.equal(
+    result.guidance,
+    "A legacy deferred architecture adoption exists. Before implementation it must be migrated to an approved-scoped adoption over a measured baseline (D162): review the read-only proposal's migration block with the PO, who confirms it through the same route as a fresh adoption.",
+  );
+});
+
+test("D162 S4: approved-scoped and partial adoption states still yield decision-recorded", () => {
+  for (const state of ["approved-scoped", "partial"]) {
+    const root = fixtureRoot(`d162s4-${state}-`);
+    const result = observeArchitectureAdoptionOrientation({
+      rootDir: root,
+      deps: { resolveAdoptionState: () => ({ state, scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "evaluated", confidence: "measured" }) },
+    });
+    assert.equal(result.status, "decision-recorded", state);
+    assert.match(result.guidance, /physical map index is missing/u, state);
+  }
+});

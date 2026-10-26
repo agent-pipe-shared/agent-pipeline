@@ -14,6 +14,13 @@ map and compiled decision summary in the AGENTS re-entry order, then only
 concepts for touched modules. `unavailable` is an honest retry/diagnosis,
 never a claim that a map exists.
 
+When its status is `migration-required`, a legacy deferred adoption exists
+and must be migrated before implementation (D162). Run the nested read-only
+`nextAction` and show the PO the proposal's `migration` block: measure when the
+map is missing, prepare the approved-scoped adoption, then confirm and apply it
+through the same route as a fresh adoption. Never run the measure or apply steps
+without the PO's go, and never offer a new deferral.
+
 Orientation and proposal are not authority to write a map or make a PO
 decision. The later implementation-authority boundary, not bootstrap,
 refuses an unresolved, out-of-scope, or physically unready architecture estate.

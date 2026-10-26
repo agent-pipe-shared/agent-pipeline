@@ -795,6 +795,68 @@ function diagnoseSharedCloseEvidencePath(root, state) {
   };
 }
 
+const POST_CLOSE_AUDIT_DRIFT_CODE = "CONTINUITY-POST-CLOSE-AUDIT-TIMESTAMP-DRIFT";
+
+// Before commit 9ed1a2800, `approve-push` (challenge and final approval) wrote
+// `updatedAt: approvedAt` on an inactive State. A closed/discarded State is only valid
+// while `updatedAt` equals its last lifecycle timestamp, so such a State classifies as
+// damaged. The drift is admitted as that known shape only when (1) the State is otherwise
+// exactly what validClosedTransitionState / validDiscardedTransitionState accept once
+// `updatedAt` is restored (one unambiguous candidate), and (2) the drifted timestamp is
+// provably a push-audit timestamp recorded in the State itself and later than the
+// lifecycle timestamp: the push approval's `approvedAt`, a push `criticalProofConsumption`
+// `consumedAt`, or, with a well-formed `pendingPushChallenge` present, a time not past
+// that challenge's `expiresAt`. Any other drift stays undiagnosed (existing refusal).
+function pushAuditProvenance(state, lifecycleTimestamp) {
+  const drift = state.updatedAt;
+  if (Date.parse(drift) <= Date.parse(lifecycleTimestamp)) return null;
+  const approval = state.pushApproval?.lastApproved;
+  if (isObject(approval) && approval.approvedAt === drift) return "push-approval-approved-at";
+  if (Array.isArray(state.criticalProofConsumption)
+    && state.criticalProofConsumption.some((entry) => isObject(entry) && entry.kind === "push" && entry.consumedAt === drift)) {
+    return "push-proof-consumed-at";
+  }
+  const pending = state.pendingPushChallenge;
+  if (isObject(pending)
+    && typeof pending.code === "string" && pending.code.length > 0
+    && typeof pending.forCommit === "string" && pending.forCommit.length > 0
+    && typeof pending.remote === "string" && pending.remote.length > 0
+    && typeof pending.destination === "string" && pending.destination.length > 0
+    && canonicalIsoTimestamp(pending.expiresAt)
+    && Date.parse(drift) <= Date.parse(pending.expiresAt)) return "pending-push-challenge";
+  return null;
+}
+
+function diagnosePostClosePushAuditDrift(root, state, drifts) {
+  if (!isObject(state)
+    || state.schema !== "pipeline.state.v0"
+    || drifts.length > 0
+    || !canonicalIsoTimestamp(state.updatedAt)) return null;
+  const candidates = [];
+  const lastClosed = Array.isArray(state.closedFeatures) ? state.closedFeatures.at(-1)?.closedAt : undefined;
+  const lastDiscarded = Array.isArray(state.discardedFeatures) ? state.discardedFeatures.at(-1)?.discardedAt : undefined;
+  for (const [kind, timestamp, valid] of [
+    ["closed", lastClosed, validClosedTransitionState],
+    ["discarded", lastDiscarded, validDiscardedTransitionState],
+  ]) {
+    if (!canonicalIsoTimestamp(timestamp) || timestamp === state.updatedAt) continue;
+    const restored = structuredClone(state);
+    restored.updatedAt = timestamp;
+    if (valid(root, restored)) candidates.push({ kind, timestamp });
+  }
+  if (candidates.length !== 1) return null;
+  const provenance = pushAuditProvenance(state, candidates[0].timestamp);
+  if (provenance === null) return null;
+  return {
+    schema: CONTINUITY_REPAIR_DIAGNOSIS_SCHEMA,
+    status: "repairable",
+    code: POST_CLOSE_AUDIT_DRIFT_CODE,
+    lifecycle: candidates[0],
+    observedUpdatedAt: state.updatedAt,
+    provenance,
+  };
+}
+
 function validDesignTransitionState(state) {
   const valid = isObject(state)
     && state.schema === "pipeline.state.v0"
@@ -1256,9 +1318,13 @@ function observeDetailed({
     } else {
       status = "unavailable";
     }
-    const diagnosis = status === "damaged"
-      ? diagnoseSharedCloseEvidencePath(root, state)
-      : null;
+    let diagnosis = null;
+    if (status === "damaged") {
+      diagnosis = diagnoseSharedCloseEvidencePath(root, state);
+      if (diagnosis.status !== "repairable") {
+        diagnosis = diagnosePostClosePushAuditDrift(root, state, drifts) ?? diagnosis;
+      }
+    }
     return {
       continuity: {
         status,
@@ -1587,6 +1653,23 @@ function repairedSharedCloseEvidenceState(state, observed, diagnosis) {
   };
 }
 
+function repairedPostClosePushAuditDrift(state, diagnosis) {
+  if (diagnosis?.status !== "repairable" || diagnosis.code !== POST_CLOSE_AUDIT_DRIFT_CODE
+    || state.updatedAt !== diagnosis.observedUpdatedAt) {
+    fail("CONTINUITY-REPAIR-DIAGNOSIS-INVALID", "post-close audit drift diagnosis is not repairable");
+  }
+  // Only `updatedAt` changes: the push approval / challenge records are the audit
+  // trail being preserved, so they are carried over byte-equal.
+  const next = structuredClone(state);
+  next.updatedAt = diagnosis.lifecycle.timestamp;
+  return {
+    reason: "repair-post-close-audit-timestamp-drift",
+    state: next,
+    authority: null,
+    diagnosis,
+  };
+}
+
 function continuityRepairBinding(plan) {
   const binding = {
     schema: plan.schema,
@@ -1610,7 +1693,9 @@ function continuityRepairBinding(plan) {
 }
 
 /**
- * Plan four bounded repairs:
+ * Plan five bounded repairs:
+ * - restore the lifecycle `updatedAt` of an inactive State a pre-9ed1a2800 `approve-push`
+ *   left drifted to a push-audit timestamp (the State itself must prove the drift);
  * - quarantine mismatching assertions on one shared close-evidence path;
  * - normalize the invalid resume-on-next-turn/active-turn pair;
  * - add continuity to an established pre-continuity state carrying PO authority; or
@@ -1655,6 +1740,9 @@ export function planOnboardingContinuityRepair({
         code: "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID",
         diagnosis: observed.continuity.diagnosis,
       };
+    } else if (observed.continuity.diagnosis?.status === "repairable"
+      && observed.continuity.diagnosis.code === POST_CLOSE_AUDIT_DRIFT_CODE) {
+      proposed = repairedPostClosePushAuditDrift(observed.state, observed.continuity.diagnosis);
     } else if (observed.continuity.diagnosis?.status === "repairable") {
       proposed = repairedSharedCloseEvidenceState(observed.state, observed, observed.continuity.diagnosis);
     } else if (observed.projected?.code === "CS-STATUS-CONTINUITY-INVALID") {
@@ -4551,6 +4639,55 @@ function nextActionBlock(bodyLines) {
 }
 
 /**
+ * PF-59 / D160: the public handover update owns only a marked generated block
+ * inside "## Next action". Everything else in the section is project prose and
+ * is kept below the block.
+ */
+const NEXT_ACTION_BLOCK_BEGIN = "<!-- pipeline:next-action:begin -->";
+const NEXT_ACTION_BLOCK_END = "<!-- pipeline:next-action:end -->";
+
+const INACTIVE_NEXT_ACTION_BODY = [
+  "No feature is currently active. Start the next one with",
+  "`pipeline-state set-feature --id <id> --plan-path <path>`, or review closed",
+  "feature history in `project/pipeline-state.json` (`closedFeatures`).",
+];
+
+// The kickoff and promotion handovers (`handoverContent()`, `promotionHandoverContent()`)
+// render these initial bodies; an unmarked section that is exactly one of them
+// is a legacy generated rendering, not project prose.
+const SNAPSHOT_NOTE_BODY = [
+  "This tracked handover is a design snapshot. Run `pipeline-state inspect`",
+  "for the current typed next action; canonical pipeline state owns lifecycle",
+  "authority. Git-backed runtime transitions publish an advisory private",
+  "handover projection without rewriting this tracked file.",
+];
+const KICKOFF_NEXT_ACTION_BODY = [
+  "Review the goal and establish the initial PRD and technical specification.",
+  ...SNAPSHOT_NOTE_BODY,
+];
+const PROMOTION_NEXT_ACTION_BODY = [...NEXT_ACTION_BODY_BY_STATUS.draft, ...SNAPSHOT_NOTE_BODY];
+
+const nonBlankLines = (lines) => lines.filter((line) => line.trim() !== "").map((line) => line.trimEnd());
+
+function isKnownGeneratedNextActionBody(bodyLines) {
+  const key = bodyLines.join("\n");
+  const known = [
+    ...Object.values(NEXT_ACTION_BODY_BY_STATUS),
+    INACTIVE_NEXT_ACTION_BODY,
+    KICKOFF_NEXT_ACTION_BODY,
+    PROMOTION_NEXT_ACTION_BODY,
+  ];
+  if (known.some((body) => nonBlankLines(body).join("\n") === key)) return true;
+  // The two fallback renderings of `nextActionSection()` carry a variable code.
+  return bodyLines.length === 3
+    && bodyLines[1] === "Treat `project/pipeline-state.json` (or `pipeline-state.mjs continuity-status`)"
+    && ((/^The recorded plan\/approval state could not be classified \([^()]*\)\.$/.test(bodyLines[0])
+        && bodyLines[2] === "as the live, authoritative source until the state is repaired.")
+      || (/^The recorded lifecycle status \("[^"]*"\) has no rendered text yet\.$/.test(bodyLines[0])
+        && bodyLines[2] === "as the live, authoritative source."));
+}
+
+/**
  * Render the CURRENT "## Next action" section of a project's `docs/state.md`
  * from the LIVE Pipeline state object (`pipeline-state.mjs`'s `readState()`
  * result), classified through the same `derivePlanLifecycle` projection every
@@ -4569,11 +4706,7 @@ function nextActionBlock(bodyLines) {
 export function nextActionSection(state) {
   const lifecycle = derivePlanLifecycle(state);
   if (lifecycle.code === "PLAN-LIFECYCLE-INACTIVE") {
-    return nextActionBlock([
-      "No feature is currently active. Start the next one with",
-      "`pipeline-state set-feature --id <id> --plan-path <path>`, or review closed",
-      "feature history in `project/pipeline-state.json` (`closedFeatures`).",
-    ]);
+    return nextActionBlock(INACTIVE_NEXT_ACTION_BODY);
   }
   if (!lifecycle.ok || lifecycle.status === null) {
     return nextActionBlock([
@@ -4622,6 +4755,57 @@ export function replaceNextActionSection(markdown, sectionText) {
 }
 
 /**
+ * PF-59 / D160: block-owning variant of `replaceNextActionSection()` used by the
+ * explicit public handover update (`syncStateMdNextAction(..., { ownBlock: true })`).
+ * Only a marked generated block inside the section is replaced.
+ * - exactly one begin and one end marker (begin first): that span is rewritten;
+ *   everything else in the section is kept byte for byte.
+ * - no marker at all, and the body (ignoring the Lifecycle phase marker line and
+ *   blank lines) is exactly a known generated rendering: legacy, replaced wholly.
+ * - no marker at all, any other prose: the marked block is inserted and the prose
+ *   is kept below it.
+ * - any other marker shape (begin without end, two begins, end first, ...): refused
+ *   with a reason, nothing guessed.
+ * `reason: null` means no "## Next action" heading was found.
+ */
+function replaceNextActionBlockDetailed(markdown, sectionText) {
+  if (typeof markdown !== "string" || typeof sectionText !== "string") return { ok: false, reason: null };
+  const lines = markdown.split("\n");
+  const headingIndex = lines.findIndex((line) => line.trim() === "## Next action");
+  if (headingIndex === -1) return { ok: false, reason: null };
+  let endIndex = lines.length;
+  for (let i = headingIndex + 1; i < lines.length; i += 1) {
+    if (lines[i].startsWith("## ")) { endIndex = i; break; }
+  }
+  const section = lines.slice(headingIndex + 1, endIndex);
+  const generated = sectionText.split("\n").slice(1);
+  while (generated.length > 0 && generated[0].trim() === "") generated.shift();
+  while (generated.length > 0 && generated[generated.length - 1].trim() === "") generated.pop();
+  const block = [NEXT_ACTION_BLOCK_BEGIN, ...generated, NEXT_ACTION_BLOCK_END];
+  const begins = [];
+  const ends = [];
+  section.forEach((line, index) => {
+    const text = line.trim();
+    if (text === NEXT_ACTION_BLOCK_BEGIN) begins.push(index);
+    else if (text === NEXT_ACTION_BLOCK_END) ends.push(index);
+  });
+  let replaced;
+  if (begins.length === 0 && ends.length === 0) {
+    const body = nonBlankLines(section.filter((line) => !line.startsWith("**Lifecycle phase:**")));
+    const prose = [...section];
+    while (prose.length > 0 && prose[0].trim() === "") prose.shift();
+    replaced = isKnownGeneratedNextActionBody(body) || prose.length === 0
+      ? ["", ...block, ""]
+      : ["", ...block, "", ...prose];
+  } else if (begins.length === 1 && ends.length === 1 && begins[0] < ends[0]) {
+    replaced = [...section.slice(0, begins[0]), ...block, ...section.slice(ends[0] + 1)];
+  } else {
+    return { ok: false, reason: `"## Next action" has unbalanced generated-block markers (${begins.length} begin, ${ends.length} end)` };
+  }
+  return { ok: true, text: [...lines.slice(0, headingIndex), "## Next action", ...replaced, ...lines.slice(endIndex)].join("\n") };
+}
+
+/**
  * Best-effort resync of `docs/state.md`'s "## Next action" section to the
  * CURRENT `state`, called after a `pipeline-state.mjs` command has already
  * committed its own write. Never throws; a caller MUST NOT let this gate
@@ -4638,7 +4822,7 @@ export function replaceNextActionSection(markdown, sectionText) {
  * than throwing, since this sync is advisory and must never gate the
  * caller's already-committed State write.
  */
-export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
+export function syncStateMdNextAction(dir, state, { apply = true, ownBlock = false } = {}) {
   let handoverPath = "docs/state.md";
   try {
     const root = physicalRoot(dir);
@@ -4690,10 +4874,17 @@ export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
   } catch (error) {
     return { ok: false, reason: `next-action rendering failed: ${error?.message ?? error}` };
   }
-  const updated = replaceNextActionSection(markdown, sectionText);
-  if (updated === null) {
-    return { ok: false, reason: 'no recognizable "## Next action" heading' };
+  // `ownBlock` (the explicit public handover update, D160) owns only a marked
+  // generated block and keeps project prose; the default keeps the whole-section
+  // replacement that the non-Git legacy fixtures rely on.
+  const wholeSection = ownBlock ? null : replaceNextActionSection(markdown, sectionText);
+  const replacement = ownBlock
+    ? replaceNextActionBlockDetailed(markdown, sectionText)
+    : wholeSection === null ? { ok: false, reason: null } : { ok: true, text: wholeSection };
+  if (!replacement.ok) {
+    return { ok: false, reason: replacement.reason ?? 'no recognizable "## Next action" heading' };
   }
+  const updated = replacement.text;
   if (updated === markdown) {
     return { ok: true, changed: false, handoverPath };
   }
@@ -4708,7 +4899,7 @@ export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
 
 /** Inspect the public projection without publishing private runtime data. */
 export function inspectPublicHandoverDuty(dir, state) {
-  const preview = syncStateMdNextAction(dir, state, { apply: false });
+  const preview = syncStateMdNextAction(dir, state, { apply: false, ownBlock: true });
   const path = preview.handoverPath ?? "docs/state.md";
   if (!preview.ok) return { schema: "pipeline.public-handover-duty.v1", status: "unavailable", path,
     reason: preview.reason, nextAction: { kind: "agent-public-handover-update", path,
@@ -4726,7 +4917,10 @@ export function inspectPublicHandoverDuty(dir, state) {
     .filter(line => line.startsWith("**Lifecycle phase:**"));
   const markerCurrent = markers.length === 1 && markers[0] === marker;
   const withoutMarker = markdown === null ? null : stripPublicPhaseMarkers(markdown);
-  const sectionCurrent = withoutMarker !== null && replaceNextActionSection(withoutMarker, nextActionSection(state)) === withoutMarker;
+  const sectionCurrent = withoutMarker !== null && (() => {
+    const owned = replaceNextActionBlockDetailed(withoutMarker, nextActionSection(state));
+    return owned.ok && owned.text === withoutMarker;
+  })();
   const status = !preview.ok ? "unavailable" : sectionCurrent && markerCurrent ? "current" : "stale";
   return { schema: "pipeline.public-handover-duty.v1", status, path,
     reason: preview.ok ? (markerCurrent ? null : "structured lifecycle phase is absent or stale") : preview.reason,
@@ -4758,7 +4952,7 @@ export function updatePublicHandoverDuty(dir, state) {
   const before = inspectPublicHandoverDuty(dir, state);
   if (before.status === "unavailable") return before;
   if (before.status === "current") return before;
-  const sync = syncStateMdNextAction(dir, state, { apply: true });
+  const sync = syncStateMdNextAction(dir, state, { apply: true, ownBlock: true });
   if (!sync.ok) return inspectPublicHandoverDuty(dir, state);
   const path = join(dir, before.path);
   let markdown;

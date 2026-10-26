@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { hostname } from 'node:os';
 import { canonical } from './po-approval-proof.mjs';
 import { observeLinuxProcess } from './native-platform-process-observer.mjs';
+import { observeWindowsProcessIdentity } from './windows-process-identity.mjs';
 import { inspectSignedDescriptorCustodyRepository, withCustodyTopologyScope, withSignedDescriptorCustodyManifestLock } from './worktree-lifecycle.mjs';
 import { inspectSourceOwnedDescriptorHandle } from './session-requester-bridge.mjs';
 import * as onboarding from './onboarding-continuity.mjs';
@@ -180,14 +181,29 @@ function stage(name,record,memberRef,releaseRef=null){const observer=stageContex
 const LOCK_PATH=`${ROOT}/registry.lock`;
 const REPAIR_SCRIPT=fileURLToPath(new URL('../scripts/session-authority-repair.mjs',import.meta.url));
 const hostSha256=()=>hash(hostname());
-function lockOwner(){
-  let observed=null;if(process.platform==='linux'){try{observed=observeLinuxProcess(process.pid);}catch{observed=null;}}
-  return {pid:process.pid,hostSha256:hostSha256(),process:observed?{start:observed.start,bootSha256:observed.bootSha256}:null,acquiredAt:new Date().toISOString()};
+// W2-R2 (AC-127, C2-P1-WIN-ORPHAN): on Windows the owner names its process start (`win32-<ticks>`), so a later reader can tell a
+// reused pid from the owner. An owner whose start cannot be observed records no process and stays unjudgeable.
+export function sessionAuthorityLockOwner({platform=process.platform,observeWindows=observeWindowsProcessIdentity}={}){
+  let observed=null;if(platform==='linux'){try{observed=observeLinuxProcess(process.pid);}catch{observed=null;}}
+  if(platform==='win32'){try{const found=observeWindows({pid:process.pid});if(found?.status==='present'&&typeof found.processStart==='string'&&found.processStart.startsWith('win32-'))observed={start:found.processStart,bootSha256:null};}catch{observed=null;}}
+  const processFact=observed?(platform==='win32'?{start:observed.start}:{start:observed.start,bootSha256:observed.bootSha256}):null;
+  return {pid:process.pid,hostSha256:hostSha256(),process:processFact,acquiredAt:new Date().toISOString()};
 }
+const lockOwner=()=>sessionAuthorityLockOwner();
 /** live | dead | unknown. Dead only on proof: no such process, a zombie, another boot or a reused pid. */
-export function judgeSessionAuthorityLockOwner(value,{observe=observeLinuxProcess,platform=process.platform,host=hostSha256()}={}){
+export function judgeSessionAuthorityLockOwner(value,{observe=observeLinuxProcess,platform=process.platform,host=hostSha256(),observeWindows=observeWindowsProcessIdentity}={}){
   const owner=value?.owner;
   if(!owner||typeof owner!=='object'||!Number.isSafeInteger(owner.pid)||owner.pid<1||owner.hostSha256!==host)return 'unknown';
+  if(platform==='win32'){
+    // Same host only (checked above). A vanished pid is dead whatever start was recorded; a present pid is the owner only
+    // when its recorded win32 start matches, and a different win32 start is a reused pid. Anything else is not proof.
+    let found;try{found=observeWindows({pid:owner.pid});}catch{return 'unknown';}
+    if(found?.status==='absent')return 'dead';
+    if(found?.status!=='present'||typeof found.processStart!=='string'||!found.processStart.startsWith('win32-'))return 'unknown';
+    const start=owner.process?.start;
+    if(typeof start!=='string'||!start.startsWith('win32-'))return 'unknown';
+    return found.processStart===start?'live':'dead';
+  }
   if(platform!=='linux'||!owner.process||typeof owner.process.start!=='string'||typeof owner.process.bootSha256!=='string')return 'unknown';
   let observed;try{observed=observe(owner.pid);}catch{return 'unknown';}
   if(observed===null||['Z','X'].includes(observed.state))return 'dead';
@@ -238,17 +254,20 @@ function sweepRetiredLocks(repo){
   }catch{/* best effort: a sweep that fails leaves the forensic copies, never the lock */}
 }
 /** Moves exactly the observed lock aside. A lock created after it was observed is put back, never removed. */
-function retireLock(repo,observed,cause){
+function retireLock(repo,observed,cause,io={},report={}){
+  const syncDir=io.syncDirectory??syncDirectory,renameFn=io.rename??renameSync;
   const dir=`agent-pipeline/session-authority-abandoned/${new Date().toISOString().replace(/[^0-9]/g,'')}-${randomBytes(4).toString('hex')}-registry-lock`;
   privateDirectories(repo,`${dir}/marker`);
   const lockAbs=safePath(repo,LOCK_PATH),asideAbs=safePath(repo,`${dir}/registry.lock`);
-  try{renameSync(lockAbs,asideAbs);}catch(error){if(error?.code==='ENOENT')return null;throw error;}
+  try{renameFn(lockAbs,asideAbs);}catch(error){if(error?.code==='ENOENT')return null;throw error;}
   const moved=lstatSync(asideAbs),bytes=readFileSync(asideAbs);
   if(String(moved.dev)!==observed.dev||String(moved.ino)!==observed.ino||hash(bytes)!==observed.sha256){
     try{linkSync(asideAbs,lockAbs);unlinkSync(asideAbs);}catch{}
     fail('SDC-LOCK-HELD','registry-lock-changed-while-retiring');
   }
-  syncDirectory(dirname(lockAbs));
+  // The lock is already moved aside and verified here. A directory fsync the platform refuses (Windows EPERM) no longer
+  // makes the removal look like a failure; it is reported as unsupported durability.
+  try{syncDir(dirname(lockAbs));report.durability='synced';}catch(error){report.durability='unsupported';report.syncErrorCode=typeof error?.code==='string'?error.code:'UNKNOWN';}
   try{writeFileSync(safePath(repo,`${dir}/retire.json`),canonical({schema:'pipeline.session-authority-lock-retirement.v1',cause,owner:observed.owner,pid:observed.pid,acquiredAt:observed.acquiredAt,retiredAt:new Date().toISOString()}),{mode:0o600,flag:'wx'});}catch{}
   sweepRetiredLocks(repo);
   return dir;
@@ -290,13 +309,23 @@ function acquireRegistryLock(repo,lockSchema,heldReason){
 }
 /** FB3-PF-55 repair: retires a lock whose owner is not confirmed alive, on the caller's word that no Pipeline
  * process runs. It never takes the lock itself. A live owner is refused. */
-export function releaseSessionAuthorityLock({repository:input,reason,judge=judgeSessionAuthorityLockOwner}={}){
+export function releaseSessionAuthorityLock({repository:input,reason,judge=judgeSessionAuthorityLockOwner,io={}}={}){
   if(typeof reason!=='string'||!reason.trim()||reason.length>500||/[\u0000-\u001f\u007f]/u.test(reason))fail('SDC-AUTHORITY-UNAVAILABLE','release-lock-reason');
   const repo=repository(input),observed=observeLock(repo,judge);
   if(observed.status==='absent')return freeze({status:'absent'});
   if(observed.owner==='live')lockHeldFault(repo,observed,'registry-lock-owner-alive');
-  const aside=retireLock(repo,observed,`released by repair: ${reason.trim()}`);
-  return freeze(aside===null?{status:'absent'}:{status:'released',aside,owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds});
+  const report={};let aside;
+  try{aside=retireLock(repo,observed,`released by repair: ${reason.trim()}`,io,report);}
+  catch(error){
+    // A platform fault before the lock moved: report the real postcondition (retained) and a typed next action, never a rollback.
+    if(error?.name==='SessionAuthorityError'||!existsSync(safePath(repo,LOCK_PATH)))throw error;
+    return freeze({status:'retained',owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds,
+      postcondition:freeze({lock:'retained',durability:'not-attempted',errorCode:typeof error?.code==='string'?error.code:'UNKNOWN'}),
+      nextAction:freeze({kind:'inspect',command:`node ${REPAIR_SCRIPT} inspect --root ${repo.primaryRoot}`})});
+  }
+  if(aside===null)return freeze({status:'absent'});
+  const postcondition=freeze(report.durability==='synced'?{lock:'removed',durability:'synced'}:{lock:'removed',durability:'unsupported',syncErrorCode:report.syncErrorCode});
+  return freeze({status:'released',aside,owner:observed.owner,pid:observed.pid,ageSeconds:observed.ageSeconds,postcondition,nextAction:freeze({kind:'none'})});
 }
 
 export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}

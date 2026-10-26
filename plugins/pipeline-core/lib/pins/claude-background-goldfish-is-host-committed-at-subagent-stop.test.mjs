@@ -20,7 +20,7 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -197,7 +197,7 @@ function buildConsumer(name) {
   gitOk("commit", "-q", "-m", "scaffold the first item check");
   const dispatchId = `PF26B-${name.toUpperCase()}`;
   const out = runDispatchBriefing(["binding", "--root", root, "--dispatch-id", dispatchId, "--item", "first-item", "--criterion", "AC-1",
-    "--agent-type", "goldfish-deep", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
+    "--agent-type", "goldfish-deep", "--effort-escalation", "MP-05", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
   { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "available", value: "a".repeat(64) }, selectedPlugin: { version: "pin" } }, pluginRoot: null }) });
   assert.equal(out.ok, true, JSON.stringify(out));
   const binding = out.binding;
@@ -264,8 +264,12 @@ const childWork = (fx) => fx.write(SOURCE, "export const value = () => 1;\nexpor
 function stopHook(fx, toolUseId) {
   mkdirSync(join(fx.stopDir, "session", "subagents"), { recursive: true });
   writeFileSync(join(fx.stopDir, "session", "subagents", `agent-${AGENT_ID}.meta.json`), JSON.stringify({ spawnDepth: 1, agentType: "goldfish-deep", toolUseId }));
+  const variant = fx.stopVariant ?? {};
+  if (variant.prepare) variant.prepare(join(fx.stopDir, "session", "subagents"), `agent-${AGENT_ID}.jsonl`);
+  const message = "lastMessage" in variant ? variant.lastMessage : finalText(fx);
   return hook(fx, HOST, ["--runner", "claude"], { hook_event_name: "SubagentStop", session_id: SESSION,
-    transcript_path: join(fx.stopDir, "session.jsonl"), cwd: fx.root, agent_id: AGENT_ID, agent_type: fx.binding.role, last_assistant_message: finalText(fx) }, HOST_COMMIT_HOOK_TIMEOUT_MS);
+    transcript_path: join(fx.stopDir, "session.jsonl"), cwd: fx.root, agent_id: AGENT_ID, agent_type: fx.binding.role,
+    ...(message === undefined ? {} : { last_assistant_message: message }) }, HOST_COMMIT_HOOK_TIMEOUT_MS);
 }
 const hostCommits = (fx) => fx.gitOk("log", "--fixed-strings", `--grep=Dispatch: ${fx.dispatchId} (goldfish)`, "--format=%H", `${fx.candidate}..HEAD`).split("\n").filter(Boolean);
 
@@ -450,4 +454,95 @@ test("(vii) a launch hook killed while it holds the registry lock does not block
   launchedPending(fx, "toolu_pf55_after_kill", {});
   assert.equal(existsSync(lock), false, "the next launch released the lock it took");
   assert.equal(readdirSync(aside).filter((name) => name.endsWith("-registry-lock")).length, 1, "the gone owner's lock was retired aside, not deleted");
+});
+
+// PF-61 (AC-142): the current Claude runtime ends a background child with a SubagentHandback tool call, so the SubagentStop
+// input carries no usable last_assistant_message and the child's contract exists only as the LAST SubagentHandback tool_use
+// of its own transcript, agent-<agent_id>.jsonl beside the agent-<agent_id>.meta.json the hook already reads.
+const assistantRecord = (content) => ({ type: "assistant", message: { role: "assistant", content } });
+const handbackRecord = (message, name = "SubagentHandback") => assistantRecord([{ type: "tool_use", id: "toolu_handback", name, input: { message } }]);
+const proseRecord = (text) => assistantRecord([{ type: "text", text }]);
+const userRecord = (text) => ({ type: "user", message: { role: "user", content: text } });
+function writeTranscript(dir, name, lines) {
+  mkdirSync(dir, { recursive: true });
+  rmSync(join(dir, name), { force: true });
+  writeFileSync(join(dir, name), `${lines.map((line) => typeof line === "string" ? line : JSON.stringify(line)).join("\n")}\n`);
+}
+const withTranscript = (lines, lastMessage) => ({ lastMessage, prepare: (dir, name) => writeTranscript(dir, name, lines) });
+const contractWith = (fx, patch) => JSON.stringify({ ...JSON.parse(finalText(fx)), ...patch });
+const stopFailureFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
+function launchedBackground(name, toolUseId) {
+  const fx = buildConsumer(name);
+  launchedPending(fx, toolUseId, {});
+  const posted = postToolUse(fx, toolUseId, {}, { status: "async_launched", agentId: AGENT_ID });
+  assert.equal(posted.status, 0, posted.stderr);
+  childWork(fx);
+  return fx;
+}
+function assertRefusedAtStop(fx, toolUseId, variant, label, expectedCode) {
+  for (const file of stopFailureFiles(fx)) rmSync(join(stateDirectory(fx), file), { force: true });
+  fx.stopVariant = variant;
+  const stopped = stopHook(fx, toolUseId);
+  assert.equal(stopped.status, 0, `${label}: the stop hook never blocks -- ${stopped.stderr}`);
+  assert.doesNotMatch(stopped.stderr, /host commit verified/u, label);
+  assert.equal(hostCommits(fx).length, 0, `${label}: nothing is committed`);
+  assert.equal(fx.gitOk("rev-parse", "HEAD"), fx.candidate, `${label}: HEAD stays on the candidate`);
+  assert.equal(pendingFiles(fx).length, 1, `${label}: the pending state is not consumed`);
+  const files = stopFailureFiles(fx);
+  assert.equal(files.length, 1, `${label}: one diagnostic is persisted next to the pending state -- ${stopped.stderr.slice(0, 300)}`);
+  const diagnostic = JSON.parse(readFileSync(join(stateDirectory(fx), files[0]), "utf8"));
+  assert.equal(diagnostic.dispatchId, fx.dispatchId, label);
+  assert.match(diagnostic.code, /^NGH[A-Z]*-[A-Z0-9-]+$/u, `${label}: ${diagnostic.code}`);
+  if (expectedCode) assert.equal(diagnostic.code, expectedCode, label);
+  assert.ok(stopped.stderr.includes(diagnostic.code), `${label}: the hook message names the persisted code -- ${stopped.stderr.slice(0, 300)}`);
+}
+
+test("(viii) SubagentHandback: a background child whose contract arrives only as its last SubagentHandback tool call (no last_assistant_message) is host-committed exactly once (PF-61)", () => {
+  const fx = launchedBackground("handback-absent", "toolu_pf61_absent");
+  fx.stopVariant = withTranscript([userRecord("Do the task."), proseRecord("Working."), handbackRecord(finalText(fx))], undefined);
+  assertCommittedOnceAtStop(fx, "toolu_pf61_absent");
+});
+
+test("(ix) SubagentHandback: a last_assistant_message that is prose, not a contract, falls back to the child's own last handback (PF-61)", () => {
+  const fx = launchedBackground("handback-prose", "toolu_pf61_prose");
+  fx.stopVariant = withTranscript([userRecord("Do the task."), handbackRecord(finalText(fx))], "Delivered through the handback.");
+  assertCommittedOnceAtStop(fx, "toolu_pf61_prose");
+});
+
+test("(x) SubagentHandback: an invalid or foreign handback, or any record other than the last handback, is refused, commits nothing and leaves a named diagnostic (PF-61)", () => {
+  const fx = launchedBackground("handback-refused", "toolu_pf61_refused");
+  const id = "toolu_pf61_refused";
+  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { dispatchId: "FOREIGN-DISPATCH" }))], undefined), "foreign dispatchId");
+  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { candidateCommit: "0".repeat(40) }))], undefined), "foreign candidate");
+  assertRefusedAtStop(fx, id, withTranscript([handbackRecord("All done, nothing to see.")], undefined), "prose handback");
+  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), proseRecord("Afterwards I said more.")], undefined), "an earlier handback followed by a later assistant record");
+  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), handbackRecord("not a contract")], "x"), "only the LAST handback counts");
+  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx), "Task")], undefined), "a valid contract carried by another tool name");
+  assertRefusedAtStop(fx, id, withTranscript([proseRecord("Working."), userRecord(finalText(fx))], undefined), "a valid contract in a user record");
+  assertRefusedAtStop(fx, id, withTranscript([], undefined), "an empty transcript");
+});
+
+test("(xi) SubagentHandback: an unparsable, oversized or symlinked child transcript is refused as unsafe and commits nothing (PF-61)", { skip: process.platform === "win32" ? "needs symlink privileges" : false }, () => {
+  const fx = launchedBackground("handback-unsafe", "toolu_pf61_unsafe");
+  const id = "toolu_pf61_unsafe";
+  const UNSAFE = "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE";
+  const valid = handbackRecord(finalText(fx));
+  assertRefusedAtStop(fx, id, withTranscript([valid, "{this is not json"], undefined), "an unparsable transcript line", UNSAFE);
+  assertRefusedAtStop(fx, id, withTranscript([proseRecord("x".repeat(9 * 1024 * 1024)), valid], undefined), "an oversized transcript", UNSAFE);
+  const target = join(fx.stopDir, "elsewhere.jsonl");
+  assertRefusedAtStop(fx, id, { lastMessage: undefined, prepare: (dir, name) => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(target, `${JSON.stringify(valid)}\n`);
+    rmSync(join(dir, name), { force: true });
+    symlinkSync(target, join(dir, name));
+  } }, "a symlinked transcript", UNSAFE);
+});
+
+test("(xii) SubagentHandback: a transcript reached through a symlinked subagents directory is refused as unsafe (PF-61)", { skip: process.platform === "win32" ? "needs symlink privileges" : false }, () => {
+  const fx = launchedBackground("handback-dir-link", "toolu_pf61_dirlink");
+  let linked = false;
+  assertRefusedAtStop(fx, "toolu_pf61_dirlink", { lastMessage: undefined, prepare: (dir, name) => {
+    if (!linked) { linked = true; const elsewhere = join(fx.stopDir, "elsewhere-subagents"); renameSync(dir, elsewhere); symlinkSync(elsewhere, dir); }
+    writeTranscript(dir, name, [handbackRecord(finalText(fx))]);
+  } }, "a symlinked subagents directory", "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE");
 });

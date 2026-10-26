@@ -827,6 +827,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/architecture-baseline.mjs",
   "plugins/pipeline-core/scripts/check-critic-bound-verify.mjs",
   "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
+  "plugins/pipeline-core/lib/pipeline-actor-assignment.mjs",
   "plugins/pipeline-core/scripts/onboarding-init.mjs",
   "plugins/pipeline-core/scripts/owning-verification-controller.mjs",
   "plugins/pipeline-core/scripts/report-interruptions.mjs",

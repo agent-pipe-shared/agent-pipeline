@@ -43,7 +43,7 @@
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, constants as fsConstants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,6 +60,7 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
   Types: goldfish-implementor, goldfish-mechanic, goldfish-deep.
   Optional: --root, repeated --path, --spec, --criterion, --recon-note.
   --runner claude|codex defaults to claude; the selected model must match its role route.
+  --effort-escalation MP-05|MP-07 admits an agent definition effort ABOVE its Claude route effort (otherwise a contradiction is refused).
   --check is included in the write scope. Paths are repository-relative.
   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
 
@@ -67,7 +68,7 @@ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
   Required strings: id, item, agentType, modelId, check, title, ac, goal.
   Required non-empty string arrays: paths, context, targeted.
   Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner.
-  Optional string arrays: newFiles, forbidden, stops; optional positive integer: estimatedToolCalls.
+  Optional string arrays: newFiles, forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
   Unknown keys are refused. --package is repository-relative. Only --out writes,
   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
 
@@ -102,6 +103,7 @@ const {
   assertPackagePathsExist,
   budgetDecision,
   isReconNotePath,
+  packageAdvisories,
   renderGoldfishBriefing,
   resolveBriefingCalibration,
   skeletonToolBudget,
@@ -114,6 +116,7 @@ const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : aw
 const { resolveProjectAuthorityPaths } = cliHelp ? {} : await import("../lib/project-authority.mjs");
 const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
 // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
+const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
 const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
 const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
 const { observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
@@ -132,7 +135,7 @@ const ACCEPTED_CRITERION_STATUSES = Object.freeze(["explicit-actual-independent-
 const SINGLE_FLAGS = Object.freeze({
   "--root": "root", "--dispatch-id": "dispatchId", "--item": "item", "--agent-type": "agentType",
   "--model-id": "modelId", "--check": "check", "--spec": "spec", "--criterion": "criterion", "--recon-note": "reconNote",
-  "--runner": "runner",
+  "--runner": "runner", "--effort-escalation": "effortEscalation",
 });
 // K142 (Greenfield finding G1): the runners a binding can be generated for. `claude` is the default and every Claude
 // behaviour is unchanged; `codex` checks the model id against the model the Codex route yields for the role, read from
@@ -188,6 +191,17 @@ function defaultCodexRoute(taskRoute) {
     return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
   } catch { return null; }
 }
+
+/** The Claude task route of a duty (read-only registry projection), or null when the registry yields none. */
+function defaultClaudeRoute(taskRoute) {
+  try {
+    const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "claude");
+    return scoped.ok ? scoped.taskRoutes.find((entry) => entry.taskRoute === taskRoute) ?? null : null;
+  } catch { return null; }
+}
+
+const EFFORT_RANK = Object.freeze({ low: 1, medium: 2, high: 3, xhigh: 4, max: 5 });
+const EFFORT_ESCALATION_ACTS = Object.freeze(["MP-05", "MP-07"]);
 
 /**
  * What the preflight observation receives. Claude: exactly `{ cwd }`, as before this change. Codex: the same call with an
@@ -250,6 +264,43 @@ function defaultQueueRow(root, sliceId) {
 }
 
 const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
+
+const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
+const STOP_FAILURE_NAME = /^stop-failure-[A-Za-z0-9._-]+\.json$/u;
+
+/**
+ * PF-61: the persisted stop-failure diagnostics of background Goldfish whose host commit failed at SubagentStop (read-only).
+ * At most 20 regular, non-symlink files, each read bounded to 64 KiB; only objects of the stop-failure schema with string
+ * dispatchId and code are kept. Any fault yields an empty list. Never deletes, moves or rewrites a file.
+ */
+function defaultStopFailures(root) {
+  try {
+    const common = resolveGitCommonDir(root);
+    if (typeof common !== "string") return [];
+    const dir = resolve(common, ...STOP_FAILURE_DIR);
+    const names = readdirSync(dir).filter((name) => STOP_FAILURE_NAME.test(name)).sort().slice(0, 20);
+    const kept = [];
+    for (const name of names) {
+      try {
+        const file = resolve(dir, name);
+        const info = lstatSync(file);
+        if (!info.isFile() || info.isSymbolicLink()) continue;
+        const fd = openSync(file, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+        let text;
+        try {
+          const buffer = Buffer.alloc(65536 + 1);
+          const length = readSync(fd, buffer, 0, buffer.length, 0);
+          if (length > 65536) continue;
+          text = buffer.subarray(0, length).toString("utf8");
+        } finally { closeSync(fd); }
+        const value = JSON.parse(text);
+        if (value && typeof value === "object" && value.schema === STOP_FAILURE_SCHEMA && typeof value.dispatchId === "string" && typeof value.code === "string") kept.push({ ...value, file: name });
+      } catch { /* an unreadable entry is no diagnostic */ }
+    }
+    return kept;
+  } catch { return []; }
+}
 
 /** Every slice row of the governed queue (read-only); an empty list outside an approved item course or when it cannot be read. */
 function defaultQueueRows(root) {
@@ -515,6 +566,7 @@ export function generateDispatchBinding(options, deps = {}) {
 
   const { dispatchId, item, agentType, modelId, check } = options;
   const runner = options.runner ?? "claude";
+  const effortEscalation = options.effortEscalation;
   if (!RUNNERS.includes(runner)) refuse("DBG-RUNNER-UNKNOWN", `unknown runner ${JSON.stringify(runner)}; repair: pass --runner ${RUNNERS.join(" or ")} (default ${RUNNERS[0]}), or omit the flag for a Claude dispatch`);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(dispatchId)) refuse("DBG-DISPATCH-ID", `dispatch id ${JSON.stringify(dispatchId)} must match [A-Za-z0-9][A-Za-z0-9._:-]{0,119}`);
   if (!/^[a-z0-9][a-z0-9-]{0,127}$/u.test(item)) refuse("DBG-ITEM-SLUG", `item slug ${JSON.stringify(item)} must be lowercase letters, digits and hyphens`);
@@ -638,6 +690,17 @@ export function generateDispatchBinding(options, deps = {}) {
     warnings.push({ code: "DBG-RUNNING-SCOPE-UNKNOWN", message: `the write scope of running dispatch(es) ${unreadable.map((entry) => entry.dispatchId).join(", ")} could not be read (no governed queue row and no generated briefing under scratch/), so this binding was not checked against them; confirm the scopes are disjoint before dispatching` });
   }
 
+  // PF-61: a background Goldfish whose host commit failed at SubagentStop left a diagnostic nobody else reads (SubagentStop
+  // surfaces no stderr). Non-blocking: never refuses and never deletes the file; the next successful completion removes it.
+  const stopFailures = (deps.stopFailures ?? defaultStopFailures)(root);
+  const stopEntries = (Array.isArray(stopFailures) ? stopFailures : [])
+    .filter((entry) => entry && typeof entry === "object" && entry.schema === STOP_FAILURE_SCHEMA && typeof entry.dispatchId === "string" && typeof entry.code === "string")
+    .sort((a, b) => String(a.observedAt ?? "").localeCompare(String(b.observedAt ?? "")) || a.dispatchId.localeCompare(b.dispatchId));
+  for (const entry of stopEntries) {
+    const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
+    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
+  }
+
   // Agent definition: effort, model alias and the maxTurns cliff.
   const resolved = resolveAgentModel(agentType, { agentsDir });
   if (!resolved) refuse("DBG-AGENT-UNRESOLVED", `no agent definition with a model for ${agentType} under the plugin agents directory`);
@@ -662,7 +725,29 @@ export function generateDispatchBinding(options, deps = {}) {
     refuse("DBG-MODEL-FAMILY", `model id ${modelId} does not belong to the ${resolved.model} family that agent definition ${agentType} declares; repair: pass a --model-id of the ${resolved.model} family (the id the dispatch will really run: the tool-layer \`model\` parameter of the dispatch call selects it, MP-29), or pass the --agent-type whose definition declares the family you mean (${AGENT_TYPES.join(", ")}), or pass --runner codex for a Codex dispatch (its model is then checked against the Codex route)`);
   }
   // The effort the run is briefed with: the Codex route's own effort for a Codex dispatch (the agent definition's effort is the Claude one).
-  const effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
+  // Claude (W2-R2): the Claude Agent tool cannot pass an effort (MP-29), so the agent definition's frontmatter effort is what the run
+  // really gets. It must therefore EQUAL the configured route's effort for the duty; a contradiction is refused before launch, unless
+  // an explicit MP-05/MP-07 escalation admits an above-route pin. An unreadable route keeps the frontmatter effort and says so.
+  let effort = typeof codexRoute?.effort === "string" && codexRoute.effort !== "" ? codexRoute.effort : resolved.effort;
+  let claudeRouteDuty = null;
+  if (effortEscalation !== undefined && !EFFORT_ESCALATION_ACTS.includes(effortEscalation)) {
+    refuse("DBG-EFFORT-ESCALATION-UNKNOWN", `--effort-escalation ${JSON.stringify(effortEscalation)} is not a recognised escalation act; repair: pass --effort-escalation ${EFFORT_ESCALATION_ACTS.join(" or ")} (the model-policy act that authorises the above-route effort), or omit the flag`);
+  }
+  if (runner !== "codex") {
+    const taskRoute = DUTY_ROUTE_OF_AGENT[agentType];
+    const route = (deps.claudeRoute ?? defaultClaudeRoute)(taskRoute);
+    const routeEffort = route && route.state !== "unavailable" && typeof route.effort === "string" && route.effort !== "" ? route.effort : null;
+    if (routeEffort === null) {
+      warnings.push({ code: "DBG-EFFORT-ROUTE-UNKNOWN", message: `the Claude route ${taskRoute} for ${agentType} could not be read from the runner profile registry, so the effort ${resolved.effort} of the agent definition was not checked against the configured route` });
+    } else if (routeEffort === resolved.effort) {
+      claudeRouteDuty = taskRoute;
+    } else if (effortEscalation !== undefined && (EFFORT_RANK[resolved.effort] ?? 0) > (EFFORT_RANK[routeEffort] ?? Infinity)) {
+      claudeRouteDuty = taskRoute;
+      warnings.push({ code: "DBG-EFFORT-ESCALATION", message: `${effortEscalation} escalation: agent definition ${agentType} pins effort ${resolved.effort}, above the ${routeEffort} the configured Claude route ${taskRoute} selects; the binding records ${resolved.effort}, the effort the run will really get` });
+    } else {
+      refuse("DBG-EFFORT-ROUTE-CONTRADICTION", `agent definition ${agentType} pins effort ${resolved.effort} but the configured Claude route ${taskRoute} selects effort ${routeEffort}; the Claude Agent tool cannot pass an effort (MP-29), so the frontmatter pin would silently win; repair: align the effort of agents/${agentType}.md with the route, or change the route in pipeline.user.yaml, or (a deliberate above-route escalation) pass --effort-escalation MP-05 or MP-07 (MP-05/MP-07), or pass the --agent-type whose definition matches the route`);
+    }
+  }
   let maxTurns;
   try { maxTurns = Number.parseInt(parseAgentFrontmatter(readFileSync(resolve(agentsDir, `${agentType}.md`), "utf8")).maxTurns, 10); } catch { maxTurns = NaN; }
   if (!Number.isSafeInteger(maxTurns)) refuse("DBG-AGENT-UNRESOLVED", `agent definition ${agentType} declares no integer maxTurns`);
@@ -793,7 +878,7 @@ export function generateDispatchBinding(options, deps = {}) {
     `- Ruleset: ${rulesetVersion ? `\`${rulesetVersion}\` · ` : ""}content identity \`${rulesetSha}\`${rulesetFallback ? ` (fallback: ${rulesetFallback})` : ""}.`,
     runner === "codex"
       ? `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; Codex route \`${DUTY_ROUTE_OF_AGENT[agentType]}\`).`
-      : `- Model/effort: \`${modelId}\` / ${resolved.effort} (${agentType}; agent definition alias \`${resolved.model}\`).`,
+      : `- Model/effort: \`${modelId}\` / ${effort} (${agentType}; agent definition alias \`${resolved.model}\`${claudeRouteDuty === null ? "" : `; Claude route \`${claudeRouteDuty}\``}).`,
     `- Tier: ${agentType}. Worktree: {{WORKTREE}}.`,
     // PF-42: governed item admission reads these two lines (parseDispatchSlice); the skeleton carries them.
     `- Slice: ${dispatchId}`,
@@ -883,7 +968,7 @@ export function buildDispatchBriefing(options, deps = {}) {
   }
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
-    sha256: rendered.sha256, warnings: generated.warnings, ...(options.out === undefined ? { text: rendered.text } : {}),
+    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg)], ...(options.out === undefined ? { text: rendered.text } : {}),
   };
 }
 

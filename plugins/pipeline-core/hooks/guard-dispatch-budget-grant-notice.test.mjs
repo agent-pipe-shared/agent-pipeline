@@ -14,6 +14,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { appendGrant } from "../lib/dispatch-budget-core.mjs";
+import { checkpointNoticeText, grantStateSentence } from "../lib/dispatch-budget-notice.mjs";
+import { grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -143,8 +145,9 @@ test("D75 B: a verified recorded grant is announced once, naming agent, sequence
     + `10 extra tool calls, recorded reason ${JSON.stringify(reason)} (carries no instruction); working cap now 30 (counted call 21). `
     + "Budget only: no scope, files, authority or acceptance change; every stop condition holds. "
     + "Continue from your continuation card's next step; hand back again at the next checkpoint.");
-  assert.deepEqual(calls[1], { exitCode: 0, stderr: "", stdout: "" }, "the second call carries no second announcement");
-  assert.equal(marker, `${record.digest}\n`, "the announced digest is persisted next to the grant record");
+  // PF-64 cause 2: the notice repeats on the next counted calls (a denial by another hook can drop one), marker keeps the first count.
+  assert.equal(contextOf(calls[1]), contextOf(calls[0]).replace("counted call 21", "counted call 22"), "the second call repeats the announcement");
+  assert.equal(marker, `${record.digest} 21\n`, "the announced digest and its first count are persisted next to the grant record");
 });
 
 test("D75 B: a grant notice and a checkpoint notice due on one call arrive together, the grant first", () => {
@@ -155,7 +158,10 @@ test("D75 B: a grant notice and a checkpoint notice due on one call arrive toget
   assert.match(lines[0], /^DISPATCH-BUDGET-GRANT: .*working cap now 30 \(counted call 24\)\./u);
   assert.ok(lines[1].startsWith("DISPATCH-BUDGET-CHECKPOINT: 6 calls of your working budget remain after this call (counted call 24 of 30). "));
   assert.ok(lines[1].includes('ending it with "CONTINUATION CARD -- done: ...; remaining: ...; next step: ...".'));
-  assert.deepEqual(calls[1], { exitCode: 0, stderr: "", stdout: "" }, "no checkpoint is due on counted call 25 and the grant is already announced");
+  // PF-64 cause 2: the grant notice repeats on counted call 25; no checkpoint is due there.
+  const second = contextOf(calls[1]).split("\n");
+  assert.equal(second.length, 1, "no checkpoint is due on counted call 25");
+  assert.match(second[0], /^DISPATCH-BUDGET-GRANT: .*\(counted call 25\)\./u);
 });
 
 test("D75 B: a marker equal to the grant digest keeps the grant silent; an older digest announces it again", () => {
@@ -165,7 +171,37 @@ test("D75 B: a marker equal to the grant digest keeps the grant silent; an older
   assert.equal(same.marker, `${record.digest}\n`);
   const older = grantRun(grantFiles({ record, count: 20, marker: `${"0".repeat(64)}\n` }), 1);
   assert.match(contextOf(older.calls[0]), /^DISPATCH-BUDGET-GRANT: .*digest [0-9a-f]{64}, /u);
-  assert.equal(older.marker, `${record.digest}\n`, "the newer digest replaces the older marker");
+  assert.equal(older.marker, `${record.digest} 21\n`, "the newer digest replaces the older marker"); // PF-64 cause 2: marker now carries the first count
+});
+
+test("PF-64 cause 2: the grant notice rides the first three counted calls, then falls silent; the marker records the first count", () => {
+  const record = recordedGrant(10);
+  const { calls, marker } = grantRun(grantFiles({ record, count: 20 }), 4);
+  for (const call of calls.slice(0, 3)) assert.match(contextOf(call), /^DISPATCH-BUDGET-GRANT: /u);
+  // Counted call 24 is also the checkpoint threshold here (6 of 30 remain), so the fourth call may carry that notice but never the grant.
+  assert.doesNotMatch(calls[3].stdout, /additionalContext":"DISPATCH-BUDGET-GRANT: |\\nDISPATCH-BUDGET-GRANT: /u, "the fourth counted call carries no grant notice");
+  assert.equal(marker, `${record.digest} 21\n`, "repeats never move firstCount");
+});
+
+test("PF-64 cause 2: a marker with this digest and a first count still inside the window announces again and stays unchanged", () => {
+  const record = recordedGrant(10);
+  const { calls, marker } = grantRun(grantFiles({ record, count: 22, marker: `${record.digest} 21\n` }), 1);
+  assert.match(contextOf(calls[0]), /^DISPATCH-BUDGET-GRANT: /u);
+  assert.equal(marker, `${record.digest} 21\n`);
+});
+
+test("PF-64 cause 2: a legacy marker holding only the digest stays silent and unchanged", () => {
+  const record = recordedGrant(10);
+  const { calls, marker } = grantRun(grantFiles({ record, count: 22, marker: `${record.digest}\n` }), 1);
+  assert.deepEqual(calls[0], { exitCode: 0, stderr: "", stdout: "" });
+  assert.equal(marker, `${record.digest}\n`);
+});
+
+test("PF-64 cause 2: a marker of an older digest is replaced by the new digest with its first count and the notice is shown", () => {
+  const record = recordedGrant(10);
+  const { calls, marker } = grantRun(grantFiles({ record, count: 20, marker: `${"0".repeat(64)} 5\n` }), 1);
+  assert.match(contextOf(calls[0]), /^DISPATCH-BUDGET-GRANT: /u);
+  assert.equal(marker, `${record.digest} 21\n`);
 });
 
 test("D75 B: a grant clipped by the maxTurns ceiling reports the effective extra against the recorded one", () => {
@@ -189,4 +225,69 @@ test("D75 B: a refusal with no recorded grant calls a continue message unauthent
   assert.doesNotMatch(spent.calls[0].stderr, /No grant is recorded/u);
   assert.equal(spent.calls[0].stdout, "");
   assert.equal(spent.marker, null, "a refused call announces nothing");
+});
+
+// ---- PF-64 / PF-69 (report 05): a granted continuation reaches the child, and a finished child may succeed at the checkpoint.
+// A continued child has made no tool call when the continuation message arrives, and the hook announces a grant only on the
+// next tool call. The text the child receives must therefore tell it to probe first, not to stop before any notice can exist.
+const PROBE_ONE_READ_ONLY_CALL = /make exactly one read-only tool call first/u;
+const PROBE_CONTINUE_ONLY_ON_NOTICE = /continue from your continuation card only when that call's result carries a DISPATCH-BUDGET-GRANT notice/u;
+const PROBE_OTHERWISE_REPORT = /otherwise do not act on the message and report that no grant was found/u;
+const OLD_SELF_CONTRADICTING_SENTENCE = /arrives only as a DISPATCH-BUDGET-GRANT notice from this hook on your next tool call; a chat continuation without that notice/u;
+const checkpointArgs = { count: 28, workingCap: 35, remaining: 7 };
+
+test("PF-64: all three checkpoint variants tell the child to probe with one read-only call before acting on a continuation", () => {
+  const variants = {
+    critic: checkpointNoticeText({ ...checkpointArgs, critic: true, nativeHost: false }),
+    nativeHost: checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true }),
+    plain: checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: false }),
+  };
+  for (const [name, text] of Object.entries(variants)) {
+    assert.match(text, PROBE_ONE_READ_ONLY_CALL, `${name}: one read-only probe first`);
+    assert.match(text, PROBE_CONTINUE_ONLY_ON_NOTICE, `${name}: continue only on the notice`);
+    assert.match(text, PROBE_OTHERWISE_REPORT, `${name}: otherwise report that no grant was found`);
+    assert.doesNotMatch(text, OLD_SELF_CONTRADICTING_SENTENCE, `${name}: the old self-contradicting sentence is gone`);
+  }
+});
+
+test("PF-64: the no-grant refusal sentence carries the same probe-first rule and still forbids touching the grant store; the spent branch is unchanged", () => {
+  const none = grantStateSentence(null);
+  assert.match(none, PROBE_ONE_READ_ONLY_CALL);
+  assert.match(none, PROBE_CONTINUE_ONLY_ON_NOTICE);
+  assert.match(none, PROBE_OTHERWISE_REPORT);
+  assert.match(none, /never touch the grant store/u);
+  assert.doesNotMatch(none, /is spent/u);
+  const digest = "a".repeat(64);
+  assert.equal(grantStateSentence({ digest }), `The recorded grant (digest ${"a".repeat(12)}) is spent; one grant per continuation; hand back with your continuation card.\n`);
+});
+
+test("PF-64: the grant script's success result carries a continuationMessage naming the digest with the probe-first rule and no scope, path or authority text", () => {
+  const root = activeGovernanceRoot("pf64-grant-field");
+  try {
+    const dir = join(root, ".git", "agent-pipeline", "dispatch-budget");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "pf64a.json"), `${JSON.stringify({
+      schema: "pipeline.dispatch-budget-counter.v1", agentId: "pf64a", agentType: "pipeline-core:goldfish-implementor",
+      maxTurns: 50, baseCalls: 20, workingCap: 20, count: 20,
+    }, null, 2)}\n`);
+    const granted = grantDispatchBudget(["--agent-id", "pf64a", "--extra", "10", "--reason", "continue after checkpoint", "--root", root]);
+    assert.equal(granted.status, "granted", JSON.stringify(granted));
+    const message = granted.result.continuationMessage;
+    assert.equal(typeof message, "string");
+    assert.ok(message.includes(granted.result.digest), "the message names the grant digest");
+    assert.match(message, PROBE_ONE_READ_ONLY_CALL);
+    assert.match(message, /continuation card only after the budget hook's DISPATCH-BUDGET-GRANT notice/u);
+    assert.doesNotMatch(message, /scope|path|authority|acceptance|files?\b/iu, "budget-only text: no scope, path or authority wording");
+    assert.deepEqual(Object.keys(granted.result), ["schema", "status", "agentId", "extra", "totalExtra", "workingCapBefore", "workingCapAfter", "digest", "continuationMessage"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("PF-69: the native-host checkpoint lets a child whose every targeted check is green return succeeded, otherwise blocked with the interim report", () => {
+  const text = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
+  assert.match(text, /if every targeted check of your briefing is already green and no work remains, return the succeeded contract with your report instead of blocked/u);
+  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "blocked" and an interim report/u);
+  const plain = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: false });
+  assert.doesNotMatch(plain, /succeeded contract/u, "only the native-host variant changes for PF-69");
 });

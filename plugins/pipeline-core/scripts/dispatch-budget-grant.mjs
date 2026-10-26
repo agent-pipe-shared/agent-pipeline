@@ -18,6 +18,9 @@
  * grants nothing), refuses past the agent's headroom, and refuses a second
  * grant for the same agent (one grant per continuation, D75 B).
  *
+ * The success result carries `continuationMessage`: the budget-only sentence the orchestrator sends the child, which tells it to make
+ * one read-only tool call first and to continue only after the hook's DISPATCH-BUDGET-GRANT notice (PF-64).
+ *
  * Exit 0 + one JSON object on stdout when granted; exit 2 + one
  * `DISPATCH-BUDGET-GRANT-REFUSED: <code>: <message>` line on stderr otherwise.
  * One orchestrator at a time is the contract: there is no cross-process lock, a
@@ -150,6 +153,7 @@ export function grantDispatchBudget(argv, dependencies = {}) {
         workingCapBefore: effectiveDispatchWorkingCap(counter.baseCalls, counter.maxTurns, alreadyGranted),
         workingCapAfter: effectiveDispatchWorkingCap(counter.baseCalls, counter.maxTurns, appended.record.totalExtra),
         digest: appended.record.digest,
+        continuationMessage: `Grant digest ${appended.record.digest} is recorded. When you receive this message, make exactly one read-only tool call first; continue from your continuation card only after the budget hook's DISPATCH-BUDGET-GRANT notice in that call's result names this digest, otherwise do not act and report that no grant was found.`,
       },
     };
   } catch (error) {

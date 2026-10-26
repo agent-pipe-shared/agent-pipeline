@@ -11,7 +11,7 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -89,6 +89,9 @@ const depsOf = (fx, over = {}) => ({
   resolveBaseline: () => ({ status: "ready", entries: [] }),
   defaultSpecPath: () => null,
   queueRow: () => null,
+  // hermetic: the pre-existing cases never read the real runner-profile registry; the route here equals each fixture agent's own effort
+  // (no contradiction, no unreadable-route warning), and the W2-R2 cases inject their own
+  claudeRoute: (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: { "duty.implement": "medium", "duty.mechanic": "low", "duty.deep": "xhigh" }[taskRoute] }),
   ...over,
 });
 
@@ -1186,4 +1189,257 @@ test("K142 build: a package that names runner codex renders a Codex briefing tha
   const claudeResult = runDispatchBriefing(claude.argv, depsOf(claude.fx));
   assert.equal(claudeResult.ok, true, JSON.stringify(claudeResult).slice(0, 300));
   assert.equal(parseNativeGoldfishBriefing(claudeResult.text).binding.runner, "claude");
+});
+
+// --- W2-R2 (backlog 2026-10-26-agent-frontmatter-effort-overrides-configured-route, AC-212): the run's effort is the configured route's ---
+
+const claudeRouteOf = (effort, state = "default") => (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", effort, state, selector: { kind: "alias", value: "sonnet" } });
+
+test("W2-R2 the binding and field 6 record the effort the configured Claude route selects when the agent definition pins the same effort", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+  assert.equal(result.binding.effort, "medium");
+  assert.match(result.skeleton, /`claude-sonnet-5-5` \/ medium/u);
+  assert.match(result.skeleton, /Claude route `duty\.implement`/u, "field 6 names the route the effort came from");
+});
+
+test("W2-R2 each agent type asks the Claude route of its own duty", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const asked = [];
+  for (const [type, effort, modelId] of [["goldfish-implementor", "medium", "claude-sonnet-5-5"], ["goldfish-mechanic", "low", "claude-haiku-4-5"], ["goldfish-deep", "xhigh", "claude-sonnet-5-5"]]) {
+    const result = runDispatchBriefing(argvOf(fx, { "--agent-type": type, "--model-id": modelId }), depsOf(fx, { claudeRoute: (route) => { asked.push(route); return claudeRouteOf(effort)(route); } }));
+    assert.equal(result.ok, true, `${type}: ${JSON.stringify(result).slice(0, 300)}`);
+  }
+  assert.deepEqual(asked, ["duty.implement", "duty.mechanic", "duty.deep"]);
+});
+
+test("W2-R2 a frontmatter effort that contradicts the configured route is refused typed before launch, never run silently", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "DBG-EFFORT-ROUTE-CONTRADICTION", result.message);
+  assert.equal(result.skeleton, undefined);
+  assert.ok(result.message.includes("xhigh") && result.message.includes("medium") && result.message.includes("duty.deep"), result.message);
+  assert.match(result.message, /repair:/u);
+  assert.match(result.message, /--effort-escalation/u);
+  assert.match(result.message, /MP-05/u);
+  assert.match(result.message, /MP-07/u);
+  assert.match(result.message, /MP-29/u, "the Claude Agent tool cannot pass an effort: the message says why the pin would win");
+});
+
+test("W2-R2 an explicit MP-05/MP-07 escalation admits the above-route effort, records the effort the run really gets and warns", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  for (const act of ["MP-05", "MP-07"]) {
+    const result = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }, ["--effort-escalation", act]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+    assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
+    assert.equal(result.binding.effort, "xhigh", "the binding states the effort the agent definition will really run");
+    const warning = result.warnings.find((entry) => entry.code === "DBG-EFFORT-ESCALATION");
+    assert.ok(warning, JSON.stringify(result.warnings));
+    assert.ok(warning.message.includes(act) && warning.message.includes("medium") && warning.message.includes("xhigh"), warning.message);
+  }
+  const unknown = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-deep" }, ["--effort-escalation", "because"]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(unknown.code, "DBG-EFFORT-ESCALATION-UNKNOWN", unknown.message);
+  assert.match(unknown.message, /repair:/u);
+});
+
+test("W2-R2 an escalation flag where the route already equals the pin changes nothing, and a pin below the route contradicts it too", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const same = runDispatchBriefing(argvOf(fx, {}, ["--effort-escalation", "MP-05"]), depsOf(fx, { claudeRoute: claudeRouteOf("medium") }));
+  assert.equal(same.ok, true);
+  assert.equal(same.warnings.some((entry) => entry.code === "DBG-EFFORT-ESCALATION"), false);
+  const lower = runDispatchBriefing(argvOf(fx, { "--agent-type": "goldfish-implementor" }), depsOf(fx, { claudeRoute: claudeRouteOf("high") }));
+  assert.equal(lower.code, "DBG-EFFORT-ROUTE-CONTRADICTION");
+});
+
+test("W2-R2 an unreadable Claude route is announced and the agent definition's effort stays the briefed one", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { claudeRoute: () => null }));
+  assert.equal(result.ok, true);
+  assert.equal(result.binding.effort, "medium");
+  assert.ok(result.warnings.some((entry) => entry.code === "DBG-EFFORT-ROUTE-UNKNOWN"), JSON.stringify(result.warnings));
+});
+
+test("W2-R2 the default Claude route reader uses the registry route of the duty, and a Codex dispatch never reads the Claude route", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { registeredFunctionalTaskRoutes, functionalTaskRoutesForRunner } = await import("../lib/model-role-route-source.mjs");
+  const scoped = functionalTaskRoutesForRunner(registeredFunctionalTaskRoutes(), "claude");
+  assert.equal(scoped.ok, true);
+  const route = scoped.taskRoutes.find((entry) => entry.taskRoute === "duty.implement");
+  const fx = makeFixture();
+  const { claudeRoute: _unused, ...rest } = depsOf(fx);
+  const result = runDispatchBriefing(argvOf(fx), rest);
+  if (route.effort === "medium") { assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300)); assert.equal(result.binding.effort, "medium"); }
+  else { assert.equal(result.code, "DBG-EFFORT-ROUTE-CONTRADICTION", result.message); assert.ok(result.message.includes(route.effort)); }
+  const codex = runDispatchBriefing(argvOf(fx, { "--model-id": "fixture-codex-model" }, CODEX), depsOf(fx, { claudeRoute: () => { throw new Error("a Codex dispatch must not read the Claude route"); }, codexRoute: (taskRoute) => ({ taskRoute, runner: "codex", role: "worker", effort: "high", state: "default", selector: { kind: "model-id", value: "fixture-codex-model" } }) }));
+  assert.equal(codex.ok, true, JSON.stringify(codex).slice(0, 300));
+  assert.equal(codex.binding.effort, "high");
+});
+
+// --- PF-65 (consumer report 05, AC-142): coordinator facts and the orientation-heavy / low-estimate advisories ---
+
+const pf65Paths = (count) => {
+  const extra = Array.from({ length: count - 1 }, (_, index) => `plugins/x/pf65-${index}.mjs`);
+  return { paths: [PATH_A, ...extra], newFiles: extra };
+};
+const pf65Codes = (result) => result.warnings.map((entry) => entry.code);
+
+test("PF-65 a facts list of non-empty strings is accepted; a wrongly typed facts value is refused naming the repair", async () => {
+  const { runDispatchBriefing } = await lib();
+  const ok = packageFixture({ facts: ["The cap is 35 calls.", "Line 60 holds the help text."] });
+  const accepted = runDispatchBriefing(ok.argv, depsOf(ok.fx));
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  for (const bad of ["a string", [""], [3]]) {
+    const wrong = packageFixture({ facts: bad });
+    const refused = runDispatchBriefing(wrong.argv, depsOf(wrong.fx));
+    assert.equal(refused.ok, false, JSON.stringify(bad));
+    assert.equal(refused.code, "DBG-PACKAGE-FIELD-TYPE", JSON.stringify(bad));
+    assert.match(refused.message, /"facts".*repair: /u);
+  }
+});
+
+test("PF-65 facts render as a list under the coordinator line inside section 1 after the goal; absent facts leave the text byte-identical", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { verifyGeneratedBriefing } = await buildLib();
+  const withFacts = packageFixture({ facts: ["First fact.", "Second fact."] });
+  const built = runDispatchBriefing(withFacts.argv, depsOf(withFacts.fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const line = "Facts established by the coordinator (do not re-derive):";
+  const goalAt = built.text.indexOf("Fixture goal text.");
+  const lineAt = built.text.indexOf(line);
+  const contextAt = built.text.indexOf("### 2. Context files");
+  assert.ok(built.text.indexOf("### 1. Goal") < goalAt && goalAt < lineAt && lineAt < contextAt, "facts sit in section 1 after the goal");
+  assert.ok(built.text.includes(`${line}\n\n- First fact.\n- Second fact.\n`));
+  assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
+  const plain = packageFixture();
+  const plainBuilt = runDispatchBriefing(plain.argv, depsOf(plain.fx));
+  assert.equal(plainBuilt.text.includes(line), false);
+  assert.ok(plainBuilt.text.includes("### 1. Goal\n\nFixture goal text.\n\n### 2. Context files"));
+});
+
+test("PF-65 more than 6 delivery paths without facts warn DBG-PACKAGE-ORIENTATION-HEAVY; facts or 6 or fewer paths do not", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { ORIENTATION_PATH_BOUND } = await buildLib();
+  assert.equal(ORIENTATION_PATH_BOUND, 6);
+  const heavy = packageFixture({ ...pf65Paths(7), estimatedToolCalls: 29 });
+  const result = runDispatchBriefing(heavy.argv, depsOf(heavy.fx));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const warning = result.warnings.find((entry) => entry.code === "DBG-PACKAGE-ORIENTATION-HEAVY");
+  assert.ok(warning, JSON.stringify(result.warnings));
+  assert.match(warning.message, /7/u);
+  assert.match(warning.message, /6/u);
+  assert.match(warning.message, /"facts"/u);
+  assert.match(warning.message, /split/u);
+  const withFacts = packageFixture({ ...pf65Paths(7), estimatedToolCalls: 29, facts: ["A coordinator fact."] });
+  assert.equal(pf65Codes(runDispatchBriefing(withFacts.argv, depsOf(withFacts.fx))).includes("DBG-PACKAGE-ORIENTATION-HEAVY"), false);
+  const atBound = packageFixture({ ...pf65Paths(6), estimatedToolCalls: 26 });
+  assert.equal(pf65Codes(runDispatchBriefing(atBound.argv, depsOf(atBound.fx))).includes("DBG-PACKAGE-ORIENTATION-HEAVY"), false);
+});
+
+test("PF-65 an estimate absent or below 8 + 3 x paths warns DBG-PACKAGE-ESTIMATE-LOW naming the floor; at or above it no warning", async () => {
+  const { runDispatchBriefing } = await lib();
+  const absent = packageFixture();
+  const absentResult = runDispatchBriefing(absent.argv, depsOf(absent.fx));
+  assert.equal(absentResult.ok, true, JSON.stringify(absentResult));
+  const warning = absentResult.warnings.find((entry) => entry.code === "DBG-PACKAGE-ESTIMATE-LOW");
+  assert.ok(warning, JSON.stringify(absentResult.warnings));
+  assert.match(warning.message, /11/u);
+  const low = packageFixture({ estimatedToolCalls: 10 });
+  const lowResult = runDispatchBriefing(low.argv, depsOf(low.fx));
+  assert.equal(lowResult.ok, true, JSON.stringify(lowResult));
+  assert.ok(pf65Codes(lowResult).includes("DBG-PACKAGE-ESTIMATE-LOW"));
+  const atFloor = packageFixture({ estimatedToolCalls: 11 });
+  assert.equal(pf65Codes(runDispatchBriefing(atFloor.argv, depsOf(atFloor.fx))).includes("DBG-PACKAGE-ESTIMATE-LOW"), false);
+  const wide = packageFixture({ ...pf65Paths(4), estimatedToolCalls: 19 });
+  const wideResult = runDispatchBriefing(wide.argv, depsOf(wide.fx));
+  assert.ok(pf65Codes(wideResult).includes("DBG-PACKAGE-ESTIMATE-LOW"));
+  assert.match(wideResult.warnings.find((entry) => entry.code === "DBG-PACKAGE-ESTIMATE-LOW").message, /20/u);
+  const wideOk = packageFixture({ ...pf65Paths(4), estimatedToolCalls: 20 });
+  assert.equal(pf65Codes(runDispatchBriefing(wideOk.argv, depsOf(wideOk.fx))).includes("DBG-PACKAGE-ESTIMATE-LOW"), false);
+});
+
+// --- PF-61 reader: a persisted background-Goldfish stop-failure diagnostic is surfaced as a non-blocking warning ---
+
+const STOP_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+const STOP_DIR = "agent-pipeline/run/native-goldfish-host-commit";
+const stopFailure = (over = {}) => ({ schema: STOP_SCHEMA, dispatchId: "ALF-BG", toolUseId: "toolu_1", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: COMMIT, observedAt: "2026-10-26T10:00:00.000Z", ...over });
+const stopWarnings = (result) => result.warnings.filter((entry) => entry.code === "DBG-HOST-COMMIT-STOP-FAILURE");
+
+test("PF-61 reader one persisted diagnostic yields exactly one warning naming dispatch, code and commit; the build still succeeds", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [stopFailure()] }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  const found = stopWarnings(result);
+  assert.equal(found.length, 1, JSON.stringify(result.warnings));
+  assert.equal(found[0].dispatchId, "ALF-BG");
+  assert.ok(found[0].message.includes("ALF-BG"));
+  assert.ok(found[0].message.includes("NGHF-HANDBACK-INVALID"));
+  assert.ok(found[0].message.includes(COMMIT));
+  assert.match(found[0].message, /commit it yourself with the Dispatch trailer, then rebuild/u);
+});
+
+test("PF-61 reader no diagnostic yields no stop-failure warning", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [] }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.deepEqual(stopWarnings(result), []);
+});
+
+test("PF-61 reader a malformed or foreign-schema entry is ignored, and several valid ones are ordered by observedAt then dispatchId", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const entries = [
+    stopFailure({ dispatchId: "ALF-B", observedAt: "2026-10-26T11:00:00.000Z" }),
+    stopFailure({ dispatchId: "ALF-FOREIGN", schema: "pipeline.something-else.v1" }),
+    stopFailure({ dispatchId: 7 }),
+    stopFailure({ dispatchId: "ALF-NOCODE", code: undefined }),
+    null,
+    "text",
+    stopFailure({ dispatchId: "ALF-A", observedAt: "2026-10-26T11:00:00.000Z" }),
+    stopFailure({ dispatchId: "ALF-FIRST", observedAt: "2026-10-26T09:00:00.000Z" }),
+  ];
+  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => entries }));
+  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
+  assert.deepEqual(stopWarnings(result).map((entry) => entry.dispatchId), ["ALF-FIRST", "ALF-A", "ALF-B"]);
+});
+
+test("PF-61 reader the default reader lists real files of the run directory, ignores a symlink, and deletes nothing", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+  const git = (...args) => {
+    const r = spawnSync("git", ["-C", fx.root, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+      "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  git("init", "-q");
+  git("add", "-A");
+  git("commit", "-q", "-m", "fixture");
+  const real = { ...depsOf(fx) };
+  delete real.git;
+  const before = runDispatchBriefing(argvOf(fx), real);
+  assert.equal(before.ok, true, JSON.stringify(before));
+  assert.deepEqual(stopWarnings(before), [], "an absent run directory is no diagnostic");
+  const dir = join(fx.root, ".git", STOP_DIR);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "stop-failure-aaa.json"), JSON.stringify(stopFailure({ dispatchId: "ALF-REAL" })));
+  writeFileSync(join(dir, "stop-failure-bad.json"), "{not json");
+  writeFileSync(join(dir, "other.json"), JSON.stringify(stopFailure({ dispatchId: "ALF-OTHERNAME" })));
+  writeFileSync(join(fx.root, "elsewhere.json"), JSON.stringify(stopFailure({ dispatchId: "ALF-LINKED" })));
+  symlinkSync(join(fx.root, "elsewhere.json"), join(dir, "stop-failure-link.json"));
+  const result = runDispatchBriefing(argvOf(fx), real);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const found = stopWarnings(result);
+  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-REAL"], JSON.stringify(result.warnings));
+  assert.equal(found[0].path, `${STOP_DIR}/stop-failure-aaa.json`);
+  assert.deepEqual(readdirSync(dir).sort(), ["other.json", "stop-failure-aaa.json", "stop-failure-bad.json", "stop-failure-link.json"]);
 });

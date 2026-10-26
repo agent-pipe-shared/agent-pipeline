@@ -252,10 +252,32 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
       status: "estimated"
     },
     decisionOptions: currentDecision.state === STATE_ADOPTION_REQUIRED
-      ? [STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL]
+      ? [STATE_APPROVED_SCOPED, STATE_PARTIAL] // D162: a new deferral is no longer offered
       : [],
     deterministicPassSafe: true
   };
+
+  // D162 S2: a legacy deferred record names its migration to the measured baseline. The measurement
+  // script is only named here, never imported (kernel closure).
+  if (currentDecision.state === STATE_DEFERRED) {
+    const legacyScope = Array.isArray(currentDecision.scope) ? [...currentDecision.scope] : [currentDecision.scope];
+    const steps = [];
+    if (!fs.existsSync(path.join(rootDir, "architecture/map"))) {
+      steps.push({ step: "measure", script: "scripts/architecture-measure.mjs", args: ["--root", rootDir, "--apply"] });
+    }
+    steps.push({
+      step: "prepare",
+      script: "scripts/architecture-adoption.mjs",
+      args: ["prepare", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, ...legacyScope.flatMap((s) => ["--scope", s]), "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]
+    });
+    steps.push({
+      step: "confirm-and-apply",
+      script: "scripts/architecture-adoption.mjs",
+      args: ["apply", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, "--request", "<request file>", "--proof", "<proof file>"],
+      note: "same confirmation route as a fresh adoption (gates.push_approval / ADR-0056 mode)"
+    });
+    proposal.migration = { from: STATE_DEFERRED, scope: legacyScope, steps };
+  }
 
   {
     const val = validateAgainstSchema(proposal, proposalSchema);
@@ -363,7 +385,7 @@ export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskSco
     return {
       ok: false,
       disposition: STATE_ADOPTION_REQUIRED,
-      error: `Architecture adoption disposition is unresolved (${STATE_ADOPTION_REQUIRED}). PO decision (${STATE_APPROVED_SCOPED} or ${STATE_DEFERRED}) required before implementation authority per AC-17.`
+      error: `Architecture adoption disposition is unresolved (${STATE_ADOPTION_REQUIRED}). PO decision (${STATE_APPROVED_SCOPED} or ${STATE_PARTIAL}) required before implementation authority per AC-17.`
     };
   }
 
@@ -526,6 +548,12 @@ function runCli() {
     }
   }
 
+  // D162 S2: no new deferral; refused before anything is built or written (also not the --out file).
+  if ((command === "prepare" || command === "apply") && decision === STATE_DEFERRED) {
+    console.error("ADOPTION-DEFERRAL-RETIRED: a new deferred adoption can no longer be created (D162). Migrate to the measured baseline instead: run architecture-measure.mjs --apply, then prepare and apply --decision approved-scoped.");
+    process.exit(1);
+  }
+
   if (out !== null && command !== "prepare") {
     console.error("Error: --out is only valid with the 'prepare' command");
     process.exit(1);
@@ -595,7 +623,7 @@ function runCli() {
     }
     case "apply": {
       if (!decision) {
-        console.error("Error: --decision is required for 'apply' (approved-scoped | deferred | partial)");
+        console.error("Error: --decision is required for 'apply' (approved-scoped | partial)");
         process.exit(1);
       }
       const applied = applyAdoptionDecision({

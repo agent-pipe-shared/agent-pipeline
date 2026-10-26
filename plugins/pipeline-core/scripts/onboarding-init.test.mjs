@@ -450,7 +450,7 @@ test("host-managed initial answers publish privately and never write reserved Gi
     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
     assert.equal(first.outcome, "pending-asks");
     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
     const sourcePath = join(root, "pipeline.user.yaml");
     const sourceBefore = readFileSync(sourcePath);
     const missingIdentity = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env, pushApproval: "chat", language: "de" });
@@ -490,7 +490,7 @@ test("host-managed first stop asks identity, approval and language before intake
     assert.equal(first.outcome, "pending-asks");
     assert.equal(first.pendingAsks.length, 1);
     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
+      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
   } finally {
     dispose(root);
@@ -801,7 +801,7 @@ function checkApprovalCell(selectedCell) {
       assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", runner);
       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
       const initialAsk = first.pendingAsks[0];
-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"],
+      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"],
         `${runner}/${pushApproval}: initial action must confirm identity, shared approval mode and language together`);
       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
@@ -989,6 +989,7 @@ test("a failed separate signature-anchor action preserves the completed initial 
       "humanApprovalMode",
       "advisorExportConsent",
       "language",
+      "pipelineActorLabel",
     ]);
     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
       ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],

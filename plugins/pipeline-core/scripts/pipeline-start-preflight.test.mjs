@@ -548,6 +548,33 @@ test("normal bootstrap reports a real greenfield scaffold as design-pending rath
   assert.equal(result.architectureOrientation.nextAction.mutation, false);
 });
 
+test("D162 S4: a migration-required orientation offers the read-only propose action and leaves readiness unchanged", () => {
+  const cwd = ROOT_CURRENT;
+  const result = preflight({
+    env: {}, pluginList: pluginList(), read: () => manifest, cwd,
+    requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
+    observeArchitectureAdoptionOrientationFn: () => ({
+      schema: "pipeline.architecture-adoption-orientation.v1",
+      status: "migration-required",
+      root: cwd,
+      adoption: { state: "deferred", scope: null, decisionRef: "po-deferral-3", coverageClass: "unavailable", confidence: "estimated" },
+      physicalMap: { greenfieldScaffold: false, status: "missing" },
+      guidance: "migrate",
+    }),
+  });
+  assert.equal(result.status, "ready", "orientation never gates bootstrap");
+  assert.equal(result.architectureOrientation.status, "migration-required");
+  assert.deepEqual(result.architectureOrientation.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [join(result.pluginRoot, "scripts", "architecture-adoption.mjs"), "propose", "--root", cwd, "--json"],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: { schema: "pipeline.adoption-proposal.v1" },
+  });
+});
+
 // Architecture orientation is carried by the one normal preflight envelope,
 // not by a runner-specific prose hint.  Re-entering an existing project must
 // therefore preserve the same non-mutating Brownfield proposal for every

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -130,9 +131,9 @@ test("a PO-deferred adoption reports complete fitness observations without enfor
     planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
     deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }) },
   });
-  assert.equal(result.status, "ready", JSON.stringify(result));
-  assert.equal(result.fitness.blockingOverallStatus, "deferred");
-  assert.equal(result.fitness.reportOnly.length, 10);
+  // D162: a deferred adoption no longer reads as ready or report-only; it requires the typed migration.
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
   assert.equal(result.artifacts.map.status, "current");
   assert.equal(result.artifacts.fitnessModel.status, "current");
   assert.equal(result.artifacts.baseline.status, "current");
@@ -157,10 +158,77 @@ test("a PO-deferred adoption still enforces fitness for a net-new path and names
       }),
     },
   });
-  assert.notEqual(result.fitness?.blockingOverallStatus, "deferred", JSON.stringify(result));
+  // D162: the net-new ratchet under deferral is retired; a deferred adoption is refused with the migration for any path.
   assert.equal(result.status, "blocked", JSON.stringify(result));
-  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
-  assert.deepEqual(result.fitness.netNewPaths, [netNew]);
+  assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
+});
+
+const D162_MIGRATION_CODE = "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED";
+const deferredDisposition = () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" });
+
+test("D162 S3: a deferred disposition over a valid map, fitness model and baseline requires migration for an existing path", () => {
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: deferredDisposition },
+  });
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, D162_MIGRATION_CODE);
+  assert.equal(result.nextAction.kind, "migration-required");
+  assert.equal(result.nextAction.code, "ARCHITECTURE-ADOPTION-MIGRATION");
+  assert.equal(result.nextAction.steps.length, 2, "the map exists, so the measure step is omitted");
+  assert.match(result.nextAction.steps[0].script, /architecture-adoption\.mjs$/u);
+  assert.ok(result.nextAction.steps[0].args.includes("prepare"));
+  assert.ok(result.nextAction.steps[0].args.includes("approved-scoped"));
+  assert.ok(result.nextAction.steps[1].args.includes("apply"));
+  assert.equal(typeof result.nextAction.guidance, "string");
+});
+
+test("D162 S3: a deferred disposition requires migration for a net-new path as well, not the fitness refusal", () => {
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/not-yet-created-net-new-module.mjs"] },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: deferredDisposition },
+  });
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, D162_MIGRATION_CODE);
+  assert.notEqual(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
+});
+
+test("D162 S3: a deferred disposition without architecture/map gets the migration with all three steps, not ARCHITECTURE-MAP-MISSING", () => {
+  const root = fixture();
+  try {
+    const result = inspectArchitectureEntryReadiness({ rootDir: root, deps: { checkPlanningAdoptionDisposition: deferredDisposition } });
+    assert.equal(result.status, "blocked", JSON.stringify(result));
+    assert.equal(result.code, D162_MIGRATION_CODE);
+    assert.notEqual(result.code, "ARCHITECTURE-MAP-MISSING");
+    assert.equal(result.nextAction.steps.length, 3);
+    assert.match(result.nextAction.steps[0].script, /architecture-measure\.mjs$/u);
+    assert.ok(result.nextAction.steps[0].args.includes("--apply"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("D162 S3: an approved-scoped disposition over a measured map with a net-new path in a measured module is not refused with the migration code", () => {
+  const root = fixture();
+  const sh = (cmd, args) => {
+    const r = spawnSync(cmd, args, { cwd: root, encoding: "utf8" });
+    assert.equal(r.status, 0, `${cmd} ${args.join(" ")}: ${r.stderr}${r.stdout}`);
+  };
+  try {
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src/a.mjs"), "export const a = 1;\n");
+    writeFileSync(join(root, "README.md"), "# fixture\n");
+    sh("git", ["init", "-q"]);
+    sh("git", ["add", "."]);
+    sh("git", ["-c", "user.name=t", "-c", "user.email=t@invalid", "commit", "-q", "-m", "init"]);
+    sh("node", [fileURLToPath(new URL("../scripts/architecture-measure.mjs", import.meta.url)), "--root", root, "--apply"]);
+    const result = inspectArchitectureEntryReadiness({
+      rootDir: root,
+      planningSurface: { planPath: "specs/f/plan.md", paths: ["src/net-new.mjs"] },
+      deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: readyDisposition },
+    });
+    assert.notEqual(result.code, D162_MIGRATION_CODE, JSON.stringify(result));
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("checkpoint map debt blocks the next planning boundary even during adoption deferral", () => {
@@ -169,7 +237,8 @@ test("checkpoint map debt blocks the next planning boundary even during adoption
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,
     deps: {
-      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
+      // D162: the subject is checkpoint debt, not the retired deferral; the disposition is approved-scoped.
+      checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "approved-scoped", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
       readCheckpointArchitectureDebt: () => ({ ok: true, debt: [{ stalenessDebt: [debt] }], resolvedDebt: [] }),
     },
   });
@@ -187,11 +256,14 @@ test("a descendant map repair consumes checkpoint debt only after class-7 passes
   const reader = () => ({ ok: true, debt: [], resolvedDebt: [{ stalenessDebt: [debt] }] });
   const common = { rootDir: repoRoot, planningSurface: { planPath: "specs/architecture-entry.md",
     paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] }, deps: {
-    checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
+    // D162: the subject is the descendant map repair, not the retired deferral; the disposition is approved-scoped.
+    checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "approved-scoped", scope: [ARCHITECTURE_ENTRY_SCOPE] }),
+    // D162: with approved-scoped, class 9 needs a signed record; a passing fitness stub keeps the debt consumption the subject.
+    evaluateArchitectureFitness: () => ({ overallStatus: "pass", outcomes: Array.from({ length: 10 }, (_, index) => ({ classId: index + 1, outcome: "pass" })) }),
     readCheckpointArchitectureDebt: reader,
   } };
   const repaired = inspectArchitectureEntryReadiness(common);
-  assert.equal(repaired.status, "ready", repaired.code);
+  assert.equal(repaired.status, "ready", JSON.stringify(repaired).slice(0, 1500));
   assert.deepEqual(repaired.artifacts.checkpointDebt, { status: "clear", openCount: 0, targets: [] });
   const stillStale = inspectArchitectureEntryReadiness({ ...common, deps: {
     ...common.deps,
@@ -354,9 +426,9 @@ test("a deferred architecture decision remains visible without changing lifecycl
         code: "ARCH-DECISION-EFFECTIVE-UNRESOLVED", decisions: [], findings: [] }),
     },
   });
-  assert.equal(result.status, "ready", JSON.stringify(result));
-  assert.equal(result.artifacts.decisionApplicability.status, "blocked");
-  assert.equal(result.artifacts.decisionApplicability.areas[0].area, "pipeline-core");
+  // D162: a deferred adoption is no longer ready; it is refused with the typed migration.
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
 });
 
 test("an unavailable optional decision clock remains diagnostic", () => {

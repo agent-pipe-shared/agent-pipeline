@@ -30,7 +30,7 @@ const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec",
 // D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
 export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
 const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
-const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops"]);
+const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops", "facts"]);
 const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls"]);
 const TOOL_BUDGET_LINE = /Tool budget[^\n]*≤(\d+) tool uses/u;
 // A repository-relative file named inside a targeted command (`node <path> ...`, a backticked path).
@@ -89,6 +89,26 @@ export function validateBriefingPackage(pkg) {
     refuse("DBG-PACKAGE-FIELD-TYPE", `package field "estimatedToolCalls" must be a positive integer when present; repair: give the estimated tool calls of the whole test-first cycle`);
   }
   return pkg;
+}
+
+// PF-65: a package naming more delivery files than this, with no coordinator facts, makes a bounded implementor spend its tool budget on orientation.
+export const ORIENTATION_PATH_BOUND = 6;
+
+/**
+ * Advisory (never blocking) findings about a valid package, as {code, message} warnings: an orientation-heavy delivery
+ * without facts, then an estimate below the floor. The floor 8 + 3 x paths is an uncalibrated heuristic until recorded runs calibrate it.
+ */
+export function packageAdvisories(pkg) {
+  const warnings = [];
+  const pathCount = new Set(pkg.paths).size;
+  if (pathCount > ORIENTATION_PATH_BOUND && (pkg.facts === undefined || pkg.facts.length === 0)) {
+    warnings.push({ code: "DBG-PACKAGE-ORIENTATION-HEAVY", message: `the package names ${pathCount} delivery paths, above the bound ${ORIENTATION_PATH_BOUND}, and carries no coordinator facts, so the implementor will likely spend its tool budget on orientation; repair: add "facts" (what the coordinator already established) or split the outcome` });
+  }
+  const floor = 8 + 3 * pathCount;
+  if (pkg.estimatedToolCalls === undefined || pkg.estimatedToolCalls < floor) {
+    warnings.push({ code: "DBG-PACKAGE-ESTIMATE-LOW", message: `estimatedToolCalls ${pkg.estimatedToolCalls === undefined ? "is absent" : `${pkg.estimatedToolCalls} is below the floor`}; the floor for ${pathCount} delivery path(s) is ${floor} (8 + 3 x paths); repair: set "estimatedToolCalls" to at least ${floor}` });
+  }
+  return warnings;
 }
 
 /** The hard tool cap the binding builder wrote into field 6 of its skeleton. */
@@ -207,6 +227,8 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
   return { code: "DBG-GENERATED-BRIEFING-REQUIRED", message: `a governed Goldfish item briefing must come from the briefing generator, not be assembled by hand; ${repair}` };
 }
 
+const factsBlock = (pkg) => (pkg.facts === undefined ? "" : `\n\nFacts established by the coordinator (do not re-derive):\n\n${pkg.facts.map((fact) => `- ${fact}`).join("\n")}`);
+
 /** Renders the full briefing; `generated` is the binding builder's result for this package. */
 export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
@@ -237,7 +259,7 @@ ${NATIVE_GOLDFISH_HOST_DIRECTIVE}
 
 ### 1. Goal
 
-${pkg.goal}
+${pkg.goal}${factsBlock(pkg)}
 
 ### 2. Context files
 

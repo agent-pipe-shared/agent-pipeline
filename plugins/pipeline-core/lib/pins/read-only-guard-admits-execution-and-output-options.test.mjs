@@ -156,9 +156,12 @@ test("A1 git fetch: helper/executable-naming options and URL transports stay ref
   for (const command of ["git fetch -u calc", "git fetch --server-option=x", "git fetch -c core.x=y",
     "git fetch ext::calc", "git fetch origin main:other"]) assert.equal(guard(command), false, command);
 });
-test("A1 git fetch: plain fetches stay admitted (control)", () => {
+// AC-123 / PO decision Q18 (QG-04 justification): this control flips from admitted to refused. A plain fetch
+// writes remote-tracking refs, FETCH_HEAD and the object database, so it is a write, not a passive read; the
+// same four commands remain the examiner, now asserting the verdict the PO decided.
+test("A1 git fetch: plain fetches are refused as ref-updating writes (Q18)", () => {
   for (const command of ["git fetch", "git fetch origin", "git fetch --all --prune", "git fetch origin main"]) {
-    assert.equal(guard(command), true, command);
+    assert.equal(guard(command), false, command);
   }
 });
 test("A1 git -C: a directory inside the project stays admitted (control); missing arg refused", () => {

@@ -114,6 +114,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
 import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
 import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
+import { existsSync as actorExistsSync } from "node:fs";
+import { heldIdentityChoice, normalizePipelineActorAssignment, writePipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
 import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
 import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
 import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -165,7 +167,7 @@ function initialJournalFailure(error) {
 }
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat --language de|en --advisor-export-consent approved|declined] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> [--pipeline-actor <label|none>] --human-approval signature|chat --language de|en --advisor-export-consent approved|declined] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
 }
 
 // The runner lane, pinned rather than inherited.
@@ -240,6 +242,11 @@ function parseArgs(argv) {
       if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-email requires a non-empty value" };
       output.gitAuthorEmail = value;
       index += 1;
+    } else if (arg === "--pipeline-actor") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--pipeline-actor requires a label or the literal none" };
+      output.pipelineActor = value;
+      index += 1;
     } else if (arg === "--human-approval" || arg === "--push-approval") {
       const value = argv[index + 1];
       if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--human-approval requires signature or chat" };
@@ -270,6 +277,7 @@ function parseArgs(argv) {
   if ((identityValues.some((value) => value !== undefined) || output.pushApproval !== undefined) && !output.pushApproval) {
     return { error: "initial answers require --human-approval" };
   }
+  if (output.pipelineActor !== undefined && output.pushApproval === undefined) return { error: "--pipeline-actor requires --human-approval" };
   if (output.pushApproval !== undefined && output.language === undefined) return { error: "initial answers require --language" };
   if (output.language !== undefined && output.pushApproval === undefined) return { error: "--language requires --human-approval" };
   if (output.advisorExportConsent !== undefined && output.pushApproval === undefined) return { error: "--advisor-export-consent requires --human-approval" };
@@ -881,7 +889,28 @@ export function applyExistingPublicTrustAnchorMaterialization(plan) {
  * The generated source is changed only at its validated approval scalars,
  * and a repo-private receipt makes the per-repository confirmation durable across restart.
  */
-export function applyInitialOnboardingAnswers({
+export function applyInitialOnboardingAnswers(params = {}) {
+  const { pipelineActor = null, ...rest } = params ?? {};
+  let label = null;
+  if (pipelineActor !== null && pipelineActor !== undefined && pipelineActor !== "none") {
+    const normalized = normalizePipelineActorAssignment({ label: pipelineActor });
+    if (!normalized.ok) return { ok: false, code: "INITIAL-ANSWERS-ACTOR-INVALID" };
+    label = normalized.assignment.label;
+  }
+  const result = applyInitialOnboardingAnswersCore(rest);
+  if (!result?.ok || label === null) return result;
+  const root = resolve(rest.rootDir);
+  for (const repositoryCapability of ["local", "host-managed"]) {
+    let held = false;
+    try { held = actorExistsSync(resolveInitialAnswersState(root, repositoryCapability).receipt); } catch { held = false; }
+    if (!held) continue;
+    const written = writePipelineActorAssignment({ root, repositoryCapability, label });
+    return written.ok ? result : { ok: false, code: "INITIAL-ANSWERS-ACTOR-WRITE-FAILED" };
+  }
+  return { ok: false, code: "INITIAL-ANSWERS-ACTOR-WRITE-FAILED" };
+}
+
+function applyInitialOnboardingAnswersCore({
   rootDir,
   runner,
   gitAuthorName = null,
@@ -1338,12 +1367,36 @@ function persistedInitialPushApproval(root, repositoryCapability = "local") {
     : null;
 }
 
+function withPipelineActorAsk(action) {
+  const inputs = action?.inputs;
+  const argv = action?.applyAction?.argv;
+  if (!Array.isArray(inputs) || !Array.isArray(argv)) return action;
+  const gitInput = inputs.find((input) => input?.name === "gitAuthorName");
+  if (!gitInput || inputs.some((input) => input?.name === "pipelineActorLabel")) return action;
+  const approvalAt = argv.indexOf("--human-approval");
+  if (approvalAt < 0) return action;
+  const actorInput = { ...gitInput, name: "pipelineActorLabel" };
+  for (const key of Object.keys(actorInput)) {
+    if (key !== "name" && typeof actorInput[key] === "string") {
+      actorInput[key] = actorInput[key].replaceAll("gitAuthorName", "pipelineActorLabel").replaceAll("--git-author-name", "--pipeline-actor");
+    }
+  }
+  if ("maxBytes" in actorInput) actorInput.maxBytes = 320;
+  const nextArgv = [...argv.slice(0, approvalAt), "--pipeline-actor", "<PO_PIPELINE_ACTOR>", ...argv.slice(approvalAt)];
+  return {
+    ...action,
+    inputs: [...inputs, actorInput],
+    guidance: `${action.guidance ?? ""} Ask once, together with the Git author, for the Pipeline actor label (or none) that names who performs submit, present, close and push; it is attribution only and never an approval.`,
+    applyAction: { ...action.applyAction, argv: nextArgv },
+  };
+}
+
 function normalizeOnboardingDriverOutput(output, root) {
   const nextAction = output?.nextAction;
   if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
   const pushApproval = persistedInitialPushApproval(root, output?.repository?.mode ?? "local");
   const pendingAsks = nextAction.pendingAsks
-    .map(initialAnswersActionWithoutTrustAnchor)
+    .map((action) => withPipelineActorAsk(initialAnswersActionWithoutTrustAnchor(action)))
     .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
   return pendingAsks.length === nextAction.pendingAsks.length
     && pendingAsks.every((action, index) => action === nextAction.pendingAsks[index])
@@ -1367,7 +1420,19 @@ function normalizeOnboardingDriverOutput(output, root) {
  * whatever machine-plane state happens to live under the real caller's `$HOME`
  * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
  */
-export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
+export function driveOnboardingInit(options = {}) {
+  const result = driveOnboardingInitCore(options);
+  if (!result || typeof result !== "object" || !options?.rootDir) return result;
+  const root = resolve(options.rootDir);
+  for (const repositoryCapability of ["local", "host-managed"]) {
+    let choice = null;
+    try { choice = heldIdentityChoice(root, repositoryCapability); } catch { choice = null; }
+    if (choice !== null) return { ...result, heldIdentityChoice: choice };
+  }
+  return result;
+}
+
+function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
   const root = resolve(rootDir);
   const steps = [];
   if (!Number.isSafeInteger(runBudgetMs) || runBudgetMs < 1) throw new Error("runBudgetMs must be a positive safe integer");
@@ -1745,6 +1810,7 @@ export function main(args = process.argv.slice(2), {
       runner: options.runner,
       gitAuthorName: options.gitAuthorName ?? null,
       gitAuthorEmail: options.gitAuthorEmail ?? null,
+      pipelineActor: options.pipelineActor ?? null,
       pushApproval: options.pushApproval,
       language: options.language,
       advisorExportConsent: options.advisorExportConsent,

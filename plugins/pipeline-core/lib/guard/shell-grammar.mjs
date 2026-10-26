@@ -1400,18 +1400,9 @@ function isReadOnlyGitSubcommand(subcommand, subargs) {
       arg === "-a" || arg === "-r" || arg === "-v" || arg === "-vv" || arg === "--list" || arg === "--show-current" || arg === "--contains" || arg.startsWith("--format="));
   }
   if (subcommand === "remote") return subargs.length === 0 || (subargs.length === 1 && subargs[0] === "-v");
-  // Fetch updates only remote-tracking/object state; it never changes the
-  // index or working tree.  A stale or migration-required lifecycle must not
-  // prevent an operator from observing the current upstream.  Destructive
-  // adoption remains separately guarded at checkout/switch time.
-  // Only closed boolean flags and plain remote/ref names: --upload-pack, -u, --server-option,
-  // -c, ext::/URL-style transports and refspecs can name an executable or helper.
-  if (subcommand === "fetch") {
-    return subargs.every((arg) =>
-      ["--all", "--prune", "-p", "--tags", "-t", "--no-tags", "--dry-run", "-n", "--quiet", "-q",
-        "--verbose", "-v"].includes(arg)
-      || /^[A-Za-z0-9][A-Za-z0-9._/@-]*$/u.test(arg));
-  }
+  // AC-123 / PO decision Q18: fetch writes remote-tracking refs, FETCH_HEAD and the object database, so it is
+  // a write, not a passive read.  It is deliberately NOT admitted here: before a ready bootstrap the pre-ready
+  // lane must refuse it (with the typed bootstrap recovery), and after readiness it follows the ordinary lifecycle gate.
   if (subcommand !== "config") return false;
   const isListMode = subargs.includes("--list") || subargs.includes("-l");
   const isGetMode = subargs.length >= 2 && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);

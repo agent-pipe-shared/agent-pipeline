@@ -22,7 +22,7 @@
  */
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,7 +39,7 @@ import {
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
-import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import { canonical, createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { placeholder, renderHumanCopySafeCommand } from "../lib/copy-safe-command.mjs";
 import { PTY_HOST_LIMIT, runMainUnderPty } from "../lib/test-hgo-cli-pty-fixture.mjs";
 
@@ -1047,4 +1047,117 @@ test("refreeze-plan validates its flag set like the sibling plan subcommand", ()
   const status = main(["refreeze-plan", "--repo", "/tmp/does-not-matter"], captured);
   assert.equal(status, 2);
   assert.match(captured.stderr, /HGO-USAGE/u);
+});
+
+// W3-R2-HGO-SWEEP-ALL-C1 (AC-160): a refusal that offers no human override route seeds no request, and
+// sweep-requests --all removes every eligible expired request in one invocation.
+function hgoRequestsDir(root) {
+  return join(realpathSync(root), ".git", "agent-pipeline", "human-guard-overrides", "requests");
+}
+
+function seedRetiredRequests(root, count, expiresAt = "2026-08-31T10:00:00.000Z") {
+  const physical = realpathSync(root), dir = hgoRequestsDir(root), names = [];
+  const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
+  for (let n = 0; n < count; n++) {
+    const retired = { schema: "pipeline.human-guard-override-request.v2", root: physical, commandClass: `retired-${n}`,
+      mode: "standard", authorSourceRoot: null, expiresAt };
+    const name = digest(retired);
+    writeFileSync(join(dir, `${name}.json`), JSON.stringify(retired), { mode: 0o600 });
+    names.push(name);
+  }
+  return names;
+}
+
+function seedOverridableDenial(root, content) {
+  return recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+    toolInput: { file_path: "notes.md", content }, denials: [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL" }], nowMs: Date.now() });
+}
+
+test("AC-160: a read-grammar refusal (GUARD-READ-COMMAND-UNSUPPORTED) seeds no override request; an overridable refusal seeds exactly one", () => {
+  const root = fixture();
+  try {
+    const seeded = seedOverridableDenial(root, "AC-160 overridable\n");
+    assert.equal(typeof seeded.requestSha256, "string", JSON.stringify(seeded));
+    const dir = hgoRequestsDir(root);
+    assert.equal(readdirSync(dir).length, 1, "an overridable refusal seeds exactly one request");
+    for (const code of ["GUARD-READ-COMMAND-UNSUPPORTED"]) {
+      // The real denial reason shape the hook hands to recordHumanGuardDenial (mirrors the live input).
+      const reason = `BLOCKED (guard-lifecycle-ready, plugin pipeline-core): ${code}: The command is outside the closed Pipeline shell grammar.`;
+      const outcome = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash",
+        toolInput: { command: "rg -rn needle probe.txt" }, denials: [{ guard: "guard-lifecycle-ready.mjs", reason }], nowMs: Date.now() });
+      assert.equal(outcome.status, "non-liftable-recovery-required", `${code}: ${JSON.stringify(outcome)}`);
+      assert.equal(outcome.requestSha256, undefined, `${code}: ${JSON.stringify(outcome)}`);
+      assert.equal(readdirSync(dir).length, 1, `${code} wrote no request file`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("AC-160: sweep-requests --all removes every eligible expired request in one invocation and reports aggregate counts", () => {
+  const root = fixture();
+  try {
+    const live = seedOverridableDenial(root, "AC-160 live request\n");
+    seedRetiredRequests(root, 150);
+    const dir = hgoRequestsDir(root);
+    assert.equal(readdirSync(dir).length, 151);
+    const out = io();
+    assert.equal(main(["sweep-requests", "--repo", root, "--all"], out), 0, out.stderr);
+    const result = JSON.parse(out.stdout);
+    assert.equal(result.removed, 150, out.stdout);
+    assert.equal(result.remainingEligible, 0, out.stdout);
+    assert.equal(result.retained, 1, out.stdout);
+    assert.equal(result.runs, 3, "150 expired requests take three publications of at most 61");
+    assert.deepEqual(readdirSync(dir), [`${live.requestSha256}.json`], "the live unexpired request is never removed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("AC-160: sweep-requests without --all keeps its bounded single-batch behaviour, and --all must be the trailing flag only", () => {
+  const root = fixture();
+  try {
+    seedOverridableDenial(root, "AC-160 bounded seed\n");
+    seedRetiredRequests(root, 70);
+    const out = io();
+    assert.equal(main(["sweep-requests", "--repo", root], out), 0, out.stderr);
+    const result = JSON.parse(out.stdout);
+    assert.equal(result.removed, 61, out.stdout);
+    assert.equal(result.remainingEligible, 9, out.stdout);
+    const bad = io();
+    assert.notEqual(main(["sweep-requests", "--all", "--repo", root], bad), 0, "a non-trailing --all is a usage error");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("AC-160: sweep-requests --all keeps a request an armed capability names", () => {
+  const root = fixture();
+  try {
+    seedOverridableDenial(root, "AC-160 armed seed\n");
+    const [held] = seedRetiredRequests(root, 70);
+    const base = join(realpathSync(root), ".git", "agent-pipeline", "human-guard-overrides");
+    writeFileSync(join(base, "capabilities", `${"c".repeat(64)}.json`), JSON.stringify({ schema: "pipeline.human-guard-override-capability.v2",
+      status: "armed", requestSha256: held, expiresAt: "2026-08-31T10:00:00.000Z" }), { mode: 0o600 });
+    const out = io();
+    assert.equal(main(["sweep-requests", "--repo", root, "--all"], out), 0, out.stderr);
+    const result = JSON.parse(out.stdout);
+    assert.equal(result.removed, 69, out.stdout);
+    assert.equal(existsSync(join(hgoRequestsDir(root), `${held}.json`)), true, "a request named by an armed capability stays");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("AC-160: the namespace-full refusal names the one-shot sweep-requests --all repair", () => {
+  const root = fixture();
+  try {
+    seedOverridableDenial(root, "AC-160 namespace seed\n");
+    seedRetiredRequests(root, 3100);
+    assert.throws(() => seedOverridableDenial(root, "AC-160 one more\n"),
+      (error) => /HGO-REQUEST-NAMESPACE-FULL|override request namespace holds/u.test(String(error?.code ?? "") + String(error?.message))
+        && /sweep-requests --repo <absolute-root> --all/u.test(String(error?.message)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

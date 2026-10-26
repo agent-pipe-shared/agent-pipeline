@@ -191,15 +191,6 @@ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
       && Array.isArray(outcome.evidence?.required)
       && outcome.evidence.required.includes("measured-calibration")
       && outcome.evidence.required.includes("explicit-threshold-promotion")
-  ) || (
-    // A PO-authorized deferral honestly has no approved-scoped snapshot to
-    // compare.  That makes profile-drift observation unavailable, not a
-    // reason to negate the PO's explicit deferral.  Findings remain blocking.
-    adoptionDisposition === "deferred"
-      && outcome.classId === 9
-      && outcome.outcome === "unavailable"
-      && outcome.evidence?.status === "unavailable"
-      && outcome.details === "Valid approved-scoped authority is unavailable"
   ));
   const blocking = outcomes.filter((outcome) => !reportOnly.includes(outcome));
   let blockingOverallStatus = "pass";
@@ -328,6 +319,33 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       "The final package is approved; its PRD still needs the explicit architecture design block",
       artifacts, disposition);
   }
+  // D162 S3: a legacy deferred adoption no longer grants entry. It must be
+  // migrated to an approved-scoped adoption over the measured baseline; this
+  // runs before the map checks so a deferred repository without a map gets the
+  // migration, not ARCHITECTURE-MAP-MISSING.
+  if (disposition.ok && disposition.disposition === "deferred") {
+    const scopeEntries = Array.isArray(disposition.scope) ? disposition.scope
+      : (typeof disposition.scope === "string" && disposition.scope ? [disposition.scope] : []);
+    const prepareArgs = ["--root", root, "--decision", "approved-scoped"];
+    for (const entry of scopeEntries) prepareArgs.push("--scope", String(entry));
+    prepareArgs.push("--rationale", "D162 migration of a legacy deferred adoption to the measured baseline",
+      "--decision-ref", "D162-migration");
+    const steps = [];
+    if (artifacts.map.status === "missing") {
+      steps.push({ step: 1, script: "scripts/architecture-measure.mjs", args: ["--root", root, "--apply"] });
+    }
+    steps.push({ step: 2, script: "scripts/architecture-adoption.mjs", args: ["prepare", ...prepareArgs] });
+    steps.push({ step: 3, script: "scripts/architecture-adoption.mjs",
+      args: ["apply", "--root", root, "--decision", "approved-scoped", "--request", "<request-file>", "--proof", "<proof-file>"] });
+    return readinessFailure("ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED",
+      "a legacy deferred architecture adoption must be migrated to an approved-scoped adoption over the measured baseline before implementation (D162)",
+      artifacts, disposition, null, {
+        kind: "migration-required",
+        code: "ARCHITECTURE-ADOPTION-MIGRATION",
+        steps,
+        guidance: "The PO confirms step 3 through the same route as a fresh adoption.",
+      });
+  }
   if (!map.ok || !map.indexFileExists || !indexValid) {
     return readinessFailure(map.indexFileExists ? "ARCHITECTURE-MAP-INVALID" : "ARCHITECTURE-MAP-MISSING",
       map.indexFileExists ? "the physical architecture map is malformed or has invalid module contracts"
@@ -431,40 +449,6 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       planningSurface: surface,
     });
   }
-  // A deliberate PO deferral means architecture fitness is observed but not
-  // enforced until the recorded review. Physical artifacts and the signed
-  // disposition above remain mandatory; this never fabricates a passing
-  // fitness result and keeps every outcome visible for the later adoption.
-  // Net-new ratchet (PO decision 2026-10-16 #5): the deferral covers only paths
-  // that already existed; a net-new implementation path gets the full check.
-  // KNOWN LIMITATION (owner: Coordinator, due 2026-10-31): "existed" is judged by on-disk existence at entry time. The
-  // deferral record (architecture-adoption.mjs: schema/state/scope/decidedAt/
-  // expiresAt/reviewDate/decisionRef/...) carries neither a commit nor a captured
-  // path list, so a path created by an earlier implementation entry reads as
-  // established at a later entry. Tightening needs the record to capture a
-  // baseline commit or path list (a schema/decision change, out of this scope).
-  const netNewPaths = disposition.disposition === "deferred"
-    ? surface.paths.filter((candidate) => !(deps.pathExists ?? existsSync)(resolve(root, candidate)))
-    : [];
-  if (disposition.disposition === "deferred" && netNewPaths.length === 0) {
-    return {
-      schema: ARCHITECTURE_ENTRY_SCHEMA,
-      status: "ready",
-      root,
-      code: null,
-      message: "physical architecture artifacts are valid; PO-approved architecture enforcement is deferred",
-      artifacts,
-      disposition,
-      fitness: {
-        overallStatus: fitness.overallStatus,
-        blockingOverallStatus: "deferred",
-        reportOnly: fitness.outcomes,
-        outcomes: fitness.outcomes,
-        summary: fitness.summary,
-      },
-      nextAction: null,
-    };
-  }
   if (!(fitnessProjection.blockingOverallStatus === "pass" || fitnessProjection.blockingOverallStatus === "excepted")) {
     return readinessFailure("ARCHITECTURE-FITNESS-NOT-READY", `planning architecture fitness is ${fitnessProjection.blockingOverallStatus}`, artifacts, disposition, {
       overallStatus: fitness.overallStatus,
@@ -473,7 +457,6 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
       outcomes: fitness.outcomes,
       summary: fitness.summary,
       planningSurface: surface,
-      ...(netNewPaths.length > 0 ? { netNewPaths } : {}),
     });
   }
 

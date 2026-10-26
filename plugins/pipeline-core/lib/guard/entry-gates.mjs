@@ -10,7 +10,7 @@ import { evaluateArchitectureFitness, inspectFitnessModelMaterialization, runFit
 import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
 import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
-import { ARCHITECTURE_ADOPTION_DENIAL_CODE, ARCHITECTURE_FITNESS_DENIAL_CODE, MINIMUM_RIGOR_ADVISORY_CODE, PIPELINE_STATE_SCRIPT } from "./constants.mjs";
+import { ARCHITECTURE_ADOPTION_DENIAL_CODE, ARCHITECTURE_ADOPTION_MIGRATION_DENIAL_CODE, ARCHITECTURE_FITNESS_DENIAL_CODE, MINIMUM_RIGOR_ADVISORY_CODE, PIPELINE_STATE_SCRIPT } from "./constants.mjs";
 import { verdict } from "./verdict.mjs";
 import { resolveSanctionedScriptInvocation } from "./sanctioned-args-scripts.mjs";
 
@@ -116,6 +116,16 @@ export function architectureAdoptionAuthorityVerdict(root, command, dependencies
   } catch {
     disposition = null;
   }
+  if (disposition?.ok === true && disposition.disposition === "deferred") {
+    return verdict(
+      2,
+      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+        + `${ARCHITECTURE_ADOPTION_MIGRATION_DENIAL_CODE}: a legacy deferred architecture adoption must be migrated to an approved-scoped adoption over the measured baseline before implementation (D162).\n`
+        + "Step 1 (only when architecture/map is missing): node scripts/architecture-measure.mjs --root <root> --apply\n"
+        + "Step 2: node scripts/architecture-adoption.mjs prepare --root <root> --decision approved-scoped --scope <each scope entry> --rationale 'D162 migration of a legacy deferred adoption to the measured baseline' --decision-ref D162-migration\n"
+        + "Step 3: the PO confirms through the same route as a fresh adoption, then node scripts/architecture-adoption.mjs apply --root <root> --decision approved-scoped --request <file> --proof <file>\n",
+    );
+  }
   if (disposition?.ok === true) return null;
   const detail = typeof disposition?.error === "string" && disposition.error.trim() !== ""
     ? disposition.error
@@ -124,7 +134,7 @@ export function architectureAdoptionAuthorityVerdict(root, command, dependencies
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${ARCHITECTURE_ADOPTION_DENIAL_CODE}: ${detail}\n`
-      + "Record one PO-owned approved-scoped, deferred, or partial adoption decision for the active plan scope before requesting implementation authority.\n",
+      + "Record one PO-owned approved-scoped or partial adoption decision for the active plan scope before requesting implementation authority.\n",
   );
 }
 
@@ -168,9 +178,7 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
     fitness = null;
   }
   if (fitness?.overallStatus === "pass" || fitness?.overallStatus === "excepted") return null;
-  // Operator hotfix 10: a complete findings-bearing fitness result under a PO-deferred
-  // adoption is report-only, but only while the library entry gate agrees. Any throw,
-  // any shortfall, any other disposition falls through to the unchanged denial below.
+  // Only the greenfield pending allowance below can lift a non-green fitness result.
   if (fitness !== null && typeof fitness === "object"
     && typeof fitness.overallStatus === "string"
     && fitness.overallStatus !== "unavailable" && fitness.overallStatus !== "unknown"
@@ -178,14 +186,7 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
     try {
       const scope = (dependencies.activeFeaturePlanningScopeFn ?? activeFeaturePlanningScope)(root, dependencies);
       if (typeof scope === "string" && scope.trim() !== "") {
-        const adoption = (dependencies.checkPlanningAdoptionDispositionFn ?? checkPlanningAdoptionDisposition)(root, scope);
-        if (adoption?.ok === true && adoption.disposition === "deferred") {
-          const entry = (dependencies.inspectArchitectureEntryReadinessFn ?? inspectArchitectureEntryReadiness)({
-            rootDir: root,
-            taskScope: scope,
-          });
-          if (entry?.status === "ready") return null;
-        }
+        // D162 S3: the operator-hotfix-10 deferred allowance is retired; a deferred disposition is refused by the adoption gate.
         // ALF-H1-PF20 (AC-127): a materialized greenfield tree is approved-scoped, never deferred, so the allowance above
         // cannot cover it. The library decides whether the only non-green evaluator outcomes are the tree's own planned,
         // not yet written contracts and verification entry points; any other finding, and navigation currency, still deny.

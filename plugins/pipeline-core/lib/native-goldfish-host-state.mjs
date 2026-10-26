@@ -249,7 +249,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
   };
   let stored;
   try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state); }
-  catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
+  catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
 }
 

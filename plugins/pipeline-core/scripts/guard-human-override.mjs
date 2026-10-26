@@ -21,6 +21,7 @@ import {
   repairHumanGuardOverrideAudit,
   refreezeHumanGuardOverridePlan,
   sweepHumanGuardOverrideRequests,
+  sweepHumanGuardOverrideRequestsAll,
   verifyHumanGuardOverrideAudit,
 } from "../lib/human-guard-override.mjs";
 import {
@@ -55,7 +56,7 @@ function usage() {
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs render-copy-safe --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
-    "  guard-human-override.mjs sweep-requests --repo <absolute-root>",
+    "  guard-human-override.mjs sweep-requests --repo <absolute-root> [--all]",
     "  guard-human-override.mjs publish-consumption-action --repo <absolute-root> --plan-sha256 <64hex> --event-out <repo-relative-path>",
     "  guard-human-override.mjs repair-audit --repo <absolute-root> --preimage-sha256 <64hex> --activate",
   ].join("\n");
@@ -191,9 +192,11 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
   const [command, ...rest] = argv;
   try {
     if (command === "sweep-requests") {
-      const parsed = flags(rest);
+      const all = rest.at(-1) === "--all";
+      const parsed = flags(all ? rest.slice(0, -1) : rest);
       if (!exactFlagSet(parsed, ["repo"]) || typeof parsed.repo !== "string") throw new Error(usage());
-      write(`${JSON.stringify(sweepHumanGuardOverrideRequests({rootDir: parsed.repo}))}\n`);
+      const sweep = all ? sweepHumanGuardOverrideRequestsAll : sweepHumanGuardOverrideRequests;
+      write(`${JSON.stringify(sweep({rootDir: parsed.repo}))}\n`);
       return 0;
     }
     if (command === "verify-audit") {

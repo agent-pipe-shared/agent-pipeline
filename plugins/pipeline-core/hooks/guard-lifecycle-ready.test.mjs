@@ -538,6 +538,29 @@ function readyStub() {
   return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
 }
 
+test("D162 S3: set-phase implementation with a deferred disposition is denied with the migration code naming the three steps", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const surface = { planPath: "specs/feature/plan.md", paths: ["src/existing.mjs"] };
+    const command = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+      activeFeaturePlanningScopeFn: () => surface.planPath,
+      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+      activeFeaturePlanningSurfaceFn: () => surface,
+      evaluateArchitectureFitnessFn: () => ({ overallStatus: "pass", outcomes: [] }),
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready, plugin pipeline-core\): GUARD-ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED:/u);
+    assert.match(result.stderr, /architecture-measure\.mjs/u);
+    assert.match(result.stderr, /approved-scoped/u);
+    assert.match(result.stderr, /architecture-adoption\.mjs apply/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("a valid architecture deferral does not let a missing physical map mint implementation authority", () => {
   const path = root();
   try {
@@ -558,8 +581,8 @@ test("a valid architecture deferral does not let a missing physical map mint imp
       evaluateArchitectureFitnessFn: evaluateArchitectureFitness,
     });
     assert.equal(result.exitCode, 2);
-    assert.match(result.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
-    assert.match(result.stderr, /navigation-currency:restore-navigation-bundle/u);
+    // D162: a deferred disposition is refused with the typed migration code before the missing map is reached.
+    assert.match(result.stderr, /GUARD-ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED/u);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -578,7 +601,8 @@ test("AC-7 reports expanded or unknown B1 rigor without deadlocking implementati
       projectDir: path,
       requireProjectOnboardingReadyFn: readyStub,
       activeFeaturePlanningScopeFn: () => surface.planPath,
-      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+      // D162: the subject here is rigor reporting, not the retired deferral; use an approved-scoped stub.
+      checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "approved-scoped" }),
       activeFeaturePlanningSurfaceFn: () => surface,
       evaluateArchitectureFitnessFn: () => ({ overallStatus: "pass" }),
       activeFeatureSelectedProfileFn: () => selectedProfile,
@@ -1190,10 +1214,6 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "git diff --check",
       "git rev-parse HEAD",
       "git config --get branch.main.remote",
-      // AC-197 group F (QG-04 justification, bounded to this list entry): e02c40247 (AC-240) admits a
-      // fetch only with plain remote and ref names, so the plain-name fetch stands in for the refspec
-      // spelling here; the refspec spelling keeps its examiner as a refusal asserted before this loop.
-      "git fetch origin main",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
@@ -1208,6 +1228,12 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "find . -delete",
       "git branch new-branch",
       "git config user.name changed",
+      // AC-123 / PO decision Q18 (QG-04 justification, bounded to this list entry): "git fetch origin main"
+      // moves here from the admitted list above. Fetch writes remote-tracking refs, FETCH_HEAD and the object
+      // database, so it is a write and is refused before a ready bootstrap; the refusal assertion is the same
+      // examiner the entry had, now asserting the opposite verdict the PO decided. Not weakened: the
+      // refspec refusal asserted before the loop stays, and the new pre-ready case adds fetch/pull/remote update.
+      "git fetch origin main",
       "git status && touch bypass",
       "node --check harness/scripts/verify.mjs --eval bypass",
       "node -e 'process.exit(0)'",
@@ -1239,6 +1265,43 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     rmSync(path, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
+});
+
+// AC-123 / PO decision Q18 (pipeline.greenfield.r2.ref-updating-git-runs-before-bootstrap): before a ready
+// bootstrap only genuinely read-only actions run. A ref-updating Git subcommand writes refs, FETCH_HEAD or the
+// object database, so the pre-ready lane refuses it and names pipeline-start as the typed recovery.
+test("pre-ready ref-updating git (fetch, pull, remote update) is refused with the typed bootstrap recovery; local reads stay admitted", () => {
+  const path = root();
+  try {
+    markGovernedFixture(path);
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const notReady = () => deny("repository-control-path-invalid");
+    for (const command of ["git fetch", "git fetch origin", "git fetch origin main", "git fetch --all --prune", "git pull", "git pull origin main", "git remote update"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: notReady,
+        readCodexHostRepositoryInitAdmissionFn: () => null,
+        hasCodexExistingGitControlMountFn: () => false,
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
+      // Canonical non-ready recovery: the typed project-onboarding-v3 inspection, which is exactly what pipeline-start runs.
+      assert.match(result.stderr, /project-onboarding-v3 inspection/u, command);
+    }
+    for (const command of ["git status", "git log", "git diff", "git rev-parse HEAD"]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: notReady,
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    // post-ready admission is unchanged
+    assert.equal(evaluateLifecycleReadyGuard(bash("git fetch origin"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    }).exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
 test("non-ready write denials surface only the typed lifecycle status and recovery route", () => {
@@ -3075,6 +3138,10 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent unknown`);
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --language de`);
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --git-author-name Fixture`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor Fixture-Actor`);
+      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor none`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor --x`);
+      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor ${"a".repeat(321)}`);
       const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
       const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval signature --language de --advisor-export-consent declined --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);

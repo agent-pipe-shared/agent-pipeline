@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Persistent accounting for Coordinator-declared generic work. No native semantic attestation. */
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { constants, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync,
-  openSync, readFileSync, readdirSync, realpathSync, rmdirSync, writeFileSync } from "node:fs";
+  openSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
@@ -138,6 +139,9 @@ function transaction(c, action) {
   try { mkdirSync(lock, { mode: 0o700 }); } catch (error) { if (error.code === "EEXIST") fail("CGB-HELD"); throw error; }
   const held = directory(lock);
   if (activeTransaction !== null) fail("CGB-HELD");
+  const owner = lockOwnerRecord(); const ownerPath = join(lock, LOCK_OWNER_FILE);
+  try { writeLockOwner(ownerPath, owner); }
+  catch (error) { try { unlinkSync(ownerPath); } catch {} try { rmdirSync(lock); } catch {} throw error; }
   const txn = { dirty: false, root:c.root }; activeTransaction = txn;
   let completed = false;
   try { const result = action(); completed = true; return result; }
@@ -147,9 +151,78 @@ function transaction(c, action) {
     if (completed || !txn.dirty) {
       const current = directory(lock);
       if (current.dev !== held.dev || current.ino !== held.ino) fail("CGB-PHYSICAL");
+      if (readLockOwner(lock).record?.nonce !== owner.nonce) fail("CGB-PHYSICAL");
+      unlinkSync(ownerPath);
       rmdirSync(lock);
     }
   }
+}
+// Owner identity of a held transaction lock. mkdir stays the only exclusion primitive; the record
+// exists so a later recovery can prove the owner is gone on this same host. It mirrors the audit-lock
+// owner semantics of the human-guard override (those helpers are a guard test seam, so not imported).
+const LOCK_OWNER_FILE = "owner.json";
+const LOCK_OWNER_SCHEMA = "pipeline.critic-generic-batch-lock-owner.v1";
+const LOCK_OWNER_KEYS = ["schema", "platform", "hostId", "machineId", "bootId", "pidNamespace", "pid", "processStart", "nonce"];
+const HEX64 = /^[0-9a-f]{64}$/u;
+function digestText(text) { return createHash("sha256").update(text).digest("hex"); }
+function readSmall(path) { try { return readFileSync(path, "utf8").trim(); } catch { return null; } }
+function procStartTicks(pid) {
+  try { const text = readFileSync(`/proc/${pid}/stat`, "utf8"); return text.slice(text.lastIndexOf(")") + 2).trim().split(/\s+/u)[19] ?? null; }
+  catch (error) { return error.code === "ENOENT" ? false : null; }
+}
+function hostIdentity() {
+  const linux = process.platform === "linux";
+  let pidNamespace = null; if (linux) { try { pidNamespace = readlinkSync("/proc/self/ns/pid"); } catch {} }
+  return {
+    platform: process.platform,
+    hostId: digestText(`host:${hostname()}`),
+    machineId: digestText(`machine:${readSmall("/etc/machine-id") ?? "unavailable"}`),
+    bootId: linux ? (readSmall("/proc/sys/kernel/random/boot_id")?.toLowerCase() ?? null) : null,
+    pidNamespace,
+  };
+}
+function lockOwnerRecord() {
+  const start = process.platform === "linux" ? procStartTicks(process.pid) : null;
+  return { schema: LOCK_OWNER_SCHEMA, ...hostIdentity(), pid: process.pid, processStart: typeof start === "string" ? start : null, nonce: randomBytes(32).toString("hex") };
+}
+function writeLockOwner(path, record) {
+  const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
+  try { writeFileSync(fd, canonicalJson(record)); fsyncSync(fd); } finally { closeSync(fd); }
+}
+/** Bytes digest plus a validated record; record is null when missing, unreadable or malformed. */
+function readLockOwner(lock) {
+  const path = join(lock, LOCK_OWNER_FILE);
+  let st; try { st = lstatSync(path); } catch { return { sha: null, record: null }; }
+  if (!st.isFile() || st.size > 4096) return { sha: "unreadable", record: null };
+  let text; try { text = readFileSync(path, "utf8"); } catch { return { sha: "unreadable", record: null }; }
+  const sha = digestText(text);
+  let record; try { record = JSON.parse(text); } catch { return { sha, record: null }; }
+  const ok = record !== null && typeof record === "object" && !Array.isArray(record)
+    && eq(Object.keys(record).sort(compare), [...LOCK_OWNER_KEYS].sort(compare))
+    && record.schema === LOCK_OWNER_SCHEMA && canonicalJson(record) === text
+    && typeof record.platform === "string" && HEX64.test(String(record.hostId)) && HEX64.test(String(record.machineId))
+    && (record.bootId === null || typeof record.bootId === "string") && (record.pidNamespace === null || typeof record.pidNamespace === "string")
+    && Number.isSafeInteger(record.pid) && record.pid > 0 && (record.processStart === null || typeof record.processStart === "string")
+    && HEX64.test(String(record.nonce));
+  return { sha, record: ok ? record : null };
+}
+/** "gone" only with positive proof on this same host; "live", "foreign" and "unproven" all keep the hold. */
+function judgeLockOwner(record) {
+  const here = hostIdentity();
+  if (record.platform !== here.platform || record.hostId !== here.hostId || record.machineId !== here.machineId) return "foreign";
+  if (record.pidNamespace !== here.pidNamespace) return "foreign";
+  if (here.platform === "linux") {
+    if (record.bootId === null || here.bootId === null) return "unproven";
+    if (record.bootId !== here.bootId) return "gone";
+    if (record.processStart === null) return "unproven";
+    const start = procStartTicks(record.pid);
+    if (start === null) return "unproven";
+    return start === false || start !== record.processStart ? "gone" : "live";
+  }
+  if (here.platform === "win32") {
+    try { process.kill(record.pid, 0); return "live"; } catch (error) { return error.code === "ESRCH" ? "gone" : "live"; }
+  }
+  return "unproven";
 }
 function unlocked(c) { assertNamespace(c); if (existsSync(join(c.root, "transaction.lock"))) fail("CGB-HELD"); }
 function ensureStore(c) {
@@ -553,7 +626,7 @@ export function inspectGenericCriticBatchRecovery({ controlRoot }) {
     const lockNames = readdirSync(lock).sort(compare);
     if (names.length > 4096 || lockNames.length > 4096) fail("CGB-BOUND");
     if (!eq(stableJson(join(c.root, "repository.json")), c.repository)) fail("CGB-CONTROL");
-    let emptyStore = eq(names, ["logical", "origins", "repository.json", "transaction.lock"]) && lockNames.length === 0;
+    let emptyStore = eq(names, ["logical", "origins", "repository.json", "transaction.lock"]) && (lockNames.length === 0 || eq(lockNames, [LOCK_OWNER_FILE]));
     const indexes = {};
     for (const name of ["logical", "origins"]) {
       if (!existsSync(join(c.root, name))) { emptyStore = false; indexes[name] = null; continue; }
@@ -562,18 +635,41 @@ export function inspectGenericCriticBatchRecovery({ controlRoot }) {
       if (indexes[name].length > 4096) fail("CGB-BOUND");
       if (indexes[name].length !== 0) emptyStore = false;
     }
-    const snapshot = { repositoryFingerprint: c.fingerprint, root: [directory(c.root).dev, directory(c.root).ino], lock: [held.dev, held.ino, String(held.ctimeMs)], names, lockNames, indexes };
+    const snapshot = { repositoryFingerprint: c.fingerprint, root: [directory(c.root).dev, directory(c.root).ino], lock: [held.dev, held.ino, String(held.ctimeMs)], names, lockNames, indexes, ownerSha256: readLockOwner(lock).sha };
     return Object.freeze({ schema: "pipeline.critic-generic-batch-recovery.v1", status: emptyStore ? "empty-store-held" : "partial-held", digestSha256: sha256Canonical(snapshot) });
   });
 }
-/** A digest binds inspection, but cannot attest that the lock owner has exited. */
+/**
+ * Release an abandoned lock of an otherwise empty store. A digest binds inspection; liveness is judged
+ * separately at release time from the owner record the transaction itself wrote, and only positive proof
+ * that the owner is gone on this same host releases anything.
+ */
 export function recoverGenericCriticBatchEmptyStore({ controlRoot, digestSha256 }) {
   return invoke(() => {
     if (!SHA.test(digestSha256)) fail("CGB-RECOVERY-SHAPE");
     const observed = inspectGenericCriticBatchRecovery({ controlRoot });
     if (observed.digestSha256 !== digestSha256) fail("CGB-RECOVERY-STALE");
     if (observed.status !== "empty-store-held") fail("CGB-RECOVERY-PARTIAL");
-    fail("CGB-RECOVERY-OWNER-UNPROVEN");
+    const c = readContext(controlRoot);
+    const lock = join(c.root, "transaction.lock");
+    const held = directory(lock);
+    const { record } = readLockOwner(lock);
+    if (record === null) fail("CGB-RECOVERY-OWNER-UNPROVEN");
+    const verdict = judgeLockOwner(record);
+    if (verdict === "foreign") fail("CGB-RECOVERY-OWNER-FOREIGN");
+    if (verdict === "live") fail("CGB-RECOVERY-OWNER-LIVE");
+    if (verdict !== "gone") fail("CGB-RECOVERY-OWNER-UNPROVEN");
+    // Release by atomic rename out of the lock name, then re-check the identity of what was moved.
+    const tomb = join(c.root, `.recovered-${randomBytes(8).toString("hex")}`);
+    renameSync(lock, tomb);
+    const moved = directory(tomb);
+    if (moved.dev !== held.dev || moved.ino !== held.ino || readLockOwner(tomb).record?.nonce !== record.nonce) {
+      try { renameSync(tomb, lock); } catch {}
+      fail("CGB-RECOVERY-STALE");
+    }
+    unlinkSync(join(tomb, LOCK_OWNER_FILE));
+    rmdirSync(tomb);
+    return Object.freeze({ schema: "pipeline.critic-generic-batch-recovery.v1", status: "released", digestSha256 });
   });
 }
 /** Shared source-bound declaration reader; presence/bindings do not attest semantic coherence. */

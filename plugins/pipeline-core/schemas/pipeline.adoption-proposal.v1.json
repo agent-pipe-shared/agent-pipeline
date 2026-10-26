@@ -20,6 +20,12 @@
     }}},
     "whatIsNotProposed": {"type": "array", "items": {"type": "string"}},
     "estimatedTotalEffort": {"type": "object", "required": ["units", "status"], "additionalProperties": false, "properties": {"units": {"type": ["number", "string"]}, "status": {"type": "string"}}},
-    "decisionOptions": {"type": "array", "items": {"type": "string"}}, "deterministicPassSafe": {"type": "boolean"}
+    "decisionOptions": {"type": "array", "items": {"type": "string"}}, "deterministicPassSafe": {"type": "boolean"},
+    "migration": {"type": "object", "required": ["from", "scope", "steps"], "additionalProperties": false, "properties": {
+      "from": {"type": "string"}, "scope": {"type": "array", "items": {"type": "string"}},
+      "steps": {"type": "array", "items": {"type": "object", "required": ["step", "script", "args"], "additionalProperties": false, "properties": {
+        "step": {"type": "string"}, "script": {"type": "string"}, "args": {"type": "array", "items": {"type": "string"}}, "note": {"type": "string"}
+      }}}
+    }}
   }
 }

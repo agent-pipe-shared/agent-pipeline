@@ -41,7 +41,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { inspectSessionCleanupManifestLocks, inspectSignedDescriptorCustodyRepository, retireDeadSessionCleanupManifestLocks } from "../lib/worktree-lifecycle.mjs";
 import { createSessionAuthorityParticipantPorts } from "../lib/session-authority-observers.mjs";
 import { healSessionAuthorityDrift, inspectSessionAuthorityLock, inspectSessionAuthorityRegistryRead, moveSessionAuthorityRegistryAside, releaseSessionAuthorityLock, withSessionAuthorityBoundary } from "../lib/session-authority-registry.mjs";
 import { cancelUnstartedGovernedItemSlice, readOrchestratorCommitIntegratedSlices, resolveGovernedItemQueue, retryWhileSessionAuthorityLockHeld } from "../lib/native-goldfish-host-state.mjs";
@@ -180,6 +180,11 @@ function lockReport(repository) {
   try { return inspectSessionAuthorityLock({ repository }); }
   catch (error) { return { status: "unreadable", reason: short(error) }; }
 }
+/** P0 2026-10-26: session-cleanup manifest locks, read without taking them; a dead writer's lock is retired by heal. */
+function cleanupLockReport(root) {
+  try { return inspectSessionCleanupManifestLocks(root); }
+  catch (error) { return [{ status: "unreadable", reason: short(error) }]; }
+}
 function lockStep(root, lock) {
   if (lock.status !== "held") return null;
   const who = lock.pid === null ? "an owner it does not record" : `pid ${lock.pid}`;
@@ -191,6 +196,7 @@ function lockStep(root, lock) {
 function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   // The strict read is what every boundary operation performs; the per-producer report explains it.
   const lock = lockReport(repository);
+  const cleanupLocks = cleanupLockReport(root);
   const registry = { ...producerReport(repository), read: inspectSessionAuthorityRegistryRead({ repository }) };
   const reservations = reservationReport(repository, root);
   const scratchBinding = scratchReport(root, scratch);
@@ -213,6 +219,7 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
     ...(!afterHeal && drifted.some((row) => row.inFlight === 0) ? [`drifted with nothing in flight: ${drifted.filter((row) => row.inFlight === 0).map((row) => `${row.producerId} (${row.drifted.join(", ")})`).join("; ")}`] : []),
     ...(migrates ? ["the catalogue was written by another plugin version and is migrated on heal"] : []),
     ...(!afterHeal && SCRATCH_REPAIRABLE.has(scratchBinding.status) ? [`this session's scratch binding is ${scratchBinding.status}`] : []),
+    ...(cleanupLocks.some((row) => row.owner === "dead") ? [`a session-cleanup lock whose writer is gone blocks custody for ${cleanupLocks.filter((row) => row.owner === "dead").map((row) => row.sessionId).join(", ")}`] : []),
   ];
   if (healReasons.length) next.push({ why: healReasons.join("; "), command: sessionAuthorityRepairCommand(root, "heal") });
   const stuck = [...drifted.filter((row) => afterHeal || row.inFlight > 0), ...broken];
@@ -221,7 +228,7 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   // A read refused only because the lock is held is explained by the lock step, not by move-aside.
   const unexplained = registry.read.status === "refused" && !healable(registry.read.reason) && !(held && registry.read.code === "SDC-LOCK-HELD");
   if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: the registry is retained aside and starts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
-  return { lock, registry, reservations, scratchBinding, next };
+  return { lock, cleanupLocks, registry, reservations, scratchBinding, next };
 }
 
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -298,6 +305,12 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   // Independent of the registry, so a registry refusal below never leaves it unrepaired.
   const scratchBound = parsed.verb === "heal" ? bindScratch(root, scratch) : null;
   let healed = null;
+  // Outside the registry boundary: custody never reclaims these locks itself, and no boundary entry is needed to retire them.
+  let retiredCleanupLocks = null;
+  if (parsed.verb === "heal") {
+    try { retiredCleanupLocks = retireDeadSessionCleanupManifestLocks(root, { asideDir: join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-session-cleanup-lock`) }); }
+    catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a dead session-cleanup lock could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
+  }
   try {
     if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => { entered.value = true; return healSessionAuthorityDrift({ boundary }); }));
     else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
@@ -310,7 +323,7 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   // is not reported healed; inspect names what holds it.
   if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained,
     ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { scratch }) }, 2);
-  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
+  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
 }
 
 if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2), undefined, { env: process.env });

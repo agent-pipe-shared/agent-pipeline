@@ -70,9 +70,10 @@ test("a not-required design result falls through to the adoption disposition (de
     },
   });
   assert.equal(dispositionReads, 1, "the adoption disposition path is consulted");
-  assert.equal(result.status, "ready", JSON.stringify(result));
+  // D162: a deferred disposition no longer stays ready; the fall-through ends in the typed migration refusal.
+  assert.equal(result.status, "blocked", JSON.stringify(result));
+  assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
   assert.notEqual(result.code, "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED");
-  assert.equal(result.fitness.blockingOverallStatus, "deferred");
 });
 
 test("a missing design block on a greenfield result still blocks with its exact PRD action", () => {
@@ -162,14 +163,17 @@ const SURFACE = { planPath: PLAN, paths: ["docs/adr/0001-x.md", "schemas/x.json"
 const tenOutcomes = (finding) => Array.from({ length: 10 }, (_, i) => ({ classId: i + 1, outcome: finding && i === 0 ? "finding" : "pass" }));
 const COMMAND = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
 const guardDeps = (over) => ({ activeFeaturePlanningScopeFn: () => PLAN, activeFeaturePlanningSurfaceFn: () => SURFACE,
-  checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "deferred" }),
+  // D162: the subject of these guard cases is delegation to the library verdict, not the retired deferral.
+  checkPlanningAdoptionDispositionFn: () => ({ ok: true, disposition: "approved-scoped" }),
   evaluateArchitectureFitnessFn: () => ({ overallStatus: "blocked", outcomes: tenOutcomes(true) }), ...over });
 
 test("under a PO deferral the guard defers to the library entry verdict for the same root and task scope", () => {
   const seen = [];
   const ready = architectureFitnessAuthorityVerdict(repoRoot, COMMAND, guardDeps({ inspectArchitectureEntryReadinessFn: (input) => { seen.push(input); return { status: "ready" }; } }));
-  assert.equal(ready, null);
-  assert.deepEqual(seen, [{ rootDir: repoRoot, taskScope: PLAN }]);
+  // D162: the operator-hotfix-10 deferred allowance is retired; the guard no longer defers to a library "ready" verdict for a non-greenfield disposition.
+  assert.equal(ready.exitCode, 2);
+  assert.match(ready.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
+  assert.deepEqual(seen, [{ rootDir: repoRoot, taskScope: PLAN }], "the library is still consulted, for the greenfield pending allowance only");
   const blocked = architectureFitnessAuthorityVerdict(repoRoot, COMMAND, guardDeps({ inspectArchitectureEntryReadinessFn: () => ({ status: "blocked" }) }));
   assert.equal(blocked.exitCode, 2);
   assert.match(blocked.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
@@ -194,7 +198,9 @@ test("a deferred established project is NOT admitted, not ready, for a net-new t
     readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }),
     checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "deferred", scope: [ARCHITECTURE_ENTRY_SCOPE], expiresAt: "2099-01-01" }),
     evaluateArchitectureFitness: () => ({ overallStatus: "blocked", outcomes: tenOutcomes(true), summary: {} }) } });
+  // D162: a deferred adoption is refused with the migration for any path, net-new included.
   assert.notEqual(result.status, "ready", "net-new path with a blocking finding is admitted under deferral");
+  assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
 });
 
 // Both states of the net-new ratchet under a deferred adoption, with existence injected through the module's
@@ -211,24 +217,21 @@ function deferredEntry(paths, existing, fitnessOutcomes) {
 
 test("state 1, net-new under deferral: a blocking finding refuses with the typed fitness code and names only the net-new paths", () => {
   const result = deferredEntry(["CLAUDE.md", "src/brand-new.mjs"], ["CLAUDE.md"], tenOutcomes(true));
+  // D162: the net-new ratchet under deferral is retired; the migration refusal replaces the typed fitness code.
   assert.equal(result.status, "blocked", JSON.stringify(result));
-  assert.equal(result.code, "ARCHITECTURE-FITNESS-NOT-READY");
-  assert.deepEqual(result.fitness.netNewPaths, ["src/brand-new.mjs"], "the already-existing path stays under the deferral and is not listed");
-  assert.equal(result.fitness.blockingOverallStatus, "blocked");
+  assert.equal(result.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
   const allNew = deferredEntry(["src/a.mjs", "src/b.mjs"], [], tenOutcomes(true));
-  assert.equal(allNew.code, "ARCHITECTURE-FITNESS-NOT-READY");
-  assert.deepEqual(allNew.fitness.netNewPaths, ["src/a.mjs", "src/b.mjs"]);
+  assert.equal(allNew.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
 });
 
 test("state 2, existing paths only under deferral: the same blocking finding stays report-only and ready; a net-new path with a clean fitness result is admitted by the full check, not by the deferral", () => {
   const frozen = deferredEntry(["CLAUDE.md", "README.md"], ["CLAUDE.md", "README.md"], tenOutcomes(true));
-  assert.equal(frozen.status, "ready", JSON.stringify(frozen));
-  assert.equal(frozen.fitness.blockingOverallStatus, "deferred");
-  assert.equal(frozen.fitness.reportOnly.length, 10, "every outcome stays visible");
-  assert.equal(frozen.fitness.reportOnly.some((o) => o.outcome === "finding"), true);
+  // D162: neither state is admitted under deferral any more; both get the typed migration refusal.
+  assert.equal(frozen.status, "blocked", JSON.stringify(frozen));
+  assert.equal(frozen.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
   const cleanNewPath = deferredEntry(["src/brand-new.mjs"], [], tenOutcomes(false));
-  assert.equal(cleanNewPath.status, "ready", JSON.stringify(cleanNewPath));
-  assert.equal(cleanNewPath.fitness.blockingOverallStatus, "pass", "admitted because the full check passed, not because it was deferred");
+  assert.equal(cleanNewPath.status, "blocked", JSON.stringify(cleanNewPath));
+  assert.equal(cleanNewPath.code, "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED");
 });
 
 // ---- (d) consumer: lib/project-onboarding-v3.mjs designToImplementationHandoverAction recommends reopen-design only on ok:false ----

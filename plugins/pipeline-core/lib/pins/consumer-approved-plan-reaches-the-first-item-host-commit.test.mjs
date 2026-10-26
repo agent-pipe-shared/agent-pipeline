@@ -198,7 +198,7 @@ const state = {};
 
 function binding(fx) {
   const out = runDispatchBriefing(["binding", "--root", fx.root, "--dispatch-id", "PIN-FIRST-ITEM", "--item", "first-item", "--criterion", "AC-1",
-    "--agent-type", "goldfish-deep", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
+    "--agent-type", "goldfish-deep", "--effort-escalation", "MP-05", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
   { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "available", value: "a".repeat(64) }, selectedPlugin: { version: "pin" } }, pluginRoot: null }) });
   assert.equal(out.ok, true, JSON.stringify(out));
   return out.binding;

@@ -14,8 +14,9 @@ import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket
 import {readCriticCourseAdmission} from "./critic-course-admission.mjs";
 import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+import {readdirSync,readlinkSync} from "node:fs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -334,5 +335,91 @@ test("feature reserve validates packet guardrails before store effects and can r
     assert.equal(existsSync(join(controlRoot,"generic-batches/transaction.lock")),false);
     assert.ok(reserveFor("e".repeat(32),".claude/pipeline.json").reservation);
   }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+// AC-245 / AGY2-H05: a transaction whose process died must leave a lock that a typed, digest-bound
+// recovery can release, but only when the recorded owner is provably gone on this same host and the
+// transaction left no partial publication. The holder below is a REAL second process running the real
+// registration; it is parked inside the transaction (after the store skeleton exists, before the first
+// batch id is drawn) so the test can observe the owner record the code itself wrote and then kill it.
+async function abandonedHolder(fx){
+  const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets"),store=join(controlRoot,"generic-batches");
+  mkdirSync(controlRoot,{recursive:true,mode:0o700});
+  chmodSync(join(fx.root,".git/agent-pipeline"),0o700);chmodSync(controlRoot,0o700);
+  const lock=join(store,"transaction.lock"),ownerFile=join(lock,"owner.json");
+  const payload=JSON.stringify({repoRoot:fx.root,controlRoot,declaration:declaration(fx)});
+  const child=spawn(process.execPath,["--input-type=module","-e",
+    "import crypto from 'node:crypto';import {syncBuiltinESMExports} from 'node:module';import {existsSync,writeSync} from 'node:fs';"
+    +"const [,moduleUrl,ownerPath,input]=process.argv.slice(1);const real=crypto.randomBytes;"
+    +"crypto.randomBytes=(...a)=>{if(existsSync(ownerPath)){writeSync(1,'held\\n');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0);}return real(...a);};"
+    +"syncBuiltinESMExports();const m=await import(moduleUrl);m.registerGenericCriticBatch(JSON.parse(input));",
+    fx.root,new URL("./critic-generic-batch.mjs",import.meta.url).href,ownerFile,payload],{stdio:["ignore","pipe","pipe"]});
+  let errors="";child.stderr.on("data",b=>{errors+=b;});
+  await new Promise((resolve,reject)=>{
+    child.stdout.on("data",b=>{if(String(b).includes("held"))resolve();});
+    child.once("error",reject);
+    child.once("exit",code=>reject(new Error(`the transaction owner ended (${code}) without holding a lock owner record: ${errors.slice(0,400)}`)));
+  });
+  const alive=()=>child.exitCode===null&&child.signalCode===null;
+  const kill=async()=>{if(!alive())return;const gone=new Promise(done=>child.once("exit",done));child.kill("SIGKILL");await gone;};
+  return {child,alive,kill,controlRoot,store,lock,ownerFile,owner:JSON.parse(readFileSync(ownerFile,"utf8"))};
+}
+function processStartTicks(pid){const text=readFileSync(`/proc/${pid}/stat`,"utf8");return text.slice(text.lastIndexOf(")")+2).trim().split(/\s+/u)[19];}
+test("a transaction records its owner; a live owner keeps the hold and a killed same-host owner without effects is recovered",async()=>{
+  const fx=fixture();let holder=null;try{
+    holder=await abandonedHolder(fx);
+    const {owner,controlRoot}=holder;
+    assert.equal(owner.schema,"pipeline.critic-generic-batch-lock-owner.v1");
+    assert.equal(owner.pid,holder.child.pid);
+    if(process.platform==="linux"){
+      assert.equal(owner.processStart,processStartTicks(owner.pid));
+      assert.equal(owner.bootId,readFileSync("/proc/sys/kernel/random/boot_id","utf8").trim().toLowerCase());
+    }
+    const inspected=inspectGenericCriticBatchRecovery({controlRoot});
+    assert.equal(inspected.status,"empty-store-held");
+    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256}),"CGB-RECOVERY-OWNER-LIVE");
+    assert.equal(existsSync(holder.lock),true);
+    await holder.kill();
+    assert.equal(inspectGenericCriticBatchRecovery({controlRoot}).digestSha256,inspected.digestSha256);
+    const released=recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256});
+    assert.equal(released.status,"released");
+    assert.equal(existsSync(holder.lock),false);
+    assert.deepEqual(readdirSync(holder.store).sort(),["logical","origins","repository.json"]);
+    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspected.digestSha256}),"CGB-RECOVERY-NOT-HELD");
+    assert.ok(register(fx).batchRef);
+  }finally{if(holder)await holder.kill();rmSync(fx.root,{recursive:true,force:true});}
+});
+test("owner identity is judged conservatively: foreign, unreadable or ownerless holds stay refused; a reused pid or an earlier boot is gone; partial effects are preserved",async()=>{
+  const fx=fixture();let holder=null;try{
+    holder=await abandonedHolder(fx);
+    const real=holder.owner,{controlRoot}=holder;
+    await holder.kill();
+    const hold=owner=>{rmSync(holder.lock,{recursive:true,force:true});mkdirSync(holder.lock,{mode:0o700});chmodSync(holder.lock,0o700);
+      if(owner!==null)writeFileSync(holder.ownerFile,canonicalJson(owner),{mode:0o600});};
+    const attempt=()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:inspectGenericCriticBatchRecovery({controlRoot}).digestSha256});
+    const refused=(owner,code)=>{hold(owner);rejected(attempt,code);assert.equal(existsSync(holder.lock),true);};
+    const released=owner=>{hold(owner);assert.equal(attempt().status,"released");assert.equal(existsSync(holder.lock),false);};
+    refused({...real,hostId:"f".repeat(64)},"CGB-RECOVERY-OWNER-FOREIGN");
+    refused({...real,machineId:"e".repeat(64)},"CGB-RECOVERY-OWNER-FOREIGN");
+    refused({...real,platform:"plan9"},"CGB-RECOVERY-OWNER-FOREIGN");
+    refused({...real,extra:true},"CGB-RECOVERY-OWNER-UNPROVEN");
+    refused({...real,pid:0},"CGB-RECOVERY-OWNER-UNPROVEN");
+    refused({...real,nonce:"short"},"CGB-RECOVERY-OWNER-UNPROVEN");
+    refused(null,"CGB-RECOVERY-OWNER-UNPROVEN");
+    if(process.platform==="linux"){
+      const mine=processStartTicks(process.pid);
+      refused({...real,pid:process.pid,processStart:mine},"CGB-RECOVERY-OWNER-LIVE");
+      released({...real,pid:process.pid,processStart:String(Number(mine)+1)});
+      released({...real,pid:process.pid,processStart:mine,bootId:"00000000-0000-0000-0000-000000000000"});
+      let namespace=null;try{namespace=readlinkSync("/proc/self/ns/pid");}catch{}
+      if(namespace!==null)refused({...real,pid:process.pid,processStart:mine,pidNamespace:"pid:[1]"},"CGB-RECOVERY-OWNER-FOREIGN");
+    }
+    hold(real);
+    writeFileSync(join(holder.store,"logical/foreign.json"),"{}");
+    const partial=inspectGenericCriticBatchRecovery({controlRoot});
+    assert.equal(partial.status,"partial-held");
+    rejected(()=>recoverGenericCriticBatchEmptyStore({controlRoot,digestSha256:partial.digestSha256}),"CGB-RECOVERY-PARTIAL");
+    assert.equal(existsSync(holder.lock),true);
+    assert.equal(existsSync(join(holder.store,"logical/foreign.json")),true);
+  }finally{if(holder)await holder.kill();rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

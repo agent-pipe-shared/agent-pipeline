@@ -733,18 +733,35 @@ function readGrantedCalls(counterFilePath, agentId, dependencies) {
 }
 
 /**
- * D75 B: the DISPATCH-BUDGET-GRANT notice for a verified grant this agent has not been told about yet, or null (no valid
- * grant, or its head digest is already in the `.announced` sibling of the grant record). Persists the digest under the
- * counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
+ * D75 B / PF-64 cause 2: the DISPATCH-BUDGET-GRANT notice for a verified grant, or null. Claude Code drops a PreToolUse allow
+ * context when another hook denies the same call, so one announcement may never reach the child. The `.announced` marker
+ * therefore holds `${digest} ${firstCount}` (firstCount = the counted call that first carried the notice) and the notice rides
+ * every budget-allowed call while the marker is absent, unreadable, holds another digest, or holds this digest with
+ * count < firstCount + 3 (at most three consecutive counted calls). The marker is written only when the digest is new or the
+ * marker is absent/unreadable; repeats never move firstCount. A legacy marker holding only this digest (no count) stays
+ * silent. Persists under the counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
  */
 function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, dependencies }) {
   const summary = grant.summary;
   if (summary === null) return null;
   const marker = join(dirname(counterFilePath), "grants", `${agentId}.announced`);
+  let write = true;
   try {
-    if ((dependencies.existsSyncFn ?? existsSync)(marker) && String((dependencies.readFileSyncFn ?? readFileSync)(marker, "utf8")).trim() === summary.digest) return null;
+    if ((dependencies.existsSyncFn ?? existsSync)(marker)) {
+      const [markerDigest, firstCountText] = String((dependencies.readFileSyncFn ?? readFileSync)(marker, "utf8")).trim().split(/\s+/u);
+      if (markerDigest === summary.digest) {
+        if (firstCountText === undefined) return null;
+        const firstCount = Number(firstCountText);
+        if (Number.isInteger(firstCount)) {
+          if (count >= firstCount + 3) return null;
+          write = false;
+        }
+      }
+    }
   } catch { /* an unreadable marker means "not announced yet" */ }
-  try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest}\n`, { mode: 0o600 }); } catch { /* announcing twice is the safe direction */ }
+  if (write) {
+    try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest} ${count}\n`, { mode: 0o600 }); } catch { /* announcing again is the safe direction */ }
+  }
   return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap });
 }
 
@@ -1453,7 +1470,8 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
       const prepared = prepareOwnedCriticNotesDirectory({ path, counter, identity, input, rootDir, dependencies });
       if (!prepared.ok) return verdict(2, "DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: " + prepared.code + ". Return the report as text; do not retry with Bash or adopt another directory.\n");
     }
-    // D75 B: the hook itself announces a verified recorded grant, once per grant digest, on an allowed call.
+    // D75 B / PF-64 cause 2: the hook itself announces a verified recorded grant on the first three counted calls after it
+    // (another hook's denial can drop one announcement, so it is not once-only).
     const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, dependencies });
     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));

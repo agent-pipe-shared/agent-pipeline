@@ -9,6 +9,8 @@ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, wri
 import { parseStrictJson } from './governance-event.mjs';
 /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
 import { realpathSync } from "node:fs";
+import { mkdirSync as stopMkdir, writeFileSync as stopWrite, unlinkSync as stopUnlink } from "node:fs";
+import { createHash as stopHash } from "node:crypto";
 import { resolve, dirname, isAbsolute, join } from "node:path";
 import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit, NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA } from "./agy-host-commit-admission.mjs";
 import { commitAdmittedNativeGoldfishReturn } from "./agy-host-commit-execution.mjs";
@@ -80,15 +82,96 @@ function readSubagentStopPending({ commonDir, input }) {
   return { ok: true, pending };
 }
 
+// PF-61: the current Claude runtime ends a background child with a tool call named SubagentHandback whose input is
+// {"message": <the contract>}; SubagentStop then carries no usable last_assistant_message. The contract is read ONLY from
+// the LAST SubagentHandback tool_use of the LAST assistant record of the child's own transcript, which sits beside the
+// meta file this route already trusts: <transcript_path without .jsonl>/subagents/agent-<agent_id>.jsonl. The read is
+// bounded, refuses a symlink and any path whose real location differs from that exact place, and fails closed on a
+// corrupt line. The message is then validated by the same validator against the same binding as any other final.
+const SUBAGENT_HANDBACK_TOOL = "SubagentHandback";
+const SUBAGENT_HANDBACK_MAX_BYTES = 8 * 1024 * 1024;
+const SUBAGENT_HANDBACK_UNSAFE = "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE";
+function readSubagentHandbackMessage(input) {
+  const unsafe = { ok: false, code: SUBAGENT_HANDBACK_UNSAFE };
+  const none = { ok: false, code: "NGHR-CLAUDE-STOP-NO-HANDBACK" };
+  const transcriptPath = input.transcript_path;
+  const agentId = input.agent_id;
+  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")
+    || typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) return unsafe;
+  const sessionDir = transcriptPath.slice(0, -".jsonl".length);
+  const file = join(sessionDir, "subagents", `agent-${agentId}.jsonl`);
+  let text;
+  try {
+    if (lstatSync(file).isSymbolicLink()) return unsafe;
+    if (realpathSync(file) !== join(realpathSync(sessionDir), "subagents", `agent-${agentId}.jsonl`)) return unsafe;
+    const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    try {
+      const stat = fstatSync(fd);
+      if (!stat.isFile() || stat.size > SUBAGENT_HANDBACK_MAX_BYTES) return unsafe;
+      const bytes = readFileSync(fd);
+      if (bytes.length > SUBAGENT_HANDBACK_MAX_BYTES) return unsafe;
+      text = bytes.toString("utf8");
+    } finally { closeSync(fd); }
+  } catch (error) { return error?.code === "ENOENT" ? { ok: false, code: "NGHR-CLAUDE-STOP-NO-TRANSCRIPT" } : unsafe; }
+  let lastAssistant = null;
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    let record;
+    try { record = JSON.parse(line); } catch { return unsafe; }
+    if (record?.type === "assistant" || record?.message?.role === "assistant") lastAssistant = record;
+  }
+  const content = lastAssistant?.message?.content;
+  if (!Array.isArray(content)) return none;
+  let message = null;
+  for (const block of content) {
+    if (block?.type === "tool_use" && block.name === SUBAGENT_HANDBACK_TOOL && typeof block.input?.message === "string") message = block.input.message;
+  }
+  return message === null ? none : { ok: true, message };
+}
+
 // The stop carries no resolved model and no tool_response: only the final message is validated, against the binding.
-// A model identity is never inferred; the receipt names its assurance as correlation-only.
-function observeClaudeSubagentStop(input, pending) {
+// A model identity is never inferred; the receipt names its assurance as correlation-only. When last_assistant_message is
+// absent or is not a valid contract (a SubagentHandback child), the child's own last handback is validated instead.
+function observeClaudeSubagentStop(input, pending, mark) {
   const state = pending.state;
   if (typeof input.session_id !== "string" || input.session_id !== state.sessionId
-    || state.runner !== "claude" || state.binding?.runner !== "claude"
-    || typeof input.last_assistant_message !== "string") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
-  const final = validateNativeGoldfishFinal(input.last_assistant_message, { binding: state.binding });
+    || state.runner !== "claude" || state.binding?.runner !== "claude") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
+  const bind = (text) => validateNativeGoldfishFinal(text, { binding: state.binding });
+  let final = typeof input.last_assistant_message === "string" ? bind(input.last_assistant_message)
+    : { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
+  if (!final.ok) {
+    const handback = readSubagentHandbackMessage(input);
+    if (handback.ok || handback.code !== "NGHR-CLAUDE-STOP-NO-TRANSCRIPT") { if (mark) mark.viaHandback = true; }
+    if (handback.ok) final = bind(handback.message);
+    else if (handback.code === SUBAGENT_HANDBACK_UNSAFE) final = handback;
+  }
   return final.ok ? { ...final, runner: "claude", assurance: SUBAGENT_STOP_ASSURANCE } : final;
+}
+
+// PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
+// leaves a small diagnostic next to its pending state, naming the exact code. A later success removes it. Diagnostic only:
+// any fault here is swallowed, the hook stays non-blocking.
+const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+function recordSubagentStopOutcome({ stop }, result) {
+  if (!stop) return;
+  try {
+    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+    const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
+    if (result?.status === "authored-commit-recorded") { try { stopUnlink(join(directory, name)); } catch { /* none to remove */ } return; }
+    // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
+    if (!stop.viaHandback) return;
+    stopMkdir(directory, { recursive: true, mode: 0o700 });
+    stopWrite(join(directory, name), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
+      dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
+      code: result?.code ?? null, commit: result?.commit ?? null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
+  } catch { /* diagnostic only */ }
+}
+
+export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
+  const diagnostic = {};
+  const result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic);
+  recordSubagentStopOutcome(diagnostic, result);
+  return result;
 }
 
 // Only the host launch call and its correlated successful return are observed.
@@ -136,7 +219,7 @@ function draftRecord({ state, observation, commitReadback }) {
  * Complete an opt-in marked native return. Every error after a possible Git
  * write is recovery-required; this route never manufactures a no-commit fact.
  */
-export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, dependencies = {}) {
+function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dependencies = {}, diagnostic = {}) {
   if (!["claude", "codex"].includes(runner) || !input || typeof input !== "object") return fail("NGHF-INPUT", "not-applicable");
   const physical = physicalRoot(root ?? input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
   if (!physical) return fail("NGHF-ROOT");
@@ -184,7 +267,8 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
     // Consume once: any observation receipt for this dispatch and candidate means the host already committed (a
     // replayed stop must not commit again); the HEAD == candidate admission is only the backstop behind this check.
     if (subagentStopAlreadyObserved({ commonDir, state: pending.state })) return fail("NGHF-RECEIPT-EXISTS", "not-applicable");
-    observation = observeClaudeSubagentStop(input, pending);
+    diagnostic.stop = { commonDir, state: pending.state, viaHandback: false };
+    observation = observeClaudeSubagentStop(input, pending, diagnostic.stop);
   } else if (runner === "codex" && input.hook_event_name === "SubagentStop") {
     pending = readNativeCodexPending({ commonDir, input });
     if (!pending.ok) return fail("NGHF-PENDING-UNAVAILABLE", "not-applicable");
