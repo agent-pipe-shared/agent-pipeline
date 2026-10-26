@@ -93,7 +93,14 @@ the two files named in the item. Every D162 slice is therefore a held patch.
 - S4 orientation and preflight: report a legacy `deferred` record as a migration offer with a
   disclosed action at session start.
 
-## Open PO questions
+## PO answers (2026-10-26, D162 second addendum)
+
+Questions 1, 2, 4 and 6 are decided: accepted debt as `excepted` baseline; brownfield only;
+same confirmation route as a fresh adoption; a typed refusal naming the migrate command at
+`set-phase implementation`. Questions 3 and 5 stay with the implementing slices (default: keep
+expiry for `partial`; the baseline commit is mandatory for records the migration writes).
+
+## Open PO questions (as asked)
 
 1. May the migration record existing debt as accepted (`excepted`) baseline violations, or must
    the measured architecture be clean?
