@@ -53,6 +53,22 @@ delivery-boundary mismatch? The unit is registered immutable; the consumer canno
   `...-UNAVAILABLE` ("names no AC-<n> criterion id") for criteria in the format `AC-E<epic>-<story>-<nn>`.
   (Parts of the relayed text were cut off in the paste; the PO can resend the full section.)
 
+## Design memo and second blocker (2026-10-26)
+
+`specs/sprint-alfred-epic/evidence/pf75-late-review-unit-design.md` (commit `2d0047cf7`) ranks the options. Chosen
+under D165: read the unit at its introducing commit (the base if it already lists the unit, else the first commit
+in `base..candidate` whose manifest lists an entry at the unit path), with the existing binding checks applied at
+that commit unchanged. The first review may then use the merge base with the publication target. Implemented as
+two held-patch slices: (A) optional `declarationCommit` in `readCriticReviewUnit`/`reviewUnitSource`
+(`lib/critic-generic-batch.mjs`), (B) `featureReviewUnit` in `lib/critic-course-admission.mjs` plus the two texts.
+
+Second blocker the memo found, independent of PF-75: `reviewUnitSource` requires `deliveryBoundary.mainRef` to equal
+the primary checkout's `symbolic-ref HEAD` at review time and the candidate to be an ancestor of it
+(`CGB-MAIN-INTEGRATION`). A consumer whose primary checkout sits on `main` while the unit names
+`refs/heads/feat/<branch>` fails even after PF-75 is fixed, and the unit is immutable. PO question: on which branch
+does the consumer's primary checkout sit when the review runs? Also surface the 512-commit `CCA-RANGE-BOUND` for a
+long-delivered feature. `push-init` itself has no `mainRef` comparison.
+
 ## Wish beyond PF-75
 
 When `critic-bound-verify` refuses, it and `repair-map` name the concrete route to the evidence (the
