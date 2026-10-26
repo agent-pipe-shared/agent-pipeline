@@ -1,0 +1,259 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 4e5cb0b..2f2710f 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -795,6 +795,68 @@ function diagnoseSharedCloseEvidencePath(root, state) {
+   };
+ }
+ 
++const POST_CLOSE_AUDIT_DRIFT_CODE = "CONTINUITY-POST-CLOSE-AUDIT-TIMESTAMP-DRIFT";
++
++// Before commit 9ed1a2800, `approve-push` (challenge and final approval) wrote
++// `updatedAt: approvedAt` on an inactive State. A closed/discarded State is only valid
++// while `updatedAt` equals its last lifecycle timestamp, so such a State classifies as
++// damaged. The drift is admitted as that known shape only when (1) the State is otherwise
++// exactly what validClosedTransitionState / validDiscardedTransitionState accept once
++// `updatedAt` is restored (one unambiguous candidate), and (2) the drifted timestamp is
++// provably a push-audit timestamp recorded in the State itself and later than the
++// lifecycle timestamp: the push approval's `approvedAt`, a push `criticalProofConsumption`
++// `consumedAt`, or, with a well-formed `pendingPushChallenge` present, a time not past
++// that challenge's `expiresAt`. Any other drift stays undiagnosed (existing refusal).
++function pushAuditProvenance(state, lifecycleTimestamp) {
++  const drift = state.updatedAt;
++  if (Date.parse(drift) <= Date.parse(lifecycleTimestamp)) return null;
++  const approval = state.pushApproval?.lastApproved;
++  if (isObject(approval) && approval.approvedAt === drift) return "push-approval-approved-at";
++  if (Array.isArray(state.criticalProofConsumption)
++    && state.criticalProofConsumption.some((entry) => isObject(entry) && entry.kind === "push" && entry.consumedAt === drift)) {
++    return "push-proof-consumed-at";
++  }
++  const pending = state.pendingPushChallenge;
++  if (isObject(pending)
++    && typeof pending.code === "string" && pending.code.length > 0
++    && typeof pending.forCommit === "string" && pending.forCommit.length > 0
++    && typeof pending.remote === "string" && pending.remote.length > 0
++    && typeof pending.destination === "string" && pending.destination.length > 0
++    && canonicalIsoTimestamp(pending.expiresAt)
++    && Date.parse(drift) <= Date.parse(pending.expiresAt)) return "pending-push-challenge";
++  return null;
++}
++
++function diagnosePostClosePushAuditDrift(root, state, drifts) {
++  if (!isObject(state)
++    || state.schema !== "pipeline.state.v0"
++    || drifts.length > 0
++    || !canonicalIsoTimestamp(state.updatedAt)) return null;
++  const candidates = [];
++  const lastClosed = Array.isArray(state.closedFeatures) ? state.closedFeatures.at(-1)?.closedAt : undefined;
++  const lastDiscarded = Array.isArray(state.discardedFeatures) ? state.discardedFeatures.at(-1)?.discardedAt : undefined;
++  for (const [kind, timestamp, valid] of [
++    ["closed", lastClosed, validClosedTransitionState],
++    ["discarded", lastDiscarded, validDiscardedTransitionState],
++  ]) {
++    if (!canonicalIsoTimestamp(timestamp) || timestamp === state.updatedAt) continue;
++    const restored = structuredClone(state);
++    restored.updatedAt = timestamp;
++    if (valid(root, restored)) candidates.push({ kind, timestamp });
++  }
++  if (candidates.length !== 1) return null;
++  const provenance = pushAuditProvenance(state, candidates[0].timestamp);
++  if (provenance === null) return null;
++  return {
++    schema: CONTINUITY_REPAIR_DIAGNOSIS_SCHEMA,
++    status: "repairable",
++    code: POST_CLOSE_AUDIT_DRIFT_CODE,
++    lifecycle: candidates[0],
++    observedUpdatedAt: state.updatedAt,
++    provenance,
++  };
++}
++
+ function validDesignTransitionState(state) {
+   const valid = isObject(state)
+     && state.schema === "pipeline.state.v0"
+@@ -1256,9 +1318,13 @@ function observeDetailed({
+     } else {
+       status = "unavailable";
+     }
+-    const diagnosis = status === "damaged"
+-      ? diagnoseSharedCloseEvidencePath(root, state)
+-      : null;
++    let diagnosis = null;
++    if (status === "damaged") {
++      diagnosis = diagnoseSharedCloseEvidencePath(root, state);
++      if (diagnosis.status !== "repairable") {
++        diagnosis = diagnosePostClosePushAuditDrift(root, state, drifts) ?? diagnosis;
++      }
++    }
+     return {
+       continuity: {
+         status,
+@@ -1587,6 +1653,23 @@ function repairedSharedCloseEvidenceState(state, observed, diagnosis) {
+   };
+ }
+ 
++function repairedPostClosePushAuditDrift(state, diagnosis) {
++  if (diagnosis?.status !== "repairable" || diagnosis.code !== POST_CLOSE_AUDIT_DRIFT_CODE
++    || state.updatedAt !== diagnosis.observedUpdatedAt) {
++    fail("CONTINUITY-REPAIR-DIAGNOSIS-INVALID", "post-close audit drift diagnosis is not repairable");
++  }
++  // Only `updatedAt` changes: the push approval / challenge records are the audit
++  // trail being preserved, so they are carried over byte-equal.
++  const next = structuredClone(state);
++  next.updatedAt = diagnosis.lifecycle.timestamp;
++  return {
++    reason: "repair-post-close-audit-timestamp-drift",
++    state: next,
++    authority: null,
++    diagnosis,
++  };
++}
++
+ function continuityRepairBinding(plan) {
+   const binding = {
+     schema: plan.schema,
+@@ -1610,7 +1693,9 @@ function continuityRepairBinding(plan) {
+ }
+ 
+ /**
+- * Plan four bounded repairs:
++ * Plan five bounded repairs:
++ * - restore the lifecycle `updatedAt` of an inactive State a pre-9ed1a2800 `approve-push`
++ *   left drifted to a push-audit timestamp (the State itself must prove the drift);
+  * - quarantine mismatching assertions on one shared close-evidence path;
+  * - normalize the invalid resume-on-next-turn/active-turn pair;
+  * - add continuity to an established pre-continuity state carrying PO authority; or
+@@ -1655,6 +1740,9 @@ export function planOnboardingContinuityRepair({
+         code: "CONTINUITY-REPAIR-UNRELATED-STATE-INVALID",
+         diagnosis: observed.continuity.diagnosis,
+       };
++    } else if (observed.continuity.diagnosis?.status === "repairable"
++      && observed.continuity.diagnosis.code === POST_CLOSE_AUDIT_DRIFT_CODE) {
++      proposed = repairedPostClosePushAuditDrift(observed.state, observed.continuity.diagnosis);
+     } else if (observed.continuity.diagnosis?.status === "repairable") {
+       proposed = repairedSharedCloseEvidenceState(observed.state, observed, observed.continuity.diagnosis);
+     } else if (observed.projected?.code === "CS-STATUS-CONTINUITY-INVALID") {
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index fcb0314..e9ae942 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -5332,7 +5332,118 @@ check("planOnboardingBootstrapAcknowledgementChat refuses a placeholder under ti
+   expectKickoffError("BOOTSTRAP-ACK-PLACEHOLDER-CONTENT", () => planOnboardingBootstrapAcknowledgementChat({ rootDir: root }));
+ });
+ 
+-assert.equal(cases.length, 308, "the complete onboarding continuity corpus must be registered before execution begins");
++// AC-115 / RV-7 (ADR-0082 level 1): a State damaged only because a pre-9ed1a2800 `approve-push` wrote
++// `updatedAt: approvedAt` on an inactive State must be repairable by one bounded repair that restores the
++// lifecycle timestamp and changes nothing else. Anything the State itself does not prove to be
++// push-audit-shaped stays refused.
++const POST_CLOSE_DRIFT = "2026-10-01T10:00:00.000Z";
++const POST_CLOSE_COMMIT = "a".repeat(40);
++
++function postClosePushDriftState(root, {
++  kind = "closed",
++  cause = "approval",
++  drift = POST_CLOSE_DRIFT,
++  approvedAt = drift,
++  expiresAt = "2026-10-01T10:10:00.000Z",
++  mutate = () => {},
++} = {}) {
++  mkdirSync(join(root, "docs"), { recursive: true });
++  writeFileSync(join(root, "docs", "state.md"), "closed handover\n");
++  const closedEntry = {
++    id: "closed-feature",
++    planPath: "specs/closed-feature/prd.md",
++    phaseAtClose: "implementation",
++    closedAt: "2026-09-06T12:00:00.000Z",
++    closedBy: "PO",
++    forCommit: null,
++  };
++  const state = { schema: "pipeline.state.v0", planApproved: false };
++  if (kind === "closed") {
++    state.closedFeatures = [closedEntry];
++    state.lifecycleTimestamp = closedEntry.closedAt;
++  } else {
++    state.discardedFeatures = [{ ...baseDiscardEntry(), discardedAt: "2026-09-07T09:00:00.000Z" }];
++    state.lifecycleTimestamp = "2026-09-07T09:00:00.000Z";
++  }
++  const lifecycleTimestamp = state.lifecycleTimestamp;
++  delete state.lifecycleTimestamp;
++  state.updatedAt = drift;
++  if (cause === "approval") {
++    state.pushApproval = { lastApproved: {
++      approvedBy: "PO",
++      approvedAt,
++      forCommit: POST_CLOSE_COMMIT,
++      criticalProof: null,
++      remote: "origin",
++      destination: "refs/heads/main",
++      threatModel: { path: "docs/threat-model.md", sha256: "b".repeat(64) },
++      pendingAuditWrite: true,
++    } };
++    state.criticalProofConsumption = [];
++  } else if (cause === "challenge") {
++    state.pendingPushChallenge = {
++      code: "PO-ABCD",
++      forCommit: POST_CLOSE_COMMIT,
++      remote: "origin",
++      destination: "refs/heads/main",
++      expiresAt,
++    };
++  }
++  mutate(state);
++  const statePath = join(root, ".claude", "pipeline-state.json");
++  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
++  return { statePath, lifecycleTimestamp, state };
++}
++
++for (const kind of ["closed", "discarded"]) {
++  for (const cause of ["approval", "challenge"]) {
++    check(`post-close push audit timestamp drift on a ${kind} State from a push ${cause} is diagnosed and repaired with updatedAt as the only change`, () => {
++      const root = fixture(`post-close-drift-${kind}-${cause}`);
++      const damaged = postClosePushDriftState(root, { kind, cause });
++      const before = readFileSync(damaged.statePath);
++      const classified = classifyOnboardingContinuity({ rootDir: root });
++      assert.equal(classified.status, "damaged");
++      assert.equal(classified.diagnosis.status, "repairable");
++      assert.equal(classified.diagnosis.code, "CONTINUITY-POST-CLOSE-AUDIT-TIMESTAMP-DRIFT");
++      const plan = planOnboardingContinuityRepair({ rootDir: root });
++      assert.equal(plan.status, "ready");
++      assert.equal(plan.reason, "repair-post-close-audit-timestamp-drift");
++      assert.deepEqual(plan.target.value, { ...JSON.parse(before), updatedAt: damaged.lifecycleTimestamp },
++        "the proposal restores the lifecycle timestamp and changes nothing else");
++      assert.deepEqual(planOnboardingContinuityRepair({ rootDir: root }), plan);
++      const applied = applyOnboardingContinuityRepair({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
++      assert.equal(applied.status, "applied");
++      assert.equal(applied.continuity.status, "valid");
++      const after = readFileSync(damaged.statePath);
++      assert.equal(digest(after), plan.target.afterSha256);
++      assert.deepEqual(JSON.parse(after), { ...JSON.parse(before), updatedAt: damaged.lifecycleTimestamp });
++      assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
++      assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
++    });
++  }
++}
++
++for (const [label, options] of Object.entries({
++  "unrelated drift with no push audit record": { cause: "none" },
++  "drift that matches neither the approval time nor a consumption": { cause: "approval", approvedAt: "2026-10-02T10:00:00.000Z" },
++  "a pending challenge whose drift is not later than the lifecycle timestamp": { cause: "challenge", drift: "2026-09-01T10:00:00.000Z", expiresAt: "2026-09-01T10:10:00.000Z" },
++  "a malformed closed entry": { cause: "approval", mutate: (state) => { delete state.closedFeatures[0].closedBy; } },
++  "an active feature": { cause: "approval", mutate: (state) => { state.activeFeature = { id: "active-feature", planPath: "specs/active-feature/prd.md", phase: "implementation" }; } },
++  "an ambiguous closed and discarded tie": { cause: "approval", kind: "closed", mutate: (state) => { state.discardedFeatures = [{ ...baseDiscardEntry(), discardedAt: "2026-09-07T09:00:00.000Z" }]; } },
++})) {
++  check(`post-close push audit drift repair refuses ${label}`, () => {
++    const root = fixture(`post-close-drift-refuse-${label.replaceAll(/[^a-z]+/gu, "-").slice(0, 30)}`);
++    const damaged = postClosePushDriftState(root, options);
++    const before = readFileSync(damaged.statePath);
++    assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
++    const plan = planOnboardingContinuityRepair({ rootDir: root });
++    assert.equal(plan.status, "unsupported");
++    assert.notEqual(plan.code, "CONTINUITY-POST-CLOSE-AUDIT-TIMESTAMP-DRIFT");
++    assert.deepEqual(readFileSync(damaged.statePath), before, "a refusal mutates nothing");
++  });
++}
++
++assert.equal(cases.length, 318, "the complete onboarding continuity corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
