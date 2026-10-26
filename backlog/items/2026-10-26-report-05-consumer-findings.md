@@ -62,6 +62,12 @@ reproduction is still owed for every entry.
   and consumer-safe-path suites 65/65. Batch Critic and PO acceptance pending.
 - PF-62 and PF-67: the root cause of the deterministic variant in this repository was a
   session-cleanup lock left inside custody; held patch `p0-session-cleanup-lock-recovery.patch`.
+- PF-61: pin baseline repaired `f09687003`; held patch `pf61-subagent-handback-commit.patch`
+  (`06d1e8e26`, C29 item 9): clone pin 12/12, finalizer suites 24/24. Gap: the stop-failure
+  diagnostic is persisted but no reader names it yet; a later slice surfaces it in
+  PostToolUse or inspect. Batch Critic and PO acceptance pending.
+- PF-67 build part: `DBG-RULESET-LOCK-HELD` already exists and is pinned (K12 cases in
+  `scripts/dispatch-briefing.test.mjs`).
 - **PF-64, budget grant not delivered.** `dispatch-budget-grant.mjs` reports `granted`, but
   the continued child sees no `DISPATCH-BUDGET-GRANT` hint and stops as unauthenticated
   (two of five cases; boundary not the 80 % checkpoint). Acceptance: a granted continuation
