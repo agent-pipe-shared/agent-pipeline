@@ -21,6 +21,10 @@ Observed 2026-10-26: after a package edit and rebuild, the prompt carried the ge
 build, and the dispatch was refused. Earlier sessions lost time to the trailing newline in the same way. Every
 retyped briefing also spends the Elephant's tokens twice: once reading the file, once writing it out.
 
+The cost repeats on every continuation: a Goldfish that stops at its tool-budget checkpoint needs a new briefing, and
+the Elephant reads and retypes the full ~90 lines again. On 2026-10-26 one slice needed three retypes (a stale marker,
+a queue hold after the B2 cancel, and the continuation itself).
+
 Wanted, one of: (a) the dispatch accepts a reference to the generated file (path plus digest) and the hook resolves
 the text itself, the Goldfish receiving exactly those bytes; or (b) `build` prints the exact prompt body to paste
 and a `verify-prompt` check compares a candidate against it before the call, with a readable diff on mismatch. A
