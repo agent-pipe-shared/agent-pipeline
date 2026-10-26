@@ -7,7 +7,7 @@ The PO applied the nineteen held patches of the C29 row as one operator commit `
 to HEAD `10e8573b5` plus the nineteen patches in order, and that both local marketplace copies equal the repository plugin
 tree (2219 files). Claude, Codex and Antigravity installs report the new version.
 
-**218 items · 190 at 75 · 16 at 50 · 12 at 25 · 28 below 75 · index 70.41%** (D167 adds the P0 row `pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location`, PF-78; previous 207 items, 184/17/6, 71.5%; after D165 210 items, 72.02%).
+**221 items · 193 at 75 · 16 at 50 · 12 at 25 · 28 below 75 · index 70.48%** (D172, 2026-10-27, below; D167 adds the P0 row `pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location`, PF-78; previous 207 items, 184/17/6, 71.5%; after D165 210 items, 72.02%).
 
 D165 adds two P0 consumer blocker rows at 25 for an interim candidate:
 `pipeline.consumer-push-blocked-by-late-review-unit` and `pipeline.brownfield-architecture-gate-never-passes`.
@@ -34,6 +34,21 @@ the scanners with the user; `pipeline.greenfield.g34.scanner-summary-truth` (75)
 | `pipeline.greenfield.r2.windows-lock-release-postcondition` | 25 | 75 | `r2-windows-session-locks` patch and notes |
 | `pipeline.greenfield.r2.windows-session-lock-owner-recovery` | 25 | 75 | `r2-windows-session-locks` patch and notes |
 | `pipeline.greenfield.g33.post-close-push-continuity` | 50 | 75 | `g33-damaged-state-recovery` patch and notes |
+
+D172 (2026-10-27) applies the PO rule that 75 counts when the work is technically delivered in the candidate: Full Verify,
+Critic, native Windows runs and PO acceptance are the gates after 75. Rows moved, each dropping only its `agent` entry:
+
+| Row | From | To | Evidence |
+|---|---:|---:|---|
+| `pipeline.dispatch-authority-store-check-fails-on-windows` (D25) | 25 | 75 | held patches D166 and D169, operator commit `304365b68`, installed `0.7.0+claude.20261026222010.17e002a` |
+| `pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location` (PF-78) | 25 | 75 | held patch D167, same commit; the consumer reports the location error gone. Documentation follow-up not delivered |
+| `pipeline.windows-private-state-check-counts-acls-inherited-from-above-the-repository` (S7b) | 50 | 75 | held patch D168, same commit |
+| `pipeline.design-course-and-registrar-disagree-on-the-feature-directory` (D7) | 25 | 50 | D170 `17e002a67` (installed), D171 `bff5c444e` (source only, not yet stamped); Wanted 2 to 4 open |
+
+Three rows join at 25 from the Glossover session (installed `…20261026222010.17e002a`): P0
+`pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have` (PF-79), P1
+`pipeline.critic-finalizer-cli-reports-scf-internal-without-the-cause` (PF-80) and P1
+`pipeline.verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project` (PF-81). Native Windows behaviour of D25 and S7b is not measured.
 
 75 means focused Source readiness. Each moved row drops only its `agent` open entry; native-host, Verify/Security,
 frozen Critic and PO acceptance stay open. Native Windows behaviour of the two Windows rows is not measured.

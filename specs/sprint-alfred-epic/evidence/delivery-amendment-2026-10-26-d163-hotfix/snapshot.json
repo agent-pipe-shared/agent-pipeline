@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.alfred-delivery-snapshot.v1",
   "measuredAt": "2026-10-26",
-  "head": "689116c579db510d6c0fb7297264eb5ce285d27d",
+  "head": "eb4749a882acb082f569620944093af910b9cc4d",
   "previous": {
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78).",
-  "total": 218,
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25.",
+  "total": 221,
   "baseline": {
     "counts": {
       "25": 2,
@@ -25,11 +25,11 @@
     "counts": {
       "25": 12,
       "50": 16,
-      "75": 190,
+      "75": 193,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 70.41
+    "index": 70.48
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -262,7 +262,7 @@
     "badOwner": [],
     "emptyOpen": [],
     "identityOrderUnchanged": true,
-    "changedRows": 6,
+    "changedRows": 10,
     "originalScopeSha256": "7282f81dd62daa6707fa78c24cbe3bcddc26b7d08e71a03127484486bf7cc775",
     "nativeDutiesPreserved": true,
     "previousIdentitiesAndStagesPreserved": false,
@@ -276,7 +276,10 @@
       "pipeline.greenfield.r2.critic-diagnostic-evidence-carry",
       "pipeline.greenfield.r2.windows-main-entry-identity",
       "pipeline.greenfield.r2.windows-lock-release-postcondition",
-      "pipeline.greenfield.r2.windows-session-lock-owner-recovery"
+      "pipeline.greenfield.r2.windows-session-lock-owner-recovery",
+      "pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have",
+      "pipeline.critic-finalizer-cli-reports-scf-internal-without-the-cause",
+      "pipeline.verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project"
     ],
     "all196IdentitiesPreserved": true,
     "previousIdentityOrderPreserved": true,
@@ -305,16 +308,40 @@
         "from": "50",
         "to": "75",
         "evidence": "specs/sprint-alfred-epic/evidence/transfer-integrated-qualification-2026-10-25/README.md"
+      },
+      {
+        "itemId": "pipeline.dispatch-authority-store-check-fails-on-windows",
+        "from": "25",
+        "to": "75",
+        "evidence": "specs/sprint-alfred-epic/evidence/held-patches/d169-dispatch-record-lane-win32-directories.notes.md"
+      },
+      {
+        "itemId": "pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location",
+        "from": "25",
+        "to": "75",
+        "evidence": "specs/sprint-alfred-epic/evidence/held-patches/d167-pf78-diagnostic-evidence-location.notes.md"
+      },
+      {
+        "itemId": "pipeline.windows-private-state-check-counts-acls-inherited-from-above-the-repository",
+        "from": "50",
+        "to": "75",
+        "evidence": "specs/sprint-alfred-epic/evidence/held-patches/d168-s7b-windows-preflight-private-root-finding.notes.md"
+      },
+      {
+        "itemId": "pipeline.design-course-and-registrar-disagree-on-the-feature-directory",
+        "from": "25",
+        "to": "50",
+        "evidence": "specs/sprint-alfred-epic/evidence/held-patches/d170-design-package-folder-is-the-feature-id.notes.md"
       }
     ]
   },
   "openByOwner": {
-    "critic": 208,
-    "po-acceptance": 207,
-    "native-host": 113,
+    "critic": 211,
+    "po-acceptance": 210,
+    "native-host": 116,
     "agent": 32,
     "po-decision": 1,
-    "verify-wsl": 66,
+    "verify-wsl": 69,
     "historical-evidence": 1
   },
   "rows": [
@@ -7601,19 +7628,18 @@
     {
       "itemId": "pipeline.dispatch-authority-store-check-fails-on-windows",
       "title": "A Goldfish dispatch can succeed on Windows: the dispatch authority store no longer checks POSIX mode bits",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D25; recorded, next-candidate priority (D166); no implementation is claimed.",
+      "reason": "Held patches D166 (agy-host-observed-store: no mode/uid verdict on win32, refusal names path and check) and D169 (dispatch-record-lane: directories without POSIX mode bits on win32) applied in operator commit 304365b68 and installed in 0.7.0+claude.20261026222010.17e002a; Windows-mocked regressions green in a fresh clone, recon of the rest of the dispatch path in the D169 recon notes. Focused Source readiness only: native Windows behaviour is not measured, a further POSIX assumption found by the consumer reopens the row.",
       "evidence": [
-        "backlog/items/2026-10-26-dispatch-authority-store-check-fails-on-windows.md"
+        "backlog/items/2026-10-26-dispatch-authority-store-check-fails-on-windows.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d166-d25-win-dispatch-authority-store.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d169-d25-windows-gate-recon.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d169-dispatch-record-lane-win32-directories.notes.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Replace the mode/uid verdict of lib/agy-host-observed-store.mjs by an ACL verdict (or skip it) on win32, name path and checked bit in the refusal, walk the rest of the dispatch path on Windows for further POSIX assumptions, and add a Windows-mocked stat.mode regression."
-        },
         {
           "owner": "native-host",
           "what": "Qualify in the affected consumer repository on its runner/platform."
@@ -7632,25 +7658,24 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "evidenceHead": "304365b68",
+      "previousSnapshotStage": "25"
     },
     {
       "itemId": "pipeline.windows-private-state-check-counts-acls-inherited-from-above-the-repository",
       "title": "The Windows private-state check judges custody once at the private root and the preflight finds a broad inherited grant before the first dispatch",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D6, raised from P1 to P0 (second independent observation). Points 2 to 5 are in the applied held patch D165-S7a (operator commit 1bcce7add, targeted tests green, native Windows not measured).",
+      "reason": "Points 2 to 5 in the applied held patch D165-S7a (operator commit 1bcce7add); point 1 (S7b) in the applied held patch D168: windowsAuthorityReadiness assesses the private-state root, names cause WIN-AUTH-PRIVATE-ROOT and one icacls instruction (operator commit 304365b68, installed in 0.7.0+claude.20261026222010.17e002a). Targeted suites green; one pipeline-start-preflight case red at HEAD too. Native Windows is not measured; whether icacls /inheritance:r re-secures existing children and whether the DACL survives the rename of pipeline-state.json stay open for the native run. Focused Source readiness only.",
       "evidence": [
         "backlog/items/2026-10-26-windows-private-state-check-counts-acls-inherited-from-above-the-repository.md",
-        "specs/sprint-alfred-epic/evidence/held-patches/d165-s7a-win-private-root-only.notes.md"
+        "specs/sprint-alfred-epic/evidence/held-patches/d165-s7a-win-private-root-only.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d168-s7b-windows-preflight-private-root-finding.notes.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Slice S7b: detect the inherited foreign grant at bootstrap/preflight on Windows (windowsAuthorityReadiness), print one copy-paste icacls instruction, continue only on a secure read-back; keep the CVCT-FILE text from hiding other causes; check that the DACL survives later state rewrites."
-        },
         {
           "owner": "native-host",
           "what": "Qualify in the affected consumer repository on its runner/platform."
@@ -7669,23 +7694,27 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "evidenceHead": "304365b68",
+      "previousSnapshotStage": "50"
     },
     {
       "itemId": "pipeline.design-course-and-registrar-disagree-on-the-feature-directory",
       "title": "The design course and the feature package registrar use one spec folder rule and a path correction needs no extra signatures",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D7/D15/D16/D17/D24; recorded, next-candidate priority (D166); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows), D7/D15/D16/D17/D24. Wanted 1 (the design package follows the registrar folder rule, an unregistrable folder is refused at promote plan) delivered by held patch D170 (operator commit 17e002a67, installed in 0.7.0+claude.20261026222010.17e002a); Wanted 5 (PO-GATE-PRD-CARDINALITY and PO-GATE-PLAN-PATH-MISMATCH name directory and bound path) delivered by held patch D171 (operator commit bff5c444e, in source, not yet in a stamped install). Wanted 2 to 4 are open. Stage 50, not 75.",
       "evidence": [
-        "backlog/items/2026-10-26-design-course-and-registrar-disagree-on-the-feature-directory.md"
+        "backlog/items/2026-10-26-design-course-and-registrar-disagree-on-the-feature-directory.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d170-design-package-folder-is-the-feature-id.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d171-po-gate-prd-messages-name-directory-and-bound-path.notes.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "The course creates specs/<featureId>/ from the start (or the registrar accepts the signed path), Phoenix apply updates activeFeature.planPath in the same transaction, reopen-design previews what it voids, a byte-identical path rebind keeps its review receipts, PO-GATE-PRD-CARDINALITY names directory and bound path."
+          "what": "Phoenix apply updates activeFeature.planPath in the same transaction (or the PO gate derives the directory from the authority PRD path), reopen-design previews what it voids, a byte-identical path rebind keeps its review receipts."
         },
         {
           "owner": "native-host",
@@ -7705,7 +7734,9 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "evidenceHead": "bff5c444e",
+      "previousSnapshotStage": "25"
     },
     {
       "itemId": "pipeline.missing-docs-adr-directory-blocks-implementation-entry",
@@ -7854,18 +7885,126 @@
     {
       "itemId": "pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location",
       "title": "The Critic diagnostic evidence is produced and registered at one location, so a consumer can push",
+      "stage": "75",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Held patch D167 (one shared diagnosticEvidenceLocation predicate for producer, CLI and registrar; refusals name both locations; chain test produce-register-admit) applied in operator commit 304365b68 and installed in 0.7.0+claude.20261026222010.17e002a. The consumer (Glossover) reports the location error gone and the chain to packet-ready running without hand edits. The fixed evidence/verify-latest.json member is decided as copy-then-produce (registered manifest is the only admitted source). Residual documentation follow-up (usage text of scripts/critic-diagnostic-evidence.mjs, critic-review skill) is not delivered. Focused Source readiness only.",
+      "evidence": [
+        "backlog/items/2026-10-26-critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d167-pf78-diagnostic-evidence-location.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d167-pf78-diagnostic-evidence-location.patch"
+      ],
+      "open": [
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true,
+      "evidenceHead": "304365b68",
+      "previousSnapshotStage": "25"
+    },
+    {
+      "itemId": "pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have",
+      "title": "The Critic packet admission has an honest route for a project without dispatch history and the dispatch record producer is documented where the consumer looks",
       "stage": "25",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (PF-78, PF-76 addendum) on the installed build 0.7.0+claude.20261026181519.1bcce7a after the CDR patch; recorded, next-candidate priority (D167); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-27 (Glossover, PF-79) on 0.7.0+claude.20261026222010.17e002a: packet-ready, but admission demands a dispatch record the project cannot honestly have; no signed push without the Critic. Recorded; recon slice D172 dispatched; no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location.md"
+        "backlog/items/2026-10-27-critic-admission-requires-a-dispatch-record-a-project-cannot-have.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "The producer writes into specs/<featureId>/evidence/ (one shared output-path rule with the registrar), decide the fixed evidence/verify-latest.json member, name the other tool location in CDI-OUTPUT-PATH and FPR-DIAG-PATH, and add a chain test (produce, register, admit) with an ignored evidence/ directory."
+          "what": "Recon the three admission routes (D172), then give a range without dispatch history a sanctioned, visibly marked binding instead of a record, name the record producer in the refusal and the references, and add a chain test (no-record project, prepare, admit)."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.critic-finalizer-cli-reports-scf-internal-without-the-cause",
+      "title": "The Critic finalizer CLI names the cause of an internal refusal instead of only SCF-INTERNAL",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "Consumer finding relayed 2026-10-27 (Glossover, PF-80): the admit step printed only SCF-INTERNAL. Recorded; no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-27-critic-finalizer-cli-reports-scf-internal-without-the-cause.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Keep the code and add a bounded, sanitised detail (inner error code and first message line), cover it with typed and untyped throw tests without the repository root in the output."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project",
+      "title": "Verify for an older commit follows the project lockfile instead of demanding package-lock.json",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "Consumer finding relayed 2026-10-27 (Glossover, PF-81): Verify for an older commit asks for package-lock.json in a pnpm project. Recorded; no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-27-verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Recon where Verify chooses the install step, follow pnpm-lock.yaml/yarn.lock/package-lock.json, and name the lockfiles looked for when none is supported; assert the install plan in a fixture test."
         },
         {
           "owner": "native-host",
