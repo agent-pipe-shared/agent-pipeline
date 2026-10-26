@@ -5,40 +5,51 @@ type: bug
 owner: pipeline
 status: open
 created: 2026-10-26
-priority: P1
+priority: P0
 release: 0.7.0
 source: "Live Claude Elephant session on the WSL PC, 2026-10-26"
 done_when: manual
 ---
 
-# A governed dispatch is refused with SDC-LOCK-HELD while no other Pipeline work runs
+# Every governed dispatch is refused with SDC-LOCK-HELD while no other Pipeline work runs
 
-Observed live on 2026-10-26: four consecutive attempts to launch the same
-generated Goldfish briefing were refused by `guard-dispatch` with
-`SDC-LOCK-HELD: version 2 native host binding failed before launch`. One refusal
-named the reason `registry-lock-held` (held by a running Pipeline process for
-2 s, longer than the 1500 ms bounded wait). `session-authority-repair.mjs
-inspect` right before and after each attempt read `lock: absent`, and `wait`
-returned `lock-free` immediately; no test run or other Goldfish was active.
-The same briefing shape had launched several times earlier in the session.
+Observed live on 2026-10-26. Six consecutive launches of two different
+generated Goldfish briefings (different items, different criteria) were
+refused by `guard-dispatch` with
+`SDC-LOCK-HELD: version 2 native host binding failed before launch`. Only the
+second refusal carried a reason (`registry-lock-held`, held by a running
+Pipeline process for 2 s, longer than the 1500 ms bounded wait); the other five
+carried no reason line. `session-authority-repair.mjs inspect` before and after
+the attempts read `lock: absent`, `wait` returned `lock-free` immediately, and
+no test run or other Goldfish process was alive. Earlier the same session had
+launched about twenty such dispatches without this refusal. The condition is
+deterministic, not intermittent: the session can no longer dispatch any
+governed Goldfish.
 
-## Analysis (Source reading, not a reproduction)
+## What the Source shows (reading, not a reproduction)
 
-`registryClosure` in `lib/session-authority-registry.mjs` refuses any read that
-meets `registry.lock` outside the reader's own boundary with
-`SDC-LOCK-HELD registry-lock-held` immediately, and a boundary acquire waits at
-most `SESSION_AUTHORITY_LOCK_WAIT_MS` (1500 ms). Several PreToolUse hooks run
-for one Agent call. If one of them holds the boundary while another reads the
-registry, the second refuses. The registry now carries 20 in-flight
-`native-goldfish` reservations from this session (cancelled or
-integrated-by-commit slices), so each boundary is held longer and the race
-becomes near-certain.
+- `prepareNativeGoldfishHostState` retries `SDC-LOCK-HELD` for up to 10 s, but
+  only when the refusal is raised before its callback entered
+  (`retryWhileSessionAuthorityLockHeld`, `lib/native-goldfish-host-state.mjs`).
+  A deterministic refusal therefore comes from inside the boundary.
+- Inside `withSessionAuthorityBoundary` (`lib/session-authority-registry.mjs`)
+  three paths raise the code without a reason surfaced to the hook:
+  `registry-lock-ownership-changed`, `domain-transition-partial-effect-retained`,
+  and `registryClosure` meeting `registry.lock` with an active boundary whose
+  repository does not equal the reader's.
+- `guard-dispatch` prints `prepared.reason` only when present, so the deciding
+  path is invisible to the operator.
+- `inspect` lists 20 `native-goldfish` reservations of this session as in-flight
+  although every one is settled (cancelled or integrated-by-commit), and
+  returns `next: []`.
+
+Which of the three paths fires is not yet established.
 
 ## Acceptance
 
-Hooks evaluating the same tool call never refuse each other: a reader that
-meets the lock waits within the same bound as an acquirer, or the hooks share
-one boundary. Settled reservations (cancelled, integrated-by-commit) stop
-lengthening every later boundary. The refusal names the actual holder and a
-typed next action instead of an inspect that reports `absent`. Preserve the
-lock's exclusivity for real concurrent writers.
+A dispatch refusal from the session-authority boundary always names its exact
+internal reason and a typed next action; `inspect` names the same cause instead
+of `lock: absent` with no next step. Settled reservations stop counting as
+in-flight. Hooks evaluating one tool call never refuse each other. A session
+that has dispatched many slices can keep dispatching. Preserve the lock's
+exclusivity for real concurrent writers and refuse genuine partial effects.
