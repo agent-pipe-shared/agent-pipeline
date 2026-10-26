@@ -42,6 +42,19 @@ reproduction is still owed for every entry.
   `succeeded` contract, but SubagentStop produced no commit (twice). Suspected: only the first
   stop (`blocked`) is evaluated. Acceptance: a continued child that returns `succeeded` is
   host-committed exactly once, or the hook names why not.
+  Reproduced in this repository on 2026-10-26 WITHOUT a budget grant: the PF-58 slice
+  (`W4-PF58-REVIEW-UNIT-CRITERIA-20261026`) launched in the background, its PostToolUse said
+  the host commit completes at SubagentStop, the child returned a valid `succeeded` contract
+  on its first and only stop, and no commit followed (host committed as orchestrator,
+  `29d4b4619`). The same happened for identity C6. So the first-stop hypothesis is wrong;
+  the SubagentStop route itself does not complete.
+
+## Progress
+
+- PF-58 fixed directly (unprotected file): `29d4b4619`, pin file 8/8, preflight, round-cap
+  and consumer-safe-path suites 65/65. Batch Critic and PO acceptance pending.
+- PF-62 and PF-67: the root cause of the deterministic variant in this repository was a
+  session-cleanup lock left inside custody; held patch `p0-session-cleanup-lock-recovery.patch`.
 - **PF-64, budget grant not delivered.** `dispatch-budget-grant.mjs` reports `granted`, but
   the continued child sees no `DISPATCH-BUDGET-GRANT` hint and stops as unauthenticated
   (two of five cases; boundary not the 80 % checkpoint). Acceptance: a granted continuation
