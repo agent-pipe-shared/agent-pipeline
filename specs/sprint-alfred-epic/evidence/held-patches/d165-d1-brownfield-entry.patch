@@ -1,0 +1,133 @@
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+index da07e1dc2..a84129550 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.mjs
+@@ -202,6 +202,14 @@ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
+   return { blockingOverallStatus, reportOnly, malformed: false };
+ }
+ 
++/**
++ * D165 D1: the same projection inspectArchitectureEntryReadiness uses (uncalibrated class 10 is report-only),
++ * exposed unchanged so the implementation entry guard decides on the identical blocking status.
++ */
++export function planningFitnessBlockingStatus(fitness) {
++  return projectPlanningFitness(fitness);
++}
++
+ /** Expose task-scoped decisions without assigning unknown paths or promoting legacy ADRs. */
+ export function inspectPlanningDecisionApplicability(root, surface, now,
+   { loadPhysicalMap = loadPhysicalArchitectureMap,
+diff --git a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+index d0baf9c3a..cc25b6011 100644
+--- a/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-entry-readiness.test.mjs
+@@ -439,6 +439,32 @@ test("an unavailable optional decision clock remains diagnostic", () => {
+   assert.equal(result.code, "ARCH-DECISION-CLOCK-UNAVAILABLE");
+ });
+ 
++test("D165-D1 (e) planningFitnessBlockingStatus returns the projection inspectArchitectureEntryReadiness uses", async () => {
++  const { planningFitnessBlockingStatus } = await import("./architecture-entry-readiness.mjs");
++  assert.equal(typeof planningFitnessBlockingStatus, "function");
++  const names = ["module-identity-ownership", "contract-presence-freshness", "dependency-direction-cycles", "boundary-crossing",
++    "authority-effect-ownership", "verification-locality", "navigation-currency", "parallel-overlap", "profile-drift", "calibrated-friction-thresholds"];
++  const outcomes = names.map((propertyId, index) => ({ classId: index + 1, propertyId, outcome: "pass", violations: [] }));
++  outcomes[9] = { classId: 10, propertyId: names[9], outcome: "unavailable", violations: [],
++    evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } };
++  const fitness = { overallStatus: "unavailable", outcomes, summary: {} };
++  const projection = planningFitnessBlockingStatus(fitness);
++  assert.equal(projection.malformed, false);
++  assert.equal(projection.blockingOverallStatus, "pass");
++  assert.deepEqual(projection.reportOnly, [outcomes[9]]);
++  const result = inspectArchitectureEntryReadiness({
++    rootDir: repoRoot,
++    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
++    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: readyDisposition,
++      evaluateArchitectureFitness: () => fitness,
++      inspectDecisions: ({ area }) => ({ area, status: "advisory", decisions: [], findings: [] }) },
++  });
++  assert.equal(result.status, "ready", JSON.stringify(result));
++  assert.equal(result.fitness.blockingOverallStatus, projection.blockingOverallStatus);
++  assert.deepEqual(result.fitness.reportOnly, projection.reportOnly);
++  assert.equal(planningFitnessBlockingStatus({ outcomes: outcomes.slice(0, 9) }).malformed, true);
++});
++
+ // ---- greenfieldPendingFitnessAllowance: pure decision, pure inputs (ALF-H1-PF20-PENDING-FITNESS-ALLOWANCE) ----
+ const PF_IMPLEMENTATION = "src/app.mjs";
+ const PF_ENTRY = "tests/app.test.mjs";
+diff --git a/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs b/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs
+index 1f9b1bba5..239b3b04f 100644
+--- a/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs
++++ b/plugins/pipeline-core/lib/guard/entry-gates-greenfield-pending.test.mjs
+@@ -170,3 +170,44 @@ test("set-phase implementation is still denied for a greenfield tree whose archi
+   assert.ok(seen[0].result.outcomes.some((outcome) => outcome.classId === 7 && outcome.outcome === "finding"), "navigation currency is a real finding of the evaluator");
+   denied(verdict, "stale map");
+ });
++
++// ---- D165 D1: an uncalibrated class 10 (report-only in the entry-readiness library) must not deny alone ----
++const D1_CLASSES = ["module-identity-ownership", "contract-presence-freshness", "dependency-direction-cycles", "boundary-crossing",
++  "authority-effect-ownership", "verification-locality", "navigation-currency", "parallel-overlap", "profile-drift", "calibrated-friction-thresholds"];
++const D1_UNCALIBRATED = { classId: 10, propertyId: D1_CLASSES[9], outcome: "unavailable", violations: [],
++  evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } };
++function d1Fitness(overrideRows, overallStatus = "unavailable") {
++  const rows = D1_CLASSES.map((propertyId, index) => ({ classId: index + 1, propertyId, outcome: "pass", violations: [] }));
++  for (const row of overrideRows) rows[row.classId - 1] = row;
++  return { overallStatus, outcomes: rows };
++}
++function d1Verdict(fitness) {
++  return architectureFitnessAuthorityVerdict(repoRoot, COMMAND, {
++    activeFeaturePlanningSurfaceFn: () => ({ planPath: PLAN, paths: [IMPLEMENTATION] }),
++    activeFeaturePlanningScopeFn: () => PLAN,
++    evaluateArchitectureFitnessFn: () => fitness,
++    // No greenfield pending allowance applies: readiness is not ready.
++    inspectArchitectureEntryReadinessFn: () => ({ status: "blocked", code: "D1-FIXTURE" }),
++  });
++}
++
++test("D165-D1 (a) fitness whose only non-pass outcome is the uncalibrated class 10 is admitted", () => {
++  assert.equal(d1Verdict(d1Fitness([D1_UNCALIBRATED])), null);
++});
++
++test("D165-D1 (b) the uncalibrated class 10 plus a class 3 finding is still denied", () => {
++  const finding = { classId: 3, propertyId: D1_CLASSES[2], outcome: "finding", violations: [{ ruleId: "x", module: "application", target: IMPLEMENTATION }] };
++  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, finding], "blocked")), "class 3 finding, blocked");
++  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, finding], "unavailable")), "class 3 finding, unavailable");
++});
++
++test("D165-D1 (c) class 10 unavailable with a different evidence shape is still denied", () => {
++  const telemetry = { classId: 10, propertyId: D1_CLASSES[9], outcome: "unavailable", violations: [], evidence: { status: "unavailable", telemetryUnavailable: true } };
++  denied(d1Verdict(d1Fitness([telemetry])), "telemetryUnavailable");
++});
++
++test("D165-D1 (d) a malformed nine-outcome set is denied", () => {
++  const fitness = d1Fitness([D1_UNCALIBRATED]);
++  fitness.outcomes = fitness.outcomes.slice(0, 9);
++  denied(d1Verdict(fitness), "nine outcomes");
++});
+diff --git a/plugins/pipeline-core/lib/guard/entry-gates.mjs b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+index d520e7c37..17846ce25 100644
+--- a/plugins/pipeline-core/lib/guard/entry-gates.mjs
++++ b/plugins/pipeline-core/lib/guard/entry-gates.mjs
+@@ -7,7 +7,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { checkPlanningAdoptionDisposition } from "../../scripts/architecture-adoption.mjs";
+ import { evaluateArchitectureFitness, inspectFitnessModelMaterialization, runFitnessQualification } from "../../scripts/architecture-fitness.mjs";
+-import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
++import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness, planningFitnessBlockingStatus } from "../architecture-entry-readiness.mjs";
+ import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
+ import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
+ import { ARCHITECTURE_ADOPTION_DENIAL_CODE, ARCHITECTURE_ADOPTION_MIGRATION_DENIAL_CODE, ARCHITECTURE_FITNESS_DENIAL_CODE, MINIMUM_RIGOR_ADVISORY_CODE, PIPELINE_STATE_SCRIPT } from "./constants.mjs";
+@@ -178,6 +178,14 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies
+     fitness = null;
+   }
+   if (fitness?.overallStatus === "pass" || fitness?.overallStatus === "excepted") return null;
++  // D165 D1: an uncalibrated class 10 is report-only in the entry-readiness library; admit when nothing else blocks.
++  if (fitness !== null && typeof fitness === "object") {
++    try {
++      const projection = planningFitnessBlockingStatus(fitness);
++      if (projection.malformed === false
++        && (projection.blockingOverallStatus === "pass" || projection.blockingOverallStatus === "excepted")) return null;
++    } catch { /* unchanged denial below */ }
++  }
+   // Only the greenfield pending allowance below can lift a non-green fitness result.
+   if (fitness !== null && typeof fitness === "object"
+     && typeof fitness.overallStatus === "string"
