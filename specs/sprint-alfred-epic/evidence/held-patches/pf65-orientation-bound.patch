@@ -1,0 +1,178 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 4524aac4c..45fd1e08e 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -30,7 +30,7 @@ const OPTIONAL_STRINGS = Object.freeze(["schema", "modelWhy", "broader", "spec",
+ // D75 (A): where a recon note may live; the same rule validates the package field and the generator's --recon-note flag.
+ export const RECON_NOTE_PREFIXES = Object.freeze(["scratch/", "specs/"]);
+ const REQUIRED_LISTS = Object.freeze(["paths", "context", "targeted"]);
+-const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops"]);
++const OPTIONAL_LISTS = Object.freeze(["newFiles", "forbidden", "stops", "facts"]);
+ const KNOWN_KEYS = new Set([...REQUIRED_STRINGS, ...OPTIONAL_STRINGS, ...REQUIRED_LISTS, ...OPTIONAL_LISTS, "estimatedToolCalls"]);
+ const TOOL_BUDGET_LINE = /Tool budget[^\n]*≤(\d+) tool uses/u;
+ // A repository-relative file named inside a targeted command (`node <path> ...`, a backticked path).
+@@ -91,6 +91,26 @@ export function validateBriefingPackage(pkg) {
+   return pkg;
+ }
+ 
++// PF-65: a package naming more delivery files than this, with no coordinator facts, makes a bounded implementor spend its tool budget on orientation.
++export const ORIENTATION_PATH_BOUND = 6;
++
++/**
++ * Advisory (never blocking) findings about a valid package, as {code, message} warnings: an orientation-heavy delivery
++ * without facts, then an estimate below the floor. The floor 8 + 3 x paths is an uncalibrated heuristic until recorded runs calibrate it.
++ */
++export function packageAdvisories(pkg) {
++  const warnings = [];
++  const pathCount = new Set(pkg.paths).size;
++  if (pathCount > ORIENTATION_PATH_BOUND && (pkg.facts === undefined || pkg.facts.length === 0)) {
++    warnings.push({ code: "DBG-PACKAGE-ORIENTATION-HEAVY", message: `the package names ${pathCount} delivery paths, above the bound ${ORIENTATION_PATH_BOUND}, and carries no coordinator facts, so the implementor will likely spend its tool budget on orientation; repair: add "facts" (what the coordinator already established) or split the outcome` });
++  }
++  const floor = 8 + 3 * pathCount;
++  if (pkg.estimatedToolCalls === undefined || pkg.estimatedToolCalls < floor) {
++    warnings.push({ code: "DBG-PACKAGE-ESTIMATE-LOW", message: `estimatedToolCalls ${pkg.estimatedToolCalls === undefined ? "is absent" : `${pkg.estimatedToolCalls} is below the floor`}; the floor for ${pathCount} delivery path(s) is ${floor} (8 + 3 x paths); repair: set "estimatedToolCalls" to at least ${floor}` });
++  }
++  return warnings;
++}
++
+ /** The hard tool cap the binding builder wrote into field 6 of its skeleton. */
+ export function skeletonToolBudget(skeleton) {
+   const match = TOOL_BUDGET_LINE.exec(skeleton);
+@@ -207,6 +227,8 @@ export function generatedBriefingAdmission(prompt, generatorCommand = "node <plu
+   return { code: "DBG-GENERATED-BRIEFING-REQUIRED", message: `a governed Goldfish item briefing must come from the briefing generator, not be assembled by hand; ${repair}` };
+ }
+ 
++const factsBlock = (pkg) => (pkg.facts === undefined ? "" : `\n\nFacts established by the coordinator (do not re-derive):\n\n${pkg.facts.map((fact) => `- ${fact}`).join("\n")}`);
++
+ /** Renders the full briefing; `generated` is the binding builder's result for this package. */
+ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { raised: false, exceeds: false }) {
+   const estimateLines = pkg.estimatedToolCalls === undefined ? "" : [
+@@ -237,7 +259,7 @@ ${NATIVE_GOLDFISH_HOST_DIRECTIVE}
+ 
+ ### 1. Goal
+ 
+-${pkg.goal}
++${pkg.goal}${factsBlock(pkg)}
+ 
+ ### 2. Context files
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 581d6e065..e5a82e136 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -68,7 +68,7 @@ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+   Required strings: id, item, agentType, modelId, check, title, ac, goal.
+   Required non-empty string arrays: paths, context, targeted.
+   Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner.
+-  Optional string arrays: newFiles, forbidden, stops; optional positive integer: estimatedToolCalls.
++  Optional string arrays: newFiles, forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
+   Unknown keys are refused. --package is repository-relative. Only --out writes,
+   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
+ 
+@@ -103,6 +103,7 @@ const {
+   assertPackagePathsExist,
+   budgetDecision,
+   isReconNotePath,
++  packageAdvisories,
+   renderGoldfishBriefing,
+   resolveBriefingCalibration,
+   skeletonToolBudget,
+@@ -918,7 +919,7 @@ export function buildDispatchBriefing(options, deps = {}) {
+   }
+   return {
+     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+-    sha256: rendered.sha256, warnings: generated.warnings, ...(options.out === undefined ? { text: rendered.text } : {}),
++    sha256: rendered.sha256, warnings: [...generated.warnings, ...packageAdvisories(pkg)], ...(options.out === undefined ? { text: rendered.text } : {}),
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index d11368600..6e6e3702e 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1281,3 +1281,85 @@ test("W2-R2 the default Claude route reader uses the registry route of the duty,
+   assert.equal(codex.ok, true, JSON.stringify(codex).slice(0, 300));
+   assert.equal(codex.binding.effort, "high");
+ });
++
++// --- PF-65 (consumer report 05, AC-142): coordinator facts and the orientation-heavy / low-estimate advisories ---
++
++const pf65Paths = (count) => {
++  const extra = Array.from({ length: count - 1 }, (_, index) => `plugins/x/pf65-${index}.mjs`);
++  return { paths: [PATH_A, ...extra], newFiles: extra };
++};
++const pf65Codes = (result) => result.warnings.map((entry) => entry.code);
++
++test("PF-65 a facts list of non-empty strings is accepted; a wrongly typed facts value is refused naming the repair", async () => {
++  const { runDispatchBriefing } = await lib();
++  const ok = packageFixture({ facts: ["The cap is 35 calls.", "Line 60 holds the help text."] });
++  const accepted = runDispatchBriefing(ok.argv, depsOf(ok.fx));
++  assert.equal(accepted.ok, true, JSON.stringify(accepted));
++  for (const bad of ["a string", [""], [3]]) {
++    const wrong = packageFixture({ facts: bad });
++    const refused = runDispatchBriefing(wrong.argv, depsOf(wrong.fx));
++    assert.equal(refused.ok, false, JSON.stringify(bad));
++    assert.equal(refused.code, "DBG-PACKAGE-FIELD-TYPE", JSON.stringify(bad));
++    assert.match(refused.message, /"facts".*repair: /u);
++  }
++});
++
++test("PF-65 facts render as a list under the coordinator line inside section 1 after the goal; absent facts leave the text byte-identical", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { verifyGeneratedBriefing } = await buildLib();
++  const withFacts = packageFixture({ facts: ["First fact.", "Second fact."] });
++  const built = runDispatchBriefing(withFacts.argv, depsOf(withFacts.fx));
++  assert.equal(built.ok, true, JSON.stringify(built));
++  const line = "Facts established by the coordinator (do not re-derive):";
++  const goalAt = built.text.indexOf("Fixture goal text.");
++  const lineAt = built.text.indexOf(line);
++  const contextAt = built.text.indexOf("### 2. Context files");
++  assert.ok(built.text.indexOf("### 1. Goal") < goalAt && goalAt < lineAt && lineAt < contextAt, "facts sit in section 1 after the goal");
++  assert.ok(built.text.includes(`${line}\n\n- First fact.\n- Second fact.\n`));
++  assert.deepEqual(verifyGeneratedBriefing(built.text), { ok: true, code: "DBG-GENERATED-VERIFIED" });
++  const plain = packageFixture();
++  const plainBuilt = runDispatchBriefing(plain.argv, depsOf(plain.fx));
++  assert.equal(plainBuilt.text.includes(line), false);
++  assert.ok(plainBuilt.text.includes("### 1. Goal\n\nFixture goal text.\n\n### 2. Context files"));
++});
++
++test("PF-65 more than 6 delivery paths without facts warn DBG-PACKAGE-ORIENTATION-HEAVY; facts or 6 or fewer paths do not", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { ORIENTATION_PATH_BOUND } = await buildLib();
++  assert.equal(ORIENTATION_PATH_BOUND, 6);
++  const heavy = packageFixture({ ...pf65Paths(7), estimatedToolCalls: 29 });
++  const result = runDispatchBriefing(heavy.argv, depsOf(heavy.fx));
++  assert.equal(result.ok, true, JSON.stringify(result));
++  const warning = result.warnings.find((entry) => entry.code === "DBG-PACKAGE-ORIENTATION-HEAVY");
++  assert.ok(warning, JSON.stringify(result.warnings));
++  assert.match(warning.message, /7/u);
++  assert.match(warning.message, /6/u);
++  assert.match(warning.message, /"facts"/u);
++  assert.match(warning.message, /split/u);
++  const withFacts = packageFixture({ ...pf65Paths(7), estimatedToolCalls: 29, facts: ["A coordinator fact."] });
++  assert.equal(pf65Codes(runDispatchBriefing(withFacts.argv, depsOf(withFacts.fx))).includes("DBG-PACKAGE-ORIENTATION-HEAVY"), false);
++  const atBound = packageFixture({ ...pf65Paths(6), estimatedToolCalls: 26 });
++  assert.equal(pf65Codes(runDispatchBriefing(atBound.argv, depsOf(atBound.fx))).includes("DBG-PACKAGE-ORIENTATION-HEAVY"), false);
++});
++
++test("PF-65 an estimate absent or below 8 + 3 x paths warns DBG-PACKAGE-ESTIMATE-LOW naming the floor; at or above it no warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const absent = packageFixture();
++  const absentResult = runDispatchBriefing(absent.argv, depsOf(absent.fx));
++  assert.equal(absentResult.ok, true, JSON.stringify(absentResult));
++  const warning = absentResult.warnings.find((entry) => entry.code === "DBG-PACKAGE-ESTIMATE-LOW");
++  assert.ok(warning, JSON.stringify(absentResult.warnings));
++  assert.match(warning.message, /11/u);
++  const low = packageFixture({ estimatedToolCalls: 10 });
++  const lowResult = runDispatchBriefing(low.argv, depsOf(low.fx));
++  assert.equal(lowResult.ok, true, JSON.stringify(lowResult));
++  assert.ok(pf65Codes(lowResult).includes("DBG-PACKAGE-ESTIMATE-LOW"));
++  const atFloor = packageFixture({ estimatedToolCalls: 11 });
++  assert.equal(pf65Codes(runDispatchBriefing(atFloor.argv, depsOf(atFloor.fx))).includes("DBG-PACKAGE-ESTIMATE-LOW"), false);
++  const wide = packageFixture({ ...pf65Paths(4), estimatedToolCalls: 19 });
++  const wideResult = runDispatchBriefing(wide.argv, depsOf(wide.fx));
++  assert.ok(pf65Codes(wideResult).includes("DBG-PACKAGE-ESTIMATE-LOW"));
++  assert.match(wideResult.warnings.find((entry) => entry.code === "DBG-PACKAGE-ESTIMATE-LOW").message, /20/u);
++  const wideOk = packageFixture({ ...pf65Paths(4), estimatedToolCalls: 20 });
++  assert.equal(pf65Codes(runDispatchBriefing(wideOk.argv, depsOf(wideOk.fx))).includes("DBG-PACKAGE-ESTIMATE-LOW"), false);
++});
