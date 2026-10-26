@@ -1,0 +1,136 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 93e20dc71..ea66a0b1d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -770,6 +770,14 @@ const EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES = 1_048_576;
+ const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
+ const FINAL_INTEGRATION_MAX_BYTES = 8_192;
+ const POST_RESULT_SENTINEL = "$POST_RESULT_SHA256";
++// D165 D4: brownfield architecture hurdles submit-plan refuses before the PO signs.
++const SUBMIT_PLAN_BROWNFIELD_ARCHITECTURE_CODES = new Set([
++  "ARCHITECTURE-MAP-MISSING", "ARCHITECTURE-MAP-INVALID", "ARCHITECTURE-FITNESS-MODEL-INVALID",
++  "ARCHITECTURE-BASELINE-INVALID", "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED",
++  "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED", "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING",
++  "ARCHITECTURE-CHECKPOINT-DEBT-OPEN", "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE",
++  "ARCHITECTURE-FITNESS-NOT-READY",
++]);
+ const NEXT_TRANSITION_KEYS = new Set(["queueHead", "blocker", "resume", "recovery", "decisionTxn", "capacity"]);
+ const RESULT_BINDING_KEYS = new Set(["path", "preResultSha256"]);
+ const FINAL_ENTRY_KEYS = new Set([
+@@ -11302,6 +11310,7 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+         console.error(`Error: submit-plan blocked by ${framingRefusal.code}: the PRD at ${framingRefusal.planPath} still contains its own unmodified framing placeholder text ("${framingRefusal.marker}"). Author the framing section before submitting.`);
+         return 2;
+       }
++      let submitDesignDraft = null;
+       if (["epic", "feature"].includes(profileName)) {
+         const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
+           planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
+@@ -11309,6 +11318,26 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+           console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+           return 2;
+         }
++        submitDesignDraft = designDraft;
++      }
++      // D165 D4: when no design package applies, a brownfield architecture hurdle
++      // (missing map, open debt, adoption, ...) would only surface at set-phase
++      // implementation, after the PO signed. Refuse it here, before any State write.
++      if (!(submitDesignDraft?.ok && submitDesignDraft.required === true)) {
++        const submitArchitecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
++          rootDir: dir,
++          taskScope: authority.value.planPath,
++          now: new Date(now()),
++          deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, {
++            gitCandidate: deps.gitCandidate,
++            trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
++            verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
++          }) },
++        });
++        if (submitArchitecture.status !== "ready" && SUBMIT_PLAN_BROWNFIELD_ARCHITECTURE_CODES.has(submitArchitecture.code)) {
++          console.error(`Error: submit-plan blocked by ${submitArchitecture.code}; ${submitArchitecture.message}. Next action: ${JSON.stringify(submitArchitecture.nextAction)}. No submission or signature request was recorded.`);
++          return 2;
++        }
+       }
+       const submitHandoff = planHandoffRefusal("submit-plan", inspectPlanDeliveryHandoff({ rootDir: dir, specPath: authority.value.specPath, expectedSpecSha256: authority.value.specSha256 })); if (submitHandoff) { console.error(submitHandoff); return 2; } // AC-264/D30/D85: refused before any write
+       const submitSources = inspectSubmissionSources(dir, authority.value, deps);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index b3e6610d8..e4946668e 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -1273,6 +1273,9 @@ function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailabl
+         ? { ok: true } : { ok: false, code: "DWP-TEST-HOST-BINDING" },
+     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchors: [poTestAnchor] }),
+     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
++    // D165-S4: submit-plan now consults architecture readiness; the shared fixture has no
++    // architecture map, so it supplies a ready stub (the D165-S4 cases override it).
++    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
+     poGateProfile: () => ({ ok: true, value: profile }),
+     poGateAuthority: () => ({
+       ok: true,
+@@ -1442,6 +1445,67 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
+   }
+ }
+ 
++// D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE
++// the PO signs, instead of letting set-phase implementation refuse it later.
++{
++  const BROWNFIELD_CODES = [
++    "ARCHITECTURE-MAP-MISSING", "ARCHITECTURE-MAP-INVALID", "ARCHITECTURE-FITNESS-MODEL-INVALID",
++    "ARCHITECTURE-BASELINE-INVALID", "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED",
++    "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED", "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING",
++    "ARCHITECTURE-CHECKPOINT-DEBT-OPEN", "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE",
++    "ARCHITECTURE-FITNESS-NOT-READY",
++  ];
++  const s4Run = (code, extraDeps = {}) => {
++    const featureId = "d165-s4-precheck";
++    const planPath = `specs/${featureId}/prd_${featureId}.md`;
++    const specPath = `specs/${featureId}/spec.md`;
++    const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
++    let calls = 0;
++    const seen = [];
++    const blocked = code === null ? { status: "ready", code: null, nextAction: null }
++      : { status: "blocked", code, message: `fixture ${code}`, nextAction: { kind: "fixture-next-action", code } };
++    const stubbed = { ...deps, architectureEntryReadiness: (req) => { calls += 1; seen.push(req); return blocked; }, ...extraDeps };
++    const before = readFileSync(statePath(root), "utf8");
++    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], stubbed));
++    return { root, attempt, before, calls: () => calls, seen };
++  };
++  for (const code of BROWNFIELD_CODES) {
++    const { root, attempt, before, calls, seen } = s4Run(code);
++    assert.equal(attempt.result, 2, `${code}: ${attempt.lines.join(" ")}`);
++    const text = attempt.lines.join("\n");
++    assert.ok(text.includes(code), `${code}: stderr must name the code: ${text}`);
++    assert.ok(text.includes("fixture-next-action"), `${code}: stderr must name the next action: ${text}`);
++    assert.ok(text.includes("No submission or signature request was recorded"), code);
++    assert.equal(readFileSync(statePath(root), "utf8"), before, `${code}: State must be byte-identical`);
++    assert.equal(calls(), 1, `${code}: readiness seam called exactly once`);
++    assert.equal(seen[0].taskScope, `specs/d165-s4-precheck/prd_d165-s4-precheck.md`, `${code}: scoped to the plan path`);
++  }
++  {
++    const { attempt, calls } = s4Run(null);
++    assert.equal(attempt.result, 0, `ready readiness must proceed: ${attempt.lines.join(" ")}`);
++    assert.equal(calls(), 1, "ready: seam called exactly once");
++  }
++  for (const code of ["ARCHITECTURE-MATERIALIZATION-REQUIRED", "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", "ARCHITECTURE-PLAN-SURFACE-MISSING", "ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED", "ARCHITECTURE-FITNESS-UNAVAILABLE"]) {
++    const { attempt, calls } = s4Run(code);
++    assert.equal(attempt.result, 0, `${code} is not a brownfield hurdle and must not refuse submit-plan: ${attempt.lines.join(" ")}`);
++    assert.equal(calls(), 1, `${code}: seam called exactly once`);
++  }
++  {
++    // The mini profile never inspects a design draft, so no design package applies: the check runs.
++    const featureId = "d165-s4-mini";
++    const planPath = `specs/${featureId}/prd_${featureId}.md`;
++    const specPath = `specs/${featureId}/spec.md`;
++    const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
++    let calls = 0;
++    const before = readFileSync(statePath(root), "utf8");
++    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "mini"],
++      { ...deps, architectureEntryReadiness: () => { calls += 1; return { status: "blocked", code: "ARCHITECTURE-MAP-MISSING", message: "m", nextAction: { kind: "x" } }; } }));
++    assert.equal(attempt.result, 2, `mini: ${attempt.lines.join(" ")}`);
++    assert.equal(calls, 1);
++    assert.equal(readFileSync(statePath(root), "utf8"), before);
++  }
++}
++
+ // An established feature under the global chat policy uses the PO's one
+ // explicit chat decision and records honest unattested attribution. It must
+ // not be routed through the onboarding-only bootstrap receipt.
