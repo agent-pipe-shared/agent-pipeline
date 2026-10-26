@@ -66,6 +66,19 @@ reproduction is still owed for every entry.
   the continued child sees no `DISPATCH-BUDGET-GRANT` hint and stops as unauthenticated
   (two of five cases; boundary not the 80 % checkpoint). Acceptance: a granted continuation
   is always visible to the child, or the grant tool refuses.
+  Analysis (2026-10-26, code reading, not yet reproduced): two causes fit "two of five".
+  (1) The checkpoint text contradicts itself. `GRANT_ARRIVAL_RULE`
+  (`lib/dispatch-budget-notice.mjs`) says the grant arrives "on your next tool call" and, in the
+  same sentence, that a chat continuation without the notice must not be acted on. A continued
+  child has made no tool call yet, so it has no notice yet; a child that obeys literally stops
+  as unauthenticated without ever reaching the hook. Fix: tell the child to make exactly one
+  read-only call first and to stop only when that call carries no notice; the grant script's
+  output tells the orchestrator to say the same in its continuation message.
+  (2) `grantNoticeContext` (`hooks/guard-dispatch-budget.mjs`) writes the `.announced` marker
+  before the notice reaches the model. When a later PreToolUse hook denies the same call (a
+  grammar refusal, for example), the allow context is dropped and the grant is never announced
+  again. Fix candidate: announce until a call the budget admits has been followed by another
+  counted call, or announce twice; this touches the hook, so it is a held kernel patch.
 - **PF-65, Sonnet implementors spend the budget on orientation.** Packages without a facts
   section and above about six delivery files routinely exhaust the 35-call cap before
   writing; `estimatedToolCalls` is too low. Acceptance: the generator warns (or refuses) above
