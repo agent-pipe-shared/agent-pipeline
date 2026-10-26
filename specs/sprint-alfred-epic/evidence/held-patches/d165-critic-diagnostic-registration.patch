@@ -1,0 +1,332 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index e485fb7e0..e2837045b 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -36,6 +36,7 @@ const fail = (code) => { throw new CriticCourseAdmissionError(code); };
+ // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
+ // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
+ const REPAIRS = Object.freeze({
++  "CCA-DETERMINISTIC-UNAVAILABLE": "No registered Critic diagnostic evidence binds the candidate. Produce it with scripts/critic-diagnostic-evidence.mjs, commit the evidence files under specs/<id>/evidence/, then register them: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>. Commit the manifest, then rerun critic-dispatch-preflight.mjs.",
+   "CCA-REVIEW-UNIT-REQUIRED": "No commit between the base and the candidate lists a Critic review unit in the feature manifest. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit. The first review may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it; the unit may be added after delivery. A course that already has a retained review keeps its first base and cannot use the unit.",
+   "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
+ });
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 868b39544..f0eb1f2b4 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -5,7 +5,9 @@ const completionCases = [];
+ function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
+ import { execFileSync } from "node:child_process";
+ import { createHash } from "node:crypto";
+-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
++import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
++import { runRegisterFeaturePackage } from "../scripts/register-feature-package.mjs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+@@ -491,4 +493,111 @@ test("D165-PF75B (g) the missing-unit repair no longer says the unit commit is t
+   assert.match(repair, /any base on the candidate history that already lists the feature manifest/u);
+   assert.match(repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
+ });
++// D165-CDR: a sanctioned command registers Critic diagnostic evidence in the feature manifest.
++function diagFixture() {
++  const fx = unitFixture({late: false});
++  const dir = `specs/${fx.featureId}/evidence`;
++  mkdirSync(join(fx.root, dir), {recursive: true});
++  const specPath = `specs/${fx.featureId}/spec.md`, logPath = `${dir}/targeted.log`, jsonPath = `${dir}/diagnostic.json`;
++  const log = "command: node synthetic-check\nlabel: targeted-check\nexitCode: 0\n--- stdout ---\npass\n--- stderr ---\n";
++  const value = {schema: "pipeline.critic-diagnostic-evidence.v1", producer: "critic-diagnostic-evidence", assurance: "captured-process-output-not-host-attested",
++    candidate: {commit: fx.candidate, tree: git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`])},
++    spec: {path: specPath, sha256: hash(readFileSync(join(fx.root, specPath)))}, guardrails: [], fullVerify: {status: "not-run", evidence: null},
++    targeted: {label: "targeted-check", status: "passed", exitCode: 0, log: {path: logPath, sha256: hash(log)}}, pending: ["full-verify"]};
++  const write = (v = value, p = jsonPath) => { writeFileSync(join(fx.root, p), `${JSON.stringify(v)}\n`); return p; };
++  writeFileSync(join(fx.root, logPath), log); write();
++  // The registration writer refuses a manifest that does not validate, so the working-tree manifest gets the full approved topology (closed keys, prd/acceptance/result/candidate-evidence).
++  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
++    const path = `specs/${fx.featureId}/${rel}`; writeFileSync(join(fx.root, path), `${klass}\n`);
++    return {class: klass, path, sha256: hash(readFileSync(join(fx.root, path))), authority, mutability, retention};
++  });
++  const committed = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...committed, artifacts: [...committed.artifacts, ...topo], candidate: null, supersedes: null})}\n`);
++  const state = {activeFeature: {id: fx.featureId}};
++  return {...fx, dir, specPath, logPath, jsonPath, value, log, write, state,
++    manifestBytes: () => readFileSync(join(fx.root, fx.manifestPath)),
++    register: (path = jsonPath) => addCriticDiagnosticEvidence({root: fx.root, state, path})};
++}
++test("D165-CDR (a) a valid diagnostic is registered with its log and the next admission no longer lacks deterministic evidence", () => {
++  const fx = diagFixture();
++  const result = fx.register();
++  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
++  const manifest = JSON.parse(fx.manifestBytes());
++  for (const path of [fx.jsonPath, fx.logPath]) {
++    const entry = manifest.artifacts.find(e => e.path === path);
++    assert.deepEqual({...entry, sha256: undefined}, {class: "candidate-evidence", authority: false, mutability: "immutable", retention: "retain", path, sha256: undefined});
++    assert.equal(entry.sha256, hash(readFileSync(join(fx.root, path))));
++  }
++  assert.deepEqual([...result.commitPaths].sort(), [fx.jsonPath, fx.logPath, fx.manifestPath].sort());
++  fx.git("add", "."); fx.git("commit", "-qm", "register diagnostic");
++  const registrationCommit = fx.git("rev-parse", "HEAD");
++  const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", registrationCommit}));
++  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++});
++test("D165-CDR (b) another commit or tree is refused and the manifest is byte-identical", () => {
++  for (const mutate of [(v, f) => { v.candidate.commit = f.pre; }, (v) => { v.candidate.tree = "1".repeat(40); }]) {
++    const fx = diagFixture();
++    const before = fx.manifestBytes();
++    const value = structuredClone(fx.value); mutate(value, fx);
++    const result = fx.register(fx.write(value));
++    assert.equal(result.code, "FPR-DIAG-CANDIDATE", JSON.stringify(result));
++    assert.deepEqual(fx.manifestBytes(), before);
++  }
++});
++test("D165-CDR (c) a path outside the evidence directory, a symlink and a missing file are refused FPR-DIAG-PATH", () => {
++  const fx = diagFixture();
++  const before = fx.manifestBytes();
++  writeFileSync(join(fx.root, "elsewhere.json"), readFileSync(join(fx.root, fx.jsonPath)));
++  assert.equal(fx.register("elsewhere.json").code, "FPR-DIAG-PATH");
++  assert.equal(fx.register(`${fx.dir}/missing.json`).code, "FPR-DIAG-PATH");
++  assert.equal(fx.register(`specs/${fx.featureId}/evidence/../spec.md`).code, "FPR-DIAG-PATH");
++  try { symlinkSync(join(fx.root, fx.jsonPath), join(fx.root, `${fx.dir}/link.json`), "file"); assert.equal(fx.register(`${fx.dir}/link.json`).code, "FPR-DIAG-PATH"); } catch (error) { if (error?.code !== "EPERM") throw error; }
++  assert.deepEqual(fx.manifestBytes(), before);
++});
++test("D165-CDR (d) JSON that is not a diagnostic is refused FPR-DIAG-SCHEMA", () => {
++  const fx = diagFixture();
++  const before = fx.manifestBytes();
++  assert.equal(fx.register(fx.write({schema: "something-else"}, `${fx.dir}/other.json`)).code, "FPR-DIAG-SCHEMA");
++  assert.equal(fx.register(fx.write({...fx.value, extra: 1}, `${fx.dir}/extra.json`)).code, "FPR-DIAG-SCHEMA");
++  writeFileSync(join(fx.root, `${fx.dir}/notjson.json`), "not json");
++  assert.equal(fx.register(`${fx.dir}/notjson.json`).code, "FPR-DIAG-SCHEMA");
++  assert.deepEqual(fx.manifestBytes(), before);
++});
++test("D165-CDR (e) a missing or altered member is refused FPR-DIAG-MEMBER", () => {
++  const fx = diagFixture();
++  const before = fx.manifestBytes();
++  writeFileSync(join(fx.root, fx.logPath), "altered\n");
++  assert.equal(fx.register().code, "FPR-DIAG-MEMBER");
++  rmSync(join(fx.root, fx.logPath));
++  assert.equal(fx.register().code, "FPR-DIAG-MEMBER");
++  assert.deepEqual(fx.manifestBytes(), before);
++});
++test("D165-CDR (f) the same bytes twice are already-registered and other bytes at a registered path are FPR-DIAG-IMMUTABLE", () => {
++  const fx = diagFixture();
++  assert.equal(fx.register().status, "diagnostic-added");
++  const once = fx.manifestBytes();
++  assert.equal(fx.register().status, "already-registered");
++  assert.deepEqual(fx.manifestBytes(), once);
++  fx.write({...fx.value, pending: ["full-verify", "another"]});
++  const result = fx.register();
++  assert.equal(result.code, "FPR-DIAG-IMMUTABLE", JSON.stringify(result));
++  assert.deepEqual(fx.manifestBytes(), once);
++});
++test("D165-CDR (g) the CLI accepts exactly the diagnostic shape and refuses any other FPR-ARGS", () => {
++  const root = mkdtempSync(join(tmpdir(), "critic-diag-cli-"));
++  const run = (argv) => { let text = ""; const code = runRegisterFeaturePackage(argv, (t) => { text += t; }); return {code, out: JSON.parse(text)}; };
++  const accepted = run(["--root", root, "--add-diagnostic-evidence", "specs/x/evidence/d.json"]);
++  assert.notEqual(accepted.out.code, "FPR-ARGS", JSON.stringify(accepted.out));
++  for (const argv of [["--add-diagnostic-evidence", "p", "--root", root], ["--root", root, "--add-diagnostic-evidence"], ["--root", root, "--add-diagnostic-evidence", "--root"], ["--root", root, "--add-diagnostic-evidence", "a", "b"], ["--root", root, "--add-review-unit", "x"]]) {
++    const refusal = run(argv);
++    assert.equal(refusal.code, 2); assert.equal(refusal.out.code, "FPR-ARGS", JSON.stringify(argv));
++  }
++});
++test("D165-CDR (h) the deterministic-unavailable repair names the producing and the registering command", () => {
++  const repair = criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE");
++  assert.equal(typeof repair, "string");
++  assert.match(repair, /scripts\/critic-diagnostic-evidence\.mjs/u);
++  assert.match(repair, /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u);
++  assert.match(repair, /critic-dispatch-preflight\.mjs/u);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 95b9e060d..005b4440c 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -37,6 +37,7 @@ import { createHash } from "node:crypto";
+ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
++import { CRITIC_DIAGNOSTIC_SCHEMA, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ 
+@@ -385,3 +386,93 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
+     next: "commit both paths in one commit. The first Critic review of this feature course may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it. A course that already has a retained review keeps its first base and cannot use this unit",
+   };
+ }
++
++/**
++ * D165-CDR: registers Critic diagnostic evidence (the diagnostic JSON and the members it names: the targeted log and,
++ * when present, the full-verify evidence) as immutable, non-authority `candidate-evidence` entries of the feature
++ * manifest. Critic course admission (`deterministic()`) reads only registered artifacts, so an unregistered
++ * diagnostic is invisible to it. The diagnostic is validated against its own recorded candidate before anything is
++ * written; the files must already exist under `specs/<feature>/evidence/`. Nothing else of the manifest changes.
++ */
++const DIAGNOSTIC_ARTIFACT = Object.freeze({ class: "candidate-evidence", authority: false, mutability: "immutable", retention: "retain" });
++function gitOut(root, args) {
++  const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 10000 });
++  return result.status === 0 ? result.stdout.trim() : null;
++}
++export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diagnosticRel, readAcceptedDeliveryContract } = {}) {
++  if (!object(state) || typeof diagnosticRel !== "string") return refused("FPR-ARGS", "root, state and the diagnostic path are required");
++  let root;
++  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
++  const featureId = state.activeFeature?.id;
++  if (!SAFE_ID.test(featureId ?? "")) return refused("FPR-NO-APPROVED-PLAN", "no active feature; set-feature first");
++  const manifestPath = `specs/${featureId}/lifecycle.json`, evidenceDir = `specs/${featureId}/evidence/`;
++  const manifestRead = inspect(root, manifestPath);
++  if (manifestRead.kind !== "file") return refused("FPR-MANIFEST-MISSING", `no manifest ${manifestPath}; register the feature package first (register-feature-package.mjs --root <root>)`, { manifestPath });
++  const checked = validateFeaturePackage(root, manifestPath);
++  let manifest;
++  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
++  if (!checked.ok) {
++    // Other bytes at an already registered diagnostic path break the manifest's own digest binding; name that cause, never amend.
++    const registered = Array.isArray(manifest?.artifacts) ? manifest.artifacts.find((entry) => entry?.path === diagnosticRel && entry.class === "candidate-evidence") : null;
++    const present = registered ? inspect(root, diagnosticRel) : null;
++    if (present?.kind === "file" && digest(present.bytes) !== registered.sha256) return refused("FPR-DIAG-IMMUTABLE", `${diagnosticRel} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path: diagnosticRel });
++    return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  }
++  // A path under the feature's evidence directory, a regular file, no symlink on the way.
++  const pathProblem = (path) => {
++    if (!repositoryRelative(path) || !path.startsWith(evidenceDir)) return `${path} is not a repository-relative path under ${evidenceDir}`;
++    const seen = inspect(root, path);
++    if (seen.kind !== "file") return `${path} is missing or is not a regular file`;
++    try { if (realpathSync(join(root, path)) !== join(root, path)) return `${path} resolves through a link`; } catch { return `${path} does not resolve`; }
++    return null;
++  };
++  const problem = pathProblem(diagnosticRel);
++  if (problem) return refused("FPR-DIAG-PATH", problem, { manifestPath, path: diagnosticRel });
++  const diagnosticBytes = inspect(root, diagnosticRel).bytes;
++  let value;
++  try { value = JSON.parse(diagnosticBytes.toString("utf8")); } catch { return refused("FPR-DIAG-SCHEMA", "the file is not JSON", { manifestPath, path: diagnosticRel }); }
++  if (!object(value) || value.schema !== CRITIC_DIAGNOSTIC_SCHEMA) return refused("FPR-DIAG-SCHEMA", `the file is not a ${CRITIC_DIAGNOSTIC_SCHEMA} document`, { manifestPath, path: diagnosticRel });
++  const recorded = value.candidate;
++  const commit = object(recorded) && typeof recorded.commit === "string" && /^[a-f0-9]{40,64}$/u.test(recorded.commit) ? gitOut(root, ["rev-parse", "--verify", `${recorded.commit}^{commit}`]) : null;
++  const tree = commit ? gitOut(root, ["rev-parse", `${commit}^{tree}`]) : null;
++  if (!commit || commit !== recorded.commit || !tree || tree !== recorded.tree) return refused("FPR-DIAG-CANDIDATE", "the recorded candidate commit and tree do not resolve to a commit of this repository", { manifestPath, path: diagnosticRel });
++  const members = [value.targeted?.log?.path, value.fullVerify?.evidence?.path].filter((path) => typeof path === "string");
++  for (const path of members) {
++    const memberProblem = pathProblem(path);
++    if (memberProblem) return refused(inspect(root, path).kind === "absent" ? "FPR-DIAG-MEMBER" : "FPR-DIAG-PATH", memberProblem, { manifestPath, path });
++  }
++  try { validateCriticDiagnostic(value, { root, candidate: { commit, tree }, readArtifact: (path) => readDiagnosticArtifact(root, path) }); }
++  catch (error) {
++    const member = error?.code === "ENOENT" || error?.code === "CDI-ARTIFACT" || error?.code === "CDI-DIGEST";
++    return refused(member ? "FPR-DIAG-MEMBER" : "FPR-DIAG-SCHEMA", `the diagnostic does not validate (${error?.code ?? "error"})`, { manifestPath, path: diagnosticRel });
++  }
++  const wanted = [diagnosticRel, ...members].map((path) => ({ path, bytes: inspect(root, path).bytes }));
++  const additions = [];
++  for (const { path, bytes } of wanted) {
++    const existing = manifest.artifacts.find((entry) => entry.path === path);
++    if (!existing) { additions.push({ ...DIAGNOSTIC_ARTIFACT, path, sha256: digest(bytes) }); continue; }
++    if (existing.sha256 !== digest(bytes)) return refused("FPR-DIAG-IMMUTABLE", `${path} is registered with other bytes; registered evidence is never replaced`, { manifestPath, path });
++  }
++  if (additions.length === 0) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, diagnosticPath: diagnosticRel };
++  const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, ...additions] }, null, 2)}\n`);
++  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* the readback below reports a manifest it cannot restore */ } };
++  const temp = join(root, `${manifestPath}.diagnostic-${process.pid}.tmp`);
++  try { writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath)); }
++  catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the diagnostic evidence could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
++  const validated = validateFeaturePackage(root, manifestPath);
++  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
++  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
++  if (envelopes.length === 1) {
++    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
++      restore();
++      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code });
++    }
++  }
++  return {
++    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "diagnostic-added", manifestPath, diagnosticPath: diagnosticRel,
++    registered: additions.map((entry) => ({ path: entry.path, sha256: entry.sha256 })),
++    manifestSha256: digest(bytes), commitPaths: [manifestPath, ...wanted.map((row) => row.path)],
++    next: "commit commitPaths in one commit, then rerun critic-dispatch-preflight.mjs against that registration commit",
++  };
++}
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index c7c6a8e6b..153dfc091 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -203,7 +203,12 @@ function sanctionedModelRoleDispatchSelectArgs(args, root) {
+ }
+ 
+ function sanctionedRegisterFeaturePackageArgs(args, root) {
+-  return exactRoot(args, root, 0) && (args.length === 2 || (args.length === 3 && args[2] === "--add-review-unit"));
++  if (!exactRoot(args, root, 0)) return false;
++  if (args.length === 2) return true;
++  if (args.length === 3) return args[2] === "--add-review-unit";
++  // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
++  return args.length === 4 && args[2] === "--add-diagnostic-evidence" && typeof args[3] === "string" && args[3] !== ""
++    && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
+ }
+ 
+ function sanctionedDesignReviewReceiptArgs(args, root) {
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index c0be345e5..8b79ac112 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -465,7 +465,11 @@ test("D64 feature-package registration: exactly the documented forms are admitte
+   withFixture("feature", f => {
+     bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
+     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
+-    for (const [label, argv] of [["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "add diagnostic evidence");
++    for (const [label, argv] of [["diagnostic flag before root", ["--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--root", f.root]],
++      ["diagnostic without path", ["--root", f.root, "--add-diagnostic-evidence"]], ["diagnostic absolute path", ["--root", f.root, "--add-diagnostic-evidence", join(f.root, "d.json")]],
++      ["diagnostic parent path", ["--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/../../x.json"]], ["diagnostic dash path", ["--root", f.root, "--add-diagnostic-evidence", "--force"]],
++      ["diagnostic extra argument", ["--root", f.root, "--add-diagnostic-evidence", "d.json", "--force"]],["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
+       ["review unit before root", ["--add-review-unit", "--root", f.root]], ["double review unit", ["--root", f.root, "--add-review-unit", "--add-review-unit"]]]) {
+       bothRefuse(scriptAction(registerScript, ...argv), f, label);
+     }
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 06ec822f0..a9bd511ec 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -1,7 +1,12 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ //
+-// register-feature-package.mjs --root <root> [--add-review-unit]
++// register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]
++//
++// `--add-diagnostic-evidence <path>` (D165-CDR) registers a Critic diagnostic (a file under
++// `specs/<feature>/evidence/`, produced by critic-diagnostic-evidence.mjs) and the log it names as
++// immutable candidate-evidence entries of the feature manifest, after validating it against its own
++// recorded candidate; it prints the paths to commit.
+ //
+ // `--add-review-unit` (PF-34) adds the Critic review unit and its manifest entry to a feature
+ // registered before the unit existed; it prints the two paths to commit and the review base.
+@@ -23,7 +28,7 @@ import { spawnSync } from "node:child_process";
+ import { realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { addCriticDiagnosticEvidence, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
+ 
+ function git(root, args) {
+@@ -50,8 +55,10 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   const rootValue = rootIndex >= 0 ? argv[rootIndex + 1] : undefined;
+   // PF-34: `--add-review-unit` adds the Critic review unit to a feature registered before it existed.
+   const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
+-  if ((argv.length !== 2 && !addReviewUnit) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit]" })}\n`);
++  // D165-CDR: `--add-diagnostic-evidence <path>` registers Critic diagnostic evidence in the feature manifest.
++  const addDiagnostic = argv.length === 4 && argv[2] === "--add-diagnostic-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
++  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
++    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]" })}\n`);
+     return 2;
+   }
+   let root;
+@@ -65,6 +72,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
+     return 2;
+   }
++  if (addDiagnostic) {
++    const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
++    out(`${JSON.stringify(added)}\n`);
++    return added.status === "refused" ? 2 : 0;
++  }
+   if (addReviewUnit) {
+     const added = addCriticReviewUnit({ root, state: read.state, readAcceptedDeliveryContract });
+     out(`${JSON.stringify(added)}\n`);
