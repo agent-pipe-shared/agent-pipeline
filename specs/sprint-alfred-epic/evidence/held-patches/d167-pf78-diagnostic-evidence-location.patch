@@ -1,0 +1,206 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index f0eb1f2b4..693511785 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -600,4 +600,48 @@ test("D165-CDR (h) the deterministic-unavailable repair names the producing and
+   assert.match(repair, /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u);
+   assert.match(repair, /critic-dispatch-preflight\.mjs/u);
+ });
++// D167-PF78: the producer writes where the registrar accepts it; the whole route is one chain.
++import {produceCriticDiagnostic} from "./critic-diagnostic-producer.mjs";
++import {planVerifySelection} from "./verify-selection.mjs";
++function chainFixture({verifyAt}) {
++  const fx = unitFixture({late: false});
++  writeFileSync(join(fx.root, ".git/info/exclude"), "/evidence/\n");
++  const dir = `specs/${fx.featureId}/evidence`, specPath = `specs/${fx.featureId}/spec.md`;
++  const tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);
++  const verify = {schema: "pipeline.verify-evidence.v0", commit: fx.candidate, tree, exitCode: 0, steps: [{name: "check", exitCode: 0}],
++    selection: planVerifySelection({mode: "critic", candidateCommit: fx.candidate, registeredSuiteIds: ["check"], policy: {schema: "pipeline.verify-selection.v1", baseline: ["check"], areas: [{id: "all", paths: ["**"], suites: ["check"]}]}})};
++  mkdirSync(join(fx.root, verifyAt.split("/").slice(0, -1).join("/")), {recursive: true});
++  writeFileSync(join(fx.root, verifyAt), JSON.stringify(verify));
++  const jsonPath = `${dir}/diagnostic.json`, logPath = `${dir}/targeted.log`;
++  const value = produceCriticDiagnostic({root: fx.root, specPath, command: [process.execPath, "-e", "console.log('ok')"], logPath, fullVerifyPath: verifyAt});
++  writeFileSync(join(fx.root, jsonPath), `${JSON.stringify(value, null, 2)}\n`);
++  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
++    const path = `specs/${fx.featureId}/${rel}`; writeFileSync(join(fx.root, path), `${klass}\n`);
++    return {class: klass, path, sha256: hash(readFileSync(join(fx.root, path))), authority, mutability, retention};
++  });
++  const committed = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...committed, artifacts: [...committed.artifacts, ...topo], candidate: null, supersedes: null})}\n`);
++  return {...fx, value, jsonPath, logPath, register: () => addCriticDiagnosticEvidence({root: fx.root, state: {activeFeature: {id: fx.featureId}}, path: jsonPath})};
++}
++test("D167-PF78 (2,3) produce into specs/<id>/evidence with a copied full-verify member, register, and admission no longer lacks deterministic evidence", () => {
++  const fx = chainFixture({verifyAt: "specs/unit-feature/evidence/verify-copy.json"});
++  assert.equal(fx.value.fullVerify.status, "passed");
++  const result = fx.register();
++  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  for (const path of [fx.jsonPath, fx.logPath, fx.value.fullVerify.evidence.path]) assert.ok(manifest.artifacts.some(e => e.path === path && e.class === "candidate-evidence"), path);
++  fx.git("add", "."); fx.git("commit", "-qm", "register diagnostic");
++  const registrationCommit = fx.git("rev-parse", "HEAD");
++  const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", registrationCommit}));
++  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++});
++test("D167-PF78 (3) a diagnostic whose full-verify member is the fixed evidence/verify-latest.json is refused FPR-DIAG-PATH naming the copy-then-produce route", () => {
++  const fx = chainFixture({verifyAt: "evidence/verify-latest.json"});
++  const before = readFileSync(join(fx.root, fx.manifestPath));
++  const result = fx.register();
++  assert.equal(result.code, "FPR-DIAG-PATH", JSON.stringify(result));
++  assert.match(result.message ?? JSON.stringify(result), /copy/u);
++  assert.match(result.message ?? JSON.stringify(result), /--full-verify/u);
++  assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+index de069ceb8..92a64e227 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+@@ -10,7 +10,7 @@ const SHA = /^[a-f0-9]{64}$/u;
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+ export const diagnosticDigest = bytes => createHash("sha256").update(bytes).digest("hex");
+-function fail(code) { const error = new Error(code); error.code = code; throw error; }
++function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
+ export function diagnosticPath(path) {
+   if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f:]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
+   return path;
+@@ -23,9 +23,18 @@ export function readDiagnosticArtifact(root, path) {
+   if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) || stat.isSymbolicLink() || !stat.isFile() || stat.size > 16 * 1024 * 1024) fail("CDI-ARTIFACT");
+   return readFileSync(absolute);
+ }
++const FEATURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
++/** Where a Critic diagnostic may live: evidence/<rest> (featureId null) or specs/<id>/evidence/<rest>. Anything else is null. */
++export function diagnosticEvidenceLocation(path) {
++  try { diagnosticPath(path); } catch { return null; }
++  const parts = path.split("/");
++  if (parts[0] === "evidence" && parts.length > 1) return { featureId: null };
++  if (parts[0] === "specs" && parts.length > 3 && parts[2] === "evidence" && FEATURE_ID.test(parts[1])) return { featureId: parts[1] };
++  return null;
++}
+ export function newDiagnosticPath(root, path) {
+   diagnosticPath(path);
+-  if (!path.startsWith("evidence/")) fail("CDI-OUTPUT-PATH");
++  if (diagnosticEvidenceLocation(path) === null) fail("CDI-OUTPUT-PATH", "diagnostic evidence is written under evidence/ or specs/<feature-id>/evidence/");
+   const realRoot = realpathSync(root);
+   let at = realRoot;
+   for (const part of path.split("/")) {
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index 1c26e355f..d314f24c0 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -72,3 +72,43 @@ test("CLI emits honest evidence and refuses missing execution, stale/dirty input
+     assert.throws(() => produceCriticDiagnostic(options(f)), /CDI-DIRTY-CANDIDATE/);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
++// D167-PF78: the producer and the registrar share one location rule.
++import * as shared from "./critic-diagnostic-evidence.mjs";
++import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
++const LOCATION_TABLE = [
++  ["evidence/x.json", true], ["specs/my-feature/evidence/x.json", true], ["specs/a1/evidence/sub/x.json", true],
++  ["specs/Bad_Id/evidence/x.json", false], ["specs/my-feature/other/x.json", false], ["../evidence/x.json", false],
++  ["specs/-bad/evidence/x.json", false], ["specs/a--b/evidence/x.json", false], ["x.json", false], ["specs/my-feature/evidence", false],
++];
++test("D167-PF78 (1) the producer accepts evidence/ and specs/<id>/evidence/ and refuses the rest and existing files", () => {
++  const f = fixture();
++  try {
++    for (const ok of ["evidence/x.json", "specs/my-feature/evidence/x.json"]) assert.equal(typeof shared.newDiagnosticPath(f.root, ok), "string", ok);
++    for (const bad of ["specs/Bad_Id/evidence/x.json", "specs/my-feature/other/x.json", "../evidence/x.json"]) assert.throws(() => shared.newDiagnosticPath(f.root, bad), /CDI-(OUTPUT-PATH|PATH)/u, bad);
++    mkdirSync(join(f.root, "specs/my-feature/evidence"), { recursive: true });
++    writeFileSync(join(f.root, "specs/my-feature/evidence/old.json"), "x");
++    assert.throws(() => shared.newDiagnosticPath(f.root, "specs/my-feature/evidence/old.json"), /CDI-OUTPUT-EXISTS/u);
++    assert.throws(() => shared.newDiagnosticPath(f.root, "specs/Bad_Id/evidence/x.json"), /CDI-OUTPUT-PATH/u);
++    const value = produceCriticDiagnostic({ ...options(f), logPath: "specs/my-feature/evidence/t.log" });
++    assert.equal(value.targeted.log.path, "specs/my-feature/evidence/t.log");
++    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "specs/Bad_Id/evidence/t.log" }), /CDI-OUTPUT-PATH/u);
++    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/t2.log", fullVerifyPath: "spec.md" }), /CDI-PATH|CDI-OUTPUT-PATH/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("D167-PF78 (4) the shared predicate agrees with the producer for a table of paths and the registrar uses it", () => {
++  const f = fixture();
++  try {
++    assert.equal(typeof shared.diagnosticEvidenceLocation, "function");
++    for (const [path, accepted] of LOCATION_TABLE) {
++      assert.equal(Boolean(shared.diagnosticEvidenceLocation(path)), accepted, path);
++      let producerAccepts = true;
++      try { shared.newDiagnosticPath(f.root, path); } catch { producerAccepts = false; }
++      assert.equal(producerAccepts, accepted, `producer ${path}`);
++    }
++    assert.equal(shared.diagnosticEvidenceLocation("specs/my-feature/evidence/x.json").featureId, "my-feature");
++    assert.equal(shared.diagnosticEvidenceLocation("evidence/x.json").featureId, null);
++    // The registrar refuses the producer-only location and names the shared one.
++    const refused = addCriticDiagnosticEvidence({ root: f.root, state: { activeFeature: { id: "my-feature" } }, path: "evidence/x.json" });
++    assert.ok(refused.code === "FPR-DIAG-PATH" || refused.code === "FPR-MANIFEST-MISSING", JSON.stringify(refused));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+index 9cd864e8d..37b944434 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+@@ -4,6 +4,7 @@ import { captureEvidence } from "../scripts/capture-evidence.mjs";
+ import {
+   CRITIC_DIAGNOSTIC_SCHEMA,
+   diagnosticDigest,
++  diagnosticEvidenceLocation,
+   diagnosticPath,
+   inspectCriticVerifyDiagnostic,
+   newDiagnosticPath,
+@@ -37,13 +38,14 @@ export function produceCriticDiagnostic({ root, candidate = "HEAD", specPath, gu
+   const bound = candidateBinding(root, candidate);
+   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
+   newDiagnosticPath(root, logPath);
+-  if (!logPath.startsWith("evidence/") || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
++  if (diagnosticEvidenceLocation(logPath) === null || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
+   const spec = source(root, bound.commit, specPath);
+   const guardrails = [...new Set(guardrailPaths)].sort().map(path => source(root, bound.commit, path));
+   const captured = captureEvidence({ command, label, out: logPath, cwd: root, repoRoot: root });
+   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
+   const fullVerify = { status: "not-run", evidence: null };
+   if (fullVerifyPath !== null) {
++    if (diagnosticEvidenceLocation(fullVerifyPath) === null) fail("CDI-PATH");
+     const bytes = readDiagnosticArtifact(root, fullVerifyPath);
+     const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), bound);
+     if (observed.execution !== "full") fail("CDI-FULL-VERIFY");
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 005b4440c..9a496a9a9 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -37,7 +37,7 @@ import { createHash } from "node:crypto";
+ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+ import { dirname, isAbsolute, join, resolve } from "node:path";
+ import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
+-import { CRITIC_DIAGNOSTIC_SCHEMA, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
++import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+ 
+@@ -420,7 +420,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+   }
+   // A path under the feature's evidence directory, a regular file, no symlink on the way.
+   const pathProblem = (path) => {
+-    if (!repositoryRelative(path) || !path.startsWith(evidenceDir)) return `${path} is not a repository-relative path under ${evidenceDir}`;
++    if (!repositoryRelative(path) || diagnosticEvidenceLocation(path)?.featureId !== featureId) return `${path} is not a repository-relative path under ${evidenceDir}; produce the diagnostic with the producer flags --log and --out under ${evidenceDir}, and for members copy the full-verify evidence byte-identically there and pass it with --full-verify`;
+     const seen = inspect(root, path);
+     if (seen.kind !== "file") return `${path} is missing or is not a regular file`;
+     try { if (realpathSync(join(root, path)) !== join(root, path)) return `${path} resolves through a link`; } catch { return `${path} does not resolve`; }
+diff --git a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+index d701b080f..b00d11707 100644
+--- a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+@@ -2,7 +2,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { mkdirSync, writeFileSync } from "node:fs";
+ import { dirname, resolve } from "node:path";
+-import { diagnosticPath, newDiagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
++import { diagnosticEvidenceLocation, diagnosticPath, newDiagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
+ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+@@ -24,7 +24,7 @@ export function runCriticDiagnosticCli(argv) {
+     }
+   }
+   diagnosticPath(out);
+-  if (!out.startsWith("evidence/") || out === options.logPath) throw new Error("Diagnostic output must be a separate evidence path");
++  if (diagnosticEvidenceLocation(out) === null || out === options.logPath) throw new Error("Diagnostic output must be a separate evidence path");
+   const target = newDiagnosticPath(options.root, out);
+   const evidence = produceCriticDiagnostic(options);
+   mkdirSync(dirname(target), { recursive: true });
