@@ -879,11 +879,25 @@ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement
   }
 
   if (prds.length !== 1) {
-    return fail("PO-GATE-PRD-CARDINALITY", "The active feature directory must contain exactly one prd_*.md file.", PRD_REPAIR);
+    const shown = prds.slice(0, 5).map((name) => `${featureDirectory}/${name}`).join(", ");
+    const more = prds.length > 5 ? ` and ${prds.length - 5} more` : "";
+    const found = prds.length === 0 ? "none" : `${shown}${more}`;
+    const hint = prds.length === 0
+      ? " The bound plan path probably points at a folder the PRD no longer lives in; rebind activeFeature.planPath through the sanctioned revision route, not by moving files."
+      : "";
+    return fail(
+      "PO-GATE-PRD-CARDINALITY",
+      `The active feature directory must contain exactly one prd_*.md file. Feature directory: ${featureDirectory}; bound plan path: ${active.planPath}; prd_*.md files found: ${prds.length} (${found}).${hint}`,
+      PRD_REPAIR,
+    );
   }
   const onlyPlanPath = `${featureDirectory}/${prds[0]}`;
   if (onlyPlanPath !== active.planPath) {
-    return fail("PO-GATE-PLAN-PATH-MISMATCH", "The sole active PRD does not equal activeFeature.planPath.", PRD_REPAIR);
+    return fail(
+      "PO-GATE-PLAN-PATH-MISMATCH",
+      `The sole active PRD does not equal activeFeature.planPath. Sole PRD found: ${onlyPlanPath}; bound plan path: ${active.planPath}.`,
+      PRD_REPAIR,
+    );
   }
 
   let planBytes;

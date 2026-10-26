@@ -531,6 +531,83 @@ check("zero and multiple child PRDs fail exact active-directory cardinality", ()
   });
 });
 
+// D171: the PRD gate refusals name the feature directory and the bound plan path.
+// Each case is collected so one run names every red case; the group then fails once.
+const d171Failures = [];
+function d171Case(name, fn) {
+  try {
+    fn();
+    process.stdout.write(`ok D171 - ${name}\n`);
+  } catch (error) {
+    d171Failures.push(name);
+    process.stdout.write(`not ok D171 - ${name}: ${String(error.message).split("\n")[0]}\n`);
+  }
+}
+
+check("D171 PRD gate refusals name the directory, the bound plan path and what was found", () => {
+  d171Case("D171-1 empty feature directory names directory, bound plan path and 0 found", () => {
+    withFixture({}, ({ primary, validate }) => {
+      unlinkSync(join(primary, "specs", "feature", "prd_feature.md"));
+      const result = validate();
+      assert.equal(result.code, "PO-GATE-PRD-CARDINALITY");
+      assert.ok(result.reason.includes("specs/feature"), result.reason);
+      assert.ok(result.reason.includes("specs/feature/prd_feature.md"), result.reason);
+      assert.match(result.reason, /\b0\b/u, result.reason);
+      assert.match(result.reason, /no PRD|planPath/u, result.reason);
+    });
+  });
+  d171Case("D171-2 two PRDs name both file names", () => {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, "specs", "feature", "prd_child.md"), prd("de"));
+      const result = validate();
+      assert.equal(result.code, "PO-GATE-PRD-CARDINALITY");
+      assert.ok(result.reason.includes("prd_child.md"), result.reason);
+      assert.ok(result.reason.includes("prd_feature.md"), result.reason);
+      assert.match(result.reason, /\b2\b/u, result.reason);
+    });
+  });
+  d171Case("D171-3 plan-path mismatch names the sole PRD path and the bound plan path", () => {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/prd_absent.md"));
+      const result = validate();
+      assert.equal(result.code, "PO-GATE-PLAN-PATH-MISMATCH");
+      assert.ok(result.reason.includes("specs/feature/prd_feature.md"), result.reason);
+      assert.ok(result.reason.includes("specs/feature/prd_absent.md"), result.reason);
+    });
+  });
+  d171Case("D171-4 no refusal message contains the absolute repository root", () => {
+    const stagings = [
+      ({ primary }) => unlinkSync(join(primary, "specs", "feature", "prd_feature.md")),
+      ({ primary }) => write(join(primary, "specs", "feature", "prd_child.md"), prd("de")),
+      ({ primary }) => write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/prd_absent.md")),
+    ];
+    for (const stage of stagings) {
+      withFixture({}, (value) => {
+        stage(value);
+        const result = value.validate();
+        assert.equal(result.ok, false);
+        assert.ok(!result.reason.includes(value.primary), result.reason);
+        assert.ok(!result.reason.includes(value.base), result.reason);
+      });
+    }
+  });
+  d171Case("D171-5 leading sentences and codes are unchanged", () => {
+    withFixture({}, ({ primary, validate }) => {
+      unlinkSync(join(primary, "specs", "feature", "prd_feature.md"));
+      const result = validate();
+      assert.equal(result.code, "PO-GATE-PRD-CARDINALITY");
+      assert.ok(result.reason.startsWith("The active feature directory must contain exactly one prd_*.md file."), result.reason);
+    });
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/prd_absent.md"));
+      const result = validate();
+      assert.equal(result.code, "PO-GATE-PLAN-PATH-MISMATCH");
+      assert.ok(result.reason.startsWith("The sole active PRD does not equal activeFeature.planPath."), result.reason);
+    });
+  });
+  assert.deepEqual(d171Failures, []);
+});
+
 check("spec, design and SDP artifacts do not affect PRD cardinality", () => {
   withFixture({}, ({ primary, validate }) => {
     for (const name of ["spec_child.md", "design_child.md", "sdp_child.md"]) {
