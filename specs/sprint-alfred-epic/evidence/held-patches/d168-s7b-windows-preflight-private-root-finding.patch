@@ -1,0 +1,187 @@
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index 7c5afa582..a6b7c1bec 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -4,6 +4,7 @@ import { win32 } from 'node:path';
+ import { createHash } from 'node:crypto';
+ import { existsSync } from 'node:fs';
+ import { inspectWindowsOwnedAuthorityPath, observeWindowsAuthorityAncestor } from './windows-owned-authority-backend.mjs';
++import { assessWindowsPrivateRoot } from './windows-private-state.mjs';
+ 
+ export const WINDOWS_AUTHORITY_READINESS_SCHEMA = 'pipeline.windows-authority-readiness.v1';
+ const NATIVE_REASON = /^WIN-AUTH-[A-Z-]{1,64}$/u;
+@@ -42,6 +43,7 @@ function guidance(pathClass, reason) {
+ /** The injected probe is called once per distinct path; it must only observe, never repair. */
+ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, privateRoot,
+   exists = existsSync,
++  assessPrivateRoot = assessWindowsPrivateRoot,
+   probe = ({ path, boundaryRoot, privatePath }) => privatePath
+     ? inspectWindowsOwnedAuthorityPath({ path, directory: true })
+     : observeWindowsAuthorityAncestor(boundaryRoot ? { path, boundaryRoot } : { path }),
+@@ -80,5 +82,29 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+       if (reason) causes.push({ pathClass, reason, path, nextAction: guidance(pathClass, reason) });
+     }
+   }
++  const stateRoot = win32.join(projectRoot, 'project');
++  if (exists(stateRoot)) {
++    let verdict;
++    try { verdict = assessPrivateRoot(stateRoot); } catch { verdict = null; }
++    const status = verdict?.status;
++    if (status === 'insecure') {
++      const quoted = stateRoot.includes('"');
++      causes.push({ pathClass: 'private-state', reason: 'WIN-AUTH-PRIVATE-ROOT', path: stateRoot, nextAction: {
++        kind: 'operator-review', mutation: false,
++        summary: 'The private state folder carries access rights inherited from above the repository. Remove the inherited grants, keep full control for the current user, then rerun readiness.',
++        inspection: ['Confirm the folder is a physical non-reparse directory inside the project.', 'Read its access list and find the entries inherited from a parent folder.'],
++        repairPreview: { folder: stateRoot,
++          commands: quoted ? [] : [
++            { shell: 'powershell', command: `icacls "${stateRoot}" /inheritance:r /grant:r "$(whoami):(OI)(CI)F"` },
++            { shell: 'cmd', command: `icacls "${stateRoot}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"` },
++          ],
++          reason: 'inherited grants from above the repository are removed, the current user keeps full control, files created later inherit the narrow rights',
++          afterwards: 'The next preflight reads the folder back and continues only when it is secure.' },
++      } });
++    } else if (status !== 'secure') {
++      causes.push({ pathClass: 'private-state', reason: 'WIN-AUTH-OBSERVATION-UNAVAILABLE', path: stateRoot,
++        nextAction: guidance('private-state', 'WIN-AUTH-OBSERVATION-UNAVAILABLE') });
++    }
++  }
+   return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: causes.length ? 'unavailable' : 'ready', causes };
+ }
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+index fff8aa3a4..699cf2ffb 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
+ import { createHash } from 'node:crypto';
+ import { registerTestCaseCompletion } from './test-case-completion.mjs';
+ import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
++import { assessWindowsPrivateRoot } from './windows-private-state.mjs';
+ 
+ const roots = {
+   projectRoot: 'D:\\work\\repo',
+   pluginRoot: 'C:\\Users\\owner\\plugins\\pipeline-core',
+   privateRoot: 'D:\\work\\repo\\.git\\agent-pipeline',
++  // The private-state root verdict is an injected seam (D168-S7b); the fixtures never reach a native observer.
++  assessPrivateRoot: () => ({ status: 'secure', reason: 'fixture', rootPath: 'D:\\work\\repo\\project' }),
+ };
+ const cases = [];
+ function test(name, run) { cases.push({ id: `WAR${String(cases.length + 1).padStart(3, '0')}`, name, run }); }
+@@ -113,4 +116,81 @@ test('direct consumers receive only closed native causes', () => {
+ });
+ 
+ if (cases.length !== 9) throw new Error('Windows authority readiness case count drift');
++const STATE_ROOT = 'D:\\work\\repo\\project';
++const okProbe = () => syntheticObservation();
++const withVerdict = (verdict, extra = {}) => {
++  const seen = [];
++  const result = assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe: okProbe, ...extra,
++    assessPrivateRoot: (path) => { seen.push(path); return { ...verdict, rootPath: path }; } });
++  return { result, seen };
++};
++
++test('D168-S7b a secure private-state root verdict yields ready and the seam is called once with the project\\ path', () => {
++  const { result, seen } = withVerdict({ status: 'secure', reason: 'private' });
++  assert.equal(result.status, 'ready');
++  assert.deepEqual(result.causes, []);
++  assert.deepEqual(seen, [STATE_ROOT]);
++});
++
++test('D168-S7b an insecure private-state root yields one WIN-AUTH-PRIVATE-ROOT cause with the exact icacls instruction', () => {
++  const { result } = withVerdict({ status: 'insecure', reason: 'inherited Authenticated Users' });
++  assert.equal(result.status, 'unavailable');
++  assert.equal(result.causes.length, 1);
++  const cause = result.causes[0];
++  assert.equal(cause.pathClass, 'private-state');
++  assert.equal(cause.reason, 'WIN-AUTH-PRIVATE-ROOT');
++  assert.equal(cause.path, STATE_ROOT);
++  assert.equal(cause.nextAction.kind, 'operator-review');
++  assert.equal(cause.nextAction.mutation, false);
++  const preview = cause.nextAction.repairPreview;
++  assert.equal(preview.folder, STATE_ROOT);
++  assert.equal(preview.commands.length, 2);
++  for (const command of preview.commands) {
++    assert.ok(command.command.includes('"' + STATE_ROOT + '"'));
++    assert.ok(command.command.includes('/inheritance:r'));
++    assert.ok(command.command.includes('(OI)(CI)F'));
++  }
++  assert.deepEqual(preview.commands.map(row => row.shell), ['powershell', 'cmd']);
++  assert.ok(preview.commands[0].command.includes('$(whoami)'));
++  assert.ok(preview.commands[1].command.includes('%USERNAME%'));
++  assert.match(preview.reason, /inherited/u);
++  assert.match(preview.afterwards, /next preflight reads the folder back/u);
++});
++
++test('D168-S7b an unobservable private-state root fails closed without offering an icacls command', () => {
++  const { result } = withVerdict({ status: 'unavailable', reason: 'no observation' });
++  assert.equal(result.status, 'unavailable');
++  assert.equal(result.causes.length, 1);
++  assert.equal(result.causes[0].reason, 'WIN-AUTH-OBSERVATION-UNAVAILABLE');
++  assert.equal(result.causes[0].pathClass, 'private-state');
++  assert.equal(result.causes[0].nextAction.repairPreview, null);
++});
++
++test('D168-S7b an absent project\\ folder is skipped silently and a quote in the folder yields no command', () => {
++  const seen = [];
++  const absent = assessWindowsAuthorityReadiness({ ...roots, exists: path => path !== STATE_ROOT, probe: okProbe,
++    assessPrivateRoot: path => { seen.push(path); return { status: 'insecure', reason: 'x', rootPath: path }; } });
++  assert.equal(absent.status, 'ready');
++  assert.deepEqual(seen, []);
++  const quoted = assessWindowsAuthorityReadiness({ ...roots, projectRoot: 'D:\\wo"rk\\repo', privateRoot: 'D:\\wo"rk\\repo\\.git\\agent-pipeline',
++    exists: () => true, probe: okProbe,
++    assessPrivateRoot: path => ({ status: 'insecure', reason: 'x', rootPath: path }) });
++  const cause = quoted.causes.find(row => row.reason === 'WIN-AUTH-PRIVATE-ROOT');
++  assert.ok(cause);
++  assert.deepEqual(cause.nextAction.repairPreview.commands, []);
++  assert.ok(cause.nextAction.repairPreview.reason.length > 0);
++});
++
++test('D168-S7b preflight and runtime judge the private-state root with the same function', () => {
++  const me = 'DESKTOP\\agent';
++  const obs = (principals, inheritedFlags) => ({ currentOwner: me, owner: me, reparsePoint: false, principals, inheritedFlags });
++  const judge = (suffix, observation) => assessWindowsAuthorityReadiness({ ...roots, exists: () => true, probe: okProbe,
++    assessPrivateRoot: path => assessWindowsPrivateRoot(path, { observe: () => ({ status: null, reason: null, observation }), identity: () => 'id-' + suffix }) });
++  const broad = judge('broad', obs([me, 'NT AUTHORITY\\Authenticated Users'], [false, true]));
++  assert.equal(broad.status, 'unavailable');
++  assert.equal(broad.causes[0].reason, 'WIN-AUTH-PRIVATE-ROOT');
++  const hardened = judge('hardened', obs([me], [false]));
++  assert.equal(hardened.status, 'ready');
++});
++
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 4785f23af..91e362619 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -10,6 +10,7 @@ import { basename, dirname, join, resolve } from "node:path";
+ import test from "node:test";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ 
++import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
+ import { validateRulesetSource } from "../lib/ruleset-source.mjs";
+ import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
+ import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+@@ -296,6 +297,23 @@ test('Windows custody refusal also closes a pending hook action until reinspecti
+   assert.deepEqual(result.nextAction.causes, causes);
+ });
+ 
++test('D168-S7b a private-state root cause with its icacls repairPreview reaches nextAction.causes unchanged', () => {
++  const folder = 'D:\\work\\repo\\project';
++  const readiness = assessWindowsAuthorityReadiness({
++    projectRoot: 'D:\\work\\repo', pluginRoot: 'C:\\Users\\owner\\plugins\\pipeline-core', privateRoot: 'D:\\work\\repo\\.git\\agent-pipeline',
++    exists: () => true,
++    probe: () => { const nativeFacts = 'seam'; return { nativeFacts, nativeFactsSha256: createHash('sha256').update(nativeFacts).digest('hex'), helperSha256: 'a'.repeat(64), committed: false }; },
++    assessPrivateRoot: path => ({ status: 'insecure', reason: 'inherited grant', rootPath: path }),
++  });
++  const cause = readiness.causes.find(row => row.reason === 'WIN-AUTH-PRIVATE-ROOT');
++  assert.ok(cause, 'the readiness assessor must produce the private-state cause');
++  assert.equal(cause.nextAction.repairPreview.folder, folder);
++  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32', assessWindowsAuthorityReadinessFn: () => readiness });
++  assert.equal(result.status, 'windows-authority-unavailable');
++  assert.deepEqual(result.nextAction.causes, readiness.causes);
++  assert.deepEqual(result.nextAction.causes.find(row => row.reason === 'WIN-AUTH-PRIVATE-ROOT').nextAction.repairPreview, cause.nextAction.repairPreview);
++});
++
+ test('trusted Windows custody leaves bootstrap ready', () => {
+   const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32',
+     assessWindowsAuthorityReadinessFn: () => ({ schema: 'pipeline.windows-authority-readiness.v1', status: 'ready', causes: [] }),
