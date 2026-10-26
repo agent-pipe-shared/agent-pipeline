@@ -6,8 +6,8 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites.",
-  "total": 208,
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate.",
+  "total": 210,
   "baseline": {
     "counts": {
       "25": 2,
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 3,
+      "25": 5,
       "50": 15,
       "75": 190,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 72.48
+    "index": 72.02
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -7524,6 +7524,78 @@
       "relatedACs": [
         "AC-108"
       ],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.consumer-push-blocked-by-late-review-unit",
+      "title": "A review unit added after delivery still admits a Critic range over the delivered code, so the consumer can push",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (PF-75, PF-58 addendum 2) on the D163 hotfix candidate; recorded, interim-candidate priority (D165); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-consumer-push-blocked-by-late-review-unit.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Admit the merge base with the publication target as first review base for a late-added unit (or a sanctioned earlier binding), check the deliveryBoundary.mainRef against a main destination, and name the concrete evidence route in critic-bound-verify and repair-map."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.brownfield-architecture-gate-never-passes",
+      "title": "A brownfield project reaches implementation: the architecture entry gate can pass after adoption or migration",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; likely interaction with the D162 patches; recorded, interim-candidate priority (D165); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-brownfield-architecture-gate-never-passes.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Align the entry guard with the library evaluation of class 10 (report-only), include the class 9 inputs in the migrated scope or measure them, admit the recommended propose step in the phases the preflight names, surface architecture hurdles before the plan signature, and give a sanctioned write route for architecture/ and AGENTS.md."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
       "reportingIdentityOnly": true
     }
   ]

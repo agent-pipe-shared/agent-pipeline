@@ -7,7 +7,10 @@ The PO applied the nineteen held patches of the C29 row as one operator commit `
 to HEAD `10e8573b5` plus the nineteen patches in order, and that both local marketplace copies equal the repository plugin
 tree (2219 files). Claude, Codex and Antigravity installs report the new version.
 
-**208 items · 190 at 75 · 15 at 50 · 3 at 25 · 18 below 75 · index 72.48%** (previous 207 items, 184/17/6, 71.5%).
+**210 items · 190 at 75 · 15 at 50 · 5 at 25 · 20 below 75 · index 72.02%** (previous 207 items, 184/17/6, 71.5%).
+
+D165 adds two P0 consumer blocker rows at 25 for an interim candidate:
+`pipeline.consumer-push-blocked-by-late-review-unit` and `pipeline.brownfield-architecture-gate-never-passes`.
 
 D164 adds one P1 row at 25, `pipeline.preflight-establishes-runner-prerequisites` (item
 `backlog/items/2026-10-26-preflight-establishes-runner-prerequisites.md`): no existing row covers establishing node and

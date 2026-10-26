@@ -13,8 +13,9 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **208 items:190 at75,15 at50,3 at25;18 below75;index72.48%** (D164 adds
-the P1 prerequisite row at25; D163
+contains **210 items:190 at75,15 at50,5 at25;20 below75;index72.02%** (D165 adds
+two P0 consumer blocker rows for an interim candidate; D164 adds the P1
+prerequisite row at25; D163
 hotfix amendment 2026-10-26: the PO applied all nineteen held patches as operator
 commit `9ce6c2361`, stamped `689116c57`, installed on all three runners).
 None is at100 and none UNKNOWN. All P0/P1/Kritisch/Wichtig/Hoch findings
