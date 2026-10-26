@@ -89,6 +89,14 @@ reproduction is still owed for every entry.
 
 - **PF-59** `update-public-handover` replaces the whole "Next action" section of the
   consumer's handover with boilerplate (project text and a push checklist lost).
+  Confirmed in code (2026-10-26): `updatePublicHandoverDuty` → `syncStateMdNextAction` →
+  `replaceNextActionSection` (`lib/onboarding-continuity.mjs`) replaces everything from the
+  heading to the next `## ` heading, although the inspect action promises to "preserve
+  unrelated prose". Git projects reach it only through this explicit update. The current
+  behaviour is pinned: `lib/public-handover-duty.test.mjs` PHD002 asserts that old text in the
+  section is removed. Fix candidate (PO topic, it flips that pin): the update owns only a
+  marked generated block inside the section; an unmarked section whose body is exactly a known
+  generated rendering is replaced as legacy, any other prose is kept below the block.
 - **PF-60** guard grammar refuses `find -o` and `cat` on paths containing `(app)`.
 - **PF-63** generated briefings point consumers at `templates/prompts/agent-obligations.md`
   "at the repository root" and `project/pipeline.json`, neither of which a consumer has; the
