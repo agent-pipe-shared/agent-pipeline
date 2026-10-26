@@ -4,6 +4,7 @@ import { captureEvidence } from "../scripts/capture-evidence.mjs";
 import {
   CRITIC_DIAGNOSTIC_SCHEMA,
   diagnosticDigest,
+  diagnosticEvidenceLocation,
   diagnosticPath,
   inspectCriticVerifyDiagnostic,
   newDiagnosticPath,
@@ -37,13 +38,14 @@ export function produceCriticDiagnostic({ root, candidate = "HEAD", specPath, gu
   const bound = candidateBinding(root, candidate);
   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
   newDiagnosticPath(root, logPath);
-  if (!logPath.startsWith("evidence/") || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
+  if (diagnosticEvidenceLocation(logPath) === null || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
   const spec = source(root, bound.commit, specPath);
   const guardrails = [...new Set(guardrailPaths)].sort().map(path => source(root, bound.commit, path));
   const captured = captureEvidence({ command, label, out: logPath, cwd: root, repoRoot: root });
   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
   const fullVerify = { status: "not-run", evidence: null };
   if (fullVerifyPath !== null) {
+    if (diagnosticEvidenceLocation(fullVerifyPath) === null) fail("CDI-PATH");
     const bytes = readDiagnosticArtifact(root, fullVerifyPath);
     const observed = inspectCriticVerifyDiagnostic(JSON.parse(bytes), bound);
     if (observed.execution !== "full") fail("CDI-FULL-VERIFY");

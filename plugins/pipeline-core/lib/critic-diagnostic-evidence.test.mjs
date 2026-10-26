@@ -72,3 +72,43 @@ test("CLI emits honest evidence and refuses missing execution, stale/dirty input
     assert.throws(() => produceCriticDiagnostic(options(f)), /CDI-DIRTY-CANDIDATE/);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+// D167-PF78: the producer and the registrar share one location rule.
+import * as shared from "./critic-diagnostic-evidence.mjs";
+import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
+const LOCATION_TABLE = [
+  ["evidence/x.json", true], ["specs/my-feature/evidence/x.json", true], ["specs/a1/evidence/sub/x.json", true],
+  ["specs/Bad_Id/evidence/x.json", false], ["specs/my-feature/other/x.json", false], ["../evidence/x.json", false],
+  ["specs/-bad/evidence/x.json", false], ["specs/a--b/evidence/x.json", false], ["x.json", false], ["specs/my-feature/evidence", false],
+];
+test("D167-PF78 (1) the producer accepts evidence/ and specs/<id>/evidence/ and refuses the rest and existing files", () => {
+  const f = fixture();
+  try {
+    for (const ok of ["evidence/x.json", "specs/my-feature/evidence/x.json"]) assert.equal(typeof shared.newDiagnosticPath(f.root, ok), "string", ok);
+    for (const bad of ["specs/Bad_Id/evidence/x.json", "specs/my-feature/other/x.json", "../evidence/x.json"]) assert.throws(() => shared.newDiagnosticPath(f.root, bad), /CDI-(OUTPUT-PATH|PATH)/u, bad);
+    mkdirSync(join(f.root, "specs/my-feature/evidence"), { recursive: true });
+    writeFileSync(join(f.root, "specs/my-feature/evidence/old.json"), "x");
+    assert.throws(() => shared.newDiagnosticPath(f.root, "specs/my-feature/evidence/old.json"), /CDI-OUTPUT-EXISTS/u);
+    assert.throws(() => shared.newDiagnosticPath(f.root, "specs/Bad_Id/evidence/x.json"), /CDI-OUTPUT-PATH/u);
+    const value = produceCriticDiagnostic({ ...options(f), logPath: "specs/my-feature/evidence/t.log" });
+    assert.equal(value.targeted.log.path, "specs/my-feature/evidence/t.log");
+    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "specs/Bad_Id/evidence/t.log" }), /CDI-OUTPUT-PATH/u);
+    assert.throws(() => produceCriticDiagnostic({ ...options(f), logPath: "evidence/t2.log", fullVerifyPath: "spec.md" }), /CDI-PATH|CDI-OUTPUT-PATH/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("D167-PF78 (4) the shared predicate agrees with the producer for a table of paths and the registrar uses it", () => {
+  const f = fixture();
+  try {
+    assert.equal(typeof shared.diagnosticEvidenceLocation, "function");
+    for (const [path, accepted] of LOCATION_TABLE) {
+      assert.equal(Boolean(shared.diagnosticEvidenceLocation(path)), accepted, path);
+      let producerAccepts = true;
+      try { shared.newDiagnosticPath(f.root, path); } catch { producerAccepts = false; }
+      assert.equal(producerAccepts, accepted, `producer ${path}`);
+    }
+    assert.equal(shared.diagnosticEvidenceLocation("specs/my-feature/evidence/x.json").featureId, "my-feature");
+    assert.equal(shared.diagnosticEvidenceLocation("evidence/x.json").featureId, null);
+    // The registrar refuses the producer-only location and names the shared one.
+    const refused = addCriticDiagnosticEvidence({ root: f.root, state: { activeFeature: { id: "my-feature" } }, path: "evidence/x.json" });
+    assert.ok(refused.code === "FPR-DIAG-PATH" || refused.code === "FPR-MANIFEST-MISSING", JSON.stringify(refused));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});

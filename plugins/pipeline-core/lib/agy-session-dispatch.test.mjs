@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { join } from "node:path";
@@ -12,7 +12,7 @@ import { assessAgyHostCommit, captureAgyHostCommitBaseline } from "./agy-host-co
 import { classifyCriticChangedPaths, CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA, evaluateCriticTriggerRow } from "./critic-skip-decision.mjs";
 import { finalizeAgyFamilyHostObservedReturn } from "../scripts/agy-host-observed-finalize.mjs";
 import { inspectAgyHostObservedLocalReadback, withAgyFamilyLocalReadback } from "./agy-host-observed-local-readback.mjs";
-import { readAgyHostObservedReceipt } from "./agy-host-observed-store.mjs";
+import { readAgyHostObservedReceipt, readAgyAuthorityInventory } from "./agy-host-observed-store.mjs";
 import { resolveModelRoleSession } from "./model-role-session.mjs";
 import { ROLE_DISPATCH_REQUEST_SCHEMA } from "./role-dispatch-preflight.mjs";
 import { buildSignatureIntent, consentSubject as legacyConsentSubject, createAgyFamilyConsentAuthority, digest as canonicalDigest, familyConsentAssignment } from "./agy-session-authority.mjs";
@@ -467,4 +467,78 @@ test("same-session consent permits a bounded positive fixture dispatch and exclu
       assert.equal(failure.result, null);
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// D166-D25: the authority store must not judge POSIX mode bits or uid on Windows, where Node reports 0o777/0o666 and has no getuid.
+const D25_NS = "agy-session-consent";
+function d25Store() {
+  const root = mkdtempSync(join(nativeContractFixtureParent(), "agy-d25-"));
+  execFileSync("git", ["init", "-q"], { cwd: root });
+  execFileSync("git", ["config", "user.name", "Synthetic"], { cwd: root });
+  execFileSync("git", ["config", "user.email", "synthetic@example.invalid"], { cwd: root });
+  execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: root });
+  writeFileSync(join(root, "input.txt"), "input\n");
+  execFileSync("git", ["add", "input.txt"], { cwd: root });
+  execFileSync("git", ["commit", "-qm", "synthetic fixture"], { cwd: root });
+  const repository = inspectSignedDescriptorCustodyRepository(root);
+  const base = join(repository.commonDir, "agent-pipeline"), run = join(base, "run"), leaf = join(run, D25_NS);
+  mkdirSync(leaf, { recursive: true, mode: 0o700 });
+  for (const dir of [base, run, leaf]) chmodSync(dir, 0o700);
+  const file = join(leaf, "one.json");
+  writeFileSync(file, JSON.stringify({ a: 1 }), { mode: 0o600 }); chmodSync(file, 0o600);
+  return { root, repository, base, run, leaf, file };
+}
+function d25Inventory(repository) { return readAgyAuthorityInventory({ repository, namespaceIds: [D25_NS] }); }
+function d25OnWindows(fn) {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  try { return fn(); } finally { Object.defineProperty(process, "platform", original); }
+}
+const d25Refuses = (fn, check) => assert.throws(fn, (error) => error.code === "AGY-AUTHORITY-PRIVATE-PATH" && (!check || error.message.includes(check)));
+
+test("D166-D25 win32 ignores POSIX mode bits of the authority directories and files", () => {
+  const s = d25Store();
+  try {
+    for (const dir of [s.base, s.run, s.leaf]) chmodSync(dir, 0o777);
+    chmodSync(s.file, 0o666);
+    const result = d25OnWindows(() => d25Inventory(s.repository));
+    assert.equal(result.entries.length, 1);
+  } finally { rmSync(s.root, { recursive: true, force: true }); }
+});
+
+test("D166-D25 win32 still refuses a symlinked leaf, a file where a directory is expected, and nlink 2", () => {
+  const symlinked = d25Store();
+  try {
+    const elsewhere = join(symlinked.run, "elsewhere");
+    mkdirSync(elsewhere, { mode: 0o700 });
+    rmSync(symlinked.leaf, { recursive: true, force: true });
+    symlinkSync(elsewhere, symlinked.leaf);
+    d25OnWindows(() => d25Refuses(() => d25Inventory(symlinked.repository)));
+  } finally { rmSync(symlinked.root, { recursive: true, force: true }); }
+  const typed = d25Store();
+  try {
+    rmSync(typed.leaf, { recursive: true, force: true });
+    writeFileSync(typed.leaf, "x", { mode: 0o600 });
+    d25OnWindows(() => d25Refuses(() => d25Inventory(typed.repository)));
+  } finally { rmSync(typed.root, { recursive: true, force: true }); }
+  const linked = d25Store();
+  try {
+    linkSync(linked.file, join(linked.run, "outside-link"));
+    d25OnWindows(() => d25Refuses(() => d25Inventory(linked.repository)));
+  } finally { rmSync(linked.root, { recursive: true, force: true }); }
+});
+
+test("D166-D25 on the real platform a 0o777 directory and a 0o666 file still refuse and the message names the path and the mode check", () => {
+  const dirCase = d25Store();
+  try {
+    chmodSync(dirCase.leaf, 0o777);
+    d25Refuses(() => d25Inventory(dirCase.repository), "mode");
+    assert.throws(() => d25Inventory(dirCase.repository), (error) => error.message.includes(dirCase.leaf));
+  } finally { rmSync(dirCase.root, { recursive: true, force: true }); }
+  const fileCase = d25Store();
+  try {
+    chmodSync(fileCase.file, 0o666);
+    d25Refuses(() => d25Inventory(fileCase.repository), "mode");
+    assert.throws(() => d25Inventory(fileCase.repository), (error) => error.message.includes(fileCase.file));
+  } finally { rmSync(fileCase.root, { recursive: true, force: true }); }
 });

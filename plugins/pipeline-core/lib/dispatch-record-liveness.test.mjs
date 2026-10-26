@@ -20,6 +20,8 @@ import { GIT_NULL_DEVICE } from "./git-null-device.mjs";
 import { discoverRepository, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 import { DISPATCH_RECORD_LIVENESS_SCHEMA, readDispatchRecordLiveness } from "./dispatch-record-liveness.mjs";
 import { DISPATCH_RECORD_OWNER_SCHEMA, LANDED_DISPATCH_RECORD_OWNER_SCHEMA } from "./guard/dispatch-record-lane.mjs";
+import * as dispatchRecordLane from "./guard/dispatch-record-lane.mjs";
+import { realpathSync, symlinkSync } from "node:fs";
 
 const SKIP = process.platform === "linux" ? false : "linux-only: the process start identity is read from /proc/<pid>/stat; run under WSL";
 const SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url));
@@ -265,4 +267,62 @@ test("DRL-12 --second-writer (the guard mode): alive -> exit 2 with a repair on 
   const badArgs = spawnSync(process.execPath, [SCRIPT, "--second-writer"], { encoding: "utf8" });
   assert.equal(badArgs.status, 0);
   assert.match(badArgs.stderr, /could not run/u);
+});
+
+// D169 Finding A: the dispatch record lane judges its directories WITHOUT POSIX mode bits on native Windows (Node reports 0o777 for every
+// directory there). Only the mode/uid verdicts are skipped; the type, symbolic-link and realpath checks hold on every platform.
+const POSIX_ONLY = process.platform === "win32" ? "posix mode bits" : false;
+function droDir(mode) {
+  const holder = realpathSync(mkdtempSync(join(tmpdir(), "d169-dro-")));
+  chmodSync(holder, 0o700);
+  roots.push(holder);
+  const dir = join(holder, "dir");
+  mkdirSync(dir);
+  chmodSync(dir, mode);
+  return { holder, dir };
+}
+function droCode(fn) { try { fn(); } catch (error) { return error.code; } return null; }
+
+test("D169-DRO-1: with platform win32 a directory reporting mode 0o777 is accepted", { skip: POSIX_ONLY }, () => {
+  const { dir } = droDir(0o777);
+  assert.equal(typeof dispatchRecordLane.secureDirectory, "function");
+  const stat = dispatchRecordLane.secureDirectory(dir, "win32");
+  assert.equal(stat.isDirectory(), true);
+});
+
+test("D169-DRO-2: with platform win32 a symbolic link, a non-directory and a realpath-differing path are still refused with DRO-PATH", () => {
+  const { holder, dir } = droDir(0o700);
+  const link = join(holder, "link");
+  symlinkSync(dir, link);
+  const file = join(holder, "file");
+  writeFileSync(file, "x");
+  const aliasParent = join(holder, "alias");
+  symlinkSync(holder, aliasParent);
+  assert.equal(typeof dispatchRecordLane.secureDirectory, "function");
+  assert.equal(droCode(() => dispatchRecordLane.secureDirectory(link, "win32")), "DRO-PATH");
+  assert.equal(droCode(() => dispatchRecordLane.secureDirectory(file, "win32")), "DRO-PATH");
+  assert.equal(droCode(() => dispatchRecordLane.secureDirectory(join(aliasParent, "dir"), "win32")), "DRO-PATH");
+  assert.equal(dispatchRecordLane.secureDirectory(dir, "win32").isDirectory(), true);
+});
+
+test("D169-DRO-3: on a POSIX platform a group-writable directory is still refused with DRO-PATH", { skip: POSIX_ONLY }, () => {
+  const { dir } = droDir(0o775);
+  assert.equal(typeof dispatchRecordLane.secureDirectory, "function");
+  assert.equal(droCode(() => dispatchRecordLane.secureDirectory(dir, "linux")), "DRO-PATH");
+  assert.equal(droCode(() => dispatchRecordLane.secureDirectory(dir)), "DRO-PATH");
+  chmodSync(dir, 0o700);
+  assert.equal(dispatchRecordLane.secureDirectory(dir, "linux").isDirectory(), true);
+});
+
+test("D169-DRO-4: syncCreationDirectory skips the directory open and fsync on win32 and still performs them elsewhere", { skip: POSIX_ONLY }, () => {
+  assert.equal(typeof dispatchRecordLane.syncCreationDirectory, "function");
+  const ok = droDir(0o700);
+  assert.doesNotThrow(() => dispatchRecordLane.syncCreationDirectory(ok.dir, "win32"));
+  assert.doesNotThrow(() => dispatchRecordLane.syncCreationDirectory(ok.dir, "linux"));
+  // A traversable but unreadable directory passes every structural check; only a real directory open can fail on it.
+  if (typeof process.getuid === "function" && process.getuid() === 0) return;
+  const blind = droDir(0o300);
+  assert.doesNotThrow(() => dispatchRecordLane.syncCreationDirectory(blind.dir, "win32"));
+  assert.throws(() => dispatchRecordLane.syncCreationDirectory(blind.dir, "linux"), (error) => error.code === "EACCES");
+  chmodSync(blind.dir, 0o700);
 });

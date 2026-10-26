@@ -600,4 +600,48 @@ test("D165-CDR (h) the deterministic-unavailable repair names the producing and 
   assert.match(repair, /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u);
   assert.match(repair, /critic-dispatch-preflight\.mjs/u);
 });
+// D167-PF78: the producer writes where the registrar accepts it; the whole route is one chain.
+import {produceCriticDiagnostic} from "./critic-diagnostic-producer.mjs";
+import {planVerifySelection} from "./verify-selection.mjs";
+function chainFixture({verifyAt}) {
+  const fx = unitFixture({late: false});
+  writeFileSync(join(fx.root, ".git/info/exclude"), "/evidence/\n");
+  const dir = `specs/${fx.featureId}/evidence`, specPath = `specs/${fx.featureId}/spec.md`;
+  const tree = git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`]);
+  const verify = {schema: "pipeline.verify-evidence.v0", commit: fx.candidate, tree, exitCode: 0, steps: [{name: "check", exitCode: 0}],
+    selection: planVerifySelection({mode: "critic", candidateCommit: fx.candidate, registeredSuiteIds: ["check"], policy: {schema: "pipeline.verify-selection.v1", baseline: ["check"], areas: [{id: "all", paths: ["**"], suites: ["check"]}]}})};
+  mkdirSync(join(fx.root, verifyAt.split("/").slice(0, -1).join("/")), {recursive: true});
+  writeFileSync(join(fx.root, verifyAt), JSON.stringify(verify));
+  const jsonPath = `${dir}/diagnostic.json`, logPath = `${dir}/targeted.log`;
+  const value = produceCriticDiagnostic({root: fx.root, specPath, command: [process.execPath, "-e", "console.log('ok')"], logPath, fullVerifyPath: verifyAt});
+  writeFileSync(join(fx.root, jsonPath), `${JSON.stringify(value, null, 2)}\n`);
+  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
+    const path = `specs/${fx.featureId}/${rel}`; writeFileSync(join(fx.root, path), `${klass}\n`);
+    return {class: klass, path, sha256: hash(readFileSync(join(fx.root, path))), authority, mutability, retention};
+  });
+  const committed = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...committed, artifacts: [...committed.artifacts, ...topo], candidate: null, supersedes: null})}\n`);
+  return {...fx, value, jsonPath, logPath, register: () => addCriticDiagnosticEvidence({root: fx.root, state: {activeFeature: {id: fx.featureId}}, path: jsonPath})};
+}
+test("D167-PF78 (2,3) produce into specs/<id>/evidence with a copied full-verify member, register, and admission no longer lacks deterministic evidence", () => {
+  const fx = chainFixture({verifyAt: "specs/unit-feature/evidence/verify-copy.json"});
+  assert.equal(fx.value.fullVerify.status, "passed");
+  const result = fx.register();
+  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  for (const path of [fx.jsonPath, fx.logPath, fx.value.fullVerify.evidence.path]) assert.ok(manifest.artifacts.some(e => e.path === path && e.class === "candidate-evidence"), path);
+  fx.git("add", "."); fx.git("commit", "-qm", "register diagnostic");
+  const registrationCommit = fx.git("rev-parse", "HEAD");
+  const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", registrationCommit}));
+  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+});
+test("D167-PF78 (3) a diagnostic whose full-verify member is the fixed evidence/verify-latest.json is refused FPR-DIAG-PATH naming the copy-then-produce route", () => {
+  const fx = chainFixture({verifyAt: "evidence/verify-latest.json"});
+  const before = readFileSync(join(fx.root, fx.manifestPath));
+  const result = fx.register();
+  assert.equal(result.code, "FPR-DIAG-PATH", JSON.stringify(result));
+  assert.match(result.message ?? JSON.stringify(result), /copy/u);
+  assert.match(result.message ?? JSON.stringify(result), /--full-verify/u);
+  assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

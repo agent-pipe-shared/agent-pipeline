@@ -10,6 +10,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { assessWindowsAuthorityReadiness } from "../lib/windows-authority-readiness.mjs";
 import { validateRulesetSource } from "../lib/ruleset-source.mjs";
 import { snapshotPhysicalPluginRoot } from "../lib/public-core-observation.mjs";
 import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
@@ -294,6 +295,23 @@ test('Windows custody refusal also closes a pending hook action until reinspecti
   assert.equal(result.status, 'windows-authority-unavailable');
   assert.equal(result.nextAction.mutation, false);
   assert.deepEqual(result.nextAction.causes, causes);
+});
+
+test('D168-S7b a private-state root cause with its icacls repairPreview reaches nextAction.causes unchanged', () => {
+  const folder = 'D:\\work\\repo\\project';
+  const readiness = assessWindowsAuthorityReadiness({
+    projectRoot: 'D:\\work\\repo', pluginRoot: 'C:\\Users\\owner\\plugins\\pipeline-core', privateRoot: 'D:\\work\\repo\\.git\\agent-pipeline',
+    exists: () => true,
+    probe: () => { const nativeFacts = 'seam'; return { nativeFacts, nativeFactsSha256: createHash('sha256').update(nativeFacts).digest('hex'), helperSha256: 'a'.repeat(64), committed: false }; },
+    assessPrivateRoot: path => ({ status: 'insecure', reason: 'inherited grant', rootPath: path }),
+  });
+  const cause = readiness.causes.find(row => row.reason === 'WIN-AUTH-PRIVATE-ROOT');
+  assert.ok(cause, 'the readiness assessor must produce the private-state cause');
+  assert.equal(cause.nextAction.repairPreview.folder, folder);
+  const result = preflight({ cwd: ROOT_CURRENT, windowsAuthorityPlatform: 'win32', assessWindowsAuthorityReadinessFn: () => readiness });
+  assert.equal(result.status, 'windows-authority-unavailable');
+  assert.deepEqual(result.nextAction.causes, readiness.causes);
+  assert.deepEqual(result.nextAction.causes.find(row => row.reason === 'WIN-AUTH-PRIVATE-ROOT').nextAction.repairPreview, cause.nextAction.repairPreview);
 });
 
 test('trusted Windows custody leaves bootstrap ready', () => {

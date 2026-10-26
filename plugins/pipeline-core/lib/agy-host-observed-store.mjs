@@ -24,7 +24,7 @@ const sameInode = (a, b) => String(a.dev) === String(b.dev) && String(a.ino) ===
 const sameSnapshot = (a, b) => sameInode(a, b) && a.size === b.size
   && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs;
 const sameContentSnapshot = (a, b) => sameInode(a, b) && a.size === b.size && a.mtimeMs === b.mtimeMs;
-function fail(code) { throw Object.assign(new Error(code), { code }); }
+function fail(code, detail) { throw Object.assign(new Error(detail ? `${code}: ${detail}` : code), { code }); }
 
 // Closed physical namespaces, not arbitrary host discovery. Missing roots are
 // observed only after their existing ancestors have been checked physically.
@@ -53,18 +53,25 @@ function storeBoundary(repository, boundary, producerPort, namespaceId) {
     || canonical(transaction.repository) !== canonical(inspectAgyAuthorityRepository(repository))
     || !transaction.allowed.includes(namespaceId)) fail("AGY-AUTHORITY-TRANSACTION");
 }
-const own = (stat, directory = false) => {
-  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile())
-    || (stat.mode & 0o777) !== (directory ? 0o700 : 0o600)
-    || (!directory && stat.nlink !== 1)
-    || (typeof process.getuid === "function" && stat.uid !== process.getuid())) fail("AGY-AUTHORITY-PRIVATE-PATH");
+// D166 D25: Windows reports 0o777/0o666 and has no getuid, so the POSIX mode and uid verdicts are skipped there (read at
+// call time); every other check stays. Private custody on Windows is judged once at the private root, never here.
+const posixModeJudged = () => process.platform !== "win32";
+const privateFail = (path, check) => fail("AGY-AUTHORITY-PRIVATE-PATH", `${path ?? "(unnamed path)"} failed the ${check} check`);
+const own = (stat, directory = false, path = undefined) => {
+  if (stat.isSymbolicLink()) privateFail(path, "symlink");
+  if (directory ? !stat.isDirectory() : !stat.isFile()) privateFail(path, "type");
+  if (posixModeJudged() && (stat.mode & 0o777) !== (directory ? 0o700 : 0o600)) privateFail(path, "mode");
+  if (!directory && stat.nlink !== 1) privateFail(path, "nlink");
+  if (posixModeJudged() && typeof process.getuid === "function" && stat.uid !== process.getuid()) privateFail(path, "uid");
 };
 // `agent-pipeline/` and `agent-pipeline/run/` are shared with other components, which may have
 // created them 0755 (PF-53). An AGY root itself stays exactly 0700; a shared ancestor only has
 // to be an own, real directory that nobody else can write.
-const sharedAncestor = (stat) => {
-  if (stat.isSymbolicLink() || !stat.isDirectory() || (stat.mode & 0o022) !== 0
-    || (typeof process.getuid === "function" && stat.uid !== process.getuid())) fail("AGY-AUTHORITY-PRIVATE-PATH");
+const sharedAncestor = (stat, path = undefined) => {
+  if (stat.isSymbolicLink()) privateFail(path, "symlink");
+  if (!stat.isDirectory()) privateFail(path, "type");
+  if (posixModeJudged() && (stat.mode & 0o022) !== 0) privateFail(path, "mode");
+  if (posixModeJudged() && typeof process.getuid === "function" && stat.uid !== process.getuid()) privateFail(path, "uid");
 };
 export function inspectAgyAuthorityRepository(repository) {
   if (!repository || Object.keys(repository).sort().join("\0") !== "candidate\0commonDir\0primaryRoot") fail("AGY-AUTHORITY-REPOSITORY");
@@ -86,7 +93,7 @@ function authorityRoot(repository, namespaceId, create = false) {
     if (create) { try { mkdirSync(path, { mode: 0o700 }); } catch (error) { if (error?.code !== "EEXIST") throw error; } }
     if (absent || !existsSync(path)) { absent = true; continue; }
     const leaf = index === parts.length - 1, stat = lstatSync(path);
-    if (leaf) own(stat, true); else sharedAncestor(stat);
+    if (leaf) own(stat, true, path); else sharedAncestor(stat, path);
     ancestors.push({ path, stat, leaf });
     if (realpathSync(path) !== path) fail("AGY-AUTHORITY-PRIVATE-PATH");
   }
@@ -95,19 +102,19 @@ function authorityRoot(repository, namespaceId, create = false) {
 function verifyAuthorityParents(root) {
   for (let index = 0; index < root.ancestors.length; index++) {
     const entry = root.ancestors[index], stat = lstatSync(entry.path);
-    if (index > 0) { if (entry.leaf) own(stat, true); else sharedAncestor(stat); }
+    if (index > 0) { if (entry.leaf) own(stat, true, entry.path); else sharedAncestor(stat, entry.path); }
     if (!stat.isDirectory() || stat.isSymbolicLink() || !sameSnapshot(entry.stat, stat) || realpathSync(entry.path) !== entry.path) fail("AGY-AUTHORITY-CAS");
   }
 }
 function authorityRead(path) {
-  const before = lstatSync(path); own(before);
+  const before = lstatSync(path); own(before, false, path);
   if (!before.size || before.size > AUTHORITY_BYTES) fail("AGY-AUTHORITY-SIZE");
   const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
-    const opened = fstatSync(fd); own(opened);
+    const opened = fstatSync(fd); own(opened, false, path);
     if (!sameSnapshot(before, opened)) fail("AGY-AUTHORITY-CAS");
     const bytes = readFileSync(fd), after = fstatSync(fd), named = lstatSync(path);
-    own(after); own(named);
+    own(after, false, path); own(named, false, path);
     if (!sameSnapshot(opened, after) || !sameSnapshot(after, named) || bytes.length !== after.size) fail("AGY-AUTHORITY-CAS");
     const value = parseStrictJson(bytes);
     return { bytes, value, stat: after };
@@ -120,7 +127,7 @@ export function readAgyAuthorityInventory({ repository, namespaceIds }) {
   for (const namespaceId of namespaceIds) {
     const root = authorityRoot(repository, namespaceId), facts = [];
     if (!root.absent) {
-      const directory = lstatSync(root.path), names = readdirSync(root.path).sort(); own(directory, true);
+      const directory = lstatSync(root.path), names = readdirSync(root.path).sort(); own(directory, true, root.path);
       // These producer stores are flat. Nested, temporary, lock and unknown
       // names remain unavailable rather than being silently ignored.
       for (const name of names) {

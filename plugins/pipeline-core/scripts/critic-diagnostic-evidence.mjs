@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { diagnosticPath, newDiagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
+import { diagnosticEvidenceLocation, diagnosticPath, newDiagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
@@ -24,7 +24,7 @@ export function runCriticDiagnosticCli(argv) {
     }
   }
   diagnosticPath(out);
-  if (!out.startsWith("evidence/") || out === options.logPath) throw new Error("Diagnostic output must be a separate evidence path");
+  if (diagnosticEvidenceLocation(out) === null || out === options.logPath) throw new Error("Diagnostic output must be a separate evidence path");
   const target = newDiagnosticPath(options.root, out);
   const evidence = produceCriticDiagnostic(options);
   mkdirSync(dirname(target), { recursive: true });

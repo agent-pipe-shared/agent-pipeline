@@ -10,7 +10,7 @@ const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
 export const diagnosticDigest = bytes => createHash("sha256").update(bytes).digest("hex");
-function fail(code) { const error = new Error(code); error.code = code; throw error; }
+function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
 export function diagnosticPath(path) {
   if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f:]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
   return path;
@@ -23,9 +23,18 @@ export function readDiagnosticArtifact(root, path) {
   if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) || stat.isSymbolicLink() || !stat.isFile() || stat.size > 16 * 1024 * 1024) fail("CDI-ARTIFACT");
   return readFileSync(absolute);
 }
+const FEATURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+/** Where a Critic diagnostic may live: evidence/<rest> (featureId null) or specs/<id>/evidence/<rest>. Anything else is null. */
+export function diagnosticEvidenceLocation(path) {
+  try { diagnosticPath(path); } catch { return null; }
+  const parts = path.split("/");
+  if (parts[0] === "evidence" && parts.length > 1) return { featureId: null };
+  if (parts[0] === "specs" && parts.length > 3 && parts[2] === "evidence" && FEATURE_ID.test(parts[1])) return { featureId: parts[1] };
+  return null;
+}
 export function newDiagnosticPath(root, path) {
   diagnosticPath(path);
-  if (!path.startsWith("evidence/")) fail("CDI-OUTPUT-PATH");
+  if (diagnosticEvidenceLocation(path) === null) fail("CDI-OUTPUT-PATH", "diagnostic evidence is written under evidence/ or specs/<feature-id>/evidence/");
   const realRoot = realpathSync(root);
   let at = realRoot;
   for (const part of path.split("/")) {

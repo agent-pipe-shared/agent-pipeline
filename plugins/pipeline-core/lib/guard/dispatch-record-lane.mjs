@@ -278,14 +278,18 @@ const closedKeys = (value, keys) => value !== null && typeof value === "object" 
 const sameFile = (a, b) => ["dev", "ino", "mode", "nlink", "uid", "gid", "size", "mtimeMs", "ctimeMs"]
   .every(key => a[key] === b[key]);
 function creationFailure(code) { const error = new Error(code); error.code = code; throw error; }
-function secureDirectory(path) {
+// win32 (D169 A): Node reports 0o777 and no meaningful uid for a directory there, so ONLY the mode-bit and uid verdicts are skipped; the type,
+// symbolic-link and realpath checks hold on every platform. The private roots below the git dir are judged by the readiness/runtime probes.
+export function secureDirectory(path, platform = process.platform) {
   const stat = lstatSync(path);
   if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(path) !== path
-    || (stat.mode & 0o022) !== 0 || (typeof process.getuid === "function" && stat.uid !== process.getuid())) creationFailure("DRO-PATH");
+    || (platform !== "win32" && ((stat.mode & 0o022) !== 0 || (typeof process.getuid === "function" && stat.uid !== process.getuid())))) creationFailure("DRO-PATH");
   return stat;
 }
-function syncCreationDirectory(path) {
-  secureDirectory(path);
+// A directory cannot be opened or fsynced on win32 (no O_DIRECTORY; EISDIR/EPERM) and the fsync has no meaning there; the files are fsynced elsewhere.
+export function syncCreationDirectory(path, platform = process.platform) {
+  secureDirectory(path, platform);
+  if (platform === "win32") return;
   const fd = openSync(path, fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW);
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }

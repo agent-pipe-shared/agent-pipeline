@@ -37,7 +37,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
-import { CRITIC_DIAGNOSTIC_SCHEMA, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 
@@ -420,7 +420,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
   }
   // A path under the feature's evidence directory, a regular file, no symlink on the way.
   const pathProblem = (path) => {
-    if (!repositoryRelative(path) || !path.startsWith(evidenceDir)) return `${path} is not a repository-relative path under ${evidenceDir}`;
+    if (!repositoryRelative(path) || diagnosticEvidenceLocation(path)?.featureId !== featureId) return `${path} is not a repository-relative path under ${evidenceDir}; produce the diagnostic with the producer flags --log and --out under ${evidenceDir}, and for members copy the full-verify evidence byte-identically there and pass it with --full-verify`;
     const seen = inspect(root, path);
     if (seen.kind !== "file") return `${path} is missing or is not a regular file`;
     try { if (realpathSync(join(root, path)) !== join(root, path)) return `${path} resolves through a link`; } catch { return `${path} does not resolve`; }
