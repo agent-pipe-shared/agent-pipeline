@@ -6,8 +6,8 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3.",
-  "total": 217,
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78).",
+  "total": 218,
   "baseline": {
     "counts": {
       "25": 2,
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 11,
+      "25": 12,
       "50": 16,
       "75": 190,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 70.62
+    "index": 70.41
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -7830,6 +7830,42 @@
         {
           "owner": "agent",
           "what": "Admit the exact argv shapes in the draft/approved shell lane, add --out to phoenix plan and document --lock-token in its usage."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location",
+      "title": "The Critic diagnostic evidence is produced and registered at one location, so a consumer can push",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (PF-78, PF-76 addendum) on the installed build 0.7.0+claude.20261026181519.1bcce7a after the CDR patch; recorded, next-candidate priority (D167); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "The producer writes into specs/<featureId>/evidence/ (one shared output-path rule with the registrar), decide the fixed evidence/verify-latest.json member, name the other tool location in CDI-OUTPUT-PATH and FPR-DIAG-PATH, and add a chain test (produce, register, admit) with an ignored evidence/ directory."
         },
         {
           "owner": "native-host",

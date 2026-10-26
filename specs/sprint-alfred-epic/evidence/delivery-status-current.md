@@ -1,10 +1,10 @@
 # Delivery status (current)
 
-**217items ·27below75 ·maturity index70.62%.**
+**218items ·28below75 ·maturity index70.41%.**
 
 | Stage | Items |
 |---|---:|
-|25|11|
+|25|12|
 |50|16|
 |75|190|
 |100|0|

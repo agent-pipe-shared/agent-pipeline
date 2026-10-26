@@ -7,7 +7,7 @@ The PO applied the nineteen held patches of the C29 row as one operator commit `
 to HEAD `10e8573b5` plus the nineteen patches in order, and that both local marketplace copies equal the repository plugin
 tree (2219 files). Claude, Codex and Antigravity installs report the new version.
 
-**217 items · 190 at 75 · 16 at 50 · 11 at 25 · 27 below 75 · index 70.62%** (previous 207 items, 184/17/6, 71.5%; after D165 210 items, 72.02%).
+**218 items · 190 at 75 · 16 at 50 · 12 at 25 · 28 below 75 · index 70.41%** (D167 adds the P0 row `pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location`, PF-78; previous 207 items, 184/17/6, 71.5%; after D165 210 items, 72.02%).
 
 D165 adds two P0 consumer blocker rows at 25 for an interim candidate:
 `pipeline.consumer-push-blocked-by-late-review-unit` and `pipeline.brownfield-architecture-gate-never-passes`.

@@ -46,6 +46,20 @@ Not in the 0.7.0 matrix. The P0/P1 findings of the same handover have their own 
   harness additionally demands `Co-Authored-By` and `Claude-Session`. The Pipeline rule wins; the plugin should name the
   conflict. Recorded on the existing item `pipeline.git-03-forbids-provider-trailers-the-runner-environment-demands`.
 
+## Build `…181519` observations (Toolbox, later the same day, all P2)
+
+D25 is unchanged on `…181519` (expected: its fix is a held patch not yet applied, `d166-d25-win-dispatch-authority-store`).
+
+- **D27** Every plugin build change voids the generated briefing (`rulesetSha`); no read-only way to tell whether an old
+  briefing is still dispatchable. Wanted: `dispatch-briefing.mjs check`.
+- **D28** `DBG-RULESET-FALLBACK` at every build: `loadedIdentity` and `installedIdentity` are `unavailable`, the content hash
+  of the plugin root changes with every file. Wanted: identity from the manifest, warning only for a real fallback.
+- **D29** The preflight reports `DUTY-NOT-RUNTIME-LIVE` with 48 differing files (agent definitions, skills, templates)
+  without a next action or a statement whether a session restart is required. Relevant to the question whether a fix is
+  already live in a running session; after installing a fix a fresh session start is advisable.
+- **D30** `hook-refresh-required` (`HOOK-SNAPSHOT-STALE` for pre-commit, commit-msg, pre-push) after every build change.
+  Wanted: bind the hooks to their content, not to the build version.
+
 ## P3
 
 - **D20** The key folder grows without retention (hundreds of `proof-*`, `signer-*`, `request-*` in a synced folder).

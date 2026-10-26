@@ -13,7 +13,9 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **217 items:190 at75,16 at50,11 at25;27 below75;index70.62%** (D166 adds
+contains **218 items:190 at75,16 at50,12 at25;28 below75;index70.41%** (D167 adds
+the P0 row for PF-78, Critic diagnostic evidence producer versus registrar
+location; D166 adds
 seven Toolbox rows: P0 D25, D6 at50 and D7 with D15/D16/D17/D24, P1 D8, D9,
 D14/D18 and D21 with the rest of D3; D165 adds
 two P0 consumer blocker rows for an interim candidate; D164 adds the P1
