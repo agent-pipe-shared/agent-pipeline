@@ -1,0 +1,258 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 542602eac..bc5f40487 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -9,6 +9,8 @@ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, wri
+ import { parseStrictJson } from './governance-event.mjs';
+ /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
+ import { realpathSync } from "node:fs";
++import { mkdirSync as stopMkdir, writeFileSync as stopWrite, unlinkSync as stopUnlink } from "node:fs";
++import { createHash as stopHash } from "node:crypto";
+ import { resolve, dirname, isAbsolute, join } from "node:path";
+ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit, NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA } from "./agy-host-commit-admission.mjs";
+ import { commitAdmittedNativeGoldfishReturn } from "./agy-host-commit-execution.mjs";
+@@ -80,17 +82,98 @@ function readSubagentStopPending({ commonDir, input }) {
+   return { ok: true, pending };
+ }
+ 
++// PF-61: the current Claude runtime ends a background child with a tool call named SubagentHandback whose input is
++// {"message": <the contract>}; SubagentStop then carries no usable last_assistant_message. The contract is read ONLY from
++// the LAST SubagentHandback tool_use of the LAST assistant record of the child's own transcript, which sits beside the
++// meta file this route already trusts: <transcript_path without .jsonl>/subagents/agent-<agent_id>.jsonl. The read is
++// bounded, refuses a symlink and any path whose real location differs from that exact place, and fails closed on a
++// corrupt line. The message is then validated by the same validator against the same binding as any other final.
++const SUBAGENT_HANDBACK_TOOL = "SubagentHandback";
++const SUBAGENT_HANDBACK_MAX_BYTES = 8 * 1024 * 1024;
++const SUBAGENT_HANDBACK_UNSAFE = "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE";
++function readSubagentHandbackMessage(input) {
++  const unsafe = { ok: false, code: SUBAGENT_HANDBACK_UNSAFE };
++  const none = { ok: false, code: "NGHR-CLAUDE-STOP-NO-HANDBACK" };
++  const transcriptPath = input.transcript_path;
++  const agentId = input.agent_id;
++  if (typeof transcriptPath !== "string" || !isAbsolute(transcriptPath) || !transcriptPath.endsWith(".jsonl")
++    || typeof agentId !== "string" || agentId.trim() === "" || agentId.includes("/") || agentId.includes("\\")) return unsafe;
++  const sessionDir = transcriptPath.slice(0, -".jsonl".length);
++  const file = join(sessionDir, "subagents", `agent-${agentId}.jsonl`);
++  let text;
++  try {
++    if (lstatSync(file).isSymbolicLink()) return unsafe;
++    if (realpathSync(file) !== join(realpathSync(sessionDir), "subagents", `agent-${agentId}.jsonl`)) return unsafe;
++    const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
++    try {
++      const stat = fstatSync(fd);
++      if (!stat.isFile() || stat.size > SUBAGENT_HANDBACK_MAX_BYTES) return unsafe;
++      const bytes = readFileSync(fd);
++      if (bytes.length > SUBAGENT_HANDBACK_MAX_BYTES) return unsafe;
++      text = bytes.toString("utf8");
++    } finally { closeSync(fd); }
++  } catch (error) { return error?.code === "ENOENT" ? { ok: false, code: "NGHR-CLAUDE-STOP-NO-TRANSCRIPT" } : unsafe; }
++  let lastAssistant = null;
++  for (const line of text.split("\n")) {
++    if (line.trim() === "") continue;
++    let record;
++    try { record = JSON.parse(line); } catch { return unsafe; }
++    if (record?.type === "assistant" || record?.message?.role === "assistant") lastAssistant = record;
++  }
++  const content = lastAssistant?.message?.content;
++  if (!Array.isArray(content)) return none;
++  let message = null;
++  for (const block of content) {
++    if (block?.type === "tool_use" && block.name === SUBAGENT_HANDBACK_TOOL && typeof block.input?.message === "string") message = block.input.message;
++  }
++  return message === null ? none : { ok: true, message };
++}
++
+ // The stop carries no resolved model and no tool_response: only the final message is validated, against the binding.
+-// A model identity is never inferred; the receipt names its assurance as correlation-only.
+-function observeClaudeSubagentStop(input, pending) {
++// A model identity is never inferred; the receipt names its assurance as correlation-only. When last_assistant_message is
++// absent or is not a valid contract (a SubagentHandback child), the child's own last handback is validated instead.
++function observeClaudeSubagentStop(input, pending, mark) {
+   const state = pending.state;
+   if (typeof input.session_id !== "string" || input.session_id !== state.sessionId
+-    || state.runner !== "claude" || state.binding?.runner !== "claude"
+-    || typeof input.last_assistant_message !== "string") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
+-  const final = validateNativeGoldfishFinal(input.last_assistant_message, { binding: state.binding });
++    || state.runner !== "claude" || state.binding?.runner !== "claude") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
++  const bind = (text) => validateNativeGoldfishFinal(text, { binding: state.binding });
++  let final = typeof input.last_assistant_message === "string" ? bind(input.last_assistant_message)
++    : { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
++  if (!final.ok) {
++    const handback = readSubagentHandbackMessage(input);
++    if (handback.ok || handback.code !== "NGHR-CLAUDE-STOP-NO-TRANSCRIPT") { if (mark) mark.viaHandback = true; }
++    if (handback.ok) final = bind(handback.message);
++    else if (handback.code === SUBAGENT_HANDBACK_UNSAFE) final = handback;
++  }
+   return final.ok ? { ...final, runner: "claude", assurance: SUBAGENT_STOP_ASSURANCE } : final;
+ }
+ 
++// PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
++// leaves a small diagnostic next to its pending state, naming the exact code. A later success removes it. Diagnostic only:
++// any fault here is swallowed, the hook stays non-blocking.
++const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
++function recordSubagentStopOutcome({ stop }, result) {
++  if (!stop) return;
++  try {
++    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
++    const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
++    if (result?.status === "authored-commit-recorded") { try { stopUnlink(join(directory, name)); } catch { /* none to remove */ } return; }
++    // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
++    if (!stop.viaHandback) return;
++    stopMkdir(directory, { recursive: true, mode: 0o700 });
++    stopWrite(join(directory, name), `${JSON.stringify({ schema: SUBAGENT_STOP_FAILURE_SCHEMA,
++      dispatchId: stop.state.binding.dispatchId, toolUseId: stop.state.toolUseId, status: result?.status ?? null,
++      code: result?.code ?? null, commit: result?.commit ?? null, observedAt: new Date().toISOString() })}\n`, { mode: 0o600 });
++  } catch { /* diagnostic only */ }
++}
++
++export function finalizeNativeGoldfishHostReturn(args = {}, dependencies = {}) {
++  const diagnostic = {};
++  const result = finalizeNativeGoldfishHostReturnInner(args, dependencies, diagnostic);
++  recordSubagentStopOutcome(diagnostic, result);
++  return result;
++}
++
+ // Only the host launch call and its correlated successful return are observed.
+ // This is diagnostic history; it cannot attest worker phases or tool counts.
+ function observedNativeHostProgress({ state, observation }) {
+@@ -136,7 +219,7 @@ function draftRecord({ state, observation, commitReadback }) {
+  * Complete an opt-in marked native return. Every error after a possible Git
+  * write is recovery-required; this route never manufactures a no-commit fact.
+  */
+-export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, dependencies = {}) {
++function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dependencies = {}, diagnostic = {}) {
+   if (!["claude", "codex"].includes(runner) || !input || typeof input !== "object") return fail("NGHF-INPUT", "not-applicable");
+   const physical = physicalRoot(root ?? input.cwd ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+   if (!physical) return fail("NGHF-ROOT");
+@@ -184,7 +267,8 @@ export function finalizeNativeGoldfishHostReturn({ runner, root, input } = {}, d
+     // Consume once: any observation receipt for this dispatch and candidate means the host already committed (a
+     // replayed stop must not commit again); the HEAD == candidate admission is only the backstop behind this check.
+     if (subagentStopAlreadyObserved({ commonDir, state: pending.state })) return fail("NGHF-RECEIPT-EXISTS", "not-applicable");
+-    observation = observeClaudeSubagentStop(input, pending);
++    diagnostic.stop = { commonDir, state: pending.state, viaHandback: false };
++    observation = observeClaudeSubagentStop(input, pending, diagnostic.stop);
+   } else if (runner === "codex" && input.hook_event_name === "SubagentStop") {
+     pending = readNativeCodexPending({ commonDir, input });
+     if (!pending.ok) return fail("NGHF-PENDING-UNAVAILABLE", "not-applicable");
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index 4e3206021..a98f8241a 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -20,7 +20,7 @@
+ import assert from "node:assert/strict";
+ import { createHash, generateKeyPairSync } from "node:crypto";
+ import { spawn, spawnSync } from "node:child_process";
+-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { dirname, join, resolve } from "node:path";
+ import { after, test } from "node:test";
+ import { fileURLToPath } from "node:url";
+@@ -264,8 +264,12 @@ const childWork = (fx) => fx.write(SOURCE, "export const value = () => 1;\nexpor
+ function stopHook(fx, toolUseId) {
+   mkdirSync(join(fx.stopDir, "session", "subagents"), { recursive: true });
+   writeFileSync(join(fx.stopDir, "session", "subagents", `agent-${AGENT_ID}.meta.json`), JSON.stringify({ spawnDepth: 1, agentType: "goldfish-deep", toolUseId }));
++  const variant = fx.stopVariant ?? {};
++  if (variant.prepare) variant.prepare(join(fx.stopDir, "session", "subagents"), `agent-${AGENT_ID}.jsonl`);
++  const message = "lastMessage" in variant ? variant.lastMessage : finalText(fx);
+   return hook(fx, HOST, ["--runner", "claude"], { hook_event_name: "SubagentStop", session_id: SESSION,
+-    transcript_path: join(fx.stopDir, "session.jsonl"), cwd: fx.root, agent_id: AGENT_ID, agent_type: fx.binding.role, last_assistant_message: finalText(fx) }, HOST_COMMIT_HOOK_TIMEOUT_MS);
++    transcript_path: join(fx.stopDir, "session.jsonl"), cwd: fx.root, agent_id: AGENT_ID, agent_type: fx.binding.role,
++    ...(message === undefined ? {} : { last_assistant_message: message }) }, HOST_COMMIT_HOOK_TIMEOUT_MS);
+ }
+ const hostCommits = (fx) => fx.gitOk("log", "--fixed-strings", `--grep=Dispatch: ${fx.dispatchId} (goldfish)`, "--format=%H", `${fx.candidate}..HEAD`).split("\n").filter(Boolean);
+ 
+@@ -451,3 +455,94 @@ test("(vii) a launch hook killed while it holds the registry lock does not block
+   assert.equal(existsSync(lock), false, "the next launch released the lock it took");
+   assert.equal(readdirSync(aside).filter((name) => name.endsWith("-registry-lock")).length, 1, "the gone owner's lock was retired aside, not deleted");
+ });
++
++// PF-61 (AC-142): the current Claude runtime ends a background child with a SubagentHandback tool call, so the SubagentStop
++// input carries no usable last_assistant_message and the child's contract exists only as the LAST SubagentHandback tool_use
++// of its own transcript, agent-<agent_id>.jsonl beside the agent-<agent_id>.meta.json the hook already reads.
++const assistantRecord = (content) => ({ type: "assistant", message: { role: "assistant", content } });
++const handbackRecord = (message, name = "SubagentHandback") => assistantRecord([{ type: "tool_use", id: "toolu_handback", name, input: { message } }]);
++const proseRecord = (text) => assistantRecord([{ type: "text", text }]);
++const userRecord = (text) => ({ type: "user", message: { role: "user", content: text } });
++function writeTranscript(dir, name, lines) {
++  mkdirSync(dir, { recursive: true });
++  rmSync(join(dir, name), { force: true });
++  writeFileSync(join(dir, name), `${lines.map((line) => typeof line === "string" ? line : JSON.stringify(line)).join("\n")}\n`);
++}
++const withTranscript = (lines, lastMessage) => ({ lastMessage, prepare: (dir, name) => writeTranscript(dir, name, lines) });
++const contractWith = (fx, patch) => JSON.stringify({ ...JSON.parse(finalText(fx)), ...patch });
++const stopFailureFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
++function launchedBackground(name, toolUseId) {
++  const fx = buildConsumer(name);
++  launchedPending(fx, toolUseId, {});
++  const posted = postToolUse(fx, toolUseId, {}, { status: "async_launched", agentId: AGENT_ID });
++  assert.equal(posted.status, 0, posted.stderr);
++  childWork(fx);
++  return fx;
++}
++function assertRefusedAtStop(fx, toolUseId, variant, label, expectedCode) {
++  for (const file of stopFailureFiles(fx)) rmSync(join(stateDirectory(fx), file), { force: true });
++  fx.stopVariant = variant;
++  const stopped = stopHook(fx, toolUseId);
++  assert.equal(stopped.status, 0, `${label}: the stop hook never blocks -- ${stopped.stderr}`);
++  assert.doesNotMatch(stopped.stderr, /host commit verified/u, label);
++  assert.equal(hostCommits(fx).length, 0, `${label}: nothing is committed`);
++  assert.equal(fx.gitOk("rev-parse", "HEAD"), fx.candidate, `${label}: HEAD stays on the candidate`);
++  assert.equal(pendingFiles(fx).length, 1, `${label}: the pending state is not consumed`);
++  const files = stopFailureFiles(fx);
++  assert.equal(files.length, 1, `${label}: one diagnostic is persisted next to the pending state -- ${stopped.stderr.slice(0, 300)}`);
++  const diagnostic = JSON.parse(readFileSync(join(stateDirectory(fx), files[0]), "utf8"));
++  assert.equal(diagnostic.dispatchId, fx.dispatchId, label);
++  assert.match(diagnostic.code, /^NGH[A-Z]*-[A-Z0-9-]+$/u, `${label}: ${diagnostic.code}`);
++  if (expectedCode) assert.equal(diagnostic.code, expectedCode, label);
++  assert.ok(stopped.stderr.includes(diagnostic.code), `${label}: the hook message names the persisted code -- ${stopped.stderr.slice(0, 300)}`);
++}
++
++test("(viii) SubagentHandback: a background child whose contract arrives only as its last SubagentHandback tool call (no last_assistant_message) is host-committed exactly once (PF-61)", () => {
++  const fx = launchedBackground("handback-absent", "toolu_pf61_absent");
++  fx.stopVariant = withTranscript([userRecord("Do the task."), proseRecord("Working."), handbackRecord(finalText(fx))], undefined);
++  assertCommittedOnceAtStop(fx, "toolu_pf61_absent");
++});
++
++test("(ix) SubagentHandback: a last_assistant_message that is prose, not a contract, falls back to the child's own last handback (PF-61)", () => {
++  const fx = launchedBackground("handback-prose", "toolu_pf61_prose");
++  fx.stopVariant = withTranscript([userRecord("Do the task."), handbackRecord(finalText(fx))], "Delivered through the handback.");
++  assertCommittedOnceAtStop(fx, "toolu_pf61_prose");
++});
++
++test("(x) SubagentHandback: an invalid or foreign handback, or any record other than the last handback, is refused, commits nothing and leaves a named diagnostic (PF-61)", () => {
++  const fx = launchedBackground("handback-refused", "toolu_pf61_refused");
++  const id = "toolu_pf61_refused";
++  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { dispatchId: "FOREIGN-DISPATCH" }))], undefined), "foreign dispatchId");
++  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(contractWith(fx, { candidateCommit: "0".repeat(40) }))], undefined), "foreign candidate");
++  assertRefusedAtStop(fx, id, withTranscript([handbackRecord("All done, nothing to see.")], undefined), "prose handback");
++  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), proseRecord("Afterwards I said more.")], undefined), "an earlier handback followed by a later assistant record");
++  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx)), handbackRecord("not a contract")], "x"), "only the LAST handback counts");
++  assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx), "Task")], undefined), "a valid contract carried by another tool name");
++  assertRefusedAtStop(fx, id, withTranscript([proseRecord("Working."), userRecord(finalText(fx))], undefined), "a valid contract in a user record");
++  assertRefusedAtStop(fx, id, withTranscript([], undefined), "an empty transcript");
++});
++
++test("(xi) SubagentHandback: an unparsable, oversized or symlinked child transcript is refused as unsafe and commits nothing (PF-61)", { skip: process.platform === "win32" ? "needs symlink privileges" : false }, () => {
++  const fx = launchedBackground("handback-unsafe", "toolu_pf61_unsafe");
++  const id = "toolu_pf61_unsafe";
++  const UNSAFE = "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE";
++  const valid = handbackRecord(finalText(fx));
++  assertRefusedAtStop(fx, id, withTranscript([valid, "{this is not json"], undefined), "an unparsable transcript line", UNSAFE);
++  assertRefusedAtStop(fx, id, withTranscript([proseRecord("x".repeat(9 * 1024 * 1024)), valid], undefined), "an oversized transcript", UNSAFE);
++  const target = join(fx.stopDir, "elsewhere.jsonl");
++  assertRefusedAtStop(fx, id, { lastMessage: undefined, prepare: (dir, name) => {
++    mkdirSync(dir, { recursive: true });
++    writeFileSync(target, `${JSON.stringify(valid)}\n`);
++    rmSync(join(dir, name), { force: true });
++    symlinkSync(target, join(dir, name));
++  } }, "a symlinked transcript", UNSAFE);
++});
++
++test("(xii) SubagentHandback: a transcript reached through a symlinked subagents directory is refused as unsafe (PF-61)", { skip: process.platform === "win32" ? "needs symlink privileges" : false }, () => {
++  const fx = launchedBackground("handback-dir-link", "toolu_pf61_dirlink");
++  let linked = false;
++  assertRefusedAtStop(fx, "toolu_pf61_dirlink", { lastMessage: undefined, prepare: (dir, name) => {
++    if (!linked) { linked = true; const elsewhere = join(fx.stopDir, "elsewhere-subagents"); renameSync(dir, elsewhere); symlinkSync(elsewhere, dir); }
++    writeTranscript(dir, name, [handbackRecord(finalText(fx))]);
++  } }, "a symlinked subagents directory", "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE");
++});
