@@ -37,6 +37,7 @@ import * as po from "../po-gate-authority.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner } from "../claude-hook-session-owner.mjs";
 import { initializeSessionAuthorityRegistry } from "../session-authority-registry.mjs";
 import { createSessionAuthorityParticipantPorts } from "../session-authority-observers.mjs";
+import { GENERATOR_MARKER_PREFIX } from "../dispatch-briefing-build.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, NATIVE_GOLDFISH_RETURN_SCHEMA } from "../native-goldfish-host-return.mjs";
 import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from "../native-goldfish-host-observation.mjs";
 import { inspectSignedDescriptorCustodyRepository } from "../worktree-lifecycle.mjs";
@@ -216,9 +217,11 @@ function markedPrompt(binding) {
     .replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, `${binding.model} / ${binding.effort}`)
     .replace(/\{\{TOOL_BUDGET[^{}]*\}\}/g, "≤24 tool uses").replace(/\{\{[^{}]*\}\}/g, "FILLED");
   const version = /\.v(\d)$/u.exec(binding.schema)[1];
-  return [`<!-- pipeline-native-goldfish-host-commit:v${version}\n${JSON.stringify(binding)}\n-->`,
+  const text = [`<!-- pipeline-native-goldfish-host-commit:v${version}\n${JSON.stringify(binding)}\n-->`,
     body.includes(NATIVE_GOLDFISH_HOST_DIRECTIVE) ? body : `${NATIVE_GOLDFISH_HOST_DIRECTIVE}\n${body}`,
     `Slice: ${binding.itemDelivery.sliceId}`, `Write scope: ${binding.allowedPaths.join(", ")}`, ""].join("\n");
+  // D78: guard-dispatch refuses a hand-built governed briefing; stamp it the way the renderer does (dispatch-briefing-build.mjs).
+  return `${text}${GENERATOR_MARKER_PREFIX}${createHash("sha256").update(text).digest("hex")} -->\n`;
 }
 
 // The guard resolves the SubagentStop registration from the hooks.json that sits beside the running module: the real
@@ -229,6 +232,8 @@ function unregisteredGuard() {
   copyFileSync(GUARD, join(dir, "hooks", "guard-dispatch.mjs"));
   symlinkSync(join(dirname(GUARD), "guard-dispatch-budget.mjs"), join(dir, "hooks", "guard-dispatch-budget.mjs"));
   symlinkSync(join(dirname(GUARD), "..", "lib"), join(dir, "lib"));
+  mkdirSync(join(dir, "scripts"));
+  symlinkSync(join(dirname(GUARD), "..", "scripts", "dispatch-record-liveness.mjs"), join(dir, "scripts", "dispatch-record-liveness.mjs"));
   writeFileSync(join(dir, "hooks", "hooks.json"), "{}");
   return join(dir, "hooks", "guard-dispatch.mjs");
 }
