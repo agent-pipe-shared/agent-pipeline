@@ -43,7 +43,13 @@ governed Goldfish.
   although every one is settled (cancelled or integrated-by-commit), and
   returns `next: []`.
 
-Which of the three paths fires is not yet established.
+Which of the three paths fires is not yet established. Strongest lead: the
+last launch that was admitted (W3-R2-IDENTITY-ACTOR-C4) was the first whose
+PostToolUse reported `NGHF-PENDING-UNAVAILABLE` (no pending host-commit state),
+and `inspect` lists no reservation for it although every earlier launch has
+one. Every launch after it was refused. That fits a domain transition left
+partially applied by that launch (`domain-transition-partial-effect-retained`),
+which later boundaries then refuse without a surfaced reason.
 
 ## Acceptance
 
