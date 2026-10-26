@@ -1,0 +1,318 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index f581d0f54..e485fb7e0 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -36,7 +36,8 @@ const fail = (code) => { throw new CriticCourseAdmissionError(code); };
+ // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
+ // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
+ const REPAIRS = Object.freeze({
+-  "CCA-REVIEW-UNIT-REQUIRED": "This feature's genesis manifest lists no Critic review unit. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit; that commit is the base of the first review, so start the course's first review from it. A course that already has a retained review keeps its first base and cannot use the unit.",
++  "CCA-REVIEW-UNIT-REQUIRED": "No commit between the base and the candidate lists a Critic review unit in the feature manifest. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit. The first review may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it; the unit may be added after delivery. A course that already has a retained review keeps its first base and cannot use the unit.",
++  "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
+ });
+ /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
+ export function criticCourseRepair(code) {
+@@ -501,21 +502,30 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
+  const last=history.at(-1);if(last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
+  const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
+  const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
++// PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
++// otherwise the first commit of base..candidate whose manifest lists it (a manifest read error counts as not listing it).
++function introducingCommit(root,base,candidate,manifestPath,path){
++ const lists=(commit)=>{try{return manifestAt(root,commit,manifestPath).value.artifacts.some(e=>e.path===path);}catch{return false;}};
++ if(lists(base))return base;
++ for(const commit of range(root,base,candidate))if(lists(commit))return commit;
++ return fail("CCA-REVIEW-UNIT-REQUIRED");
++}
+ function featureReviewUnit(input,resolved){
+  const root=resolved.resolvedRepository.repoRoot,identity=resolved.courseIdentity;
+- const genesis=manifestAt(root,identity.genesisCandidate.base,identity.manifestPath).value;
+- const current=manifestAt(root,input.candidateCommit,identity.manifestPath).value;
+  const path=`specs/${identity.originalFeatureId}/design/critic-review-unit.json`;
++ const base=identity.genesisCandidate.base,introduced=introducingCommit(root,base,input.candidateCommit,identity.manifestPath,path);
++ const genesis=manifestAt(root,introduced,identity.manifestPath).value;
++ const current=manifestAt(root,input.candidateCommit,identity.manifestPath).value;
+  const units=genesis.artifacts.filter(e=>e.path===path);
+  const unit=units[0];
+  if(units.length!==1||!exact(unit,["class","path","sha256","authority","mutability","retention"])||unit.class!=="design"||unit.authority!==false||unit.mutability!=="immutable"||unit.retention!=="retain"||!SHA256.test(unit.sha256??""))fail("CCA-REVIEW-UNIT-REQUIRED");
+  if(!current.artifacts.some(e=>equal(unit,e)))fail("CCA-REVIEW-UNIT-BINDING");
+- const blob=observedBlob(root,identity.genesisCandidate.base,path);
++ const blob=observedBlob(root,introduced,path);
+  if(blob.sha256!==unit.sha256)fail("CCA-REVIEW-UNIT-BINDING");
+  let declaration;try{declaration=JSON.parse(blob.bytes);}catch{fail("CCA-REVIEW-UNIT-BINDING");}
+  const specs=genesis.artifacts.filter(e=>e.class==="spec"&&e.authority===true);
+  if(specs.length!==1||!safe(specs[0].path)||!current.artifacts.some(e=>e.class==="spec"&&e.authority===true&&e.path===specs[0].path))fail("CCA-REVIEW-UNIT-SPEC");
+- const observed=readCriticReviewUnit({repoRoot:root,baseCommit:identity.genesisCandidate.base,candidateCommit:input.candidateCommit,specPath:specs[0].path,logicalWorkIds:declaration.logicalWorkIds,reviewUnitPath:unit.path});
++ const observed=readCriticReviewUnit({repoRoot:root,baseCommit:base,candidateCommit:input.candidateCommit,specPath:specs[0].path,logicalWorkIds:declaration.logicalWorkIds,reviewUnitPath:unit.path,...(introduced!==base?{declarationCommit:introduced}:{})});
+  if(observed.reference.sha256!==unit.sha256)fail("CCA-REVIEW-UNIT-BINDING");
+  assertFeatureCriticReviewUnitOwnership({repoRoot:root,courseKey:identity.courseKey,logicalWorkIds:observed.declaration.logicalWorkIds});
+  return {...observed.reference,specPath:observed.declaration.specPath};
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 2855ddb4c..868b39544 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+-import { readCriticCourseAdmission, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
++import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
+ 
+ const H = (c) => c.repeat(64);
+@@ -407,4 +407,88 @@ test("CCA18 dropping retained registration cannot create new genesis in the runt
+ });
+ 
+ test("CCA19 registered diagnostic JSON and required log carry as one immutable candidate bundle", diagnosticCarryCase);
++// D165-PF75B: the review unit is read at the commit that introduced it, not only at the genesis base.
++function unitFixture({late, unit = true, bulk = 0}) {
++  const root = mkdtempSync(join(tmpdir(), "critic-unit-intro-"));
++  const featureId = "unit-feature", dir = `specs/${featureId}`, manifestPath = `${dir}/lifecycle.json`, specPath = `${dir}/spec.md`, unitPath = `${dir}/design/critic-review-unit.json`;
++  mkdirSync(join(root, dir, "design"), {recursive: true}); mkdirSync(join(root, "src"), {recursive: true});
++  git(root, ["init", "-q"]); git(root, ["config", "user.name", "Fixture"]); git(root, ["config", "user.email", "fixture@example.invalid"]);
++  const commit = (message) => { git(root, ["add", "."]); git(root, ["commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++  writeFileSync(join(root, "README.md"), "pre\n");
++  const pre = commit("pre-manifest");
++  writeFileSync(join(root, specPath), "# Spec\nAC-1 behavior\n");
++  const artifacts = [{class: "spec", path: specPath, sha256: hash(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active"}];
++  const write = () => writeFileSync(join(root, manifestPath), `${JSON.stringify({schema: "pipeline.feature-package.v1", feature: {id: featureId, rigor: 1}, state: "approved", artifacts})}\n`);
++  const unitBody = (purpose) => JSON.stringify({schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose, specPath, logicalWorkIds: ["work-one", "work-two"], criterionIds: ["AC-1"], deliveryBoundary: {mainRef: git(root, ["symbolic-ref", "HEAD"])}, singletonRationale: null});
++  const addUnit = (purpose) => { writeFileSync(join(root, unitPath), unitBody(purpose)); const entry = {class: "design", path: unitPath, sha256: hash(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain"}; const at = artifacts.findIndex(e => e.path === unitPath); if (at >= 0) artifacts[at] = entry; else artifacts.push(entry); write(); };
++  const out = {root, featureId, manifestPath, unitPath, pre, addUnit, commit, write, git: (...a) => git(root, a)};
++  if (!late) { if (unit) addUnit("Deliver one behavior boundary"); else write(); out.base = commit("manifest with unit"); }
++  else { write(); out.base = commit("manifest without unit"); writeFileSync(join(root, "src/code.mjs"), "export const delivered = 1;\n"); out.code = commit("delivered code"); if (unit) { addUnit("Deliver one behavior boundary"); out.unit = commit("late review unit"); } }
++  if (bulk) { const lines = []; let parent = git(root, ["rev-parse", "HEAD"]); for (let i = 0; i < bulk; i++) { lines.push(`commit refs/heads/bulk\nmark :${i + 1}\ncommitter F <f@example.invalid> ${1700000000 + i} +0000\ndata 1\nx\n${i ? `from :${i}` : `from ${parent}`}\n`); } execFileSync("git", ["-C", root, "fast-import", "--quiet"], {input: lines.join("\n")}); git(root, ["reset", "-q", "--hard", "bulk"]); }
++  writeFileSync(join(root, "src/code.mjs"), "export const delivered = 2;\n");
++  out.candidate = commit("candidate");
++  return out;
++}
++const unitRequest = (fx, overrides = {}) => runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", ...overrides});
++const identityOf = (fx, candidate = fx.candidate) => resolveRegisteredCriticCourseIdentity({repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.base, candidateCommit: candidate, registrationCommit: candidate, acceptedReference: null});
++test("D165-PF75B (a) a unit already listed at the base keeps decision and course key", () => {
++  const fx = unitFixture({late: false});
++  const actual = readCriticCourseAdmission(unitRequest(fx));
++  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++  const identity = identityOf(fx);
++  assert.equal(identity.ok, true);
++  const subject = {repositoryFingerprint: identity.value.courseIdentity.repositoryFingerprint, originalFeatureId: fx.featureId, manifestPath: fx.manifestPath, originalManifestSha256: hash(git(fx.root, ["show", `${fx.base}:${fx.manifestPath}`]) + "\n"), genesisCandidate: identity.value.courseIdentity.genesisCandidate};
++  assert.equal(identity.value.courseIdentity.courseKey, sha256Canonical(subject));
++  assert.deepEqual(identity.value.courseIdentity.genesisCandidate.base, fx.base);
++});
++test("D165-PF75B (b) a unit introduced after the first review base is admitted from the commit that added the manifest", () => {
++  const fx = unitFixture({late: true});
++  const range = fx.git("rev-list", `${fx.base}..${fx.candidate}`).split("\n");
++  assert.ok(range.includes(fx.code) && range.includes(fx.unit));
++  const actual = readCriticCourseAdmission(unitRequest(fx));
++  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
++});
++test("D165-PF75B (h) a base before the manifest stays refused and the repair names the registration commit", () => {
++  const fx = unitFixture({late: true});
++  const actual = readCriticCourseAdmission(unitRequest(fx, {baseCommit: fx.pre}));
++  assert.equal(actual.decision.code, "CCA-MANIFEST-READ", JSON.stringify(actual.decision));
++  const repair = criticCourseRepair("CCA-MANIFEST-READ");
++  assert.equal(typeof repair, "string");
++  assert.match(repair, /git log --diff-filter=A --format=%H -- specs\/<id>\/lifecycle\.json/u);
++  assert.match(repair, /commit that (first )?added the feature manifest/u);
++});
++test("D165-PF75B (c) no commit between base and candidate lists the unit", () => {
++  const fx = unitFixture({late: true, unit: false});
++  const actual = readCriticCourseAdmission(unitRequest(fx));
++  assert.equal(actual.decision.code, "CCA-REVIEW-UNIT-REQUIRED", JSON.stringify(actual.decision));
++});
++test("D165-PF75B (d) a late unit rewritten after its introduction is refused as a binding failure", () => {
++  const fx = unitFixture({late: true});
++  fx.addUnit("Rewritten scope after declaring");
++  fx.candidate = fx.commit("rewrite unit");
++  const actual = readCriticCourseAdmission(unitRequest(fx));
++  assert.equal(actual.decision.code, "CCA-REVIEW-UNIT-BINDING", JSON.stringify(actual.decision));
++});
++test("D165-PF75B (e) a later round resolves the same introducing commit and the same course key", () => {
++  // Criterion: determinism of the introducing commit and an unchanged course key. With no retained history the genesis candidate is the input candidate, so keys of different candidates differ by design; base and candidate are held fixed here.
++  const fx = unitFixture({late: true});
++  const first = readCriticCourseAdmission(unitRequest(fx)), again = readCriticCourseAdmission(unitRequest(fx));
++  assert.equal(first.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(first.decision));
++  assert.deepEqual(again, first);
++  const one = identityOf(fx), two = identityOf(fx);
++  assert.equal(one.ok && two.ok, true);
++  assert.equal(two.value.courseIdentity.courseKey, one.value.courseIdentity.courseKey);
++});
++test("D165-PF75B (f) a range over 512 commits is refused", () => {
++  const fx = unitFixture({late: true, bulk: 513});
++  const actual = readCriticCourseAdmission(unitRequest(fx));
++  assert.equal(actual.decision.code, "CCA-RANGE-BOUND", JSON.stringify(actual.decision));
++});
++test("D165-PF75B (g) the missing-unit repair no longer says the unit commit is the base of the first review", () => {
++  const repair = criticCourseRepair("CCA-REVIEW-UNIT-REQUIRED");
++  assert.doesNotMatch(repair, /base of the first review/u);
++  assert.doesNotMatch(repair, /start the course's first review from it/u);
++  assert.match(repair, /any base on the candidate history that already lists the feature manifest/u);
++  assert.match(repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 58785be5a..da8f46b82 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -270,11 +270,15 @@ function declarationSource(root, d, correction = false) {
+ }
+ function reviewUnitSource(root, d, work) {
+   // A committed declaration proves ordering and bindings, not semantic coherence.
+-  const before = reference(root, d.baseCommit, d.reviewUnitPath);
++  const declarationCommit = Object.hasOwn(d, "declarationCommit") ? d.declarationCommit : d.baseCommit;
++  if (typeof declarationCommit !== "string" || !OID.test(declarationCommit)) fail("CGB-REVIEW-UNIT-BINDING");
++  try { if (git(root, ["cat-file", "-t", declarationCommit]).trim() !== "commit") fail("CGB-REVIEW-UNIT-BINDING"); }
++  catch (error) { if (error?.code === "CGB-REVIEW-UNIT-BINDING") throw error; fail("CGB-REVIEW-UNIT-BINDING"); }
++  const before = reference(root, declarationCommit, d.reviewUnitPath);
+   const current = reference(root, d.candidateCommit, d.reviewUnitPath);
+   if (before.blobOid !== current.blobOid) fail("CGB-REVIEW-UNIT-BINDING");
+   let declaration;
+-  try { declaration = JSON.parse(git(root, ["show", `${d.baseCommit}:${before.path}`])); }
++  try { declaration = JSON.parse(git(root, ["show", `${declarationCommit}:${before.path}`])); }
+   catch { fail("CGB-REVIEW-UNIT-SHAPE"); }
+   shape(declaration, ["schema", "kind", "purpose", "specPath", "logicalWorkIds", "criterionIds", "deliveryBoundary", "singletonRationale"]);
+   if (declaration.schema !== "pipeline.critic-review-unit.v1"
+@@ -282,7 +286,7 @@ function reviewUnitSource(root, d, work) {
+     || typeof declaration.purpose !== "string" || declaration.purpose.trim().length === 0 || declaration.purpose.length > 2048
+     || !eq(logical(declaration.logicalWorkIds), work) || declaration.specPath !== d.specPath) fail("CGB-REVIEW-UNIT-BINDING");
+   const criteria = logical(declaration.criterionIds);
+-  const spec = git(root, ["show", `${d.baseCommit}:${normalizePacketPath(d.specPath)}`]);
++  const spec = git(root, ["show", `${declarationCommit}:${normalizePacketPath(d.specPath)}`]);
+   if (criteria.some(id => !spec.includes(id))) fail("CGB-REVIEW-UNIT-BINDING");
+   const exception = ["independent-delivery", "urgent-isolated-risk"].includes(declaration.kind);
+   if ((work.length === 1 && !exception) || (exception && (typeof declaration.singletonRationale !== "string"
+@@ -292,6 +296,8 @@ function reviewUnitSource(root, d, work) {
+   const repo = discoverRepository(realpathSync(root));
+   const primaryRef = git(repo.primaryRoot, ["symbolic-ref", "HEAD"]).trim();
+   if (declaration.deliveryBoundary.mainRef !== primaryRef || !primaryRef.startsWith("refs/heads/")) fail("CGB-MAIN-INTEGRATION");
++  try { git(root, ["merge-base", "--is-ancestor", declarationCommit, d.candidateCommit]); }
++  catch { fail("CGB-REVIEW-UNIT-BINDING"); }
+   git(root, ["merge-base", "--is-ancestor", d.baseCommit, d.candidateCommit]);
+   try { git(root, ["merge-base", "--is-ancestor", d.candidateCommit, primaryRef]); }
+   catch { fail("CGB-MAIN-INTEGRATION"); }
+@@ -675,7 +681,8 @@ export function recoverGenericCriticBatchEmptyStore({ controlRoot, digestSha256
+ /** Shared source-bound declaration reader; presence/bindings do not attest semantic coherence. */
+ export function readCriticReviewUnit(input) {
+   return invoke(() => {
+-    shape(input, ["repoRoot", "baseCommit", "candidateCommit", "specPath", "logicalWorkIds", "reviewUnitPath"]);
++    const baseKeys = ["repoRoot", "baseCommit", "candidateCommit", "specPath", "logicalWorkIds", "reviewUnitPath"];
++    shape(input, Object.hasOwn(input ?? {}, "declarationCommit") ? [...baseKeys, "declarationCommit"] : baseKeys);
+     if (!OID.test(input.baseCommit) || !OID.test(input.candidateCommit)) fail("CGB-SHAPE");
+     return reviewUnitSource(input.repoRoot, input, logical(input.logicalWorkIds));
+   });
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 462c75806..9616e7794 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -7,7 +7,7 @@ import {tmpdir} from "node:os";
+ import {join} from "node:path";
+ import {isSuccessfulSpawn} from "./successful-spawn.mjs";
+ import {produceCriticDiagnostic} from "./critic-diagnostic-producer.mjs";
+-import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership,reserveFeatureCriticReviewUnitOwnership} from "./critic-generic-batch.mjs";
++import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership,reserveFeatureCriticReviewUnitOwnership,readCriticReviewUnit} from "./critic-generic-batch.mjs";
+ import {admitSessionCriticReview,finalizeSessionCriticReview,runSessionCriticFinalizerCli} from "../scripts/session-critic-finalizer.mjs";
+ import {sha256Canonical,CRITIC_DISPATCH_LIMITS} from "./review-economy.mjs";
+ import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket,sha256,canonicalJson} from "../scripts/critic-packet-preflight.mjs";
+@@ -16,7 +16,7 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
+ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+ import {readdirSync,readlinkSync} from "node:fs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -422,4 +422,56 @@ test("owner identity is judged conservatively: foreign, unreadable or ownerless
+     assert.equal(existsSync(join(holder.store,"logical/foreign.json")),true);
+   }finally{if(holder)await holder.kill();rmSync(fx.root,{recursive:true,force:true});}
+ });
++function unitInput(fx,overrides={}){return {repoRoot:fx.root,baseCommit:fx.base,candidateCommit:fx.candidate,specPath:"specs/spec.md",logicalWorkIds:["AC-1","AC-2"],reviewUnitPath:"specs/review-unit.json",...overrides};}
++// Builds history where the review unit is absent at `pre`, present from `decl`, with `candidate` after it; main points at candidate.
++function lateDeclarationFixture(){
++  const fx=fixture();const root=fx.root;
++  git(root,["checkout","-q","--orphan","pre"]);git(root,["rm","-rqf","."]);
++  mkdirSync(join(root,"specs"),{recursive:true});writeFileSync(join(root,"specs/spec.md"),"# Spec\nAC-1 AC-2\n");
++  const pre=commit(root,"pre without unit");
++  writeFileSync(join(root,"specs/review-unit.json"),JSON.stringify(unit()));
++  const decl=commit(root,"late unit declaration");
++  writeFileSync(join(root,"specs/spec.md"),"# Spec\nAC-1 AC-2\nwork\n");
++  const candidate=commit(root,"work after declaration");
++  git(root,["branch","-f","main",candidate]);git(root,["checkout","-q","main"]);
++  return {...fx,pre,decl,lateCandidate:candidate};
++}
++test("D165-PF75A default declarationCommit equals base: result and reference identical to the absent option",()=>{
++  const fx=fixture();try{
++    const plain=readCriticReviewUnit(unitInput(fx));
++    const explicit=readCriticReviewUnit(unitInput(fx,{declarationCommit:fx.base}));
++    assert.deepEqual(explicit,plain);assert.equal(plain.reference.commit,fx.base);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D165-PF75A declarationCommit later than base admits a unit absent at base and binds the blob at declarationCommit",()=>{
++  const fx=lateDeclarationFixture();try{
++    const input=unitInput(fx,{baseCommit:fx.pre,candidateCommit:fx.lateCandidate});
++    assert.throws(()=>readCriticReviewUnit(input));
++    const result=readCriticReviewUnit({...input,declarationCommit:fx.decl});
++    assert.equal(result.reference.commit,fx.decl);
++    assert.equal(result.reference.blobOid,git(fx.root,["rev-parse",`${fx.decl}:specs/review-unit.json`]));
++    assert.equal(result.declaration.kind,"related-fixes");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D165-PF75A unit changed between declarationCommit and candidate is refused",()=>{
++  const fx=lateDeclarationFixture();try{
++    writeFileSync(join(fx.root,"specs/review-unit.json"),JSON.stringify(unit({purpose:"changed after declaration"})));
++    const candidate=commit(fx.root,"unit changed");
++    rejected(()=>readCriticReviewUnit(unitInput(fx,{baseCommit:fx.pre,candidateCommit:candidate,declarationCommit:fx.decl})),"CGB-REVIEW-UNIT-BINDING");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D165-PF75A declarationCommit that is not an ancestor of the candidate is refused",()=>{
++  const fx=fixture();try{
++    const side=git(fx.root,["commit-tree",`${fx.base}^{tree}`,"-p",fx.base,"-m","side commit"],{env:{...process.env,GIT_AUTHOR_NAME:"Test",GIT_AUTHOR_EMAIL:"test@example.invalid",GIT_COMMITTER_NAME:"Test",GIT_COMMITTER_EMAIL:"test@example.invalid"}});
++    assert.notEqual(side,fx.base);
++    rejected(()=>readCriticReviewUnit(unitInput(fx,{declarationCommit:side})),"CGB-REVIEW-UNIT-BINDING");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D165-PF75A malformed declarationCommit fails the review-unit binding",()=>{
++  const fx=fixture();try{
++    const blob=git(fx.root,["rev-parse",`${fx.base}:specs/review-unit.json`]);
++    for(const bad of ["not-an-oid","ABCDEF".repeat(7)+"ABCD",fx.base.slice(0,12),"0".repeat(40),blob,fx.tree])
++      rejected(()=>readCriticReviewUnit(unitInput(fx,{declarationCommit:bad})),"CGB-REVIEW-UNIT-BINDING");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 76daeeb82..95b9e060d 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -320,9 +320,9 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+  * PF-34 (b): a feature registered before the review unit existed gets it through this one typed amendment: the unit
+  * (registered as found, or generated as in registration) and its `design` entry appended to the manifest. Nothing
+  * else of the manifest changes. A failure restores the manifest's bytes and removes what this call created.
+- * The course's genesis base is its first review's base (critic-course-admission.mjs), so the commit that adds the
+- * unit is the earliest base a Critic review of this course can use; a course that already has a retained review
+- * keeps its first base and cannot use the unit.
++ * A unit added after delivery may be reviewed from any base on the candidate history that already lists the feature
++ * manifest (critic-course-admission.mjs reads the unit at the commit that introduced it); a course that already has
++ * a retained review keeps its first base and cannot use the unit.
+  */
+ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDeliveryContract } = {}) {
+   if (typeof readAcceptedDeliveryContract !== "function" || !object(state)) return refused("FPR-ARGS", "root, state and the envelope reader are required");
+@@ -382,6 +382,6 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
+     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "review-unit-added", manifestPath, reviewUnitPath: unitPath,
+     reviewUnit: { status: unitSeen.kind === "file" ? "found" : "generated", path: unitPath, sha256: digest(unitBytes) },
+     manifestSha256: digest(bytes), commitPaths: [manifestPath, unitPath],
+-    next: "commit both paths in one commit. That commit is the earliest base a Critic review of this feature course can use: start the course's first review from it. A course that already has a retained review keeps its first base and cannot use this unit",
++    next: "commit both paths in one commit. The first Critic review of this feature course may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it. A course that already has a retained review keeps its first base and cannot use this unit",
+   };
+ }
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index a68ef0b0a..3ba7e9cf0 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -221,7 +221,7 @@ for (const declared of [false, true, "unit-drift", "singleton", "wrong-main", "f
+       assert.equal(typeof result.repair, "string", JSON.stringify(result));
+       assert.match(result.repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
+       assert.match(result.repair, /commit both printed paths in one commit/u);
+-      assert.match(result.repair, /base of the first review/u);
++      assert.match(result.repair, /any base on the candidate history that already lists the feature manifest/u);
+       assert.match(result.repair, /retained review keeps its first base/u);
+       return;
+     }
