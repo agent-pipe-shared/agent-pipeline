@@ -24,6 +24,18 @@ added; no earlier identity disappeared. [Finding ledger](../specs/sprint-alfred-
 75 means focused Source readiness, not native acceptance or release.
 All-at75 remains the continuation objective after transfer.
 
+**D165 interim candidate, status 2026-10-26 (implementation complete, verify, critic and PO acceptance pending):**
+two held patches are committed and NOT applied: brownfield entry D1
+(`held-patches/d165-d1-brownfield-entry.patch`) and the late review unit PF-75
+(`held-patches/d165-pf75-b-introducing-commit.patch`, cumulative: apply it
+alone, never slice A separately; memo `evidence/pf75-late-review-unit-design.md`).
+Both pass their focused suites in fresh clones. Still open for the candidate: D2
+(class 9 / e2e reproduction), D3, D4, D5, the Windows side findings, the
+PF-75 push-prepare remedy text and a Critic repair-map route, and the Toolbox
+handover file for D2 to D5 (missing in this checkout). The guard-dispatch suite
+is red at the pre-hotfix commit too
+(`backlog/items/2026-10-26-guard-dispatch-suite-red-before-the-hotfix.md`).
+
 ## Off-machine follow-up (WSL PC re-entry, 2026-10-26)
 
 The PO relayed a handover written on the original machine after the push of
