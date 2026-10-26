@@ -1,0 +1,306 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 4e5cb0b91..4eb8fe15a 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -4550,6 +4550,55 @@ function nextActionBlock(bodyLines) {
+   return ["## Next action", "", ...bodyLines, ""].join("\n");
+ }
+ 
++/**
++ * PF-59 / D160: the public handover update owns only a marked generated block
++ * inside "## Next action". Everything else in the section is project prose and
++ * is kept below the block.
++ */
++const NEXT_ACTION_BLOCK_BEGIN = "<!-- pipeline:next-action:begin -->";
++const NEXT_ACTION_BLOCK_END = "<!-- pipeline:next-action:end -->";
++
++const INACTIVE_NEXT_ACTION_BODY = [
++  "No feature is currently active. Start the next one with",
++  "`pipeline-state set-feature --id <id> --plan-path <path>`, or review closed",
++  "feature history in `project/pipeline-state.json` (`closedFeatures`).",
++];
++
++// The kickoff and promotion handovers (`handoverContent()`, `promotionHandoverContent()`)
++// render these initial bodies; an unmarked section that is exactly one of them
++// is a legacy generated rendering, not project prose.
++const SNAPSHOT_NOTE_BODY = [
++  "This tracked handover is a design snapshot. Run `pipeline-state inspect`",
++  "for the current typed next action; canonical pipeline state owns lifecycle",
++  "authority. Git-backed runtime transitions publish an advisory private",
++  "handover projection without rewriting this tracked file.",
++];
++const KICKOFF_NEXT_ACTION_BODY = [
++  "Review the goal and establish the initial PRD and technical specification.",
++  ...SNAPSHOT_NOTE_BODY,
++];
++const PROMOTION_NEXT_ACTION_BODY = [...NEXT_ACTION_BODY_BY_STATUS.draft, ...SNAPSHOT_NOTE_BODY];
++
++const nonBlankLines = (lines) => lines.filter((line) => line.trim() !== "").map((line) => line.trimEnd());
++
++function isKnownGeneratedNextActionBody(bodyLines) {
++  const key = bodyLines.join("\n");
++  const known = [
++    ...Object.values(NEXT_ACTION_BODY_BY_STATUS),
++    INACTIVE_NEXT_ACTION_BODY,
++    KICKOFF_NEXT_ACTION_BODY,
++    PROMOTION_NEXT_ACTION_BODY,
++  ];
++  if (known.some((body) => nonBlankLines(body).join("\n") === key)) return true;
++  // The two fallback renderings of `nextActionSection()` carry a variable code.
++  return bodyLines.length === 3
++    && bodyLines[1] === "Treat `project/pipeline-state.json` (or `pipeline-state.mjs continuity-status`)"
++    && ((/^The recorded plan\/approval state could not be classified \([^()]*\)\.$/.test(bodyLines[0])
++        && bodyLines[2] === "as the live, authoritative source until the state is repaired.")
++      || (/^The recorded lifecycle status \("[^"]*"\) has no rendered text yet\.$/.test(bodyLines[0])
++        && bodyLines[2] === "as the live, authoritative source."));
++}
++
+ /**
+  * Render the CURRENT "## Next action" section of a project's `docs/state.md`
+  * from the LIVE Pipeline state object (`pipeline-state.mjs`'s `readState()`
+@@ -4569,11 +4618,7 @@ function nextActionBlock(bodyLines) {
+ export function nextActionSection(state) {
+   const lifecycle = derivePlanLifecycle(state);
+   if (lifecycle.code === "PLAN-LIFECYCLE-INACTIVE") {
+-    return nextActionBlock([
+-      "No feature is currently active. Start the next one with",
+-      "`pipeline-state set-feature --id <id> --plan-path <path>`, or review closed",
+-      "feature history in `project/pipeline-state.json` (`closedFeatures`).",
+-    ]);
++    return nextActionBlock(INACTIVE_NEXT_ACTION_BODY);
+   }
+   if (!lifecycle.ok || lifecycle.status === null) {
+     return nextActionBlock([
+@@ -4621,6 +4666,57 @@ export function replaceNextActionSection(markdown, sectionText) {
+   return [...before, ...sectionText.split("\n"), ...after].join("\n");
+ }
+ 
++/**
++ * PF-59 / D160: block-owning variant of `replaceNextActionSection()` used by the
++ * explicit public handover update (`syncStateMdNextAction(..., { ownBlock: true })`).
++ * Only a marked generated block inside the section is replaced.
++ * - exactly one begin and one end marker (begin first): that span is rewritten;
++ *   everything else in the section is kept byte for byte.
++ * - no marker at all, and the body (ignoring the Lifecycle phase marker line and
++ *   blank lines) is exactly a known generated rendering: legacy, replaced wholly.
++ * - no marker at all, any other prose: the marked block is inserted and the prose
++ *   is kept below it.
++ * - any other marker shape (begin without end, two begins, end first, ...): refused
++ *   with a reason, nothing guessed.
++ * `reason: null` means no "## Next action" heading was found.
++ */
++function replaceNextActionBlockDetailed(markdown, sectionText) {
++  if (typeof markdown !== "string" || typeof sectionText !== "string") return { ok: false, reason: null };
++  const lines = markdown.split("\n");
++  const headingIndex = lines.findIndex((line) => line.trim() === "## Next action");
++  if (headingIndex === -1) return { ok: false, reason: null };
++  let endIndex = lines.length;
++  for (let i = headingIndex + 1; i < lines.length; i += 1) {
++    if (lines[i].startsWith("## ")) { endIndex = i; break; }
++  }
++  const section = lines.slice(headingIndex + 1, endIndex);
++  const generated = sectionText.split("\n").slice(1);
++  while (generated.length > 0 && generated[0].trim() === "") generated.shift();
++  while (generated.length > 0 && generated[generated.length - 1].trim() === "") generated.pop();
++  const block = [NEXT_ACTION_BLOCK_BEGIN, ...generated, NEXT_ACTION_BLOCK_END];
++  const begins = [];
++  const ends = [];
++  section.forEach((line, index) => {
++    const text = line.trim();
++    if (text === NEXT_ACTION_BLOCK_BEGIN) begins.push(index);
++    else if (text === NEXT_ACTION_BLOCK_END) ends.push(index);
++  });
++  let replaced;
++  if (begins.length === 0 && ends.length === 0) {
++    const body = nonBlankLines(section.filter((line) => !line.startsWith("**Lifecycle phase:**")));
++    const prose = [...section];
++    while (prose.length > 0 && prose[0].trim() === "") prose.shift();
++    replaced = isKnownGeneratedNextActionBody(body) || prose.length === 0
++      ? ["", ...block, ""]
++      : ["", ...block, "", ...prose];
++  } else if (begins.length === 1 && ends.length === 1 && begins[0] < ends[0]) {
++    replaced = [...section.slice(0, begins[0]), ...block, ...section.slice(ends[0] + 1)];
++  } else {
++    return { ok: false, reason: `"## Next action" has unbalanced generated-block markers (${begins.length} begin, ${ends.length} end)` };
++  }
++  return { ok: true, text: [...lines.slice(0, headingIndex), "## Next action", ...replaced, ...lines.slice(endIndex)].join("\n") };
++}
++
+ /**
+  * Best-effort resync of `docs/state.md`'s "## Next action" section to the
+  * CURRENT `state`, called after a `pipeline-state.mjs` command has already
+@@ -4638,7 +4734,7 @@ export function replaceNextActionSection(markdown, sectionText) {
+  * than throwing, since this sync is advisory and must never gate the
+  * caller's already-committed State write.
+  */
+-export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
++export function syncStateMdNextAction(dir, state, { apply = true, ownBlock = false } = {}) {
+   let handoverPath = "docs/state.md";
+   try {
+     const root = physicalRoot(dir);
+@@ -4690,10 +4786,17 @@ export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
+   } catch (error) {
+     return { ok: false, reason: `next-action rendering failed: ${error?.message ?? error}` };
+   }
+-  const updated = replaceNextActionSection(markdown, sectionText);
+-  if (updated === null) {
+-    return { ok: false, reason: 'no recognizable "## Next action" heading' };
+-  }
++  // `ownBlock` (the explicit public handover update, D160) owns only a marked
++  // generated block and keeps project prose; the default keeps the whole-section
++  // replacement that the non-Git legacy fixtures rely on.
++  const wholeSection = ownBlock ? null : replaceNextActionSection(markdown, sectionText);
++  const replacement = ownBlock
++    ? replaceNextActionBlockDetailed(markdown, sectionText)
++    : wholeSection === null ? { ok: false, reason: null } : { ok: true, text: wholeSection };
++  if (!replacement.ok) {
++    return { ok: false, reason: replacement.reason ?? 'no recognizable "## Next action" heading' };
++  }
++  const updated = replacement.text;
+   if (updated === markdown) {
+     return { ok: true, changed: false, handoverPath };
+   }
+@@ -4708,7 +4811,7 @@ export function syncStateMdNextAction(dir, state, { apply = true } = {}) {
+ 
+ /** Inspect the public projection without publishing private runtime data. */
+ export function inspectPublicHandoverDuty(dir, state) {
+-  const preview = syncStateMdNextAction(dir, state, { apply: false });
++  const preview = syncStateMdNextAction(dir, state, { apply: false, ownBlock: true });
+   const path = preview.handoverPath ?? "docs/state.md";
+   if (!preview.ok) return { schema: "pipeline.public-handover-duty.v1", status: "unavailable", path,
+     reason: preview.reason, nextAction: { kind: "agent-public-handover-update", path,
+@@ -4726,7 +4829,10 @@ export function inspectPublicHandoverDuty(dir, state) {
+     .filter(line => line.startsWith("**Lifecycle phase:**"));
+   const markerCurrent = markers.length === 1 && markers[0] === marker;
+   const withoutMarker = markdown === null ? null : stripPublicPhaseMarkers(markdown);
+-  const sectionCurrent = withoutMarker !== null && replaceNextActionSection(withoutMarker, nextActionSection(state)) === withoutMarker;
++  const sectionCurrent = withoutMarker !== null && (() => {
++    const owned = replaceNextActionBlockDetailed(withoutMarker, nextActionSection(state));
++    return owned.ok && owned.text === withoutMarker;
++  })();
+   const status = !preview.ok ? "unavailable" : sectionCurrent && markerCurrent ? "current" : "stale";
+   return { schema: "pipeline.public-handover-duty.v1", status, path,
+     reason: preview.ok ? (markerCurrent ? null : "structured lifecycle phase is absent or stale") : preview.reason,
+@@ -4758,7 +4864,7 @@ export function updatePublicHandoverDuty(dir, state) {
+   const before = inspectPublicHandoverDuty(dir, state);
+   if (before.status === "unavailable") return before;
+   if (before.status === "current") return before;
+-  const sync = syncStateMdNextAction(dir, state, { apply: true });
++  const sync = syncStateMdNextAction(dir, state, { apply: true, ownBlock: true });
+   if (!sync.ok) return inspectPublicHandoverDuty(dir, state);
+   const path = join(dir, before.path);
+   let markdown;
+diff --git a/plugins/pipeline-core/lib/public-handover-duty.test.mjs b/plugins/pipeline-core/lib/public-handover-duty.test.mjs
+index f5c5a49fa..6cbdba723 100644
+--- a/plugins/pipeline-core/lib/public-handover-duty.test.mjs
++++ b/plugins/pipeline-core/lib/public-handover-duty.test.mjs
+@@ -41,7 +41,9 @@ test("an explicit update follows feature and phase while preserving other handov
+   assert.ok(first.includes("## Decisions\n\nKeep this.\n"));
+   assert.ok(first.includes("**Lifecycle phase:** feature `demo` · phase `design`"));
+   assert.ok(first.includes("## Next action\n\n**Lifecycle phase:**"));
+-  assert.ok(!first.includes("Old lifecycle text"));
++  // D160 (PF-59): the update owns only the marked generated block; project text in the section is kept below it.
++  assert.ok(first.includes("Old lifecycle text."));
++  assert.ok(first.indexOf("<!-- pipeline:next-action:end -->") < first.indexOf("Old lifecycle text."));
+   assert.equal(updatePublicHandoverDuty(root, state).status, "current");
+   assert.equal(readFileSync(path, "utf8"), first);
+   const implementing = { ...state, activeFeature: { ...state.activeFeature, phase: "implementation" } };
+@@ -108,5 +110,97 @@ test("an explicit public update refuses physical aliases without changing their
+   assert.equal(readFileSync(target, "utf8"), bytes);
+ }));
+ 
+-if (cases.length !== 6) throw new Error("public-handover-duty-tests case count drift");
++const PF59_BEGIN = "<!-- pipeline:next-action:begin -->";
++const PF59_END = "<!-- pipeline:next-action:end -->";
++const pf59Body = s => nextActionSection(s).replace(/^## Next action\n\n/, "").trimEnd();
++const pf59Marker = "**Lifecycle phase:** feature `demo` · phase `design`";
++
++test("PF-59 (D160): project prose and a push checklist inside Next action stay byte for byte below the generated block", () => fixture((root, path) => {
++  const prose = "Our own plan text.\n\n### Push checklist\n\n- [ ] run verify\n- [ ] tag the release\n\n";
++  writeFileSync(path, `# State\n\n## Goal\n\nG.\n\n## Next action\n\n${prose}## Decisions\n\nKeep this.\n`, "utf8");
++  assert.equal(inspectPublicHandoverDuty(root, state).status, "stale");
++  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
++  const first = readFileSync(path, "utf8");
++  const expected = `# State\n\n## Goal\n\nG.\n\n## Next action\n\n${pf59Marker}\n\n${PF59_BEGIN}\n${pf59Body(state)}\n${PF59_END}\n\n${prose}## Decisions\n\nKeep this.\n`;
++  assert.equal(first, expected);
++  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
++  assert.equal(readFileSync(path, "utf8"), first);
++}));
++
++test("PF-59 (D160): a phase change rewrites only the marked block and the marker line, the prose stays", () => fixture((root, path) => {
++  const prose = "Project text that must survive.\n\n- [ ] push checklist item\n\n";
++  writeFileSync(path, `# State\n\n## Next action\n\n${prose}## Decisions\n\nKeep.\n`, "utf8");
++  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
++  const implementing = { ...state, activeFeature: { ...state.activeFeature, phase: "implementation" } };
++  assert.equal(inspectPublicHandoverDuty(root, implementing).status, "stale");
++  assert.equal(updatePublicHandoverDuty(root, implementing).status, "current");
++  const after = readFileSync(path, "utf8");
++  assert.equal(after, `# State\n\n## Next action\n\n**Lifecycle phase:** feature \`demo\` · phase \`implementation\`\n\n${PF59_BEGIN}\n${pf59Body(implementing)}\n${PF59_END}\n\n${prose}## Decisions\n\nKeep.\n`);
++  assert.notEqual(pf59Body(implementing), pf59Body(state));
++  // A State whose generated body differs rewrites the block content too, and nothing else.
++  const inactive = { schema: "pipeline.state.v0", activeFeature: null, planApproved: false };
++  assert.notEqual(pf59Body(inactive), pf59Body(state));
++  assert.equal(updatePublicHandoverDuty(root, inactive).status, "current");
++  const idle = readFileSync(path, "utf8");
++  assert.ok(idle.includes(`${PF59_BEGIN}\n${pf59Body(inactive)}\n${PF59_END}\n\n${prose}## Decisions`));
++  assert.ok(idle.includes("**Lifecycle phase:** no active feature"));
++  assert.ok(!idle.includes(pf59Body(implementing)));
++}));
++
++test("PF-59 (D160): an unmarked section that is exactly a legacy generated rendering is replaced wholly without duplicate text", () => fixture((root, path) => {
++  const draftBody = pf59Body(state);
++  const renderings = [
++    `**Lifecycle phase:** feature \`demo\` · phase \`old\`\n\n${draftBody}\n\n`,
++    `${draftBody}\n\n`,
++    "No feature is currently active. Start the next one with\n`pipeline-state set-feature --id <id> --plan-path <path>`, or review closed\nfeature history in `project/pipeline-state.json` (`closedFeatures`).\n\n",
++    "The plan is approved. Switch the feature to implementation with\n`pipeline-state set-phase --phase implementation`, then proceed with the\napproved implementation packages.\n\n",
++    "Review the goal and establish the initial PRD and technical specification.\n\nThis tracked handover is a design snapshot. Run `pipeline-state inspect`\nfor the current typed next action; canonical pipeline state owns lifecycle\nauthority. Git-backed runtime transitions publish an advisory private\nhandover projection without rewriting this tracked file.\n\n",
++  ];
++  for (const legacy of renderings) {
++    writeFileSync(path, `# State\n\n## Next action\n\n${legacy}## Decisions\n\nKeep.\n`, "utf8");
++    assert.equal(updatePublicHandoverDuty(root, state).status, "current");
++    assert.equal(readFileSync(path, "utf8"), `# State\n\n## Next action\n\n${pf59Marker}\n\n${PF59_BEGIN}\n${draftBody}\n${PF59_END}\n\n## Decisions\n\nKeep.\n`);
++  }
++}));
++
++test("PF-59 (D160): a begin marker without an end marker, or two begin markers, is refused as unavailable and the file stays unchanged", () => fixture((root, path) => {
++  const bodies = [
++    `${PF59_BEGIN}\nGenerated.\n\nProject text.\n\n`,
++    `${PF59_BEGIN}\nOne.\n${PF59_END}\n\n${PF59_BEGIN}\nTwo.\n${PF59_END}\n\n`,
++    `${PF59_END}\nBackwards.\n${PF59_BEGIN}\n\n`,
++    `Text.\n${PF59_END}\n\n`,
++  ];
++  for (const body of bodies) {
++    const bytes = `# State\n\n## Next action\n\n${body}## Decisions\n\nKeep.\n`;
++    writeFileSync(path, bytes, "utf8");
++    const duty = inspectPublicHandoverDuty(root, state);
++    assert.equal(duty.status, "unavailable");
++    assert.equal(typeof duty.reason, "string");
++    assert.ok(duty.reason.length > 0);
++    const updated = updatePublicHandoverDuty(root, state);
++    assert.equal(updated.status, "unavailable");
++    assert.equal(typeof updated.reason, "string");
++    assert.equal(readFileSync(path, "utf8"), bytes);
++  }
++}));
++
++test("PF-59 (D160): the alias refusal and the Notes-marker rule still hold with a marked block present", () => fixture((root, path) => {
++  const target = join(root, "private-fixture.md");
++  const bytes = `# Private fixture\n\n## Next action\n\n${PF59_BEGIN}\nMust remain unchanged.\n${PF59_END}\n`;
++  writeFileSync(target, bytes);
++  symlinkSync(target, path);
++  assert.equal(updatePublicHandoverDuty(root, state).status, "unavailable");
++  assert.equal(readFileSync(target, "utf8"), bytes);
++  rmSync(path);
++  // Markers outside Next action neither count as malformed nor make the section current.
++  const notes = `## Notes\n\n${PF59_BEGIN}\n\n**Lifecycle phase:** feature \`demo\` · phase \`design\`\n\n`;
++  writeFileSync(path, `# State\n\n${notes}## Next action\n\nProject text.\n\n## Decisions\n\nKeep.\n`, "utf8");
++  assert.equal(inspectPublicHandoverDuty(root, state).status, "stale");
++  assert.equal(updatePublicHandoverDuty(root, state).status, "current");
++  const updated = readFileSync(path, "utf8");
++  assert.ok(updated.includes(notes));
++  assert.ok(updated.includes("Project text.\n\n## Decisions\n\nKeep.\n"));
++}));
++
++if (cases.length !== 11) throw new Error("public-handover-duty-tests case count drift");
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? "3"), maxBytes: 65536 });
