@@ -54,8 +54,9 @@ only**:
    whether an ACE is inherited so the finding in step 1 can name it.
 4. A file with an **explicit** foreign ACE below a secured root (someone changed it later) is still `insecure`
    at the next root-or-readback check; the root-only rule never hides a changed root.
-5. Open point for the PO (default chosen if unanswered): "root" = the private-state directory (`project/` and
+5. **Decided by the PO, 2026-10-26:** "root" = the private-state directory (`project/` and
    `<git-dir>/agent-pipeline`), not the whole repository root, so the user's source tree keeps its normal rights.
+   Goal stated by the PO: all Windows ACL checks come out clean under this one rule.
 - Regression cases: root hardened → file below it is `secure` without its own observation; root inherits
   `Authenticated Users` → preflight finding with the command, runtime refuses with a pointer to it; explicit
   foreign ACE on the root → `insecure`; malformed or missing observation fails closed.
