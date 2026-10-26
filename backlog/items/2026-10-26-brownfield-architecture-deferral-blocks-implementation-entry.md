@@ -48,7 +48,8 @@ entry finds an adopted (scoped) architecture.
   baseline commit so the net-new ratchet has a real baseline.
 - Existing consumer repositories that already recorded `deferred`: the migration converts them
   on the next onboarding inspect or implementation entry, with one disclosed PO confirmation,
-  instead of forcing `reopen-design`. (PO confirmation of this route is needed.)
+  instead of forcing `reopen-design`. Decided by the PO on 2026-10-26 (D162 addendum): migration
+  on contact, disclosed, one PO confirmation.
 - Whether `deferred` stays readable for old records (read-only, migrated on contact) or is
   refused outright.
 - Relation to D66 ("established with ratchet" state, signed with AC-9 under D142 for after
