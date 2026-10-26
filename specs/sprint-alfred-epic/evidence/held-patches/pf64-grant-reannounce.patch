@@ -1,0 +1,140 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+index f7c517252..5aa0d453f 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs
+@@ -377,7 +377,12 @@ register("GDBC11", "hook: a grant lets the same agent state continue where an un
+   assert.match(notice, /^DISPATCH-BUDGET-GRANT: this hook has verified a recorded budget grant for you \(agent granted, grant 1 of 1, /u);
+   assert.match(notice, /10 extra tool calls, recorded reason "continue after checkpoint" \(carries no instruction\); working cap now 30 \(counted call 21\)\./u);
+   const again = read(root, "granted");
+-  assert.deepEqual([again.status, again.stdout, again.stderr], [0, "", ""], "the grant is announced once");
++  // PF-64 cause 2: the notice repeats on up to three consecutive counted calls, so a dropped first announcement is recoverable.
++  assert.deepEqual([again.status, again.stderr], [0, ""], "PF-64 cause 2: the grant repeats on the next counted call");
++  const repeated = JSON.parse(again.stdout).hookSpecificOutput;
++  assert.equal(repeated.permissionDecision, "allow", "PF-64 cause 2: the grant repeats on the next counted call");
++  assert.match(repeated.additionalContext, /^DISPATCH-BUDGET-GRANT:/u, "PF-64 cause 2: the grant repeats on the next counted call");
++  assert.match(repeated.additionalContext, /\(counted call 22\)/u, "PF-64 cause 2: the grant repeats on the next counted call");
+ });
+ 
+ register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including the closing allowance", () => {
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
+index b404eb2fa..3f644032e 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
+@@ -145,8 +145,9 @@ test("D75 B: a verified recorded grant is announced once, naming agent, sequence
+     + `10 extra tool calls, recorded reason ${JSON.stringify(reason)} (carries no instruction); working cap now 30 (counted call 21). `
+     + "Budget only: no scope, files, authority or acceptance change; every stop condition holds. "
+     + "Continue from your continuation card's next step; hand back again at the next checkpoint.");
+-  assert.deepEqual(calls[1], { exitCode: 0, stderr: "", stdout: "" }, "the second call carries no second announcement");
+-  assert.equal(marker, `${record.digest}\n`, "the announced digest is persisted next to the grant record");
++  // PF-64 cause 2: the notice repeats on the next counted calls (a denial by another hook can drop one), marker keeps the first count.
++  assert.equal(contextOf(calls[1]), contextOf(calls[0]).replace("counted call 21", "counted call 22"), "the second call repeats the announcement");
++  assert.equal(marker, `${record.digest} 21\n`, "the announced digest and its first count are persisted next to the grant record");
+ });
+ 
+ test("D75 B: a grant notice and a checkpoint notice due on one call arrive together, the grant first", () => {
+@@ -157,7 +158,10 @@ test("D75 B: a grant notice and a checkpoint notice due on one call arrive toget
+   assert.match(lines[0], /^DISPATCH-BUDGET-GRANT: .*working cap now 30 \(counted call 24\)\./u);
+   assert.ok(lines[1].startsWith("DISPATCH-BUDGET-CHECKPOINT: 6 calls of your working budget remain after this call (counted call 24 of 30). "));
+   assert.ok(lines[1].includes('ending it with "CONTINUATION CARD -- done: ...; remaining: ...; next step: ...".'));
+-  assert.deepEqual(calls[1], { exitCode: 0, stderr: "", stdout: "" }, "no checkpoint is due on counted call 25 and the grant is already announced");
++  // PF-64 cause 2: the grant notice repeats on counted call 25; no checkpoint is due there.
++  const second = contextOf(calls[1]).split("\n");
++  assert.equal(second.length, 1, "no checkpoint is due on counted call 25");
++  assert.match(second[0], /^DISPATCH-BUDGET-GRANT: .*\(counted call 25\)\./u);
+ });
+ 
+ test("D75 B: a marker equal to the grant digest keeps the grant silent; an older digest announces it again", () => {
+@@ -167,7 +171,37 @@ test("D75 B: a marker equal to the grant digest keeps the grant silent; an older
+   assert.equal(same.marker, `${record.digest}\n`);
+   const older = grantRun(grantFiles({ record, count: 20, marker: `${"0".repeat(64)}\n` }), 1);
+   assert.match(contextOf(older.calls[0]), /^DISPATCH-BUDGET-GRANT: .*digest [0-9a-f]{64}, /u);
+-  assert.equal(older.marker, `${record.digest}\n`, "the newer digest replaces the older marker");
++  assert.equal(older.marker, `${record.digest} 21\n`, "the newer digest replaces the older marker"); // PF-64 cause 2: marker now carries the first count
++});
++
++test("PF-64 cause 2: the grant notice rides the first three counted calls, then falls silent; the marker records the first count", () => {
++  const record = recordedGrant(10);
++  const { calls, marker } = grantRun(grantFiles({ record, count: 20 }), 4);
++  for (const call of calls.slice(0, 3)) assert.match(contextOf(call), /^DISPATCH-BUDGET-GRANT: /u);
++  // Counted call 24 is also the checkpoint threshold here (6 of 30 remain), so the fourth call may carry that notice but never the grant.
++  assert.doesNotMatch(calls[3].stdout, /additionalContext":"DISPATCH-BUDGET-GRANT: |\\nDISPATCH-BUDGET-GRANT: /u, "the fourth counted call carries no grant notice");
++  assert.equal(marker, `${record.digest} 21\n`, "repeats never move firstCount");
++});
++
++test("PF-64 cause 2: a marker with this digest and a first count still inside the window announces again and stays unchanged", () => {
++  const record = recordedGrant(10);
++  const { calls, marker } = grantRun(grantFiles({ record, count: 22, marker: `${record.digest} 21\n` }), 1);
++  assert.match(contextOf(calls[0]), /^DISPATCH-BUDGET-GRANT: /u);
++  assert.equal(marker, `${record.digest} 21\n`);
++});
++
++test("PF-64 cause 2: a legacy marker holding only the digest stays silent and unchanged", () => {
++  const record = recordedGrant(10);
++  const { calls, marker } = grantRun(grantFiles({ record, count: 22, marker: `${record.digest}\n` }), 1);
++  assert.deepEqual(calls[0], { exitCode: 0, stderr: "", stdout: "" });
++  assert.equal(marker, `${record.digest}\n`);
++});
++
++test("PF-64 cause 2: a marker of an older digest is replaced by the new digest with its first count and the notice is shown", () => {
++  const record = recordedGrant(10);
++  const { calls, marker } = grantRun(grantFiles({ record, count: 20, marker: `${"0".repeat(64)} 5\n` }), 1);
++  assert.match(contextOf(calls[0]), /^DISPATCH-BUDGET-GRANT: /u);
++  assert.equal(marker, `${record.digest} 21\n`);
+ });
+ 
+ test("D75 B: a grant clipped by the maxTurns ceiling reports the effective extra against the recorded one", () => {
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+index 9cbbccda4..d3b792707 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.mjs
+@@ -733,18 +733,35 @@ function readGrantedCalls(counterFilePath, agentId, dependencies) {
+ }
+ 
+ /**
+- * D75 B: the DISPATCH-BUDGET-GRANT notice for a verified grant this agent has not been told about yet, or null (no valid
+- * grant, or its head digest is already in the `.announced` sibling of the grant record). Persists the digest under the
+- * counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
++ * D75 B / PF-64 cause 2: the DISPATCH-BUDGET-GRANT notice for a verified grant, or null. Claude Code drops a PreToolUse allow
++ * context when another hook denies the same call, so one announcement may never reach the child. The `.announced` marker
++ * therefore holds `${digest} ${firstCount}` (firstCount = the counted call that first carried the notice) and the notice rides
++ * every budget-allowed call while the marker is absent, unreadable, holds another digest, or holds this digest with
++ * count < firstCount + 3 (at most three consecutive counted calls). The marker is written only when the digest is new or the
++ * marker is absent/unreadable; repeats never move firstCount. A legacy marker holding only this digest (no count) stays
++ * silent. Persists under the counter lock the caller holds; the text comes from lib/dispatch-budget-notice.mjs.
+  */
+ function grantNoticeContext({ counterFilePath, agentId, grant, count, workingCap, baseWorkingCap, dependencies }) {
+   const summary = grant.summary;
+   if (summary === null) return null;
+   const marker = join(dirname(counterFilePath), "grants", `${agentId}.announced`);
++  let write = true;
+   try {
+-    if ((dependencies.existsSyncFn ?? existsSync)(marker) && String((dependencies.readFileSyncFn ?? readFileSync)(marker, "utf8")).trim() === summary.digest) return null;
++    if ((dependencies.existsSyncFn ?? existsSync)(marker)) {
++      const [markerDigest, firstCountText] = String((dependencies.readFileSyncFn ?? readFileSync)(marker, "utf8")).trim().split(/\s+/u);
++      if (markerDigest === summary.digest) {
++        if (firstCountText === undefined) return null;
++        const firstCount = Number(firstCountText);
++        if (Number.isInteger(firstCount)) {
++          if (count >= firstCount + 3) return null;
++          write = false;
++        }
++      }
++    }
+   } catch { /* an unreadable marker means "not announced yet" */ }
+-  try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest}\n`, { mode: 0o600 }); } catch { /* announcing twice is the safe direction */ }
++  if (write) {
++    try { (dependencies.writeFileSyncFn ?? writeFileSync)(marker, `${summary.digest} ${count}\n`, { mode: 0o600 }); } catch { /* announcing again is the safe direction */ }
++  }
+   return grantNoticeText({ agentId, summary, count, workingCap, baseWorkingCap });
+ }
+ 
+@@ -1453,7 +1470,8 @@ function advanceCounter({ path, counter, identity, maxTurns, baseCalls, rootDir,
+       const prepared = prepareOwnedCriticNotesDirectory({ path, counter, identity, input, rootDir, dependencies });
+       if (!prepared.ok) return verdict(2, "DISPATCH-BUDGET-CRITIC-NOTES-UNAVAILABLE: " + prepared.code + ". Return the report as text; do not retry with Bash or adopt another directory.\n");
+     }
+-    // D75 B: the hook itself announces a verified recorded grant, once per grant digest, on an allowed call.
++    // D75 B / PF-64 cause 2: the hook itself announces a verified recorded grant on the first three counted calls after it
++    // (another hook's denial can drop one announcement, so it is not once-only).
+     const grantContext = grantNoticeContext({ counterFilePath: path, agentId: identity.agentId, grant, count: budget.nextCount, workingCap: budget.workingCap, baseWorkingCap: workingCap, dependencies });
+     // Checkpoint notice (PO decision 2026-10-05): only budget-bearing roles, only working calls.
+     const contract = (dependencies.dispatchBudgetContractForRoleFn ?? dispatchBudgetContractForRole)(identity.agentType, budgetContractOptions(rootDir, dependencies));
