@@ -29,6 +29,25 @@ So the lock is not a race between concurrent dispatchers. Every successful Agent
 owner process has exited, and the registry reports `next boundary entry retires it` while the boundary entry
 itself (the next `guard-dispatch`) blocks instead. Spacing dispatches does not help; only `heal` between them does.
 
+## Live measurement (2026-10-26, lock watcher on a real session; supersedes the hypothesis below)
+
+A 5 ms poller on `registry.lock` recorded every holder with its command line and, from 3 s on, its process state.
+
+- The stranded lock is held by `hooks/guard-dispatch.mjs` (PreToolUse:Agent) and, once, by `post-compact-reground.mjs`.
+  Each dispatch takes the lock three to four times in a row. The first acquisitions last about 1 s each.
+- On the heavier dispatches one or more acquisitions last about 30 s each (for example 16:49:38 to 16:50:11, again to
+  16:50:43, again to 16:51:15), the holder in state `R` (running, CPU-bound), no wait channel, no child process.
+  So the boundary does a long synchronous computation while it holds the lock.
+- When the sum passes the hook timeout (`guard-dispatch` 120 s, `post-compact-reground` 10 s) the harness kills the
+  process inside the boundary. Nothing runs the `finally`, the lock stays with a dead owner. Both kill times match the
+  timeouts (acquired 16:42:35.7, found dead 16:44:28; acquired 16:40:12.98, found dead 16:40:22).
+- A later `guard-dispatch` retires such a dead-owner lock on its own (the S7a and later dispatches were admitted
+  without `heal`), so the visible damage is the lost time plus a dead lock between two dispatches.
+
+So there are two defects, not one: (1) the boundary computes for about 30 s per acquisition while it holds the
+registry lock (the cause of the slowness too; the profile of the holder is the next measurement), (2) a hook killed
+by its timeout inside the boundary strands the lock.
+
 ## Likely area (hypothesis for the implementor to confirm, not a finding)
 
 The hook process that registers the dispatch reservation acquires the registry lock and exits (`process.exit`, or
