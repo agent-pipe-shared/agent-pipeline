@@ -1,0 +1,145 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.mjs b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+index 52da6643c..7efeaf24e 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.mjs
+@@ -6080,6 +6080,23 @@ function buildCoordinatorSourcedPromotionPlan({
+   return plan;
+ }
+ 
++// Source: SAFE_ID in lib/feature-package-registration.mjs (kept equal by a test).
++const PROMOTION_FOLDER_SAFE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
++
++// D170: the feature package registrar binds specs/<featureId>/, so a promote
++// plan under a folder it could never register is refused here, at plan time.
++// A flat specs/ layout is left untouched.
++function assertRegistrablePromotionFolder(specPath) {
++  const dir = dirname(specPath);
++  if (dir === "specs") return;
++  const segments = dir.split("/");
++  if (segments.length === 2 && segments[0] === "specs" && PROMOTION_FOLDER_SAFE_ID.test(segments[1])) return;
++  const hyphenated = segments.length === 2 && segments[0] === "specs" ? segments[1].replaceAll("_", "-") : "";
++  const hint = hyphenated && PROMOTION_FOLDER_SAFE_ID.test(hyphenated) ? ` Use specs/${hyphenated} instead.` : "";
++  fail("KICKOFF-PROMOTION-FOLDER",
++    `design package directory ${dir} cannot be registered: it must be directly under specs/ and use lowercase letters, digits and single hyphens only, because the feature package registrar binds specs/<featureId>/.${hint}`);
++}
++
+ function buildKickoffPromotionPlan({
+   rootDir, profile, featureId, planPath, prdPath, specPath, designInputPath,
+   runner = "codex",
+@@ -6088,6 +6105,7 @@ function buildKickoffPromotionPlan({
+ } = {}) {
+   if (!isAbsolute(onboardingScript)) fail("KICKOFF-PROMOTION-PLAN", "onboarding script must be absolute");
+   const input = promotionInput({ profile, featureId, planPath, prdPath, specPath, designInputPath });
++  assertRegistrablePromotionFolder(input.specPath ?? specPath);
+   const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
+   if (coordinatorSourced) {
+     return buildCoordinatorSourcedPromotionPlan({
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+index e9ae942b7..317f0c708 100644
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -4639,6 +4639,61 @@ check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refus
+     () => planOnboardingBootstrapBind({ rootDir: root }));
+ });
+ 
++// D170 (D7 root cause): the feature package registrar binds specs/<featureId>/
++// with a hyphen-only id, so `kickoff promote plan` refuses a folder it could
++// never register, at plan time. The refusal is pure and fires before any
++// observation, so a nonexistent rootDir is fine.
++function d170PlanFor(folder, featureId = "my-topic") {
++  return {
++    rootDir: join(dirname(fileURLToPath(import.meta.url)), "d170-no-such-root"), profile: "feature", featureId,
++    planPath: `${folder}/prd_my-topic.md`, prdPath: `${folder}/prd_my-topic.md`,
++    specPath: `${folder}/spec.md`, designInputPath: `${folder}/design-input.md`,
++  };
++}
++function d170Refusal(folder) {
++  try { planOnboardingKickoffPromotion(d170PlanFor(folder)); } catch (error) { return error; }
++  return undefined;
++}
++
++check("D170 the promote-plan folder SAFE_ID pattern stays equal to the registrar's", () => {
++  const here = dirname(fileURLToPath(import.meta.url));
++  const registrar = readFileSync(join(here, "feature-package-registration.mjs"), "utf8");
++  const continuity = readFileSync(join(here, "onboarding-continuity.mjs"), "utf8");
++  const pick = (text, name) => text.match(new RegExp(`^const ${name} = (/[^\\n]+/u);$`, "mu"))?.[1];
++  assert.ok(pick(registrar, "SAFE_ID"), "registrar SAFE_ID line is readable");
++  assert.equal(pick(continuity, "PROMOTION_FOLDER_SAFE_ID"), pick(registrar, "SAFE_ID"));
++});
++
++check("D170 a promotion plan under an underscore folder is refused at plan time and names the directory", () => {
++  const error = d170Refusal("specs/2026-10-25_my-topic");
++  assert.equal(error?.code, "KICKOFF-PROMOTION-FOLDER");
++  assert.match(error.message, /specs\/2026-10-25_my-topic/u);
++  assert.match(error.message, /specs\/2026-10-25-my-topic/u, "suggests the hyphen form");
++});
++
++check("D170 a promotion plan under an uppercase folder is refused", () => {
++  const error = d170Refusal("specs/My-Topic");
++  assert.equal(error?.code, "KICKOFF-PROMOTION-FOLDER");
++  assert.match(error.message, /specs\/My-Topic/u);
++});
++
++check("D170 a promotion plan under a nested folder is refused", () => {
++  const error = d170Refusal("specs/a/b");
++  assert.equal(error?.code, "KICKOFF-PROMOTION-FOLDER");
++  assert.match(error.message, /specs\/a\/b/u);
++});
++
++check("D170 a flat specs layout and a registrable folder do not hit the folder refusal", () => {
++  for (const folder of ["specs", "specs/my-topic", "specs/2026-10-25-my-topic"]) {
++    assert.notEqual(d170Refusal(folder)?.code, "KICKOFF-PROMOTION-FOLDER", folder);
++  }
++});
++
++check("D170 a promotion plan under specs/my-topic with --id my-topic is not stopped by the folder rule", () => {
++  const error = d170Refusal("specs/my-topic");
++  assert.ok(error === undefined || error.code !== "KICKOFF-PROMOTION-FOLDER");
++});
++
+ // The legacy kickoff route also remains marker-strict. A generated checkpoint
+ // is additionally refused earlier as coordinator-only; this fixture covers a
+ // genuine legacy promotion without such a checkpoint.
+@@ -5443,7 +5498,7 @@ for (const [label, options] of Object.entries({
+   });
+ }
+ 
+-assert.equal(cases.length, 318, "the complete onboarding continuity corpus must be registered before execution begins");
++assert.equal(cases.length, 324, "the complete onboarding continuity corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs b/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
+index a4395c2e1..ae3a93e31 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
++++ b/plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs
+@@ -194,7 +194,9 @@ const { closeBlock, core, kickoffDesign } = loadInputs();
+ assert.match(kickoffDesign, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
+ assert.match(kickoffDesign, /Never infer, silently select, or retrospectively claim a profile/u);
+ assert.match(kickoffDesign, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
+-assert.match(kickoffDesign, /`specs\/YYYY-MM-DD_short-topic\/`/u);
++assert.match(kickoffDesign, /`specs\/<id>\/`, where `<id>` is the `--id` of the promotion/u);
++assert.match(kickoffDesign, /`YYYY-MM-DD-short-topic`/u);
++assert.doesNotMatch(kickoffDesign, /YYYY-MM-DD_short-topic/u);
+ assert.match(kickoffDesign, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
+ assert.match(kickoffDesign, /The PRD and Spec both carry a\n`Source:` line \(the `design-input\.md` path and sha256\)/u);
+ assert.match(kickoffDesign, /the PRD and Spec carry a compact traceability table/u);
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+index aa34acd7d..f1cde944f 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md
+@@ -162,9 +162,11 @@ The transaction-created `specs/kickoff-*` files are provisional bootstrap
+ anchors, not the standard long-term design location. Once material design input
+ exists, create the normal design package before presenting a planning result
+ or proposing a restart, then use the sanctioned kickoff-promotion flow. Its
+-directory is `specs/YYYY-MM-DD_short-topic/`, where the date is the local
+-creation date and `short-topic` is a short, lowercase, ASCII-safe summary of
+-the user's topic. Use `prd_short-topic.md`, `spec.md`, and `design-input.md`.
++directory is `specs/<id>/`, where `<id>` is the `--id` of the promotion:
++lowercase letters, digits and single hyphens only, with a date prefix only in
++the hyphen form `YYYY-MM-DD-short-topic`, never an underscore. The directory
++name equals the feature ID because the feature package registrar binds
++`specs/<featureId>/`. Use `prd_short-topic.md`, `spec.md`, and `design-input.md`.
+ Never overwrite an existing package; choose an unambiguous suffix after a
+ readback. The promotion's `--profile`, feature ID, plan/PRD/Spec paths must
+ bind to that package exactly.
