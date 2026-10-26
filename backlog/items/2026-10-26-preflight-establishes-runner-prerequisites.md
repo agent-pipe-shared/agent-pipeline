@@ -45,4 +45,21 @@ selbes für die anderen vorraussetzungen wie semgreb, osv etc."
    Program Files on Windows) directly.
 4. Never installs anything itself and never uses sudo; the user runs the returned command.
 
+## Design direction (PO, 2026-10-26, D164 addendum)
+
+"das muss künftig plattform neutral dann auch für windows, macOs und Linux funktionieren aber ohne harte
+versionsvorgaben etc. also so das auch nach monaten die agenten das je plattform korrekt installieren und am
+besten vllt den besten weg selber definieren"
+
+- The Pipeline owns WHAT, not HOW: a closed capability contract per prerequisite (tool name, the probe that
+  proves it works for the gate, e.g. it runs, reports a parseable version, accepts the flags the gate uses,
+  and is reachable from the runner's own process). No pinned versions or hard-coded install commands; a
+  minimum is stated only where a measured incompatibility exists, and then as a capability probe.
+- HOW is decided at runtime by the agent for the actual platform (Windows, macOS, Linux/WSL): it detects the
+  available package managers and official installers (for example winget/scoop/choco, brew, apt/dnf/pacman,
+  the tool's own release binaries), proposes the best current route with its source, and the user runs it.
+- Success is never inferred from the command: the preflight re-runs the capability probe and only then
+  reports ready. A refused or failed install stays not ready with the probe's own diagnostic.
+- Only official sources; the proposal names the source so the user can judge it.
+
 Kernel/protected paths are likely involved (preflight, onboarding); deliver as held patches where so.
