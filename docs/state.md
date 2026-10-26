@@ -59,7 +59,10 @@ suite and restart cases; C5 packaging pending) and G33 damaged-State recovery
 session is refused with `SDC-LOCK-HELD` while `inspect` reads the lock absent.
 Built briefings wait in `scratch/wave3/` (`briefing-identity-c5.md`,
 `briefing-g33-c2.md`; rebuild at HEAD before use, pass with the trailing
-newline). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
+newline). PO chose Q22 (b): `heal` and `move-aside` ran, the refusal stayed;
+next is a session restart and one retry. Consumer report 05 is triaged in
+`backlog/items/2026-10-26-report-05-consumer-findings.md` (blocker PF-58, four
+majors, all 0.7.0). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
 (C29, T3, Q21, Q22).
 
 ## Committed Source and actual qualification
