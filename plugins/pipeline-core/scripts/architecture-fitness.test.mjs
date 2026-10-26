@@ -57,6 +57,22 @@ it("physical fitness rejects empty and whitespace-only contract and verification
   } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
 });
 
+import * as class9Authority from "../lib/architecture-adoption-authority.mjs";
+
+it("D165-S3: class 9 is evaluable, not unavailable, for a scope that carries the class 9 constant", () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-d165s3-"));
+  try {
+    fs.mkdirSync(path.join(rootDir, "architecture"));
+    fs.cpSync(path.join(REPO_ROOT, "architecture/map"), path.join(rootDir, "architecture/map"), { recursive: true });
+    fs.mkdirSync(path.join(rootDir, "project"));
+    fs.writeFileSync(path.join(rootDir, "project/pipeline.json"), "{}\n");
+    const evaluate = () => evaluateArchitectureFitness({ rootDir, profileDrift: false }).outcomes.find(o => o.classId === 9);
+    fixtureAdoption({ rootDir, decision: "approved-scoped", scope: class9Authority.withClass9RequiredScope(["src/"]), rationale: "Legacy scope widened" });
+    assert.notEqual(evaluate().outcome, OUTCOME_UNAVAILABLE);
+    assert.equal(evaluate().outcome, OUTCOME_PASS);
+  } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+});
+
 it("actual fitness compares the durable accepted snapshot and refuses absent authority", () => {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "fitness-accepted-"));
   try {

@@ -64,6 +64,13 @@ export function scopeValue(scope) {
   return [...new Set(normalized)].sort();
 }
 
+export const CLASS9_REQUIRED_SCOPE = Object.freeze(["architecture/map", "pipeline.user.yaml", "project/pipeline.json"]);
+
+export function withClass9RequiredScope(scope) {
+  const given = scope === undefined || scope === null ? [] : Array.isArray(scope) ? scope : [scope];
+  return [...new Set([...given, ...CLASS9_REQUIRED_SCOPE])].sort();
+}
+
 export function adoptionSnapshot(rootDir) {
   const root = resolve(rootDir);
   const profileBytes = existsSync(join(root, "project/pipeline.json")) ? readFileSync(join(root, "project/pipeline.json"), "utf8") : null;

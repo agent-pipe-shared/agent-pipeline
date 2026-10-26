@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 //
-// register-feature-package.mjs --root <root> [--add-review-unit]
+// register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]
+//
+// `--add-diagnostic-evidence <path>` (D165-CDR) registers a Critic diagnostic (a file under
+// `specs/<feature>/evidence/`, produced by critic-diagnostic-evidence.mjs) and the log it names as
+// immutable candidate-evidence entries of the feature manifest, after validating it against its own
+// recorded candidate; it prints the paths to commit.
 //
 // `--add-review-unit` (PF-34) adds the Critic review unit and its manifest entry to a feature
 // registered before the unit existed; it prints the two paths to commit and the review base.
@@ -23,7 +28,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticDiagnosticEvidence, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
 
 function git(root, args) {
@@ -50,8 +55,10 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   const rootValue = rootIndex >= 0 ? argv[rootIndex + 1] : undefined;
   // PF-34: `--add-review-unit` adds the Critic review unit to a feature registered before it existed.
   const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
-  if ((argv.length !== 2 && !addReviewUnit) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
-    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit]" })}\n`);
+  // D165-CDR: `--add-diagnostic-evidence <path>` registers Critic diagnostic evidence in the feature manifest.
+  const addDiagnostic = argv.length === 4 && argv[2] === "--add-diagnostic-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+    out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]" })}\n`);
     return 2;
   }
   let root;
@@ -64,6 +71,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   if (read?.status !== "ok") {
     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
     return 2;
+  }
+  if (addDiagnostic) {
+    const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
+    out(`${JSON.stringify(added)}\n`);
+    return added.status === "refused" ? 2 : 0;
   }
   if (addReviewUnit) {
     const added = addCriticReviewUnit({ root, state: read.state, readAcceptedDeliveryContract });

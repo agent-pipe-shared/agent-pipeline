@@ -240,7 +240,85 @@ check(`hardenWindowsPrivateDirectory stays secure, twice in a row, under an inhe
   }
 });
 
-if (completionCases.length !== 16) throw new Error("case completion count drift: expected 16, got " + completionCases.length);
+// D165-S7A: custody is judged once at the private-state root; ACEs inherited from above it are not counted per file.
+const ME = "DESKTOP\\agent";
+const ROOT = "C:/repo/.git/agent-pipeline";
+const FILE = ROOT + "/plan.json";
+const obs = (principals, flags) => ({ currentOwner: ME, owner: ME, reparsePoint: false, principals, ...(flags === undefined ? {} : { inheritedFlags: flags }) });
+const hardenedRoot = () => obs([ME], [false]);
+function fakeObserver(table, calls = []) {
+  return (path) => {
+    calls.push(path);
+    const value = table[path];
+    if (value instanceof Error) throw value;
+    if (value === undefined) return { status: "unavailable", reason: "no observation", observation: null };
+    return { status: null, reason: null, observation: value };
+  };
+}
+const assessFake = (table, options = {}) => assessWindowsPrivatePath(FILE, { privateRoot: ROOT, observe: fakeObserver(table), identity: () => "id-" + Math.random(), ...options });
+check("D165-S7A file with only inherited rights below a hardened root is secure without a per-file DACL verdict", () => {
+  const verdict = assessFake({ [ROOT]: hardenedRoot(), [FILE]: obs([ME, "BUILTIN\\Users"], [true, true]) });
+  assert.equal(verdict.status, "secure");
+});
+check("D165-S7A root that inherits Authenticated Users is insecure and every file below names the root", () => {
+  const root = obs([ME, "NT AUTHORITY\\Authenticated Users"], [false, true]);
+  const rootVerdict = assessWindowsPrivatePath(ROOT, { privateRoot: ROOT, observe: fakeObserver({ [ROOT]: root }), identity: () => "a" });
+  assert.equal(rootVerdict.status, "insecure");
+  const fileVerdict = assessFake({ [ROOT]: root, [FILE]: obs([ME], [true]) });
+  assert.equal(fileVerdict.status, "insecure");
+  assert.ok(fileVerdict.reason.includes(ROOT), fileVerdict.reason);
+  assert.equal(fileVerdict.rootPath, ROOT);
+});
+check("D165-S7A explicit foreign ACE on the file below a secure root is insecure", () => {
+  assert.equal(assessFake({ [ROOT]: hardenedRoot(), [FILE]: obs([ME, "BUILTIN\\Users"], [true, false]) }).status, "insecure");
+});
+check("D165-S7A explicit foreign ACE on the root is insecure", () => {
+  const root = obs([ME, "BUILTIN\\Users"], [false, false]);
+  assert.equal(assessWindowsPrivatePath(ROOT, { privateRoot: ROOT, observe: fakeObserver({ [ROOT]: root }), identity: () => "a" }).status, "insecure");
+  assert.equal(assessFake({ [ROOT]: root, [FILE]: obs([ME], [true]) }).status, "insecure");
+});
+check("D165-S7A observation without the inherited flag fails closed as not-inherited", () => {
+  assert.equal(assessFake({ [ROOT]: hardenedRoot(), [FILE]: obs([ME, "BUILTIN\\Users"]) }).status, "insecure");
+  assert.equal(assessFake({ [ROOT]: obs([ME, "BUILTIN\\Users"]), [FILE]: obs([ME], [true]) }).status, "insecure");
+  assert.equal(assessFake({ [ROOT]: hardenedRoot(), [FILE]: obs([ME, "BUILTIN\\Users"], [true]) }).status === "secure", false);
+  assert.equal(assessFake({ [ROOT]: hardenedRoot(), [FILE]: obs([ME, "BUILTIN\\Users"], ["yes", "no"]) }).status === "secure", false);
+});
+check("D165-S7A malformed, missing or throwing observation fails closed", () => {
+  for (const table of [
+    {},
+    { [ROOT]: hardenedRoot() },
+    { [FILE]: obs([ME], [true]) },
+    { [ROOT]: new Error("boom"), [FILE]: obs([ME], [true]) },
+    { [ROOT]: hardenedRoot(), [FILE]: new Error("boom") },
+    { [ROOT]: null, [FILE]: obs([ME], [true]) },
+    { [ROOT]: { principals: "x" }, [FILE]: obs([ME], [true]) },
+    { [ROOT]: hardenedRoot(), [FILE]: { owner: ME } },
+  ]) assert.notEqual(assessFake(table).status, "secure");
+});
+check("D165-S7A owner and reparse-point checks of a file below a secure root are unchanged", () => {
+  const owned = obs([ME], [true]); owned.owner = "SYSTEM";
+  const link = obs([ME], [true]); link.reparsePoint = true;
+  assert.equal(assessFake({ [ROOT]: hardenedRoot(), [FILE]: owned }).status, "insecure");
+  assert.equal(assessFake({ [ROOT]: hardenedRoot(), [FILE]: link }).status, "insecure");
+});
+check("D165-S7A the root is assessed once per process and re-assessed after its observation identity changes", () => {
+  const calls = [];
+  const table = { [ROOT]: hardenedRoot(), [FILE]: obs([ME], [true]) };
+  const uniqueRoot = "C:/memo-repo/.git/agent-pipeline";
+  const memoTable = { [uniqueRoot]: hardenedRoot(), [uniqueRoot + "/a.json"]: obs([ME], [true]), [uniqueRoot + "/b.json"]: obs([ME], [true]) };
+  const observe = fakeObserver(memoTable, calls);
+  let identity = "one";
+  const options = { privateRoot: uniqueRoot, observe, identity: () => identity };
+  assert.equal(assessWindowsPrivatePath(uniqueRoot + "/a.json", options).status, "secure");
+  assert.equal(assessWindowsPrivatePath(uniqueRoot + "/b.json", options).status, "secure");
+  assert.equal(calls.filter((path) => path === uniqueRoot).length, 1, "second assessment must hit the memo");
+  identity = "two";
+  assert.equal(assessWindowsPrivatePath(uniqueRoot + "/a.json", options).status, "secure");
+  assert.equal(calls.filter((path) => path === uniqueRoot).length, 2, "changed identity must miss the memo");
+  assert.ok(table);
+});
+
+if (completionCases.length !== 24) throw new Error("case completion count drift: expected 24, got " + completionCases.length);
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openCompletionDescriptor(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

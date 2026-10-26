@@ -10,9 +10,8 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { createInterface as createReadlineInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { applyTrustAnchorBootstrap } from "./onboarding-init.mjs";
@@ -142,17 +141,35 @@ export async function applyBootstrapTrustRecovery(options, { confirm, apply = ap
   }
 }
 
-// The digest request is the argument of question(): readline redraws its own prompt line, so text written
-// before an empty question("") is erased on a real terminal and the human sees a bare cursor.
-export async function confirmOnTerminal(plan, io, createInterface = createReadlineInterface) {
-  const terminal = createInterface({ input: io.stdin, output: io.stdout });
-  try {
-    io.stdout.write(`First-anchor recovery for ${plan.intent.root}. This does not waive any approval gate.\n`);
-    return (await terminal.question(`Type the plan digest ${plan.planSha256} to continue: `)).trim();
-  } finally { terminal.close(); }
+/**
+ * Reads exactly one line, one byte at a time, so a second pasted line stays in the descriptor for the next prompt
+ * (a buffered readline interface drops it on close). Same pattern as po-human-approval.mjs's defaultReadConfirmation.
+ * `read` and `maxBytes` are test seams; end of input before any byte yields the empty answer.
+ */
+export function readTypedLine(fd = 0, read = readSync, maxBytes = Infinity) {
+  const buffer = Buffer.alloc(1); const bytes = [];
+  while (bytes.length < maxBytes) {
+    let count;
+    try { count = read(fd, buffer, 0, 1, null); }
+    catch (error) { if (error?.code === "EAGAIN") continue; if (error?.code === "EOF") break; throw error; }
+    if (count === 0 || buffer[0] === 10) break;
+    bytes.push(buffer[0]);
+  }
+  return Buffer.from(bytes).toString("utf8");
 }
 
-export async function main(argv = process.argv.slice(2), io = process, createInterface = createReadlineInterface) {
+function readLineFromTerminal(prompt, io) {
+  io.stdout.write(prompt);
+  return readTypedLine(0);
+}
+
+// The prompt is the reader's argument, written by the reader itself, so the digest request is written exactly once.
+export async function confirmOnTerminal(plan, io, readLine = (prompt) => readLineFromTerminal(prompt, io)) {
+  io.stdout.write(`First-anchor recovery for ${plan.intent.root}. This does not waive any approval gate.\n`);
+  return String(await readLine(`Type the plan digest ${plan.planSha256} to continue: `)).trim();
+}
+
+export async function main(argv = process.argv.slice(2), io = process, readLine = undefined) {
   const parsed = parse(argv);
   if (!parsed) {
     io.stderr.write("Usage: bootstrap-trust-recovery.mjs plan|apply --root ABS --mode existing|new --directory ABS --human-name NAME --existing-key ABS|none [--plan-sha256 HEX for apply]\n");
@@ -170,7 +187,7 @@ export async function main(argv = process.argv.slice(2), io = process, createInt
     io.stderr.write(`${JSON.stringify(refusal("BTR-EXTERNAL-TTY-REQUIRED"))}\n`);
     return 2;
   }
-  const result = await applyBootstrapTrustRecovery(options, { confirm: (plan) => confirmOnTerminal(plan, io, createInterface) });
+  const result = await applyBootstrapTrustRecovery(options, { confirm: (plan) => confirmOnTerminal(plan, io, readLine) });
   io.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   return result.ok ? 0 : 1;
 }

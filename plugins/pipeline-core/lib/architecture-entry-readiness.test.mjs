@@ -184,6 +184,22 @@ test("D162 S3: a deferred disposition over a valid map, fitness model and baseli
   assert.equal(typeof result.nextAction.guidance, "string");
 });
 
+import * as class9Authority from "./architecture-adoption-authority.mjs";
+
+test("D165-S3: the migration prepare arguments carry the legacy scope unioned with the class 9 inputs", () => {
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: deferredDisposition },
+  });
+  const args = result.nextAction.steps[0].args;
+  const scopes = args.flatMap((a, i) => (args[i - 1] === "--scope" ? [a] : []));
+  for (const required of ["architecture/map", "project/pipeline.json", "pipeline.user.yaml", ARCHITECTURE_ENTRY_SCOPE]) {
+    assert.ok(scopes.includes(required), `${required} missing from ${JSON.stringify(scopes)}`);
+  }
+  assert.deepEqual(scopes, class9Authority.withClass9RequiredScope([ARCHITECTURE_ENTRY_SCOPE]));
+});
+
 test("D162 S3: a deferred disposition requires migration for a net-new path as well, not the fitness refusal", () => {
   const result = inspectArchitectureEntryReadiness({
     rootDir: repoRoot,

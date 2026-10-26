@@ -37,8 +37,48 @@ function parseObservation(stdout) {
       || typeof value.currentOwner !== "string" || typeof value.owner !== "string"
       || typeof value.reparsePoint !== "boolean" || !Array.isArray(value.principals)
       || value.principals.some((entry) => typeof entry !== "string" || entry.length === 0)) return null;
+    // Optional per-ACE inherited flags, parallel to `principals`. A present but malformed flag list is malformed; an
+    // absent one (an old observation) is read as "not inherited" by every consumer.
+    if (Object.hasOwn(value, "inheritedFlags")
+      && (!Array.isArray(value.inheritedFlags) || value.inheritedFlags.length !== value.principals.length
+        || value.inheritedFlags.some((flag) => typeof flag !== "boolean"))) return null;
     return value;
   } catch { return null; }
+}
+
+function inheritedAt(observation, index) {
+  return Array.isArray(observation.inheritedFlags) && observation.inheritedFlags[index] === true;
+}
+
+/**
+ * Policy for a file that sits below a private-state root already judged secure: the file's DACL is not given a verdict
+ * of its own, because every ACE it inherited came from that root. Only an explicit (non-inherited) foreign ACE on the file
+ * itself makes it insecure; owner, reparse-point and emptiness checks are the strict ones. An observation without
+ * inherited flags counts every ACE as explicit (fail closed).
+ */
+export function evaluateWindowsPrivateFileUnderRoot(observation, rootVerdict) {
+  if (!rootVerdict || rootVerdict.status === "unavailable" || rootVerdict.status === undefined) {
+    return unavailable(rootVerdict?.reason ?? "private-state root verdict is unavailable");
+  }
+  if (rootVerdict.status !== "secure") {
+    return { status: "insecure", reason: rootVerdict.reason, rootPath: rootVerdict.rootPath };
+  }
+  if (!observation || typeof observation !== "object") return unavailable("DACL observation is unavailable");
+  const current = normalized(observation.currentOwner);
+  const owner = normalized(observation.owner);
+  if (!current || !owner) return unavailable("Windows owner observation is incomplete");
+  if (observation.reparsePoint !== false) return insecure("private path is a reparse point or its state is unknown");
+  if (owner !== current) return insecure("private path owner is not the concrete current principal");
+  if (!Array.isArray(observation.principals) || observation.principals.length === 0) return insecure("private path DACL is empty or unavailable");
+  if (Object.hasOwn(observation, "inheritedFlags")
+    && (!Array.isArray(observation.inheritedFlags) || observation.inheritedFlags.length !== observation.principals.length
+      || observation.inheritedFlags.some((flag) => typeof flag !== "boolean"))) return unavailable("DACL inherited flags are malformed");
+  for (let index = 0; index < observation.principals.length; index += 1) {
+    if (!inheritedAt(observation, index) && normalized(observation.principals[index]) !== current) {
+      return insecure("private path carries an explicit DACL entry for a non-owner principal");
+    }
+  }
+  return { status: "secure", reason: "Windows owner, explicit DACL, and reparse-point checks are private; rights are inherited from a secure private-state root", rootPath: rootVerdict.rootPath };
 }
 
 /** Pure DACL policy: only the concrete current principal may hold an ACE. */
@@ -63,7 +103,8 @@ const OBSERVE_SCRIPT = [
   "$a=Get-Acl -LiteralPath $p",
   "$me=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name",
   "$principals=@($a.Access | ForEach-Object { $_.IdentityReference.Value })",
-  "[pscustomobject]@{currentOwner=$me;owner=$a.Owner;reparsePoint=[bool]($i.Attributes -band [IO.FileAttributes]::ReparsePoint);principals=$principals}|ConvertTo-Json -Compress",
+  "$inherited=@($a.Access | ForEach-Object { [bool]$_.IsInherited })",
+  "[pscustomobject]@{currentOwner=$me;owner=$a.Owner;reparsePoint=[bool]($i.Attributes -band [IO.FileAttributes]::ReparsePoint);principals=$principals;inheritedFlags=$inherited}|ConvertTo-Json -Compress",
 ].join(";");
 
 // Fixed marker the hardener script writes to stderr when it fails. Only an exception TYPE name follows it, so a reason
@@ -108,7 +149,7 @@ const OBSERVE_BATCH_SCRIPT = [
   "function N($s){$v=$s.Value;if(-not $names.ContainsKey($v)){try{$names[$v]=$s.Translate([System.Security.Principal.NTAccount]).Value}catch{$names[$v]=$v}};return $names[$v]}",
   "$sections=[System.Security.AccessControl.AccessControlSections]'Access,Owner'",
   "$sidType=[System.Security.Principal.SecurityIdentifier]",
-  "foreach($p in @($paths)){try{$at=[IO.File]::GetAttributes($p);$sec=if($at -band [IO.FileAttributes]::Directory){[IO.Directory]::GetAccessControl($p,$sections)}else{[IO.File]::GetAccessControl($p,$sections)};$principals=@(foreach($r in $sec.GetAccessRules($true,$true,$sidType)){N $r.IdentityReference});$rows.Add([pscustomobject]@{path=[string]$p;currentOwner=$me;owner=(N ($sec.GetOwner($sidType)));reparsePoint=[bool]($at -band [IO.FileAttributes]::ReparsePoint);principals=$principals})}catch{$rows.Add([pscustomobject]@{path=[string]$p;error=$true})}}",
+  "foreach($p in @($paths)){try{$at=[IO.File]::GetAttributes($p);$sec=if($at -band [IO.FileAttributes]::Directory){[IO.Directory]::GetAccessControl($p,$sections)}else{[IO.File]::GetAccessControl($p,$sections)};$rules=@($sec.GetAccessRules($true,$true,$sidType));$principals=@(foreach($r in $rules){N $r.IdentityReference});$inherited=@(foreach($r in $rules){[bool]$r.IsInherited});$rows.Add([pscustomobject]@{path=[string]$p;currentOwner=$me;owner=(N ($sec.GetOwner($sidType)));reparsePoint=[bool]($at -band [IO.FileAttributes]::ReparsePoint);principals=$principals;inheritedFlags=$inherited})}catch{$rows.Add([pscustomobject]@{path=[string]$p;error=$true})}}",
   "ConvertTo-Json -InputObject @($rows.ToArray()) -Compress -Depth 5",
 ].join(";");
 
@@ -251,10 +292,15 @@ function privateTreeEntries(root, limit) {
   return found;
 }
 
-function batchRowObservation(row, path) {
+function batchRowShapeOk(row, path) {
   const keys = ["currentOwner", "owner", "path", "principals", "reparsePoint"];
-  if (!row || typeof row !== "object" || Array.isArray(row) || row.path !== path || row.error === true
-    || Object.keys(row).length !== keys.length || keys.some((key) => !Object.hasOwn(row, key))) return null;
+  const optional = Object.hasOwn(row, "inheritedFlags") ? 1 : 0;
+  return !(!row || typeof row !== "object" || Array.isArray(row) || row.path !== path || row.error === true
+    || Object.keys(row).length !== keys.length + optional || keys.some((key) => !Object.hasOwn(row, key)));
+}
+
+function batchRowObservation(row, path) {
+  if (!row || typeof row !== "object" || !batchRowShapeOk(row, path)) return null;
   const { path: _path, ...facts } = row;
   return parseObservation(JSON.stringify(facts));
 }
@@ -309,9 +355,64 @@ function prefetchPrivateTree(path, identity, root) {
 
 /** Observe one physical Windows path against the concrete current principal. */
 export function assessWindowsPrivatePath(path, options = {}) {
-  const { status, reason, observation } = observeWindowsPrivatePath(path, options);
-  if (status) return { status, reason };
-  return evaluateWindowsPrivateState(observation);
+  const root = typeof path === "string" ? (options.privateRoot ?? privateStateRootOf(path)) : null;
+  if (typeof root === "string" && root.length > 0 && normalizedPath(root) !== normalizedPath(path)) {
+    const rootVerdict = assessWindowsPrivateRoot(root, options);
+    if (rootVerdict.status !== "secure") return evaluateWindowsPrivateFileUnderRoot(null, rootVerdict);
+    const seen = observeSafely(path, options);
+    if (seen.status) return { status: seen.status, reason: seen.reason };
+    return evaluateWindowsPrivateFileUnderRoot(seen.observation, rootVerdict);
+  }
+  const seen = observeSafely(path, options);
+  if (seen.status) return { status: seen.status, reason: seen.reason };
+  return evaluateWindowsPrivateState(seen.observation);
+}
+
+function normalizedPath(path) { return String(path).replace(/[\\/]+$/u, "").replace(/\\/gu, "/").toLocaleLowerCase("en-US"); }
+
+/** The private-state root (`.git/agent-pipeline` or `project`) that contains `path`, else null. */
+function privateStateRootOf(path) {
+  const git = privateTreeRoot(path);
+  if (git !== null) return git;
+  const match = /^(.*[\\/]project)[\\/]/iu.exec(path);
+  return match === null ? null : match[1];
+}
+
+// A throwing or malformed observer fails closed as unavailable; `options.observe` is the fixture seam of the pure policy.
+function observeSafely(path, options) {
+  try {
+    const seen = (options.observe ?? observeWindowsPrivatePath)(path, options);
+    if (!seen || typeof seen !== "object") return { status: "unavailable", reason: "DACL observation is unavailable", observation: null };
+    if (seen.status) return { status: seen.status, reason: seen.reason, observation: null };
+    if (!seen.observation || typeof seen.observation !== "object") return { status: "unavailable", reason: "DACL observation is unavailable", observation: null };
+    return { status: null, reason: null, observation: seen.observation };
+  } catch {
+    return { status: "unavailable", reason: "DACL observation is unavailable", observation: null };
+  }
+}
+
+const ROOT_MEMO = new Map();
+
+/**
+ * Assess a private-state root ONCE per process under the strict rule: no foreign principal among ALL its effective ACEs
+ * (inherited ones included), plus the unchanged owner and reparse-point checks. Memoized by root path and observation
+ * identity (`options.identity`, default the lstat identity), so a root that changed is observed again. The verdict carries
+ * `rootPath`, and an insecure one names it in the reason.
+ */
+export function assessWindowsPrivateRoot(root, options = {}) {
+  const identity = (options.identity ?? lstatIdentity)(root);
+  const key = typeof identity === "string" ? identity : null;
+  if (key !== null) {
+    const hit = ROOT_MEMO.get(root);
+    if (hit && hit.identity === key) return { ...hit.verdict };
+    if (hit) ROOT_MEMO.delete(root);
+  }
+  const seen = observeSafely(root, options);
+  const base = seen.status ? { status: seen.status, reason: seen.reason } : evaluateWindowsPrivateState(seen.observation);
+  const verdict = base.status === "secure" ? { ...base, rootPath: root }
+    : { status: base.status, reason: `private-state root ${root} is not secure: ${base.reason}`, rootPath: root };
+  if (key !== null && verdict.status === "secure") ROOT_MEMO.set(root, { identity: key, verdict: { ...verdict } });
+  return verdict;
 }
 
 /** Evaluate exact per-path observations returned by the bounded native batch reader. */
@@ -321,9 +422,7 @@ export function evaluateWindowsPrivatePathBatch(paths, observations) {
   }
   return paths.map((path, index) => {
     const row = observations[index];
-    const keys = ["currentOwner", "owner", "path", "principals", "reparsePoint"];
-    if (typeof path !== "string" || !row || typeof row !== "object" || Array.isArray(row) || row.path !== path || row.error === true
-      || Object.keys(row).length !== keys.length || keys.some((key) => !Object.hasOwn(row, key))) {
+    if (typeof path !== "string" || !row || typeof row !== "object" || !batchRowShapeOk(row, path)) {
       return unavailable("native Windows DACL batch is malformed");
     }
     const observation = parseObservation(JSON.stringify(row));
@@ -392,6 +491,7 @@ export function assessWindowsPrivatePaths(paths, options = {}) {
  */
 export function hardenWindowsPrivateDirectory(path, options = {}) {
   OBSERVATION_MEMO.delete(path);
+  ROOT_MEMO.clear();
   const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options, "hardening");
   if (result?.status) return result;
   return assessWindowsPrivatePath(path, options);

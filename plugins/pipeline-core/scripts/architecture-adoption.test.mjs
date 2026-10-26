@@ -12,6 +12,7 @@ import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { applyAdoptionDecision as rawApply } from "./architecture-adoption.mjs";
 import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
+import * as class9Authority from "../lib/architecture-adoption-authority.mjs";
 import { setupAdoptionFixture, signAdoptionRequest, fixtureGit } from "./architecture-adoption-test-fixture.mjs";
 
 import {
@@ -678,7 +679,7 @@ describe("D162 S2: adoption retires the new deferral and names the migration", (
     assert.deepEqual(proposal.migration.steps.map((s) => s.step), ["measure", "prepare", "confirm-and-apply"]);
     assert.deepEqual(proposal.migration.steps[0].args, ["--root", root, "--apply"]);
     assert.equal(proposal.migration.steps[0].script, "scripts/architecture-measure.mjs");
-    assert.deepEqual(proposal.migration.steps[1].args, ["prepare", "--root", root, "--decision", "approved-scoped", "--scope", "lib/", "--scope", "src/", "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]);
+    assert.deepEqual(proposal.migration.steps[1].args, ["prepare", "--root", root, "--decision", "approved-scoped", "--scope", "architecture/map", "--scope", "lib/", "--scope", "pipeline.user.yaml", "--scope", "project/pipeline.json", "--scope", "src/", "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]);
     assert.equal(proposal.migration.steps[1].script, "scripts/architecture-adoption.mjs");
     assert.deepEqual(proposal.migration.steps[2].args, ["apply", "--root", root, "--decision", "approved-scoped", "--request", "<request file>", "--proof", "<proof file>"]);
     assert.ok(proposal.migration.steps[2].note.includes("ADR-0056"));
@@ -693,6 +694,31 @@ describe("D162 S2: adoption retires the new deferral and names the migration", (
 
   it("D162 S2: a proposal without a deferred record carries no migration", () => {
     assert.equal(generateAdoptionProposal(root).migration, undefined);
+  });
+
+  const CLASS9 = ["architecture/map", "pipeline.user.yaml", "project/pipeline.json"];
+  const prepareScopes = (proposal) => {
+    const args = proposal.migration.steps.find((s) => s.step === "prepare").args;
+    return args.flatMap((a, i) => (args[i - 1] === "--scope" ? [a] : []));
+  };
+
+  it("D165-S3: a legacy scope without the class 9 inputs migrates to a prepare scope that contains them", () => {
+    applyLegacyDeferred(["src/"]);
+    assert.deepEqual(prepareScopes(generateAdoptionProposal(root)), [...CLASS9, "src/"].sort());
+  });
+
+  it("D165-S3: a legacy scope that already contains the class 9 inputs is unchanged", () => {
+    const scope = [...CLASS9, "src/"].sort();
+    applyLegacyDeferred(scope);
+    assert.deepEqual(prepareScopes(generateAdoptionProposal(root)), scope);
+  });
+
+  it("D165-S3: the constant is frozen and exact, and the union is sorted, de-duplicated and stable", () => {
+    assert.ok(Object.isFrozen(class9Authority.CLASS9_REQUIRED_SCOPE));
+    assert.deepEqual([...class9Authority.CLASS9_REQUIRED_SCOPE], CLASS9);
+    const once = class9Authority.withClass9RequiredScope(["z/", "a/", "a/", "project/pipeline.json"]);
+    assert.deepEqual(once, ["a/", "architecture/map", "pipeline.user.yaml", "project/pipeline.json", "z/"]);
+    assert.deepEqual(class9Authority.withClass9RequiredScope(once), once);
   });
 
   for (const command of ["prepare", "apply"]) {

@@ -275,7 +275,7 @@ function markers(repository) {
 }
 
 // `env` carries the session identity for the scratch binding; only the command line passes the process's own.
-export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.write(text), { env = {}, scratchDeps = {}, waitDeps = {} } = {}) {
+export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.write(text), { env = {}, scratchDeps = {}, waitDeps = {}, releaseDeps = {} } = {}) {
   const emit = (value, code) => { out(`${JSON.stringify({ schema: SCHEMA, ...value })}\n`); return code; };
   const scratch = { env, deps: scratchDeps };
   const parsed = parse(argv);
@@ -288,8 +288,8 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   if (parsed.verb === "release-lock") {
     // Never takes the lock it releases (FB3-PF-55); a live owner is refused with the wait command.
     try {
-      const released = releaseSessionAuthorityLock({ repository, reason: parsed.flags.reason.trim() });
-      return emit({ ...released, ...inspect(repository, root, { scratch }) }, 0);
+      const released = releaseSessionAuthorityLock({ repository, reason: parsed.flags.reason.trim(), ...releaseDeps });
+      return emit({ ...released, ...inspect(repository, root, { scratch }) }, released.status === "retained" ? 2 : 0);
     } catch (error) {
       return emit(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error) }, 2);
     }

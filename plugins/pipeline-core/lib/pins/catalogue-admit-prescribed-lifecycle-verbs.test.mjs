@@ -465,7 +465,11 @@ test("D64 feature-package registration: exactly the documented forms are admitte
   withFixture("feature", f => {
     bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
     bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
-    for (const [label, argv] of [["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "add diagnostic evidence");
+    for (const [label, argv] of [["diagnostic flag before root", ["--add-diagnostic-evidence", "specs/feature/evidence/d.json", "--root", f.root]],
+      ["diagnostic without path", ["--root", f.root, "--add-diagnostic-evidence"]], ["diagnostic absolute path", ["--root", f.root, "--add-diagnostic-evidence", join(f.root, "d.json")]],
+      ["diagnostic parent path", ["--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/../../x.json"]], ["diagnostic dash path", ["--root", f.root, "--add-diagnostic-evidence", "--force"]],
+      ["diagnostic extra argument", ["--root", f.root, "--add-diagnostic-evidence", "d.json", "--force"]],["foreign root", ["--root", join(f.root, "..")]], ["no root", []], ["extra flag", ["--root", f.root, "--force"]],
       ["review unit before root", ["--add-review-unit", "--root", f.root]], ["double review unit", ["--root", f.root, "--add-review-unit", "--add-review-unit"]]]) {
       bothRefuse(scriptAction(registerScript, ...argv), f, label);
     }

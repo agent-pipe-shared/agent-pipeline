@@ -193,6 +193,10 @@ export const MODEL_ROLE_BOOTSTRAP_SCRIPT = fileURLToPath(new URL("../../scripts/
 export const ANTIGRAVITY_NATIVE_DISPATCH_PREPARE_SCRIPT = fileURLToPath(new URL("../../scripts/antigravity-native-dispatch-prepare.mjs", import.meta.url));
 export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scripts/register-feature-package.mjs", import.meta.url));
 export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+// D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
+export const ARCHITECTURE_MEASURE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-measure.mjs", import.meta.url));
+export const ARCHITECTURE_FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
 
 export const DESIGN_COURSE_SCRIPT = fileURLToPath(new URL("../../scripts/design-course-session.mjs", import.meta.url));
 

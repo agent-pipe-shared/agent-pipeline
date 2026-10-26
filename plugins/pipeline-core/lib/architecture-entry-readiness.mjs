@@ -21,6 +21,7 @@ import { evaluateArchitectureFitness, evaluateNavigationCurrency } from "../scri
 import { inspectArchitectureReentryPointer, loadMapBundle, resolveModuleForPath } from "../scripts/module-inventory.mjs";
 import { readCheckpointArchitectureDebt } from "./checkpoint-push-audit.mjs";
 import { inspectArchitectureDesign } from "./architecture-design.mjs";
+import { withClass9RequiredScope } from "./architecture-adoption-authority.mjs";
 import { loadPhysicalArchitectureMap } from "./architecture-effective-decisions.mjs";
 import { inspectArchitectureDecisionContinuity } from "./architecture-decision-continuity.mjs";
 
@@ -335,7 +336,7 @@ export function inspectArchitectureEntryReadiness({ rootDir = process.cwd(), tas
     const scopeEntries = Array.isArray(disposition.scope) ? disposition.scope
       : (typeof disposition.scope === "string" && disposition.scope ? [disposition.scope] : []);
     const prepareArgs = ["--root", root, "--decision", "approved-scoped"];
-    for (const entry of scopeEntries) prepareArgs.push("--scope", String(entry));
+    for (const entry of withClass9RequiredScope(scopeEntries.map(String))) prepareArgs.push("--scope", entry);
     prepareArgs.push("--rationale", "D162 migration of a legacy deferred adoption to the measured baseline",
       "--decision-ref", "D162-migration");
     const steps = [];

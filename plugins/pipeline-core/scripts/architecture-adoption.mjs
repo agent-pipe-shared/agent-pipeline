@@ -25,6 +25,7 @@ import {
   verifyAdoptionAuthority,
   atomicWriteAdoptionState,
   scopeValue,
+  withClass9RequiredScope,
   loadAdoptionMap,
 } from "../lib/architecture-adoption-authority.mjs";
 
@@ -268,7 +269,7 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
     steps.push({
       step: "prepare",
       script: "scripts/architecture-adoption.mjs",
-      args: ["prepare", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, ...legacyScope.flatMap((s) => ["--scope", s]), "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]
+      args: ["prepare", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, ...withClass9RequiredScope(legacyScope).flatMap((s) => ["--scope", s]), "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]
     });
     steps.push({
       step: "confirm-and-apply",

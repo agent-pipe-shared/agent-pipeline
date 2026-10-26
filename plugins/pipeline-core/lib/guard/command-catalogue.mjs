@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
 import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
 import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
 import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
-import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
 import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
 import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
 import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
@@ -203,7 +203,12 @@ function sanctionedModelRoleDispatchSelectArgs(args, root) {
 }
 
 function sanctionedRegisterFeaturePackageArgs(args, root) {
-  return exactRoot(args, root, 0) && (args.length === 2 || (args.length === 3 && args[2] === "--add-review-unit"));
+  if (!exactRoot(args, root, 0)) return false;
+  if (args.length === 2) return true;
+  if (args.length === 3) return args[2] === "--add-review-unit";
+  // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
+  return args.length === 4 && args[2] === "--add-diagnostic-evidence" && typeof args[3] === "string" && args[3] !== ""
+    && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
 }
 
 function sanctionedDesignReviewReceiptArgs(args, root) {
@@ -305,7 +310,64 @@ function sanctionedAntigravityNativeDispatchPrepareArgs(args, root) {
     && !args[4].split("/").some((part) => part === "." || part === "..");
 }
 
+// D165 (S1): the brownfield adoption route. Each script is admitted as exact argv shapes only; `architecture-adoption.mjs apply`
+// (PO proof) is deliberately NOT admitted. Every flag is single-use except `prepare --scope` (at most 8, handled by a pre-pass
+// because matchFlagSpec refuses repeats). The fitness script ignores unknown flags itself, so this catalogue is the strict side.
+const ADOPTION_MAX_SCOPES = 8;
+const ADOPTION_TEXT = /^[A-Za-z0-9][A-Za-z0-9 ._:,+@/()-]{0,400}$/u;
+const ADOPTION_OUT = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/u;
+function adoptionScope(value) {
+  if (typeof value !== "string" || value.startsWith("/") || !/^[A-Za-z0-9._][A-Za-z0-9._/-]{0,200}$/u.test(value)) return false;
+  const parts = value.split("/");
+  if (parts[parts.length - 1] === "") parts.pop();
+  return parts.length > 0 && !parts.some((part) => part === "" || part === "." || part === "..");
+}
+// A path under scratch/ with no dot segment whose existing prefix is physical (no link) and whose target is absent or a regular file.
+function adoptionPhysicalOut(root, value) {
+  const parts = value.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return false;
+  let current = root;
+  try {
+    for (let index = 0; index < parts.length; index += 1) {
+      current = join(current, parts[index]);
+      let info;
+      try { info = lstatSync(current); } catch (error) { if (error.code === "ENOENT") return true; throw error; }
+      if (info.isSymbolicLink() || realpathSync(current) !== current
+        || (index < parts.length - 1 ? !info.isDirectory() : !info.isFile())) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+function sanctionedArchitectureAdoptionToolArgs(script, args, root) {
+  const rootFlag = { "--root": (value) => value === root };
+  if (script === ARCHITECTURE_MEASURE_SCRIPT) return matchFlagSpec(args, { requiredValue: rootFlag, optional: { "--apply": true } });
+  if (script === ARCHITECTURE_FITNESS_SCRIPT) return matchFlagSpec(args, { requiredValue: rootFlag, optional: { "--check": true, "--json": true } });
+  const rest = args.slice(1);
+  if (["propose", "status", "check"].includes(args[0])) return matchFlagSpec(rest, { requiredValue: rootFlag, optional: { "--json": true } });
+  if (args[0] !== "prepare") return false;
+  const others = [];
+  let scopes = 0;
+  for (let i = 0; i < rest.length; i += 1) {
+    if (rest[i] !== "--scope") { others.push(rest[i]); continue; }
+    scopes += 1;
+    if (scopes > ADOPTION_MAX_SCOPES || !adoptionScope(rest[i + 1])) return false;
+    i += 1;
+  }
+  const text = (value) => ADOPTION_TEXT.test(value);
+  return matchFlagSpec(others, {
+    requiredValue: { ...rootFlag, "--decision": (value) => value === "approved-scoped" || value === "partial" },
+    optionalValue: {
+      "--expires": text, "--review-date": text, "--decision-ref": text, "--decided-at": text, "--rationale": text,
+      "--out": (value) => ADOPTION_OUT.test(value) && adoptionPhysicalOut(root, value),
+    },
+    optional: { "--json": true },
+  });
+}
+
 function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+  if (script === ARCHITECTURE_ADOPTION_SCRIPT || script === ARCHITECTURE_MEASURE_SCRIPT || script === ARCHITECTURE_FITNESS_SCRIPT) {
+    return sanctionedArchitectureAdoptionToolArgs(script, args, root);
+  }
   // The source CLI returns its static usage before parsing or reading signing state.
   if (script === PO_HUMAN_APPROVAL_SCRIPT) return args.length === 1 && ["--help", "-h"].includes(args[0]);
   if (script === AUDIT_PACK_SCRIPT) return ["plan", "verify"].includes(auditPackRequest(args, root)?.verb);

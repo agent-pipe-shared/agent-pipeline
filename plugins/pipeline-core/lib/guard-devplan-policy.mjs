@@ -340,6 +340,18 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
 const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", "AGENTS.md", "pipeline.user.yaml"]);
 const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
 
+/**
+ * D165 D5: the ONE predicate for the onboarding scaffold exemption, shared by the shell lane, the
+ * staged-commit check (via devPlanGateVerdict) and the Edit/Write hook, so the lanes cannot disagree.
+ * `normalizedPath` is the case-folded, slash-normalized relative path; the constants are folded the
+ * same way. It owns nothing but the AC-207 lists above and widens nothing.
+ */
+export function isOnboardingScaffoldPath(normalizedPath) {
+  if (typeof normalizedPath !== "string") return false;
+  return ONBOARDING_SCAFFOLD_EXACT_PATHS.some((exact) => normalizedPath === normalize(exact))
+    || ONBOARDING_SCAFFOLD_PREFIXES.some((prefix) => normalizedPath.startsWith(normalize(prefix)));
+}
+
 // A dispatched role must create this receipt as its opening act. It is
 // coordination evidence rather than product implementation, so only this
 // canonical receipt filename is admitted before plan approval.
@@ -531,8 +543,7 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate = 
       && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
         // normalizedPath is case-folded by normalize(); fold the constants the same way,
         // otherwise a mixed-case entry such as "AGENTS.md" can never match.
-        || ONBOARDING_SCAFFOLD_EXACT_PATHS.some((exact) => normalizedPath === normalize(exact))
-        || ONBOARDING_SCAFFOLD_PREFIXES.some((prefix) => normalizedPath.startsWith(normalize(prefix)))))
+        || isOnboardingScaffoldPath(normalizedPath)))
   );
   if (isExempt) return { verdict: "allow" };
 

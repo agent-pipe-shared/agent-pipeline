@@ -5,7 +5,9 @@ const completionCases = [];
 function test(name, run) { completionCases.push({id: "CCA" + String(completionCases.length + 1).padStart(3, "0"), name, run}); }
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
+import { runRegisterFeaturePackage } from "../scripts/register-feature-package.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
@@ -490,5 +492,112 @@ test("D165-PF75B (g) the missing-unit repair no longer says the unit commit is t
   assert.doesNotMatch(repair, /start the course's first review from it/u);
   assert.match(repair, /any base on the candidate history that already lists the feature manifest/u);
   assert.match(repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
+});
+// D165-CDR: a sanctioned command registers Critic diagnostic evidence in the feature manifest.
+function diagFixture() {
+  const fx = unitFixture({late: false});
+  const dir = `specs/${fx.featureId}/evidence`;
+  mkdirSync(join(fx.root, dir), {recursive: true});
+  const specPath = `specs/${fx.featureId}/spec.md`, logPath = `${dir}/targeted.log`, jsonPath = `${dir}/diagnostic.json`;
+  const log = "command: node synthetic-check\nlabel: targeted-check\nexitCode: 0\n--- stdout ---\npass\n--- stderr ---\n";
+  const value = {schema: "pipeline.critic-diagnostic-evidence.v1", producer: "critic-diagnostic-evidence", assurance: "captured-process-output-not-host-attested",
+    candidate: {commit: fx.candidate, tree: git(fx.root, ["rev-parse", `${fx.candidate}^{tree}`])},
+    spec: {path: specPath, sha256: hash(readFileSync(join(fx.root, specPath)))}, guardrails: [], fullVerify: {status: "not-run", evidence: null},
+    targeted: {label: "targeted-check", status: "passed", exitCode: 0, log: {path: logPath, sha256: hash(log)}}, pending: ["full-verify"]};
+  const write = (v = value, p = jsonPath) => { writeFileSync(join(fx.root, p), `${JSON.stringify(v)}\n`); return p; };
+  writeFileSync(join(fx.root, logPath), log); write();
+  // The registration writer refuses a manifest that does not validate, so the working-tree manifest gets the full approved topology (closed keys, prd/acceptance/result/candidate-evidence).
+  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
+    const path = `specs/${fx.featureId}/${rel}`; writeFileSync(join(fx.root, path), `${klass}\n`);
+    return {class: klass, path, sha256: hash(readFileSync(join(fx.root, path))), authority, mutability, retention};
+  });
+  const committed = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...committed, artifacts: [...committed.artifacts, ...topo], candidate: null, supersedes: null})}\n`);
+  const state = {activeFeature: {id: fx.featureId}};
+  return {...fx, dir, specPath, logPath, jsonPath, value, log, write, state,
+    manifestBytes: () => readFileSync(join(fx.root, fx.manifestPath)),
+    register: (path = jsonPath) => addCriticDiagnosticEvidence({root: fx.root, state, path})};
+}
+test("D165-CDR (a) a valid diagnostic is registered with its log and the next admission no longer lacks deterministic evidence", () => {
+  const fx = diagFixture();
+  const result = fx.register();
+  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
+  const manifest = JSON.parse(fx.manifestBytes());
+  for (const path of [fx.jsonPath, fx.logPath]) {
+    const entry = manifest.artifacts.find(e => e.path === path);
+    assert.deepEqual({...entry, sha256: undefined}, {class: "candidate-evidence", authority: false, mutability: "immutable", retention: "retain", path, sha256: undefined});
+    assert.equal(entry.sha256, hash(readFileSync(join(fx.root, path))));
+  }
+  assert.deepEqual([...result.commitPaths].sort(), [fx.jsonPath, fx.logPath, fx.manifestPath].sort());
+  fx.git("add", "."); fx.git("commit", "-qm", "register diagnostic");
+  const registrationCommit = fx.git("rev-parse", "HEAD");
+  const actual = readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: fx.candidate}, {requestedMode: "full", registrationCommit}));
+  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+});
+test("D165-CDR (b) another commit or tree is refused and the manifest is byte-identical", () => {
+  for (const mutate of [(v, f) => { v.candidate.commit = f.pre; }, (v) => { v.candidate.tree = "1".repeat(40); }]) {
+    const fx = diagFixture();
+    const before = fx.manifestBytes();
+    const value = structuredClone(fx.value); mutate(value, fx);
+    const result = fx.register(fx.write(value));
+    assert.equal(result.code, "FPR-DIAG-CANDIDATE", JSON.stringify(result));
+    assert.deepEqual(fx.manifestBytes(), before);
+  }
+});
+test("D165-CDR (c) a path outside the evidence directory, a symlink and a missing file are refused FPR-DIAG-PATH", () => {
+  const fx = diagFixture();
+  const before = fx.manifestBytes();
+  writeFileSync(join(fx.root, "elsewhere.json"), readFileSync(join(fx.root, fx.jsonPath)));
+  assert.equal(fx.register("elsewhere.json").code, "FPR-DIAG-PATH");
+  assert.equal(fx.register(`${fx.dir}/missing.json`).code, "FPR-DIAG-PATH");
+  assert.equal(fx.register(`specs/${fx.featureId}/evidence/../spec.md`).code, "FPR-DIAG-PATH");
+  try { symlinkSync(join(fx.root, fx.jsonPath), join(fx.root, `${fx.dir}/link.json`), "file"); assert.equal(fx.register(`${fx.dir}/link.json`).code, "FPR-DIAG-PATH"); } catch (error) { if (error?.code !== "EPERM") throw error; }
+  assert.deepEqual(fx.manifestBytes(), before);
+});
+test("D165-CDR (d) JSON that is not a diagnostic is refused FPR-DIAG-SCHEMA", () => {
+  const fx = diagFixture();
+  const before = fx.manifestBytes();
+  assert.equal(fx.register(fx.write({schema: "something-else"}, `${fx.dir}/other.json`)).code, "FPR-DIAG-SCHEMA");
+  assert.equal(fx.register(fx.write({...fx.value, extra: 1}, `${fx.dir}/extra.json`)).code, "FPR-DIAG-SCHEMA");
+  writeFileSync(join(fx.root, `${fx.dir}/notjson.json`), "not json");
+  assert.equal(fx.register(`${fx.dir}/notjson.json`).code, "FPR-DIAG-SCHEMA");
+  assert.deepEqual(fx.manifestBytes(), before);
+});
+test("D165-CDR (e) a missing or altered member is refused FPR-DIAG-MEMBER", () => {
+  const fx = diagFixture();
+  const before = fx.manifestBytes();
+  writeFileSync(join(fx.root, fx.logPath), "altered\n");
+  assert.equal(fx.register().code, "FPR-DIAG-MEMBER");
+  rmSync(join(fx.root, fx.logPath));
+  assert.equal(fx.register().code, "FPR-DIAG-MEMBER");
+  assert.deepEqual(fx.manifestBytes(), before);
+});
+test("D165-CDR (f) the same bytes twice are already-registered and other bytes at a registered path are FPR-DIAG-IMMUTABLE", () => {
+  const fx = diagFixture();
+  assert.equal(fx.register().status, "diagnostic-added");
+  const once = fx.manifestBytes();
+  assert.equal(fx.register().status, "already-registered");
+  assert.deepEqual(fx.manifestBytes(), once);
+  fx.write({...fx.value, pending: ["full-verify", "another"]});
+  const result = fx.register();
+  assert.equal(result.code, "FPR-DIAG-IMMUTABLE", JSON.stringify(result));
+  assert.deepEqual(fx.manifestBytes(), once);
+});
+test("D165-CDR (g) the CLI accepts exactly the diagnostic shape and refuses any other FPR-ARGS", () => {
+  const root = mkdtempSync(join(tmpdir(), "critic-diag-cli-"));
+  const run = (argv) => { let text = ""; const code = runRegisterFeaturePackage(argv, (t) => { text += t; }); return {code, out: JSON.parse(text)}; };
+  const accepted = run(["--root", root, "--add-diagnostic-evidence", "specs/x/evidence/d.json"]);
+  assert.notEqual(accepted.out.code, "FPR-ARGS", JSON.stringify(accepted.out));
+  for (const argv of [["--add-diagnostic-evidence", "p", "--root", root], ["--root", root, "--add-diagnostic-evidence"], ["--root", root, "--add-diagnostic-evidence", "--root"], ["--root", root, "--add-diagnostic-evidence", "a", "b"], ["--root", root, "--add-review-unit", "x"]]) {
+    const refusal = run(argv);
+    assert.equal(refusal.code, 2); assert.equal(refusal.out.code, "FPR-ARGS", JSON.stringify(argv));
+  }
+});
+test("D165-CDR (h) the deterministic-unavailable repair names the producing and the registering command", () => {
+  const repair = criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE");
+  assert.equal(typeof repair, "string");
+  assert.match(repair, /scripts\/critic-diagnostic-evidence\.mjs/u);
+  assert.match(repair, /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u);
+  assert.match(repair, /critic-dispatch-preflight\.mjs/u);
 });
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { applyBootstrapTrustRecovery, confirmOnTerminal, main, planBootstrapTrustRecovery } from "./bootstrap-trust-recovery.mjs";
+import { applyBootstrapTrustRecovery, confirmOnTerminal, main, planBootstrapTrustRecovery, readTypedLine } from "./bootstrap-trust-recovery.mjs";
 
 function fixture(fn) {
   const home = mkdtempSync(join(tmpdir(), "pipeline-bootstrap-recovery-"));
@@ -58,18 +58,48 @@ test("recovery CLI rejects non-TTY activation without invoking setup", () => fix
   assert.match(lines.join(""), /BTR-EXTERNAL-TTY-REQUIRED/u);
 }));
 
-test("recovery confirmation puts the digest request in the readline question, so the terminal does not erase it", async () => {
+// D165-S5 (W1): the line reader replaced readline/promises, whose close() dropped a second pasted line. The earlier
+// intent of this case is kept: the digest request is the reader's prompt argument, never a separate write before it.
+test("recovery confirmation hands the digest request to the line reader as its prompt, so it is not written twice", async () => {
   const plan = { planSha256: "a".repeat(64), intent: { root: "/repo" } };
-  const questions = [];
+  const prompts = [];
   const written = [];
-  let closed = false;
-  const createInterface = () => ({ question: async (q) => { questions.push(q); return `  ${plan.planSha256}\n`; }, close() { closed = true; } });
-  const answer = await confirmOnTerminal(plan, { stdin: {}, stdout: { write: (s) => written.push(s) } }, createInterface);
+  const readLine = (prompt) => { prompts.push(prompt); return `  ${plan.planSha256}\r`; };
+  const answer = await confirmOnTerminal(plan, { stdin: {}, stdout: { write: (s) => written.push(s) } }, readLine);
   assert.equal(answer, plan.planSha256);
-  assert.equal(closed, true);
-  assert.deepEqual(questions, [`Type the plan digest ${plan.planSha256} to continue: `]);
+  assert.deepEqual(prompts, [`Type the plan digest ${plan.planSha256} to continue: `]);
   assert.doesNotMatch(written.join(""), /Type the plan digest/u);
+  assert.match(written.join(""), /First-anchor recovery for \/repo\. This does not waive any approval gate\./u);
 });
+
+test("D165-S5 a second pasted line is not swallowed: each prompt consumes exactly one line, the next prompt gets the next", async () => {
+  const consumed = [];
+  const source = Buffer.from("first-answer\nsecond-answer\n");
+  let position = 0;
+  const read = (_fd, buffer) => { if (position >= source.length) return 0; buffer[0] = source[position]; position += 1; return 1; };
+  assert.equal(readTypedLine(0, read), "first-answer");
+  assert.equal(position, "first-answer\n".length, "exactly the first line and its newline were consumed");
+  assert.equal(readTypedLine(0, read), "second-answer");
+  const plan = { planSha256: "b".repeat(64), intent: { root: "/repo" } };
+  let rest = `${plan.planSha256}\nnext-value\n`;
+  const readLine = () => { const at = rest.indexOf("\n"); const line = rest.slice(0, at); rest = rest.slice(at + 1); consumed.push(line); return line; };
+  assert.equal(await confirmOnTerminal(plan, { stdin: {}, stdout: { write() {} } }, readLine), plan.planSha256);
+  assert.equal(rest, "next-value\n", "the pasted second line stays available for the next prompt");
+  assert.equal(readLine(), "next-value");
+});
+
+test("D165-S5 a single-line answer behaves as before and an end of input before an answer fails closed", () => fixture(async (options) => {
+  assert.equal(readTypedLine(0, (_fd, buffer) => { buffer[0] = 120; return 1; }, 1), "x", "a bounded run without a newline still returns what was typed");
+  assert.equal(readTypedLine(0, () => 0), "", "end of input with nothing typed is the empty answer");
+  const plan = planBootstrapTrustRecovery(options);
+  let setupCount = 0;
+  const result = await applyBootstrapTrustRecovery({ ...options, planSha256: plan.planSha256 }, {
+    confirm: (p) => confirmOnTerminal(p, { stdin: {}, stdout: { write() {} } }, () => readTypedLine(0, () => 0)),
+    apply: () => { setupCount += 1; return { ok: true, code: "TRUST-ANCHOR-BOOTSTRAP-COMPLETE" }; }, audit: () => "audit.json",
+  });
+  assert.equal(result.code, "BTR-NOT-CONFIRMED");
+  assert.equal(setupCount, 0);
+}));
 
 test("recovery reports source complete if audit fails, without pretending the setup rolled back", () => fixture(async (options) => {
   const plan = planBootstrapTrustRecovery(options);

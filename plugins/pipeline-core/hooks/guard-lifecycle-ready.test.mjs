@@ -12594,3 +12594,105 @@ test("TR-B T74 directory Grep: the Grep tool on a directory stays refused with G
     rmSync(path, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------
+// D165-S1 (backlog 2026-10-26-brownfield-architecture-gate-never-passes, D3 + map route of D5; AC-127):
+// the preflight publishes `architecture-adoption.mjs propose|status|check --root <root> --json` as a
+// non-mutating next action and the brownfield route needs `architecture-measure.mjs [--apply]`,
+// `architecture-adoption.mjs prepare` and `architecture-fitness.mjs`; the lifecycle shell lane refused all of
+// them in draft/approved as an opaque script. Admitted as exact argv shapes only; `apply` stays behind the
+// attended PO-proof ceremony.
+// ---------------------------------------------------------------------------------
+const D165S1_ADOPTION = fileURLToPath(new URL("../scripts/architecture-adoption.mjs", import.meta.url));
+const D165S1_MEASURE = fileURLToPath(new URL("../scripts/architecture-measure.mjs", import.meta.url));
+const D165S1_FITNESS = fileURLToPath(new URL("../scripts/architecture-fitness.mjs", import.meta.url));
+
+function d165s1Fixture(status) {
+  const path = devPlanShellFixture();
+  if (status === "approved") {
+    writeFileSync(join(path, ".claude", "pipeline-state.json"),
+      JSON.stringify({ ...DEVPLANSHELL_UNAPPROVED_STATE, planApproved: true }));
+  }
+  return path;
+}
+
+function d165s1Admitted(path) {
+  return [
+    `node ${D165S1_ADOPTION} propose --root ${path}`,
+    `node ${D165S1_ADOPTION} propose --root ${path} --json`,
+    `node ${D165S1_ADOPTION} status --root ${path}`,
+    `node ${D165S1_ADOPTION} status --root ${path} --json`,
+    `node ${D165S1_ADOPTION} check --root ${path} --json`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --rationale measured-baseline`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --scope lib/ --decision-ref D162-migration --out scratch/adoption-request.json`,
+    `node ${D165S1_MEASURE} --root ${path}`,
+    `node ${D165S1_MEASURE} --root ${path} --apply`,
+    `node ${D165S1_FITNESS} --root ${path}`,
+    `node ${D165S1_FITNESS} --root ${path} --check`,
+    `node ${D165S1_FITNESS} --root ${path} --json`,
+  ];
+}
+
+function d165s1Refused(path) {
+  return [
+    `node ${D165S1_ADOPTION} apply --root ${path} --decision approved-scoped --request scratch/r.json --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} apply --root ${path}`,
+    `node ${D165S1_ADOPTION} propose --root ${path} --bogus`,
+    `node ${D165S1_ADOPTION} propose --root ${path} extra`,
+    `node ${D165S1_ADOPTION} propose --root ${path} --json --json`,
+    `node ${D165S1_ADOPTION} propose --root ${path}-other`,
+    `node ${D165S1_ADOPTION} propose`,
+    `node ${D165S1_ADOPTION} status --root ${path} --out scratch/x.json`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --out docs/x.json`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --out scratch/../docs/x.json`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --proof scratch/p.json`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ extra`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --root ${path} --decision approved-scoped`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope /etc`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope ../x`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped${" --scope src/".repeat(9)}`,
+    `node ${D165S1_ADOPTION} prepare --root ${path} --decision approved-scoped --scope src/ --decision-ref a --decision-ref b`,
+    `node ${D165S1_MEASURE} --root ${path} --bogus`,
+    `node ${D165S1_MEASURE} --root ${path} --apply --apply`,
+    `node ${D165S1_MEASURE} --root ${path} extra`,
+    `node ${D165S1_MEASURE} --root ${path}-other --apply`,
+    `node ${D165S1_FITNESS} --root ${path} --qualify`,
+    `node ${D165S1_FITNESS} --root ${path} --commit abc`,
+    `node ${D165S1_FITNESS} --root ${path} extra`,
+    `node ${D165S1_FITNESS} --root ${path}-other`,
+  ];
+}
+
+for (const status of ["draft", "approved"]) {
+  test(`D165-S1 ${status}: the architecture adoption, measure and fitness shapes are admitted`, () => {
+    const path = d165s1Fixture(status);
+    try {
+      mkdirSync(join(path, "scratch"), { recursive: true });
+      for (const command of d165s1Admitted(path)) {
+        const result = devPlanShellRun(path, command);
+        assert.equal(result.exitCode, 0, `refused an admitted shape: ${command} -- ${result.stderr}`);
+      }
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+
+  test(`D165-S1 ${status}: apply, unknown flags, extra positionals, foreign roots and repeated flags stay refused`, () => {
+    const path = d165s1Fixture(status);
+    try {
+      mkdirSync(join(path, "scratch"), { recursive: true });
+      for (const command of d165s1Refused(path)) {
+        const result = devPlanShellRun(path, command);
+        assert.equal(result.exitCode, 2, `admitted a refused shape: ${command}`);
+      }
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+
+  test(`D165-S1 ${status}: other node scripts keep their previous refusal`, () => {
+    const path = d165s1Fixture(status);
+    try {
+      const other = fileURLToPath(new URL("../scripts/architecture-baseline-unknown.mjs", import.meta.url));
+      const result = devPlanShellRun(path, `node ${other} --root ${path}`);
+      assert.equal(result.exitCode, 2);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"));
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  });
+}

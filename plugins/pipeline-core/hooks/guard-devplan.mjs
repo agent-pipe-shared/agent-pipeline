@@ -148,7 +148,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
-import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
+import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, isOnboardingScaffoldPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
 // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
 // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
 // the policy module both of this gate's lanes already share, never re-decided here. See that
@@ -537,7 +537,9 @@ const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
 const isExempt = isDraftAuthority
   || (!touchesAuthority
     && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
-      || isSanctionedCloseArtifact(normalizedPath)));
+      || isSanctionedCloseArtifact(normalizedPath)
+      // D165 D5: same onboarding scaffold the shell lane and staged-commit check exempt (AC-207).
+      || isOnboardingScaffoldPath(normalizedPath)));
 if (isExempt) process.exit(0);
 
 // ---- rebase authority: the ONE relief, and it is narrower than the gate it relieves -----

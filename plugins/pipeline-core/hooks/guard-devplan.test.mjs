@@ -1010,6 +1010,74 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
   else failures.push("rg grammar did not admit bounded filename filter");
 }
 
+// ---- D165-S2 Edit/Write lane exempts the same onboarding scaffold as the shell lane ------
+// AC-127 / D165 D5: the hook kept its own exempt list and refused architecture/, AGENTS.md and
+// pipeline.user.yaml before implementation while lib/guard-devplan-policy.mjs already exempts them
+// (AC-207). Parity only: nothing outside the policy library's scaffold lists is newly admitted.
+{
+  const devplanPolicy = await import("../lib/guard-devplan-policy.mjs");
+  const SCAFFOLD_WRITES = ["architecture/map/modules.json", "AGENTS.md", "pipeline.user.yaml"];
+  const PRODUCTION_WRITES = ["lib/production.mjs", "src/implementation.mjs"];
+  const phases = [
+    ["draft", UNAPPROVED_STATE, false],
+    ["draft-authority", DRAFT_AUTHORITY_STATE, true],
+    ["awaiting-approval", AWAITING_AUTHORITY_STATE, true],
+    ["approved", APPROVED_STATE, false],
+  ];
+  for (const [phase, state, withDocs] of phases) {
+    const dir = freshDir(`d165-s2-${phase}`);
+    writeManifest(dir, MANIFEST_BLOCKING);
+    if (withDocs) writeAuthorityDocs(dir);
+    writeState(dir, state);
+    for (const tool of ["Edit", "Write"]) {
+      for (const path of SCAFFOLD_WRITES) {
+        check(`D165-S2 allow  ${tool} ${path} in ${phase}`, tool, path, ALLOW, { projectDir: dir, stderrEmpty: true });
+      }
+    }
+    for (const path of PRODUCTION_WRITES) {
+      check(`D165-S2 block  Edit ${path} still refused in ${phase}`, "Edit", path, BLOCK, { projectDir: dir });
+    }
+  }
+
+  // Table-driven agreement: the exported predicate matches what the shell lane and the staged
+  // commit check decide (both call devPlanGateVerdict) for paths no other exemption covers.
+  const dir = freshDir("d165-s2-table");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  const table = [
+    ["architecture/map/modules.json", true],
+    ["architecture/fitness.json", true],
+    ["AGENTS.md", true],
+    ["pipeline.user.yaml", true],
+    [".gitignore", true],
+    ["project/pipeline.json", true],
+    ["src/implementation.mjs", false],
+    ["lib/production.mjs", false],
+    ["tests/a.test.mjs", false],
+    ["README.md", false],
+    ["architecture-notes.md", false],
+    ["sub/AGENTS.md", false],
+    ["sub/pipeline.user.yaml", false],
+  ];
+  for (const [path, scaffold] of table) {
+    const id = `D165-S2 predicate agrees with devPlanGateVerdict for ${path}`;
+    if (checkFilter !== "" && !id.includes(checkFilter)) continue;
+    const predicate = devplanPolicy.isOnboardingScaffoldPath;
+    if (typeof predicate !== "function") {
+      failures.push(`${id}: lib/guard-devplan-policy.mjs does not export isOnboardingScaffoldPath`);
+      console.log(`FAIL  ${id} -- predicate not exported`);
+      continue;
+    }
+    const verdict = devplanPolicy.devPlanGateVerdict({ filePath: path, projectDir: dir }).verdict;
+    const got = predicate(path.replace(/\\/g, "/").toLowerCase());
+    if (got === scaffold && (verdict === "allow") === scaffold) { pass++; console.log(`PASS  ${id}`); }
+    else {
+      failures.push(`${id}: predicate=${got} verdict=${verdict} (expected scaffold=${scaffold})`);
+      console.log(`FAIL  ${id} -- predicate=${got} verdict=${verdict}`);
+    }
+  }
+}
+
 // ---- Cleanup --------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

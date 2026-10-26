@@ -465,6 +465,28 @@ const cases = [
     assert.deepEqual(again.result.retiredCleanupLocks ?? [], []);
     assert.equal(existsSync(join(active, `${sessions[0]}.json.lock`)), true); assert.equal(existsSync(join(active, `${foreign}.json.lock`)), true);
   }) },
+  { id: "SAR15", name: "D165-S5 (W2) release-lock exits non-zero (2) when the lock was retained rather than released, with the JSON unchanged, and 0 when it was released (AC-127)", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const repository = inspectSignedDescriptorCustodyRepository(root);
+    mkdirSync(join(repository.commonDir, "agent-pipeline/session-authority"), { recursive: true, mode: 0o700 });
+    const lockPath = join(repository.commonDir, "agent-pipeline/session-authority/registry.lock");
+    const sha = (text) => createHash("sha256").update(text).digest("hex");
+    const writeLock = () => writeFileSync(lockPath, JSON.stringify({ schema: "pipeline.session-authority-lock.v2", repositorySha256: "a".repeat(64), nonce: "e".repeat(64),
+      owner: { pid: 9036, hostSha256: sha(hostname()), process: null, acquiredAt: new Date(Date.now() - 3600000).toISOString() } }), { mode: 0o600, flag: "wx" });
+    const argv = ["release-lock", "--root", root, "--no-pipeline-running", "--reason", "orphan"];
+    const run = (releaseDeps) => { let text = ""; const code = runSessionAuthorityRepair(argv, (chunk) => { text += chunk; }, { releaseDeps }); return { code, result: JSON.parse(text) }; };
+    writeLock();
+    const retained = run({ io: { rename: () => { const error = new Error("EPERM: operation not permitted, rename"); error.code = "EPERM"; throw error; } } });
+    assert.equal(retained.result.status, "retained", JSON.stringify(retained.result));
+    assert.equal(existsSync(lockPath), true, "the lock is still there");
+    assert.deepEqual(retained.result.postcondition, { lock: "retained", durability: "not-attempted", errorCode: "EPERM" });
+    assert.equal(retained.code, 2, "a retained lock is not a success");
+    rmSync(lockPath, { force: true });
+    writeLock();
+    const released = run({});
+    assert.equal(released.result.status, "released", JSON.stringify(released.result));
+    assert.equal(released.code, 0);
+  }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
