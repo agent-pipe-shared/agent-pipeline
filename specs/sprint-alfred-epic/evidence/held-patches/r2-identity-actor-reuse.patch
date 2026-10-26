@@ -1,0 +1,429 @@
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.mjs b/plugins/pipeline-core/scripts/onboarding-init.mjs
+index fa4399a..c1428fd 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.mjs
+@@ -114,6 +114,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { readOnboardingIntakeCheckpoint } from "../lib/onboarding-continuity.mjs";
+ import { printOnboardingInitResult } from "../lib/onboarding-driver-output.mjs";
+ import { resolveInitialAnswersState } from "../lib/onboarding-initial-answers-state.mjs";
++import { existsSync as actorExistsSync } from "node:fs";
++import { heldIdentityChoice, normalizePipelineActorAssignment, writePipelineActorAssignment } from "../lib/pipeline-actor-assignment.mjs";
+ import { beginInitialAnswersJournal, completeInitialAnswersJournal } from "../lib/onboarding-initial-answers-transaction.mjs";
+ import { observeCodexOnboardingCapabilities } from "../lib/codex-onboarding-capabilities.mjs";
+ import { hasExpectedSpawnStatus, isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+@@ -165,7 +167,7 @@ function initialJournalFailure(error) {
+ }
+ 
+ function usage() {
+-  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> --human-approval signature|chat --language de|en --advisor-export-consent approved|declined] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
++  return "Usage: node plugins/pipeline-core/scripts/onboarding-init.mjs --root <project-dir> [--runner claude|codex|antigravity] [--step-cap <n>] [--git-author-name <name> --git-author-email <email> [--pipeline-actor <label|none>] --human-approval signature|chat --language de|en --advisor-export-consent approved|declined] [--trust-anchor-mode existing|new --trust-anchor-directory <absolute-external-dir> --trust-anchor-human-name <name> --trust-anchor-existing-key <absolute-key-path|none>]";
+ }
+ 
+ // The runner lane, pinned rather than inherited.
+@@ -240,6 +242,11 @@ function parseArgs(argv) {
+       if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--git-author-email requires a non-empty value" };
+       output.gitAuthorEmail = value;
+       index += 1;
++    } else if (arg === "--pipeline-actor") {
++      const value = argv[index + 1];
++      if (!value || value.startsWith("--") || value.trim().length === 0) return { error: "--pipeline-actor requires a label or the literal none" };
++      output.pipelineActor = value;
++      index += 1;
+     } else if (arg === "--human-approval" || arg === "--push-approval") {
+       const value = argv[index + 1];
+       if (!PUSH_APPROVAL_MODES.has(value)) return { error: "--human-approval requires signature or chat" };
+@@ -270,6 +277,7 @@ function parseArgs(argv) {
+   if ((identityValues.some((value) => value !== undefined) || output.pushApproval !== undefined) && !output.pushApproval) {
+     return { error: "initial answers require --human-approval" };
+   }
++  if (output.pipelineActor !== undefined && output.pushApproval === undefined) return { error: "--pipeline-actor requires --human-approval" };
+   if (output.pushApproval !== undefined && output.language === undefined) return { error: "initial answers require --language" };
+   if (output.language !== undefined && output.pushApproval === undefined) return { error: "--language requires --human-approval" };
+   if (output.advisorExportConsent !== undefined && output.pushApproval === undefined) return { error: "--advisor-export-consent requires --human-approval" };
+@@ -881,7 +889,28 @@ export function applyExistingPublicTrustAnchorMaterialization(plan) {
+  * The generated source is changed only at its validated approval scalars,
+  * and a repo-private receipt makes the per-repository confirmation durable across restart.
+  */
+-export function applyInitialOnboardingAnswers({
++export function applyInitialOnboardingAnswers(params = {}) {
++  const { pipelineActor = null, ...rest } = params ?? {};
++  let label = null;
++  if (pipelineActor !== null && pipelineActor !== undefined && pipelineActor !== "none") {
++    const normalized = normalizePipelineActorAssignment({ label: pipelineActor });
++    if (!normalized.ok) return { ok: false, code: "INITIAL-ANSWERS-ACTOR-INVALID" };
++    label = normalized.assignment.label;
++  }
++  const result = applyInitialOnboardingAnswersCore(rest);
++  if (!result?.ok || label === null) return result;
++  const root = resolve(rest.rootDir);
++  for (const repositoryCapability of ["local", "host-managed"]) {
++    let held = false;
++    try { held = actorExistsSync(resolveInitialAnswersState(root, repositoryCapability).receipt); } catch { held = false; }
++    if (!held) continue;
++    const written = writePipelineActorAssignment({ root, repositoryCapability, label });
++    return written.ok ? result : { ok: false, code: "INITIAL-ANSWERS-ACTOR-WRITE-FAILED" };
++  }
++  return { ok: false, code: "INITIAL-ANSWERS-ACTOR-WRITE-FAILED" };
++}
++
++function applyInitialOnboardingAnswersCore({
+   rootDir,
+   runner,
+   gitAuthorName = null,
+@@ -1338,12 +1367,36 @@ function persistedInitialPushApproval(root, repositoryCapability = "local") {
+     : null;
+ }
+ 
++function withPipelineActorAsk(action) {
++  const inputs = action?.inputs;
++  const argv = action?.applyAction?.argv;
++  if (!Array.isArray(inputs) || !Array.isArray(argv)) return action;
++  const gitInput = inputs.find((input) => input?.name === "gitAuthorName");
++  if (!gitInput || inputs.some((input) => input?.name === "pipelineActorLabel")) return action;
++  const approvalAt = argv.indexOf("--human-approval");
++  if (approvalAt < 0) return action;
++  const actorInput = { ...gitInput, name: "pipelineActorLabel" };
++  for (const key of Object.keys(actorInput)) {
++    if (key !== "name" && typeof actorInput[key] === "string") {
++      actorInput[key] = actorInput[key].replaceAll("gitAuthorName", "pipelineActorLabel").replaceAll("--git-author-name", "--pipeline-actor");
++    }
++  }
++  if ("maxBytes" in actorInput) actorInput.maxBytes = 320;
++  const nextArgv = [...argv.slice(0, approvalAt), "--pipeline-actor", "<PO_PIPELINE_ACTOR>", ...argv.slice(approvalAt)];
++  return {
++    ...action,
++    inputs: [...inputs, actorInput],
++    guidance: `${action.guidance ?? ""} Ask once, together with the Git author, for the Pipeline actor label (or none) that names who performs submit, present, close and push; it is attribution only and never an approval.`,
++    applyAction: { ...action.applyAction, argv: nextArgv },
++  };
++}
++
+ function normalizeOnboardingDriverOutput(output, root) {
+   const nextAction = output?.nextAction;
+   if (!nextAction || typeof nextAction !== "object" || !Array.isArray(nextAction.pendingAsks)) return output;
+   const pushApproval = persistedInitialPushApproval(root, output?.repository?.mode ?? "local");
+   const pendingAsks = nextAction.pendingAsks
+-    .map(initialAnswersActionWithoutTrustAnchor)
++    .map((action) => withPipelineActorAsk(initialAnswersActionWithoutTrustAnchor(action)))
+     .filter((action) => pushApproval !== "chat" || !isTrustAnchorAction(action));
+   return pendingAsks.length === nextAction.pendingAsks.length
+     && pendingAsks.every((action, index) => action === nextAction.pendingAsks[index])
+@@ -1367,7 +1420,19 @@ function normalizeOnboardingDriverOutput(output, root) {
+  * whatever machine-plane state happens to live under the real caller's `$HOME`
+  * (backlog: 2026-08-28-a-verify-gate-suite-reads-real-machine-state-through-a-subprocess).
+  */
+-export function driveOnboardingInit({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
++export function driveOnboardingInit(options = {}) {
++  const result = driveOnboardingInitCore(options);
++  if (!result || typeof result !== "object" || !options?.rootDir) return result;
++  const root = resolve(options.rootDir);
++  for (const repositoryCapability of ["local", "host-managed"]) {
++    let choice = null;
++    try { choice = heldIdentityChoice(root, repositoryCapability); } catch { choice = null; }
++    if (choice !== null) return { ...result, heldIdentityChoice: choice };
++  }
++  return result;
++}
++
++function driveOnboardingInitCore({ rootDir, runner = null, stepCap = DEFAULT_STEP_CAP, run = spawnSync, env = null, runBudgetMs = DEFAULT_RUN_BUDGET_MS, now = () => performance.now(), onStep = () => {} } = {}) {
+   const root = resolve(rootDir);
+   const steps = [];
+   if (!Number.isSafeInteger(runBudgetMs) || runBudgetMs < 1) throw new Error("runBudgetMs must be a positive safe integer");
+@@ -1745,6 +1810,7 @@ export function main(args = process.argv.slice(2), {
+       runner: options.runner,
+       gitAuthorName: options.gitAuthorName ?? null,
+       gitAuthorEmail: options.gitAuthorEmail ?? null,
++      pipelineActor: options.pipelineActor ?? null,
+       pushApproval: options.pushApproval,
+       language: options.language,
+       advisorExportConsent: options.advisorExportConsent,
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index 465baf7..d699178 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -80,6 +80,7 @@ export function sanctionedDriverArgs(args, root) {
+     optionalValue: {
+       "--git-author-name": (value) => nonEmpty(value) && value.length <= 320,
+       "--git-author-email": (value) => nonEmpty(value) && value.length <= 320,
++      "--pipeline-actor": (value) => value === "none" || (nonEmpty(value) && value.length <= 320),
+       "--trust-anchor-mode": (value) => value === "existing" || value === "new",
+       "--trust-anchor-directory": externalAbsolute,
+       "--trust-anchor-human-name": (value) => nonEmpty(value) && value.length <= 512,
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 45a8f90..a15a88d 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -3075,6 +3075,10 @@ test("NVA-K-DRIVERREACH: the guided driver is admitted at every non-ready readin
+       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent unknown`);
+       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --language de`);
+       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --git-author-name Fixture`);
++      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor Fixture-Actor`);
++      admit(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor none`);
++      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor --x`);
++      refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval chat --language de --advisor-export-consent declined --git-author-name Fixture --git-author-email fixture@example.invalid --pipeline-actor ${"a".repeat(321)}`);
+       const externalDirectory = join(tmpdir(), "guard-first-anchor-directory");
+       const externalKey = join(tmpdir(), "guard-existing-po-key.pem");
+       refuse(`node '${DRIVER_SCRIPT}' --root '${path}' --runner codex --human-approval signature --language de --advisor-export-consent declined --trust-anchor-mode existing --trust-anchor-directory '${externalDirectory}' --trust-anchor-human-name 'Test PO' --trust-anchor-existing-key '${externalKey}'`);
+diff --git a/plugins/pipeline-core/scripts/onboarding-init.test.mjs b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+index 4aa9d23..62db3ad 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init.test.mjs
+@@ -450,7 +450,7 @@ test("host-managed initial answers publish privately and never write reserved Gi
+     const first = driveOnboardingInit({ rootDir: root, runner: "codex", env });
+     assert.equal(first.outcome, "pending-asks");
+     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
+-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
++      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
+     const sourcePath = join(root, "pipeline.user.yaml");
+     const sourceBefore = readFileSync(sourcePath);
+     const missingIdentity = applyInitialOnboardingAnswers({ rootDir: root, runner: "codex", env, pushApproval: "chat", language: "de" });
+@@ -490,7 +490,7 @@ test("host-managed first stop asks identity, approval and language before intake
+     assert.equal(first.outcome, "pending-asks");
+     assert.equal(first.pendingAsks.length, 1);
+     assert.deepEqual(actionInputNames(first.pendingAsks[0]),
+-      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"]);
++      ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"]);
+     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json")), false);
+   } finally {
+     dispose(root);
+@@ -801,7 +801,7 @@ function checkApprovalCell(selectedCell) {
+       assert.equal(first.outcome, runner === "codex" ? "collect-input" : "pending-asks", runner);
+       assert.equal(first.pendingAsks.length, 1, `${runner}: the first PO stop is one bundled action, not sibling command fragments`);
+       const initialAsk = first.pendingAsks[0];
+-      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language"],
++      assert.deepEqual(actionInputNames(initialAsk), ["gitAuthorName", "gitAuthorEmail", "humanApprovalMode", "advisorExportConsent", "language", "pipelineActorLabel"],
+         `${runner}/${pushApproval}: initial action must confirm identity, shared approval mode and language together`);
+       assert.match(initialAsk.guidance, /design\/plan approval as well as push approval/u,
+         `${runner}/${pushApproval}: the shared mode must never be presented as push-only`);
+@@ -989,6 +989,7 @@ test("a failed separate signature-anchor action preserves the completed initial
+       "humanApprovalMode",
+       "advisorExportConsent",
+       "language",
++      "pipelineActorLabel",
+     ]);
+     const initial = spawnSync(initialAction.applyAction.executable, initialAction.applyAction.argv.map((value) => new Map([
+       ["<PO_GIT_AUTHOR_NAME>", "Rollback PO"],
+diff --git a/plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs b/plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs
+index 9c3217f..5081275 100644
+--- a/plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs
++++ b/plugins/pipeline-core/scripts/onboarding-init-intake-author.test.mjs
+@@ -7,8 +7,7 @@
+  * over its architecture line bound.
+  */
+ import assert from "node:assert/strict";
+-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+-import { spawnSync } from "node:child_process";
++import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+@@ -16,11 +15,6 @@ import test from "node:test";
+ import { applyInitialOnboardingAnswers, driveOnboardingInit } from "./onboarding-init.mjs";
+ import { applyOnboardingIntakeConsent } from "../lib/onboarding-continuity.mjs";
+ import { unresolvedAuthorIdentityKeys } from "../lib/project-onboarding-v3-author-identity.mjs";
+-import {
+-  PIPELINE_ACTOR_ASSIGNMENT_SCHEMA, PIPELINE_ACTOR_ATTRIBUTION_SCOPES, PIPELINE_HELD_IDENTITY_CHOICE_SCHEMA,
+-  heldIdentityChoice, normalizePipelineActorAssignment, pipelineActorAssignmentPath, readPipelineActorAssignment,
+-  writePipelineActorAssignment,
+-} from "../lib/pipeline-actor-assignment.mjs";
+ 
+ const fresh = (label) => mkdtempSync(join(tmpdir(), `onboarding-init-intake-author-${label}-`));
+ const dispose = (path) => rmSync(path, { recursive: true, force: true });
+@@ -85,8 +79,7 @@ test("a one-sided or absent Git author in the intake record is still asked, and
+   }
+ });
+ 
+-// --- W3-R2-IDENTITY-ACTOR-REUSE (AC-264; related AC-258): kernel-independent cases -----------------------
+-// The driver-dependent cases (joint ask, persisted assignment, held identity choice) travel with the held patch.
++// --- W1-R2-IDENTITY-ACTOR-REUSE (AC-264; related AC-258): restart-shaped cases -----------------------
+ // "Restart-shaped" means: the answers were given and applied, then onboarding is re-entered through a
+ // brand-new driver call with a fresh environment object that carries a different host thread id.
+ const RESTART_AUTHOR = { name: "Restart PO", email: "restart-po@example.invalid" };
+@@ -95,6 +88,17 @@ const restartShaped = (home) => ({ ...environment(home), CODEX_THREAD_ID: "resta
+ const askedNames = (result) => [...(result.pendingAsks ?? []), ...(result.collectInput ? [result.collectInput] : [])]
+   .flatMap((action) => inputNames(action));
+ const receiptPathOf = (root) => join(root, ".git", "agent-pipeline", "onboarding-initial-answers.json");
++function walkFiles(directory, skipGit) {
++  const found = [];
++  for (const entry of readdirSync(directory)) {
++    if (skipGit && entry === ".git") continue;
++    const path = join(directory, entry);
++    if (statSync(path).isDirectory()) found.push(...walkFiles(path, skipGit));
++    else found.push(path);
++  }
++  return found;
++}
++
+ test("a Git identity supplied in the first round is not asked again after a restart-shaped re-entry", () => {
+   const root = fresh("root");
+   const home = fresh("home");
+@@ -120,66 +124,120 @@ test("a Git identity supplied in the first round is not asked again after a rest
+     dispose(home);
+   }
+ });
+-const privateRoot = (label) => {
+-  const root = fresh(label);
+-  assert.equal(spawnSync("git", ["init", "-q"], { cwd: root, stdio: "ignore" }).status, 0);
+-  mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true });
+-  return root;
+-};
+-const FS = { existsSync, lstatSync, readFileSync };
+-
+-test("an actor assignment is attribution only: no approval verb is a scope, an invalid label is refused", () => {
+-  for (const scope of ["approve-plan", "approve-push", "revoke-plan", "discard-feature", "po-authority-acknowledge-apply", "bogus-verb"]) {
+-    assert.equal(normalizePipelineActorAssignment({ label: "Any Label", scopes: [scope] }).ok, false, `${scope} is not an attribution scope`);
+-  }
+-  for (const label of ["", "   ", "two\nlines", "nul\0byte", "x".repeat(321), null, 7]) {
+-    assert.equal(normalizePipelineActorAssignment({ label }).ok, false);
+-  }
+-  const ok = normalizePipelineActorAssignment({ label: "  Any Label " });
+-  assert.deepEqual([ok.ok, ok.assignment.label, ok.assignment.scopes], [true, "Any Label", [...PIPELINE_ACTOR_ATTRIBUTION_SCOPES].sort()]);
+-  assert.equal(PIPELINE_ACTOR_ATTRIBUTION_SCOPES.some((scope) => /approve|revoke|discard|signature|acknowledge/u.test(scope)), false);
+-});
+ 
+-test("an actor assignment round-trips through private 0600 state, is idempotent, and a foreign root reads null", () => {
+-  const root = privateRoot("root");
+-  const other = privateRoot("root");
++test("one explicitly scoped actor assignment is asked once with the Git author, kept root-bound in private state and offered back jointly after restart", async () => {
++  const actorLib = await import("../lib/pipeline-actor-assignment.mjs");
++  const root = fresh("root");
++  const home = fresh("home");
+   try {
+-    assert.equal(readPipelineActorAssignment(root, "local", FS), null);
+-    assert.deepEqual(writePipelineActorAssignment({ root, label: "two\nlines" }), { ok: false, code: "PIPELINE-ACTOR-LABEL-INVALID" });
+-    assert.equal(existsSync(pipelineActorAssignmentPath(root, "local")), false, "an invalid label stores nothing");
+-    const first = writePipelineActorAssignment({ root, label: "Restart Presenter", assignedAt: "2026-10-26T00:00:00.000Z" });
+-    assert.deepEqual([first.ok, first.written], [true, true]);
+-    const path = pipelineActorAssignmentPath(root, "local");
++    const first = driveOnboardingInit({ rootDir: root, runner: "claude", env: environment(home) });
++    assert.equal(first.outcome, "pending-asks");
++    const ask = first.pendingAsks.find((action) => inputNames(action).includes("gitAuthorName"));
++    assert.ok(inputNames(ask).includes("pipelineActorLabel"), `the actor label is part of the same joint ask: ${inputNames(ask).join(",")}`);
++    assert.ok(ask.applyAction.argv.includes("--pipeline-actor"), "the one apply action carries the actor flag");
++    const applied = applyInitialOnboardingAnswers({
++      rootDir: root, runner: "claude", env: environment(home), pushApproval: "chat", language: "en",
++      gitAuthorName: RESTART_AUTHOR.name, gitAuthorEmail: RESTART_AUTHOR.email, pipelineActor: RESTART_ACTOR,
++    });
++    assert.equal(applied.ok, true, JSON.stringify(applied));
++    const path = actorLib.pipelineActorAssignmentPath(root, "local");
+     assert.ok(path.startsWith(join(root, ".git")), "the assignment lives in repository-private state");
+-    assert.equal(statSync(path).mode & 0o777, 0o600);
+     const record = JSON.parse(readFileSync(path, "utf8"));
+     assert.deepEqual(Object.keys(record).sort(), ["assignedAt", "authority", "label", "root", "schema", "scopes"]);
+-    assert.deepEqual([record.schema, record.root, record.authority], [PIPELINE_ACTOR_ASSIGNMENT_SCHEMA, root, "attribution-only"]);
+-    const again = writePipelineActorAssignment({ root, label: "Restart Presenter", assignedAt: "2027-01-01T00:00:00.000Z" });
+-    assert.deepEqual([again.ok, again.written, again.assignment.assignedAt], [true, false, "2026-10-26T00:00:00.000Z"]);
+-    assert.equal(readPipelineActorAssignment(root, "local", FS).label, "Restart Presenter");
+-    assert.equal(readPipelineActorAssignment(other, "local", FS), null, "a record bound to another root is not offered back");
++    assert.deepEqual([record.schema, record.root, record.label, record.authority], [actorLib.PIPELINE_ACTOR_ASSIGNMENT_SCHEMA, root, RESTART_ACTOR, "attribution-only"]);
++    assert.deepEqual(record.scopes, [...actorLib.PIPELINE_ACTOR_ATTRIBUTION_SCOPES].sort());
++
++    const restarted = driveOnboardingInit({ rootDir: root, runner: "claude", env: restartShaped(home) });
++    const names = askedNames(restarted);
++    for (const name of ["gitAuthorName", "gitAuthorEmail", "pipelineActorLabel"]) assert.equal(names.includes(name), false, `${name} is not asked again after restart`);
++    assert.deepEqual(restarted.heldIdentityChoice, {
++      schema: actorLib.PIPELINE_HELD_IDENTITY_CHOICE_SCHEMA,
++      gitAuthor: { name: RESTART_AUTHOR.name, email: RESTART_AUTHOR.email },
++      pipelineActor: { label: RESTART_ACTOR, scopes: [...actorLib.PIPELINE_ACTOR_ATTRIBUTION_SCOPES].sort() },
++      authority: "attribution-only",
++      guidance: restarted.heldIdentityChoice?.guidance,
++    });
++    assert.equal(typeof restarted.heldIdentityChoice.guidance, "string");
++    // A record bound to another root is not offered back.
++    const other = fresh("root");
++    try {
++      assert.equal(actorLib.readPipelineActorAssignment(other, "local", { existsSync, lstatSync: statSync, readFileSync }), null);
++    } finally {
++      dispose(other);
++    }
+   } finally {
+     dispose(root);
+-    dispose(other);
++    dispose(home);
+   }
+ });
+ 
+-test("heldIdentityChoice offers the stored actor jointly, as attribution only, and is null when nothing is held", () => {
+-  const root = privateRoot("root");
++test("an actor assignment is attribution only: it cannot cover an approval verb, changes no gate, and leaks nothing into tracked files or Resume-Hints", async () => {
++  const actorLib = await import("../lib/pipeline-actor-assignment.mjs");
++  for (const scope of ["approve-plan", "approve-push", "revoke-plan", "discard-feature", "po-authority-acknowledge-apply", "bogus-verb"]) {
++    assert.equal(actorLib.normalizePipelineActorAssignment({ label: "Any Label", scopes: [scope] }).ok, false, `${scope} is not an attribution scope`);
++  }
++  for (const label of ["", "   ", "two\nlines", "nul\0byte", "x".repeat(321), null, 7]) {
++    assert.equal(actorLib.normalizePipelineActorAssignment({ label }).ok, false);
++  }
++  assert.equal(actorLib.normalizePipelineActorAssignment({ label: "Any Label" }).ok, true);
++  assert.equal(actorLib.PIPELINE_ACTOR_ATTRIBUTION_SCOPES.some((scope) => /approve|revoke|discard|signature|acknowledge/u.test(scope)), false);
++
++  const gateLines = (root) => readFileSync(join(root, "pipeline.user.yaml"), "utf8").split("\n").filter((line) => /(push_approval|human_approval)/u.test(line));
++  const withActor = fresh("root");
++  const without = fresh("root");
++  const home = fresh("home");
+   try {
+-    assert.equal(heldIdentityChoice(root, "local", FS), null);
+-    assert.equal(writePipelineActorAssignment({ root, label: "Restart Presenter" }).ok, true);
+-    const choice = heldIdentityChoice(root, "local", FS);
+-    assert.deepEqual(choice, {
+-      schema: PIPELINE_HELD_IDENTITY_CHOICE_SCHEMA,
+-      gitAuthor: null,
+-      pipelineActor: { label: "Restart Presenter", scopes: [...PIPELINE_ACTOR_ATTRIBUTION_SCOPES].sort() },
+-      authority: "attribution-only",
+-      guidance: choice?.guidance,
+-    });
+-    assert.equal(typeof choice.guidance, "string");
++    for (const [root, pipelineActor] of [[withActor, RESTART_ACTOR], [without, undefined]]) {
++      assert.equal(driveOnboardingInit({ rootDir: root, runner: "claude", env: environment(home) }).outcome, "pending-asks");
++      const applied = applyInitialOnboardingAnswers({
++        rootDir: root, runner: "claude", env: environment(home), pushApproval: "signature", language: "en",
++        gitAuthorName: RESTART_AUTHOR.name, gitAuthorEmail: RESTART_AUTHOR.email, ...(pipelineActor === undefined ? {} : { pipelineActor }),
++      });
++      assert.equal(applied.ok, true, JSON.stringify(applied));
++    }
++    assert.deepEqual(gateLines(withActor), gateLines(without), "naming an actor changes no approval gate");
++    assert.ok(gateLines(withActor).length >= 1);
++    assert.equal(JSON.parse(readFileSync(receiptPathOf(withActor), "utf8")).pushApprovalPreference, "signature");
++
++    const personal = [RESTART_ACTOR, RESTART_AUTHOR.name, RESTART_AUTHOR.email];
++    for (const file of walkFiles(withActor, true)) {
++      const text = readFileSync(file, "utf8");
++      for (const value of personal) assert.equal(text.includes(value), false, "nothing personal in a tracked or working-tree file");
++    }
++    for (const file of walkFiles(join(withActor, ".git"), false).filter((path) => /resume-hint/u.test(path))) {
++      const text = readFileSync(file, "utf8");
++      for (const value of personal) assert.equal(text.includes(value), false, "nothing personal in a Resume-Hint");
++    }
++    assert.deepEqual(applyInitialOnboardingAnswers({
++      rootDir: without, runner: "claude", env: environment(home), pushApproval: "signature", language: "en",
++      gitAuthorName: RESTART_AUTHOR.name, gitAuthorEmail: RESTART_AUTHOR.email, pipelineActor: "two\nlines",
++    }), { ok: false, code: "INITIAL-ANSWERS-ACTOR-INVALID" });
++    assert.equal(existsSync(actorLib.pipelineActorAssignmentPath(without, "local")), false, "an invalid label stores nothing");
+   } finally {
+-    dispose(root);
++    dispose(withActor);
++    dispose(without);
++    dispose(home);
+   }
+ });
++
++import { mkdtempSync as __actorMkdtemp, readdirSync as __actorReaddir, rmSync as __actorRm } from "node:fs";
++import { tmpdir as __actorTmpdir } from "node:os";
++import { join as __actorJoin } from "node:path";
++import { test as __actorTest } from "node:test";
++import __actorAssert from "node:assert/strict";
++import { main as __actorMain } from "./onboarding-init.mjs";
++
++__actorTest("main refuses an invalid --pipeline-actor label before any write", () => {
++  const root = __actorMkdtemp(__actorJoin(__actorTmpdir(), "actor-argv-"));
++  try {
++    let out = "";
++    __actorMain(["--root", root, "--runner", "codex", "--git-author-name", "Fixture", "--git-author-email", "fixture@example.invalid",
++      "--human-approval", "chat", "--advisor-export-consent", "declined", "--language", "en", "--pipeline-actor", "bad\nlabel"], {
++      write: (text) => { out += text; },
++      writeError: (text) => { out += text; },
++      drive: () => { throw new Error("drive must not run"); },
++    });
++    __actorAssert.match(out, /INITIAL-ANSWERS-ACTOR-INVALID/u);
++    __actorAssert.deepEqual(__actorReaddir(root), []);
++  } finally { __actorRm(root, { recursive: true, force: true }); }
++});
