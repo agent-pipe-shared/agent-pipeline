@@ -1,0 +1,50 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 60f66e2df..3201ef5ad 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -600,6 +600,7 @@ kernel authority, so a maintenance window cannot lift them:
+ `plugins/pipeline-core/scripts/architecture-baseline.mjs`,
+ `plugins/pipeline-core/scripts/check-critic-bound-verify.mjs`,
+ `plugins/pipeline-core/scripts/dispatch-record-write.mjs`,
++`plugins/pipeline-core/lib/pipeline-actor-assignment.mjs`,
+ `plugins/pipeline-core/scripts/onboarding-init.mjs`,
+ `plugins/pipeline-core/scripts/osv-deadline-disconnect-controls.mjs`,
+ `plugins/pipeline-core/scripts/osv-guard-refusal-controls.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 11861d5d9..67a5f3fff 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -827,6 +827,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/scripts/architecture-baseline.mjs",
+   "plugins/pipeline-core/scripts/check-critic-bound-verify.mjs",
+   "plugins/pipeline-core/scripts/dispatch-record-write.mjs",
++  "plugins/pipeline-core/lib/pipeline-actor-assignment.mjs",
+   "plugins/pipeline-core/scripts/onboarding-init.mjs",
+   "plugins/pipeline-core/scripts/owning-verification-controller.mjs",
+   "plugins/pipeline-core/scripts/report-interruptions.mjs",
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index a98f8241a..0c2d1ba78 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -197,7 +197,7 @@ function buildConsumer(name) {
+   gitOk("commit", "-q", "-m", "scaffold the first item check");
+   const dispatchId = `PF26B-${name.toUpperCase()}`;
+   const out = runDispatchBriefing(["binding", "--root", root, "--dispatch-id", dispatchId, "--item", "first-item", "--criterion", "AC-1",
+-    "--agent-type", "goldfish-deep", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
++    "--agent-type", "goldfish-deep", "--effort-escalation", "MP-05", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
+   { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "available", value: "a".repeat(64) }, selectedPlugin: { version: "pin" } }, pluginRoot: null }) });
+   assert.equal(out.ok, true, JSON.stringify(out));
+   const binding = out.binding;
+diff --git a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+index 5a2a6153e..8e9ace703 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+@@ -198,7 +198,7 @@ const state = {};
+ 
+ function binding(fx) {
+   const out = runDispatchBriefing(["binding", "--root", fx.root, "--dispatch-id", "PIN-FIRST-ITEM", "--item", "first-item", "--criterion", "AC-1",
+-    "--agent-type", "goldfish-deep", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
++    "--agent-type", "goldfish-deep", "--effort-escalation", "MP-05", "--model-id", "claude-sonnet-5-5", "--spec", SPEC, "--check", CHECK, "--path", SOURCE],
+   { observePreflight: () => ({ rulesetSource: { loadedIdentity: { status: "available", value: "a".repeat(64) }, selectedPlugin: { version: "pin" } }, pluginRoot: null }) });
+   assert.equal(out.ok, true, JSON.stringify(out));
+   return out.binding;
