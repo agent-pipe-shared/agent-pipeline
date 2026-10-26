@@ -320,9 +320,9 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
  * PF-34 (b): a feature registered before the review unit existed gets it through this one typed amendment: the unit
  * (registered as found, or generated as in registration) and its `design` entry appended to the manifest. Nothing
  * else of the manifest changes. A failure restores the manifest's bytes and removes what this call created.
- * The course's genesis base is its first review's base (critic-course-admission.mjs), so the commit that adds the
- * unit is the earliest base a Critic review of this course can use; a course that already has a retained review
- * keeps its first base and cannot use the unit.
+ * A unit added after delivery may be reviewed from any base on the candidate history that already lists the feature
+ * manifest (critic-course-admission.mjs reads the unit at the commit that introduced it); a course that already has
+ * a retained review keeps its first base and cannot use the unit.
  */
 export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDeliveryContract } = {}) {
   if (typeof readAcceptedDeliveryContract !== "function" || !object(state)) return refused("FPR-ARGS", "root, state and the envelope reader are required");
@@ -382,6 +382,6 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "review-unit-added", manifestPath, reviewUnitPath: unitPath,
     reviewUnit: { status: unitSeen.kind === "file" ? "found" : "generated", path: unitPath, sha256: digest(unitBytes) },
     manifestSha256: digest(bytes), commitPaths: [manifestPath, unitPath],
-    next: "commit both paths in one commit. That commit is the earliest base a Critic review of this feature course can use: start the course's first review from it. A course that already has a retained review keeps its first base and cannot use this unit",
+    next: "commit both paths in one commit. The first Critic review of this feature course may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it. A course that already has a retained review keeps its first base and cannot use this unit",
   };
 }

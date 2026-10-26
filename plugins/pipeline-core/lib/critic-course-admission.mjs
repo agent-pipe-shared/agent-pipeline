@@ -36,7 +36,8 @@ const fail = (code) => { throw new CriticCourseAdmissionError(code); };
 // PF-34: the one refusal whose repair is a sanctioned command. The decision object's keys stay
 // closed, so the route travels beside the decision; ${PIPELINE_PLUGIN_ROOT} is a literal placeholder.
 const REPAIRS = Object.freeze({
-  "CCA-REVIEW-UNIT-REQUIRED": "This feature's genesis manifest lists no Critic review unit. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit; that commit is the base of the first review, so start the course's first review from it. A course that already has a retained review keeps its first base and cannot use the unit.",
+  "CCA-REVIEW-UNIT-REQUIRED": "No commit between the base and the candidate lists a Critic review unit in the feature manifest. Add it: node ${PIPELINE_PLUGIN_ROOT}/scripts/register-feature-package.mjs --root <root> --add-review-unit. Then commit both printed paths in one commit. The first review may start from any base on the candidate history that already lists the feature manifest, for example the commit that first added it; the unit may be added after delivery. A course that already has a retained review keeps its first base and cannot use the unit.",
+  "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
 });
 /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
 export function criticCourseRepair(code) {
@@ -501,21 +502,30 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
  const last=history.at(-1);if(last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
  const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
  const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
+// PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
+// otherwise the first commit of base..candidate whose manifest lists it (a manifest read error counts as not listing it).
+function introducingCommit(root,base,candidate,manifestPath,path){
+ const lists=(commit)=>{try{return manifestAt(root,commit,manifestPath).value.artifacts.some(e=>e.path===path);}catch{return false;}};
+ if(lists(base))return base;
+ for(const commit of range(root,base,candidate))if(lists(commit))return commit;
+ return fail("CCA-REVIEW-UNIT-REQUIRED");
+}
 function featureReviewUnit(input,resolved){
  const root=resolved.resolvedRepository.repoRoot,identity=resolved.courseIdentity;
- const genesis=manifestAt(root,identity.genesisCandidate.base,identity.manifestPath).value;
- const current=manifestAt(root,input.candidateCommit,identity.manifestPath).value;
  const path=`specs/${identity.originalFeatureId}/design/critic-review-unit.json`;
+ const base=identity.genesisCandidate.base,introduced=introducingCommit(root,base,input.candidateCommit,identity.manifestPath,path);
+ const genesis=manifestAt(root,introduced,identity.manifestPath).value;
+ const current=manifestAt(root,input.candidateCommit,identity.manifestPath).value;
  const units=genesis.artifacts.filter(e=>e.path===path);
  const unit=units[0];
  if(units.length!==1||!exact(unit,["class","path","sha256","authority","mutability","retention"])||unit.class!=="design"||unit.authority!==false||unit.mutability!=="immutable"||unit.retention!=="retain"||!SHA256.test(unit.sha256??""))fail("CCA-REVIEW-UNIT-REQUIRED");
  if(!current.artifacts.some(e=>equal(unit,e)))fail("CCA-REVIEW-UNIT-BINDING");
- const blob=observedBlob(root,identity.genesisCandidate.base,path);
+ const blob=observedBlob(root,introduced,path);
  if(blob.sha256!==unit.sha256)fail("CCA-REVIEW-UNIT-BINDING");
  let declaration;try{declaration=JSON.parse(blob.bytes);}catch{fail("CCA-REVIEW-UNIT-BINDING");}
  const specs=genesis.artifacts.filter(e=>e.class==="spec"&&e.authority===true);
  if(specs.length!==1||!safe(specs[0].path)||!current.artifacts.some(e=>e.class==="spec"&&e.authority===true&&e.path===specs[0].path))fail("CCA-REVIEW-UNIT-SPEC");
- const observed=readCriticReviewUnit({repoRoot:root,baseCommit:identity.genesisCandidate.base,candidateCommit:input.candidateCommit,specPath:specs[0].path,logicalWorkIds:declaration.logicalWorkIds,reviewUnitPath:unit.path});
+ const observed=readCriticReviewUnit({repoRoot:root,baseCommit:base,candidateCommit:input.candidateCommit,specPath:specs[0].path,logicalWorkIds:declaration.logicalWorkIds,reviewUnitPath:unit.path,...(introduced!==base?{declarationCommit:introduced}:{})});
  if(observed.reference.sha256!==unit.sha256)fail("CCA-REVIEW-UNIT-BINDING");
  assertFeatureCriticReviewUnitOwnership({repoRoot:root,courseKey:identity.courseKey,logicalWorkIds:observed.declaration.logicalWorkIds});
  return {...observed.reference,specPath:observed.declaration.specPath};

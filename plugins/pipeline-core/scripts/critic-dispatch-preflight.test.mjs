@@ -221,7 +221,7 @@ for (const declared of [false, true, "unit-drift", "singleton", "wrong-main", "f
       assert.equal(typeof result.repair, "string", JSON.stringify(result));
       assert.match(result.repair, /register-feature-package\.mjs --root <root> --add-review-unit/u);
       assert.match(result.repair, /commit both printed paths in one commit/u);
-      assert.match(result.repair, /base of the first review/u);
+      assert.match(result.repair, /any base on the candidate history that already lists the feature manifest/u);
       assert.match(result.repair, /retained review keeps its first base/u);
       return;
     }

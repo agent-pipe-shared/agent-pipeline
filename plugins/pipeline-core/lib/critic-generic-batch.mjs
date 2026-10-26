@@ -270,11 +270,15 @@ function declarationSource(root, d, correction = false) {
 }
 function reviewUnitSource(root, d, work) {
   // A committed declaration proves ordering and bindings, not semantic coherence.
-  const before = reference(root, d.baseCommit, d.reviewUnitPath);
+  const declarationCommit = Object.hasOwn(d, "declarationCommit") ? d.declarationCommit : d.baseCommit;
+  if (typeof declarationCommit !== "string" || !OID.test(declarationCommit)) fail("CGB-REVIEW-UNIT-BINDING");
+  try { if (git(root, ["cat-file", "-t", declarationCommit]).trim() !== "commit") fail("CGB-REVIEW-UNIT-BINDING"); }
+  catch (error) { if (error?.code === "CGB-REVIEW-UNIT-BINDING") throw error; fail("CGB-REVIEW-UNIT-BINDING"); }
+  const before = reference(root, declarationCommit, d.reviewUnitPath);
   const current = reference(root, d.candidateCommit, d.reviewUnitPath);
   if (before.blobOid !== current.blobOid) fail("CGB-REVIEW-UNIT-BINDING");
   let declaration;
-  try { declaration = JSON.parse(git(root, ["show", `${d.baseCommit}:${before.path}`])); }
+  try { declaration = JSON.parse(git(root, ["show", `${declarationCommit}:${before.path}`])); }
   catch { fail("CGB-REVIEW-UNIT-SHAPE"); }
   shape(declaration, ["schema", "kind", "purpose", "specPath", "logicalWorkIds", "criterionIds", "deliveryBoundary", "singletonRationale"]);
   if (declaration.schema !== "pipeline.critic-review-unit.v1"
@@ -282,7 +286,7 @@ function reviewUnitSource(root, d, work) {
     || typeof declaration.purpose !== "string" || declaration.purpose.trim().length === 0 || declaration.purpose.length > 2048
     || !eq(logical(declaration.logicalWorkIds), work) || declaration.specPath !== d.specPath) fail("CGB-REVIEW-UNIT-BINDING");
   const criteria = logical(declaration.criterionIds);
-  const spec = git(root, ["show", `${d.baseCommit}:${normalizePacketPath(d.specPath)}`]);
+  const spec = git(root, ["show", `${declarationCommit}:${normalizePacketPath(d.specPath)}`]);
   if (criteria.some(id => !spec.includes(id))) fail("CGB-REVIEW-UNIT-BINDING");
   const exception = ["independent-delivery", "urgent-isolated-risk"].includes(declaration.kind);
   if ((work.length === 1 && !exception) || (exception && (typeof declaration.singletonRationale !== "string"
@@ -292,6 +296,8 @@ function reviewUnitSource(root, d, work) {
   const repo = discoverRepository(realpathSync(root));
   const primaryRef = git(repo.primaryRoot, ["symbolic-ref", "HEAD"]).trim();
   if (declaration.deliveryBoundary.mainRef !== primaryRef || !primaryRef.startsWith("refs/heads/")) fail("CGB-MAIN-INTEGRATION");
+  try { git(root, ["merge-base", "--is-ancestor", declarationCommit, d.candidateCommit]); }
+  catch { fail("CGB-REVIEW-UNIT-BINDING"); }
   git(root, ["merge-base", "--is-ancestor", d.baseCommit, d.candidateCommit]);
   try { git(root, ["merge-base", "--is-ancestor", d.candidateCommit, primaryRef]); }
   catch { fail("CGB-MAIN-INTEGRATION"); }
@@ -675,7 +681,8 @@ export function recoverGenericCriticBatchEmptyStore({ controlRoot, digestSha256 
 /** Shared source-bound declaration reader; presence/bindings do not attest semantic coherence. */
 export function readCriticReviewUnit(input) {
   return invoke(() => {
-    shape(input, ["repoRoot", "baseCommit", "candidateCommit", "specPath", "logicalWorkIds", "reviewUnitPath"]);
+    const baseKeys = ["repoRoot", "baseCommit", "candidateCommit", "specPath", "logicalWorkIds", "reviewUnitPath"];
+    shape(input, Object.hasOwn(input ?? {}, "declarationCommit") ? [...baseKeys, "declarationCommit"] : baseKeys);
     if (!OID.test(input.baseCommit) || !OID.test(input.candidateCommit)) fail("CGB-SHAPE");
     return reviewUnitSource(input.repoRoot, input, logical(input.logicalWorkIds));
   });

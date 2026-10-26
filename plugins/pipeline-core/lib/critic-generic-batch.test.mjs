@@ -7,7 +7,7 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {isSuccessfulSpawn} from "./successful-spawn.mjs";
 import {produceCriticDiagnostic} from "./critic-diagnostic-producer.mjs";
-import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership,reserveFeatureCriticReviewUnitOwnership} from "./critic-generic-batch.mjs";
+import {registerGenericCriticBatch,appendGenericCriticBatchCorrection,readGenericCriticBatchAdmission,assertFeatureCriticReviewUnitOwnership,reserveFeatureCriticReviewUnitOwnership,readCriticReviewUnit} from "./critic-generic-batch.mjs";
 import {admitSessionCriticReview,finalizeSessionCriticReview,runSessionCriticFinalizerCli} from "../scripts/session-critic-finalizer.mjs";
 import {sha256Canonical,CRITIC_DISPATCH_LIMITS} from "./review-economy.mjs";
 import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket,sha256,canonicalJson} from "../scripts/critic-packet-preflight.mjs";
@@ -16,7 +16,7 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
 import {readdirSync,readlinkSync} from "node:fs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -421,5 +421,57 @@ test("owner identity is judged conservatively: foreign, unreadable or ownerless 
     assert.equal(existsSync(holder.lock),true);
     assert.equal(existsSync(join(holder.store,"logical/foreign.json")),true);
   }finally{if(holder)await holder.kill();rmSync(fx.root,{recursive:true,force:true});}
+});
+function unitInput(fx,overrides={}){return {repoRoot:fx.root,baseCommit:fx.base,candidateCommit:fx.candidate,specPath:"specs/spec.md",logicalWorkIds:["AC-1","AC-2"],reviewUnitPath:"specs/review-unit.json",...overrides};}
+// Builds history where the review unit is absent at `pre`, present from `decl`, with `candidate` after it; main points at candidate.
+function lateDeclarationFixture(){
+  const fx=fixture();const root=fx.root;
+  git(root,["checkout","-q","--orphan","pre"]);git(root,["rm","-rqf","."]);
+  mkdirSync(join(root,"specs"),{recursive:true});writeFileSync(join(root,"specs/spec.md"),"# Spec\nAC-1 AC-2\n");
+  const pre=commit(root,"pre without unit");
+  writeFileSync(join(root,"specs/review-unit.json"),JSON.stringify(unit()));
+  const decl=commit(root,"late unit declaration");
+  writeFileSync(join(root,"specs/spec.md"),"# Spec\nAC-1 AC-2\nwork\n");
+  const candidate=commit(root,"work after declaration");
+  git(root,["branch","-f","main",candidate]);git(root,["checkout","-q","main"]);
+  return {...fx,pre,decl,lateCandidate:candidate};
+}
+test("D165-PF75A default declarationCommit equals base: result and reference identical to the absent option",()=>{
+  const fx=fixture();try{
+    const plain=readCriticReviewUnit(unitInput(fx));
+    const explicit=readCriticReviewUnit(unitInput(fx,{declarationCommit:fx.base}));
+    assert.deepEqual(explicit,plain);assert.equal(plain.reference.commit,fx.base);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D165-PF75A declarationCommit later than base admits a unit absent at base and binds the blob at declarationCommit",()=>{
+  const fx=lateDeclarationFixture();try{
+    const input=unitInput(fx,{baseCommit:fx.pre,candidateCommit:fx.lateCandidate});
+    assert.throws(()=>readCriticReviewUnit(input));
+    const result=readCriticReviewUnit({...input,declarationCommit:fx.decl});
+    assert.equal(result.reference.commit,fx.decl);
+    assert.equal(result.reference.blobOid,git(fx.root,["rev-parse",`${fx.decl}:specs/review-unit.json`]));
+    assert.equal(result.declaration.kind,"related-fixes");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D165-PF75A unit changed between declarationCommit and candidate is refused",()=>{
+  const fx=lateDeclarationFixture();try{
+    writeFileSync(join(fx.root,"specs/review-unit.json"),JSON.stringify(unit({purpose:"changed after declaration"})));
+    const candidate=commit(fx.root,"unit changed");
+    rejected(()=>readCriticReviewUnit(unitInput(fx,{baseCommit:fx.pre,candidateCommit:candidate,declarationCommit:fx.decl})),"CGB-REVIEW-UNIT-BINDING");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D165-PF75A declarationCommit that is not an ancestor of the candidate is refused",()=>{
+  const fx=fixture();try{
+    const side=git(fx.root,["commit-tree",`${fx.base}^{tree}`,"-p",fx.base,"-m","side commit"],{env:{...process.env,GIT_AUTHOR_NAME:"Test",GIT_AUTHOR_EMAIL:"test@example.invalid",GIT_COMMITTER_NAME:"Test",GIT_COMMITTER_EMAIL:"test@example.invalid"}});
+    assert.notEqual(side,fx.base);
+    rejected(()=>readCriticReviewUnit(unitInput(fx,{declarationCommit:side})),"CGB-REVIEW-UNIT-BINDING");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D165-PF75A malformed declarationCommit fails the review-unit binding",()=>{
+  const fx=fixture();try{
+    const blob=git(fx.root,["rev-parse",`${fx.base}:specs/review-unit.json`]);
+    for(const bad of ["not-an-oid","ABCDEF".repeat(7)+"ABCD",fx.base.slice(0,12),"0".repeat(40),blob,fx.tree])
+      rejected(()=>readCriticReviewUnit(unitInput(fx,{declarationCommit:bad})),"CGB-REVIEW-UNIT-BINDING");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
