@@ -1,0 +1,180 @@
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index e5a82e136..b74268f6b 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -43,7 +43,7 @@
+  */
+ import { createHash } from "node:crypto";
+ import { execFileSync } from "node:child_process";
+-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
++import { closeSync, constants as fsConstants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, resolve, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
+ 
+@@ -116,6 +116,7 @@ const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : aw
+ const { resolveProjectAuthorityPaths } = cliHelp ? {} : await import("../lib/project-authority.mjs");
+ const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+ // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
++const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
+ const { readRunningDispatches } = cliHelp ? {} : await import("../lib/dispatch-record-liveness.mjs");
+ const { CANCEL_CLASS_HELP, CANCEL_CLASSES, scopesOverlap } = cliHelp ? {} : await import("../lib/slice-queue.mjs");
+ const { observePipelineStartPreflight } = cliHelp ? {} : await import("./pipeline-start-preflight.mjs");
+@@ -264,6 +265,43 @@ function defaultQueueRow(root, sliceId) {
+ 
+ const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
+ 
++const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
++const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
++const STOP_FAILURE_NAME = /^stop-failure-[A-Za-z0-9._-]+\.json$/u;
++
++/**
++ * PF-61: the persisted stop-failure diagnostics of background Goldfish whose host commit failed at SubagentStop (read-only).
++ * At most 20 regular, non-symlink files, each read bounded to 64 KiB; only objects of the stop-failure schema with string
++ * dispatchId and code are kept. Any fault yields an empty list. Never deletes, moves or rewrites a file.
++ */
++function defaultStopFailures(root) {
++  try {
++    const common = resolveGitCommonDir(root);
++    if (typeof common !== "string") return [];
++    const dir = resolve(common, ...STOP_FAILURE_DIR);
++    const names = readdirSync(dir).filter((name) => STOP_FAILURE_NAME.test(name)).sort().slice(0, 20);
++    const kept = [];
++    for (const name of names) {
++      try {
++        const file = resolve(dir, name);
++        const info = lstatSync(file);
++        if (!info.isFile() || info.isSymbolicLink()) continue;
++        const fd = openSync(file, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
++        let text;
++        try {
++          const buffer = Buffer.alloc(65536 + 1);
++          const length = readSync(fd, buffer, 0, buffer.length, 0);
++          if (length > 65536) continue;
++          text = buffer.subarray(0, length).toString("utf8");
++        } finally { closeSync(fd); }
++        const value = JSON.parse(text);
++        if (value && typeof value === "object" && value.schema === STOP_FAILURE_SCHEMA && typeof value.dispatchId === "string" && typeof value.code === "string") kept.push({ ...value, file: name });
++      } catch { /* an unreadable entry is no diagnostic */ }
++    }
++    return kept;
++  } catch { return []; }
++}
++
+ /** Every slice row of the governed queue (read-only); an empty list outside an approved item course or when it cannot be read. */
+ function defaultQueueRows(root) {
+   try {
+@@ -652,6 +690,17 @@ export function generateDispatchBinding(options, deps = {}) {
+     warnings.push({ code: "DBG-RUNNING-SCOPE-UNKNOWN", message: `the write scope of running dispatch(es) ${unreadable.map((entry) => entry.dispatchId).join(", ")} could not be read (no governed queue row and no generated briefing under scratch/), so this binding was not checked against them; confirm the scopes are disjoint before dispatching` });
+   }
+ 
++  // PF-61: a background Goldfish whose host commit failed at SubagentStop left a diagnostic nobody else reads (SubagentStop
++  // surfaces no stderr). Non-blocking: never refuses and never deletes the file; the next successful completion removes it.
++  const stopFailures = (deps.stopFailures ?? defaultStopFailures)(root);
++  const stopEntries = (Array.isArray(stopFailures) ? stopFailures : [])
++    .filter((entry) => entry && typeof entry === "object" && entry.schema === STOP_FAILURE_SCHEMA && typeof entry.dispatchId === "string" && typeof entry.code === "string")
++    .sort((a, b) => String(a.observedAt ?? "").localeCompare(String(b.observedAt ?? "")) || a.dispatchId.localeCompare(b.dispatchId));
++  for (const entry of stopEntries) {
++    const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
++    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
++  }
++
+   // Agent definition: effort, model alias and the maxTurns cliff.
+   const resolved = resolveAgentModel(agentType, { agentsDir });
+   if (!resolved) refuse("DBG-AGENT-UNRESOLVED", `no agent definition with a model for ${agentType} under the plugin agents directory`);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 6e6e3702e..a0d87dab8 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -11,7 +11,7 @@
+ import test, { after } from "node:test";
+ import assert from "node:assert/strict";
+ import { createHash } from "node:crypto";
+-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
++import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { spawnSync } from "node:child_process";
+ import { tmpdir } from "node:os";
+ import { dirname, join } from "node:path";
+@@ -1363,3 +1363,83 @@ test("PF-65 an estimate absent or below 8 + 3 x paths warns DBG-PACKAGE-ESTIMATE
+   const wideOk = packageFixture({ ...pf65Paths(4), estimatedToolCalls: 20 });
+   assert.equal(pf65Codes(runDispatchBriefing(wideOk.argv, depsOf(wideOk.fx))).includes("DBG-PACKAGE-ESTIMATE-LOW"), false);
+ });
++
++// --- PF-61 reader: a persisted background-Goldfish stop-failure diagnostic is surfaced as a non-blocking warning ---
++
++const STOP_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
++const STOP_DIR = "agent-pipeline/run/native-goldfish-host-commit";
++const stopFailure = (over = {}) => ({ schema: STOP_SCHEMA, dispatchId: "ALF-BG", toolUseId: "toolu_1", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: COMMIT, observedAt: "2026-10-26T10:00:00.000Z", ...over });
++const stopWarnings = (result) => result.warnings.filter((entry) => entry.code === "DBG-HOST-COMMIT-STOP-FAILURE");
++
++test("PF-61 reader one persisted diagnostic yields exactly one warning naming dispatch, code and commit; the build still succeeds", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [stopFailure()] }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  const found = stopWarnings(result);
++  assert.equal(found.length, 1, JSON.stringify(result.warnings));
++  assert.equal(found[0].dispatchId, "ALF-BG");
++  assert.ok(found[0].message.includes("ALF-BG"));
++  assert.ok(found[0].message.includes("NGHF-HANDBACK-INVALID"));
++  assert.ok(found[0].message.includes(COMMIT));
++  assert.match(found[0].message, /commit it yourself with the Dispatch trailer, then rebuild/u);
++});
++
++test("PF-61 reader no diagnostic yields no stop-failure warning", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => [] }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.deepEqual(stopWarnings(result), []);
++});
++
++test("PF-61 reader a malformed or foreign-schema entry is ignored, and several valid ones are ordered by observedAt then dispatchId", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const entries = [
++    stopFailure({ dispatchId: "ALF-B", observedAt: "2026-10-26T11:00:00.000Z" }),
++    stopFailure({ dispatchId: "ALF-FOREIGN", schema: "pipeline.something-else.v1" }),
++    stopFailure({ dispatchId: 7 }),
++    stopFailure({ dispatchId: "ALF-NOCODE", code: undefined }),
++    null,
++    "text",
++    stopFailure({ dispatchId: "ALF-A", observedAt: "2026-10-26T11:00:00.000Z" }),
++    stopFailure({ dispatchId: "ALF-FIRST", observedAt: "2026-10-26T09:00:00.000Z" }),
++  ];
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { stopFailures: () => entries }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  assert.deepEqual(stopWarnings(result).map((entry) => entry.dispatchId), ["ALF-FIRST", "ALF-A", "ALF-B"]);
++});
++
++test("PF-61 reader the default reader lists real files of the run directory, ignores a symlink, and deletes nothing", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
++  const git = (...args) => {
++    const r = spawnSync("git", ["-C", fx.root, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
++      "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { encoding: "utf8", env });
++    assert.equal(r.status, 0, r.stderr);
++    return r.stdout.trim();
++  };
++  git("init", "-q");
++  git("add", "-A");
++  git("commit", "-q", "-m", "fixture");
++  const real = { ...depsOf(fx) };
++  delete real.git;
++  const before = runDispatchBriefing(argvOf(fx), real);
++  assert.equal(before.ok, true, JSON.stringify(before));
++  assert.deepEqual(stopWarnings(before), [], "an absent run directory is no diagnostic");
++  const dir = join(fx.root, ".git", STOP_DIR);
++  mkdirSync(dir, { recursive: true });
++  writeFileSync(join(dir, "stop-failure-aaa.json"), JSON.stringify(stopFailure({ dispatchId: "ALF-REAL" })));
++  writeFileSync(join(dir, "stop-failure-bad.json"), "{not json");
++  writeFileSync(join(dir, "other.json"), JSON.stringify(stopFailure({ dispatchId: "ALF-OTHERNAME" })));
++  writeFileSync(join(fx.root, "elsewhere.json"), JSON.stringify(stopFailure({ dispatchId: "ALF-LINKED" })));
++  symlinkSync(join(fx.root, "elsewhere.json"), join(dir, "stop-failure-link.json"));
++  const result = runDispatchBriefing(argvOf(fx), real);
++  assert.equal(result.ok, true, JSON.stringify(result));
++  const found = stopWarnings(result);
++  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-REAL"], JSON.stringify(result.warnings));
++  assert.equal(found[0].path, `${STOP_DIR}/stop-failure-aaa.json`);
++  assert.deepEqual(readdirSync(dir).sort(), ["other.json", "stop-failure-aaa.json", "stop-failure-bad.json", "stop-failure-link.json"]);
++});
