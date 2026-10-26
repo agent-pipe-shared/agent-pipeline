@@ -51,6 +51,19 @@ one. Every launch after it was refused. That fits a domain transition left
 partially applied by that launch (`domain-transition-partial-effect-retained`),
 which later boundaries then refuse without a surfaced reason.
 
+## Repair attempt under PO option (b), 2026-10-26
+
+`inspect` then read the lock as held by a dead owner (pid 1657066, acquired 01:32Z, about
+4.9 h old), although earlier reads had shown it absent. `heal` retired it (lock absent,
+registry readable). The next launch was still refused `SDC-LOCK-HELD` without a reason.
+`move-aside --no-goldfish-running` archived the registry (all 20 reservations settled, no
+worker running); the next launch was again refused the same way. A standalone replay of
+`prepareNativeGoldfishHostState` with the identical briefing and no sibling hooks returned
+`SDC-AUTHORITY-UNAVAILABLE: item-course-requester-unavailable` instead (the session's owner
+association left with the archived registry). The hook path therefore refuses for a cause
+the standalone path does not reach; the surfaced code hides it. A consumer report shows the
+same class (report 05, PF-62 and PF-67).
+
 ## Acceptance
 
 A dispatch refusal from the session-authority boundary always names its exact
