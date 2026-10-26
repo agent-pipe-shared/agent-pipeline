@@ -1,0 +1,124 @@
+diff --git a/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs b/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
+index 031e81ca5..4af7db636 100644
+--- a/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
++++ b/plugins/pipeline-core/lib/architecture-adoption-orientation.mjs
+@@ -65,13 +65,16 @@ export function observeArchitectureAdoptionOrientation({ rootDir = process.cwd()
+   const physicalMapStatus = greenfieldScaffold ? "design-pending"
+     : indexPresent ? "present-unvalidated" : "missing";
+   const adoptionRequired = adoption?.state === "adoption-required";
++  const migrationRequired = adoption?.state === "deferred";
+   const status = adoptionRequired
+     ? (greenfieldScaffold ? "design-pending" : "adoption-required")
+-    : "decision-recorded";
++    : migrationRequired ? "migration-required" : "decision-recorded";
+   const guidance = status === "design-pending"
+     ? "The greenfield navigation scaffold exists but is not an adopted architecture baseline. Complete initial design, then record a scoped architecture disposition before implementation."
+     : status === "adoption-required"
+       ? "No usable architecture adoption decision exists. Review the staged read-only adoption proposal with the PO before implementation."
++      : status === "migration-required"
++        ? "A legacy deferred architecture adoption exists. Before implementation it must be migrated to an approved-scoped adoption over a measured baseline (D162): review the read-only proposal's migration block with the PO, who confirms it through the same route as a fresh adoption."
+       : physicalMapStatus === "missing"
+         ? "A durable architecture adoption decision exists, but the physical map index is missing. Preserve that decision; materialize the map before implementation, where map and fitness evidence are verified."
+         : "A durable architecture adoption decision was read back. Respect its scope; the present map and fitness evidence are verified only at the implementation boundary.";
+diff --git a/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs b/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs
+index 2592fef67..aa70a04ed 100644
+--- a/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs
++++ b/plugins/pipeline-core/lib/architecture-adoption-orientation.test.mjs
+@@ -79,3 +79,29 @@ test("a valid durable adoption decision is shown as a readback, never as physica
+   assert.equal(result.physicalMap.status, "missing");
+   assert.match(result.guidance, /physical map index is missing/u);
+ });
++
++test("D162 S4: a legacy deferred adoption yields migration-required with the migration guidance", () => {
++  const root = fixtureRoot("d162s4-deferred-");
++  const result = observeArchitectureAdoptionOrientation({
++    rootDir: root,
++    deps: { resolveAdoptionState: () => ({ state: "deferred", scope: null, decisionRef: "po-deferral-3", coverageClass: "unavailable", confidence: "estimated" }) },
++  });
++  assert.equal(result.status, "migration-required");
++  assert.equal(result.adoption.state, "deferred");
++  assert.equal(
++    result.guidance,
++    "A legacy deferred architecture adoption exists. Before implementation it must be migrated to an approved-scoped adoption over a measured baseline (D162): review the read-only proposal's migration block with the PO, who confirms it through the same route as a fresh adoption.",
++  );
++});
++
++test("D162 S4: approved-scoped and partial adoption states still yield decision-recorded", () => {
++  for (const state of ["approved-scoped", "partial"]) {
++    const root = fixtureRoot(`d162s4-${state}-`);
++    const result = observeArchitectureAdoptionOrientation({
++      rootDir: root,
++      deps: { resolveAdoptionState: () => ({ state, scope: ["src/"], decisionRef: "po-architecture-17", coverageClass: "evaluated", confidence: "measured" }) },
++    });
++    assert.equal(result.status, "decision-recorded", state);
++    assert.match(result.guidance, /physical map index is missing/u, state);
++  }
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 669491f2c..ce791500d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -1641,6 +1641,7 @@ export function observePipelineStartPreflight({
+   // map-first proposal when that artifact is absent; do not ask for a new
+   // adoption decision merely because the map still needs materializing.
+   const architectureOrientationAction = architectureOrientation.status === "adoption-required"
++    || architectureOrientation.status === "migration-required"
+     || (architectureOrientation.status === "decision-recorded"
+       && architectureOrientation.physicalMap?.status === "missing")
+     ? {
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 6eb9bdca3..4785f23af 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -548,6 +548,33 @@ test("normal bootstrap reports a real greenfield scaffold as design-pending rath
+   assert.equal(result.architectureOrientation.nextAction.mutation, false);
+ });
+ 
++test("D162 S4: a migration-required orientation offers the read-only propose action and leaves readiness unchanged", () => {
++  const cwd = ROOT_CURRENT;
++  const result = preflight({
++    env: {}, pluginList: pluginList(), read: () => manifest, cwd,
++    requireProjectOnboardingReadyFn() { return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "bootstrap" }; },
++    observeArchitectureAdoptionOrientationFn: () => ({
++      schema: "pipeline.architecture-adoption-orientation.v1",
++      status: "migration-required",
++      root: cwd,
++      adoption: { state: "deferred", scope: null, decisionRef: "po-deferral-3", coverageClass: "unavailable", confidence: "estimated" },
++      physicalMap: { greenfieldScaffold: false, status: "missing" },
++      guidance: "migrate",
++    }),
++  });
++  assert.equal(result.status, "ready", "orientation never gates bootstrap");
++  assert.equal(result.architectureOrientation.status, "migration-required");
++  assert.deepEqual(result.architectureOrientation.nextAction, {
++    kind: "command",
++    executable: "node",
++    argv: [join(result.pluginRoot, "scripts", "architecture-adoption.mjs"), "propose", "--root", cwd, "--json"],
++    mutation: false,
++    requiresConfirmation: false,
++    executionBoundary: "default",
++    expected: { schema: "pipeline.adoption-proposal.v1" },
++  });
++});
++
+ // Architecture orientation is carried by the one normal preflight envelope,
+ // not by a runner-specific prose hint.  Re-entering an existing project must
+ // therefore preserve the same non-mutating Brownfield proposal for every
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md b/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
+index 073525457..3a1ed3454 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
+@@ -14,6 +14,13 @@ map and compiled decision summary in the AGENTS re-entry order, then only
+ concepts for touched modules. `unavailable` is an honest retry/diagnosis,
+ never a claim that a map exists.
+ 
++When its status is `migration-required`, a legacy deferred adoption exists
++and must be migrated before implementation (D162). Run the nested read-only
++`nextAction` and show the PO the proposal's `migration` block: measure when the
++map is missing, prepare the approved-scoped adoption, then confirm and apply it
++through the same route as a fresh adoption. Never run the measure or apply steps
++without the PO's go, and never offer a new deferral.
++
+ Orientation and proposal are not authority to write a map or make a PO
+ decision. The later implementation-authority boundary, not bootstrap,
+ refuses an unresolved, out-of-scope, or physically unready architecture estate.
