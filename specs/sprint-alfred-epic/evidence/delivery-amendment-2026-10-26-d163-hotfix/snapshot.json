@@ -6,8 +6,8 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim.",
-  "total": 207,
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites.",
+  "total": 208,
   "baseline": {
     "counts": {
       "25": 2,
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 2,
+      "25": 3,
       "50": 15,
       "75": 190,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 72.71
+    "index": 72.48
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -7486,6 +7486,45 @@
         "C2-P1-WIN-ORPHAN"
       ],
       "evidenceHead": "9ce6c2361"
+    },
+    {
+      "itemId": "pipeline.preflight-establishes-runner-prerequisites",
+      "title": "Preflight establishes node, semgrep, osv-scanner and gitleaks with the user instead of only reporting them",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "PO decision D164 (3); observed on the WSL PC: node only under fnm, osv-scanner and gitleaks absent, missing scanners count as SKIPPED and clean, and the node probe judges only the preflight's own node. Analyzed and recorded; no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-preflight-establishes-runner-prerequisites.md",
+        "specs/sprint-alfred-epic/plans/po-decisions-2026-10-25-fix-wave.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Typed per-prerequisite readback and an attended per-platform install action in the preflight; a missing scanner is not ready and never counts as clean; the node probe checks stable candidates directly (Linux/WSL and native Windows)."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify on WSL and native Windows."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [
+        "AC-108"
+      ],
+      "reportingIdentityOnly": true
     }
   ]
 }

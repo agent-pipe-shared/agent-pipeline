@@ -7,7 +7,11 @@ The PO applied the nineteen held patches of the C29 row as one operator commit `
 to HEAD `10e8573b5` plus the nineteen patches in order, and that both local marketplace copies equal the repository plugin
 tree (2219 files). Claude, Codex and Antigravity installs report the new version.
 
-**207 items · 190 at 75 · 15 at 50 · 2 at 25 · 17 below 75 · index 72.71%** (previous 184/17/6, 71.5%).
+**208 items · 190 at 75 · 15 at 50 · 3 at 25 · 18 below 75 · index 72.48%** (previous 207 items, 184/17/6, 71.5%).
+
+D164 adds one P1 row at 25, `pipeline.preflight-establishes-runner-prerequisites` (item
+`backlog/items/2026-10-26-preflight-establishes-runner-prerequisites.md`): no existing row covers establishing node and
+the scanners with the user; `pipeline.greenfield.g34.scanner-summary-truth` (75) covers only the summary wording.
 
 | Row | From | To | Evidence |
 |---|---:|---:|---|
