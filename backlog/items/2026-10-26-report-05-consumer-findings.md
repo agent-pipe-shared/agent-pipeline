@@ -66,6 +66,9 @@ reproduction is still owed for every entry.
   (`06d1e8e26`, C29 item 9): clone pin 12/12, finalizer suites 24/24. Gap: the stop-failure
   diagnostic is persisted but no reader names it yet; a later slice surfaces it in
   PostToolUse or inspect. Batch Critic and PO acceptance pending.
+- PF-65: held patch `pf65-orientation-bound.patch` (C29 item 10). PF-64 cause 1 and PF-69:
+  held patch `pf64-pf69-checkpoint-text.patch` (C29 item 12). PF-64 cause 2 (announced marker
+  in the hook) is open. All are kernel paths; batch Critic and PO acceptance pending.
 - PF-67 build part: `DBG-RULESET-LOCK-HELD` already exists and is pinned (K12 cases in
   `scripts/dispatch-briefing.test.mjs`).
 - **PF-64, budget grant not delivered.** `dispatch-budget-grant.mjs` reports `granted`, but
