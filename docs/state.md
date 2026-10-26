@@ -59,8 +59,13 @@ suite and restart cases; C5 packaging pending) and G33 damaged-State recovery
 session is refused with `SDC-LOCK-HELD` while `inspect` reads the lock absent.
 Built briefings wait in `scratch/wave3/` (`briefing-identity-c5.md`,
 `briefing-g33-c2.md`; rebuild at HEAD before use, pass with the trailing
-newline). PO chose Q22 (b): `heal` and `move-aside` ran, the refusal stayed;
-next is a session restart and one retry. Consumer report 05 is triaged in
+newline). Q22 resolved: the refusal came from a session-cleanup manifest lock a
+gone hook process left inside custody (not the registry lock); retired
+once under PO exception D159, dispatch resumed. Durable fix is held patch
+`p0-session-cleanup-lock-recovery.patch` (C29 item 8). G33 patch committed
+(`c42dbaf7f`); identity needs one more continuation (patch build, notes).
+Caution: scratch work trees that symlink root entries let pipeline-state
+suites overwrite the real `architecture/adoption-state.json` (restored). Consumer report 05 is triaged in
 `backlog/items/2026-10-26-report-05-consumer-findings.md` (blocker PF-58, four
 majors, all 0.7.0). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
 (C29, T3, Q21, Q22).

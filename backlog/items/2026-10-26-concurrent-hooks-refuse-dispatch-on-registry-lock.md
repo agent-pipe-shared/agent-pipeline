@@ -64,6 +64,16 @@ association left with the archived registry). The hook path therefore refuses fo
 the standalone path does not reach; the surfaced code hides it. A consumer report shows the
 same class (report 05, PF-62 and PF-67).
 
+## Root cause (measured 2026-10-26, after D159)
+
+Not the registry lock. A replay with the hook's own session owner showed custody refusing
+"preexisting manifest lock cannot be reclaimed by custody" for
+`session-cleanup/active/claude-<session>.json.lock`, left at 00:58:49 by the C4 launch's hook
+process (pid gone). Custody never reclaims, and the worktree error carries no `reason`, so the
+hook printed none. The lock was retired once under D159 (kept aside) and dispatch resumed.
+Durable fix as held patch `p0-session-cleanup-lock-recovery.patch` (inspect names the lock,
+heal retires a dead writer's lock, the refusal carries the message); notes beside it.
+
 ## Acceptance
 
 A dispatch refusal from the session-authority boundary always names its exact
