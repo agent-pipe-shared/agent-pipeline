@@ -439,6 +439,32 @@ test("an unavailable optional decision clock remains diagnostic", () => {
   assert.equal(result.code, "ARCH-DECISION-CLOCK-UNAVAILABLE");
 });
 
+test("D165-D1 (e) planningFitnessBlockingStatus returns the projection inspectArchitectureEntryReadiness uses", async () => {
+  const { planningFitnessBlockingStatus } = await import("./architecture-entry-readiness.mjs");
+  assert.equal(typeof planningFitnessBlockingStatus, "function");
+  const names = ["module-identity-ownership", "contract-presence-freshness", "dependency-direction-cycles", "boundary-crossing",
+    "authority-effect-ownership", "verification-locality", "navigation-currency", "parallel-overlap", "profile-drift", "calibrated-friction-thresholds"];
+  const outcomes = names.map((propertyId, index) => ({ classId: index + 1, propertyId, outcome: "pass", violations: [] }));
+  outcomes[9] = { classId: 10, propertyId: names[9], outcome: "unavailable", violations: [],
+    evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } };
+  const fitness = { overallStatus: "unavailable", outcomes, summary: {} };
+  const projection = planningFitnessBlockingStatus(fitness);
+  assert.equal(projection.malformed, false);
+  assert.equal(projection.blockingOverallStatus, "pass");
+  assert.deepEqual(projection.reportOnly, [outcomes[9]]);
+  const result = inspectArchitectureEntryReadiness({
+    rootDir: repoRoot,
+    planningSurface: { planPath: "specs/architecture-entry.md", paths: ["plugins/pipeline-core/lib/architecture-entry-readiness.mjs"] },
+    deps: { readCheckpointArchitectureDebt: clearCheckpointDebt, checkPlanningAdoptionDisposition: readyDisposition,
+      evaluateArchitectureFitness: () => fitness,
+      inspectDecisions: ({ area }) => ({ area, status: "advisory", decisions: [], findings: [] }) },
+  });
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  assert.equal(result.fitness.blockingOverallStatus, projection.blockingOverallStatus);
+  assert.deepEqual(result.fitness.reportOnly, projection.reportOnly);
+  assert.equal(planningFitnessBlockingStatus({ outcomes: outcomes.slice(0, 9) }).malformed, true);
+});
+
 // ---- greenfieldPendingFitnessAllowance: pure decision, pure inputs (ALF-H1-PF20-PENDING-FITNESS-ALLOWANCE) ----
 const PF_IMPLEMENTATION = "src/app.mjs";
 const PF_ENTRY = "tests/app.test.mjs";

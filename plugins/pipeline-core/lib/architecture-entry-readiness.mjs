@@ -202,6 +202,14 @@ function projectPlanningFitness(fitness, { adoptionDisposition = null } = {}) {
   return { blockingOverallStatus, reportOnly, malformed: false };
 }
 
+/**
+ * D165 D1: the same projection inspectArchitectureEntryReadiness uses (uncalibrated class 10 is report-only),
+ * exposed unchanged so the implementation entry guard decides on the identical blocking status.
+ */
+export function planningFitnessBlockingStatus(fitness) {
+  return projectPlanningFitness(fitness);
+}
+
 /** Expose task-scoped decisions without assigning unknown paths or promoting legacy ADRs. */
 export function inspectPlanningDecisionApplicability(root, surface, now,
   { loadPhysicalMap = loadPhysicalArchitectureMap,

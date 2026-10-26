@@ -7,7 +7,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkPlanningAdoptionDisposition } from "../../scripts/architecture-adoption.mjs";
 import { evaluateArchitectureFitness, inspectFitnessModelMaterialization, runFitnessQualification } from "../../scripts/architecture-fitness.mjs";
-import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness } from "../architecture-entry-readiness.mjs";
+import { architectureTouchedContracts, greenfieldPendingFitnessAllowance, inspectArchitectureEntryReadiness, planningFitnessBlockingStatus } from "../architecture-entry-readiness.mjs";
 import { deriveMinimumRigor, inferInputsFromRepo, isContractPath, isProtectedPath, loadPolicy } from "../../scripts/rigor-floor.mjs";
 import { classifyVerifyCommand } from "../../scripts/pipeline-state.mjs";
 import { ARCHITECTURE_ADOPTION_DENIAL_CODE, ARCHITECTURE_ADOPTION_MIGRATION_DENIAL_CODE, ARCHITECTURE_FITNESS_DENIAL_CODE, MINIMUM_RIGOR_ADVISORY_CODE, PIPELINE_STATE_SCRIPT } from "./constants.mjs";
@@ -178,6 +178,14 @@ export function architectureFitnessAuthorityVerdict(root, command, dependencies 
     fitness = null;
   }
   if (fitness?.overallStatus === "pass" || fitness?.overallStatus === "excepted") return null;
+  // D165 D1: an uncalibrated class 10 is report-only in the entry-readiness library; admit when nothing else blocks.
+  if (fitness !== null && typeof fitness === "object") {
+    try {
+      const projection = planningFitnessBlockingStatus(fitness);
+      if (projection.malformed === false
+        && (projection.blockingOverallStatus === "pass" || projection.blockingOverallStatus === "excepted")) return null;
+    } catch { /* unchanged denial below */ }
+  }
   // Only the greenfield pending allowance below can lift a non-green fitness result.
   if (fitness !== null && typeof fitness === "object"
     && typeof fitness.overallStatus === "string"

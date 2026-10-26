@@ -170,3 +170,44 @@ test("set-phase implementation is still denied for a greenfield tree whose archi
   assert.ok(seen[0].result.outcomes.some((outcome) => outcome.classId === 7 && outcome.outcome === "finding"), "navigation currency is a real finding of the evaluator");
   denied(verdict, "stale map");
 });
+
+// ---- D165 D1: an uncalibrated class 10 (report-only in the entry-readiness library) must not deny alone ----
+const D1_CLASSES = ["module-identity-ownership", "contract-presence-freshness", "dependency-direction-cycles", "boundary-crossing",
+  "authority-effect-ownership", "verification-locality", "navigation-currency", "parallel-overlap", "profile-drift", "calibrated-friction-thresholds"];
+const D1_UNCALIBRATED = { classId: 10, propertyId: D1_CLASSES[9], outcome: "unavailable", violations: [],
+  evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } };
+function d1Fitness(overrideRows, overallStatus = "unavailable") {
+  const rows = D1_CLASSES.map((propertyId, index) => ({ classId: index + 1, propertyId, outcome: "pass", violations: [] }));
+  for (const row of overrideRows) rows[row.classId - 1] = row;
+  return { overallStatus, outcomes: rows };
+}
+function d1Verdict(fitness) {
+  return architectureFitnessAuthorityVerdict(repoRoot, COMMAND, {
+    activeFeaturePlanningSurfaceFn: () => ({ planPath: PLAN, paths: [IMPLEMENTATION] }),
+    activeFeaturePlanningScopeFn: () => PLAN,
+    evaluateArchitectureFitnessFn: () => fitness,
+    // No greenfield pending allowance applies: readiness is not ready.
+    inspectArchitectureEntryReadinessFn: () => ({ status: "blocked", code: "D1-FIXTURE" }),
+  });
+}
+
+test("D165-D1 (a) fitness whose only non-pass outcome is the uncalibrated class 10 is admitted", () => {
+  assert.equal(d1Verdict(d1Fitness([D1_UNCALIBRATED])), null);
+});
+
+test("D165-D1 (b) the uncalibrated class 10 plus a class 3 finding is still denied", () => {
+  const finding = { classId: 3, propertyId: D1_CLASSES[2], outcome: "finding", violations: [{ ruleId: "x", module: "application", target: IMPLEMENTATION }] };
+  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, finding], "blocked")), "class 3 finding, blocked");
+  denied(d1Verdict(d1Fitness([D1_UNCALIBRATED, finding], "unavailable")), "class 3 finding, unavailable");
+});
+
+test("D165-D1 (c) class 10 unavailable with a different evidence shape is still denied", () => {
+  const telemetry = { classId: 10, propertyId: D1_CLASSES[9], outcome: "unavailable", violations: [], evidence: { status: "unavailable", telemetryUnavailable: true } };
+  denied(d1Verdict(d1Fitness([telemetry])), "telemetryUnavailable");
+});
+
+test("D165-D1 (d) a malformed nine-outcome set is denied", () => {
+  const fitness = d1Fitness([D1_UNCALIBRATED]);
+  fitness.outcomes = fitness.outcomes.slice(0, 9);
+  denied(d1Verdict(fitness), "nine outcomes");
+});
