@@ -36,6 +36,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 
@@ -106,11 +107,13 @@ export function renderResultRecord({ featureId }) {
  * PF-34: the Critic review unit of the feature course. Critic course admission
  * (`featureReviewUnit`, critic-course-admission.mjs) requires it as a non-authority, immutable,
  * retained `design` artifact of the manifest; no route created it. The whole feature is one
- * course, so its one logical work id is the feature; the criteria are the `AC-<n>` ids its Spec
+ * course, so its one logical work id is the feature; the criteria are the `AC-<n>` or `AC-E<epic>-<story>-<nn>` ids its Spec
  * names. A Spec that names none gets no unit, and the result says so.
  */
 export const CRITIC_REVIEW_UNIT_SCHEMA = "pipeline.critic-review-unit.v1";
-const REVIEW_UNIT_CRITERION = /\bAC-[0-9]{1,6}\b/gu;
+// The id grammar is the binding's own (CRITERION_ID_SOURCE); no leading letter/digit/hyphen, no trailing digit/hyphen,
+// so AC-1 inside AC-12 or AC-E1-03-32 is never matched a second time.
+const REVIEW_UNIT_CRITERION = new RegExp(`(?<![A-Za-z0-9-])${CRITERION_ID_SOURCE}(?![0-9-])`, "gu");
 export const criticReviewUnitPath = (featureId) => `specs/${featureId}/design/critic-review-unit.json`;
 const REVIEW_UNIT_ARTIFACT = Object.freeze({ authority: false, mutability: "immutable", retention: "retain" });
 
@@ -127,7 +130,7 @@ function primaryMainRef(root) {
 /** The unit's bytes, or the reason none is written. */
 export function renderCriticReviewUnit({ featureId, specPath, specBytes, mainRef }) {
   const criterionIds = [...new Set(String(specBytes ?? "").match(REVIEW_UNIT_CRITERION) ?? [])].sort().slice(0, 128);
-  if (criterionIds.length === 0) return { ok: false, reason: `the Spec ${specPath} names no AC-<n> criterion id, which the review unit binds` };
+  if (criterionIds.length === 0) return { ok: false, reason: `the Spec ${specPath} names no criterion id (AC-<n> or AC-E<epic>-<story>-<nn>), which the review unit binds` };
   if (typeof mainRef !== "string") return { ok: false, reason: "the primary checkout is on no branch, which the review unit names as its delivery boundary" };
   const unit = {
     schema: CRITIC_REVIEW_UNIT_SCHEMA, kind: "independent-delivery",

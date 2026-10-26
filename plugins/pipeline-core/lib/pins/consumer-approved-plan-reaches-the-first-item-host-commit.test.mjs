@@ -39,7 +39,7 @@ import { runDispatchBriefing } from "../../scripts/dispatch-briefing.mjs";
 import { initialGreenfieldAgentEntryTarget, initialGreenfieldMapTargets } from "../architecture-map-scaffold.mjs";
 import { createDesignReviewReceipt } from "../design-review-receipt.mjs";
 import { readCriticReviewUnit } from "../critic-generic-batch.mjs";
-import { renderAcceptancePointer, renderResultRecord } from "../feature-package-registration.mjs";
+import { renderAcceptancePointer, renderCriticReviewUnit, renderResultRecord } from "../feature-package-registration.mjs";
 import { createGovernanceScopeController } from "../governance-scope.mjs";
 import { NEUTRAL_MANIFEST } from "../project-authority.mjs";
 import { derivePlanLifecycle } from "../plan-spec-state-v2.mjs";
@@ -352,4 +352,23 @@ test("(g) PF-34: a feature registered before the review unit existed gets it wit
   assert.equal(again.json.status, "already-present", again.stdout);
   const usage = register(fx, "--add-review-unit", "extra");
   assert.equal(usage.json.code, "FPR-ARGS");
+});
+
+test("(h) PF-58: the review unit binds every criterion id form the binding admits (AC-142)", () => {
+  const render = (text) => renderCriticReviewUnit({ featureId: FEATURE, specPath: SPEC, specBytes: Buffer.from(text), mainRef: "refs/heads/main" });
+  const ids = (text) => {
+    const out = render(text);
+    assert.equal(out.ok, true, JSON.stringify(out));
+    return JSON.parse(out.bytes.toString("utf8")).criterionIds;
+  };
+  assert.deepEqual(ids("- **AC-E2-01-05:** b\n- **AC-E1-03-32:** a\nAC-E1-03-32 again\n"), ["AC-E1-03-32", "AC-E2-01-05"], "compound ids only");
+  assert.deepEqual(ids("AC-7 and AC-E1-03-32"), ["AC-7", "AC-E1-03-32"], "mixed forms: both are kept, with no extra AC-1/AC-3 from inside the compound id");
+  const none = render("This Spec names no criterion.");
+  assert.equal(none.ok, false);
+  assert.match(none.reason, /AC-<n>/u);
+  assert.match(none.reason, /AC-E<epic>-<story>-<nn>/u);
+  const near = render("AC-E0-01-01 AC-0 XAC-5 AC-E1-03 AC-E1-03-32-9 -AC-4");
+  assert.equal(near.ok, false, "near misses are not criterion ids");
+  const many = Array.from({ length: 200 }, (_, index) => `AC-E1-1-${index + 1}`).join(" ");
+  assert.equal(ids(many).length, 128, "the 128-id cap still holds");
 });
