@@ -1,0 +1,281 @@
+diff --git a/plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json b/plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json
+index fae39fcde..5ba91783a 100644
+--- a/plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json
++++ b/plugins/pipeline-core/schemas/pipeline.adoption-proposal.v1.json
+@@ -20,6 +20,12 @@
+     }}},
+     "whatIsNotProposed": {"type": "array", "items": {"type": "string"}},
+     "estimatedTotalEffort": {"type": "object", "required": ["units", "status"], "additionalProperties": false, "properties": {"units": {"type": ["number", "string"]}, "status": {"type": "string"}}},
+-    "decisionOptions": {"type": "array", "items": {"type": "string"}}, "deterministicPassSafe": {"type": "boolean"}
++    "decisionOptions": {"type": "array", "items": {"type": "string"}}, "deterministicPassSafe": {"type": "boolean"},
++    "migration": {"type": "object", "required": ["from", "scope", "steps"], "additionalProperties": false, "properties": {
++      "from": {"type": "string"}, "scope": {"type": "array", "items": {"type": "string"}},
++      "steps": {"type": "array", "items": {"type": "object", "required": ["step", "script", "args"], "additionalProperties": false, "properties": {
++        "step": {"type": "string"}, "script": {"type": "string"}, "args": {"type": "array", "items": {"type": "string"}}, "note": {"type": "string"}
++      }}}
++    }}
+   }
+ }
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.mjs b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+index 343c9e834..0acd88443 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.mjs
+@@ -252,11 +252,33 @@ export function generateAdoptionProposal(rootDir = DEFAULT_ROOT) {
+       status: "estimated"
+     },
+     decisionOptions: currentDecision.state === STATE_ADOPTION_REQUIRED
+-      ? [STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL]
++      ? [STATE_APPROVED_SCOPED, STATE_PARTIAL] // D162: a new deferral is no longer offered
+       : [],
+     deterministicPassSafe: true
+   };
+ 
++  // D162 S2: a legacy deferred record names its migration to the measured baseline. The measurement
++  // script is only named here, never imported (kernel closure).
++  if (currentDecision.state === STATE_DEFERRED) {
++    const legacyScope = Array.isArray(currentDecision.scope) ? [...currentDecision.scope] : [currentDecision.scope];
++    const steps = [];
++    if (!fs.existsSync(path.join(rootDir, "architecture/map"))) {
++      steps.push({ step: "measure", script: "scripts/architecture-measure.mjs", args: ["--root", rootDir, "--apply"] });
++    }
++    steps.push({
++      step: "prepare",
++      script: "scripts/architecture-adoption.mjs",
++      args: ["prepare", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, ...legacyScope.flatMap((s) => ["--scope", s]), "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]
++    });
++    steps.push({
++      step: "confirm-and-apply",
++      script: "scripts/architecture-adoption.mjs",
++      args: ["apply", "--root", rootDir, "--decision", STATE_APPROVED_SCOPED, "--request", "<request file>", "--proof", "<proof file>"],
++      note: "same confirmation route as a fresh adoption (gates.push_approval / ADR-0056 mode)"
++    });
++    proposal.migration = { from: STATE_DEFERRED, scope: legacyScope, steps };
++  }
++
+   {
+     const val = validateAgainstSchema(proposal, proposalSchema);
+     if (!val.valid) {
+@@ -363,7 +385,7 @@ export function checkPlanningAdoptionDisposition(rootDir = DEFAULT_ROOT, taskSco
+     return {
+       ok: false,
+       disposition: STATE_ADOPTION_REQUIRED,
+-      error: `Architecture adoption disposition is unresolved (${STATE_ADOPTION_REQUIRED}). PO decision (${STATE_APPROVED_SCOPED} or ${STATE_DEFERRED}) required before implementation authority per AC-17.`
++      error: `Architecture adoption disposition is unresolved (${STATE_ADOPTION_REQUIRED}). PO decision (${STATE_APPROVED_SCOPED} or ${STATE_PARTIAL}) required before implementation authority per AC-17.`
+     };
+   }
+ 
+@@ -526,6 +548,12 @@ function runCli() {
+     }
+   }
+ 
++  // D162 S2: no new deferral; refused before anything is built or written (also not the --out file).
++  if ((command === "prepare" || command === "apply") && decision === STATE_DEFERRED) {
++    console.error("ADOPTION-DEFERRAL-RETIRED: a new deferred adoption can no longer be created (D162). Migrate to the measured baseline instead: run architecture-measure.mjs --apply, then prepare and apply --decision approved-scoped.");
++    process.exit(1);
++  }
++
+   if (out !== null && command !== "prepare") {
+     console.error("Error: --out is only valid with the 'prepare' command");
+     process.exit(1);
+@@ -595,7 +623,7 @@ function runCli() {
+     }
+     case "apply": {
+       if (!decision) {
+-        console.error("Error: --decision is required for 'apply' (approved-scoped | deferred | partial)");
++        console.error("Error: --decision is required for 'apply' (approved-scoped | partial)");
+         process.exit(1);
+       }
+       const applied = applyAdoptionDecision({
+diff --git a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+index dec01196a..235c9f9ea 100644
+--- a/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
++++ b/plugins/pipeline-core/scripts/architecture-adoption.test.mjs
+@@ -197,7 +197,8 @@ adrReferences: []
+     it("enforces backfill safety and deterministic-pass rule", () => {
+       const proposal = generateAdoptionProposal(tempDir);
+       assert.equal(proposal.deterministicPassSafe, true);
+-      assert.deepEqual(proposal.decisionOptions, [STATE_APPROVED_SCOPED, STATE_DEFERRED, STATE_PARTIAL]);
++      // D162: a new deferral is no longer offered; only approved-scoped and partial remain.
++      assert.deepEqual(proposal.decisionOptions, [STATE_APPROVED_SCOPED, STATE_PARTIAL]);
+       assert.ok(proposal.coverageClass);
+       assert.ok(proposal.confidence);
+ 
+@@ -622,3 +623,118 @@ describe("ADOPT-SIGN-T2: the scratch-bound --out of `prepare`", () => {
+     assert.deepEqual(entries(dir), ["keep.txt"]);
+   });
+ });
++
++// D162 S2: a new brownfield deferral is no longer offered; a legacy deferred record names its migration
++// to the measured baseline, and the CLI refuses to create a deferral before building or writing anything.
++describe("D162 S2: adoption retires the new deferral and names the migration", () => {
++  const script = path.resolve("plugins/pipeline-core/scripts/architecture-adoption.mjs");
++  const measureScript = path.resolve("plugins/pipeline-core/scripts/architecture-measure.mjs");
++  let root, key;
++  const snapshot = (dir) => {
++    const out = {};
++    const walk = (cur) => {
++      for (const entry of fs.readdirSync(cur, { withFileTypes: true })) {
++        if (entry.name === ".git") continue;
++        const full = path.join(cur, entry.name);
++        if (entry.isDirectory()) walk(full);
++        else out[path.relative(dir, full)] = fs.readFileSync(full, "utf8");
++      }
++    };
++    walk(dir);
++    return out;
++  };
++  const applyLegacyDeferred = (scope) => {
++    const deferred = { rootDir: root, decision: "deferred", scope, rationale: "Legacy deferral", decidedAt: "2026-01-01T00:00:00.000Z", expiresAt: null, reviewDate: "2099-01-01", decisionRef: "LEGACY-1" };
++    const req = prepareAdoptionAuthority(deferred);
++    return rawApply({ ...deferred, approvalRequest: req, proof: signAdoptionRequest(req, key) });
++  };
++  beforeEach(() => {
++    root = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-d162s2-"));
++    key = setupAdoptionFixture(root);
++  });
++  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
++
++  it("D162 S2: an adoption-required proposal offers exactly approved-scoped and partial", () => {
++    const empty = fs.mkdtempSync(path.join(os.tmpdir(), "adoption-d162s2-empty-"));
++    try {
++      assert.deepEqual(generateAdoptionProposal(empty).decisionOptions, [STATE_APPROVED_SCOPED, STATE_PARTIAL]);
++    } finally { fs.rmSync(empty, { recursive: true, force: true }); }
++  });
++
++  it("D162 S2: a planning check on an unresolved adoption names approved-scoped or partial", () => {
++    const res = checkPlanningAdoptionDisposition(fs.mkdtempSync(path.join(os.tmpdir(), "adoption-d162s2-check-")), "src/a.mjs");
++    assert.equal(res.ok, false);
++    assert.ok(res.error.includes("approved-scoped or partial"), res.error);
++    assert.ok(!res.error.includes("deferred"), res.error);
++  });
++
++  it("D162 S2: a legacy deferred record yields a proposal that names scope and the three migration steps", () => {
++    applyLegacyDeferred(["src/", "lib/"]);
++    fs.rmSync(path.join(root, "architecture/map"), { recursive: true, force: true });
++    const proposal = generateAdoptionProposal(root);
++    assert.deepEqual(proposal.decisionOptions, []);
++    assert.equal(proposal.migration.from, "deferred");
++    assert.deepEqual(proposal.migration.scope, ["lib/", "src/"]); // the record stores its scope normalized (sorted)
++    assert.deepEqual(proposal.migration.steps.map((s) => s.step), ["measure", "prepare", "confirm-and-apply"]);
++    assert.deepEqual(proposal.migration.steps[0].args, ["--root", root, "--apply"]);
++    assert.equal(proposal.migration.steps[0].script, "scripts/architecture-measure.mjs");
++    assert.deepEqual(proposal.migration.steps[1].args, ["prepare", "--root", root, "--decision", "approved-scoped", "--scope", "lib/", "--scope", "src/", "--rationale", "D162 migration of a legacy deferred adoption to the measured baseline", "--decision-ref", "D162-migration"]);
++    assert.equal(proposal.migration.steps[1].script, "scripts/architecture-adoption.mjs");
++    assert.deepEqual(proposal.migration.steps[2].args, ["apply", "--root", root, "--decision", "approved-scoped", "--request", "<request file>", "--proof", "<proof file>"]);
++    assert.ok(proposal.migration.steps[2].note.includes("ADR-0056"));
++  });
++
++  it("D162 S2: with an existing architecture/map the migration names only prepare and confirm-and-apply", () => {
++    applyLegacyDeferred(["src/"]);
++    assert.ok(fs.existsSync(path.join(root, "architecture/map")));
++    const proposal = generateAdoptionProposal(root);
++    assert.deepEqual(proposal.migration.steps.map((s) => s.step), ["prepare", "confirm-and-apply"]);
++  });
++
++  it("D162 S2: a proposal without a deferred record carries no migration", () => {
++    assert.equal(generateAdoptionProposal(root).migration, undefined);
++  });
++
++  for (const command of ["prepare", "apply"]) {
++    it(`D162 S2: CLI ${command} --decision deferred is refused before anything is built or written`, () => {
++      fs.mkdirSync(path.join(root, "scratch"), { recursive: true });
++      const before = snapshot(root);
++      const out = path.join(root, "scratch/request.json");
++      const args = [command, "--root", root, "--decision", "deferred", "--scope", "src/", "--rationale", "No new deferral", "--decision-ref", "NEW-DEFERRAL-1", "--decided-at", "2026-01-01T00:00:00.000Z", ...(command === "prepare" ? ["--out", out] : [])];
++      const res = spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
++      assert.equal(res.status, 1, res.stderr);
++      assert.ok(res.stderr.startsWith("ADOPTION-DEFERRAL-RETIRED:"), res.stderr);
++      assert.ok(res.stderr.includes("architecture-measure.mjs --apply"), res.stderr);
++      assert.ok(res.stderr.includes("approved-scoped"), res.stderr);
++      assert.ok(res.stderr.includes("D162"), res.stderr);
++      assert.equal(fs.existsSync(out), false);
++      assert.deepEqual(snapshot(root), before);
++    });
++  }
++
++  it("D162 S2: a legacy deferral migrates through measurement and an approved-scoped adoption", () => {
++    applyLegacyDeferred(["src/"]);
++    assert.equal(resolveAdoptionState(root).state, STATE_DEFERRED);
++    // Brownfield shape: no physical architecture yet; the measurement writes it.
++    fs.rmSync(path.join(root, "architecture/map"), { recursive: true, force: true });
++    fs.mkdirSync(path.join(root, "src"), { recursive: true });
++    fs.writeFileSync(path.join(root, "src/a.mjs"), "export const a = 1;\n");
++    fixtureGit(root, ["add", "-A"]);
++    fixtureGit(root, ["commit", "-qm", "legacy deferred state"]);
++    const measured = spawnSync(process.execPath, [measureScript, "--root", root, "--apply", "--json"], { encoding: "utf8" });
++    assert.equal(measured.status, 0, measured.stdout + measured.stderr);
++    assert.ok(fs.existsSync(path.join(root, "architecture/map/index.md")));
++    assert.ok(fs.existsSync(path.join(root, "architecture/baseline.json")));
++    fixtureGit(root, ["add", "-A"]);
++    fixtureGit(root, ["commit", "-qm", "measured baseline"]);
++    const input = { rootDir: root, decision: "approved-scoped", scope: ["src/"], rationale: "D162 migration of a legacy deferred adoption to the measured baseline", decidedAt: "2026-02-01T00:00:00.000Z", expiresAt: null, reviewDate: null, decisionRef: "D162-migration" };
++    const req = prepareAdoptionAuthority(input);
++    rawApply({ ...input, approvalRequest: req, proof: signAdoptionRequest(req, key) });
++    const resolved = resolveAdoptionState(root);
++    assert.equal(resolved.state, STATE_APPROVED_SCOPED);
++    assert.deepEqual(resolved.scope, ["src/"]);
++    const check = checkPlanningAdoptionDisposition(root, "src/a.mjs");
++    assert.equal(check.ok, true, check.error);
++    assert.equal(check.disposition, STATE_APPROVED_SCOPED);
++  });
++});
+diff --git a/schemas/pipeline.adoption-proposal.v1.json b/schemas/pipeline.adoption-proposal.v1.json
+index 4a75cc719..f947dc2dc 100644
+--- a/schemas/pipeline.adoption-proposal.v1.json
++++ b/schemas/pipeline.adoption-proposal.v1.json
+@@ -186,6 +186,55 @@
+     },
+     "deterministicPassSafe": {
+       "type": "boolean"
++    },
++    "migration": {
++      "type": "object",
++      "required": [
++        "from",
++        "scope",
++        "steps"
++      ],
++      "additionalProperties": false,
++      "properties": {
++        "from": {
++          "type": "string"
++        },
++        "scope": {
++          "type": "array",
++          "items": {
++            "type": "string"
++          }
++        },
++        "steps": {
++          "type": "array",
++          "items": {
++            "type": "object",
++            "required": [
++              "step",
++              "script",
++              "args"
++            ],
++            "additionalProperties": false,
++            "properties": {
++              "step": {
++                "type": "string"
++              },
++              "script": {
++                "type": "string"
++              },
++              "args": {
++                "type": "array",
++                "items": {
++                  "type": "string"
++                }
++              },
++              "note": {
++                "type": "string"
++              }
++            }
++          }
++        }
++      }
+     }
+   }
+ }
