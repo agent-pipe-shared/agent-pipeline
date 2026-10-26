@@ -1,0 +1,136 @@
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.mjs b/plugins/pipeline-core/hooks/guard-devplan.mjs
+index b486e07d2..b1bcb34d1 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.mjs
+@@ -148,7 +148,7 @@ import {
+   validatePortablePipelineState,
+ } from "../lib/project-authority.mjs";
+ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+-import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
++import { designAdvisoryAdmission, designAdvisoryRemediation, lifecycleDesignApprovalDenial, isDispatchRecordCoordinationPath, isOnboardingScaffoldPath, unverifiedApprovalAdvisory } from "../lib/guard-devplan-policy.mjs";
+ // NVA-B-REBWIRE-1 (backlog: 2026-09-01-an-authorized-rebase-demands-a-fresh-po-signature-
+ // after-every-conflict.md): the dev-plan gate's ONE relief and its denial disclosure, owned by
+ // the policy module both of this gate's lanes already share, never re-decided here. See that
+@@ -537,7 +537,9 @@ const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
+ const isExempt = isDraftAuthority
+   || (!touchesAuthority
+     && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
+-      || isSanctionedCloseArtifact(normalizedPath)));
++      || isSanctionedCloseArtifact(normalizedPath)
++      // D165 D5: same onboarding scaffold the shell lane and staged-commit check exempt (AC-207).
++      || isOnboardingScaffoldPath(normalizedPath)));
+ if (isExempt) process.exit(0);
+ 
+ // ---- rebase authority: the ONE relief, and it is narrower than the gate it relieves -----
+diff --git a/plugins/pipeline-core/hooks/guard-devplan.test.mjs b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+index 756b279a9..9ed80f774 100644
+--- a/plugins/pipeline-core/hooks/guard-devplan.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-devplan.test.mjs
+@@ -1010,6 +1010,74 @@ console.log("PASS  private Advisor transaction and exact final-approval matrix i
+   else failures.push("rg grammar did not admit bounded filename filter");
+ }
+ 
++// ---- D165-S2 Edit/Write lane exempts the same onboarding scaffold as the shell lane ------
++// AC-127 / D165 D5: the hook kept its own exempt list and refused architecture/, AGENTS.md and
++// pipeline.user.yaml before implementation while lib/guard-devplan-policy.mjs already exempts them
++// (AC-207). Parity only: nothing outside the policy library's scaffold lists is newly admitted.
++{
++  const devplanPolicy = await import("../lib/guard-devplan-policy.mjs");
++  const SCAFFOLD_WRITES = ["architecture/map/modules.json", "AGENTS.md", "pipeline.user.yaml"];
++  const PRODUCTION_WRITES = ["lib/production.mjs", "src/implementation.mjs"];
++  const phases = [
++    ["draft", UNAPPROVED_STATE, false],
++    ["draft-authority", DRAFT_AUTHORITY_STATE, true],
++    ["awaiting-approval", AWAITING_AUTHORITY_STATE, true],
++    ["approved", APPROVED_STATE, false],
++  ];
++  for (const [phase, state, withDocs] of phases) {
++    const dir = freshDir(`d165-s2-${phase}`);
++    writeManifest(dir, MANIFEST_BLOCKING);
++    if (withDocs) writeAuthorityDocs(dir);
++    writeState(dir, state);
++    for (const tool of ["Edit", "Write"]) {
++      for (const path of SCAFFOLD_WRITES) {
++        check(`D165-S2 allow  ${tool} ${path} in ${phase}`, tool, path, ALLOW, { projectDir: dir, stderrEmpty: true });
++      }
++    }
++    for (const path of PRODUCTION_WRITES) {
++      check(`D165-S2 block  Edit ${path} still refused in ${phase}`, "Edit", path, BLOCK, { projectDir: dir });
++    }
++  }
++
++  // Table-driven agreement: the exported predicate matches what the shell lane and the staged
++  // commit check decide (both call devPlanGateVerdict) for paths no other exemption covers.
++  const dir = freshDir("d165-s2-table");
++  writeManifest(dir, MANIFEST_BLOCKING);
++  writeState(dir, UNAPPROVED_STATE);
++  const table = [
++    ["architecture/map/modules.json", true],
++    ["architecture/fitness.json", true],
++    ["AGENTS.md", true],
++    ["pipeline.user.yaml", true],
++    [".gitignore", true],
++    ["project/pipeline.json", true],
++    ["src/implementation.mjs", false],
++    ["lib/production.mjs", false],
++    ["tests/a.test.mjs", false],
++    ["README.md", false],
++    ["architecture-notes.md", false],
++    ["sub/AGENTS.md", false],
++    ["sub/pipeline.user.yaml", false],
++  ];
++  for (const [path, scaffold] of table) {
++    const id = `D165-S2 predicate agrees with devPlanGateVerdict for ${path}`;
++    if (checkFilter !== "" && !id.includes(checkFilter)) continue;
++    const predicate = devplanPolicy.isOnboardingScaffoldPath;
++    if (typeof predicate !== "function") {
++      failures.push(`${id}: lib/guard-devplan-policy.mjs does not export isOnboardingScaffoldPath`);
++      console.log(`FAIL  ${id} -- predicate not exported`);
++      continue;
++    }
++    const verdict = devplanPolicy.devPlanGateVerdict({ filePath: path, projectDir: dir }).verdict;
++    const got = predicate(path.replace(/\\/g, "/").toLowerCase());
++    if (got === scaffold && (verdict === "allow") === scaffold) { pass++; console.log(`PASS  ${id}`); }
++    else {
++      failures.push(`${id}: predicate=${got} verdict=${verdict} (expected scaffold=${scaffold})`);
++      console.log(`FAIL  ${id} -- predicate=${got} verdict=${verdict}`);
++    }
++  }
++}
++
+ // ---- Cleanup --------------------------------------------------------------------------
+ for (const dir of ALL_DIRS) {
+   try {
+diff --git a/plugins/pipeline-core/lib/guard-devplan-policy.mjs b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+index 503ad10a1..3287345ce 100644
+--- a/plugins/pipeline-core/lib/guard-devplan-policy.mjs
++++ b/plugins/pipeline-core/lib/guard-devplan-policy.mjs
+@@ -340,6 +340,18 @@ export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claud
+ const ONBOARDING_SCAFFOLD_EXACT_PATHS = Object.freeze([".gitignore", "AGENTS.md", "pipeline.user.yaml"]);
+ const ONBOARDING_SCAFFOLD_PREFIXES = Object.freeze(["architecture/", "project/"]);
+ 
++/**
++ * D165 D5: the ONE predicate for the onboarding scaffold exemption, shared by the shell lane, the
++ * staged-commit check (via devPlanGateVerdict) and the Edit/Write hook, so the lanes cannot disagree.
++ * `normalizedPath` is the case-folded, slash-normalized relative path; the constants are folded the
++ * same way. It owns nothing but the AC-207 lists above and widens nothing.
++ */
++export function isOnboardingScaffoldPath(normalizedPath) {
++  if (typeof normalizedPath !== "string") return false;
++  return ONBOARDING_SCAFFOLD_EXACT_PATHS.some((exact) => normalizedPath === normalize(exact))
++    || ONBOARDING_SCAFFOLD_PREFIXES.some((prefix) => normalizedPath.startsWith(normalize(prefix)));
++}
++
+ // A dispatched role must create this receipt as its opening act. It is
+ // coordination evidence rather than product implementation, so only this
+ // canonical receipt filename is admitted before plan approval.
+@@ -531,8 +543,7 @@ export function devPlanGateVerdict({ filePath, projectDir, forceLifecycleGate =
+       && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
+         // normalizedPath is case-folded by normalize(); fold the constants the same way,
+         // otherwise a mixed-case entry such as "AGENTS.md" can never match.
+-        || ONBOARDING_SCAFFOLD_EXACT_PATHS.some((exact) => normalizedPath === normalize(exact))
+-        || ONBOARDING_SCAFFOLD_PREFIXES.some((prefix) => normalizedPath.startsWith(normalize(prefix)))))
++        || isOnboardingScaffoldPath(normalizedPath)))
+   );
+   if (isExempt) return { verdict: "allow" };
+ 
