@@ -4639,6 +4639,61 @@ check("planOnboardingBootstrapBind: the same pure-generator staging PRD is refus
     () => planOnboardingBootstrapBind({ rootDir: root }));
 });
 
+// D170 (D7 root cause): the feature package registrar binds specs/<featureId>/
+// with a hyphen-only id, so `kickoff promote plan` refuses a folder it could
+// never register, at plan time. The refusal is pure and fires before any
+// observation, so a nonexistent rootDir is fine.
+function d170PlanFor(folder, featureId = "my-topic") {
+  return {
+    rootDir: join(dirname(fileURLToPath(import.meta.url)), "d170-no-such-root"), profile: "feature", featureId,
+    planPath: `${folder}/prd_my-topic.md`, prdPath: `${folder}/prd_my-topic.md`,
+    specPath: `${folder}/spec.md`, designInputPath: `${folder}/design-input.md`,
+  };
+}
+function d170Refusal(folder) {
+  try { planOnboardingKickoffPromotion(d170PlanFor(folder)); } catch (error) { return error; }
+  return undefined;
+}
+
+check("D170 the promote-plan folder SAFE_ID pattern stays equal to the registrar's", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const registrar = readFileSync(join(here, "feature-package-registration.mjs"), "utf8");
+  const continuity = readFileSync(join(here, "onboarding-continuity.mjs"), "utf8");
+  const pick = (text, name) => text.match(new RegExp(`^const ${name} = (/[^\\n]+/u);$`, "mu"))?.[1];
+  assert.ok(pick(registrar, "SAFE_ID"), "registrar SAFE_ID line is readable");
+  assert.equal(pick(continuity, "PROMOTION_FOLDER_SAFE_ID"), pick(registrar, "SAFE_ID"));
+});
+
+check("D170 a promotion plan under an underscore folder is refused at plan time and names the directory", () => {
+  const error = d170Refusal("specs/2026-10-25_my-topic");
+  assert.equal(error?.code, "KICKOFF-PROMOTION-FOLDER");
+  assert.match(error.message, /specs\/2026-10-25_my-topic/u);
+  assert.match(error.message, /specs\/2026-10-25-my-topic/u, "suggests the hyphen form");
+});
+
+check("D170 a promotion plan under an uppercase folder is refused", () => {
+  const error = d170Refusal("specs/My-Topic");
+  assert.equal(error?.code, "KICKOFF-PROMOTION-FOLDER");
+  assert.match(error.message, /specs\/My-Topic/u);
+});
+
+check("D170 a promotion plan under a nested folder is refused", () => {
+  const error = d170Refusal("specs/a/b");
+  assert.equal(error?.code, "KICKOFF-PROMOTION-FOLDER");
+  assert.match(error.message, /specs\/a\/b/u);
+});
+
+check("D170 a flat specs layout and a registrable folder do not hit the folder refusal", () => {
+  for (const folder of ["specs", "specs/my-topic", "specs/2026-10-25-my-topic"]) {
+    assert.notEqual(d170Refusal(folder)?.code, "KICKOFF-PROMOTION-FOLDER", folder);
+  }
+});
+
+check("D170 a promotion plan under specs/my-topic with --id my-topic is not stopped by the folder rule", () => {
+  const error = d170Refusal("specs/my-topic");
+  assert.ok(error === undefined || error.code !== "KICKOFF-PROMOTION-FOLDER");
+});
+
 // The legacy kickoff route also remains marker-strict. A generated checkpoint
 // is additionally refused earlier as coordinator-only; this fixture covers a
 // genuine legacy promotion without such a checkpoint.
@@ -5443,7 +5498,7 @@ for (const [label, options] of Object.entries({
   });
 }
 
-assert.equal(cases.length, 318, "the complete onboarding continuity corpus must be registered before execution begins");
+assert.equal(cases.length, 324, "the complete onboarding continuity corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

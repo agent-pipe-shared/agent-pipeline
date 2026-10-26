@@ -6080,6 +6080,23 @@ function buildCoordinatorSourcedPromotionPlan({
   return plan;
 }
 
+// Source: SAFE_ID in lib/feature-package-registration.mjs (kept equal by a test).
+const PROMOTION_FOLDER_SAFE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+// D170: the feature package registrar binds specs/<featureId>/, so a promote
+// plan under a folder it could never register is refused here, at plan time.
+// A flat specs/ layout is left untouched.
+function assertRegistrablePromotionFolder(specPath) {
+  const dir = dirname(specPath);
+  if (dir === "specs") return;
+  const segments = dir.split("/");
+  if (segments.length === 2 && segments[0] === "specs" && PROMOTION_FOLDER_SAFE_ID.test(segments[1])) return;
+  const hyphenated = segments.length === 2 && segments[0] === "specs" ? segments[1].replaceAll("_", "-") : "";
+  const hint = hyphenated && PROMOTION_FOLDER_SAFE_ID.test(hyphenated) ? ` Use specs/${hyphenated} instead.` : "";
+  fail("KICKOFF-PROMOTION-FOLDER",
+    `design package directory ${dir} cannot be registered: it must be directly under specs/ and use lowercase letters, digits and single hyphens only, because the feature package registrar binds specs/<featureId>/.${hint}`);
+}
+
 function buildKickoffPromotionPlan({
   rootDir, profile, featureId, planPath, prdPath, specPath, designInputPath,
   runner = "codex",
@@ -6088,6 +6105,7 @@ function buildKickoffPromotionPlan({
 } = {}) {
   if (!isAbsolute(onboardingScript)) fail("KICKOFF-PROMOTION-PLAN", "onboarding script must be absolute");
   const input = promotionInput({ profile, featureId, planPath, prdPath, specPath, designInputPath });
+  assertRegistrablePromotionFolder(input.specPath ?? specPath);
   const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
   if (coordinatorSourced) {
     return buildCoordinatorSourcedPromotionPlan({

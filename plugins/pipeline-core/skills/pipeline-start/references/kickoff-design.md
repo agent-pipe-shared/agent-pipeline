@@ -162,9 +162,11 @@ The transaction-created `specs/kickoff-*` files are provisional bootstrap
 anchors, not the standard long-term design location. Once material design input
 exists, create the normal design package before presenting a planning result
 or proposing a restart, then use the sanctioned kickoff-promotion flow. Its
-directory is `specs/YYYY-MM-DD_short-topic/`, where the date is the local
-creation date and `short-topic` is a short, lowercase, ASCII-safe summary of
-the user's topic. Use `prd_short-topic.md`, `spec.md`, and `design-input.md`.
+directory is `specs/<id>/`, where `<id>` is the `--id` of the promotion:
+lowercase letters, digits and single hyphens only, with a date prefix only in
+the hyphen form `YYYY-MM-DD-short-topic`, never an underscore. The directory
+name equals the feature ID because the feature package registrar binds
+`specs/<featureId>/`. Use `prd_short-topic.md`, `spec.md`, and `design-input.md`.
 Never overwrite an existing package; choose an unambiguous suffix after a
 readback. The promotion's `--profile`, feature ID, plan/PRD/Spec paths must
 bind to that package exactly.
