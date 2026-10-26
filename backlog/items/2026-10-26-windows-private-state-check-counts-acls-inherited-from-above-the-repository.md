@@ -5,8 +5,9 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
-priority: P1
+priority: P0
 release: 0.7.0
+sprint: alfred
 source: "PO consumer run 2026-10-26 (brownfield repo on a Windows data drive, first native dispatch after implementation entry): guard-dispatch blocked with CVCT-FILE although the plan was approved"
 done_when: manual
 ---
@@ -61,7 +62,24 @@ only**:
   `Authenticated Users` → preflight finding with the command, runtime refuses with a pointer to it; explicit
   foreign ACE on the root → `insecure`; malformed or missing observation fails closed.
 
-## Why P1
+## Second consumer observation (Toolbox, D6, 2026-10-26) and status
+
+The Toolbox session (Windows 11, build 0.7.0+claude.20261026152532.b8a2ec6) hit the same cause independently and the
+PO raised it to P0 (blocks the first dispatch with no agent-side workaround): the preflight and
+`windowsAuthorityReadiness` reported `ready` beforehand, the failure surfaced only at the first dispatch as
+`CVCT-FILE: the current plan approval is unavailable` (identical text for other causes, cf. D12), while
+`pipeline-state.mjs inspect` showed `planApproved: true`. `project/pipeline-state.json` inherited
+`Authenticated Users:(M)`, `Users:(RX)`, `Administrators:(F)`, `SYSTEM:(F)` from the project folder and the drive.
+`icacls` is closed to the agent by the PowerShell grammar and no sanctioned repair exists ("No action in this
+diagnostic writes an ACL"). Open question from the consumer: does the writer re-create the file by rename on later
+state changes and does the hardened folder's inheritance cover that? Check after the next status change.
+
+Status: points 2 to 5 are in held patch `D165-S7a` (applied in operator commit `1bcce7add`, targeted tests green, not
+measured on native Windows). Point 1 (Windows bootstrap finding with the copy-paste `icacls` instruction, slice S7b)
+and the missing readiness check in the preflight are still open. Two further Windows dispatch gates follow behind this
+one (see `pipeline.dispatch-authority-store-check-fails-on-windows`).
+
+## Why P1 (original rating, raised to P0 above)
 
 It stops every first dispatch on a data-drive Windows repository, and its only remedy today is a permission
 change on the user's folder. Kernel paths (`lib/windows-private-state.mjs`, `scripts/pipeline-state.mjs`): a held

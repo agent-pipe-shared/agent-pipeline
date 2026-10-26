@@ -18,6 +18,13 @@ GIT-03 rejects provider `Co-Authored-By` trailers and session URLs in commit mes
 runner environment instructs the agent to add exactly those lines to commits. The two
 instructions conflict; it is not a pure Pipeline defect. In the project, the Pipeline rule won.
 
+## Second observation (Toolbox session, D26, 2026-10-26)
+
+Same conflict in a Windows consumer: GIT-03 allows only `Dispatch:` and `AI-Assisted: true`; the Claude Code harness
+demands `Co-Authored-By` and `Claude-Session` in addition. The consumer did not add the lines (GIT-03 wins). The
+plugin should name the conflict (obligations text and refusal message), or the harness note should respect the
+Pipeline rule. Classified P2 by the consumer.
+
 ## Triggering situation
 
 First commit in a real greenfield project. Sources: `guardrails/git.md`,

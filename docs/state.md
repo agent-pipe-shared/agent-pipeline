@@ -13,7 +13,9 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **210 items:190 at75,15 at50,5 at25;20 below75;index72.02%** (D165 adds
+contains **217 items:190 at75,16 at50,11 at25;27 below75;index70.62%** (D166 adds
+seven Toolbox rows: P0 D25, D6 at50 and D7 with D15/D16/D17/D24, P1 D8, D9,
+D14/D18 and D21 with the rest of D3; D165 adds
 two P0 consumer blocker rows for an interim candidate; D164 adds the P1
 prerequisite row at25; D163
 hotfix amendment 2026-10-26: the PO applied all nineteen held patches as operator
@@ -25,16 +27,32 @@ added; no earlier identity disappeared. [Finding ledger](../specs/sprint-alfred-
 All-at75 remains the continuation objective after transfer.
 
 **D165 interim candidate, status 2026-10-26 (implementation complete, verify, critic and PO acceptance pending):**
-two held patches are committed and NOT applied: brownfield entry D1
-(`held-patches/d165-d1-brownfield-entry.patch`) and the late review unit PF-75
-(`held-patches/d165-pf75-b-introducing-commit.patch`, cumulative: apply it
-alone, never slice A separately; memo `evidence/pf75-late-review-unit-design.md`).
-Both pass their focused suites in fresh clones. Still open for the candidate: D2
-(class 9 / e2e reproduction), D3, D4, D5, the Windows side findings, the
-PF-75 push-prepare remedy text and a Critic repair-map route, and the Toolbox
-handover file for D2 to D5 (missing in this checkout). The guard-dispatch suite
-is red at the pre-hotfix commit too
+the PO applied brownfield entry D1, the PF-75 declaration patch (A), and in
+operator commit `1bcce7add` S1 command admission, S2 devplan parity, S3 scope
+union, S5 Windows findings, S7a Windows private root-only check and CDR (Critic
+diagnostic evidence registration), installed as
+`0.7.0+claude.20261026181519.1bcce7a`. Still held and NOT applied: S4
+(`held-patches/d165-s4-submit-plan-precheck.patch`, turns ten fixture suites red;
+scope decision open: restrict the precheck to enforced/calibrated adoption) and the
+partial S8 (state suite fixture, line-2218 decision open). The PF-75 patch B
+(`d165-pf75-b-introducing-commit.patch`) matches neither forward nor reverse in
+the tree and needs a manual applied-state check. Open: S7b (Windows
+bootstrap finding with the copy-paste `icacls` instruction), CDR documentation,
+the lock fix, nine push-init fixture cases (`CBV-ROOT`), the Antigravity
+installer (`ATR-SOURCE-CANDIDATE-UNAVAILABLE`), the PF-75 push-prepare remedy
+text and a Critic repair-map route. The guard-dispatch suite is red at the
+pre-hotfix commit too
 (`backlog/items/2026-10-26-guard-dispatch-suite-red-before-the-hotfix.md`).
+
+**D166 Toolbox handovers (2026-10-26, PO blocked in the consumer session):** the
+three Toolbox files (D1-D26) are distilled into seven backlog items and seven
+matrix rows; P0 first: D25 dispatch on Windows
+(`2026-10-26-dispatch-authority-store-check-fails-on-windows.md`), D6, D7 complex.
+P2/P3 and D26 live in `2026-10-26-toolbox-session-friction-and-feature-wishes.md`
+(0.7.1). Consumer acceptance test for P0: a Windows feature run from draft to the
+first Goldfish dispatch without manual `icacls`, `git mv` or `discard-feature`.
+Toolbox ran on a build before S1-S3/S5/S7a; D2, D3, D5 and the D6 cause need a
+live confirmation on the installed candidate.
 
 ## Off-machine follow-up (WSL PC re-entry, 2026-10-26)
 

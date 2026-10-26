@@ -6,8 +6,8 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate.",
-  "total": 210,
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3.",
+  "total": 217,
   "baseline": {
     "counts": {
       "25": 2,
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 5,
-      "50": 15,
+      "25": 11,
+      "50": 16,
       "75": 190,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 72.02
+    "index": 70.62
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -7577,6 +7577,259 @@
         {
           "owner": "agent",
           "what": "Align the entry guard with the library evaluation of class 10 (report-only), include the class 9 inputs in the migrated scope or measure them, admit the recommended propose step in the phases the preflight names, surface architecture hurdles before the plan signature, and give a sanctioned write route for architecture/ and AGENTS.md."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.dispatch-authority-store-check-fails-on-windows",
+      "title": "A Goldfish dispatch can succeed on Windows: the dispatch authority store no longer checks POSIX mode bits",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D25; recorded, next-candidate priority (D166); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-dispatch-authority-store-check-fails-on-windows.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Replace the mode/uid verdict of lib/agy-host-observed-store.mjs by an ACL verdict (or skip it) on win32, name path and checked bit in the refusal, walk the rest of the dispatch path on Windows for further POSIX assumptions, and add a Windows-mocked stat.mode regression."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.windows-private-state-check-counts-acls-inherited-from-above-the-repository",
+      "title": "The Windows private-state check judges custody once at the private root and the preflight finds a broad inherited grant before the first dispatch",
+      "stage": "50",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D6, raised from P1 to P0 (second independent observation). Points 2 to 5 are in the applied held patch D165-S7a (operator commit 1bcce7add, targeted tests green, native Windows not measured).",
+      "evidence": [
+        "backlog/items/2026-10-26-windows-private-state-check-counts-acls-inherited-from-above-the-repository.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d165-s7a-win-private-root-only.notes.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Slice S7b: detect the inherited foreign grant at bootstrap/preflight on Windows (windowsAuthorityReadiness), print one copy-paste icacls instruction, continue only on a secure read-back; keep the CVCT-FILE text from hiding other causes; check that the DACL survives later state rewrites."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.design-course-and-registrar-disagree-on-the-feature-directory",
+      "title": "The design course and the feature package registrar use one spec folder rule and a path correction needs no extra signatures",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P0",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D7/D15/D16/D17/D24; recorded, next-candidate priority (D166); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-design-course-and-registrar-disagree-on-the-feature-directory.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "The course creates specs/<featureId>/ from the start (or the registrar accepts the signed path), Phoenix apply updates activeFeature.planPath in the same transaction, reopen-design previews what it voids, a byte-identical path rebind keeps its review receipts, PO-GATE-PRD-CARDINALITY names directory and bound path."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.missing-docs-adr-directory-blocks-implementation-entry",
+      "title": "A project without docs/adr reaches implementation",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D8; workaround: empty docs/adr with .gitkeep. Recorded (D166); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-missing-docs-adr-directory-blocks-implementation-entry.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "A missing docs/adr means no decisions (ready), or the refusal names the path and the repair; surface the hurdle before the plan signature."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.fitness-class-6-blocks-documentation-modules-without-a-verification-entry",
+      "title": "Fitness class 6 does not block documentation modules that have no verification entry point",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D9; workaround: a thin CI entry point that cost a second adoption signature. Recorded (D166); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-fitness-class-6-blocks-documentation-modules-without-a-verification-entry.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Exempt documentation modules from class 6 (or report-only for modules without executable code) and decide whether an entry-point declaration must invalidate the signed adoption snapshot."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.half-moved-feature-directory-locks-every-shell-and-source-write",
+      "title": "A half-moved feature directory leaves the repair path open: the guard admits repair commands and the EL-01 tripwire reads the bound spec path",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D14/D18; workaround: the PO runs git mv in the own terminal. Recorded (D166); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-half-moved-feature-directory-locks-every-shell-and-source-write.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Diagnosed inspection codes admit only repair commands instead of failing closed, the EL-01 tripwire reads continuity.authority.spec.path and leaves scratch/ out of the write lock, inspection and preflight give one consistent next step."
+        },
+        {
+          "owner": "native-host",
+          "what": "Qualify in the affected consumer repository on its runner/platform."
+        },
+        {
+          "owner": "verify-wsl",
+          "what": "Candidate-bound integrated Verify/Security remains pending."
+        },
+        {
+          "owner": "critic",
+          "what": "Scheduled frozen-batch independent Critic remains pending."
+        },
+        {
+          "owner": "po-acceptance",
+          "what": "PO acceptance remains pending."
+        }
+      ],
+      "relatedACs": [],
+      "reportingIdentityOnly": true
+    },
+    {
+      "itemId": "pipeline.draft-guard-blocks-the-sanctioned-recovery-wrappers",
+      "title": "The draft guard admits the sanctioned recovery wrappers (Phoenix plan/apply, materialize-architecture) in exact argv shapes",
+      "stage": "25",
+      "baselineStage": "UNKNOWN",
+      "priority": "P1",
+      "release": "0.7.0",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D21 and the open rest of D3; workaround: the PO runs the wrappers in the own terminal. Recorded (D166); no implementation is claimed.",
+      "evidence": [
+        "backlog/items/2026-10-26-draft-guard-blocks-the-sanctioned-recovery-wrappers.md"
+      ],
+      "open": [
+        {
+          "owner": "agent",
+          "what": "Admit the exact argv shapes in the draft/approved shell lane, add --out to phoenix plan and document --lock-token in its usage."
         },
         {
           "owner": "native-host",

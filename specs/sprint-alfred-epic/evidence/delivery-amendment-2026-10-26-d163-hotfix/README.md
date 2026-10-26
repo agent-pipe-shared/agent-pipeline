@@ -7,10 +7,20 @@ The PO applied the nineteen held patches of the C29 row as one operator commit `
 to HEAD `10e8573b5` plus the nineteen patches in order, and that both local marketplace copies equal the repository plugin
 tree (2219 files). Claude, Codex and Antigravity installs report the new version.
 
-**210 items · 190 at 75 · 15 at 50 · 5 at 25 · 20 below 75 · index 72.02%** (previous 207 items, 184/17/6, 71.5%).
+**217 items · 190 at 75 · 16 at 50 · 11 at 25 · 27 below 75 · index 70.62%** (previous 207 items, 184/17/6, 71.5%; after D165 210 items, 72.02%).
 
 D165 adds two P0 consumer blocker rows at 25 for an interim candidate:
 `pipeline.consumer-push-blocked-by-late-review-unit` and `pipeline.brownfield-architecture-gate-never-passes`.
+
+D166 adds seven rows from the Toolbox consumer handovers (Windows, build `…152532`): P0
+`pipeline.dispatch-authority-store-check-fails-on-windows` (D25), `pipeline.windows-private-state-check-counts-acls-inherited-from-above-the-repository`
+(D6, at 50: held patch D165-S7a applied in `1bcce7add`, bootstrap finding S7b open) and
+`pipeline.design-course-and-registrar-disagree-on-the-feature-directory` (D7, D15, D16, D17, D24); P1
+`pipeline.missing-docs-adr-directory-blocks-implementation-entry` (D8),
+`pipeline.fitness-class-6-blocks-documentation-modules-without-a-verification-entry` (D9),
+`pipeline.half-moved-feature-directory-locks-every-shell-and-source-write` (D14, D18) and
+`pipeline.draft-guard-blocks-the-sanctioned-recovery-wrappers` (D21, rest of D3). Counts: **217 items · 190 at 75 · 16 at 50 · 11 at 25 · 27 below 75 · index 70.62%**.
+D2, D3, D4, D5 stay in the existing brownfield row (status table in its backlog item); P2/P3 are backlog only.
 
 D164 adds one P1 row at 25, `pipeline.preflight-establishes-runner-prerequisites` (item
 `backlog/items/2026-10-26-preflight-establishes-runner-prerequisites.md`): no existing row covers establishing node and

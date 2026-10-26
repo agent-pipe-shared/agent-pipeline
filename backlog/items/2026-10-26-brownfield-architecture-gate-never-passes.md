@@ -7,6 +7,7 @@ status: open
 created: 2026-10-26
 priority: P0
 release: 0.7.0
+sprint: alfred
 source: "PO relay of a consumer handover (Toolbox, Windows), 2026-10-26, on the D163 hotfix candidate; full handover with code sites, fix proposals and a regression test is on the PO's Windows machine at D:/Dev/Web/Toolbox/scratch/defekt-uebergabe-architektur-gate.md (not yet in this repository)"
 done_when: manual
 ---
@@ -49,6 +50,24 @@ the plan. The trust anchor behaved the same way.
 
 The agent may not write `architecture/` or `AGENTS.md` in any phase although implementation requires them; the
 PO had to copy the map into place by hand (Copy-Item).
+
+## Second Toolbox handover (build 0.7.0+claude.20261026152532.b8a2ec6, 2026-10-26)
+
+The consumer re-ran the gates on the hotfix build; the three handover files are distilled here and in the items named
+below (the German originals stay on the consumer machine).
+
+| ID | Consumer status on that build | Status in this repository |
+|---|---|---|
+| D1 | fixed (`lib/guard/entry-gates.mjs:181-187` evaluates `planningFitnessBlockingStatus`) | applied; the consumer's idea of a regression test remains useful |
+| D2 | open: scope had to be extended by hand (`architecture/map`, `project/pipeline.json`, `pipeline.user.yaml`) | `D165-S3` scope union applied in `1bcce7add` |
+| D3 | open: `propose` refused as `GUARD-DEVPLAN-SHELL` | `D165-S1` applied (propose, status, check, prepare, measure, fitness); `materialize-architecture` and the Phoenix wrapper remain, see `pipeline.draft-guard-blocks-the-sanctioned-recovery-wrappers` |
+| D4 | open, aggravated: more gates (D8, D9) first appear at `set-phase implementation` | `D165-S4` held patch, not applied (turns ten fixture suites red, scope decision pending) |
+| D5 | open: map written via `scratch/` and `Copy-Item` | `D165-S2` Edit/Write parity applied |
+
+New gates found behind D1-D5: D8 (`pipeline.missing-docs-adr-directory-blocks-implementation-entry`), D9
+(`pipeline.fitness-class-6-blocks-documentation-modules-without-a-verification-entry`), D10 (`prepare` without
+`--decided-at` throws a TypeError, in `pipeline.toolbox-session-friction-and-feature-wishes`). The consumer build
+predates S1-S3 and S5; each row above needs a live confirmation on the installed candidate.
 
 ## Windows side findings
 
