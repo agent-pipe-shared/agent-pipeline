@@ -67,8 +67,20 @@ once under PO exception D159, dispatch resumed. Durable fix is held patch
 Caution: scratch work trees that symlink root entries let pipeline-state
 suites overwrite the real `architecture/adoption-state.json` (restored). Consumer report 05 is triaged in
 `backlog/items/2026-10-26-report-05-consumer-findings.md` (blocker PF-58, four
-majors, all 0.7.0). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
-(C29, T3, Q21, Q22).
+majors, all 0.7.0). Identity patch committed (`8cbd536ba`); PF-58 fixed directly
+(`29d4b4619`); PF-61 and PF-65 are held patches C29 items 9 and 10. Kernel paths
+(checked with `isNeverLiftableKernelPath`): `lib/dispatch-briefing-build.mjs`,
+`lib/dispatch-budget-notice.mjs`, `lib/onboarding-continuity.mjs`,
+`scripts/push-prepare.mjs`, `scripts/architecture-adoption.mjs`,
+`lib/architecture-entry-readiness.mjs`, so PF-64/69, PF-59 (D160), D161 and D162
+are held-patch work too; packages wait in `scratch/wave3/` (`pkg-pf64-grant-arrival.json`,
+`pkg-pf59-handover-block.json`). PO decisions today: D160 (Q23 a), D161 (Q21 a),
+D162 (brownfield architecture: no deferral, adoption as onboarding migration,
+old records migrated on contact). The PO plans the C29 sitting for about 15:00
+today; a bundle integration run of all ten patches is in progress because
+patch 3 turns the SubagentStop pin red (goldfish-deep effort versus the
+`duty.deep` route). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
+(C29, T3).
 
 ## Committed Source and actual qualification
 
