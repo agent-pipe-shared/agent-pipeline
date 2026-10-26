@@ -44,6 +44,24 @@ manual registry repair).
 PO observation on this PC: in a new session whose first request is a fetch
 from origin, the fetch ran before `pipeline-start` (see PO list Q18).
 
+## WSL PC autonomous round (2026-10-26, PO away)
+
+Held kernel patches committed for the bundled sitting C29 (all `git apply
+--check` clean, suites re-run by the Coordinator): pre-ready ref Git
+`ed5b55474`, HGO request sweep `2e3aaf3c6`, route effort `b7fbc78b6`, Windows
+session locks `6e9a37f16`, Critic transaction owner recovery `a574a7c20`.
+Rows stay at their stage until the PO applies them. Behavioral-evidence oracle
+row moved 25→75 (`45612a7bd`). Tracked packager `scripts/pack-held-patch.mjs`.
+In progress, scratch only: identity/actor reuse (work copy GREEN on the guard
+suite and restart cases; C5 packaging pending) and G33 damaged-State recovery
+(new backlog item `35e93ec92`; RED confirmed; C2 apply/GREEN/package pending).
+**Blocker (Q22, P0 item `c647a524e`):** every governed dispatch from this
+session is refused with `SDC-LOCK-HELD` while `inspect` reads the lock absent.
+Built briefings wait in `scratch/wave3/` (`briefing-identity-c5.md`,
+`briefing-g33-c2.md`; rebuild at HEAD before use, pass with the trailing
+newline). Open PO topics: `specs/sprint-alfred-epic/plans/po-ceremonies-pending.md`
+(C29, T3, Q21, Q22).
+
 ## Committed Source and actual qualification
 
 - AC168 `0b80f4f09`:Main66pass/1native skip, stage50. Live10% measurement
@@ -121,8 +139,9 @@ merge an old rehearsal or rejected overlay.
    cases now green, two private-Critic binding cases remain RED. Settle focused
    qualification before a full rerun. G9b hook-cwd2/2 green but original pin31/34,
    three receipt/readback failures open.
-5. G33 prevention is committed; safe recovery of damaged State needs a trusted
-   preimage and remains unresolved. Preserve all23 below75 rows, including
+5. G33 prevention is committed; safe recovery of damaged State is in progress
+   as a held patch (bounded fifth continuity repair; provenance must be in the
+   State itself; see the WSL round above). Preserve all23 below75 rows, including
    behavioral oracle, architecture scope before signing, Critic recovery,
    lifecycle and native/provider outcomes. Scope next fanouts from row evidence;
    no silent deferral to0.7.1.
