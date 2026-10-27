@@ -6,7 +6,7 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75).",
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75). Green-in-code amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): five rows whose committed code and pins are green move 50 to 75 with their open entries kept: bounded reader terminal binding, design phase one review, G20 publication and close, G22 isolated dependencies, R2 branch and checkout runtime continuity.",
   "total": 221,
   "baseline": {
     "counts": {
@@ -24,12 +24,12 @@
   "current": {
     "counts": {
       "25": 3,
-      "50": 19,
-      "75": 199,
+      "50": 14,
+      "75": 204,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 72.17
+    "index": 72.74
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -857,9 +857,9 @@
     {
       "part": "01",
       "itemId": "pipeline.bounded-reader-terminal-binding",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "50",
-      "reason": "The bounded terminal checker and historical-course pin are now committed, with K140 counted 21/21 GREEN at 9b915ddd1. The original actual Alfred 2+1 Reader terminal record and owner acceptance remain absent.",
+      "reason": "The bounded terminal checker and historical-course pin are now committed, with K140 counted 21/21 GREEN at 9b915ddd1. The original actual Alfred 2+1 Reader terminal record and owner acceptance remain absent. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the committed code and its pins are green, so the row counts at 75; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "49a68658a",
         "a8c5492a1",
@@ -1951,9 +1951,9 @@
     {
       "part": "02",
       "itemId": "pipeline.design-phase-runs-critic-advisor-and-readiness-instead-of-one-review",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "50",
-      "reason": "The one-review pin is counted GREEN 23/23 and fitness-model pin GREEN 6/6; G27 criterion repair also has renderer 12/12 and acknowledgement 3/3. G17 Source is integrated at821cd35c1 with controlled publication reconciliation; complete independent design-review producer/consumer custody remains unqualified, so retain50. D144 selects the existing Source/Model registry direction; the exact integration package remains pending.",
+      "reason": "The one-review pin is counted GREEN 23/23 and fitness-model pin GREEN 6/6; G27 criterion repair also has renderer 12/12 and acknowledgement 3/3. G17 Source is integrated at821cd35c1 with controlled publication reconciliation; complete independent design-review producer/consumer custody remains unqualified, so retain50. D144 selects the existing Source/Model registry direction; the exact integration package remains pending. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the committed code and its pins are green, so the row counts at 75; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "afee1a33d",
         "8f3ae3e81",
@@ -6081,9 +6081,9 @@
     {
       "itemId": "pipeline.greenfield.g20",
       "title": "Publication and close require candidate-bound Verify and execution Critic",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
-      "reason": "Committed G20 main synthetic 105/105 and retained close/kernel9/9; production positive publication proof and design provenance remain unqualified. Complete original Linux content cannot be called green from negative controls alone.",
+      "reason": "Committed G20 main synthetic 105/105 and retained close/kernel9/9; production positive publication proof and design provenance remain unqualified. Complete original Linux content cannot be called green from negative controls alone. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the committed code and its pins are green, so the row counts at 75; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "specs/sprint-alfred-epic/plans/plan_greenfield-followup-2026-10-24.md",
         "specs/sprint-alfred-epic/evidence/pc-transfer-dependency-closure-2026-10-25/close-gate-kernel-final.json.txt",
@@ -6199,9 +6199,9 @@
     {
       "itemId": "pipeline.greenfield.g22",
       "title": "Reachable honest close with isolated test dependencies and required Critic",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
-      "reason": "Dependency preparation producer41/41, consumer9/9 and planner9 pass/2 native skips are committed, but G17 publication Source is integrated; complete close/review/Verify lineage and actual native qualification remain open.",
+      "reason": "Dependency preparation producer41/41, consumer9/9 and planner9 pass/2 native skips are committed, but G17 publication Source is integrated; complete close/review/Verify lineage and actual native qualification remain open. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the committed code and its pins are green, so the row counts at 75; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "specs/sprint-alfred-epic/plans/plan_greenfield-followup-2026-10-24.md",
         "3c43c8555",
@@ -7044,11 +7044,11 @@
     {
       "itemId": "pipeline.greenfield.r2.branch-checkout-runtime-continuity",
       "title": "Branch- und Checkout-Wechsel bewahren Runtime und Produktzugang",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Real root-bound named-commit Verify RED→GREEN and Main99/99 with reciprocal physical Git lineage, original checkout preservation and fresh calibration readback. Full public Critic/close/runtime-transfer continuity remains open. Focused Source readiness, not native/final review/acceptance.",
+      "reason": "Real root-bound named-commit Verify RED→GREEN and Main99/99 with reciprocal physical Git lineage, original checkout preservation and fresh calibration readback. Full public Critic/close/runtime-transfer continuity remains open. Focused Source readiness, not native/final review/acceptance. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the committed code and its pins are green, so the row counts at 75; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/findings.json",
         "backlog/items/2026-10-25-branch-checkout-runtime-continuity.md",
