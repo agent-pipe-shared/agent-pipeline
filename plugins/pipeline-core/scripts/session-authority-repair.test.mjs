@@ -3,7 +3,7 @@
 // and the last resort leaves no state that blocks the next dispatch.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { devNull, hostname } from "node:os";
 import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
@@ -500,6 +500,77 @@ const cases = [
     const goldfish = found.registry.producers.find((row) => row.producerId === "native-goldfish");
     assert.ok(goldfish, JSON.stringify(found.registry));
     assert.equal(goldfish.status, "ok", JSON.stringify(goldfish));
+  }) },
+  { id: "SAR17", name: "D181b heal retires a legacy finalizer stop-failure record from the old native-goldfish-host-commit directory aside, reports it in retiredStopFailures, leaves the registry readable and has nothing to retire the second time", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
+    const name = `stop-failure-${"b".repeat(32)}.json`;
+    writeFileSync(join(legacy, name), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "GONE-DISPATCH", toolUseId: "native-tool-gone", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
+    const healed = repair("heal", "--root", root);
+    assert.equal(healed.code, 0, JSON.stringify(healed.result));
+    assert.deepEqual(healed.result.retiredStopFailures, [{ name, dispatchId: "GONE-DISPATCH", code: "NGHF-HANDBACK-INVALID", observedAt: "2026-10-27T00:00:00.000Z" }], JSON.stringify(healed.result));
+    assert.equal(existsSync(join(legacy, name)), false, "the record left the old directory");
+    const kept = healed.result.retained.find((row) => row.endsWith("-stop-failure"));
+    assert.ok(kept, JSON.stringify(healed.result.retained));
+    assert.deepEqual(readdirSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", kept)), [name], "moved aside, not deleted");
+    const found = repair("inspect", "--root", root).result;
+    assert.notEqual(found.registry.status, "refused", JSON.stringify(found.registry));
+    const again = repair("heal", "--root", root);
+    assert.deepEqual(again.result.retiredStopFailures ?? [], []);
+  }) },
+  { id: "SAR18", name: "D181b heal keeps a legacy stop-failure record whose dispatch still has an unsettled pending state and lists it under keptStopFailures with the reason", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
+    const name = `stop-failure-${"c".repeat(32)}.json`;
+    writeFileSync(join(legacy, name), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "DELIVER-AC-1", toolUseId: "native-tool-one", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
+    const healed = repair("heal", "--root", root);
+    assert.deepEqual(healed.result.retiredStopFailures ?? [], [], JSON.stringify(healed.result));
+    assert.equal(existsSync(join(legacy, name)), true, "an in-flight dispatch's record stays");
+    const row = (healed.result.keptStopFailures ?? []).find((entry) => entry.name === name);
+    assert.ok(row && typeof row.reason === "string" && row.reason !== "", JSON.stringify(healed.result.keptStopFailures));
+  }) },
+  { id: "SAR19", name: "D181b heal never moves a stop-failure-named file with another schema, array JSON or a symlink and lists each as kept", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
+    const other = `stop-failure-${"d".repeat(32)}.json`, array = `stop-failure-${"e".repeat(32)}.json`, link = `stop-failure-${"f".repeat(32)}.json`;
+    writeFileSync(join(legacy, other), `${JSON.stringify({ schema: "pipeline.something-else.v1", dispatchId: "GONE-DISPATCH" })}\n`, { mode: 0o600 });
+    writeFileSync(join(legacy, array), "[]\n", { mode: 0o600 });
+    symlinkSync(join(legacy, other), join(legacy, link));
+    const healed = repair("heal", "--root", root);
+    assert.deepEqual(healed.result.retiredStopFailures ?? [], [], JSON.stringify(healed.result));
+    for (const entry of [other, array, link]) {
+      assert.equal(existsSync(join(legacy, entry)) || lstatSync(join(legacy, entry), { throwIfNoEntry: false }) !== undefined, true, `${entry} stays`);
+      assert.ok((healed.result.keptStopFailures ?? []).some((row) => row.name === entry && row.reason), `${entry} listed: ${JSON.stringify(healed.result.keptStopFailures)}`);
+    }
+  }) },
+  { id: "SAR20", name: "D181b heal never touches a record in the new native-goldfish-host-diagnostics directory", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const diagnostics = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-diagnostics");
+    mkdirSync(diagnostics, { recursive: true, mode: 0o700 });
+    const file = join(diagnostics, `stop-failure-${"a".repeat(32)}.json`);
+    writeFileSync(file, `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "GONE-DISPATCH", toolUseId: "t", status: "refused", code: "X", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
+    const healed = repair("heal", "--root", root);
+    assert.deepEqual(healed.result.retiredStopFailures ?? [], [], JSON.stringify(healed.result));
+    assert.equal(existsSync(file), true);
+  }) },
+  { id: "SAR21", name: "D181b the inspect next text for move-aside says it does not clear a finalizer stop-failure record", run: () => fixture(({ root }) => {
+    if (process.platform !== "linux") return;
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
+    writeFileSync(join(legacy, `stop-failure-${"b".repeat(32)}.json`), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "GONE-DISPATCH", toolUseId: "t", status: "refused", code: "X", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
+    const found = repair("inspect", "--root", root).result;
+    const aside = found.next.find((row) => / move-aside --root /u.test(row.command));
+    assert.ok(aside, JSON.stringify(found.next));
+    assert.match(aside.why, /does not clear a finalizer stop-failure record/u, aside.why);
   }) },
 ];
 

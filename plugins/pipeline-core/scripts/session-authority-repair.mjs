@@ -36,7 +36,7 @@
 //               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
 //
 // Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,7 +86,7 @@ function parse(argv) {
   }
   if (!flags.root) return { error: "--root <root> is required" };
   if (verb === "move-aside" && (flags["no-goldfish-running"] !== true || !validReason(flags.reason)))
-    return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"" };
+    return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"; move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh" };
   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
     return { error: "release-lock needs --no-pipeline-running (you assert that no Pipeline process runs for this repository) and --reason \"<one line>\"" };
   if (verb === "take-over" && (flags["no-other-session-running"] !== true || !validSession(flags.from) || !validReason(flags.reason)))
@@ -99,6 +99,43 @@ function parse(argv) {
     flags.timeout = timeout;
   }
   return { verb, flags };
+}
+
+// D181b: a finalizer stop-failure record written before the diagnostic moved out of the native Goldfish namespace sits in the old
+// directory and makes the native inventory refuse. Heal moves it aside (never deletes) unless its dispatch may still be in flight.
+const LEGACY_STOP_FAILURE_NAME = /^stop-failure-[a-f0-9]{32}\.json$/u;
+function retireLegacyStopFailures(repository, asideDir) {
+  const directory = join(repository.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+  const retired = [], kept = [];
+  if (!existsSync(directory)) return { retired, kept };
+  const names = readdirSync(directory);
+  const candidates = names.filter((name) => LEGACY_STOP_FAILURE_NAME.test(name));
+  if (!candidates.length) return { retired, kept };
+  // Unsettled pending state: a pending file naming the dispatch with no authority-terminal record for its digest.
+  const unsettled = new Set(); let pendingProblem = null;
+  for (const name of names.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
+    try {
+      const bytes = readFileSync(join(directory, name));
+      const dispatchId = JSON.parse(bytes.toString("utf8"))?.binding?.dispatchId;
+      if (typeof dispatchId !== "string") throw new Error("no binding.dispatchId");
+      if (!names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) unsettled.add(dispatchId);
+    } catch (error) { pendingProblem = `pending state ${name} cannot be read (${short(error)}), so in-flight cannot be decided`; }
+  }
+  for (const name of candidates) {
+    const path = join(directory, name);
+    let record;
+    try {
+      if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
+      record = JSON.parse(readFileSync(path, "utf8"));
+    } catch (error) { kept.push({ name, reason: `unreadable or malformed: ${short(error)}` }); continue; }
+    if (record === null || typeof record !== "object" || Array.isArray(record) || record.schema !== "pipeline.native-goldfish-host-stop-failure.v1" || typeof record.dispatchId !== "string") { kept.push({ name, reason: "not a native-goldfish-host-stop-failure.v1 record" }); continue; }
+    if (pendingProblem !== null) { kept.push({ name, reason: pendingProblem }); continue; }
+    if (unsettled.has(record.dispatchId)) { kept.push({ name, reason: `dispatch ${record.dispatchId} has an unsettled pending state` }); continue; }
+    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
+    renameSync(path, join(asideDir, name));
+    retired.push({ name, dispatchId: record.dispatchId, code: record.code ?? null, observedAt: record.observedAt ?? null });
+  }
+  return { retired, kept };
 }
 
 function producerReport(repository) {
@@ -227,7 +264,7 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
   const healable = (reason) => !afterHeal && (reason === "catalogue-source-closure" || drifted.some((row) => row.inFlight === 0 && reason === `${row.producerId}:namespace-drift`));
   // A read refused only because the lock is held is explained by the lock step, not by move-aside.
   const unexplained = registry.read.status === "refused" && !healable(registry.read.reason) && !(held && registry.read.code === "SDC-LOCK-HELD");
-  if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: the registry is retained aside and starts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
+  if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
   return { lock, cleanupLocks, registry, reservations, scratchBinding, next };
 }
 
@@ -307,23 +344,27 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
   let healed = null;
   // Outside the registry boundary: custody never reclaims these locks itself, and no boundary entry is needed to retire them.
   let retiredCleanupLocks = null;
+  let stopFailures = null;
   if (parsed.verb === "heal") {
     try { retiredCleanupLocks = retireDeadSessionCleanupManifestLocks(root, { asideDir: join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-session-cleanup-lock`) }); }
     catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a dead session-cleanup lock could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
+    try { stopFailures = retireLegacyStopFailures(repository, join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-stop-failure`)); }
+    catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a legacy stop-failure record could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
   }
+  const stopFields = { ...(stopFailures?.retired.length ? { retiredStopFailures: stopFailures.retired } : {}), ...(stopFailures?.kept.length ? { keptStopFailures: stopFailures.kept } : {}) };
   try {
     if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => { entered.value = true; return healSessionAuthorityDrift({ boundary }); }));
     else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
   } catch (error) {
     const heal = typeof error?.repair === "string" ? { repair: error.repair } : parsed.verb === "heal" ? { repair: sessionAuthorityRepairCommand(root, "inspect") } : {};
-    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
+    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal, ...stopFields }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
   }
   const retained = markers(repository).filter((name) => !before.has(name));
   // Critic F8: a registry that still does not read (a member in flight, or a heal that could not retain its marker)
   // is not reported healed; inspect names what holds it.
-  if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained,
+  if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained, ...stopFields,
     ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { scratch }) }, 2);
-  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
+  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...stopFields, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
 }
 
 if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2), undefined, { env: process.env });
