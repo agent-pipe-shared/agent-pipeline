@@ -181,7 +181,7 @@ export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
   if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
   return result;
 }
-function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered } = {}, dependencies = {}, written = []) {
+function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered, admissionDeadline = null } = {}, dependencies = {}, written = []) {
   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
   const fields = toolFields(runner, input);
   if (!fields || !safeCorrelation(fields.correlation) || !ID.test(fields.sessionId ?? "")) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
@@ -248,7 +248,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
   };
   let stored;
-  try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state); }
+  try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline); }
   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
 }
@@ -701,7 +701,23 @@ export function inspectSourceOwnedNativeConfiguredObservation({root,sessionId,to
   });
 }
 
-function publishNativeAuthorityState(commonDir,name,state){
+// D177: a phase checkpoint, not a timer. Called at the admission's phase boundaries; one stderr line per call, and a typed
+// GUARD-DISPATCH-SLOW refusal when the elapsed time already exceeds the budget. withSessionAuthorityBoundary releases the
+// registry lock on the throw. Without a deadline argument it does nothing (no line, no throw).
+export function createAdmissionCheckpoint(deadline){
+  if(!deadline||typeof deadline!=='object')return ()=>{};
+  const now=typeof deadline.now==='function'?deadline.now:Date.now,write=typeof deadline.write==='function'?deadline.write:line=>process.stderr.write(line);
+  return phase=>{
+    const elapsed=now()-deadline.startMs,seconds=(elapsed/1000).toFixed(1);
+    write(`guard-dispatch: phase ${phase} at ${seconds}s\n`);
+    if(elapsed>deadline.budgetMs){
+      // No repository fault helper carries a custom code, so the fault is an Error with the code property set.
+      throw Object.assign(new Error(`GUARD-DISPATCH-SLOW: admission phase ${phase} reached ${seconds}s, over the ${(deadline.budgetMs/1000).toFixed(1)}s budget`),{code:'GUARD-DISPATCH-SLOW',reason:`GUARD-DISPATCH-SLOW: admission phase ${phase} reached ${seconds}s, over the ${(deadline.budgetMs/1000).toFixed(1)}s budget`});
+    }
+  };
+}
+function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null){
+  const checkpoint=createAdmissionCheckpoint(admissionDeadline);
   const repository=inspectSignedDescriptorCustodyRepository(state.root);
   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-authority-common-drift');
   // PF-52: a catalogue left by another plugin version is moved aside before presence is decided.
@@ -729,6 +745,7 @@ function publishNativeAuthorityState(commonDir,name,state){
       // PF-49: one integration source for every check of a dispatch — native records united with the D40 commit
       // evidence, exactly as observeGovernedItemIntegrationReadiness reads it for the admission before this.
       // D177: only the item's own dependencies are proven here; the settled set below is computed once per admission.
+      checkpoint('integrated-slice-read');
       const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
       const integratedIds=new Set([...integration.integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))]);
       const heldIds=item.dependsOn.filter(id=>!integratedIds.has(id));
@@ -743,6 +760,7 @@ function publishNativeAuthorityState(commonDir,name,state){
         if(!prior||(rank[row.value.phase]??0)>(rank[prior.value.phase]??0)||row.value.phase===prior.value.phase&&(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);
       }
       // D51 (2): a reservation whose slice is integrated (native record or D40/D40b commit evidence) or cancelled no longer collides.
+      checkpoint('collision-check');
       const settled=readSettledItemSliceIds({repository,boundary,governed});
       for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
         const pending=entry.value.basis.itemDelivery;
@@ -765,13 +783,15 @@ function publishNativeAuthorityState(commonDir,name,state){
     // PF-55: every check that can still refuse runs before the registry member is reserved, so a
     // refused dispatch leaves no orphaned reserved member behind.
     if(state.binding.itemDelivery){
+      checkpoint('mint');
       const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
-      try {const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
+      try {checkpoint('baseline-capture');const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
       finally{nativeConcurrentAuthorities.delete(authority);}
     }
     // Productive native delivery publishes its bounded Source-owned receipts here.
     // Prepare the empty directory before launch/authoring; no product bytes or baseline waiver.
     if(state.delivery){const evidencePath=join(repository.primaryRoot,"evidence");let present;try{present=lstatSync(evidencePath);}catch(error){if(error.code!=="ENOENT")throw error;mkdirSync(evidencePath,{mode:0o700});present=lstatSync(evidencePath);}if(!present.isDirectory()||present.isSymbolicLink()||realpathSync(evidencePath)!==evidencePath)throw nativeManagedFault("native-evidence-parent-unsafe");}
+    checkpoint('reserve');
     nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(name,operation);
     const reserved=reserveSessionAuthorityMember({boundary,producerPort:port,association:operation.association,operationHandle:handle});
     operation.memberHandle=reserved.memberHandle;operation.memberRef=reserved.memberRef;
@@ -1537,7 +1557,7 @@ export function memoPerAdmission(boundary,key,compute){
   if(!memo.has(key))memo.set(key,compute());
   return memo.get(key);
 }
-function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
+export function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
   const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null]);
   const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}));
   return {integrated:[...memo.integrated],releasedPendingHashes:[...memo.releasedPendingHashes]};
@@ -1573,7 +1593,7 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
 /** D51 (2): the slices whose item reservations no longer block an owner, criterion or write-scope check:
  * integrated by a native record or by D40/D40b commit evidence, or cancelled in the governed queue.
  * Every native and AGY collision check reads this one definition. */
-function settledItemSlices(integratedIds,governed){
+export function settledItemSlices(integratedIds,governed){
   return new Set([...integratedIds,...(governed?.status==='required'?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[])]);
 }
 export function readSettledItemSliceIds({repository,boundary,governed=resolveGovernedItemQueue({root:repository.primaryRoot})}={}) {

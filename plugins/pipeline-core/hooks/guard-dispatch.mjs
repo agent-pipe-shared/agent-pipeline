@@ -86,6 +86,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES, loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
 import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+// D177: hook entry time (module evaluation is the hook's start); the admission deadline measures from here.
+const HOOK_ENTRY_MS = Date.now();
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
 import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
@@ -1017,6 +1019,7 @@ if (isDirectInvocation(import.meta.url)) {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
         const prepared = prepareNativeGoldfishHostState({
           root: rootDir, runner: nativeRunner, input,
+          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 100000 },
           subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
         });
         if (prepared.ok) nativePendingPrepared = true;

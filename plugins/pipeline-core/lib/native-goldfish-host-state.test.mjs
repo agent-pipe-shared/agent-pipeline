@@ -87,8 +87,33 @@ function itemContinuity() {
     capacity:{concurrencyLimit:3,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:"defer"}};
 }
 
+function d177Item(runtime, root, original, id, path, locator, extra = {}) {
+  const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: id, itemId: id, criterionLocator: locator, checks: [{ id: "original-criterion", path: `src/${path}.test.mjs`, dependencies: [`src/${path}.mjs`, `src/${path}.test.mjs`] }] };
+  const binding = { ...makeBinding({ dispatchId: id, commit: original.candidate.commit, tree: original.candidate.tree }), allowedPaths: [`src/${path}.mjs`], schema: "pipeline.native-goldfish-host-briefing.v3", model: "sonnet", effort: "medium", itemDelivery };
+  const input = toolInput("claude", { root, session: `session-${id}`, toolUseId: `tool-${id}`, binding });
+  input.tool_input.prompt = input.tool_input.prompt.replace("host-commit:v1", "host-commit:v3") + `\nSlice: ${id}\nWrite scope: src/${path}.mjs\n`;
+  const prepared = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input, ...extra }));
+  return { binding, input, prepared, path };
+}
+// Two admitted original items (LEFT, RIGHT) in an enrolled fixture, the NGHS17 shape. prepareBoth=false returns before preparing.
+function d177Setup(root, prepareBoth = true) {
+  const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") }), plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit original course" });
+  assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src/second.mjs"), "export const value='expected';\n");
+  writeFileSync(join(root, "src/second.test.mjs"), "import test from 'node:test';import assert from 'node:assert/strict';import {value} from './second.mjs';test('second original criterion',()=>assert.equal(value,'expected'));\n");
+  const original = prepareApprovedItemCourseFixture({ root, additionalCriteria: [{ id: "AC-2", text: "The independent second dependency returns expected bytes." }] }), repository = inspectSignedDescriptorCustodyRepository(root);
+  const runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/parallel-original"), sessionId: "parallel-original-owner" });
+  initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
+  const items = {};
+  if (prepareBoth) for (const [id, path, locator] of [["LEFT", "change", original.criterionLocator], ["RIGHT", "second", original.criterionLocators["AC-2"]]]) {
+    items[id] = d177Item(runtime, root, original, id, path, locator); assert.equal(items[id].prepared.ok, true, JSON.stringify(items[id].prepared));
+  }
+  return { original, repository, runtime, items };
+}
+
 const cases = [
-  { id: "D177-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
+  { id: "D177-a-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
     const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
     const first = {}, second = {}; let calls = 0;
     const compute = () => { calls += 1; return { calls }; };
@@ -101,6 +126,50 @@ const cases = [
     memoPerAdmission(null, "k1", compute); memoPerAdmission(null, "k1", compute);
     assert.equal(calls, 5, "no boundary object: never memoised");
   } },
+  { id: "D177-differential-settled", name: "D177 the skip and the memo leave the integrated, released and settled results identical to the unfiltered computation, and a memo hit reads no repository", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({ root }) => {
+    assert.equal(typeof mod.readNativeIntegratedSlices, "function", "the unfiltered reader is reachable for the differential");
+    assert.equal(typeof mod.settledItemSlices, "function");
+    const { original, repository, runtime, items } = d177Setup(root);
+    const returned = (id) => { const item = items[id]; return { ...item.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: item.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: id, candidateCommit: item.binding.candidateCommit, outcome: "succeeded", report: "D177 fixture return.", changedPaths: [`src/${item.path}.mjs`] }) }] } }; };
+    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // D177 LEFT\n");
+    const finalized = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned("LEFT") }));
+    assert.equal(finalized.status, "authored-commit-recorded", JSON.stringify(finalized));
+    assert.equal(runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: items.LEFT.prepared.sha256 })).status, "integrated");
+    const repo = inspectSignedDescriptorCustodyRepository(root), governed = resolveGovernedItemQueue({ root });
+    // integrated LEFT, open RIGHT; a second view marks RIGHT cancelled (a new queue sha256, so a fresh computation)
+    const views = [governed, { ...governed, sha256: "c".repeat(64), normalized: { ...governed.normalized, slices: governed.normalized.slices.map((row) => row.id === "RIGHT" ? { ...row, state: "cancelled" } : row) } }];
+    for (const view of views) {
+      const got = runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, (boundary) => {
+        const unfiltered = mod.readNativeIntegratedSlices({ governed: view, repository: repo, boundary });
+        const commit = readOrchestratorCommitIntegratedSlices({ root: repo.primaryRoot, candidateCommit: repo.candidate.commit, slices: view.normalized.slices });
+        const oldSettled = mod.settledItemSlices([...unfiltered.integrated, ...commit], view);
+        const fresh = mod.readSettledItemSliceIds({ repository: repo, boundary, governed: view });
+        const skipped = mod.readNativeIntegratedSlices({ governed: view, repository: repo, boundary, skipCancelled: true });
+        const only = mod.readNativeIntegratedSlices({ governed: view, repository: repo, boundary, only: new Set(["LEFT"]) });
+        let reads = 0;
+        const counted = new Proxy(repo, { get(target, key) { if (key === "primaryRoot") reads += 1; return target[key]; } });
+        mod.readSettledItemSliceIds({ repository: counted, boundary, governed: view });
+        return { unfiltered, oldSettled: [...oldSettled].sort(), fresh: [...fresh].sort(), skipped, only, reads };
+      }));
+      assert.deepEqual(got.fresh, got.oldSettled, "settled set identical to the unfiltered computation");
+      assert.ok(got.unfiltered.integrated.includes("LEFT"), "the fixture has an integrated row");
+      assert.deepEqual([...got.skipped.releasedPendingHashes].sort(), [...got.unfiltered.releasedPendingHashes].sort(), "releasedPendingHashes complete in every shape");
+      assert.deepEqual(got.only.integrated, got.unfiltered.integrated.filter((id) => id === "LEFT"), "only: the dependency ids that were asked for");
+      assert.equal(got.reads, 0, "a memo hit performs no repository-root read (no per-row git proof)");
+    }
+  }); } },
+  { id: "D177-slow-phase-releases-lock", name: "D177 a stubbed clock past the budget yields GUARD-DISPATCH-SLOW naming the phase, one stderr-style line per phase, and the registry lock is free afterwards", run: () => fixture(({ root }) => {
+    const { original, repository, runtime, items } = d177Setup(root, false);
+    const lines = []; let calls = 0;
+    const admissionDeadline = { startMs: 0, budgetMs: 100000, now: () => (calls++ < 1 ? 0 : 200000), write: (line) => lines.push(line) };
+    const item = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator, { admissionDeadline });
+    assert.equal(item.prepared.ok, false);
+    assert.equal(item.prepared.code, "GUARD-DISPATCH-SLOW");
+    assert.match(String(item.prepared.reason), /integrated-slice-read|collision-check/u);
+    assert.ok(lines.length >= 1 && lines.every((line) => /^guard-dispatch: phase [a-z-]+ at \d+(\.\d+)?s\n?$/u.test(line)), JSON.stringify(lines));
+    const repo = inspectSignedDescriptorCustodyRepository(root);
+    assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the throw released the registry lock");
+  }) },
   { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
     const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });
     input.tool_input.prompt = "ordinary Goldfish briefing";
