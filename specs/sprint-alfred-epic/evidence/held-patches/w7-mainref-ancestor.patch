@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index da8f46b82..e3628be80 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -295,7 +295,10 @@ function reviewUnitSource(root, d, work) {
+   shape(declaration.deliveryBoundary, ["mainRef"]);
+   const repo = discoverRepository(realpathSync(root));
+   const primaryRef = git(repo.primaryRoot, ["symbolic-ref", "HEAD"]).trim();
+-  if (declaration.deliveryBoundary.mainRef !== primaryRef || !primaryRef.startsWith("refs/heads/")) fail("CGB-MAIN-INTEGRATION");
++  // A feat/ mainRef is admitted only while the primary checkout is on main (candidate ancestry is checked below).
++  const mainRef = declaration.deliveryBoundary.mainRef;
++  const featOnMain = typeof mainRef === "string" && /^refs\/heads\/feat\/[^\s]+$/u.test(mainRef) && primaryRef === "refs/heads/main";
++  if ((mainRef !== primaryRef && !featOnMain) || !primaryRef.startsWith("refs/heads/")) fail("CGB-MAIN-INTEGRATION");
+   try { git(root, ["merge-base", "--is-ancestor", declarationCommit, d.candidateCommit]); }
+   catch { fail("CGB-REVIEW-UNIT-BINDING"); }
+   git(root, ["merge-base", "--is-ancestor", d.baseCommit, d.candidateCommit]);
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 9616e7794..6753c0e55 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -16,7 +16,7 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
+ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+ import {readdirSync,readlinkSync} from "node:fs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -474,4 +474,31 @@ test("D165-PF75A malformed declarationCommit fails the review-unit binding",()=>
+       rejected(()=>readCriticReviewUnit(unitInput(fx,{declarationCommit:bad})),"CGB-REVIEW-UNIT-BINDING");
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
++const FEAT_REF="refs/heads/feat/x";
++function featFixture(){return fixture({unitOverride:{deliveryBoundary:{mainRef:FEAT_REF}}});}
++test("D-W7M feat/ mainRef is accepted when the primary checkout is on main and the candidate is its ancestor",()=>{
++  const fx=featFixture();try{
++    assert.equal(git(fx.root,["symbolic-ref","HEAD"]),"refs/heads/main");
++    const result=readCriticReviewUnit(unitInput(fx));
++    assert.equal(result.declaration.deliveryBoundary.mainRef,FEAT_REF);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D-W7M feat/ mainRef is refused when the primary checkout sits on an unrelated branch",()=>{
++  const fx=featFixture();try{
++    git(fx.root,["checkout","-q","-b","other"]);
++    rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D-W7M feat/ mainRef is refused when the candidate is not an ancestor of the primary main",()=>{
++  const fx=featFixture();try{
++    git(fx.root,["reset","-q","--hard",fx.base]);
++    rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D-W7M a non-feat/ mainRef that differs from the primary checkout stays refused",()=>{
++  for(const ref of ["refs/heads/release/x","refs/heads/featx","refs/heads/other","refs/tags/feat/x","refs/heads/feat/"]){
++    const fx=fixture({unitOverride:{deliveryBoundary:{mainRef:ref}}});
++    try{rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");}finally{rmSync(fx.root,{recursive:true,force:true});}
++  }
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
