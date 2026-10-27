@@ -1,0 +1,45 @@
+diff --git a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+index e92d85252..d91aab4e6 100644
+--- a/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
++++ b/plugins/pipeline-core/scripts/check-state-phase-consistency.test.mjs
+@@ -93,6 +93,7 @@ function lifecycleDeps(dir, planPath) {
+     poGateAuthority: injectedPoGateAuthority(planPath),
+     poGateProfile: injectedPoGateProfile(),
+     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
++    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
+   };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 0d9c3958b..504761fc2 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -143,6 +143,7 @@ import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, open
+ import { userInfo } from "node:os";
+ import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
++import { materializeArchitectureDesignFixture } from "../lib/architecture-design-test-fixture.mjs";
+ 
+ const HERE = dirname(fileURLToPath(import.meta.url));
+ const PLUGIN_ROOT = join(HERE, "..");
+@@ -512,6 +513,8 @@ async function buildSubmittedFeature(prefix, { fallback } = {}) {
+ 
+   git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, "project/critical-human-proof.json", "specs/e2e/acceptance.md", "specs/e2e/result.md");
+   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
++  // The real submit-plan refuses a governed root whose architecture is not ready (D165-S4): materialize the sanctioned design package.
++  materializeArchitectureDesignFixture({ rootDir: dir, planPath: PLAN_PATH, sourcePath: "src/index.mjs", decisionRef: "TEST-DAR-ROUTE", by: "Design route fixture PO" });
+ 
+   const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", PLAN_PATH]);
+   if (featureSet.status !== 0) throw new Error(`fixture set-feature failed: ${featureSet.stderr}`);
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs
+index e01a00f4c..d1cfa9e8a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs
+@@ -240,6 +240,7 @@ function generatorSubmitFixture(name, { exempt }) {
+       spec: { path: specPath, sha256: specSha256 },
+     }),
+     designAdvisoryAdmission: () => ({ ok: true, id: h("e"), mode: "admitted" }),
++    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
+   };
+   return { dir, deps };
+ }
