@@ -705,6 +705,59 @@ test("Cut A (6) CLI finalize without an origin exits 2 with the typed code, not 
   } finally { cleanup(fx); }
 });
 
+const FALLBACK_FLAG = "--allow-caller-authored-fallback";
+
+test("Cut A follow-up (1) CLI finalize without the flag and without a Source record is refused typed at exit 2", () => {
+  const fx = fixture();
+  try {
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+    assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.output.code, ORIGIN_UNAVAILABLE);
+  } finally { cleanup(fx); }
+});
+
+test("Cut A follow-up (2) CLI finalize with the flag completes and reports caller-authored-fallback", () => {
+  const fx = fixture();
+  try {
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+    assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath, FALLBACK_FLAG]);
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.output.status, "completed");
+    assert.equal(result.output.independence, "caller-authored-fallback");
+    assert.equal(result.output.origin, "caller-authored");
+    assert.equal(result.output.nativeAttestation, false);
+  } finally { cleanup(fx); }
+});
+
+test("Cut A follow-up (3) the flag on any other command is SCF-USAGE", () => {
+  const fx = fixture();
+  try {
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+    for (const command of ["admit", "register-batch", "append-correction", "export"]) {
+      const result = runSessionCriticFinalizerCli([command, "--root", fx.root, "--request", requestPath, FALLBACK_FLAG]);
+      assert.equal(result.exitCode, 2, command);
+      assert.equal(result.output.code, "SCF-USAGE", command);
+    }
+  } finally { cleanup(fx); }
+});
+
+test("Cut A follow-up (4) a wrong or duplicated sixth token is SCF-USAGE and nothing is consumed", () => {
+  const fx = fixture();
+  try {
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+    for (const tail of [["--allow-caller-authored"], ["--allow-caller-authored-fallback=true"], ["yes"], [FALLBACK_FLAG, FALLBACK_FLAG], [""]]) {
+      const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath, ...tail]);
+      assert.equal(result.exitCode, 2, JSON.stringify(tail));
+      assert.equal(result.output.code, "SCF-USAGE", JSON.stringify(tail));
+    }
+  } finally { cleanup(fx); }
+});
+
 // D173 (PF-80): the CLI names the cause of an internal refusal. An argv whose first element throws reaches the
 // adapter's catch with any thrown value the case needs, without a model call or a fixture repository.
 const D173_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";

@@ -57,7 +57,7 @@ export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evi
 export const SESSION_CRITIC_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
 const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs admit --root <repository-root> --request <repo-relative request.json>",
-  "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json>",
+  "Usage: session-critic-finalizer.mjs finalize --root <repository-root> --request <repo-relative request.json> [--allow-caller-authored-fallback]",
   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
@@ -730,8 +730,11 @@ function runSessionCriticExportCli(argv, deps) {
 /** Closed CLI adapter. The request and verdict stay as bounded local files. */
 export function runSessionCriticFinalizerCli(argv, deps = {}) {
   try {
+    // The opt-in is a sixth argv token on `finalize` only; it is never read from the request file.
+    const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";
+    if (Array.isArray(argv) && argv.includes("--allow-caller-authored-fallback") && !optIn) fail("SCF-USAGE");
     if (Array.isArray(argv) && argv[0] === "export") return runSessionCriticExportCli(argv, deps);
-    if (!Array.isArray(argv) || argv.length !== 5 || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+    if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
     const root = realpathSync(resolve(argv[2]));
     const raw = readPhysicalRequest(root, argv[4]);
     if (argv[0] === "register-batch") {
@@ -771,7 +774,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       return Object.freeze({ exitCode: 0, output: admitSessionCriticReview(common, deps) });
     }
     const verdict = readBoundedJson(root, request.verdictPath, "SCF-VERDICT-FILE");
-    const result = finalizeSessionCriticReview({ ...common, verdict }, deps);
+    const result = finalizeSessionCriticReview({ ...common, verdict, ...(optIn ? { allowCallerAuthoredFallback: true } : {}) }, deps);
     return Object.freeze({ exitCode: result.status === "completed" ? 0 : 2, output: result });
   } catch (error) {
     const typed = error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError";
