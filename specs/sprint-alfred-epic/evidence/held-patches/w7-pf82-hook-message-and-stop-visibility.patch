@@ -1,0 +1,161 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 05ad4e822..71787af08 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -1,7 +1,9 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ /** Claude/Codex native hook bridge for the explicitly marked Goldfish host-commit route. */
+-import { readFileSync } from "node:fs";
++import { readFileSync, readdirSync } from "node:fs";
++import { join } from "node:path";
++import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
+ import { finalizeNativeGoldfishHostReturn } from "../lib/native-goldfish-host-finalizer.mjs";
+@@ -19,7 +21,40 @@ export function qualifyNativeGoldfishHookDelivery({root,result}={}) {
+   return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256})};
+ }
+ 
+-export function nativeGoldfishHookMessage(result) {
++const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
++
++/** Newest stop-failure diagnostic the SubagentStop completion left (PF-61), or null. Diagnostic only: any fault reads as none. */
++export function readNativeGoldfishStopFailure({ commonDir } = {}) {
++  try {
++    if (typeof commonDir !== "string" || commonDir.length === 0) return null;
++    const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++    let newest = null;
++    for (const name of readdirSync(directory)) {
++      if (!/^stop-failure-[0-9a-f]+\.json$/u.test(name) && !/^stop-failure-[A-Za-z0-9_-]+\.json$/u.test(name)) continue;
++      let entry;
++      try { entry = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
++      if (entry?.schema !== STOP_FAILURE_SCHEMA || typeof entry.code !== "string") continue;
++      const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
++      if (!newest || observedAt > newest.observedAt) {
++        newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt };
++      }
++    }
++    return newest;
++  } catch { return null; }
++}
++
++function stopFailureNotice(failure) {
++  if (!failure || typeof failure.code !== "string") return null;
++  return `A background Goldfish host commit failed at its stop (${failure.code})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.`;
++}
++
++export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
++  const base = nativeGoldfishHookBaseMessage(result);
++  const notice = stopFailureNotice(stopFailure);
++  return base && notice ? `${base} ${notice}` : base ?? notice;
++}
++
++function nativeGoldfishHookBaseMessage(result) {
+   if (!result || result.status === "not-applicable" || result.status === "agent-bound") return null;
+   if (result.status === "authored-commit-recorded") {
+     return `Goldfish host commit verified: ${result.commit}; v4 dispatch record: ${result.record?.target ?? "written"}.${result.delivery?` Item checks ${result.delivery.checkStatus?.verdict??"unqualified"}; Main integration ${result.integration?.status??"pending"} (${result.integration?.code??"held"}).`:""}`;
+@@ -30,11 +65,11 @@ export function nativeGoldfishHookMessage(result) {
+   }
+   if (result.code === "NGHF-PENDING-UNAVAILABLE") {
+     const why = result.reason === "async-launch"
+-      ? "this Agent call ran in the background (run_in_background true, or an async_launched result), so no final return reached this hook and no pending host-commit state could complete it"
++      ? "this Agent call ran in the background (run_in_background true, or an async_launched result) and no pending host-commit state existed at PostToolUse time, so nothing can complete it at its stop"
+       : "no pending host-commit state was prepared for this launch (the PreToolUse WARNING names the preparation code)";
+     // PF-26B: when the PreToolUse guard recorded why preparation failed, name that exact code instead of pointing at a warning.
+     const prepared = typeof result.preparationCode === "string" ? ` The pre-launch preparation failed with ${result.preparationCode}.` : "";
+-    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Orchestrator route: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
++    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Interim route: verify the child's diff yourself and commit it as the Elephant with the "Dispatch: <dispatchId> (goldfish)" trailer; that commit is not host-observed evidence. scripts/dispatch-record-write.mjs refuses a v4 authored-commit Claude record without host observation, so do not expect it to accept one for this launch.`;
+   }
+   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
+     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
+@@ -59,7 +94,13 @@ if (isDirectInvocation(import.meta.url)) {
+   // A stop hook must never block the stop: a fault after the finalizer ran degrades to the recovery message, exit 0.
+   try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
+   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
+-  const message = nativeGoldfishHookMessage(result);
++  // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
++  let stopFailure = null;
++  if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
++    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()) }); }
++    catch { stopFailure = null; }
++  }
++  const message = nativeGoldfishHookMessage(result, { stopFailure });
+   if (!message) process.exit(0);
+   if (runner === "claude" && input.hook_event_name === "PostToolUse") {
+     process.stdout.write(`${JSON.stringify({ hookSpecificOutput: {
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs
+index 1cf97eae7..e30bdeea2 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-commit-execution.test.mjs
+@@ -7,6 +7,7 @@ import { join } from "node:path";
+ import { assessAgyHostCommit, captureAgyHostCommitBaseline } from "./agy-host-commit-admission.mjs";
+ import { commitAdmittedNativeGoldfishReturn } from "./agy-host-commit-execution.mjs";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
++import * as hook from "../hooks/native-goldfish-host.mjs";
+ 
+ function git(root, ...args) {
+   const run = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false });
+@@ -62,9 +63,61 @@ const cases = [
+     assert.equal(readFileSync(marker, "utf8"), "invoked");
+     assert.equal(git(root, "rev-parse", "HEAD"), parent);
+   }) },
++  { id: "NGHC03", name: "an async launch without pending state says no pending state existed, names the stored preparation code and does not blame a missing final return", run: () => {
++    const message = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-PENDING-UNAVAILABLE",
++      reason: "async-launch", preparationCode: "NGHS-CLAUDE-FOREGROUND-REQUIRED", commit: null, record: null });
++    assert.match(message, /\(NGHF-PENDING-UNAVAILABLE\)/u);
++    assert.match(message, /no pending host-commit state existed/u);
++    assert.match(message, /NGHS-CLAUDE-FOREGROUND-REQUIRED/u);
++    assert.match(message, /background/u);
++    assert.doesNotMatch(message, /no final return reached/u);
++  } },
++  { id: "NGHC04", name: "the advice does not recommend the record writer for a v4 authored-commit Claude record it refuses and does not claim host-observed evidence", run: () => {
++    for (const reason of ["async-launch", "no-pending"]) {
++      const message = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-PENDING-UNAVAILABLE",
++        reason, commit: null, record: null });
++      assert.match(message, /Dispatch: <dispatchId> \(goldfish\)/u, reason);
++      assert.doesNotMatch(message, /write the dispatch record via/u, reason);
++      assert.match(message, /dispatch-record-write\.mjs refuses/u, reason);
++      assert.match(message, /not host-observed evidence/u, reason);
++      assert.doesNotMatch(message, /NGHS-/u, reason);
++    }
++  } },
++  { id: "NGHC05", name: "a stop-failure diagnostic is read back as its newest code and dispatch, and an absent or malformed one reads as none", run: () => {
++    const commonDir = mkdtempSync(join(tmpdir(), "native-goldfish-diag-"));
++    try {
++      assert.equal(hook.readNativeGoldfishStopFailure({ commonDir }), null);
++      const diagnostics = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++      mkdirSync(diagnostics, { recursive: true });
++      const write = (name, body) => writeFileSync(join(diagnostics, name), typeof body === "string" ? body : `${JSON.stringify(body)}\n`);
++      write("stop-failure-aaa.json", { schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "OLD-1",
++        toolUseId: "t1", status: "recovery-required", code: "NGHF-OLD", commit: null, observedAt: "2026-10-27T10:00:00.000Z" });
++      write("stop-failure-bbb.json", { schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "NEW-2",
++        toolUseId: "t2", status: "recovery-required", code: "NGHF-COMMIT-ADMISSION", commit: null, observedAt: "2026-10-27T11:00:00.000Z" });
++      write("stop-failure-ccc.json", "{not json");
++      const failure = hook.readNativeGoldfishStopFailure({ commonDir });
++      assert.equal(failure.code, "NGHF-COMMIT-ADMISSION");
++      assert.equal(failure.dispatchId, "NEW-2");
++    } finally { rmSync(commonDir, { recursive: true, force: true }); }
++  } },
++  { id: "NGHC06", name: "a failed background host commit is shown in the PostToolUse message, alone when nothing else applies, and absent when none exists", run: () => {
++    const failure = { code: "NGHF-COMMIT-ADMISSION", dispatchId: "NEW-2", observedAt: "2026-10-27T11:00:00.000Z" };
++    const alone = hook.nativeGoldfishHookMessage({ status: "not-applicable", code: "NGHF-NOT-APPLICABLE" }, { stopFailure: failure });
++    assert.match(alone, /NGHF-COMMIT-ADMISSION/u);
++    assert.match(alone, /NEW-2/u);
++    assert.match(alone, /No commit or authorship record is claimed/u);
++    const joined = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-PENDING-UNAVAILABLE",
++      reason: "async-launch", commit: null, record: null }, { stopFailure: failure });
++    assert.match(joined, /\(NGHF-PENDING-UNAVAILABLE\)/u);
++    assert.match(joined, /NGHF-COMMIT-ADMISSION/u);
++    assert.equal(hook.nativeGoldfishHookMessage({ status: "not-applicable", code: "NGHF-NOT-APPLICABLE" }, { stopFailure: null }), null);
++    assert.equal(hook.nativeGoldfishHookMessage({ status: "not-applicable", code: "NGHF-NOT-APPLICABLE" }), null);
++    const stopped = hook.nativeGoldfishHookMessage({ status: "recovery-required", code: "NGHF-COMMIT-ADMISSION", commit: null, record: null });
++    assert.match(stopped, /NGHF-COMMIT-ADMISSION/u);
++  } },
+ ];
+ 
+-const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
++const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ registerTestCaseCompletion({ cases, fd,
+   maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
