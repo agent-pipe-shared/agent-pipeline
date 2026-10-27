@@ -1,0 +1,233 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index 3d1277649..d2a1ed162 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -11655,6 +11655,96 @@ test("QP3-4 W0-4 F-2: the record lane admits exactly backlog/, docs/ and scratch
+   assert.equal(notebookTraversal.exitCode, 2, "NotebookEdit traversal out of scratch/ refused");
+ });
+ 
++// W7 Slice B (AC-127, item half-moved-feature-directory-locks-every-shell-and-source-write): under a PORG-INVALID-OBSERVATION (session) the
++// lifecycle gate admits EXACTLY `git mv <src> <dst>` and `git restore <path>` with every path inside the bound feature directory (specs/f).
++function hmRoot(state = QW04_STATES.approved) {
++  const path = qw04GuardRoot(state);
++  mkdirSync(join(path, "specs", "f", "sub"), { recursive: true });
++  mkdirSync(join(path, "src"), { recursive: true });
++  for (const name of ["spec.md", "design-input.md", "a.md"]) writeFileSync(join(path, "specs", "f", name), "x\n");
++  return path;
++}
++function hmBash(path, command, outcome = "invalid") { return qw04Run(path, "Bash", { command }, outcome); }
++
++test("HM-1 an invalid session observation admits the exact git mv and git restore repair commands inside the bound feature directory", () => {
++  const path = hmRoot();
++  for (const command of [
++    "git mv specs/f/a.md specs/f/b.md",
++    "git mv specs/f/a.md specs/f/sub/a.md",
++    "git mv specs/f/spec.md specs/f/spec-renamed.md",
++    `git mv ${join(path, "specs", "f", "a.md")} ${join(path, "specs", "f", "c.md")}`,
++    "git restore specs/f/a.md",
++    "git restore specs/f/spec.md",
++    "git restore specs/f/not-yet.md",
++  ]) {
++    const result = hmBash(path, command);
++    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
++  }
++});
++
++test("HM-2 git mv with a destination or source outside the feature directory, a traversal, a flag or a bound authority file leaving its directory is refused", () => {
++  const path = hmRoot();
++  symlinkSync(join(path, "src"), join(path, "specs", "f", "escape"), "dir");
++  for (const command of [
++    "git mv specs/f/a.md src/a.md", "git mv src/a.md specs/f/a.md", "git mv specs/f/a.md docs/a.md",
++    "git mv specs/f/a.md specs/f/../../src/a.md", "git mv specs/f/a.md ../outside.md",
++    "git mv -f specs/f/a.md specs/f/b.md", "git mv -k specs/f/a.md specs/f/b.md", "git mv specs/f/a.md",
++    "git mv specs/f/a.md specs/f/b.md specs/f/sub", "git mv specs/f/a.md specs/f/escape/a.md",
++    "git mv specs/f/escape specs/f/b", "git mv specs/f/spec.md specs/f/sub/spec.md", "git mv specs/f specs/g", "git mv specs/f/*.md specs/f/sub",
++  ]) {
++    const result = hmBash(path, command);
++    assert.equal(result.exitCode, 2, `admitted: ${command}`);
++    assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, command);
++  }
++});
++
++test("HM-3 chaining, extra commands and any other git subcommand are never admitted by the repair lane", () => {
++  const path = hmRoot();
++  for (const command of [
++    "git mv specs/f/a.md specs/f/b.md && rm -rf src", "git mv specs/f/a.md specs/f/b.md; rm -rf src",
++    "git mv specs/f/a.md specs/f/b.md && git mv specs/f/b.md specs/f/c.md", "git restore specs/f/a.md | cat",
++    "git rm specs/f/a.md", "git checkout -- specs/f/a.md", "git reset --hard", "git clean -fd specs/f", "git add specs/f/a.md",
++  ]) {
++    const result = hmBash(path, command);
++    assert.equal(result.exitCode, 2, `admitted: ${command}`);
++  }
++});
++
++test("HM-4 git restore outside the feature directory, with a flag, a pathspec, a traversal or a symlink escape is refused", () => {
++  const path = hmRoot();
++  symlinkSync(join(path, "src"), join(path, "specs", "f", "escape"), "dir");
++  for (const command of [
++    "git restore src/prod.mjs", "git restore .", "git restore specs/f", "git restore specs", "git restore --staged specs/f/a.md",
++    "git restore -s HEAD~1 specs/f/a.md", "git restore specs/f/../../src/prod.mjs", "git restore specs/f/escape/prod.mjs",
++    "git restore specs/f/*.md", "git restore specs/f/a.md specs/f/spec.md", "git restore project/pipeline-state.json", "git restore",
++  ]) {
++    const result = hmBash(path, command);
++    assert.equal(result.exitCode, 2, `admitted: ${command}`);
++  }
++});
++
++test("HM-5 controls: a production write stays refused and the lane is session-intent PORG-INVALID-OBSERVATION only", () => {
++  const path = hmRoot();
++  for (const toolName of ["Write", "Edit"]) {
++    assert.equal(qw04Run(path, toolName, { file_path: "src/prod.mjs" }).exitCode, 2, `${toolName} src/prod.mjs`);
++    assert.equal(qw04Run(path, toolName, { file_path: "specs/f/new.md" }).exitCode, 2, `${toolName} specs/f/new.md`);
++  }
++  assert.equal(qw04Run(path, "Write", { file_path: "scratch/hm-note.md" }).exitCode, 0, "scratch record write control");
++  for (const outcome of ["invalidBootstrapIntent", "partial", "drift"]) {
++    for (const command of ["git mv specs/f/a.md specs/f/b.md", "git restore specs/f/a.md"]) {
++      assert.equal(hmBash(path, command, outcome).exitCode, 2, `${outcome}: ${command}`);
++    }
++  }
++});
++
++test("HM-6 without a readable bound feature directory in the state the repair lane admits nothing", () => {
++  for (const state of [null, "{ not json", { schema: "pipeline.state.v0", activeFeature: { id: "f", planPath: "docs/prd-bound.md" }, planApproved: true }]) {
++    const path = hmRoot(state);
++    assert.equal(hmBash(path, "git mv specs/f/a.md specs/f/b.md").exitCode, 2, `state ${JSON.stringify(state)}`);
++    assert.equal(hmBash(path, "git restore specs/f/a.md").exitCode, 2, `state ${JSON.stringify(state)} restore`);
++  }
++});
++
+ // ALFRED-QP4-BUILD2: tests for the fourth signed quality package (appended to the HEAD test file); re-scoped to the guard-side changes only.
+ // Contract: scratch/qp4/false-positives.md. The refusal label GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY non-admitted single read-family
+ // command (isRejectedReadFamilyCommand), so R1-R3/R6 were never outside-root reads: they are refused for rg flags the closed grammar does not know
+diff --git a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+index 2a95ae9bb..ff1fb999f 100644
+--- a/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
++++ b/plugins/pipeline-core/lib/guard/lifecycle-gate.mjs
+@@ -10,7 +10,7 @@ import { writeTargetPath } from "../tool-write-target.mjs";
+ import { HOST_INIT_CROSS_VIEW_STATUSES, INTAKE_LIFECYCLE_STATUSES, LAUNCH_SCRIPT, REBASE_READINESS_LIFECYCLE_STATUSES, RESTART_RESUME_HINT_INPUT_PATH, SCRATCH_LIFECYCLE_STATUSES, WRITE_TOOLS } from "./constants.mjs";
+ import { exactReadyReceipt, verdict } from "./verdict.mjs";
+ import { blocked, externalRestartOnly } from "./denial-route.mjs";
+-import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
++import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, isHalfMovedRepairCommand, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
+ import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
+ import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
+ import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+@@ -232,6 +232,15 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
+       && !restartResumeHintNearMissWrite(input, root)
+       && w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies);
+     if (invalidObservationRecordWrite) return verdict(0);
++    // W7 Slice B (backlog 2026-10-26-half-moved-feature-directory-locks-every-shell-and-source-write): a half-moved feature
++    // directory makes the observation invalid, and nothing could then repair it. Admit exactly `git mv`/`git restore` inside
++    // the bound feature directory (isHalfMovedRepairCommand) -- session intent, PORG-INVALID-OBSERVATION, Bash; nothing else.
++    const invalidObservationHalfMovedRepair = error instanceof ProjectOnboardingReadyError
++      && error.code === "PORG-INVALID-OBSERVATION"
++      && error.intent === "session"
++      && toolName === "Bash"
++      && isHalfMovedRepairCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
++    if (invalidObservationHalfMovedRepair) return verdict(0);
+     const exactObservedOnboardingNextAction = error instanceof ProjectOnboardingReadyError
+       && error.code === "PORG-NOT-READY"
+       && error.intent === "session"
+diff --git a/plugins/pipeline-core/lib/guard/write-scope.mjs b/plugins/pipeline-core/lib/guard/write-scope.mjs
+index f882ed3c5..78d881003 100644
+--- a/plugins/pipeline-core/lib/guard/write-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/write-scope.mjs
+@@ -83,6 +83,98 @@ export function w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies
+   } catch { return false; }
+ }
+ 
++// W7 Slice B (item half-moved-feature-directory-locks-every-shell-and-source-write): the bound feature directories are the
++// directories of the active feature's persisted plan / spec / design-input paths, limited to a directory of at least two
++// segments under specs/ or docs/ (so a top-level `docs/prd.md` never makes all of docs/ a repair root). null when no state
++// is readable or any readable state is unparseable -- a lane that cannot establish the directory refuses.
++const HALF_MOVED_ROOT_PREFIXES = Object.freeze(["specs", "docs"]);
++
++function w04BoundFeatureDirectories(root) {
++  const dirs = new Set();
++  let read = 0;
++  for (const state of [join(root, "project", "pipeline-state.json"), join(root, ".claude", "pipeline-state.json")]) {
++    let text;
++    try { text = w04ReadFileSync(state, "utf8"); } catch (error) {
++      if (error?.code === "ENOENT") continue;
++      return null;
++    }
++    let parsed;
++    try { parsed = JSON.parse(text); } catch { return null; }
++    read += 1;
++    for (const key of ["planPath", "specPath", "designInputPath"]) {
++      const value = parsed?.activeFeature?.[key];
++      if (typeof value !== "string" || value === "" || value.includes("\0")) continue;
++      const segments = w04NormalizeRelative(value).split("/");
++      segments.pop();
++      if (segments.length < 2 || !HALF_MOVED_ROOT_PREFIXES.includes(segments[0])) continue;
++      if (segments.some((segment) => segment === "" || segment === ".." || segment.startsWith(".") || segment === "node_modules")) continue;
++      dirs.add(segments.join("/"));
++    }
++  }
++  return read === 0 || dirs.size === 0 ? null : dirs;
++}
++
++/**
++ * W7 Slice B: the ONE repair shape admitted under a PORG-INVALID-OBSERVATION (session) -- exactly `git mv <src> <dst>` or
++ * `git restore <path>`, no flag, no chaining (simpleWords() accepts one simple command only), every path strictly inside
++ * ONE bound feature directory, spelled without `..`, glob/shell metacharacters or backslashes, and physically equal to its
++ * lexical spelling (no symlink anywhere on the path, so no realpath escape). A bound authority file may be renamed only
++ * within its own directory, never moved out of it. Any fault while establishing this refuses.
++ */
++export function isHalfMovedRepairCommand(command, root, dependencies = {}) {
++  try {
++    const words = simpleWords(command, root);
++    if (!words || words[0] !== "git") return false;
++    let operands;
++    if (words[1] === "mv" && words.length === 4) operands = [words[2], words[3]];
++    else if (words[1] === "restore" && words.length === 3) operands = [words[2]];
++    else return false;
++    const dirs = w04BoundFeatureDirectories(root);
++    const bound = w04BoundAuthorityPaths(root);
++    if (dirs === null || bound === null) return false;
++    const realpath = dependencies.w04RealpathSyncFn ?? w04RealpathSync;
++    const lstat = dependencies.lstatSyncFn ?? lstatSync;
++    const realRoot = realpath(root);
++    const resolved = [];
++    for (const word of operands) {
++      if (word === "" || word.startsWith("-") || /[\0\\*?[\]{}~$`!#&|;<>"'\s]/u.test(word)) return false;
++      if (word.split("/").includes("..")) return false;
++      const absolute = resolve(root, word);
++      const rel = relative(root, absolute).split(sep).join("/");
++      if (rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return false;
++      if (rel.split("/").some((segment) => segment === "" || segment.startsWith(".") || segment === "node_modules")) return false;
++      const lower = w04NormalizeRelative(rel);
++      const dir = [...dirs].find((candidate) => lower.startsWith(`${candidate}/`));
++      if (dir === undefined) return false;
++      try {
++        if (lstat(absolute).isSymbolicLink()) return false;
++      } catch (error) {
++        if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return false;
++      }
++      let current = absolute;
++      const tail = [];
++      for (;;) {
++        try { current = realpath(current); break; } catch (error) {
++          if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return false;
++          const parent = w04Dirname(current);
++          if (parent === current) return false;
++          tail.unshift(basename(current));
++          current = parent;
++        }
++      }
++      const physical = w04NormalizeRelative(relative(realRoot, join(current, ...tail)).split(sep).join("/"));
++      if (physical !== lower) return false;
++      resolved.push({ lower, dir });
++    }
++    if (resolved.length === 2) {
++      const [source, destination] = resolved;
++      if (source.dir !== destination.dir || source.lower === destination.lower) return false;
++      if (bound.has(source.lower) && w04Dirname(source.lower) !== w04Dirname(destination.lower)) return false;
++    }
++    return true;
++  } catch { return false; }
++}
++
+ /**
+  * MEMPATH-1 (PO decision, 2026-08-08 -- backlog/items/2026-07-29-guard-lifecycle-ready-
+  * blocks-claude-memory-writes.md, "PO decision, 2026-08-08 -- Option A"). Claude Code's own
