@@ -1,0 +1,97 @@
+diff --git a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+index 1c289ed52..c33ca2ad2 100644
+--- a/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
++++ b/plugins/pipeline-core/lib/project-onboarding-v3.test.mjs
+@@ -10448,6 +10448,92 @@ test("F4 portable rollback preserves foreign content when a created target's ino
+   } finally { dispose(ownedRoot); }
+ });
+ 
++// D47 (PO decision 2026-10-27): digest-bound evidence bytes must survive a checkout with
++// core.autocrlf=true. Onboarding seeds line-ending attributes for the evidence paths into a
++// project that owns no .gitattributes, and only ASKS (mutation:false) for a project that does.
++const D47_ATTRIBUTE_LINES = ["specs/**/evidence/** text eol=lf", "evidence/** text eol=lf"];
++const D47_ATTRIBUTE_SEED = `${D47_ATTRIBUTE_LINES.join("\n")}\n`;
++const d47Apply = (path) => applyProjectOnboardingV3(
++  planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }),
++  { rootDir: path, activate: true, deps: fakeDeps },
++);
++
++test("D47-GA-1 a fresh onboarding seeds .gitattributes with exactly the evidence line-ending lines, and git agrees", () => {
++  const fresh = root();
++  try {
++    hostGit(fresh, ["init", "--initial-branch=main"]);
++    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: fresh, deps: fakeDeps });
++    assert.equal(plan.targets.some((target) => target.path === ".gitattributes"), true, "a project without .gitattributes gets a seed target");
++    const applied = applyProjectOnboardingV3(plan, { rootDir: fresh, activate: true, deps: fakeDeps });
++    assert.equal(applied.status, "applied");
++    assert.equal(readFileSync(join(fresh, ".gitattributes"), "utf8"), D47_ATTRIBUTE_SEED, "exactly the attribute lines and nothing else");
++    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectAttributesGapAction"), false, "a fresh seed needs no ask");
++    const attr = (candidate) => spawnSync("git", ["check-attr", "text", "eol", "--", candidate], { cwd: fresh, encoding: "utf8" }).stdout;
++    for (const candidate of ["specs/f1/evidence/a.log", "specs/f1/evidence/sub/b.json", "evidence/c.log"]) {
++      assert.match(attr(candidate), /text: set/u, `git must set text for ${candidate}`);
++      assert.match(attr(candidate), /eol: lf/u, `git must set eol=lf for ${candidate}`);
++    }
++    assert.match(attr("src/app.js"), /text: unspecified/u, "unrelated paths stay untouched");
++  } finally { dispose(fresh); }
++});
++
++test("D47-GA-2 re-planning after the seed is idempotent: no target, no duplicate lines, bytes unchanged", () => {
++  const fresh = root();
++  try {
++    hostGit(fresh, ["init", "--initial-branch=main"]);
++    assert.equal(d47Apply(fresh).status, "applied");
++    const before = readFileSync(join(fresh, ".gitattributes"), "utf8");
++    const replan = planProjectOnboardingV3({ runner: "codex", rootDir: fresh, deps: fakeDeps });
++    assert.equal((replan.targets ?? []).some((target) => target.path === ".gitattributes"), false);
++    const after = readFileSync(join(fresh, ".gitattributes"), "utf8");
++    assert.equal(after, before);
++    assert.equal(after.split("\n").filter((line) => line === D47_ATTRIBUTE_LINES[0]).length, 1);
++  } finally { dispose(fresh); }
++});
++
++test("D47-GA-3 an owned .gitattributes that already carries the lines gets no ask and stays byte-identical", () => {
++  const complete = root();
++  try {
++    const bytes = `* text=auto\n${D47_ATTRIBUTE_LINES[1]}\n*.sh text eol=lf\n${D47_ATTRIBUTE_LINES[0]}\n`;
++    writeFileSync(join(complete, ".gitattributes"), bytes);
++    const applied = d47Apply(complete);
++    assert.equal(applied.status, "applied");
++    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectAttributesGapAction"), false);
++    assert.equal(readFileSync(join(complete, ".gitattributes"), "utf8"), bytes);
++  } finally { dispose(complete); }
++});
++
++test("D47-GA-4 an owned .gitattributes that lacks the lines gets a mutation:false ask naming the exact lines, bytes untouched", () => {
++  const owned = root();
++  try {
++    const bytes = "* text=auto\n";
++    writeFileSync(join(owned, ".gitattributes"), bytes);
++    const applied = d47Apply(owned);
++    assert.equal(applied.status, "applied");
++    const ask = applied.projectAttributesGapAction;
++    assert.equal(ask.kind, "collect-input");
++    assert.equal(ask.mutation, false);
++    for (const line of D47_ATTRIBUTE_LINES) assert.ok(ask.guidance.includes(line), `the ask names ${line}`);
++    assert.equal(readFileSync(join(owned, ".gitattributes"), "utf8"), bytes, "the ask never mutates the file it asks about");
++  } finally { dispose(owned); }
++});
++
++test("D47-GA-5 an owned .gitattributes with other content is never rewritten, and a partial file is asked for only the missing line", () => {
++  const owned = root();
++  try {
++    const bytes = `*.sh text eol=lf\r\n${D47_ATTRIBUTE_LINES[1]}\r\n`;
++    writeFileSync(join(owned, ".gitattributes"), bytes);
++    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: owned, deps: fakeDeps });
++    assert.equal(plan.targets.some((target) => target.path === ".gitattributes"), false, "an owned file is never a target");
++    const applied = applyProjectOnboardingV3(plan, { rootDir: owned, activate: true, deps: fakeDeps });
++    assert.equal(readFileSync(join(owned, ".gitattributes"), "utf8"), bytes, "byte-identical, CRLF included");
++    const ask = applied.projectAttributesGapAction;
++    assert.ok(ask.guidance.includes(D47_ATTRIBUTE_LINES[0]));
++    // line [1] is a suffix of line [0], so look for it as a standalone token only
++    assert.doesNotMatch(ask.guidance, /(?<![\w/*])evidence\/\*\* text eol=lf/u, "the line already present is not asked for again");
++  } finally { dispose(owned); }
++});
++
+ export const FRESH_ENROLLMENT_REGRESSION_CASES = [
+   {id:"FRB001",name:"fresh public portable apply in empty and existing Git roots creates no retirement",run:()=>{
+     for(const initialized of [false,true]){const path=root();try{
