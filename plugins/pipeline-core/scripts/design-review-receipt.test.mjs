@@ -221,22 +221,57 @@ test("no observation records unknown, with the role named and no requested route
   assert.equal(result.receipt.reviewer.model, "unknown");
 }));
 
-test("a requested route is recorded as requested and never as executed", withRepo((repo) => {
+// W7 attestation slice (PO 2026-10-27): no verifiable source-owned dispatch observation route exists, so a self-asserted
+// requested route or observed identity is refused as unattested instead of being written into the receipt. The two cases
+// that used to pin acceptance are updated deliberately (see the held-patch notes); the default path still records unknown.
+test("a self-asserted requested route alone is refused as unattested and nothing is written", withRepo((repo) => {
   const result = createReceiptFromDisk(request(repo, { requestedRoute: "opus-4-7" }), { env: CLAUDE, now });
-  assert.equal(result.ok, true);
-  assert.equal(result.requestedRoute, "opus-4-7");
-  assert.equal(result.observedIdentity, "unknown");
-  assert.equal(result.receipt.reviewer.model, "unknown");
-  assert.equal(readFileSync(join(repo, RECEIPT1), "utf8").includes("opus-4-7"), false);
+  assert.deepEqual([result.ok, result.code], [false, "DRC-OBSERVATION-UNATTESTED"]);
+  assert.equal(existsSync(join(repo, RECEIPT1)), false);
 }));
 
-test("a supplied observation is recorded as observed, apart from the requested route", withRepo((repo) => {
-  const result = createReceiptFromDisk(request(repo, { requestedRoute: "opus", observedIdentity: "claude-opus-4-7" }), { env: CLAUDE, now });
-  assert.equal(result.ok, true);
-  assert.equal(result.requestedRoute, "opus");
-  assert.equal(result.observedIdentity, "claude-opus-4-7");
-  assert.equal(result.receipt.reviewer.model, "claude-opus-4-7");
-  assert.equal(parseDesignReviewReceipt(readFileSync(join(repo, RECEIPT1))).ok, true);
+test("a self-asserted observed identity, with or without a requested route, is refused as unattested and nothing is written", withRepo((repo) => {
+  for (const over of [{ observedIdentity: "claude-opus-4-7" }, { requestedRoute: "opus", observedIdentity: "claude-opus-4-7" }]) {
+    const result = createReceiptFromDisk(request(repo, over), { env: CLAUDE, now });
+    assert.deepEqual([result.ok, result.code], [false, "DRC-OBSERVATION-UNATTESTED"], JSON.stringify(over));
+  }
+  assert.equal(existsSync(join(repo, RECEIPT1)), false);
+}));
+
+test("the same unattested refusal holds on the claude, antigravity and codex runners", withRepo((repo) => {
+  const runners = [{ CLAUDECODE: "1" }, { ANTIGRAVITY_AGENT: "1" }, { CODEX_THREAD_ID: "t-1" }];
+  for (const env of runners) {
+    for (const over of [{ observedIdentity: "claude-opus-4-7" }, { requestedRoute: "opus" }, { requestedRoute: "opus", observedIdentity: "claude-opus-4-7" }]) {
+      const result = createReceiptFromDisk(request(repo, over), { env, now });
+      assert.deepEqual([result.ok, result.code], [false, "DRC-OBSERVATION-UNATTESTED"], `${JSON.stringify(env)} ${JSON.stringify(over)}`);
+    }
+  }
+  assert.equal(existsSync(join(repo, RECEIPT1)), false);
+}));
+
+test("control: the default path with no flags still yields unknown on every runner, and carries no fallback", withRepo((repo) => {
+  const cases = [[{ CLAUDECODE: "1" }, "claude"], [{ ANTIGRAVITY_AGENT: "1" }, "antigravity"], [{ CODEX_SESSION_ID: "s-1" }, "codex"]];
+  for (const [env, runner] of cases) {
+    const out = `specs/feat-x/review/${runner}-default.receipt.json`;
+    const result = createReceiptFromDisk(request(repo, { outPath: out }), { env, now });
+    assert.equal(result.ok, true, runner);
+    assert.deepEqual([result.reviewerRole, result.requestedRoute, result.observedIdentity], ["critic", null, "unknown"]);
+    const parsed = parseDesignReviewReceipt(readFileSync(join(repo, out)));
+    assert.equal(parsed.receipt.reviewer.model, "unknown");
+    assert.equal(parsed.receipt.reviewer.runner, runner);
+    assert.equal(Object.hasOwn(parsed.receipt, "fallback"), false);
+  }
+}));
+
+test("control: the legacy typed fallback route still works, with or without its observed identity, and is the only way to carry a route", withRepo((repo) => {
+  const code = "RRP-FALLBACK-SELF-DISPATCH-NO-CARRIER";
+  const plain = createReceiptFromDisk(request(repo, { requestedRoute: "duty.critic_normal", fallbackReasonCode: code }), { env: CLAUDE, now });
+  assert.equal(plain.ok, true, `${plain.code}: ${plain.message}`);
+  assert.equal(plain.receipt.fallback.requestedRoute, "duty.critic_normal");
+  assert.equal(plain.receipt.fallback.observedIdentity, "unknown");
+  const observed = createReceiptFromDisk(request(repo, { outPath: RECEIPT2, requestedRoute: "duty.critic_normal", observedIdentity: "claude-sonnet-5-5", fallbackReasonCode: code }), { env: CLAUDE, now });
+  assert.equal(observed.ok, true, `${observed.code}: ${observed.message}`);
+  assert.equal(observed.receipt.fallback.observedIdentity, "claude-sonnet-5-5");
 }));
 
 test("a malformed requested route or observed identity is refused and writes nothing", withRepo((repo) => {
@@ -250,10 +285,12 @@ test("a malformed requested route or observed identity is refused and writes not
 test("the command line reports role, requested route and observed identity separately", withRepo((repo) => {
   const plain = runMain(baseArgv(repo));
   assert.deepEqual([plain.json.reviewerRole, plain.json.requestedRoute, plain.json.observedIdentity], ["critic", null, "unknown"]);
+  // W7 attestation slice: a self-asserted route/identity on the command line is refused, typed, and writes nothing.
   const observed = runMain(baseArgv(repo, { out: RECEIPT2, "requested-route": "opus", "observed-identity": "claude-opus-4-7" }));
-  assert.equal(observed.code, 0, observed.stderr);
-  assert.deepEqual([observed.json.requestedRoute, observed.json.observedIdentity], ["opus", "claude-opus-4-7"]);
-  assert.equal(parseDesignReviewReceipt(readFileSync(join(repo, RECEIPT2))).receipt.reviewer.model, "claude-opus-4-7");
+  assert.equal(observed.code, 2);
+  assert.equal(observed.json.status, "refused");
+  assert.equal(observed.json.code, "DRC-OBSERVATION-UNATTESTED");
+  assert.equal(existsSync(join(repo, RECEIPT2)), false);
 }));
 
 test("library refusals pass through under their own code and write nothing", withRepo((repo) => {

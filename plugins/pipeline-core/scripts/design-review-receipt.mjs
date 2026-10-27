@@ -163,6 +163,11 @@ export function createReceiptFromDisk(input, deps = {}) {
     }
     if (requestedRoute === null) return refuse("DRC-USAGE", "a fallback names the route that was requested: supply --requested-route with --fallback-reason-code");
   }
+  // W7 attestation: no verifiable source-owned dispatch observation route exists yet, so a self-asserted requested route
+  // or observed identity is unattested. Only the typed fallback record (which says it is not an independent review) may carry them.
+  if ((requestedRoute !== null || observedIdentity !== null) && fallbackReasonCode === null) {
+    return refuse("DRC-OBSERVATION-UNATTESTED", "a requested route or observed identity cannot be recorded: no verifiable source-owned dispatch observation exists, so a self-asserted value is unattested; omit it (the identity is recorded as unknown)");
+  }
 
   const named = [["report", request.reportPath], ["PRD", request.prdPath], ["Spec", request.specPath], ["output", request.outPath]];
   companionPaths.forEach((path) => named.push(["companion", path]));
