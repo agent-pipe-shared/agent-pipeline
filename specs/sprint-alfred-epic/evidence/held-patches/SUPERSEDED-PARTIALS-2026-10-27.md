@@ -13,6 +13,7 @@ and must NOT be applied. Apply only the replacement.
 | `w7-pf83-stop-failure-removed-on-success.patch` | `w7-pf83-stop-failure-removed-c2.patch` | test half only (NGHF14-16), no production change and no run; c2 holds the same cases plus the fix |
 | `w7-g18-readiness-aggregate.patch` | `w7-g18-readiness-aggregate-c2.patch` | module and cases without a clean RED run (the RED run overlapped writing the module); c2 has RED 4 fail, GREEN 48/48, baseline 44/44 |
 | `w7-elephant-context-guard-dispatch.patch` | `w7-elephant-context-guard-dispatch-c2.patch` | test half only (GD67-GD72), no production edit and no run |
+| `w7-d56-admit-attested-record.patch` | `w7-d56-admit-attested-record-c2.patch` | CSC-A1 to A5 fixtures were rejected by the real validator (empty log) and no baseline run; c2 is complete and applies at the candidate alone |
 
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.

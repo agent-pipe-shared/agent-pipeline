@@ -1,0 +1,177 @@
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index b79504c93..502a48c40 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -188,8 +188,12 @@ function terminalAuthoredDelivery(record) {
+     && Array.isArray(record?.commits) && record.commits.length > 0
+     && record.commits.at(-1) === record.candidateCommit;
+   if (record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA) return delivered;
+-  return record?.schema === DISPATCH_RECORD_SCHEMA
+-    && record?.outcomeClassification?.kind === "authored-commit" && delivered;
++  return record?.schema === DISPATCH_RECORD_SCHEMA && delivered
++    && (record?.outcomeClassification?.kind === "authored-commit"
++      || record?.outcomeClassification?.kind === "orchestrator-attested");
++}
++function admittedKindOf(record) {
++  return record?.schema === DISPATCH_RECORD_SCHEMA ? record.outcomeClassification.kind : null;
+ }
+ 
+ function verifyCandidateDescendsFromRecord(root, recordCandidate, reviewCandidate, options = {}) {
+@@ -816,6 +820,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+   const pendingRecordPaths = [];
+   let targetRecordCandidateCommit = null;
+   let admittedByDescendant = false;
++  let admittedRecordKind = null;
+   if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
+   if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
+ 
+@@ -864,13 +869,18 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+         const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
+         if (addendumFinding) findings.push(addendumFinding);
+         else coveredRecordCount += 1;
++      } else if (record.taskId === taskId && record.candidateCommit === candidateCommit && isV4
++        && !["authored-commit", "orchestrator-attested"].includes(record.outcomeClassification.kind)) {
++        targetRecordCandidateCommit = record.candidateCommit;
++        findings.push(`${path}: a v4 ${record.outcomeClassification.kind} record does not deliver an authored commit and cannot admit a review at its candidate`);
+       } else if (record.taskId === taskId && record.candidateCommit === candidateCommit) {
+         targetRecordCandidateCommit = record.candidateCommit;
+         admittedCount += 1;
++        admittedRecordKind = admittedKindOf(record);
+       } else if (record.taskId === taskId && terminalAuthoredDelivery(record)) {
+         targetRecordCandidateCommit = record.candidateCommit;
+         const ancestry = verifyCandidateDescendsFromRecord(root, record.candidateCommit, candidateCommit, options);
+-        if (ancestry.ok) { admittedCount += 1; admittedByDescendant = true; }
++        if (ancestry.ok) { admittedCount += 1; admittedByDescendant = true; admittedRecordKind = admittedKindOf(record); }
+         else if (ancestry.finding) findings.push(`${path}: ${ancestry.finding}`);
+         else findings.push(`${path}: requested review candidate is not a descendant of the record's original candidateCommit`);
+       } else if (record.taskId === taskId) {
+@@ -902,14 +912,16 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+   if (signedImportAnchor !== null) admittedCount = 1;
+   if (admittedCount !== 1) {
+     const missingRecordHint = admittedCount === 0
+-      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none; a range with no dispatch history has no admitted route yet and needs a PO decision (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
++      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by scripts/dispatch-record-write.mjs (writeOrchestratorAttestedDispatchRecord), admitted as weaker assurance than a host-observed record; a range with no dispatch history has no admitted route yet and needs a PO decision (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+       : "";
+     findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
+   }
+   const ok = findings.length === 0 && admittedCount === 1;
+   return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount,
+     pendingRecordCount, pendingRecordPaths, administrativelyRetiredRecordCount, targetRecordCandidateCommit,
+-    admittedByDescendant, readFindings: findings };
++    admittedByDescendant, admittedRecordKind: admittedCount === 1 ? admittedRecordKind : null,
++    assurance: admittedCount === 1 && admittedRecordKind === "orchestrator-attested" ? "orchestrator-attested" : null,
++    readFindings: findings };
+ }
+ 
+ 
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index b6432a2f2..aac73cbf9 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -12,6 +12,7 @@ import { DEFAULT_ABANDONED_V3_RECOVERY_INDEX_PATH, DEFAULT_LEGACY_RECONCILE_INDE
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
++import { ORCHESTRATOR_ATTESTATION_SCHEMA, ORCHESTRATOR_ATTESTED_ASSURANCE } from "../lib/dispatch-record.mjs";
+ 
+ const SHA = "a".repeat(40);
+ const trigger = (overrides = {}) => ({ schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 0, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false }, ...overrides });
+@@ -988,3 +989,98 @@ test("git path reader returns an empty array for a valid zero-path commit", () =
+   assert.equal(calls.length, 1);
+   assert.deepEqual(calls[0].args.at(-1), SHA);
+ });
++
++// D56 slice 4/5: review admission of the orchestrator-attested record kind (real validateDispatchRecord, no stub).
++const DESCENDANT = "b".repeat(40);
++const ancestryOk = () => "";
++const TERMINAL_LOG = [{ phase: "done", toolUseCount: 3 }];
++function deliveredV4(taskId, kind, overrides = {}) {
++  const text = "Completed delivery.";
++  return v4(taskId, { outcome: "completed", resultSha256: sha256(text), commits: [SHA], log: TERMINAL_LOG,
++    report: { text, changedFiles: ["src/change.txt"] }, criticRequired: required(),
++    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind },
++    ...(kind === "orchestrator-attested" ? { attestation: { schema: ORCHESTRATOR_ATTESTATION_SCHEMA,
++      assurance: ORCHESTRATOR_ATTESTED_ASSURANCE, briefingSha256: "1".repeat(64), handbackSha256: "2".repeat(64) } } : {}),
++    ...overrides });
++}
++const admit = (record, candidateCommit = SHA, options = {}) => evaluateReviewAdmission({
++  root: fixture({ [`evidence/dispatch-record-${record.taskId}.json`]: json(record) }),
++  taskId: record.taskId, candidateCommit, readChangedPaths: () => [], ...options });
++
++test("CSC-A1 an attested terminal v4 record admits exactly once at its own candidate and reports its weaker assurance", () => {
++  const result = admit(deliveredV4("ATT", "orchestrator-attested"));
++  assert.equal(result.ok, true, result.readFindings.join("\n"));
++  assert.equal(result.admittedCount, 1);
++  assert.equal(result.admittedRecordKind, "orchestrator-attested");
++  assert.equal(result.assurance, "orchestrator-attested");
++});
++
++test("CSC-A2 the attested record admits a later descendant candidate through the descendant branch", () => {
++  const result = admit(deliveredV4("ATT", "orchestrator-attested"), DESCENDANT, { gitRead: ancestryOk });
++  assert.equal(result.ok, true, result.readFindings.join("\n"));
++  assert.equal(result.admittedByDescendant, true);
++  assert.equal(result.targetRecordCandidateCommit, SHA);
++  assert.equal(result.admittedRecordKind, "orchestrator-attested");
++  assert.equal(result.assurance, "orchestrator-attested");
++});
++
++test("CSC-A3 an authored-commit v4 record admits as before and carries no assurance label", () => {
++  const exact = admit(deliveredV4("AUT", "authored-commit"));
++  assert.equal(exact.ok, true, exact.readFindings.join("\n"));
++  assert.equal(exact.admittedRecordKind, "authored-commit");
++  assert.equal(exact.assurance, null);
++  const later = admit(deliveredV4("AUT", "authored-commit"), DESCENDANT, { gitRead: ancestryOk });
++  assert.equal(later.ok, true, later.readFindings.join("\n"));
++  assert.equal(later.admittedByDescendant, true);
++  assert.equal(later.assurance, null);
++});
++
++test("CSC-A4 a v4 read-only record with criticRequired is not admitted at the exact candidate", () => {
++  const text = "Read only analysis.";
++  const result = admit(v4("RO", { outcome: "read-only-completed", resultSha256: sha256(text), commits: [], log: TERMINAL_LOG,
++    report: { text, changedFiles: [] }, criticRequired: required(),
++    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" } }));
++  assert.equal(result.ok, false);
++  assert.equal(result.admittedCount, 0);
++  assert.equal(result.applicableRecordCount, 1);
++  assert.doesNotMatch(result.readFindings.join("\n"), /invalid v4 dispatch record/u);
++  assert.match(result.readFindings.join("\n"), /does not deliver an authored commit/u);
++  assert.equal(result.admittedRecordKind, null);
++  assert.equal(result.assurance, null);
++});
++
++test("CSC-A5 a v4 stopped-without-commit record with criticRequired is not admitted at the exact candidate", () => {
++  const text = "Stopped before any commit.";
++  const result = admit(v4("STOP", { outcome: "stopped-without-commit", resultSha256: sha256(text), commits: [], log: TERMINAL_LOG,
++    report: { text, changedFiles: [] }, criticRequired: required(),
++    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "stopped-without-commit" } }));
++  assert.equal(result.ok, false);
++  assert.equal(result.admittedCount, 0);
++  assert.equal(result.applicableRecordCount, 1);
++  assert.doesNotMatch(result.readFindings.join("\n"), /invalid v4 dispatch record/u);
++  assert.match(result.readFindings.join("\n"), /does not deliver an authored commit/u);
++  assert.equal(result.admittedRecordKind, null);
++});
++
++test("CSC-A6 the zero-target refusal keeps its pinned prefix and also names the attested route", () => {
++  const result = evaluateReviewAdmission({ root: fixture({ "evidence/.keep": "" }), taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
++  const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`));
++  assert.ok(text, result.readFindings.join("\n"));
++  assert.match(text, /orchestrator-attested/u);
++  assert.match(text, /dispatch-record-write\.mjs/u);
++  assert.match(text, /writeOrchestratorAttestedDispatchRecord/u);
++  assert.equal(result.admittedRecordKind, null);
++});
++
++test("CSC-A7 a delivered v3 record still admits with no label (documents D-2, no behaviour change)", () => {
++  const text = "Completed delivery.";
++  const record = v3("OLD", { outcome: "completed", resultSha256: sha256(text), commits: [SHA],
++    report: { text, changedFiles: ["src/change.txt"] }, criticRequired: required() });
++  const exact = admit(record);
++  assert.equal(exact.ok, true, exact.readFindings.join("\n"));
++  assert.equal(exact.admittedRecordKind, null);
++  assert.equal(exact.assurance, null);
++  const later = admit(record, DESCENDANT, { gitRead: ancestryOk });
++  assert.equal(later.ok, true, later.readFindings.join("\n"));
++  assert.equal(later.admittedByDescendant, true);
++});
