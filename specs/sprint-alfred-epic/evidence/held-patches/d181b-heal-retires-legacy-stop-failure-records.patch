@@ -1,0 +1,197 @@
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.mjs b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+index df133e466..0ff850bee 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.mjs
+@@ -36,7 +36,7 @@
+ //               keeps its own typed recovery (session-cleanup.mjs plan-recovery).
+ //
+ // Prints one JSON result. Exit 0: inspected | healed | moved-aside | taken-over | nothing-to-take-over. Exit 2: refused (typed SAR-* code).
+-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
+ import { createHash, randomBytes } from "node:crypto";
+ import { join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -86,7 +86,7 @@ function parse(argv) {
+   }
+   if (!flags.root) return { error: "--root <root> is required" };
+   if (verb === "move-aside" && (flags["no-goldfish-running"] !== true || !validReason(flags.reason)))
+-    return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"" };
++    return { error: "move-aside needs --no-goldfish-running (you assert that no Goldfish or other authority operation runs) and --reason \"<one line>\"; move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh" };
+   if (verb === "release-lock" && (flags["no-pipeline-running"] !== true || !validReason(flags.reason)))
+     return { error: "release-lock needs --no-pipeline-running (you assert that no Pipeline process runs for this repository) and --reason \"<one line>\"" };
+   if (verb === "take-over" && (flags["no-other-session-running"] !== true || !validSession(flags.from) || !validReason(flags.reason)))
+@@ -101,6 +101,43 @@ function parse(argv) {
+   return { verb, flags };
+ }
+ 
++// D181b: a finalizer stop-failure record written before the diagnostic moved out of the native Goldfish namespace sits in the old
++// directory and makes the native inventory refuse. Heal moves it aside (never deletes) unless its dispatch may still be in flight.
++const LEGACY_STOP_FAILURE_NAME = /^stop-failure-[a-f0-9]{32}\.json$/u;
++function retireLegacyStopFailures(repository, asideDir) {
++  const directory = join(repository.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
++  const retired = [], kept = [];
++  if (!existsSync(directory)) return { retired, kept };
++  const names = readdirSync(directory);
++  const candidates = names.filter((name) => LEGACY_STOP_FAILURE_NAME.test(name));
++  if (!candidates.length) return { retired, kept };
++  // Unsettled pending state: a pending file naming the dispatch with no authority-terminal record for its digest.
++  const unsettled = new Set(); let pendingProblem = null;
++  for (const name of names.filter((row) => /^pending-(claude|codex)-[a-f0-9]{64}\.json$/u.test(row))) {
++    try {
++      const bytes = readFileSync(join(directory, name));
++      const dispatchId = JSON.parse(bytes.toString("utf8"))?.binding?.dispatchId;
++      if (typeof dispatchId !== "string") throw new Error("no binding.dispatchId");
++      if (!names.includes(`authority-terminal-${createHash("sha256").update(bytes).digest("hex")}.json`)) unsettled.add(dispatchId);
++    } catch (error) { pendingProblem = `pending state ${name} cannot be read (${short(error)}), so in-flight cannot be decided`; }
++  }
++  for (const name of candidates) {
++    const path = join(directory, name);
++    let record;
++    try {
++      if (lstatSync(path).isSymbolicLink()) { kept.push({ name, reason: "a symlink is never moved" }); continue; }
++      record = JSON.parse(readFileSync(path, "utf8"));
++    } catch (error) { kept.push({ name, reason: `unreadable or malformed: ${short(error)}` }); continue; }
++    if (record === null || typeof record !== "object" || Array.isArray(record) || record.schema !== "pipeline.native-goldfish-host-stop-failure.v1" || typeof record.dispatchId !== "string") { kept.push({ name, reason: "not a native-goldfish-host-stop-failure.v1 record" }); continue; }
++    if (pendingProblem !== null) { kept.push({ name, reason: pendingProblem }); continue; }
++    if (unsettled.has(record.dispatchId)) { kept.push({ name, reason: `dispatch ${record.dispatchId} has an unsettled pending state` }); continue; }
++    mkdirSync(asideDir, { recursive: true, mode: 0o700 });
++    renameSync(path, join(asideDir, name));
++    retired.push({ name, dispatchId: record.dispatchId, code: record.code ?? null, observedAt: record.observedAt ?? null });
++  }
++  return { retired, kept };
++}
++
+ function producerReport(repository) {
+   const base = join(repository.commonDir, "agent-pipeline", "session-authority");
+   if (!existsSync(join(base, "catalogue.json"))) return { status: "absent", producers: [] };
+@@ -227,7 +264,7 @@ function inspect(repository, root, { afterHeal = false, scratch } = {}) {
+   const healable = (reason) => !afterHeal && (reason === "catalogue-source-closure" || drifted.some((row) => row.inFlight === 0 && reason === `${row.producerId}:namespace-drift`));
+   // A read refused only because the lock is held is explained by the lock step, not by move-aside.
+   const unexplained = registry.read.status === "refused" && !healable(registry.read.reason) && !(held && registry.read.code === "SDC-LOCK-HELD");
+-  if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: the registry is retained aside and starts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
++  if (registry.status === "unreadable" || stuck.length || unexplained) next.push({ why: `${[...stuck.map((row) => `${row.producerId} ${row.status}${row.drifted?.length ? ` (${row.drifted.join(", ")})` : ""}${row.reason ? `: ${row.reason}` : ""}`), ...(unexplained ? [`the registry read refuses: ${registry.read.code} ${registry.read.reason}`] : [])].join("; ") || `the registry does not read: ${registry.reason}`}. Last resort once no Goldfish runs: move-aside does not clear a finalizer stop-failure record (heal clears it); the registry is retained aside and restarts fresh`, command: `${sessionAuthorityRepairCommand(root, "move-aside")} --no-goldfish-running --reason "<why>"` });
+   return { lock, cleanupLocks, registry, reservations, scratchBinding, next };
+ }
+ 
+@@ -307,23 +344,27 @@ export function runSessionAuthorityRepair(argv, out = (text) => process.stdout.w
+   let healed = null;
+   // Outside the registry boundary: custody never reclaims these locks itself, and no boundary entry is needed to retire them.
+   let retiredCleanupLocks = null;
++  let stopFailures = null;
+   if (parsed.verb === "heal") {
+     try { retiredCleanupLocks = retireDeadSessionCleanupManifestLocks(root, { asideDir: join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-session-cleanup-lock`) }); }
+     catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a dead session-cleanup lock could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
++    try { stopFailures = retireLegacyStopFailures(repository, join(repository.commonDir, "agent-pipeline", "session-authority-abandoned", `${new Date().toISOString().replace(/[^0-9]/gu, "")}-${randomBytes(4).toString("hex")}-stop-failure`)); }
++    catch (error) { return emit({ status: "refused", code: "SAR-UNAVAILABLE", reason: `a legacy stop-failure record could not be retired: ${short(error)}`, ...(scratchBound === null ? {} : { scratchBound }) }, 2); }
+   }
++  const stopFields = { ...(stopFailures?.retired.length ? { retiredStopFailures: stopFailures.retired } : {}), ...(stopFailures?.kept.length ? { keptStopFailures: stopFailures.kept } : {}) };
+   try {
+     if (parsed.verb === "heal") healed = retryWhileSessionAuthorityLockHeld((entered) => withSessionAuthorityBoundary({ repository }, (boundary) => { entered.value = true; return healSessionAuthorityDrift({ boundary }); }));
+     else retryWhileSessionAuthorityLockHeld((entered) => { const moved = moveSessionAuthorityRegistryAside({ repository, reason: parsed.flags.reason.trim(), onEntered: () => { entered.value = true; } }); return moved; });
+   } catch (error) {
+     const heal = typeof error?.repair === "string" ? { repair: error.repair } : parsed.verb === "heal" ? { repair: sessionAuthorityRepairCommand(root, "inspect") } : {};
+-    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
++    return emit({ ...(error?.code === "SDC-LOCK-HELD" ? lockRefusal(error, root) : { status: "refused", code: "SAR-UNAVAILABLE", reason: short(error), ...heal, ...stopFields }), ...(scratchBound === null ? {} : { scratchBound }) }, 2);
+   }
+   const retained = markers(repository).filter((name) => !before.has(name));
+   // Critic F8: a registry that still does not read (a member in flight, or a heal that could not retain its marker)
+   // is not reported healed; inspect names what holds it.
+-  if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained,
++  if (healed?.status === "refused") return emit({ status: "refused", code: "SAR-HEAL-INCOMPLETE", reason: `the registry still does not read after heal: ${healed.reason}`, retained, ...stopFields,
+     ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { scratch }) }, 2);
+-  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
++  return emit({ status: parsed.verb === "heal" ? "healed" : "moved-aside", retained, ...(retiredCleanupLocks === null ? {} : { retiredCleanupLocks }), ...stopFields, ...(scratchBound === null ? {} : { scratchBound }), ...inspect(repository, root, { afterHeal: parsed.verb === "heal", scratch }) }, 0);
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) process.exitCode = runSessionAuthorityRepair(process.argv.slice(2), undefined, { env: process.env });
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index b00290307..86bf44385 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -3,7 +3,7 @@
+ // and the last resort leaves no state that blocks the next dispatch.
+ import assert from "node:assert/strict";
+ import { spawnSync } from "node:child_process";
+-import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { createHash } from "node:crypto";
+ import { devNull, hostname } from "node:os";
+ import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
+@@ -501,6 +501,77 @@ const cases = [
+     assert.ok(goldfish, JSON.stringify(found.registry));
+     assert.equal(goldfish.status, "ok", JSON.stringify(goldfish));
+   }) },
++  { id: "SAR17", name: "D181b heal retires a legacy finalizer stop-failure record from the old native-goldfish-host-commit directory aside, reports it in retiredStopFailures, leaves the registry readable and has nothing to retire the second time", run: () => fixture(({ root }) => {
++    if (process.platform !== "linux") return;
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
++    const name = `stop-failure-${"b".repeat(32)}.json`;
++    writeFileSync(join(legacy, name), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "GONE-DISPATCH", toolUseId: "native-tool-gone", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
++    const healed = repair("heal", "--root", root);
++    assert.equal(healed.code, 0, JSON.stringify(healed.result));
++    assert.deepEqual(healed.result.retiredStopFailures, [{ name, dispatchId: "GONE-DISPATCH", code: "NGHF-HANDBACK-INVALID", observedAt: "2026-10-27T00:00:00.000Z" }], JSON.stringify(healed.result));
++    assert.equal(existsSync(join(legacy, name)), false, "the record left the old directory");
++    const kept = healed.result.retained.find((row) => row.endsWith("-stop-failure"));
++    assert.ok(kept, JSON.stringify(healed.result.retained));
++    assert.deepEqual(readdirSync(join(repository.commonDir, "agent-pipeline/session-authority-abandoned", kept)), [name], "moved aside, not deleted");
++    const found = repair("inspect", "--root", root).result;
++    assert.notEqual(found.registry.status, "refused", JSON.stringify(found.registry));
++    const again = repair("heal", "--root", root);
++    assert.deepEqual(again.result.retiredStopFailures ?? [], []);
++  }) },
++  { id: "SAR18", name: "D181b heal keeps a legacy stop-failure record whose dispatch still has an unsettled pending state and lists it under keptStopFailures with the reason", run: () => fixture(({ root }) => {
++    if (process.platform !== "linux") return;
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
++    const name = `stop-failure-${"c".repeat(32)}.json`;
++    writeFileSync(join(legacy, name), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "DELIVER-AC-1", toolUseId: "native-tool-one", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
++    const healed = repair("heal", "--root", root);
++    assert.deepEqual(healed.result.retiredStopFailures ?? [], [], JSON.stringify(healed.result));
++    assert.equal(existsSync(join(legacy, name)), true, "an in-flight dispatch's record stays");
++    const row = (healed.result.keptStopFailures ?? []).find((entry) => entry.name === name);
++    assert.ok(row && typeof row.reason === "string" && row.reason !== "", JSON.stringify(healed.result.keptStopFailures));
++  }) },
++  { id: "SAR19", name: "D181b heal never moves a stop-failure-named file with another schema, array JSON or a symlink and lists each as kept", run: () => fixture(({ root }) => {
++    if (process.platform !== "linux") return;
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
++    const other = `stop-failure-${"d".repeat(32)}.json`, array = `stop-failure-${"e".repeat(32)}.json`, link = `stop-failure-${"f".repeat(32)}.json`;
++    writeFileSync(join(legacy, other), `${JSON.stringify({ schema: "pipeline.something-else.v1", dispatchId: "GONE-DISPATCH" })}\n`, { mode: 0o600 });
++    writeFileSync(join(legacy, array), "[]\n", { mode: 0o600 });
++    symlinkSync(join(legacy, other), join(legacy, link));
++    const healed = repair("heal", "--root", root);
++    assert.deepEqual(healed.result.retiredStopFailures ?? [], [], JSON.stringify(healed.result));
++    for (const entry of [other, array, link]) {
++      assert.equal(existsSync(join(legacy, entry)) || lstatSync(join(legacy, entry), { throwIfNoEntry: false }) !== undefined, true, `${entry} stays`);
++      assert.ok((healed.result.keptStopFailures ?? []).some((row) => row.name === entry && row.reason), `${entry} listed: ${JSON.stringify(healed.result.keptStopFailures)}`);
++    }
++  }) },
++  { id: "SAR20", name: "D181b heal never touches a record in the new native-goldfish-host-diagnostics directory", run: () => fixture(({ root }) => {
++    if (process.platform !== "linux") return;
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    const diagnostics = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-diagnostics");
++    mkdirSync(diagnostics, { recursive: true, mode: 0o700 });
++    const file = join(diagnostics, `stop-failure-${"a".repeat(32)}.json`);
++    writeFileSync(file, `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "GONE-DISPATCH", toolUseId: "t", status: "refused", code: "X", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
++    const healed = repair("heal", "--root", root);
++    assert.deepEqual(healed.result.retiredStopFailures ?? [], [], JSON.stringify(healed.result));
++    assert.equal(existsSync(file), true);
++  }) },
++  { id: "SAR21", name: "D181b the inspect next text for move-aside says it does not clear a finalizer stop-failure record", run: () => fixture(({ root }) => {
++    if (process.platform !== "linux") return;
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    const legacy = join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-commit");
++    writeFileSync(join(legacy, `stop-failure-${"b".repeat(32)}.json`), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "GONE-DISPATCH", toolUseId: "t", status: "refused", code: "X", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
++    const found = repair("inspect", "--root", root).result;
++    const aside = found.next.find((row) => / move-aside --root /u.test(row.command));
++    assert.ok(aside, JSON.stringify(found.next));
++    assert.match(aside.why, /does not clear a finalizer stop-failure record/u, aside.why);
++  }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
