@@ -1,0 +1,179 @@
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index e4f65d631..9ca535848 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -915,7 +915,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+   if (signedImportAnchor !== null) admittedCount = 1;
+   if (admittedCount !== 1) {
+     const missingRecordHint = admittedCount === 0
+-      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by scripts/dispatch-record-write.mjs (writeOrchestratorAttestedDispatchRecord), admitted as weaker assurance than a host-observed record; a range with no dispatch history has no admitted route yet and needs a PO decision (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
++      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+       : "";
+     findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
+   }
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index 356552b7a..7a386cee4 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -339,7 +339,7 @@ test("D176 the admission refusal without a dispatch record names the expected re
+   assert.match(text, /host/u);
+   assert.match(text, /foreground/u);
+   assert.match(text, /cannot be authored/u);
+-  assert.match(text, /PO decision/u);
++  assert.match(text, /attested-request/u);
+ });
+ 
+ test("D176 the admission refusal keeps its original prefix byte-identical", () => {
+@@ -1073,11 +1073,11 @@ test("CSC-A6 the zero-target refusal keeps its pinned prefix and also names the
+   assert.ok(text, result.readFindings.join("\n"));
+   assert.match(text, /orchestrator-attested/u);
+   assert.match(text, /dispatch-record-write\.mjs/u);
+-  assert.match(text, /writeOrchestratorAttestedDispatchRecord/u);
++  assert.match(text, /--attested-request/u);
+   assert.equal(result.admittedRecordKind, null);
+ });
+ 
+-test("CSC-A7 a delivered v3 record still admits with no label (documents D-2, no behaviour change)", () => {
++test("CSC-A7a delivered v3 record still admits with no label (documents D-2, no behaviour change)", () => {
+   const text = "Completed delivery.";
+   const record = v3("OLD", { outcome: "completed", resultSha256: sha256(text), commits: [SHA],
+     report: { text, changedFiles: ["src/change.txt"] }, criticRequired: required() });
+@@ -1089,3 +1089,12 @@ test("CSC-A7 a delivered v3 record still admits with no label (documents D-2, no
+   assert.equal(later.ok, true, later.readFindings.join("\n"));
+   assert.equal(later.admittedByDescendant, true);
+ });
++
++test("CSC-A8 the zero-target refusal names the attested-request CLI and no longer defers a no-history range to a PO decision", () => {
++  const result = evaluateReviewAdmission({ root: fixture({ "evidence/.keep": "" }), taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
++  const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`));
++  assert.ok(text, result.readFindings.join("\n"));
++  assert.match(text, /node plugins\/pipeline-core\/scripts\/dispatch-record-write\.mjs --repo-root \. --attested-request <request\.json>/u);
++  assert.doesNotMatch(text, /PO decision/u);
++  assert.doesNotMatch(text, /writeOrchestratorAttestedDispatchRecord/u);
++});
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index e2ce0f08a..2fc83ce58 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -511,7 +511,16 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
+     const reviewAdmission = signedImportAnchor === undefined
+       ? evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, baseCommit: base, candidateCommit: candidate })
+       : evaluateSignedQualityImportReviewAdmissionFn({ root: repoRoot, anchor: signedImportAnchor });
+-    if (!reviewAdmission.ok) fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${(reviewAdmission.readFindings ?? reviewAdmission.findings ?? []).join("; ")}`);
++    if (!reviewAdmission.ok) {
++      let producerHint = "";
++      if (signedImportAnchor === undefined && reviewAdmission.admittedCount === 0) {
++        const range = git(repoRoot, ["log", "--format=%B", `${base}..${candidate}`], { allowNonzero: true });
++        if (range.status === 0 && /^Dispatch: \S+ \(goldfish\)$/mu.test(String(range.stdout))) {
++          producerHint = " The range carries a Goldfish Dispatch trailer: the Elephant can reconstruct the missing record with node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, where the closed request names the briefing, the hand-back text and the delivery commits (pipeline.dispatch-attested-request.v1).";
++        }
++      }
++      fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${(reviewAdmission.readFindings ?? reviewAdmission.findings ?? []).join("; ")}${producerHint}`);
++    }
+     if (signedImportAnchor !== undefined && reviewAdmission.code !== "signed-quality-import-review-admitted") fail("CPP-REVIEW-ADMISSION", "Signed import review admission did not return its distinct success code.");
+     if (signedImportAnchor !== undefined && options.taskId !== signedImportAnchor.taskId) fail("CPP-COORDINATOR-BINDING", "Packet task identity does not match the signed import intent.");
+     const localDispatchEvidence = signedImportAnchor === undefined
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
+index 3c8e2a4f3..1667629e1 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
+@@ -22,6 +22,7 @@ import {
+   recordCandidateResult,
+ } from "./critic-packet-preflight.mjs";
+ import { createLocalDispatchEvidenceBinding } from "./check-critic-skip-coverage.mjs";
++import { runAttestedRequest } from "./dispatch-record-write.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
+ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+@@ -305,14 +306,14 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged
+     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
+     const disposed = records.filter((record) => record.event === "DISPOSED");
+     assert.equal(records[0].event, "DECLARED");
+-    assert.equal(records[0].caseCount, 15);
+-    assert.equal(disposed.length, 15);
++    assert.equal(records[0].caseCount, 17);
++    assert.equal(disposed.length, 17);
+     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
+     assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
+     assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
+-    assert.deepEqual(records.at(-1).counts, { pass: 14, fail: 1, skip: 0, todo: 0 });
+-    assert.equal(records.at(-1).declaredCount, 15);
+-    assert.equal(records.at(-1).disposedCount, 15);
++    assert.deepEqual(records.at(-1).counts, { pass: 16, fail: 1, skip: 0, todo: 0 });
++    assert.equal(records.at(-1).declaredCount, 17);
++    assert.equal(records.at(-1).disposedCount, 17);
+   }
+ });
+ 
+@@ -442,7 +443,70 @@ check("CPPA-3 a binding without the assurance key is refused as not closed", ()
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 15, "the complete candidate packet corpus must be registered before execution begins");
++// D56 finish: a project without dispatch history reconstructs the attested record and is admitted (weaker assurance).
++const TRAILER_TASK = "batman-b1";
++function deliveryFixture({ trailer = true } = {}) {
++  const f = fixture();
++  rmSync(join(f.root, "evidence", "dispatch-record-batman-b1.json"));
++  const message = trailer ? `feat(x): deliver\n\nAI-Assisted: true\nDispatch: ${TRAILER_TASK} (goldfish)\n` : "feat(x): deliver\n";
++  git(f.root, ["commit", "--quiet", "--amend", "-m", message]);
++  return { ...f, candidate: git(f.root, ["rev-parse", "HEAD"]) };
++}
++function writeAttestedInputs(f) {
++  mkdirSync(join(f.root, "scratch"), { recursive: true });
++  const block = { schema: "pipeline.native-goldfish-host-briefing.v3", dispatchId: TRAILER_TASK, candidateCommit: f.base, runner: "claude",
++    role: "pipeline-core:goldfish-implementor", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local",
++    allowedPaths: ["specs/review.md", "roles/critic.md"],
++    criticDecision: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" } };
++  writeFileSync(join(f.root, "scratch", "briefing.md"), `Briefing.\n\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(block)}\n-->\n\n### 1. Goal\nDo it.\n`);
++  writeFileSync(join(f.root, "scratch", "handback.txt"), "Delivered the change.\n");
++  writeFileSync(join(f.root, "scratch", "attested-request.json"), JSON.stringify({ schema: "pipeline.dispatch-attested-request.v1",
++    briefingPath: "scratch/briefing.md", handbackPath: "scratch/handback.txt", commits: [f.candidate] }));
++}
++const producerRoute = /dispatch-record-write\.mjs --repo-root \. --attested-request/u;
++// The preflight-specific sentence (critic-packet-preflight.mjs) that appears only when the range carries a Goldfish Dispatch trailer.
++const trailerSentence = /The range carries a Goldfish Dispatch trailer: the Elephant can reconstruct the missing record with/u;
++function admissionRefusal(f) {
++  try { prepareCandidatePacket(options(f, "f".repeat(32))); } catch (error) { return error; }
++  return assert.fail("admission was expected to refuse");
++}
++
++check("CPPA-4 admission refusal for a range with a Dispatch trailer names the attested record producer; without a trailer it does not", () => {
++  const withTrailer = deliveryFixture();
++  const without = deliveryFixture({ trailer: false });
++  try {
++    const refused = admissionRefusal(withTrailer);
++    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(refused));
++    assert.match(refused.message, /found 0/u);
++    assert.match(refused.message, producerRoute);
++    assert.match(refused.message, trailerSentence);
++    const plain = admissionRefusal(without);
++    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(plain));
++    assert.doesNotMatch(plain.message, trailerSentence);
++  } finally { rmSync(withTrailer.root, { recursive: true, force: true }); rmSync(without.root, { recursive: true, force: true }); }
++});
++
++check("CPPA-5 chain: no dispatch history refuses, the reconstructed attested record admits with orchestrator-attested assurance, an untrailered commit still refuses", () => {
++  const f = deliveryFixture();
++  const plain = deliveryFixture({ trailer: false });
++  try {
++    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(admissionRefusal(f)));
++    assert.equal(existsSync(join(f.root, "evidence", "dispatch-record-batman-b1.json")), false);
++    writeAttestedInputs(f);
++    const receipt = runAttestedRequest({ repoRoot: f.root, attestedRequestPath: "scratch/attested-request.json" });
++    assert.equal(receipt.target, "evidence/dispatch-record-batman-b1.json");
++    assert.equal(existsSync(join(f.root, "evidence", "dispatch-record-batman-b1.json")), true);
++    const result = prepareCandidatePacket(options(f, "9".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 33) });
++    assert.equal(result.packet.coordinatorOnly.localDispatchEvidence.assurance, "orchestrator-attested");
++    assert.notEqual(result.packet.coordinatorOnly.localDispatchEvidence.assurance, "host-observed");
++    writeAttestedInputs(plain);
++    assert.throws(() => runAttestedRequest({ repoRoot: plain.root, attestedRequestPath: "scratch/attested-request.json" }), (error) => error?.code === "record-attestation-git");
++    assert.equal(existsSync(join(plain.root, "evidence", "dispatch-record-batman-b1.json")), false);
++    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(admissionRefusal(plain)));
++  } finally { rmSync(f.root, { recursive: true, force: true }); rmSync(plain.root, { recursive: true, force: true }); }
++});
++
++assert.equal(cases.length, 17, "the complete candidate packet corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
