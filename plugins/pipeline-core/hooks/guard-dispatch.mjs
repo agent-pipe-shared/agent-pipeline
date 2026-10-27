@@ -1019,7 +1019,7 @@ if (isDirectInvocation(import.meta.url)) {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
         const prepared = prepareNativeGoldfishHostState({
           root: rootDir, runner: nativeRunner, input,
-          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 100000 },
+          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 200000 },
           subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
         });
         if (prepared.ok) nativePendingPrepared = true;
