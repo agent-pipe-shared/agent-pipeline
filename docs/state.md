@@ -54,6 +54,22 @@ added; no earlier identity disappeared. [Finding ledger](../specs/sprint-alfred-
 75 means focused Source readiness, not native acceptance or release.
 All-at75 remains the continuation objective after transfer.
 
+**Status 2026-10-27 evening (composed stack verified; apply, Full Verify, Critic, native runs and PO acceptance pending):**
+the complete held patches are composed in
+`specs/sprint-alfred-epic/evidence/held-patches/w7-final-bundle-2026-10-27.patch`
+(53 files; apply blocks and the baseline comparison in `COMPOSED-STACK-VERIFY-2026-10-27.md`:
+no regression in the 51 touched or submit-plan test files, every red file red with identical
+names on the clean HEAD). Not in the bundle: PF-86 c1/c2 (partial, NGHS46 red), and the slices
+admission read cost, admission 300 s budget with 330 s hook timeout (hooks.json is TP-4), D31 schema
+half, signature slice A (one operator command, full proof path) and D56 validator, none dispatched
+yet. **Dispatch blocker:** admission takes 102-112 s; the budget literal was raised 100 s to 200 s
+(commit `5df5da90d`, Elephant exception by PO decision 2026-10-27) but the installed plugin copy
+needs `guard-dispatch.mjs` copied by the PO; the 120 s hook timeout stays the ceiling. The registry
+was moved aside once (retained under `session-authority-abandoned`) without lowering the admission
+time; the measured cost is the native pending-inventory read (about 15 s per read, repeated per
+registry boundary). PO decisions taken: PF-86 registry API change go; PF-85 1a after the cancel
+class; signature ceremony and D50 as in the 2026-10-27 register.
+
 **Status 2026-10-27 (held work and one blocker; Full Verify, Critic, native runs and PO acceptance pending):**
 installed candidate `0.7.0+claude.20261027062846.bdc9f83` carries D173 (PF-80) and
 D177 C1 (memoised integrated-slice proof). Held and NOT applied, in
