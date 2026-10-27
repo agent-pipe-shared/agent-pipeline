@@ -55,6 +55,12 @@ command. In all three greenfield runs the PO had to do considerably more:
 - **Assignment (if accepted):**
 - **Date:**
 
+### PO decision 2026-10-27 (answers the two open questions of `w7-recon-signature-ceremony.notes.md`)
+
+- **In-repository proof refusal stays** (ADR-0059 Decision 1 unchanged; no scratch-mirror import, so no Slice B). The ceremony is built so that the PO gets exactly ONE node command, the signing command with the key, and the agent does everything else alone: the preparation, locating the signed proof, the import via `authorize-by-signature`, and the retry. No second or third command for the PO.
+- **Hand-off by full proof path** (PO choice over placeholder and file-name-only). The `<external-proof.json>` placeholder goes away. Consequence the next slice must settle explicitly: the pin that the private key directory is not printed (`guard-human-override.test.mjs`, "resolves the configured machine key directory without printing its private path") conflicts with a printed full path. The PO accepted the full path, so the slice revises that pin with a written justification, keeping the path out of persistent logs and evidence where it can be avoided.
+- **Delivery:** one slice (Slice A, widened) in `lib/human-guard-override.mjs`, `scripts/guard-human-override.mjs`, `scripts/guard-human-override.test.mjs`: held patch for the batch Critic (custody paths). The matrix row stays at 50 until that slice exists; native-host qualification of the real signature remains open.
+
 ### Blocker analysis 2026-10-22
 
 Read-only survey of the open clauses that the delivery remeasure assigned to native-host, verify-wsl, po-decision or po-signature (evidence: `specs/sprint-alfred-epic/evidence/blocker-analysis-2026-10-22/`). Status key: LINUX-RUN and WINDOWS-INTEROP-RUN are runs an agent can do from the WSL host; HOST-SESSION-NEEDED, PO-DECISION and PO-SIGNATURE are not agent work.
