@@ -1,0 +1,153 @@
+diff --git a/plugins/pipeline-core/agents/goldfish-implementor.md b/plugins/pipeline-core/agents/goldfish-implementor.md
+index c661fb9a7..7204d1a1b 100644
+--- a/plugins/pipeline-core/agents/goldfish-implementor.md
++++ b/plugins/pipeline-core/agents/goldfish-implementor.md
+@@ -3,7 +3,7 @@ name: goldfish-implementor
+ description: "Agent-Pipeline Goldfish (implementor tier, effort medium - THE STANDARD for clearly-briefed implementation) - fresh-context executor for exactly ONE briefed task (implementation, mass edit, research, review preparation) without in-task design latitude. Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); never for open-ended exploration. Guardrail/hook/canon code, test-suite/verify authorship, or genuine in-task design latitude belong to goldfish-deep (effort xhigh) instead; purely mechanical/uniform/pure-plan-execution work belongs to goldfish-mechanic (effort low). Delivers diff + condensed evidence-backed report, or a clean stop."
+ model: sonnet
+ effort: medium
+-maxTurns: 50
++maxTurns: 76
+ tools: [Read, Edit, Write, Grep, Glob, Bash]
+ # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
+ #   pipeline learns via the versioned operating model, not via agent memory.
+@@ -29,7 +29,7 @@ tools: [Read, Edit, Write, Grep, Glob, Bash]
+ #   weaker (weakest-tier) model for implementation remains FORBIDDEN regardless of tier (MP-03). NOTE:
+ #   `effort` as an agent-frontmatter key (MP-02/MP-27); if the harness does not honor it, the dispatch
+ #   invocation parameter carries the effort.
+-# maxTurns: 50 = hard leash (docs/operating-model.md, Rigor, risk and gates, stage 1); start value, calibrate via telemetry.
++# maxTurns: 76 = hard leash (docs/operating-model.md, Rigor, risk and gates, stage 1); PO decision 2026-10-27: one budget grant may take a Goldfish to a total of 70 calls (ceiling = maxTurns - 6; working cap = maxTurns - 15, so the briefed base is 40 and the single-grant headroom 30).
+ # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
+ #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back
+ #   to shell listing via Bash.
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs b/plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs
+index ae3837f1f..c60f02f9e 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-binding.test.mjs
+@@ -8,8 +8,15 @@ import {
+   bindDispatchBudget,
+   consumePendingDispatchBudgetBinding,
+   persistPendingDispatchBudgetBindings,
++  readAgentMaxTurns,
+   resolvePendingDispatchBudgetBinding,
+ } from "./dispatch-budget-binding.mjs";
++import {
++  CLOSING_ALLOWANCE,
++  dispatchGrantHeadroom,
++  effectiveDispatchBaseCap,
++  effectiveDispatchWorkingCap,
++} from "./dispatch-budget-core.mjs";
+ import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ 
+ const cases = [];
+@@ -153,7 +160,18 @@ check("keeps a pending record written before the commit mode existed valid and u
+   } finally { rmSync(commonDir, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 11, "the complete dispatch budget binding corpus must register before execution");
++check("the shipped implementor definition keeps the PO ceiling: maxTurns 76, ceiling 70, one grant of 30 at base 40", () => {
++  const pluginRoot = join(import.meta.dirname, "..");
++  const maxTurns = readAgentMaxTurns("pipeline-core:goldfish-implementor", pluginRoot);
++  assert.equal(maxTurns, 76);
++  assert.equal(maxTurns - CLOSING_ALLOWANCE - 1, 70, "the ceiling a Goldfish may reach through one grant");
++  assert.equal(effectiveDispatchBaseCap(40, maxTurns), 40, "the briefed Tool budget line stays 40");
++  assert.equal(dispatchGrantHeadroom(40, maxTurns), 30);
++  assert.equal(effectiveDispatchWorkingCap(40, maxTurns, 30), 70);
++  assert.equal(effectiveDispatchWorkingCap(40, maxTurns, 31), 70, "a larger grant is clamped to the ceiling");
++});
++
++assert.equal(cases.length, 12, "the complete dispatch budget binding corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs b/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs
+index a2520338e..a4dc6fff3 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-calibration.test.mjs
+@@ -41,7 +41,7 @@ const rule = (overrides = {}) => ({
+   schema: DISPATCH_BUDGET_CALIBRATION_RULE_SCHEMA,
+   fixedCalls: 10,
+   callsPerFile: { correction: 6, documentation: 8, implementation: 5, investigation: 3, review: 4 },
+-  maxTurnsByTier: { mechanic: 50, implementor: 50, deep: 80 },
++  maxTurnsByTier: { mechanic: 50, implementor: 76, deep: 80 },
+   ...overrides,
+ });
+ const sample = (overrides = {}) => ({
+@@ -74,13 +74,17 @@ test("the evaluator exposes both a weak formula and a tier cap that truncates a
+   assert.equal(weak.evaluations[0].classification, "undercut-terminal-bound");
+   assert.equal(weak.evaluations[0].requiredBaseCalls, 71);
+ 
++  // Derived from the rule helper's implementor limit (76 -> working cap 61), not a literal: the tier cap truncates the stronger formula (68).
++  // The observed call count equals that cap, so the required base (observed + 5 closing) still exceeds what the tier allows: the undercut survives the higher limit.
++  const implementorCap = dispatchWorkingCap(rule().maxTurnsByTier.implementor);
+   const capped = evaluateDispatchBudgetCalibration({
+     rule: rule({ fixedCalls: 60 }),
+-    samples: [sample({ tier: "implementor", fileCount: 1, observedCalls: 40 })],
++    samples: [sample({ tier: "implementor", fileCount: 1, observedCalls: implementorCap })],
+   });
+   assert.equal(capped.evaluations[0].proposedBaseCalls, 68);
+-  assert.equal(capped.evaluations[0].workingCap, 35);
+-  assert.equal(capped.evaluations[0].effectiveBaseCalls, 35);
++  assert.ok(implementorCap < 68, "the tier cap must sit below the proposed formula for this case to truncate it");
++  assert.equal(capped.evaluations[0].workingCap, implementorCap);
++  assert.equal(capped.evaluations[0].effectiveBaseCalls, implementorCap);
+   assert.equal(capped.evaluations[0].tierLimited, true);
+   assert.equal(capped.evaluations[0].undercutsObservedBound, true);
+ });
+diff --git a/plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs b/plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs
+index cb4f7f70d..31d6c565e 100644
+--- a/plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs
++++ b/plugins/pipeline-core/lib/pins/budget-checkpoint-fires-below-the-briefed-cap.test.mjs
+@@ -73,19 +73,19 @@ test("RED: a mutant computing the checkpoint on the briefed cap fails the contra
+   assert.throws(() => assertCapContract(briefedBased), assert.AssertionError);
+ });
+ 
+-test("P1 the agent definition frontmatter is the maxTurns source (50 / 50 / 80)", () => {
+-  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT), 50);
++test("P1 the agent definition frontmatter is the maxTurns source (76 / 50 / 80)", () => {
++  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT), 76);
+   assert.equal(readAgentMaxTurns("goldfish-mechanic", PLUGIN_ROOT), 50);
+   assert.equal(readAgentMaxTurns("pipeline-core:goldfish-deep", PLUGIN_ROOT), 80);
+ });
+ 
+-test("P1/P3 the briefing Tool budget line is the briefed base cap; 45 on the implementor binds effective 35", () => {
++test("P1/P3 the briefing Tool budget line is the briefed base cap; 70 on the implementor binds effective 61", () => {
+   const maxTurns = readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT);
+-  const binding = bindDispatchBudget({ prompt: briefing(45), maxTurns, applicable: true });
++  const binding = bindDispatchBudget({ prompt: briefing(70), maxTurns, applicable: true });
+   assert.equal(binding.status, "prepared");
+-  assert.equal(binding.baseCalls, 45);
+-  assert.equal(binding.workingCap, 35);
+-  assert.equal(binding.effectiveCap, 35);
++  assert.equal(binding.baseCalls, 70);
++  assert.equal(binding.workingCap, 61);
++  assert.equal(binding.effectiveCap, 61);
+   assert.equal(binding.tierLimited, true);
+   const within = bindDispatchBudget({ prompt: briefing(30), maxTurns, applicable: true });
+   assert.equal(within.effectiveCap, 30);
+diff --git a/plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs b/plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs
+index c3d1a0e49..174b51101 100644
+--- a/plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs
++++ b/plugins/pipeline-core/lib/pins/dispatch-budget-lock-refuses-every-subagent-call-on-windows.test.mjs
+@@ -185,7 +185,7 @@ function hookFixture() {
+   const counterPath = join(budgetDir, `${agentId}.json`);
+   writeFileSync(counterPath, `${JSON.stringify({
+     schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType: "pipeline-core:goldfish-implementor",
+-    maxTurns: 50, baseCalls: 35, workingCap: 35, count: 0,
++    maxTurns: 76, baseCalls: 40, workingCap: 40, count: 0,
+   }, null, 2)}\n`);
+   return { root, agentId, counterPath, lockPath: `${counterPath}.binding.lock` };
+ }
+diff --git a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+index e2f7ad632..cbb7f2b26 100644
+--- a/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
++++ b/plugins/pipeline-core/lib/pins/parallel-work-in-one-checkout-is-unsafe.test.mjs
+@@ -61,7 +61,7 @@ function hookFixture() {
+   const counterPath = join(budgetDir, `${agentId}.json`);
+   writeFileSync(counterPath, `${JSON.stringify({
+     schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType: GOLDFISH,
+-    maxTurns: 50, baseCalls: 35, workingCap: 35, count: 0,
++    maxTurns: 76, baseCalls: 40, workingCap: 40, count: 0,
+   }, null, 2)}\n`);
+   return { root, agentId, budgetDir, counterPath, lockPath: `${counterPath}.binding.lock` };
+ }
