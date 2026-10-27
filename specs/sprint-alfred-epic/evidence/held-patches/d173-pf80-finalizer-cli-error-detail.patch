@@ -1,0 +1,186 @@
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 9181d7941..7e2089b30 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -316,26 +316,26 @@ function validateStampOnlyRange(root, integrationCommit, candidateCommit) {
+ /** Create a private, content-bound reference from the trusted local dispatch reader. */
+ export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit, baseCommit } = {}) {
+   if (typeof root !== "string" || typeof taskId !== "string" || typeof reviewCandidateCommit !== "string"
+-    || !/^[a-f0-9]{40}$/u.test(reviewCandidateCommit)) throw new TypeError("local dispatch evidence input is invalid");
++    || !/^[a-f0-9]{40}$/u.test(reviewCandidateCommit)) throw Object.assign(new TypeError("local dispatch evidence input is invalid"), { code: "LDE-INPUT" });
+   const historical = historicalAdmission(root,{kind:"admitted-dispatch",taskId,baseCommit,candidateCommit:reviewCandidateCommit});
+   const scan = walkDispatchRecordsForReview(root,historical?.entries ?? []);
+-  if (scan.findings.length > 0) throw new Error("local dispatch evidence source is unreadable");
++  if (scan.findings.length > 0) throw Object.assign(new Error("local dispatch evidence source is unreadable"), { code: "LDE-SOURCE-UNREADABLE" });
+   const matches = scan.records.filter(({ record }) => record?.taskId === taskId);
+-  if (matches.length !== 1) throw new Error("local dispatch evidence requires one exact source record");
++  if (matches.length !== 1) throw Object.assign(new Error("local dispatch evidence requires one exact source record"), { code: "LDE-SOURCE-RECORD-MISSING" });
+   const entry = matches[0];
+   const record = entry.record;
+   const v3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
+   const v4 = record?.schema === DISPATCH_RECORD_SCHEMA;
+-  if (!v3 && !v4) throw new Error("local dispatch evidence source is not a required authored delivery");
++  if (!v3 && !v4) throw Object.assign(new Error("local dispatch evidence source is not a required authored delivery"), { code: "LDE-SCHEMA" });
+   try { (v3 ? validatePreviousDispatchRecord : validateDispatchRecord)(record); }
+-  catch { throw new Error("local dispatch evidence source is not a required authored delivery"); }
++  catch { throw Object.assign(new Error("local dispatch evidence source is not a required authored delivery"), { code: "LDE-RECORD-INVALID" }); }
+   if (criticDisposition(record) !== "required"
+     || !/^[a-f0-9]{40}$/u.test(record.candidateCommit ?? "")) {
+-    throw new Error("local dispatch evidence source is not a required authored delivery");
++    throw Object.assign(new Error("local dispatch evidence source is not a required authored delivery"), { code: "LDE-CRITIC-NOT-REQUIRED" });
+   }
+   const admission = evaluateReviewAdmission({ root, taskId, baseCommit, candidateCommit: reviewCandidateCommit });
+   if (!admission.ok || admission.targetRecordCandidateCommit !== record.candidateCommit) {
+-    throw new Error("local dispatch evidence candidate is not admitted for this task");
++    throw Object.assign(new Error("local dispatch evidence candidate is not admitted for this task"), { code: "LDE-CANDIDATE-BINDING" });
+   }
+   const binding = {
+     schema: "pipeline.local-dispatch-evidence.v1",
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index 32639ea25..c89a7cc60 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -315,6 +315,19 @@ test("Critic addendum checks the reviewed candidate's real Git blob and explicit
+   assert.match(unreferenced.readFindings.join("\n"), /does not bind the exact immutable dispatch record/u);
+ });
+ 
++test("D173 the local dispatch evidence error without a source record carries a stable code and the old message", () => {
++  const taskId = "D173-NO-SOURCE";
++  const root = fixture({ "source.txt": "reviewed source\n", "evidence/.keep": "" });
++  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
++  git("init", "-q");
++  git("add", "source.txt");
++  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "candidate");
++  const reviewCandidateCommit = git("rev-parse", "HEAD");
++  assert.throws(() => createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit }),
++    (error) => error.constructor === Error && error.code === "LDE-SOURCE-RECORD-MISSING"
++      && error.message === "local dispatch evidence requires one exact source record");
++});
++
+ test("ignored historical dispatch records bind through the consumed private snapshot only", () => {
+   const taskId = "HISTORICAL-AUTHORED";
+   const root = fixture({ "source.txt": "reviewed source\n", "evidence/.keep": "" });
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index debd7fbce..b6caf2854 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -744,17 +744,47 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+     const result = finalizeSessionCriticReview({ ...common, verdict }, deps);
+     return Object.freeze({ exitCode: result.status === "completed" ? 0 : 2, output: result });
+   } catch (error) {
++    const typed = error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError";
++    const detail = describeCliError(error);
+     return Object.freeze({
+       exitCode: 2,
+       output: Object.freeze({
+         schema: SESSION_CRITIC_CLI_ERROR_SCHEMA,
+         status: "rejected",
+-        code: error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
++        code: typed ? error.code : "SCF-INTERNAL",
++        ...(detail === null ? {} : { detail }),
+       }),
+     });
+   }
+ }
+ 
++const CLI_ERROR_CODE = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/u;
++
++/** Pure: a bounded, path-free cause line for a CLI rejection, or null when none is worth adding. */
++export function describeCliError(error) {
++  const typed = error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError";
++  let rawCode = null;
++  let rawMessage = null;
++  try {
++    rawCode = error?.code;
++    rawMessage = error?.message;
++  } catch { /* a hostile getter yields no detail source */ }
++  const message = typeof rawMessage === "string" ? rawMessage : "";
++  const first = message.split(/\r?\n/u)[0]
++    .replace(/(?:[A-Za-z]:\\|\/)[^\s'"`]*/gu, "<path>")
++    .replace(/\s+/gu, " ").trim().slice(0, 200);
++  if (typed) {
++    if (first === "" || message === rawCode) return null;
++    return typeof rawCode === "string" && CLI_ERROR_CODE.test(rawCode) ? `${rawCode}: ${first}` : first;
++  }
++  const code = typeof rawCode === "string" && CLI_ERROR_CODE.test(rawCode) ? rawCode : null;
++  if (code !== null) return first === "" ? code : `${code}: ${first}`;
++  if (first !== "") return first;
++  let name = "unknown";
++  try { name = typeof error?.constructor?.name === "string" && error.constructor.name !== "" ? error.constructor.name : "unknown"; } catch { /* keep unknown */ }
++  return `untyped error: ${name}`;
++}
++
+ export const __test = Object.freeze({ buildResult, receiptFor, validateResult });
+ 
+ if (isDirectInvocation(import.meta.url)) {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index acbdb7340..8c7ed8078 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -589,6 +589,66 @@ test("CLI closes argv/request vocabulary and reports typed exit-2 errors", () =>
+   } finally { cleanup(fx); }
+ });
+ 
++// D173 (PF-80): the CLI names the cause of an internal refusal. An argv whose first element throws reaches the
++// adapter's catch with any thrown value the case needs, without a model call or a fixture repository.
++const D173_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";
++function d173Cli(thrown) {
++  const argv = ["finalize", "--root", "x", "--request", "y"];
++  Object.defineProperty(argv, 0, { get() { throw thrown; } });
++  return runSessionCriticFinalizerCli(argv);
++}
++
++test("D173 an untyped throw reaching the CLI catch keeps SCF-INTERNAL and names the constructor or inner code", () => {
++  class D173CustomFailure {}
++  const bare = d173Cli(new D173CustomFailure());
++  assert.equal(bare.exitCode, 2);
++  assert.equal(bare.output.code, "SCF-INTERNAL");
++  assert.equal(bare.output.detail, "untyped error: D173CustomFailure");
++  const coded = d173Cli(Object.assign(new Error("record missing"), { code: "LDE-RECORD-MISSING" }));
++  assert.equal(coded.output.code, "SCF-INTERNAL");
++  assert.equal(coded.output.detail, "LDE-RECORD-MISSING: record missing");
++  const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-d173-"));
++  try {
++    const real = runSessionCriticFinalizerCli(["finalize", "--root", join(root, "missing"), "--request", "scratch/r.json"]);
++    assert.equal(real.output.code, "SCF-INTERNAL");
++    assert.match(real.output.detail, /^ENOENT: no such file or directory, [a-z]+ '<path>'$/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("D173 a detail never carries an absolute path", () => {
++  const result = d173Cli(new Error("failed reading /home/user/secret/file.json and C:\\Users\\x\\y.txt today"));
++  assert.equal(result.output.code, "SCF-INTERNAL");
++  assert.equal(result.output.detail, "failed reading <path> and <path> today");
++  assert.doesNotMatch(result.output.detail, /\/home|C:\\/u);
++});
++
++test("D173 a detail uses only the first line and is capped at 200 characters", () => {
++  const result = d173Cli(new Error(`${"x".repeat(300)}\nsecond line SECRET`));
++  assert.equal(result.output.detail.length, 200);
++  assert.doesNotMatch(result.output.detail, /SECRET/u);
++  const spaced = d173Cli(new Error("a   b\t c\nrest"));
++  assert.equal(spaced.output.detail, "a b c");
++});
++
++test("D173 a typed error keeps its code and gains a detail only when its message differs from the code", () => {
++  const same = new SessionCriticFinalizerError("SCF-D173-TYPED");
++  Object.defineProperty(same, "message", { value: "SCF-D173-TYPED" });
++  const typed = d173Cli(same);
++  assert.equal(typed.exitCode, 2);
++  assert.equal(typed.output.code, "SCF-D173-TYPED");
++  assert.equal(Object.hasOwn(typed.output, "detail"), false);
++  const usage = runSessionCriticFinalizerCli(["finalize", "--root", "x"]);
++  assert.equal(usage.output.code, "SCF-USAGE");
++  assert.equal(usage.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
++  assert.equal(usage.output.detail, "SCF-USAGE: Session Critic finalization is invalid.");
++});
++
++test("D173 an output without a detail is byte-identical to the old shape", () => {
++  const batch = Object.assign(new Error("CGB-D173"), { name: "GenericCriticBatchError", code: "CGB-D173" });
++  assert.equal(JSON.stringify(d173Cli(batch).output), `{"schema":"${D173_ERROR_SCHEMA}","status":"rejected","code":"CGB-D173"}`);
++  assert.equal(SESSION_CRITIC_CLI_ERROR_SCHEMA, D173_ERROR_SCHEMA);
++});
++
+ test("a foreign failure inside the generic batch keeps CGB-PHYSICAL and surfaces its original cause", () => {
+   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-cause-"));
+   try {
