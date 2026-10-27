@@ -1,0 +1,101 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 69c75e271..95ba6d9af 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -51,6 +51,9 @@ const SUBDIRS = ["agent-pipeline", "run", "native-goldfish-host-commit"];
+ function fail(code) { return { ok: false, code }; }
+ // Names each held dependency with the cause that actually holds it (Critic F1): only a deliverable,
+ // non-cancelled slice can be released by a "Dispatch: <slice> (goldfish)" commit.
++export function heldDependencyRepair() {
++  return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
++}
+ export function heldDependencyReason(held, slices) {
+   const why = id => {
+     const row = slices.find(entry => entry.id === id);
+@@ -215,7 +218,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
+       if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`};
+       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
+-      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices)};}
++      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
+     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");
+     // Native adapters currently carry literal file paths. A glob/prefix queue
+     // requires a separately admitted concrete path amendment; do not guess it.
+@@ -749,7 +752,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+       const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
+       const integratedIds=new Set([...integration.integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))]);
+       const heldIds=item.dependsOn.filter(id=>!integratedIds.has(id));
+-      if(heldIds.length)throw nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`);
++      if(heldIds.length)throw Object.assign(nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`),{repair:heldDependencyRepair()});
+       const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
+       const agyPort=createAgyFamilyDispatchAuthorityProducerPort({repository});
+       const agyProducer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:agyPort});
+@@ -1100,7 +1103,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       const readiness=dependsOn.length?observeGovernedItemIntegrationReadiness({root:physical}):null;
+       const held=readiness?.status==='observed'?dependsOn.filter(id=>!readiness.integrated.includes(id)):[];
+       if(held.length>0)return {status:'refused',code:'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',reason:`${heldDependencyReason(held,raw.slices)}; the queue was not written`,
+-        repair:`a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`};
++        repair:heldDependencyRepair()};
+       // Approval, requester, candidate and preimage are checked again immediately
+       // before publishing a fresh inode. Existing linked bytes remain unchanged.
+       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index d840e36af..02d393bef 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1186,6 +1186,55 @@ const cases = [
+     assert.equal(legacyResult.queue.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'unclassified');
+   })},
+ 
++  { id: "NGHS40", name: "PF-85 1b: every item-delivery refusal names the sanctioned repair: a held-dependency admission refusal and the reservation-publish refusal carry slice-queue.mjs cancel, all five classes and the Dispatch trailer; the owner collision keeps its repair", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
++    const classes=['budget','wrong-premise','review-defect','integrated-elsewhere','superseded'];
++    const namesRepair=(repair,label)=>{
++      assert.equal(typeof repair,'string',`${label}: a non-empty repair is present`);assert.ok(repair.length>0,label);
++      assert.match(repair,/slice-queue\.mjs cancel/u,label);
++      for(const name of classes)assert.ok(repair.includes(name),`${label} names ${name}`);
++      assert.match(repair,/Dispatch: .* \(goldfish\)/u,label);
++    };
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
++    const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
++    controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
++    mkdirSync(join(root,".claude"));mkdirSync(join(root,"specs/unit"),{recursive:true});
++    writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
++    writeFileSync(join(root,".claude/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/plan.md",phase:"implementation"},planApproved:true}));
++    const item=(id,itemId,path,dependsOn=[])=>({id,title:id,state:"ready",dependsOn,writeScope:[path],tier:"implementor",commitMode:"diff-only",loadClass:"light",delivery:{itemId,criteria:["CR-1"],baseCommit:commit}});
++    const queue={schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-A","AC-1","src/change.mjs"),item("ITEM-B","AC-1","src/b.mjs"),item("ITEM-D","AC-2","src/d.mjs",["ITEM-A"])]};
++    writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify(queue));
++    assert.equal(resolveGovernedItemQueue({root}).status,"required");
++    const statePath=join(root,".claude/pipeline-state.json");
++    writeFileSync(statePath,JSON.stringify({...JSON.parse(readFileSync(statePath,"utf8")),continuity:itemContinuity()}));
++    chmodSync(statePath,0o600);
++    const repository=inspectSignedDescriptorCustodyRepository(root);
++    const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,"agent-pipeline/controlled-method-fixtures/item-owner"),sessionId:"item-owner-unit"});
++    const ports=createSessionAuthorityParticipantPorts({repository});
++    for(const row of ports)assert.doesNotThrow(()=>row.port.readBaseline(),row.producerId);
++    assert.equal(initializeSessionAuthorityRegistry({repository},ports).status,"initialized");
++    const launch=(id,path,session)=>{
++      const binding={...makeBinding({dispatchId:id,commit,tree}),allowedPaths:[path]};
++      const input=toolInput("claude",{root,session,toolUseId:`tool-${id}`,binding});
++      input.tool_input.prompt+=`\nSlice: ${id}\nWrite scope: ${path}\n`;
++      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:"claude",input},dependencies));
++    };
++    assert.equal(launch("ITEM-A","src/change.mjs","session-one").ok,true);
++    // Pin: the owner collision already carries a repair (reservationFault).
++    const duplicate=launch("ITEM-B","src/b.mjs","session-two");
++    assert.equal(duplicate.reason,"item-delivery-owner-collision");namesRepair(duplicate.repair,'owner collision');
++    // A successor whose dependency is held is refused at the held-dependency branch (not the readiness branch) with a repair.
++    const successor=launch("ITEM-D","src/d.mjs","session-three");
++    assert.equal(successor.ok,false,JSON.stringify(successor));
++    assert.equal(successor.code,"NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD",JSON.stringify(successor));
++    assert.ok(!String(successor.reason).startsWith("integration readiness"),`reached the held branch: ${successor.reason}`);
++    namesRepair(successor.repair,'held-dependency admission');
++    // The reservation-publish refusal is only reachable on an admission race, so it is pinned at its source and through the one shared text.
++    assert.equal(typeof mod.heldDependencyRepair,"function","heldDependencyRepair is exported");
++    namesRepair(mod.heldDependencyRepair(),'heldDependencyRepair');
++    const source=readFileSync(new URL("./native-goldfish-host-state.mjs",import.meta.url),"utf8");
++    assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
++  })}},
++
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
