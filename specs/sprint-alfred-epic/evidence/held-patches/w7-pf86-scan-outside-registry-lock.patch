@@ -1,0 +1,127 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 95ba6d9af..b59f7d587 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -737,11 +737,15 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+     bindingSha256:nativeManagedDigest({repository:{primaryRoot:repository.primaryRoot,commonDir:repository.commonDir},runner:state.runner,sessionId:state.sessionId,correlation:state.toolUseId,dispatchId:state.binding.dispatchId,candidate:state.binding.candidateCommit}),phase:'reserved',sourceFacts:[],pendingSha256:null};
+   if(owner.operations.has(name))throw nativeManagedFault('native-authority-duplicate-operation');
+   owner.assurance=current.assurance;
++  // PF-86: the boundary-independent git read runs before the registry lock; a fault falls back to the in-boundary read.
++  let prescan=null;
++  if(state.delivery){try{prescan=prescanCommitIntegratedSlices({repository,governed:resolveGovernedItemQueue({root:state.root})});}catch{prescan=null;}}
+   return withSessionAuthorityBoundary({repository},boundary=>{
+     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
+     if(state.delivery){
+       const governed=resolveGovernedItemQueue({root:state.root});
+       if(governed.status!=='required'||governed.sha256!==state.delivery.queueSha256)throw nativeManagedFault('item-delivery-queue-drift');
++      adoptPrescanInBoundary({boundary,repository,governed,prescan});
+       if(current.association.state!=='bound')throw nativeManagedFault('item-delivery-owner-unbound');
+       const item=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
+       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
+@@ -1560,6 +1564,20 @@ export function memoPerAdmission(boundary,key,compute){
+   if(!memo.has(key))memo.set(key,compute());
+   return memo.get(key);
+ }
++// PF-86: the commit-evidence git read needs no registry boundary, so it runs BEFORE the lock and is adopted inside the boundary
++// only when the queue digest and the candidate commit still match (its validity key); otherwise it is re-read under the boundary.
++export function prescanCommitIntegratedSlices({repository,governed,read=readOrchestratorCommitIntegratedSlices}){
++  if(governed?.status!=='required')return null;
++  return {queueSha256:governed.sha256,candidateCommit:repository.candidate.commit,integrated:read({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})};
++}
++export function adoptPrescanInBoundary({boundary,repository,governed,prescan,read=readOrchestratorCommitIntegratedSlices}){
++  const key=JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]);
++  if(prescan&&prescan.queueSha256===governed.sha256&&prescan.candidateCommit===repository.candidate.commit){
++    memoPerAdmission(boundary,key,()=>prescan.integrated);return {status:'reused'};
++  }
++  memoPerAdmission(boundary,key,()=>read({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}));
++  return {status:prescan?'recomputed-after-drift':'computed'};
++}
+ // D182: every member record is a full registry read (about 0.8 s each with 25 members). The integrated-slice computation and the
+ // released-reservation read both walked all members, and the computation itself ran once per (skipCancelled, only) shape, so one
+ // admission read every member four times. The records are read ONCE per admission and member set; the memo lives on the boundary.
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 02d393bef..8316270ff 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1235,8 +1235,80 @@ const cases = [
+     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
+   })}},
+ 
++  { id: "NGHS41", name: "PF-86 (i): two admissions with disjoint scopes both succeed through the lock-free pre-scan, and a third on the first scope sees the first reservation", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
++    assert.equal(typeof mod.prescanCommitIntegratedSlices,"function","the pre-scan is exported");
++    assert.equal(typeof mod.adoptPrescanInBoundary,"function","the compare-and-adopt step is exported");
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
++    const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
++    controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
++    mkdirSync(join(root,".claude"));mkdirSync(join(root,"specs/unit"),{recursive:true});
++    writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
++    writeFileSync(join(root,".claude/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/plan.md",phase:"implementation"},planApproved:true}));
++    const item=(id,itemId,path)=>({id,title:id,state:"ready",dependsOn:[],writeScope:[path],tier:"implementor",commitMode:"diff-only",loadClass:"light",delivery:{itemId,criteria:["CR-1"],baseCommit:commit}});
++    writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify({schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-A","AC-1","src/a.mjs"),item("ITEM-B","AC-2","src/b.mjs"),item("ITEM-C","AC-3","src/a.mjs")]}));
++    const statePath=join(root,".claude/pipeline-state.json");
++    writeFileSync(statePath,JSON.stringify({...JSON.parse(readFileSync(statePath,"utf8")),continuity:itemContinuity()}));
++    chmodSync(statePath,0o600);
++    const repository=inspectSignedDescriptorCustodyRepository(root);
++    const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,"agent-pipeline/controlled-method-fixtures/item-owner"),sessionId:"item-owner-unit"});
++    const ports=createSessionAuthorityParticipantPorts({repository});
++    assert.equal(initializeSessionAuthorityRegistry({repository},ports).status,"initialized");
++    const launch=(id,path,session)=>{
++      const binding={...makeBinding({dispatchId:id,commit,tree}),allowedPaths:[path]};
++      const input=toolInput("claude",{root,session,toolUseId:`tool-${id}`,binding});
++      input.tool_input.prompt+=`\nSlice: ${id}\nWrite scope: ${path}\n`;
++      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:"claude",input},dependencies));
++    };
++    assert.equal(launch("ITEM-A","src/a.mjs","session-one").ok,true);
++    assert.equal(launch("ITEM-B","src/b.mjs","session-two").ok,true);
++    const third=launch("ITEM-C","src/a.mjs","session-three");
++    assert.equal(third.ok,false,JSON.stringify(third));
++    assert.match(String(third.reason),/item-delivery-(scope|owner|criterion-owner)-collision/u);
++  })}},
++
++  { id: "NGHS42", name: "PF-86 (ii): a pre-scan is adopted only when the queue digest and the candidate commit still match; a competing change is re-read, never silently overwritten", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
++    assert.equal(typeof mod.prescanCommitIntegratedSlices,"function");assert.equal(typeof mod.adoptPrescanInBoundary,"function");
++    const repository={primaryRoot:"/fixture-root",candidate:{commit:"c1"}};
++    const governed=(sha,ids)=>({status:"required",sha256:sha,normalized:{slices:ids.map(id=>({id}))}});
++    const reads=[];
++    const read=({candidateCommit,slices})=>{reads.push([candidateCommit,slices.map(row=>row.id)]);return slices.map(row=>row.id);};
++    const key=(g,c)=>JSON.stringify(["commit-integrated",g.sha256,c]);
++    // match: one read in total (the pre-scan), the boundary memo is seeded from it
++    const g1=governed("a".repeat(64),["S1"]);
++    const scan=mod.prescanCommitIntegratedSlices({repository,governed:g1,read});
++    assert.equal(reads.length,1);
++    const b1={};
++    assert.equal(mod.adoptPrescanInBoundary({boundary:b1,repository,governed:g1,prescan:scan,read}).status,"reused");
++    assert.equal(reads.length,1,"no second read under the boundary");
++    assert.deepEqual(mod.memoPerAdmission(b1,key(g1,"c1"),()=>{throw new Error("memo must be seeded");}),["S1"]);
++    // queue digest changed between pre-scan and publish: the delta is re-read under the boundary from the CURRENT queue
++    const g2=governed("b".repeat(64),["S1","S2"]);
++    const b2={};
++    assert.equal(mod.adoptPrescanInBoundary({boundary:b2,repository,governed:g2,prescan:scan,read}).status,"recomputed-after-drift");
++    assert.equal(reads.length,2);
++    assert.deepEqual(mod.memoPerAdmission(b2,key(g2,"c1"),()=>{throw new Error("memo must be seeded");}),["S1","S2"]);
++    // candidate commit changed: same refusal to adopt
++    const b3={},moved={primaryRoot:"/fixture-root",candidate:{commit:"c2"}};
++    assert.equal(mod.adoptPrescanInBoundary({boundary:b3,repository:moved,governed:g1,prescan:scan,read}).status,"recomputed-after-drift");
++    assert.equal(reads.at(-1)[0],"c2");
++  }},
++
++  { id: "NGHS43", name: "PF-86 (iii): the pre-scanned admission yields the same integrated set as the unchanged in-boundary read, and a pre-scan fault or an absent queue falls back to it", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
++    assert.equal(typeof mod.prescanCommitIntegratedSlices,"function");assert.equal(typeof mod.adoptPrescanInBoundary,"function");
++    const repository={primaryRoot:"/fixture-root",candidate:{commit:"c1"}};
++    const g={status:"required",sha256:"c".repeat(64),normalized:{slices:[{id:"S1"},{id:"S2"}]}};
++    const read=({slices})=>slices.map(row=>row.id).filter(id=>id==="S2");
++    const key=JSON.stringify(["commit-integrated",g.sha256,"c1"]);
++    const direct=read({slices:g.normalized.slices});
++    const withScan={};mod.adoptPrescanInBoundary({boundary:withScan,repository,governed:g,prescan:mod.prescanCommitIntegratedSlices({repository,governed:g,read}),read});
++    const without={};assert.equal(mod.adoptPrescanInBoundary({boundary:without,repository,governed:g,prescan:null,read}).status,"computed");
++    assert.deepEqual(mod.memoPerAdmission(withScan,key,()=>[]),direct);
++    assert.deepEqual(mod.memoPerAdmission(without,key,()=>[]),direct);
++    assert.equal(mod.prescanCommitIntegratedSlices({repository,governed:{status:"absent"},read}),null);
++  }},
++
+ ];
+ 
+-const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
++const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ registerTestCaseCompletion({ cases, fd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
