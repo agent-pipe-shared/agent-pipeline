@@ -728,8 +728,9 @@ function publishNativeAuthorityState(commonDir,name,state){
       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
       // PF-49: one integration source for every check of a dispatch — native records united with the D40 commit
       // evidence, exactly as observeGovernedItemIntegrationReadiness reads it for the admission before this.
-      const integration=readNativeIntegratedSlices({governed,repository,boundary});
-      const integratedIds=new Set([...integration.integrated,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})]);
+      // D177: only the item's own dependencies are proven here; the settled set below is computed once per admission.
+      const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
+      const integratedIds=new Set([...integration.integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))]);
       const heldIds=item.dependsOn.filter(id=>!integratedIds.has(id));
       if(heldIds.length)throw nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`);
       const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
@@ -742,7 +743,7 @@ function publishNativeAuthorityState(commonDir,name,state){
         if(!prior||(rank[row.value.phase]??0)>(rank[prior.value.phase]??0)||row.value.phase===prior.value.phase&&(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);
       }
       // D51 (2): a reservation whose slice is integrated (native record or D40/D40b commit evidence) or cancelled no longer collides.
-      const settled=settledItemSlices(integratedIds,governed);
+      const settled=readSettledItemSliceIds({repository,boundary,governed});
       for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
         const pending=entry.value.basis.itemDelivery;
         if(pending.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.sliceId);
@@ -1527,7 +1528,22 @@ export function readNativeReleasedItemReservations({repository,boundary}) {
   return {releasedPendingHashes:[...owner.operations.values()].filter(row=>released.has(row.bindingSha256)).map(row=>row.pendingSha256)};
 }
 
-function readNativeIntegratedSlices({governed,repository,boundary}) {
+// D177: one computation per (boundary, governed queue sha256, candidate commit, shape) within ONE admission. The memo lives on a
+// WeakMap keyed by the boundary object, so it dies with the admission and is never module-global state that survives one.
+const admissionMemos=new WeakMap();
+export function memoPerAdmission(boundary,key,compute){
+  if(!boundary||typeof boundary!=='object')return compute();
+  let memo=admissionMemos.get(boundary);if(!memo){memo=new Map();admissionMemos.set(boundary,memo);}
+  if(!memo.has(key))memo.set(key,compute());
+  return memo.get(key);
+}
+function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
+  const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null]);
+  const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}));
+  return {integrated:[...memo.integrated],releasedPendingHashes:[...memo.releasedPendingHashes]};
+}
+function computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}) {
+  const cancelled=new Set(skipCancelled?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[]);
   const port=createNativeGoldfishAuthorityProducerPort({repository});
       const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port}),read=readNativeManagedInventory(repository,'native-goldfish')[0];
       const members=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}));
@@ -1535,6 +1551,11 @@ function readNativeIntegratedSlices({governed,repository,boundary}) {
       for(const row of read.entries.filter(entry=>entry.relativePath.startsWith('authority-integration-'))) {
         if(!members.some(member=>member.record.phase==='released'&&member.record.bindingSha256===row.value.bindingSha256))continue;
         releasedPendingHashes.push(row.value.pendingSha256);
+        // D177: the per-row proof (a git read per row) runs only for rows the caller can still use. A settled-set caller
+        // unions the cancelled slices anyway, and a dependency caller needs only its own dependsOn ids; releasedPendingHashes
+        // above stays complete in every shape.
+        if(only&&!only.has(row.value.sliceId))continue;
+        if(cancelled.has(row.value.sliceId))continue;
         const pending=read.entries.find(entry=>entry.relativePath.startsWith('pending-')&&entry.sourceFact.sha256===row.value.pendingSha256);
         const item=governed.normalized.slices.find(item=>item.id===row.value.sliceId&&item.delivery.itemId===row.value.itemId);
         if(!pending?.value.binding.itemDelivery||!item)continue;
@@ -1557,8 +1578,8 @@ function settledItemSlices(integratedIds,governed){
 }
 export function readSettledItemSliceIds({repository,boundary,governed=resolveGovernedItemQueue({root:repository.primaryRoot})}={}) {
   if(governed?.status!=='required')return new Set();
-  const {integrated}=readNativeIntegratedSlices({governed,repository,boundary});
-  return settledItemSlices([...integrated,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})],governed);
+  const {integrated}=readNativeIntegratedSlices({governed,repository,boundary,skipCancelled:true});
+  return settledItemSlices([...integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))],governed);
 }
 /** The repair a reservation collision names: the slice that still holds it and the commands that release it. */
 export function itemReservationRepair(sliceId) {

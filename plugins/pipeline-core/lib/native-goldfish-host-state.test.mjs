@@ -88,6 +88,19 @@ function itemContinuity() {
 }
 
 const cases = [
+  { id: "D177-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
+    const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
+    const first = {}, second = {}; let calls = 0;
+    const compute = () => { calls += 1; return { calls }; };
+    assert.equal(memoPerAdmission(first, "k1", compute), memoPerAdmission(first, "k1", compute));
+    assert.equal(calls, 1, "same boundary and key: one computation");
+    memoPerAdmission(first, "k2", compute); // a changed queue sha or candidate commit changes the key
+    assert.equal(calls, 2, "changed key: fresh computation");
+    memoPerAdmission(second, "k1", compute); // a later admission has its own boundary object
+    assert.equal(calls, 3, "another boundary: no leak");
+    memoPerAdmission(null, "k1", compute); memoPerAdmission(null, "k1", compute);
+    assert.equal(calls, 5, "no boundary object: never memoised");
+  } },
   { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
     const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });
     input.tool_input.prompt = "ordinary Goldfish briefing";
