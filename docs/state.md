@@ -69,6 +69,15 @@ was moved aside once (retained under `session-authority-abandoned`) without lowe
 time; the measured cost is the native pending-inventory read (about 15 s per read, repeated per
 registry boundary). PO decisions taken: PF-86 registry API change go; PF-85 1a after the cancel
 class; signature ceremony and D50 as in the 2026-10-27 register.
+**Update (same evening):** the bundle has a second file,
+`w7-increment-2026-10-27.patch` (apply order: bundle, then increment; chain-checked on a fresh clone of
+HEAD): D31 schema half, admission budget 300 s with hook timeout 330 s (hooks.json TP-4: PO ceremony),
+D56 attested-record validator slice 1, and the admission read-cost fix. A CPU profile corrected the
+earlier cost guess: one inventory read is 44 ms, one admission repeated it about 960 times and zero-filled
+buffers on every file read; with `allocUnsafe` plus a stamp-checked read reuse the real-state admission
+reads fall from 19.3 s to 5.5 s. Still open: PF-86 c3, signature slice A, D56 slices 2-5, the baseline-red
+test files; Full Verify, batch Critic (the read reuse is an authority-read change), native run and PO
+acceptance are not done, no row is lifted.
 
 **Status 2026-10-27 (held work and one blocker; Full Verify, Critic, native runs and PO acceptance pending):**
 installed candidate `0.7.0+claude.20261027062846.bdc9f83` carries D173 (PF-80) and
