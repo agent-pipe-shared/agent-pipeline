@@ -35,3 +35,9 @@ Read-only recon first (notes under the held-patches evidence folder, one per gro
 2. PF-85, PF-86, PF-83, D31, D32: dispatch admission, queue and registry behaviour.
 3. D51, D41, D47: Critic evidence binding, help text, line-ending robustness.
 D50 needs a native Windows run; there is nothing to build until that run exists.
+
+## PO decisions of 2026-10-27
+
+- PF-82/D52 record kind: an Elephant-committed Goldfish result is accepted as its own attested evidence kind (working name `orchestrator-attested`, never `authored-commit`). It binds the hand-back payload digest, the commit, the `Dispatch: <id> (goldfish)` trailer, `parent == candidateCommit` and the briefed write scope. Critic admission and the signed push show it as the weaker assurance. The host-observation rule for `authored-commit` is unchanged.
+- D52/D43/D45 Elephant commit gap: measure first. Find the pre-commit hook that led to the `--no-verify` workaround before widening any binding; `--no-verify` stays forbidden (GG-17). No binding change until the measurement exists.
+- D51 evidence carry: allowed, narrowly. A diagnostic artifact bound to an ancestor commit A is accepted for candidate B only across a linear range of at most 512 commits made solely of registered evidence-only commits, with no correction commit and identical non-evidence content; the admission records the carry proof digest. The strict Verify receipt check is not touched.
