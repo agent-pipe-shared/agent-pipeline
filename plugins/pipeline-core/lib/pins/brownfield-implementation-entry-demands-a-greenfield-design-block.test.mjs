@@ -292,3 +292,58 @@ test("win32 dialect: a backslash-spelled approved plan path is refused with a ty
   const posix = mod.inspectArchitectureDesign(entryFixture("none"), PLAN, {});
   assert.deepEqual(posix, NOT_REQUIRED, "the POSIX spelling of the same fixture is the brownfield exemption");
 });
+
+// ---- (f) end-to-end brownfield entry (D165 D1/S3): approved-scoped adoption with the class 9 scope union, map and docs/adr
+// present (the real repository root supplies both), class 10 unavailable. Case "docs/adr missing" is deliberately omitted:
+// its outcome depends on whether the D179 held patch is applied. ----
+import { withClass9RequiredScope, CLASS9_REQUIRED_SCOPE } from "../architecture-adoption-authority.mjs";
+
+const E2E_PATH = "plugins/pipeline-core/lib/architecture-entry-readiness.mjs";
+const E2E_SURFACE = { planPath: PLAN, paths: [E2E_PATH] };
+const E2E_NAMES = ["module-identity-ownership", "contract-presence-freshness", "dependency-direction-cycles", "boundary-crossing",
+  "authority-effect-ownership", "verification-locality", "navigation-currency", "parallel-overlap", "profile-drift", "calibrated-friction-thresholds"];
+function e2eFitness(class9) {
+  const outcomes = E2E_NAMES.map((propertyId, index) => ({ classId: index + 1, propertyId, outcome: "pass", violations: [] }));
+  outcomes[9] = { classId: 10, propertyId: E2E_NAMES[9], outcome: "unavailable", violations: [],
+    evidence: { status: "unavailable", required: ["measured-calibration", "explicit-threshold-promotion"] } };
+  if (class9 === "finding") outcomes[8] = { classId: 9, propertyId: "profile-drift", outcome: "finding",
+    violations: [{ ruleId: "profile-drift", module: "x", target: "project/pipeline.json", details: "class 9 input outside the adoption scope" }] };
+  return { overallStatus: class9 === "finding" ? "blocked" : "unavailable", outcomes, summary: {} };
+}
+function e2eReadiness(scope, fitness) {
+  return inspectArchitectureEntryReadiness({ rootDir: repoRoot, planningSurface: E2E_SURFACE, deps: {
+    inspectArchitectureDesign: () => NOT_REQUIRED,
+    readCheckpointArchitectureDebt: () => ({ ok: true, debt: [], resolvedDebt: [] }),
+    checkPlanningAdoptionDisposition: () => ({ ok: true, disposition: "approved-scoped", scope }),
+    evaluateArchitectureFitness: () => fitness,
+    inspectDecisions: ({ area }) => ({ area, status: "advisory", decisions: [], findings: [] }) } });
+}
+const e2eGuard = (fitness, readiness) => architectureFitnessAuthorityVerdict(repoRoot, COMMAND, guardDeps({
+  activeFeaturePlanningSurfaceFn: () => E2E_SURFACE, evaluateArchitectureFitnessFn: () => fitness,
+  inspectArchitectureEntryReadinessFn: () => readiness }));
+
+test("end-to-end brownfield entry: approved-scoped adoption with the class 9 scope union, map and docs/adr present, class 10 unavailable -> guard verdict null and readiness ready", () => {
+  const scope = withClass9RequiredScope([ARCHITECTURE_ENTRY_SCOPE]);
+  for (const required of CLASS9_REQUIRED_SCOPE) assert.ok(scope.includes(required), `scope carries ${required}`);
+  const fitness = e2eFitness("pass");
+  const readiness = e2eReadiness(scope, fitness);
+  assert.equal(readiness.status, "ready", JSON.stringify(readiness));
+  assert.equal(readiness.artifacts.map.status, "current");
+  assert.equal(readiness.fitness.blockingOverallStatus, "pass");
+  assert.equal(readiness.fitness.reportOnly.length, 1, "class 10 is report-only");
+  assert.equal(readiness.fitness.reportOnly[0].classId, 10);
+  assert.equal(e2eGuard(fitness, readiness), null, "the guard admits the transition on the identical projection");
+});
+
+test("end-to-end brownfield entry: class 9 inputs missing from the adoption scope still deny (class 9 is never downgraded to report-only)", () => {
+  const given = [ARCHITECTURE_ENTRY_SCOPE];
+  const unioned = withClass9RequiredScope(given);
+  assert.notDeepEqual(unioned, given, "the bare scope lacks the class 9 inputs; the union adds them");
+  const fitness = e2eFitness("finding");
+  const readiness = e2eReadiness(given, fitness);
+  assert.equal(readiness.status, "blocked", JSON.stringify(readiness));
+  assert.equal(readiness.code, "ARCHITECTURE-FITNESS-NOT-READY");
+  const verdict = e2eGuard(fitness, readiness);
+  assert.equal(verdict?.exitCode, 2);
+  assert.match(verdict.stderr, /GUARD-ARCHITECTURE-FITNESS-NON-GREEN/u);
+});
