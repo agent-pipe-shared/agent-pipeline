@@ -1,0 +1,144 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index ea66a0b1d..2095024a9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -11635,6 +11635,42 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+     }
+ 
+     case "reopen-design": {
++      if (rest.includes("--dry-run")) {
++        // Preview only: nothing below writes state, an audit entry or an invalidation record.
++        const previewFlags = parseFlags(rest.filter((token) => token !== "--dry-run"));
++        if (isBlank(previewFlags.by)) {
++          console.error("Error: reopen-design requires --by <name>.");
++          return 2;
++        }
++        const submission = base.planSubmission;
++        const approval = base.planApproval;
++        const previewAt = now();
++        const transition = reopenPlanDesign({
++          state: base,
++          expectedStateSha256: sha256CanonicalJson(base),
++          by: previewFlags.by,
++          at: previewAt,
++        });
++        const wouldChange = transition.ok === true && transition.replay !== true;
++        console.log(JSON.stringify({
++          schema: "pipeline.reopen-design-preview.v1",
++          dryRun: true,
++          wrote: false,
++          ok: transition.ok === true,
++          code: transition.ok === true ? null : transition.code ?? null,
++          wouldChange,
++          phase: { current: base.activeFeature?.phase ?? null, after: wouldChange ? "design" : base.activeFeature?.phase ?? null },
++          voids: {
++            planSubmissionSha256: submission ? sha256CanonicalJson(submission) : null,
++            planApprovalPresent: approval !== undefined && approval !== null,
++            planApprovalSha256: approval ? sha256CanonicalJson(approval) : null,
++            approvalSignaturePresent: Boolean(approval?.designApproval),
++            // Receipts and reviews are files bound to the plan hash, not state fields: name the hash they bind to.
++            receiptsBoundToPlanSha256: submission?.planSha256 ?? null,
++          },
++        }, null, 2));
++        return 0;
++      }
+       const by = flags.by;
+       if (isBlank(by)) {
+         console.error("Error: reopen-design requires --by <name>.");
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2922eb40c..272086a4d 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3245,3 +3245,92 @@ handoffCase("R6 the inspection fails closed, and the criterion scan is exported
+ 
+ assert.deepEqual(handoffFailures, [], `AC-264 plan-readiness hand-off cases failed: ${handoffFailures.join(" | ")}`);
+ console.log("AC-264 plan-readiness hand-off R1-R6 complete.");
++
++// Phoenix slice b: reopen-design --dry-run previews what a reopen voids without writing anything.
++const dryRunFailures = [];
++function dryRunCase(name, fn) {
++  try { fn(); } catch (error) { dryRunFailures.push(`${name}: ${error?.message ?? error}`); }
++}
++function dryRunFixture(featureId) {
++  const planPath = `specs/${featureId}/prd_${featureId}.md`;
++  const specPath = `specs/${featureId}/spec.md`;
++  const fixture = planAuthorityFixture({ featureId, planPath, specPath, now: "2026-10-27T10:00:00.000Z" });
++  assert.equal(capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], fixture.deps)).result, 0);
++  return fixture;
++}
++function dryRunPreview(fixture, args = ["reopen-design", "--by", "po-test", "--dry-run"]) {
++  const out = capturedStdout(() => run(args, fixture.deps));
++  return { result: out.result, lines: out.lines, preview: out.lines.length > 0 ? JSON.parse(out.lines.join("\n")) : null };
++}
++
++dryRunCase("DR1 --dry-run after a submitted plan prints a typed preview and leaves the state file byte-identical", () => {
++  const fixture = dryRunFixture("reopen-dryrun-submitted");
++  const before = createHash("sha256").update(readFileSync(statePath(fixture.root))).digest("hex");
++  const { result, preview } = dryRunPreview(fixture);
++  const after = createHash("sha256").update(readFileSync(statePath(fixture.root))).digest("hex");
++  assert.equal(result, 0);
++  assert.equal(after, before, "dry-run must not write the state file");
++  assert.equal(preview.schema, "pipeline.reopen-design-preview.v1");
++  assert.equal(preview.dryRun, true);
++  assert.equal(preview.wouldChange, true);
++  assert.equal(preview.phase.after, "design");
++  assert.match(preview.voids.planSubmissionSha256, /^[a-f0-9]{64}$/u);
++  assert.equal(preview.voids.planApprovalPresent, false);
++});
++
++dryRunCase("DR1b an approved plan: the preview names the approval and its signature record", () => {
++  const fixture = dryRunFixture("reopen-dryrun-approved");
++  const state = JSON.parse(readFileSync(statePath(fixture.root), "utf8"));
++  state.planApproved = true;
++  state.planApproval = { schema: "x", approvedBy: "po", approvedAt: "2026-10-27T10:30:00.000Z", designApproval: { signature: "s" } };
++  writeFileSync(statePath(fixture.root), JSON.stringify(state, null, 2));
++  const before = createHash("sha256").update(readFileSync(statePath(fixture.root))).digest("hex");
++  const { result, preview } = dryRunPreview(fixture);
++  assert.equal(result, 0);
++  assert.equal(createHash("sha256").update(readFileSync(statePath(fixture.root))).digest("hex"), before);
++  assert.equal(preview.voids.planApprovalPresent, true);
++  assert.match(preview.voids.planApprovalSha256, /^[a-f0-9]{64}$/u);
++  assert.equal(preview.voids.approvalSignaturePresent, true);
++});
++
++dryRunCase("DR2 the preview lists what a real reopen then actually voids", () => {
++  const fixture = dryRunFixture("reopen-dryrun-matches-real");
++  const { preview } = dryRunPreview(fixture);
++  assert.equal(capturedStdout(() => run(["reopen-design", "--by", "po-test"], fixture.deps)).result, 0);
++  const state = JSON.parse(readFileSync(statePath(fixture.root), "utf8"));
++  assert.equal(state.planInvalidation.invalidatedSubmissionSha256, preview.voids.planSubmissionSha256);
++  assert.equal(state.planInvalidation.invalidatedApprovalSha256, preview.voids.planApprovalSha256);
++  assert.equal(state.activeFeature.phase, preview.phase.after);
++  assert.equal(state.planApproved, false);
++});
++
++dryRunCase("DR3 --dry-run without an active plan exits 0 with an empty preview and writes nothing", () => {
++  const planAuth = planAuthorityFixture({ featureId: "reopen-dryrun-none", planPath: "specs/reopen-dryrun-none/prd.md", specPath: "specs/reopen-dryrun-none/spec.md" });
++  const state = JSON.parse(readFileSync(statePath(planAuth.root), "utf8"));
++  delete state.planSubmission;
++  delete state.planApproval;
++  state.planApproved = false;
++  writeFileSync(statePath(planAuth.root), JSON.stringify(state, null, 2));
++  const before = createHash("sha256").update(readFileSync(statePath(planAuth.root))).digest("hex");
++  const { result, preview } = dryRunPreview(planAuth);
++  assert.equal(result, 0);
++  assert.equal(createHash("sha256").update(readFileSync(statePath(planAuth.root))).digest("hex"), before);
++  assert.equal(preview.dryRun, true);
++  assert.equal(preview.wouldChange, false);
++  assert.equal(preview.voids.planSubmissionSha256, null);
++  assert.equal(preview.voids.planApprovalPresent, false);
++});
++
++dryRunCase("DR4 the real reopen-design output and state are unchanged by the new flag", () => {
++  const fixture = dryRunFixture("reopen-dryrun-real-unchanged");
++  const real = capturedStdout(() => run(["reopen-design", "--by", "po-test"], fixture.deps));
++  assert.equal(real.result, 0);
++  assert.equal(real.lines.length, 1);
++  assert.match(real.lines[0], /^Design reopened by "po-test" on 2026-10-27T10:00:00\.000Z; lifecycle="draft"\.$/u);
++  const state = JSON.parse(readFileSync(statePath(fixture.root), "utf8"));
++  assert.equal(state.activeFeature.phase, "design");
++  assert.equal(state.planInvalidation.reason, "reopen-design");
++});
++
++assert.deepEqual(dryRunFailures, [], `reopen-design --dry-run cases failed: ${dryRunFailures.join(" | ")}`);
++console.log("reopen-design --dry-run cases DR1-DR4 complete.");
