@@ -1,0 +1,149 @@
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index 866ad0adf..5632cbe21 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -328,7 +328,7 @@ export function evaluateCapabilityCompleteness(preflightResult, requiredCapabili
+  */
+ export const ENVIRONMENT_READINESS_SCHEMA = "pipeline.environment-readiness.v1";
+ export const GIT_HOOKS_REPAIR_SCHEMA = "pipeline.git-hooks-repair.v1";
+-export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable"]);
++export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable", "scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
+ const FINDING_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
+ const MAX_CAUSE_CHARS = 400;
+ const MANDATORY_HOOK_IDS = Object.freeze(["pre-push-hook", "pre-commit-hook", "commit-msg-hook"]);
+@@ -484,6 +484,21 @@ const pendingOwnerProbe = (findingId) => () => ({
+   repair: attendedPrerequisite(`${findingId}-probe`, "the probe for this finding belongs to its owning R7 contract (R7-2, R7-3 or R7-5) and registers through the findingProbes seam; until it ships this finding stays unknown and the report stays non-gating."),
+ });
+ 
++/** One scanner observation per report: reuses runToolchainPreflight's statuses (never a second probe path). A scanner that is
++ * not ready is an attended prerequisite finding, never ok and never clean; the install-command text stays out of this report. */
++const scannerProbe = (tool) => (context) => {
++  context.scanners ??= runToolchainPreflight({
++    rootDir: context.rootDir,
++    manifestResult: { status: "ok", manifest: { security: { scanners: { gitleaks: { enabled: true }, "osv-scanner": { enabled: true }, semgrep: { enabled: true } } } } },
++    platform: context.platform,
++    tempDir: context.tempDir,
++  }, context.deps);
++  const entry = context.scanners.results.find((candidate) => candidate.tool === tool);
++  if (entry?.status === "ready") return { status: "ok", cause: `${tool} ${entry.version ?? "(version unreported)"} is ready`, repair: null };
++  const status = entry?.status ?? "unobserved";
++  return { status: "attended", cause: `${tool} prerequisite status: ${status}`, repair: attendedPrerequisite(`${tool}-installed`, GUIDANCE[platformName(context.platform)][tool]) };
++};
++
+ const DEFAULT_FINDING_PROBES = Object.freeze({
+   "git-version": gitVersionProbe,
+   "signing-toolchain": signingProbe("signing-toolchain"),
+@@ -493,6 +508,9 @@ const DEFAULT_FINDING_PROBES = Object.freeze({
+   "bound-paths-tracked": pendingOwnerProbe("bound-paths-tracked"),
+   "orphan-descriptors": pendingOwnerProbe("orphan-descriptors"),
+   "approval-verifiable": pendingOwnerProbe("approval-verifiable"),
++  "scanner-gitleaks": scannerProbe("gitleaks"),
++  "scanner-osv-scanner": scannerProbe("osv-scanner"),
++  "scanner-semgrep": scannerProbe("semgrep"),
+ });
+ 
+ export async function runEnvironmentReadinessReport({ rootDir = process.cwd(), platform = process.platform, tempDir = tmpdir() } = {}, deps = {}) {
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index 2b45bc1ea..ace2db024 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -401,7 +401,8 @@ check("capability-completeness: performs zero filesystem/git mutation (repo stat
+ // Fixtures: per-test temporary repositories whose git configuration is isolated from the machine
+ // (empty global config, no system config, HOME redirected), removed afterwards. Nothing here reads
+ // or writes the real repository's hooks or the real machine's git configuration.
+-const R77_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable"]);
++const R77_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable", "scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
++const R77_SCANNER_FINDING_IDS = Object.freeze(["scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
+ const R77_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
+ const R77_FINDING_KEYS = Object.freeze(["cause", "findingId", "repair", "status"]);
+ const R77_KNOWN_BAD_GIT = "2.56.0.windows.1";
+@@ -423,7 +424,7 @@ function r77IsAgentAction(repair) {
+ function r77AssertFinding(finding, label) {
+   assert.ok(finding !== null && typeof finding === "object", `${label}: a finding must be an object`);
+   assert.deepEqual(Object.keys(finding).sort(), [...R77_FINDING_KEYS], `${label}: a finding carries exactly the closed fields findingId, status, cause, repair`);
+-  assert.ok(R77_FINDING_IDS.includes(finding.findingId), `${label}: findingId must be one of the eight closed ids`);
++  assert.ok(R77_FINDING_IDS.includes(finding.findingId), `${label}: findingId must be one of the closed ids`);
+   assert.ok(R77_STATES.includes(finding.status), `${label}: status must be ok, repairable, attended or unknown`);
+   assert.equal(typeof finding.cause, "string", `${label}: cause must be a string`);
+   if (finding.status === "ok") return;
+@@ -522,7 +523,7 @@ check("R7-7a: the matrix checker itself fails a non-ok finding without its typed
+   assert.doesNotThrow(() => r77AssertFinding({ ...base, status: "repairable", repair: r77Action("x") }, "repairable"));
+   assert.doesNotThrow(() => r77AssertFinding({ ...base, status: "attended", repair: r77Attended() }, "attended"));
+ });
+-check("R7-7a: a fixture matrix puts each of the eight finding ids in ok, repairable and attended, each non-ok with its typed repair, cause path-redacted", async () => {
++check("R7-7a: a fixture matrix puts each of the closed finding ids in ok, repairable and attended, each non-ok with its typed repair, cause path-redacted", async () => {
+   await r77WithFixtureRepo(async (repo) => {
+     for (const id of R77_FINDING_IDS) {
+       for (const status of ["ok", "repairable", "attended"]) {
+@@ -530,7 +531,7 @@ check("R7-7a: a fixture matrix puts each of the eight finding ids in ok, repaira
+         const repair = status === "ok" ? null : status === "repairable" ? r77Action(repo) : r77Attended();
+         const probe = () => ({ status, cause: `fixture ${label} observed under ${repo}`, repair });
+         const report = await r77Report(repo, { [R77_PROBES_DEP]: r77Probes({ [id]: probe }) });
+-        assert.deepEqual(report.findings.map((finding) => finding.findingId).sort(), [...R77_FINDING_IDS].sort(), `${label}: the report carries exactly the eight closed finding ids, once each`);
++        assert.deepEqual(report.findings.map((finding) => finding.findingId).sort(), [...R77_FINDING_IDS].sort(), `${label}: the report carries exactly the closed finding ids, once each`);
+         for (const finding of report.findings) r77AssertFinding(finding, `${label}/${finding.findingId}`);
+         const finding = r77Finding(report, id);
+         assert.equal(finding.status, status, `${label}: the fixture state must surface as the finding status`);
+@@ -779,4 +780,62 @@ check("R7-6n: an invalid legacy per-repository store is a failure, never absent"
+     rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+   }
+ });
++// W7 preflight slice 1: gitleaks, osv-scanner and semgrep are typed prerequisite findings (AC-264 slice; the environment
++// readiness never reports a missing scanner as ready or clean). Fixtures inject the resolver and probes; nothing is spawned.
++const W7_SCANNER_TOOLS = Object.freeze({ "scanner-gitleaks": "gitleaks", "scanner-osv-scanner": "osv-scanner", "scanner-semgrep": "semgrep" });
++const W7_SCANNER_OBSERVED = () => ({
++  gitleaks: () => observed("gitleaks", "8.18.0", ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"]),
++  "osv-scanner": () => observed("osv-scanner", "2.0.0", ["--format", "recursive-source"]),
++  semgrep: () => observed("semgrep", "1.50.0", ["--json", "--config"]),
++});
++const w7ScannerDeps = (resolveExecutableFn) => ({
++  probeNodeFn: nodeReady, probeGitFn: gitReady, resolveExecutableFn, resolveInstallerFn: () => null, scannerProbes: W7_SCANNER_OBSERVED(),
++  [R77_PROBES_DEP]: r77Probes({}, R77_SCANNER_FINDING_IDS),
++});
++check("W7-1a: the closed finding id list exports the three scanner ids", () => {
++  for (const id of R77_SCANNER_FINDING_IDS) assert.ok(toolchainModule.ENVIRONMENT_FINDING_IDS.includes(id), `${id} must be in ENVIRONMENT_FINDING_IDS`);
++  assert.deepEqual([...toolchainModule.ENVIRONMENT_FINDING_IDS], [...R77_FINDING_IDS], "the id list is the previous eight ids followed by the three scanner ids");
++});
++check("W7-1b: an injected missing scanner yields a non-ready attended finding with its scanner id; the report is not ok", async () => {
++  await r77WithFixtureRepo(async (repo) => {
++    const report = await r77Report(repo, w7ScannerDeps(() => null));
++    for (const id of R77_SCANNER_FINDING_IDS) {
++      const finding = r77Finding(report, id);
++      r77AssertFinding(finding, `missing ${id}`);
++      assert.equal(finding.status, "attended", `${id}: a missing scanner is attended, never ok`);
++      assert.match(finding.cause, new RegExp(W7_SCANNER_TOOLS[id], "u"), `${id}: the cause names the scanner`);
++      assert.equal(finding.repair.kind, "attended-prerequisite");
++      assert.match(finding.repair.prerequisite, new RegExp(W7_SCANNER_TOOLS[id], "u"), `${id}: the prerequisite names the scanner`);
++    }
++    assert.equal(report.ok, false, "a missing scanner is never clean");
++  });
++});
++check("W7-1c: an injected present scanner yields a ready (ok) finding with no repair", async () => {
++  await r77WithFixtureRepo(async (repo) => {
++    const report = await r77Report(repo, w7ScannerDeps((name) => `/tools/${name}`));
++    for (const id of R77_SCANNER_FINDING_IDS) {
++      const finding = r77Finding(report, id);
++      r77AssertFinding(finding, `present ${id}`);
++      assert.equal(finding.status, "ok", `${id}: a present compatible scanner is ready`);
++      assert.equal(finding.repair, null);
++    }
++  });
++});
++check("W7-1d: the report carries the previous eight findings plus exactly three scanner findings", async () => {
++  await r77WithFixtureRepo(async (repo) => {
++    const report = await r77Report(repo, w7ScannerDeps((name) => `/tools/${name}`));
++    assert.equal(report.findings.length, 8 + 3);
++    assert.deepEqual(report.findings.map((finding) => finding.findingId), [...R77_FINDING_IDS]);
++  });
++});
++check("W7-1e: the scanner findings expose no install command text and an incompatible scanner is attended", async () => {
++  await r77WithFixtureRepo(async (repo) => {
++    const deps = w7ScannerDeps((name) => `/tools/${name}`);
++    deps.scannerProbes = { ...deps.scannerProbes, "osv-scanner": () => observed("osv-scanner", "3.0.0", ["--format", "recursive-source"]) };
++    const report = await r77Report(repo, deps);
++    assert.equal(r77Finding(report, "scanner-osv-scanner").status, "attended", "an incompatible version is not ready");
++    assert.equal(r77Finding(report, "scanner-gitleaks").status, "ok");
++    for (const id of R77_SCANNER_FINDING_IDS) assert.doesNotMatch(JSON.stringify(r77Finding(report, id)), /sudo|apt-get|go install|brew install|winget/u, `${id}: no install command text`);
++  });
++});
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
