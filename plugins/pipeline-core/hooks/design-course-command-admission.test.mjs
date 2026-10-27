@@ -65,7 +65,8 @@ export function fixture(profile = 'feature') {
     gitHead: () => ({ ok: true, commit: candidate.commit }),
     gitUserName: () => 'Fixture', poGateProfile: () => ({ ok: true, value: evidence }),
     poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: 'pipeline.po-gate-authority.v2', planPath, planSha256: sources.prd.sha256, specPath, specSha256: sources.spec.sha256 } }),
-    designAdvisoryAdmission: () => ({ ok: true, id: 'a'.repeat(64) }), runner: 'codex' };
+    designAdvisoryAdmission: () => ({ ok: true, id: 'a'.repeat(64) }), runner: 'codex',
+    architectureEntryReadiness: () => ({ status: 'ready', code: null, nextAction: null }) };
   const submitted = capture(() => run(['submit-plan', '--by', 'coordinator', '--profile', profile], deps));
   assert.equal(submitted.code, 0, submitted.stderr);
   const state = JSON.parse(readFileSync(statePath(root), 'utf8'));

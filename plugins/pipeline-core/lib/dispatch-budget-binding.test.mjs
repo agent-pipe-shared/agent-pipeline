@@ -8,8 +8,15 @@ import {
   bindDispatchBudget,
   consumePendingDispatchBudgetBinding,
   persistPendingDispatchBudgetBindings,
+  readAgentMaxTurns,
   resolvePendingDispatchBudgetBinding,
 } from "./dispatch-budget-binding.mjs";
+import {
+  CLOSING_ALLOWANCE,
+  dispatchGrantHeadroom,
+  effectiveDispatchBaseCap,
+  effectiveDispatchWorkingCap,
+} from "./dispatch-budget-core.mjs";
 import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 
 const cases = [];
@@ -153,7 +160,18 @@ check("keeps a pending record written before the commit mode existed valid and u
   } finally { rmSync(commonDir, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 11, "the complete dispatch budget binding corpus must register before execution");
+check("the shipped implementor definition keeps the PO ceiling: maxTurns 76, ceiling 70, one grant of 30 at base 40", () => {
+  const pluginRoot = join(import.meta.dirname, "..");
+  const maxTurns = readAgentMaxTurns("pipeline-core:goldfish-implementor", pluginRoot);
+  assert.equal(maxTurns, 76);
+  assert.equal(maxTurns - CLOSING_ALLOWANCE - 1, 70, "the ceiling a Goldfish may reach through one grant");
+  assert.equal(effectiveDispatchBaseCap(40, maxTurns), 40, "the briefed Tool budget line stays 40");
+  assert.equal(dispatchGrantHeadroom(40, maxTurns), 30);
+  assert.equal(effectiveDispatchWorkingCap(40, maxTurns, 30), 70);
+  assert.equal(effectiveDispatchWorkingCap(40, maxTurns, 31), 70, "a larger grant is clamped to the ceiling");
+});
+
+assert.equal(cases.length, 12, "the complete dispatch budget binding corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

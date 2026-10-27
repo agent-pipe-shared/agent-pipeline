@@ -73,19 +73,19 @@ test("RED: a mutant computing the checkpoint on the briefed cap fails the contra
   assert.throws(() => assertCapContract(briefedBased), assert.AssertionError);
 });
 
-test("P1 the agent definition frontmatter is the maxTurns source (50 / 50 / 80)", () => {
-  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT), 50);
+test("P1 the agent definition frontmatter is the maxTurns source (76 / 50 / 80)", () => {
+  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT), 76);
   assert.equal(readAgentMaxTurns("goldfish-mechanic", PLUGIN_ROOT), 50);
   assert.equal(readAgentMaxTurns("pipeline-core:goldfish-deep", PLUGIN_ROOT), 80);
 });
 
-test("P1/P3 the briefing Tool budget line is the briefed base cap; 45 on the implementor binds effective 35", () => {
+test("P1/P3 the briefing Tool budget line is the briefed base cap; 70 on the implementor binds effective 61", () => {
   const maxTurns = readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT);
-  const binding = bindDispatchBudget({ prompt: briefing(45), maxTurns, applicable: true });
+  const binding = bindDispatchBudget({ prompt: briefing(70), maxTurns, applicable: true });
   assert.equal(binding.status, "prepared");
-  assert.equal(binding.baseCalls, 45);
-  assert.equal(binding.workingCap, 35);
-  assert.equal(binding.effectiveCap, 35);
+  assert.equal(binding.baseCalls, 70);
+  assert.equal(binding.workingCap, 61);
+  assert.equal(binding.effectiveCap, 61);
   assert.equal(binding.tierLimited, true);
   const within = bindDispatchBudget({ prompt: briefing(30), maxTurns, applicable: true });
   assert.equal(within.effectiveCap, 30);

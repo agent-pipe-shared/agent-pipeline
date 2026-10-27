@@ -2404,9 +2404,11 @@ test("pipeline author repair binds one exact source root and action without Stat
       nowMs: 2500,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
       humanApprovalScriptPath: join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+      proofDirectory: join(tmpdir(), "synthetic-po-key-directory"),
     });
+    // Slice A (PO decision 2026-10-27): the agent import carries the full proof path, no placeholder.
     assert.deepEqual(signing.authorizeBySignatureCommand.argv.slice(-4), [
-      "--proof", "<external-proof.json>", "--author-source-root", sourceRoot,
+      "--proof", join(tmpdir(), "synthetic-po-key-directory", `proof-${signing.intentSha256}.json`), "--author-source-root", sourceRoot,
     ]);
     const armed = armBySignature({
       rootDir: root,

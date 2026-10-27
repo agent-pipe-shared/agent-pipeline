@@ -335,3 +335,66 @@ test("hotfix 9: materializeArchitectureDesign returns the not-required result un
   assert.deepEqual(result, HF9_NOT_REQUIRED);
   assert.deepEqual(snapshot(fixture.root), before);
 });
+
+// --- W7: a module declared kind "documentation" with only non-executable owned paths needs no verification entry point (D9) ---
+import { loadMapBundle } from "../scripts/module-inventory.mjs";
+function docDesign(ownedPaths = ["docs/guide/**", "README.md"]) {
+  const input = design();
+  input.modules = [{ id: "handbook", kind: "documentation", responsibility: "Written guidance", nonResponsibilities: ["Code"],
+    ownedPaths, publicContracts: ["docs/guide/index.md"], allowedDependencies: [], authorityEffects: [],
+    verificationEntryPoints: [], adrReferences: [] }];
+  input.implementationSurface = ["docs/guide/index.md"];
+  input.disposition.scope = ["docs/", "README.md", "architecture/", "specs/"];
+  delete input.fitnessModel.modules;
+  return input;
+}
+test("W7 documentation module: empty entry points and docs paths are valid in the design and clean in class 6", () => {
+  const parsed = parseArchitectureDesign(prd(docDesign()));
+  assert.equal(parsed.fitnessModel.modules[0].kind, "documentation");
+  assert.deepEqual(parsed.fitnessModel.modules[0].verificationEntryPoints, []);
+  const root = mkdtempSync(join(tmpdir(), "architecture-doc-module-"));
+  try {
+    for (const target of architectureDesignTargets(parsed).filter((row) => row.path.startsWith("architecture/map/"))) {
+      mkdirSync(join(root, "architecture/map"), { recursive: true });
+      writeFileSync(join(root, target.path), target.bytes);
+    }
+    mkdirSync(join(root, "docs/guide"), { recursive: true });
+    writeFileSync(join(root, "docs/guide/index.md"), "# Guide\n");
+    writeFileSync(join(root, "README.md"), "# Readme\n");
+    // The rendered concept file carries the declaration and validates against the schema (kind is optional, enum documentation).
+    const concept = readFileSync(join(root, "architecture/map/handbook.md"), "utf8");
+    assert.match(concept, /^kind: "documentation"$/mu);
+    const bundle = loadMapBundle(root);
+    assert.deepEqual(bundle.errors, []);
+    assert.ok(bundle.modules.some((module) => module.id === "handbook"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test("W7 documentation module: an executable owned path is refused with the typed code naming the path", () => {
+  for (const [paths, field] of [[["src/**"], "modules[0].ownedPaths[0]"], [["docs/**", "scripts/run.mjs"], "modules[0].ownedPaths[1]"],
+    [["docs/**", "tests/a.mjs"], "modules[0].ownedPaths[1]"]]) {
+    assert.throws(() => parseArchitectureDesign(prd(docDesign(paths))), error =>
+      error.message === "ARCHITECTURE-DESIGN-DOC-MODULE-INVALID" && error.field === field && typeof error.expected === "string");
+  }
+  for (const [ok, surface] of [[["docs/**"], "docs/x.md"], [["notes/a.txt", "x/b.rst", "c.adoc", "d.mdx"], "notes/a.txt"]]) {
+    assert.doesNotThrow(() => parseArchitectureDesign(prd({ ...docDesign(ok), implementationSurface: [surface] })));
+  }
+});
+test("W7 documentation module: without the declaration an empty entry point list stays refused, and an unknown kind is refused", () => {
+  const plain = docDesign(); delete plain.modules[0].kind;
+  assert.throws(() => parseArchitectureDesign(prd(plain)), error => error.message === "ARCHITECTURE-DESIGN-MODULE-INVALID");
+  const odd = docDesign(); odd.modules[0].kind = "other";
+  assert.throws(() => parseArchitectureDesign(prd(odd)), error => error.message === "ARCHITECTURE-DESIGN-MODULE-INVALID");
+});
+test("W7 documentation module: kind absent leaves the derived rows byte-identical, and an explicit row must match kind", () => {
+  const input = design(); delete input.fitnessModel.modules;
+  const rows = parseArchitectureDesign(prd(input)).fitnessModel.modules;
+  assert.equal(Object.hasOwn(rows[0], "kind"), false);
+  assert.equal(JSON.stringify(rows), JSON.stringify([{ id: "application", ownedPaths: ["src/**", "tests/**", "docs/contract.md"],
+    allowedDependencies: [], authorityEffects: [], verificationEntryPoints: ["tests/application.test.mjs"] }]));
+  const doc = docDesign();
+  const derived = parseArchitectureDesign(prd(doc)).fitnessModel.modules;
+  doc.fitnessModel.modules = structuredClone(derived);
+  assert.doesNotThrow(() => parseArchitectureDesign(prd(doc)));
+  delete doc.fitnessModel.modules[0].kind;
+  assert.throws(() => parseArchitectureDesign(prd(doc)), error => error.message === "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
+});

@@ -67,6 +67,12 @@ const snapshot = (commonDir) => JSON.stringify(readdirSync(privateDir(commonDir)
   .map((name) => [name, readFileSync(join(privateDir(commonDir), name), "utf8")]));
 const readReceipt = (commonDir) => { const names = privateEntries(commonDir, "observation-claude-"); assert.equal(names.length, 1);
   return JSON.parse(readFileSync(join(privateDir(commonDir), names[0]), "utf8")); };
+// PF-83: the stop-failure diagnostics live beside, not inside, the host-commit private directory (D180b).
+const diagDir = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+const diagEntries = (commonDir) => (existsSync(diagDir(commonDir)) ? readdirSync(diagDir(commonDir)).sort() : []);
+const plantDiagnostic = (commonDir, name, content) => { mkdirSync(diagDir(commonDir), { recursive: true, mode: 0o700 }); writeFileSync(join(diagDir(commonDir), name), content); };
+const diagRecord = (dispatchId, toolUseId) => `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId, toolUseId,
+  status: "not-finalized", code: "NGHR-FINAL-JSON", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`;
 function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
   const root=fixtureRoot("native-goldfish-host-finalizer-"); const commonDir=join(root,".git");
   const stopDir=fixtureRoot("native-goldfish-stop-hook-"); const background=options.background===true;
@@ -409,6 +415,90 @@ const cases = [
     assert.equal("checks" in result, false);
     assert.deepEqual(readdirSync(join(root, "evidence")).filter((name) => name.startsWith("dispatch-checks-")), []);
   }) },
+  // NGHF14-NGHF16 -- PF-83: a stop-failure diagnostic is removed once its dispatch has succeeded, matched by the recorded dispatch id.
+  { id: "NGHF14", name: "A handback stop failure leaves a diagnostic; a later success without a handback removes every diagnostic of that dispatch, whatever its tool-use id", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"),`${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: "All done, no JSON here." } }] } })}\n`);
+    const failed = finalize(stopInput(binding, undefined));
+    assert.equal(failed.status, "not-finalized", failed.code);
+    assert.equal(diagEntries(commonDir).length, 1, `${failed.code} ${JSON.stringify(failed)}`);
+    plantDiagnostic(commonDir, `stop-failure-${"1".repeat(32)}.json`, diagRecord(binding.dispatchId, "tool-earlier-launch"));
+    assert.equal(diagEntries(commonDir).length, 2);
+    const accepted = finalize(stopInput(binding, finalText(binding)));
+    assert.equal(accepted.status, "authored-commit-recorded", accepted.code);
+    assert.equal(facts.commits, 1);
+    assert.deepEqual(diagEntries(commonDir), []);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF15", name: "A dispatch that succeeded through a foreground PostToolUse never leaves a stop-failure diagnostic behind", run: () => fixture(({ root, commonDir, binding, dependencies }) => {
+    plantDiagnostic(commonDir, `stop-failure-${"2".repeat(32)}.json`, diagRecord(binding.dispatchId, "tool-earlier-launch"));
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+      tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } } }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", result.code);
+    assert.deepEqual(diagEntries(commonDir), []);
+  }) },
+  { id: "NGHF16", name: "The success of one dispatch never removes a diagnostic of another dispatch, an unreadable file or one without a dispatch id", run: () => fixture(({ root, commonDir, binding, dependencies }) => {
+    plantDiagnostic(commonDir, `stop-failure-${"3".repeat(32)}.json`, diagRecord("NGHF-OTHER", "tool-claude"));
+    plantDiagnostic(commonDir, `stop-failure-${"4".repeat(32)}.json`, "{ not json");
+    plantDiagnostic(commonDir, `stop-failure-${"5".repeat(32)}.json`, `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", toolUseId: "tool-claude" })}\n`);
+    plantDiagnostic(commonDir, `stop-failure-${"6".repeat(32)}.json`, diagRecord(binding.dispatchId, "tool-earlier-launch"));
+    const before = diagEntries(commonDir);
+    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
+      tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
+      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } } }, dependencies);
+    assert.equal(result.status, "authored-commit-recorded", result.code);
+    assert.deepEqual(diagEntries(commonDir), before.filter((name) => !name.includes("6".repeat(32))));
+    assert.equal(diagEntries(commonDir).length, 3);
+  }) },
+  // NGHF17-NGHF19 -- D31: a budget stop hands back a typed checkpoint outcome; it is neither success nor failure.
+  { id: "NGHF17", name: "A checkpoint handback writes no stop-failure diagnostic, and a following success of the same dispatch still completes", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "checkpoint", report: "Budget reached; two of three cases written, continuation card follows." }) } }] } })}\n`);
+    const interim = finalize(stopInput(binding, undefined));
+    assert.equal(interim.status, "checkpoint-recorded", `${interim.code} ${JSON.stringify(interim)}`);
+    assert.equal(interim.code, "NGHF-CHECKPOINT-RESERVATION-LIVE");
+    assert.equal(interim.commit, null);
+    assert.deepEqual(diagEntries(commonDir), []);
+    assert.equal(facts.commits, 0);
+    const accepted = finalize(stopInput(binding, finalText(binding)));
+    assert.equal(accepted.status, "authored-commit-recorded", accepted.code);
+    assert.equal(facts.commits, 1);
+    assert.deepEqual(diagEntries(commonDir), []);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF18", name: "A checkpoint leaves the reservation live and names both continuation routes; a repeated checkpoint is idempotent", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "checkpoint", report: "Budget reached; notes follow." }) } }] } })}\n`);
+    const before = snapshot(commonDir);
+    const first = finalize(stopInput(binding, undefined));
+    assert.equal(first.status, "checkpoint-recorded", `${first.code} ${JSON.stringify(first)}`);
+    assert.equal(first.reservation, "live");
+    assert.deepEqual(first.continuation, { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" });
+    assert.equal(snapshot(commonDir), before, "a checkpoint consumes and changes nothing");
+    const second = finalize(stopInput(binding, undefined));
+    assert.deepEqual(second, first);
+    assert.equal(snapshot(commonDir), before);
+    assert.equal(facts.commits, 0);
+    assert.deepEqual(diagEntries(commonDir), []);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF19", name: "An outcome other than succeeded and checkpoint still writes the stop-failure diagnostic and is not finalized", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "failed" }) } }] } })}\n`);
+    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
+    assert.equal(failed.status, "not-finalized", failed.code);
+    assert.equal(diagEntries(commonDir).length, 1, JSON.stringify(failed));
+    assert.equal(facts.commits, 0);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
 
 ];
 

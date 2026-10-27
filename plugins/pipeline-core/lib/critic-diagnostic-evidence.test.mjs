@@ -112,3 +112,102 @@ test("D167-PF78 (4) the shared predicate agrees with the producer for a table of
     assert.ok(refused.code === "FPR-DIAG-PATH" || refused.code === "FPR-MANIFEST-MISSING", JSON.stringify(refused));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+// D41: the evidence route is printed by the help of the producer and the registrar, not only by the refusal text.
+const ROUTE_STEPS = [
+  /critic-diagnostic-evidence\.mjs/u,
+  /commit/iu,
+  /register-feature-package\.mjs --root <root> --add-diagnostic-evidence <path>/u,
+  /commit the manifest/iu,
+  /critic-dispatch-preflight\.mjs[^\n]*--registration-commit/u,
+];
+function assertRouteInOrder(text) {
+  let from = 0;
+  for (const step of ROUTE_STEPS) {
+    const rest = text.slice(from);
+    const m = step.exec(rest);
+    assert.ok(m, `route step ${step} missing or out of order in:\n${text}`);
+    from += m.index + m[0].length;
+  }
+}
+for (const script of ["critic-diagnostic-evidence.mjs", "register-feature-package.mjs"]) {
+  test(`D41 ${script} --help prints the five-step evidence route and exits 0`, () => {
+    const result = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts", script), "--help"], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assertRouteInOrder(result.stdout);
+  });
+}
+test("D41 malformed argv keeps its refusal codes and exit status", () => {
+  const producer = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs"), "--help", "--root", "x"], { encoding: "utf8" });
+  assert.equal(producer.status, 1);
+  assert.match(producer.stderr, /Usage: critic-diagnostic-evidence/u);
+  const missing = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs"), "--root"], { encoding: "utf8" });
+  assert.equal(missing.status, 1);
+  const registrar = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts/register-feature-package.mjs"), "--help", "extra"], { encoding: "utf8" });
+  assert.equal(registrar.status, 2);
+  assert.equal(JSON.parse(registrar.stdout).code, "FPR-ARGS");
+  const bare = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts/register-feature-package.mjs")], { encoding: "utf8" });
+  assert.equal(bare.status, 2);
+  assert.equal(JSON.parse(bare.stdout).code, "FPR-ARGS");
+});
+// PF-88 slice 2: --base derives the required guardrails instead of the operator naming them.
+import { createHash } from "node:crypto";
+const MANIFEST_JSON = ".claude/pipeline.json";
+function commitAll(root, message) {
+  git(root, ["add", "-f", "."]);
+  git(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", message]);
+  return git(root, ["rev-parse", "HEAD"]);
+}
+function derivedFixture() {
+  const f = fixture();
+  mkdirSync(join(f.root, ".claude"), { recursive: true });
+  mkdirSync(join(f.root, "governance", "guidelines"), { recursive: true });
+  mkdirSync(join(f.root, "governance", "policies"), { recursive: true });
+  writeFileSync(join(f.root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+  writeFileSync(join(f.root, "governance", "guidelines", "review.md"), "Review changed code.\n");
+  writeFileSync(join(f.root, "governance", "policies", "checklist.md"), "- verify\n");
+  const base = commitAll(f.root, "base");
+  writeFileSync(join(f.root, MANIFEST_JSON), "{}\n");
+  const candidate = commitAll(f.root, "change the JSON manifest");
+  return { ...f, base, candidate: { commit: candidate, tree: git(f.root, ["rev-parse", "HEAD^{tree}"]) } };
+}
+const baseOptions = (f, extra = {}) => ({ root: f.root, specPath: "spec.md", guardrailPaths: [], baseRef: f.base, command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/derived.log", ...extra });
+test("PF88-S2 (i) the CLI with --base and no --guardrail hashes the changed JSON manifest and the output validates", () => {
+  const f = derivedFixture();
+  try {
+    const script = resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs");
+    const args = [script, "--root", f.root, "--spec", "spec.md", "--base", f.base, "--log", "evidence/d.log", "--out", "evidence/d.json", "--", process.execPath, "-e", "process.exit(0)"];
+    const result = spawnSync(process.execPath, args, { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    const value = JSON.parse(readFileSync(join(f.root, "evidence/d.json"), "utf8"));
+    const manifest = value.guardrails.find(g => g.path === MANIFEST_JSON);
+    assert.ok(manifest, JSON.stringify(value.guardrails));
+    assert.equal(manifest.sha256, createHash("sha256").update("{}\n").digest("hex"));
+    assert.ok(value.guardrails.some(g => g.path === ".claude/pipeline.yaml"));
+    assert.doesNotThrow(() => validateCriticDiagnostic(value, { root: f.root, candidate: f.candidate, spec: value.spec, guardrails: value.guardrails }));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("PF88-S2 (ii) explicit --guardrail plus derived is a deduplicated sorted union", () => {
+  const f = derivedFixture();
+  try {
+    const value = produceCriticDiagnostic(baseOptions(f, { guardrailPaths: ["guard.md", MANIFEST_JSON] }));
+    const paths = value.guardrails.map(g => g.path);
+    assert.deepEqual(paths, [...new Set(paths)].sort());
+    assert.ok(paths.includes("guard.md"));
+    assert.equal(paths.filter(p => p === MANIFEST_JSON).length, 1);
+    assert.ok(paths.includes("governance/policies/checklist.md"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("PF88-S2 (iii) without a base the guardrail set is exactly the explicit one", () => {
+  const f = derivedFixture();
+  try {
+    const value = produceCriticDiagnostic(baseOptions(f, { baseRef: undefined, guardrailPaths: ["guard.md"] }));
+    assert.deepEqual(value.guardrails.map(g => g.path), ["guard.md"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+test("PF88-S2 (iv) a base that is not a commit fails closed with a typed error", () => {
+  const f = derivedFixture();
+  try {
+    assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: "no-such-ref" })), /CDI-BASE/u);
+    assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: `${f.candidate.tree}` })), /CDI-BASE/u);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});

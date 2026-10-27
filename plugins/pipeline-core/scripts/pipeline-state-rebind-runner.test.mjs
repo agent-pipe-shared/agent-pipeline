@@ -240,6 +240,7 @@ function generatorSubmitFixture(name, { exempt }) {
       spec: { path: specPath, sha256: specSha256 },
     }),
     designAdvisoryAdmission: () => ({ ok: true, id: h("e"), mode: "admitted" }),
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
   };
   return { dir, deps };
 }

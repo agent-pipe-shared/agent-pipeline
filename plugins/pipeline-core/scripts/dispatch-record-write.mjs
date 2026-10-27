@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import { inspectSourceOwnedNativeConfiguredRoute } from "../lib/native-goldfish-host-state.mjs";
+import { execFileSync } from "node:child_process";
 import { randomBytes, createHash } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from "node:fs";
 import { basename, dirname, relative, resolve } from "node:path";
@@ -174,11 +175,51 @@ export function writeHostObservedNativeGoldfishDispatchRecord({ repoRoot, target
   return publishDispatchRecord(root, target, record, dependencies, { hostObservedNativeGoldfish: true });
 }
 
+/**
+ * D56 route for a delivery the ORCHESTRATOR committed itself (a project has no host observation to offer). The record is a
+ * weaker, visibly labelled assurance: before it is published the Git objects are reopened here, so the attestation is at
+ * least bound to real commits, each carrying this task's Dispatch trailer, in one linear chain, touching exactly the files
+ * the record reports. It cannot satisfy any host-observed predicate (the other routes refuse this kind).
+ */
+export function writeOrchestratorAttestedDispatchRecord({ repoRoot, target, record }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  return publishDispatchRecord(root, target, record, dependencies, { orchestratorAttestedRoute: true });
+}
+
+function gitText(root, args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
+}
+/** Reopen the attested delivery's commits. Readers are injectable so the checks are deterministic without a repository. */
+function verifyOrchestratorAttestedDelivery(root, record, dependencies) {
+  const readCommitMessage = dependencies.readCommitMessage ?? ((commit) => gitText(root, ["log", "-1", "--format=%B", commit]));
+  const readChangedPaths = dependencies.readChangedPaths ?? ((commit) => gitText(root, ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", commit]).split("\n").filter(Boolean));
+  const readParents = dependencies.readParents ?? ((commit) => gitText(root, ["rev-list", "--parents", "-n", "1", commit]).trim().split(" ").slice(1));
+  if (record.commits.length === 0 || record.report === null) fail("record-attestation-git", "an attested delivery needs commits and a report");
+  const trailer = `Dispatch: ${record.taskId} (goldfish)`;
+  const changed = new Set();
+  let previous = null;
+  for (const commit of record.commits) {
+    let message; let paths; let parents;
+    try { message = readCommitMessage(commit); paths = readChangedPaths(commit); parents = readParents(commit); }
+    catch { fail("record-attestation-git", "an attested commit is not readable in this repository"); }
+    if (message.split(/\r?\n/u).filter((line) => line === trailer).length !== 1) fail("record-attestation-git", `an attested commit must carry exactly one "${trailer}" trailer`);
+    if (!Array.isArray(parents) || parents.length !== 1) fail("record-attestation-git", "an attested commit must have exactly one parent (no merge, no root)");
+    if (previous !== null && parents[0] !== previous) fail("record-attestation-git", "attested commits must form one linear chain in the order recorded");
+    for (const path of paths) changed.add(path);
+    previous = commit;
+  }
+  const reported = [...new Set([...record.report.changedFiles, ...(record.report.orchestratorAddedFiles ?? [])])].sort();
+  if (JSON.stringify([...changed].sort()) !== JSON.stringify(reported)) fail("record-attestation-scope", "the files the attested commits touch differ from the files the record reports");
+}
+
 function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
-  { hostObservedAgy = false, hostObservedNativeGoldfish = false } = {}) {
+  { hostObservedAgy = false, hostObservedNativeGoldfish = false, orchestratorAttestedRoute = false } = {}) {
   const record = validateDispatchRecord(inputRecord);
   // D77 (K6, AC-163): the empty-log refusal for a NEW terminal v3/v4 record lives here; committed v3 history stays readable.
   assertTerminalLogForWrite(record);
+  const orchestratorAttested = record.schema === "pipeline.dispatch-record.v4" && record.outcomeClassification.kind === "orchestrator-attested";
+  if (orchestratorAttested !== orchestratorAttestedRoute) fail("record-attestation-route", "the orchestrator-attested kind is written only by the attested writer, and that writer accepts nothing else");
+  if (orchestratorAttested) verifyOrchestratorAttestedDelivery(root, record, dependencies);
   const modelCheck = compareRecordedModel(record);
   if (record.schema === DISPATCH_RECORD_SCHEMA && !isTerminalOutcome(record.outcome)) {
     if (hostObservedAgy || hostObservedNativeGoldfish) fail("attempt-host-route", "terminal host route cannot publish an opening");

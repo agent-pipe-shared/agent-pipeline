@@ -7,7 +7,11 @@ export const PREVIOUS_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v3";
 export const CLOSING_ALLOWANCE_SCHEMA = "pipeline.dispatch-closing-allowance.v1";
 export const LEGACY_DISPATCH_RECORD_SCHEMA = "pipeline.dispatch-record.v2";
 export const OUTCOME_CLASSIFICATION_SCHEMA = "pipeline.dispatch-outcome-classification.v1";
-export const OUTCOME_CLASSIFICATIONS = Object.freeze(["authored-commit", "read-only", "stopped-without-commit", "completed-undelivered"]);
+export const OUTCOME_CLASSIFICATIONS = Object.freeze(["authored-commit", "read-only", "stopped-without-commit", "completed-undelivered", "orchestrator-attested"]);
+// D56: the orchestrator committed the worker's delivery itself and attests it; a weaker, visibly labelled assurance than a
+// host-observed authored commit. It is never a host-observation substitute (see dispatch-authorship-verify, follow-up slice).
+export const ORCHESTRATOR_ATTESTATION_SCHEMA = "pipeline.dispatch-orchestrator-attestation.v1";
+export const ORCHESTRATOR_ATTESTED_ASSURANCE = "orchestrator-attested";
 const RESERVED_NON_AUTHORING_OUTCOMES = Object.freeze({ "read-only-completed": "read-only", "stopped-without-commit": "stopped-without-commit" });
 export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress", "started", "pending", "running"]);
 export const NO_DELIVERY_OUTCOME = "completed-no-delivery";
@@ -20,7 +24,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "schema", "taskId", "agentType", "model", "effort", "rulesetSha", "dispatcher", "candidateCommit",
   "resultSha256", "outcome", "commits", "log", "report", "modelOverride", "criticSkip", "criticRequired", "criticEvidence", "orchestratorAddedFiles", "closingAllowance",
 ]);
-const V4_TOP_LEVEL_KEYS = Object.freeze([...TOP_LEVEL_KEYS, "outcomeClassification", "observationIdentity", "runner"]);
+const V4_TOP_LEVEL_KEYS = Object.freeze([...TOP_LEVEL_KEYS, "outcomeClassification", "observationIdentity", "runner", "attestation"]);
 
 function fail(code, message) {
   const error = new Error(message); error.code = code; throw error;
@@ -197,7 +201,15 @@ function validateRecord(record, { legacy, v3 = false }) {
       if (![record.observationIdentity.dispatchId, record.observationIdentity.attemptId].every((value) => typeof value === "string" && SAFE_OBSERVATION_ID.test(value))) fail("record-no-delivery", "undelivered observation identity is invalid");
       if (!Object.hasOwn(record, "criticRequired") || Object.hasOwn(record, "criticSkip") || Object.hasOwn(record, "criticEvidence")) fail("record-no-delivery", "undelivered observation must remain pending independent review");
     } else if (Object.hasOwn(record, "observationIdentity")) fail("record-outcome-classification", "observationIdentity is reserved for completed-undelivered");
-    if (kind === "authored-commit") {
+    if (kind === "orchestrator-attested") {
+      if (!Object.hasOwn(record, "attestation")) fail("record-outcome-classification", "orchestrator-attested classification requires an attestation");
+      exactKeys(record.attestation, ["schema", "assurance", "briefingSha256", "handbackSha256"], "attestation");
+      if (record.attestation.schema !== ORCHESTRATOR_ATTESTATION_SCHEMA || record.attestation.assurance !== ORCHESTRATOR_ATTESTED_ASSURANCE) fail("record-attestation", "attestation schema or assurance is invalid");
+      if (![record.attestation.briefingSha256, record.attestation.handbackSha256].every((value) => typeof value === "string" && /^[a-f0-9]{64}$/u.test(value))) fail("record-attestation", "attestation digests must be lowercase SHA-256");
+      if (!terminal) fail("record-outcome-classification", "orchestrator-attested record must be terminal");
+      if (Object.hasOwn(record, "criticSkip")) fail("record-critic-disposition", "orchestrator-attested record cannot skip independent review");
+    } else if (Object.hasOwn(record, "attestation")) fail("record-outcome-classification", "attestation is reserved for orchestrator-attested");
+    if (kind === "authored-commit" || kind === "orchestrator-attested") {
       if (Object.hasOwn(RESERVED_NON_AUTHORING_OUTCOMES, record.outcome)) fail("record-outcome-classification", `authored-commit classification must not use reserved outcome ${record.outcome}`);
       if (terminal && (record.commits.length === 0 || record.commits.at(-1) !== record.candidateCommit)) fail("record-commit-binding", "authored-commit terminal record requires candidateCommit as the final commits entry");
     } else if (kind !== "completed-undelivered") {

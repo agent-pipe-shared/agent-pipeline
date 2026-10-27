@@ -1186,6 +1186,108 @@ const cases = [
     assert.equal(legacyResult.queue.slices.find(entry=>entry.id==='ITEM-AC-1').cancelClass,'unclassified');
   })},
 
+  { id: "NGHS40", name: "DR1 an aggregate dispatch-readiness assessment lists every failing probe in input order, not only the first", run: async () => {
+    const { assessDispatchReadiness } = await import("./dispatch-readiness.mjs");
+    const result = assessDispatchReadiness({ probes: [
+      { area: "host-identity", observe: () => ({ ok: true }) },
+      { area: "reservation", observe: () => ({ code: "R-1", nextAction: "release the reservation" }) },
+      { area: "reviewer-admission", observe: () => ({ code: "C-2", nextAction: "run the critic preflight" }) },
+    ] });
+    assert.equal(result.schema, "pipeline.dispatch-readiness.v1");
+    assert.equal(result.status, "blocked");
+    assert.deepEqual(result.blockers, [
+      { area: "reservation", code: "R-1", nextAction: "release the reservation" },
+      { area: "reviewer-admission", code: "C-2", nextAction: "run the critic preflight" },
+    ]);
+  }},
+
+  { id: "NGHS41", name: "DR2 every blocker carries a non-empty nextAction; a probe without one yields DR-NEXT-ACTION-MISSING", run: async () => {
+    const { assessDispatchReadiness } = await import("./dispatch-readiness.mjs");
+    const result = assessDispatchReadiness({ probes: [
+      { area: "a", observe: () => ({ code: "A-1", nextAction: "do a" }) },
+      { area: "b", observe: () => ({ code: "B-1" }) },
+      { area: "c", observe: () => ({ code: "C-1", nextAction: "  " }) },
+    ] });
+    assert.equal(result.blockers.length, 3);
+    for (const blocker of result.blockers) assert.ok(typeof blocker.nextAction === "string" && blocker.nextAction.trim().length > 0, JSON.stringify(blocker));
+    assert.equal(result.blockers[1].code, "DR-NEXT-ACTION-MISSING");
+    assert.equal(result.blockers[2].code, "DR-NEXT-ACTION-MISSING");
+    assert.equal(result.blockers[0].code, "A-1");
+  }},
+
+  { id: "NGHS42", name: "DR3 a throwing probe yields a typed DR-PROBE-THREW blocker, never an exception, and later probes still run", run: async () => {
+    const { assessDispatchReadiness } = await import("./dispatch-readiness.mjs");
+    let result;
+    assert.doesNotThrow(() => { result = assessDispatchReadiness({ probes: [
+      { area: "x", observe: () => { throw new Error("boom"); } },
+      { area: "y", observe: () => ({ code: "Y-1", nextAction: "fix y" }) },
+    ] }); });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.blockers.length, 2);
+    assert.equal(result.blockers[0].area, "x");
+    assert.equal(result.blockers[0].code, "DR-PROBE-THREW");
+    assert.ok(result.blockers[0].nextAction.trim().length > 0);
+    assert.equal(result.blockers[1].code, "Y-1");
+  }},
+
+  { id: "NGHS43", name: "DR4 the assessment is ready only when blockers is empty", run: async () => {
+    const { assessDispatchReadiness } = await import("./dispatch-readiness.mjs");
+    const ready = assessDispatchReadiness({ probes: [{ area: "a", observe: () => ({ ok: true }) }, { area: "b", observe: () => ({ ok: true }) }] });
+    assert.deepEqual(ready, { schema: "pipeline.dispatch-readiness.v1", status: "ready", blockers: [] });
+    assert.equal(assessDispatchReadiness({ probes: [] }).status, "ready");
+    const blocked = assessDispatchReadiness({ probes: [{ area: "a", observe: () => ({ code: "A", nextAction: "n" }) }] });
+    assert.equal(blocked.status, "blocked");
+    assert.ok(blocked.blockers.length > 0);
+  }},
+  { id: "NGHS44", name: "PF-85 1b: every item-delivery refusal names the sanctioned repair: a held-dependency admission refusal and the reservation-publish refusal carry slice-queue.mjs cancel, all five classes and the Dispatch trailer; the owner collision keeps its repair", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
+    const classes=['budget','wrong-premise','review-defect','integrated-elsewhere','superseded'];
+    const namesRepair=(repair,label)=>{
+      assert.equal(typeof repair,'string',`${label}: a non-empty repair is present`);assert.ok(repair.length>0,label);
+      assert.match(repair,/slice-queue\.mjs cancel/u,label);
+      for(const name of classes)assert.ok(repair.includes(name),`${label} names ${name}`);
+      assert.match(repair,/Dispatch: .* \(goldfish\)/u,label);
+    };
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
+    const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
+    controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
+    mkdirSync(join(root,".claude"));mkdirSync(join(root,"specs/unit"),{recursive:true});
+    writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
+    writeFileSync(join(root,".claude/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/plan.md",phase:"implementation"},planApproved:true}));
+    const item=(id,itemId,path,dependsOn=[])=>({id,title:id,state:"ready",dependsOn,writeScope:[path],tier:"implementor",commitMode:"diff-only",loadClass:"light",delivery:{itemId,criteria:["CR-1"],baseCommit:commit}});
+    const queue={schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-A","AC-1","src/change.mjs"),item("ITEM-B","AC-1","src/b.mjs"),item("ITEM-D","AC-2","src/d.mjs",["ITEM-A"])]};
+    writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify(queue));
+    assert.equal(resolveGovernedItemQueue({root}).status,"required");
+    const statePath=join(root,".claude/pipeline-state.json");
+    writeFileSync(statePath,JSON.stringify({...JSON.parse(readFileSync(statePath,"utf8")),continuity:itemContinuity()}));
+    chmodSync(statePath,0o600);
+    const repository=inspectSignedDescriptorCustodyRepository(root);
+    const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,"agent-pipeline/controlled-method-fixtures/item-owner"),sessionId:"item-owner-unit"});
+    const ports=createSessionAuthorityParticipantPorts({repository});
+    for(const row of ports)assert.doesNotThrow(()=>row.port.readBaseline(),row.producerId);
+    assert.equal(initializeSessionAuthorityRegistry({repository},ports).status,"initialized");
+    const launch=(id,path,session)=>{
+      const binding={...makeBinding({dispatchId:id,commit,tree}),allowedPaths:[path]};
+      const input=toolInput("claude",{root,session,toolUseId:`tool-${id}`,binding});
+      input.tool_input.prompt+=`\nSlice: ${id}\nWrite scope: ${path}\n`;
+      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:"claude",input},dependencies));
+    };
+    assert.equal(launch("ITEM-A","src/change.mjs","session-one").ok,true);
+    // Pin: the owner collision already carries a repair (reservationFault).
+    const duplicate=launch("ITEM-B","src/b.mjs","session-two");
+    assert.equal(duplicate.reason,"item-delivery-owner-collision");namesRepair(duplicate.repair,'owner collision');
+    // A successor whose dependency is held is refused at the held-dependency branch (not the readiness branch) with a repair.
+    const successor=launch("ITEM-D","src/d.mjs","session-three");
+    assert.equal(successor.ok,false,JSON.stringify(successor));
+    assert.equal(successor.code,"NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD",JSON.stringify(successor));
+    assert.ok(!String(successor.reason).startsWith("integration readiness"),`reached the held branch: ${successor.reason}`);
+    namesRepair(successor.repair,'held-dependency admission');
+    // The reservation-publish refusal is only reachable on an admission race, so it is pinned at its source and through the one shared text.
+    assert.equal(typeof mod.heldDependencyRepair,"function","heldDependencyRepair is exported");
+    namesRepair(mod.heldDependencyRepair(),'heldDependencyRepair');
+    const source=readFileSync(new URL("./native-goldfish-host-state.mjs",import.meta.url),"utf8");
+    assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
+  })}},
+
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

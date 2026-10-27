@@ -82,7 +82,8 @@ export function parseArchitectureDesign(prd) {
     requireValue(validateAgainstSchema(module, moduleSchema).valid && !module.provisional && !module.candidateBinding
       && /^[a-z][a-z0-9-]*$/u.test(module.id)
       && module.id !== "index" && !ids.has(module.id) && module.responsibility.trim()
-      && module.ownedPaths.length > 0 && module.publicContracts.length > 0 && module.verificationEntryPoints.length > 0,
+      && module.ownedPaths.length > 0 && module.publicContracts.length > 0
+      && (module.verificationEntryPoints.length > 0 || module.kind === "documentation"),
     "ARCHITECTURE-DESIGN-MODULE-INVALID");
     ids.add(module.id);
     module.ownedPaths.forEach((path, pathIndex) => requireField(
@@ -90,6 +91,15 @@ export function parseArchitectureDesign(prd) {
       "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
       "bounded repository-relative path or owned prefix ending in /**", path,
     ));
+    // A documentation module may omit verification entry points only when every owned path is non-executable.
+    if (module.kind === "documentation") {
+      module.ownedPaths.forEach((path, pathIndex) => {
+        const stripped = path.replace(/\/\*\*?$/u, "").replace(/\/$/u, "");
+        requireField(stripped === "docs" || stripped.startsWith("docs/") || /\.(?:md|mdx|txt|rst|adoc)$/u.test(stripped),
+          "ARCHITECTURE-DESIGN-DOC-MODULE-INVALID", `modules[${index}].ownedPaths[${pathIndex}]`,
+          "a documentation module owns only docs/ paths or files ending in .md, .mdx, .txt, .rst or .adoc", path);
+      });
+    }
     for (const key of ["publicContracts", "verificationEntryPoints"]) {
       module[key].forEach((path, pathIndex) => requireField(
         bounded(path), "ARCHITECTURE-DESIGN-PATH-INVALID", `modules[${index}].${key}[${pathIndex}]`,
@@ -106,7 +116,8 @@ export function parseArchitectureDesign(prd) {
     && (model.modules === undefined || Array.isArray(model.modules)), "ARCHITECTURE-DESIGN-FITNESS-MISMATCH");
   const moduleRows = input.modules.map(module => ({ id: module.id,
     ownedPaths: module.ownedPaths, allowedDependencies: module.allowedDependencies,
-    authorityEffects: module.authorityEffects, verificationEntryPoints: module.verificationEntryPoints }));
+    authorityEffects: module.authorityEffects, verificationEntryPoints: module.verificationEntryPoints,
+    ...(module.kind === undefined ? {} : { kind: module.kind }) }));
   if (model.modules !== undefined) {
     requireField(model.modules.length === moduleRows.length, "ARCHITECTURE-DESIGN-FITNESS-MISMATCH",
       "fitnessModel.modules", "omit redundant modules or provide one matching row per declared module", model.modules.length);

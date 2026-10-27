@@ -41,8 +41,22 @@ const REPAIRS = Object.freeze({
   "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
 });
 /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
+const REPAIRS_EXTRA = {};
+Object.assign(REPAIRS_EXTRA, {
+  "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it, commit the manifest, then rerun critic-dispatch-preflight.mjs.",
+  "CCA-DETERMINISTIC-SELECTION": "The delta request names a different set of diagnostic evidence than the one registered. Regenerate the delta request from the currently registered diagnostic evidence paths, then rerun critic-dispatch-preflight.mjs.",
+  "CCA-DELTA-REQUIRED": "A retained review exists, so the next review must be a delta. Prepare and register a delta request for the candidate, then rerun critic-dispatch-preflight.mjs with its path.",
+  "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is a delta. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
+});
+const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
+/** Repair text for a CCA refusal code, an explicit no-route object naming who decides, or null for non-CCA input. */
 export function criticCourseRepair(code) {
-  return typeof code === "string" && Object.hasOwn(REPAIRS, code) ? REPAIRS[code] : null;
+  if (typeof code !== "string") return null;
+  if (Object.hasOwn(REPAIRS, code)) return REPAIRS[code];
+  if (Object.hasOwn(REPAIRS_EXTRA, code)) return REPAIRS_EXTRA[code];
+  if (!code.startsWith("CCA-")) return null;
+  return Object.freeze({ route: "none", decidedBy: PO_DECIDES.has(code) ? "PO" : "Coordinator",
+    reason: `No sanctioned self-service recovery exists for ${code}; the ${PO_DECIDES.has(code) ? "PO" : "Coordinator"} decides how the course proceeds.` });
 }
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
@@ -480,12 +494,30 @@ function runtimeSource(input,resolved){const root=resolved.resolvedRepository.re
  if(parent && parent.candidate.commit!==input.baseCommit){if(parent.candidate.commit!==input.candidateCommit)fail('CCA-PARENT');}
  const correction=[],evidence=[];for(const oid of commits)(evidenceCommitV2(root,oid,id)?evidence:correction).push(oid);
  return {manifestSha256:manifestAt(root,input.registrationCommit,`specs/${id}/lifecycle.json`).sha256,historySha256:sha256Canonical(history.map(r=>r.record)),candidate:{base:input.baseCommit,commit:input.candidateCommit,tree},rangeCommits:commits,correctionCommits:correction,evidenceOnlyCommits:evidence,changedPaths:changed};}
-function deterministic(root,commit,featureId,candidate,paths=null){const m=manifestAt(root,commit,`specs/${featureId}/lifecycle.json`).value,entries=[];
+function deterministic(root,commit,featureId,candidate,paths=null){const m=manifestAt(root,commit,`specs/${featureId}/lifecycle.json`).value,entries=[],carry=[];
  for(const artifact of m.artifacts.filter(goodEvidence)){if(paths && !paths.includes(artifact.path))continue;const r=registeredArtifact(root,commit,featureId,artifact.path);let value;try{value=JSON.parse(r.blob.bytes);}catch{continue;}
-  if(value?.schema!=='pipeline.critic-diagnostic-evidence.v1'||!equal(value.candidate,{commit:candidate.commit,tree:candidate.tree}))continue;
-  const observation=validateCriticDiagnostic(value,{root,candidate:{commit:candidate.commit,tree:candidate.tree},readArtifact:path=>{const read=registeredArtifact(root,commit,featureId,path);return read.blob.bytes;}});
+  if(value?.schema!=='pipeline.critic-diagnostic-evidence.v1')continue;
+  let bound={commit:candidate.commit,tree:candidate.tree};
+  if(!equal(value.candidate,bound)){
+   // D51: evidence bound to an ancestor commit is carried only across a registered evidence-only range.
+   const proof=object(value.candidate)?carryProof(root,commit,featureId,value.candidate.commit,value.candidate.tree,candidate):null;
+   if(!proof)continue;
+   bound={commit:value.candidate.commit,tree:value.candidate.tree};carry.push({path:artifact.path,proofSha256:sha256Canonical(proof)});}
+  const observation=validateCriticDiagnostic(value,{root,candidate:bound,readArtifact:path=>{const read=registeredArtifact(root,commit,featureId,path);return read.blob.bytes;}});
   if(observation.targeted.status!=='passed')fail('CCA-DETERMINISTIC-FAILED');entries.push({path:artifact.path,sha256:artifact.sha256});}
- entries.sort((a,b)=>a.path.localeCompare(b.path));if(!entries.length)unavailable('CCA-DETERMINISTIC-UNAVAILABLE');if(paths && (!exactSet(paths,entries.map(e=>e.path))))fail('CCA-DETERMINISTIC-SELECTION');return {entries,sha256:sha256Canonical(entries),candidate:{commit:candidate.commit,tree:candidate.tree}};}
+ entries.sort((a,b)=>a.path.localeCompare(b.path));carry.sort((a,b)=>a.path.localeCompare(b.path));if(!entries.length)unavailable('CCA-DETERMINISTIC-UNAVAILABLE');if(paths && (!exactSet(paths,entries.map(e=>e.path))))fail('CCA-DETERMINISTIC-SELECTION');return {entries,carry,sha256:sha256Canonical(carry.length?{entries,carry}:entries),candidate:{commit:candidate.commit,tree:candidate.tree}};}
+// D51: A..B must be a bounded linear range of registered evidence-only commits; the non-evidence tree is then identical by construction and re-checked by path.
+function carryProof(root,commit,featureId,from,fromTree,to){
+ try{
+  if(typeof from!=='string'||!OID.test(from)||typeof fromTree!=='string'||from===to.commit)return null;
+  if(gitBytes(root,['rev-parse',`${from}^{tree}`],'CCA-RANGE-TREE').toString('utf8').trim()!==fromTree)return null;
+  const commits=range(root,from,to.commit);
+  if(!commits.length||!commits.every(oid=>evidenceCommitV2(root,oid,featureId)))return null;
+  const manifestPath=`specs/${featureId}/lifecycle.json`,registered=new Set(manifestAt(root,commit,manifestPath).value.artifacts.filter(goodEvidence).map(e=>e.path));
+  const changed=gitBytes(root,['diff','--name-only','-z',from,to.commit,'--'],'CCA-RANGE-READ').toString('utf8').split('\0').filter(Boolean);
+  if(!changed.every(p=>p===manifestPath||registered.has(p)))return null;
+  return {schema:'pipeline.critic-diagnostic-evidence-carry.v1',from,fromTree,to:to.commit,toTree:to.tree,rangeCommits:commits};
+ }catch{return null;}}
 function parentProjection(row){return row?{reviewId:row.record.reviewId,recordSha256:row.record.recordSha256,packetId:row.record.request.packetId,receiptSha256:row.consumed.receiptSha256}:null;}
 function requestRead(input,resolved,history,source,evidence){const id=resolved.courseIdentity.originalFeatureId;
  const registered=registeredArtifact(resolved.resolvedRepository.repoRoot,input.registrationCommit,id,input.deltaRequestPath);

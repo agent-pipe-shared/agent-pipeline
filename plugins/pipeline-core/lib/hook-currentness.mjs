@@ -86,7 +86,7 @@ async function snapshotIsStale() {
     const { assessHookCurrentness } = await import(toFileUrl(resolvePath(PLUGIN_LIB_DIR, "hook-currentness.mjs")).href);
     if (assessHookCurrentness({ recordedPluginLibDir: PLUGIN_LIB_DIR, pluginLibDir: SOURCE_PLUGIN_LIB_DIR }).current === true) return false;
   } catch { /* an unassessable comparison against an existing source is stale */ }
-  block(["HOOK-SNAPSHOT-STALE: this hook's runtime snapshot no longer matches the loaded plugin; refresh it with: " + SNAPSHOT_REFRESH_COMMAND]);
+  block(["HOOK-SNAPSHOT-STALE: this hook's runtime snapshot no longer matches the loaded plugin; refresh it with: " + SNAPSHOT_REFRESH_COMMAND + " (bypassing this hook, e.g. git commit --no-verify, is forbidden: refresh it, never bypass it)"]);
   return true;
 }
 `;

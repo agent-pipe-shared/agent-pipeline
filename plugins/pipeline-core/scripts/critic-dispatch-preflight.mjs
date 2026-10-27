@@ -17,12 +17,11 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { parseYaml } from "../lib/yaml-lite.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import {
-  CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
-  deriveCriticPacketGovernance,
-} from "../lib/critic-packet-governance.mjs";
+  CriticGuardrailDerivationError,
+  deriveRequiredCriticGuardrails,
+} from "../lib/critic-required-guardrails.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   RequirementTraceabilityError,
@@ -165,20 +164,6 @@ function resolveBase(root, base) {
   fail("CDP-GIT", "Git observation failed for rev-parse.");
 }
 
-function candidateInventory(root, candidate) {
-  const rows = git(root, ["ls-tree", "-r", "-z", candidate]);
-  const files = [];
-  for (const row of rows.split("\0")) {
-    if (!row) continue;
-    const match = row.match(/^(\d{6}) (blob) ([a-f0-9]+)\t(.+)$/s);
-    if (!match || !OID.test(match[3])) fail("CDP-TREE", "Candidate tree inventory is malformed.");
-    files.push({ path: normalizePath(match[4], "candidate path"), blobOid: match[3], readable: match[1] !== "120000" });
-  }
-  files.sort((left, right) => compare(left.path, right.path));
-  if (new Set(files.map(({ path }) => path)).size !== files.length) fail("CDP-TREE", "Candidate tree contains duplicate paths.");
-  return files;
-}
-
 function candidateText(root, candidate, path) {
   const result = spawnSync("git", ["-C", root, "show", `${candidate}:${path}`], {
     encoding: "utf8",
@@ -248,7 +233,12 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path, 
     else fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`);
   } catch (error) {
     if (error instanceof CriticDispatchPreflightError) throw error;
-    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode: error.code ?? "CDI-INVALID" });
+    const diagnosticCode = error.code ?? "CDI-INVALID";
+    if (diagnosticCode === "CDI-GUARDRAILS") {
+      const requiredGuardrailPaths = guardrails.map((entry) => entry.path);
+      fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths });
+    }
+    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode });
   }
   return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree }, diagnostic };
 }
@@ -297,49 +287,47 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
 
-  stage = "inventory";
-  const files = candidateInventory(realRoot, candidateCommit);
-  const byPath = new Map(files.map((file) => [file.path, file]));
-  stage = "manifest";
-  const manifestFile = byPath.get(".claude/pipeline.yaml");
-  if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
-  let manifest;
-  try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
-  catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
-  stage = "governance";
-  const changedPaths = scope === null
-    ? git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
-      .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare)
-    : scope.paths;
-  const governance = deriveCriticPacketGovernance({
-    schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
-    manifest,
-    candidateFiles: files,
-    changedPaths,
-  });
-  const governancePaths = governance.required.map(({ path }) => path);
+  // The required-guardrail derivation lives in one shared module; the
+  // requirement-map evaluation stays here and runs inside it, after governance.
   let requirementTraceability;
+  let derived;
   try {
-    requirementTraceability = evaluateRequirementTraceability({
-      specPath: spec,
-      candidate: { commit: candidateCommit, tree: candidateTree },
-      candidateFiles: byPath,
-      readCandidateFile: (path) => candidateBytes(realRoot, candidateCommit, path),
+    derived = deriveRequiredCriticGuardrails({
+      root: realRoot,
+      candidate: candidateCommit,
+      base: baseCommit ?? baseTree,
+      changedPaths: scope === null ? null : scope.paths,
+      explicitGuardrails: guardrails,
+      onStage: (next) => { stage = next; },
+      requirementPaths: ({ byPath }) => {
+        try {
+          requirementTraceability = evaluateRequirementTraceability({
+            specPath: spec,
+            candidate: { commit: candidateCommit, tree: candidateTree },
+            candidateFiles: byPath,
+            readCandidateFile: (path) => candidateBytes(realRoot, candidateCommit, path),
+          });
+        } catch (error) {
+          if (error instanceof RequirementTraceabilityError) {
+            fail("CDP-REQUIREMENT-MAP", `${error.code}: ${error.message}`);
+          }
+          throw error;
+        }
+        if (requirementTraceability.missingCriteria.length > 0) {
+          const names = requirementTraceability.missingCriteria.map(({ id }) => id).join(", ");
+          fail("CDP-REQUIREMENT-ABSENT", `Candidate is missing named requirements: ${names}`, {
+            missingCriteria: requirementTraceability.missingCriteria,
+          });
+        }
+        return requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
+      },
     });
   } catch (error) {
-    if (error instanceof RequirementTraceabilityError) {
-      fail("CDP-REQUIREMENT-MAP", `${error.code}: ${error.message}`);
-    }
+    if (error instanceof CriticGuardrailDerivationError) fail(error.code, error.message);
     throw error;
   }
-  if (requirementTraceability.missingCriteria.length > 0) {
-    const names = requirementTraceability.missingCriteria.map(({ id }) => id).join(", ");
-    fail("CDP-REQUIREMENT-ABSENT", `Candidate is missing named requirements: ${names}`, {
-      missingCriteria: requirementTraceability.missingCriteria,
-    });
-  }
-  const requirementPaths = requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
-  const allGuardrails = [...new Set([...guardrails, ...governancePaths, ...requirementPaths])].sort(compare);
+  const { byPath, governance } = derived;
+  const allGuardrails = derived.paths;
   stage = "candidate-files";
   const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
   sourceSpecSha256 = specReadback.sha256;

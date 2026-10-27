@@ -770,6 +770,14 @@ const EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES = 1_048_576;
 const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
 const FINAL_INTEGRATION_MAX_BYTES = 8_192;
 const POST_RESULT_SENTINEL = "$POST_RESULT_SHA256";
+// D165 D4: brownfield architecture hurdles submit-plan refuses before the PO signs.
+const SUBMIT_PLAN_BROWNFIELD_ARCHITECTURE_CODES = new Set([
+  "ARCHITECTURE-MAP-MISSING", "ARCHITECTURE-MAP-INVALID", "ARCHITECTURE-FITNESS-MODEL-INVALID",
+  "ARCHITECTURE-BASELINE-INVALID", "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED",
+  "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED", "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING",
+  "ARCHITECTURE-CHECKPOINT-DEBT-OPEN", "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE",
+  "ARCHITECTURE-FITNESS-NOT-READY",
+]);
 const NEXT_TRANSITION_KEYS = new Set(["queueHead", "blocker", "resume", "recovery", "decisionTxn", "capacity"]);
 const RESULT_BINDING_KEYS = new Set(["path", "preResultSha256"]);
 const FINAL_ENTRY_KEYS = new Set([
@@ -11302,11 +11310,32 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: submit-plan blocked by ${framingRefusal.code}: the PRD at ${framingRefusal.planPath} still contains its own unmodified framing placeholder text ("${framingRefusal.marker}"). Author the framing section before submitting.`);
         return 2;
       }
+      let submitDesignDraft = null;
       if (["epic", "feature"].includes(profileName)) {
         const designDraft = inspectArchitectureDesignDraft({ rootDir: dir,
           planPath: authority.value.planPath, expectedPlanSha256: authority.value.planSha256 });
         if (!designDraft.ok) {
           console.error(`Error: submit-plan blocked by ${designDraft.code}; complete the exact draft architecture design before submission. No submission or signature request was recorded.`);
+          return 2;
+        }
+        submitDesignDraft = designDraft;
+      }
+      // D165 D4: when no design package applies, a brownfield architecture hurdle
+      // (missing map, open debt, adoption, ...) would only surface at set-phase
+      // implementation, after the PO signed. Refuse it here, before any State write.
+      if (!(submitDesignDraft?.ok && submitDesignDraft.required === true)) {
+        const submitArchitecture = (deps.architectureEntryReadiness ?? inspectArchitectureEntryReadiness)({
+          rootDir: dir,
+          taskScope: authority.value.planPath,
+          now: new Date(now()),
+          deps: { inspectArchitectureDesign: (root, scope) => inspectArchitectureDesign(root, scope, {
+            gitCandidate: deps.gitCandidate,
+            trustedAdvisorExecutablePath: deps.trustedAdvisorExecutablePath,
+            verifyReadinessExecution: deps.verifyDesignReadinessHostExecution,
+          }) },
+        });
+        if (submitArchitecture.status !== "ready" && SUBMIT_PLAN_BROWNFIELD_ARCHITECTURE_CODES.has(submitArchitecture.code)) {
+          console.error(`Error: submit-plan blocked by ${submitArchitecture.code}; ${submitArchitecture.message}. Next action: ${JSON.stringify(submitArchitecture.nextAction)}. No submission or signature request was recorded.`);
           return 2;
         }
       }

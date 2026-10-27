@@ -51,6 +51,9 @@ const SUBDIRS = ["agent-pipeline", "run", "native-goldfish-host-commit"];
 function fail(code) { return { ok: false, code }; }
 // Names each held dependency with the cause that actually holds it (Critic F1): only a deliverable,
 // non-cancelled slice can be released by a "Dispatch: <slice> (goldfish)" commit.
+export function heldDependencyRepair() {
+  return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
+}
 export function heldDependencyReason(held, slices) {
   const why = id => {
     const row = slices.find(entry => entry.id === id);
@@ -215,7 +218,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
     if(item.dependsOn.length>0){const readiness=observeGovernedItemIntegrationReadiness({root:root??input.cwd??process.cwd()});
       if(readiness.status!=='observed')return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:`integration readiness ${readiness.status} (${readiness.code}): ${String(readiness.reason??'').slice(0,120)}`};
       const held=item.dependsOn.filter(id=>!readiness.integrated.includes(id));
-      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices)};}
+      if(held.length>0)return {...fail('NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD'),reason:heldDependencyReason(held,deliveryQueue.normalized.slices),repair:heldDependencyRepair()};}
     if (item.delivery.baseCommit !== binding.candidateCommit) return fail("NGHS-ITEM-BASE-MISMATCH");
     // Native adapters currently carry literal file paths. A glob/prefix queue
     // requires a separately admitted concrete path amendment; do not guess it.
@@ -749,7 +752,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
       const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
       const integratedIds=new Set([...integration.integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))]);
       const heldIds=item.dependsOn.filter(id=>!integratedIds.has(id));
-      if(heldIds.length)throw nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`);
+      if(heldIds.length)throw Object.assign(nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`),{repair:heldDependencyRepair()});
       const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
       const agyPort=createAgyFamilyDispatchAuthorityProducerPort({repository});
       const agyProducer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:agyPort});
@@ -1100,7 +1103,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const readiness=dependsOn.length?observeGovernedItemIntegrationReadiness({root:physical}):null;
       const held=readiness?.status==='observed'?dependsOn.filter(id=>!readiness.integrated.includes(id)):[];
       if(held.length>0)return {status:'refused',code:'NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD',reason:`${heldDependencyReason(held,raw.slices)}; the queue was not written`,
-        repair:`a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`};
+        repair:heldDependencyRepair()};
       // Approval, requester, candidate and preimage are checked again immediately
       // before publishing a fresh inode. Existing linked bytes remain unchanged.
       const after=observeCurrentPlanApprovalForCalibration({rootDir:physical});

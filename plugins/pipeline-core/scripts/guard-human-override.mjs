@@ -97,7 +97,14 @@ function externalJson(repoRoot, path, platform = process.platform) {
   const rel = platform === "win32" ? relRaw.split("\\").join("/") : relRaw;
   const outside = rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
   if (!outside) throw new Error("--proof must be supplied outside the repository");
-  return JSON.parse(readFileSync(source, "utf8"));
+  try {
+    return JSON.parse(readFileSync(source, "utf8"));
+  } catch (error) {
+    // The agent runs this right after handing the operator the one signing command; a missing file means
+    // that command has not completed yet, which is a different state from a malformed proof.
+    if (error?.code === "ENOENT") throw new Error("--proof file does not exist yet: the signing command has not written it (nothing was authorized)");
+    throw error;
+  }
 }
 
 function flags(argv) {
@@ -157,6 +164,22 @@ function ceremonyReadinessBlock(report) {
     }
   }
   return { blockedBy, repairs };
+}
+
+/**
+ * The directory `sign-intent` will write its proof into, resolved by the same resolver the signing command uses
+ * (explicit flag is not available here; environment, machine plane, legacy repository value). Absolute or null; never throws.
+ */
+async function observeProofDirectory(rest) {
+  try {
+    const parsed = flags(rest);
+    if (!parsed || typeof parsed.repo !== "string") return null;
+    const { resolvePoKeyDirectory } = await import("./po-human-approval.mjs");
+    const resolution = resolvePoKeyDirectory({ repoRoot: parsed.repo });
+    return resolution.status === "resolved" && typeof resolution.directory === "string" && resolve(resolution.directory) === resolution.directory ? resolution.directory : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The process-entry observation of the environment readiness report for one repository; never throws. */
@@ -483,21 +506,19 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         scriptPath: SCRIPT,
         humanApprovalScriptPath: PO_HUMAN_APPROVAL_SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
+        proofDirectory: typeof options.proofDirectory === "string" ? options.proofDirectory : null,
       });
       const output = hasReadiness ? { ...prepared, environmentReadiness: readiness } : prepared;
       const signIntent = copySafeActionText(
         "sign-intent",
         prepared.signIntentCommand,
       );
-      const authorizeBySignature = copySafeActionText(
-        "authorize-by-signature",
-        prepared.authorizeBySignatureCommand,
-        ["<external-proof.json>"],
-      );
-      // With the report attached the document is one compact line (the shape the readiness
-      // report is carried in at every entry point); without it, the existing pretty form.
+      // PO decision 2026-10-27: the operator-facing channel carries exactly ONE command. The import
+      // (`authorizeBySignatureCommand`, with the full proof path) is an agent action in the JSON
+      // channel only; the proof path is never printed into the operator block, whose lines stay
+      // within the copy-safe bound no matter how long the key directory path is.
       write(hasReadiness ? `${JSON.stringify(output)}\n` : `${JSON.stringify(output, null, 2)}\n`);
-      writeError(`${signIntent}\n\n${authorizeBySignature}\n`);
+      writeError(`${signIntent}\n\nThis is the only command you run.\nThe agent imports the signed proof itself.\n`);
       return 0;
     }
     if (command === "refreeze-plan") {
@@ -604,7 +625,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
 /** Process entry: `prepare-for-signature` carries the environment readiness report; every other command is unchanged. */
 async function runCli(argv = process.argv.slice(2)) {
   const options = argv[0] === "prepare-for-signature"
-    ? { environmentReadiness: await observeEnvironmentReadiness(argv.slice(1)) }
+    ? { environmentReadiness: await observeEnvironmentReadiness(argv.slice(1)), proofDirectory: await observeProofDirectory(argv.slice(1)) }
     : {};
   return main(argv, {}, options);
 }

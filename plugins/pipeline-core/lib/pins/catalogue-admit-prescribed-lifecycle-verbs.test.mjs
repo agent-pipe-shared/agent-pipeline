@@ -79,7 +79,9 @@ function fixture(profile = "feature") {
     gitHead: () => ({ ok: true, commit: candidate.commit }),
     gitUserName: () => "Fixture", poGateProfile: () => ({ ok: true, value: evidence }),
     poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: sources.prd.sha256, specPath, specSha256: sources.spec.sha256 } }),
-    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex" };
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex",
+    // D165-S4: submit-plan consults architecture readiness; this fixture has no architecture map, so it supplies a ready stub.
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }) };
   const submitted = fixtureCapture(() => run(["submit-plan", "--by", "coordinator", "--profile", profile], deps));
   assert.equal(submitted.code, 0, submitted.stderr);
   const state = JSON.parse(readFileSync(statePath(root), "utf8"));
@@ -554,5 +556,36 @@ test("D64 model-role bootstrap admits a host session and is a decision, not an a
     // model-role-bootstrap.mjs ADMITS the session's role receipt into the host store after readback; whether the
     // guard may pre-admit that write for the agent is a product decision (see the D64 report), so it is pinned refused.
     bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex"), f, "bootstrap");
+  });
+});
+
+// ---- D41 follow-up: a sole `--help` lets an agent read the feature package registrar's evidence route ----
+test("D41 feature-package registrar: a sole --help is admitted by the catalogue and the real guard", () => {
+  withFixture("feature", f => {
+    bothAdmit(scriptAction(registerScript, "--help"), f, "sole --help");
+  });
+});
+
+test("D41 feature-package registrar: --help combined with anything else stays refused", () => {
+  withFixture("feature", f => {
+    for (const [label, argv] of [["help with a second argument", ["--help", "--add-review-unit"]],
+      ["help with a root value", ["--help", f.root]], ["help after the root flag", ["--root", "--help"]],
+      ["help after the root", ["--root", f.root, "--help"]], ["help twice", ["--help", "--help"]],
+      ["short help", ["-h"]], ["bare help word", ["help"]], ["another flag alone", ["--add-review-unit"]],
+      ["help with a diagnostic path", ["--help", "--add-diagnostic-evidence", "specs/feature/evidence/d.json"]]]) {
+      bothRefuse(scriptAction(registerScript, ...argv), f, label);
+    }
+  });
+});
+
+test("D41 feature-package registrar: the existing admitted shapes and path refusals are unchanged", () => {
+  withFixture("feature", f => {
+    bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "clean relative path");
+    for (const [label, path] of [["dash", "--force"], ["absolute", join(f.root, "d.json")], ["drive letter", "C:x.json"],
+      ["backslash", "specs\\d.json"], ["dot-dot", "specs/../x.json"]]) {
+      bothRefuse(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", path), f, path === "--force" ? label : label);
+    }
   });
 });

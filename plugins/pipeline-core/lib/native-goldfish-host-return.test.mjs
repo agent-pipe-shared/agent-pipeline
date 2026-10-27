@@ -94,6 +94,23 @@ const cases = [
     for (const path of ["src/change.test.ts", "src/change.js", "src/change.test.json"])
       assert.equal(validateItemDeliveryBriefing(briefing(path)).code, "NGHR-ITEM-DELIVERY-SHAPE", path);
   }],
+  ["NGHR07 D31: a checkpoint return validates only where the caller allows it, with the same binding rules", () => {
+    const checkpointText = JSON.stringify({ ...final, outcome: "checkpoint", report: "Budget stop; continuation card follows." });
+    const admitted = validateNativeGoldfishFinal(checkpointText, { binding, allowCheckpoint: true });
+    assert.equal(admitted.ok, true, admitted.code);
+    assert.equal(admitted.final.outcome, "checkpoint");
+    assert.equal(admitted.final.reportSha256, SHA("Budget stop; continuation card follows."));
+    // The default route (foreground PostToolUse, Codex) still admits only a success.
+    assert.equal(validateNativeGoldfishFinal(checkpointText, { binding }).code, "NGHR-FINAL-SHAPE");
+    // Every other field is bound exactly as for a success.
+    for (const change of [{ dispatchId: "OTHER" }, { candidateCommit: "d".repeat(40) }, { changedPaths: ["outside.txt"] }, { extra: true }])
+      assert.equal(validateNativeGoldfishFinal(JSON.stringify({ ...JSON.parse(checkpointText), ...change }), { binding, allowCheckpoint: true }).ok, false);
+  }],
+  ["NGHR08 D31: an unknown outcome is refused with the same code even where checkpoints are allowed", () => {
+    for (const outcome of ["blocked", "failed", "Checkpoint", ""])
+      assert.equal(validateNativeGoldfishFinal(JSON.stringify({ ...final, outcome }), { binding, allowCheckpoint: true }).code, "NGHR-FINAL-SHAPE", outcome);
+    assert.equal(validateNativeGoldfishFinal(finalText, { binding, allowCheckpoint: true }).final.outcome, "succeeded");
+  }],
 
 ];
 

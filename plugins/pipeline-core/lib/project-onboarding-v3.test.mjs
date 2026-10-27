@@ -163,7 +163,7 @@ process.once("exit", () => rmSync(testRuntimeBin, { recursive: true, force: true
 // direct parent retains custody of all case completions.
 const SHARD_COUNT = 6;
 const CHUNK_COUNT = 2;
-const EXPECTED_CASE_COUNT = 216;
+const EXPECTED_CASE_COUNT = 228;
 const CASES_PER_CHILD = EXPECTED_CASE_COUNT / (SHARD_COUNT * CHUNK_COUNT);
 // Bound each independent chunk without truncating slower Git fixtures. Sized from a measured
 // native-Windows run of all 216 cases with no deadline (2026-10-05, working tree and HEAD): the
@@ -2807,7 +2807,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
@@ -7508,7 +7508,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.deepEqual(
       plan.targets.map((target) => target.path),
       [
-        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+        "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
         "project/pipeline.json", "project/pipeline.yaml",
       ],
       "fresh onboarding seeds the canonical project authority, the ignore rules for the paths it writes into, and the docs/adr decision-record hint and template (D80); runtime targets are initialized later",
@@ -7674,7 +7674,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.runnerPermissions, inspected.runnerPermissions);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
+      "architecture/map/index.md", "architecture/map/inventory.json", "AGENTS.md", ".gitattributes", ".gitignore", "docs/adr/README.txt", "docs/adr/templates/adr-template.md", "pipeline.user.yaml", "project/consumer-verify.mjs", "project/critical-human-proof.json",
       "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
@@ -10448,6 +10448,159 @@ test("F4 portable rollback preserves foreign content when a created target's ino
   } finally { dispose(ownedRoot); }
 });
 
+// D47 (PO decision 2026-10-27): digest-bound evidence bytes must survive a checkout with
+// core.autocrlf=true. Onboarding seeds line-ending attributes for the evidence paths into a
+// project that owns no .gitattributes, and only ASKS (mutation:false) for a project that does.
+const D47_ATTRIBUTE_LINES = ["specs/**/evidence/** text eol=lf", "evidence/** text eol=lf"];
+const D47_ATTRIBUTE_SEED = `${D47_ATTRIBUTE_LINES.join("\n")}\n`;
+const d47Apply = (path) => applyProjectOnboardingV3(
+  planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }),
+  { rootDir: path, activate: true, deps: fakeDeps },
+);
+
+test("D47-GA-1 a fresh onboarding seeds .gitattributes with exactly the evidence line-ending lines, and git agrees", () => {
+  const fresh = root();
+  try {
+    hostGit(fresh, ["init", "--initial-branch=main"]);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: fresh, deps: fakeDeps });
+    assert.equal(plan.targets.some((target) => target.path === ".gitattributes"), true, "a project without .gitattributes gets a seed target");
+    const applied = applyProjectOnboardingV3(plan, { rootDir: fresh, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(readFileSync(join(fresh, ".gitattributes"), "utf8"), D47_ATTRIBUTE_SEED, "exactly the attribute lines and nothing else");
+    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectAttributesGapAction"), false, "a fresh seed needs no ask");
+    const attr = (candidate) => spawnSync("git", ["check-attr", "text", "eol", "--", candidate], { cwd: fresh, encoding: "utf8" }).stdout;
+    for (const candidate of ["specs/f1/evidence/a.log", "specs/f1/evidence/sub/b.json", "evidence/c.log"]) {
+      assert.match(attr(candidate), /text: set/u, `git must set text for ${candidate}`);
+      assert.match(attr(candidate), /eol: lf/u, `git must set eol=lf for ${candidate}`);
+    }
+    assert.match(attr("src/app.js"), /text: unspecified/u, "unrelated paths stay untouched");
+  } finally { dispose(fresh); }
+});
+
+test("D47-GA-2 a root holding only the seeded .gitattributes is planned without rewriting it: no target, no duplicate lines, bytes unchanged", () => {
+  const fresh = root();
+  try {
+    writeFileSync(join(fresh, ".gitattributes"), D47_ATTRIBUTE_SEED);
+    const applied = d47Apply(fresh);
+    assert.equal(applied.status, "applied");
+    const after = readFileSync(join(fresh, ".gitattributes"), "utf8");
+    assert.equal(after, D47_ATTRIBUTE_SEED);
+    assert.equal(after.split("\n").filter((line) => line === D47_ATTRIBUTE_LINES[0]).length, 1);
+    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectAttributesGapAction"), false);
+  } finally { dispose(fresh); }
+});
+
+test("D47-GA-6 an empty owned .gitattributes is asked for both exact lines and stays empty", () => {
+  const owned = root();
+  try {
+    writeFileSync(join(owned, ".gitattributes"), "");
+    const applied = d47Apply(owned);
+    for (const line of D47_ATTRIBUTE_LINES) assert.ok(applied.projectAttributesGapAction.guidance.includes(line));
+    assert.equal(readFileSync(join(owned, ".gitattributes"), "utf8"), "");
+  } finally { dispose(owned); }
+});
+
+test("D47-GA-7 the plan target for a fresh root is kind project-attributes and sorts before .gitignore", () => {
+  const fresh = root();
+  try {
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: fresh, deps: fakeDeps });
+    const paths = plan.targets.map((target) => target.path);
+    assert.ok(paths.indexOf(".gitattributes") >= 0 && paths.indexOf(".gitattributes") < paths.indexOf(".gitignore"));
+    assert.equal(plan.targets.find((target) => target.path === ".gitattributes").kind, "project-attributes");
+  } finally { dispose(fresh); }
+});
+
+test("D47-GA-8 surrounding whitespace on an owned line still counts as present", () => {
+  const owned = root();
+  try {
+    writeFileSync(join(owned, ".gitattributes"), `  ${D47_ATTRIBUTE_LINES[0]}  \n\t${D47_ATTRIBUTE_LINES[1]}\n`);
+    assert.equal(Object.prototype.hasOwnProperty.call(d47Apply(owned), "projectAttributesGapAction"), false);
+  } finally { dispose(owned); }
+});
+
+test("D47-GA-9 the ask is an acknowledgment input named projectAttributesGapAcknowledged", () => {
+  const owned = root();
+  try {
+    writeFileSync(join(owned, ".gitattributes"), "* text=auto\n");
+    const ask = d47Apply(owned).projectAttributesGapAction;
+    assert.equal(ask.input.name, "projectAttributesGapAcknowledged");
+    assert.equal(ask.requiresConfirmation, false);
+  } finally { dispose(owned); }
+});
+
+test("D47-GA-10 an owned .gitattributes does not stop .gitignore from being seeded", () => {
+  const owned = root();
+  try {
+    writeFileSync(join(owned, ".gitattributes"), "* text=auto\n");
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: owned, deps: fakeDeps });
+    assert.equal(plan.targets.some((target) => target.path === ".gitattributes"), false);
+    assert.equal(plan.targets.some((target) => target.path === ".gitignore"), true);
+  } finally { dispose(owned); }
+});
+
+test("D47-GA-11 a fresh apply seeds both .gitattributes and .gitignore and neither appears as an ask", () => {
+  const fresh = root();
+  try {
+    const applied = d47Apply(fresh);
+    assert.equal(existsSync(join(fresh, ".gitattributes")), true);
+    assert.equal(existsSync(join(fresh, ".gitignore")), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectAttributesGapAction"), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectIgnoreGapAction"), false);
+  } finally { dispose(fresh); }
+});
+
+test("D47-GA-12 a line with different inner spacing is not the exact line and is asked for", () => {
+  const owned = root();
+  try {
+    writeFileSync(join(owned, ".gitattributes"), "evidence/**  text eol=lf\nspecs/**/evidence/** text  eol=lf\n");
+    const ask = d47Apply(owned).projectAttributesGapAction;
+    for (const line of D47_ATTRIBUTE_LINES) assert.ok(ask.guidance.includes(line));
+  } finally { dispose(owned); }
+});
+
+test("D47-GA-3 an owned .gitattributes that already carries the lines gets no ask and stays byte-identical", () => {
+  const complete = root();
+  try {
+    const bytes = `* text=auto\n${D47_ATTRIBUTE_LINES[1]}\n*.sh text eol=lf\n${D47_ATTRIBUTE_LINES[0]}\n`;
+    writeFileSync(join(complete, ".gitattributes"), bytes);
+    const applied = d47Apply(complete);
+    assert.equal(applied.status, "applied");
+    assert.equal(Object.prototype.hasOwnProperty.call(applied, "projectAttributesGapAction"), false);
+    assert.equal(readFileSync(join(complete, ".gitattributes"), "utf8"), bytes);
+  } finally { dispose(complete); }
+});
+
+test("D47-GA-4 an owned .gitattributes that lacks the lines gets a mutation:false ask naming the exact lines, bytes untouched", () => {
+  const owned = root();
+  try {
+    const bytes = "* text=auto\n";
+    writeFileSync(join(owned, ".gitattributes"), bytes);
+    const applied = d47Apply(owned);
+    assert.equal(applied.status, "applied");
+    const ask = applied.projectAttributesGapAction;
+    assert.equal(ask.kind, "collect-input");
+    assert.equal(ask.mutation, false);
+    for (const line of D47_ATTRIBUTE_LINES) assert.ok(ask.guidance.includes(line), `the ask names ${line}`);
+    assert.equal(readFileSync(join(owned, ".gitattributes"), "utf8"), bytes, "the ask never mutates the file it asks about");
+  } finally { dispose(owned); }
+});
+
+test("D47-GA-5 an owned .gitattributes with other content is never rewritten, and a partial file is asked for only the missing line", () => {
+  const owned = root();
+  try {
+    const bytes = `*.sh text eol=lf\r\n${D47_ATTRIBUTE_LINES[1]}\r\n`;
+    writeFileSync(join(owned, ".gitattributes"), bytes);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: owned, deps: fakeDeps });
+    assert.equal(plan.targets.some((target) => target.path === ".gitattributes"), false, "an owned file is never a target");
+    const applied = applyProjectOnboardingV3(plan, { rootDir: owned, activate: true, deps: fakeDeps });
+    assert.equal(readFileSync(join(owned, ".gitattributes"), "utf8"), bytes, "byte-identical, CRLF included");
+    const ask = applied.projectAttributesGapAction;
+    assert.ok(ask.guidance.includes(D47_ATTRIBUTE_LINES[0]));
+    // line [1] is a suffix of line [0], so look for it as a standalone token only
+    assert.doesNotMatch(ask.guidance, /(?<![\w/*])evidence\/\*\* text eol=lf/u, "the line already present is not asked for again");
+  } finally { dispose(owned); }
+});
+
 export const FRESH_ENROLLMENT_REGRESSION_CASES = [
   {id:"FRB001",name:"fresh public portable apply in empty and existing Git roots creates no retirement",run:()=>{
     for(const initialized of [false,true]){const path=root();try{
@@ -10533,7 +10686,7 @@ for(const entry of FRESH_ENROLLMENT_REGRESSION_CASES)if(entry.standalone!==true)
 Object.freeze(ONBOARDING_TEST_CASES);
 export const ONBOARDING_CASE_IDS = Object.freeze(ONBOARDING_TEST_CASES.map((entry) => entry.id).sort());
 if (DIRECT_INVOCATION) {
-  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 216 stable callbacks");
+  assert.equal(declared, EXPECTED_CASE_COUNT, "the suite must declare all 228 stable callbacks");
   if (shard !== null) assert.equal(assignedCases.length, CASES_PER_CHILD, "each child must execute 18 callbacks");
 }
 
@@ -10552,7 +10705,7 @@ if (ORCHESTRATING_SHARDS) {
   if (failed.length === 0) {
     assert.equal(results.length, SHARD_COUNT * CHUNK_COUNT, "all 12 child receipts are required");
     const completion = recorder.snapshot();
-    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 216 callbacks must be reported");
+    assert.equal(completion.disposedCount, EXPECTED_CASE_COUNT, "all 228 callbacks must be reported");
     assert.equal(completion.terminal, true, "the parent must emit the terminal completion record");
     const classes = new Set(results.flatMap((result) => result.coverage));
     assert.ok(classes.size > 0, "B8 corpus must reach at least one real session command");

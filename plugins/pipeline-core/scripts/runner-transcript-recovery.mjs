@@ -20,6 +20,7 @@ import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
 import { auditCurrentRunnerSession } from "../lib/runner-own-session-audit.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { resolveModelRoleHostSessionIdentity } from "../lib/model-role-host-identity.mjs";
 import { repositoryPathIdentityOrSelf, windowsNotationCandidate } from "../lib/repository-path-identity.mjs";
 
 const SCHEMA = "pipeline.runner-transcript-recovery.v1";
@@ -59,15 +60,15 @@ function resolveCodexSessionsDirectory(env, homeDirectory) {
   return realDirectory(join(codexHome, "sessions"));
 }
 
-function regularJsonlFiles(sessionsDirectory) {
+function regularJsonlFiles(sessionsDirectory, maxCandidates = MAX_CANDIDATES, state = {}) {
   const files = [];
   const queue = [sessionsDirectory];
-  while (queue.length > 0 && files.length < MAX_CANDIDATES) {
+  while (queue.length > 0 && files.length < maxCandidates) {
     const directory = queue.pop();
     let entries;
     try { entries = readdirSync(directory, { withFileTypes: true }); } catch { continue; }
     for (const entry of entries) {
-      if (files.length >= MAX_CANDIDATES) break;
+      if (files.length >= maxCandidates) { state.boundReached = true; break; }
       // Never follow a session-storage symlink: it could point at arbitrary host data.
       if (entry.isSymbolicLink()) continue;
       const candidate = join(directory, entry.name);
@@ -81,6 +82,7 @@ function regularJsonlFiles(sessionsDirectory) {
       }
     }
   }
+  if (queue.length > 0 && files.length >= maxCandidates) state.boundReached = true;
   return files;
 }
 
@@ -180,7 +182,23 @@ function candidateMetadata(filePath, projectIdentity) {
   try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs }; } catch { return null; }
 }
 
-function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir } = {}) {
+/**
+ * A claimed current session (`--exclude-session`) is only a claim. When the host resolves its own
+ * identity for this runner and it disagrees (or the host's own sources conflict), refuse with the
+ * typed identity code instead of reading a transcript on the strength of a wrong claim. An identity the
+ * host cannot supply is not a conflict: nothing is compared.
+ */
+function claimedSessionConflict({ runner, excludeSession, env = process.env } = {}) {
+  if (typeof excludeSession !== "string" || excludeSession.trim() === "") return null;
+  const host = resolveModelRoleHostSessionIdentity({ runner, env });
+  if (host.code === "MODEL-ROLE-SESSION-IDENTITY-CONFLICT"
+    || (host.ok && host.sessionId !== excludeSession)) {
+    return unavailable(runner ?? "unknown", "MODEL-ROLE-SESSION-IDENTITY-CONFLICT");
+  }
+  return null;
+}
+
+function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env = process.env, homedirFn = homedir, limits } = {}) {
   if (runner !== CODEX_RUNNER) return { unavailable: unavailable(runner ?? "unknown", "runner-transcript-source-unavailable") };
   if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
     return { unavailable: unavailable(runner, "current-session-identity-unavailable") };
@@ -190,14 +208,15 @@ function priorProjectMatchingCandidates({ rootDir, runner, excludeSession, env =
   const projectIdentity = repositoryPathIdentityOrSelf(root);
   const sessionsDirectory = resolveCodexSessionsDirectory(env, homedirFn);
   if (sessionsDirectory === null) return { unavailable: unavailable(runner, "runner-session-storage-unavailable") };
-  const candidates = regularJsonlFiles(sessionsDirectory)
+  const enumeration = {};
+  const candidates = regularJsonlFiles(sessionsDirectory, limits?.maxCandidates ?? MAX_CANDIDATES, enumeration)
     .map((filePath) => candidateMetadata(filePath, projectIdentity))
     .filter((candidate) => candidate !== null && candidate.sessionId !== excludeSession)
     .sort((left, right) => right.mtimeMs - left.mtimeMs);
   if (candidates.length === 0) {
     return { unavailable: unavailable(runner, "no-prior-project-matching-transcript") };
   }
-  return { candidates };
+  return { candidates, boundReached: enumeration.boundReached === true };
 }
 
 function boundedDetail(value) {
@@ -274,6 +293,8 @@ export function recoverRunnerTranscript({ rootDir, runner, excludeSession, env =
  * and does not make an otherwise authenticated session disappear.
  */
 export function listRunnerTranscripts(options = {}) {
+  const conflict = claimedSessionConflict(options);
+  if (conflict !== null) return conflict;
   const found = priorProjectMatchingCandidates(options);
   if (found.unavailable) return found.unavailable;
   return {
@@ -295,6 +316,8 @@ export function listRunnerTranscripts(options = {}) {
  * the CLI's requested `read` operation; recovery/list stay bounded excerpts.
  */
 export function readRunnerTranscript({ sessionId, ...options } = {}) {
+  const conflict = claimedSessionConflict(options);
+  if (conflict !== null) return conflict;
   const found = priorProjectMatchingCandidates(options);
   if (found.unavailable) return found.unavailable;
   if (typeof sessionId !== "string" || sessionId.trim() === "") {
@@ -481,7 +504,9 @@ function claudeCandidateMetadata(filePath, projectIdentity) {
   try { return { filePath, sessionId: uniqueSessionIds[0], mtimeMs: statSync(filePath).mtimeMs }; } catch { return null; }
 }
 
-function claudeProjectCandidates({ rootDir, excludeSession, env = process.env, homedirFn = homedir } = {}) {
+function claudeProjectCandidates({ rootDir, excludeSession, env = process.env, homedirFn = homedir, limits } = {}) {
+  const maxCandidates = limits?.maxCandidates ?? MAX_CANDIDATES;
+  let boundReached = false;
   if (typeof excludeSession !== "string" || excludeSession.trim() === "") {
     return { unavailable: unavailable(CLAUDE_RUNNER, "current-session-identity-unavailable") };
   }
@@ -496,9 +521,9 @@ function claudeProjectCandidates({ rootDir, excludeSession, env = process.env, h
   try { entries = readdirSync(projectDirectory, { withFileTypes: true }); } catch { entries = []; }
   const candidates = [];
   for (const entry of entries) {
-    if (candidates.length >= MAX_CANDIDATES) break;
     // Never follow a storage symlink; direct children only.
     if (entry.isSymbolicLink() || !entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+    if (candidates.length >= maxCandidates) { boundReached = true; break; }
     try {
       const real = realpathSync(join(projectDirectory, entry.name));
       if (!pathInside(projectDirectory, real) || !lstatSync(real).isFile()) continue;
@@ -507,7 +532,7 @@ function claudeProjectCandidates({ rootDir, excludeSession, env = process.env, h
     } catch { /* An unreadable candidate is not evidence. */ }
   }
   if (candidates.length === 0) return { unavailable: unavailable(CLAUDE_RUNNER, "no-prior-project-matching-transcript") };
-  return { candidates };
+  return { candidates, boundReached };
 }
 
 function exportCandidates(options) {
@@ -549,6 +574,8 @@ function snapshotExportSegments({ segments, sessionId, authenticate, refreshedPa
  */
 export function exportRunnerTranscript({ sessionId, ...options } = {}) {
   const runner = typeof options.runner === "string" && options.runner !== "" ? options.runner : "unknown";
+  const conflict = claimedSessionConflict(options);
+  if (conflict !== null) return conflict;
   const found = exportCandidates(options);
   if (found.unavailable) return found.unavailable;
   const failed = () => unavailable(runner, "requested-session-unavailable");
@@ -569,11 +596,19 @@ export function exportRunnerTranscript({ sessionId, ...options } = {}) {
     });
   } catch { return failed(); }
   const parsed = snapshots.map((snapshot) => {
-    const { records, unparsedLineCount } = parseJsonLinesCounted(snapshot.bytes);
+    // Optional seam ceiling: only the whole lines inside the ceiling are described; the digest and length
+    // still identify the whole file, and the export is marked partial instead of failing or truncating silently.
+    const ceiling = options.limits?.maxSegmentBytes;
+    const overCeiling = Number.isSafeInteger(ceiling) && ceiling >= 0 && snapshot.bytes.length > ceiling;
+    const described = overCeiling
+      ? snapshot.bytes.subarray(0, snapshot.bytes.subarray(0, ceiling).lastIndexOf(10) + 1)
+      : snapshot.bytes;
+    const { records, unparsedLineCount } = parseJsonLinesCounted(described);
     const stamps = records.map(recordTimestampMs).filter((ms) => ms !== null);
     return {
       records,
       unparsedLineCount,
+      overCeiling,
       filePath: snapshot.segment.filePath,
       mtimeMs: snapshot.identity.mtimeMs,
       sha256: createHash("sha256").update(snapshot.bytes).digest("hex"),
@@ -590,11 +625,20 @@ export function exportRunnerTranscript({ sessionId, ...options } = {}) {
   });
   const firsts = parsed.map((segment) => segment.firstMs).filter((ms) => ms !== null);
   const lasts = parsed.map((segment) => segment.lastMs).filter((ms) => ms !== null);
+  const incompleteReasons = [
+    ...(parsed.some((segment) => segment.unparsedLineCount > 0) ? ["records-skipped"] : []),
+    ...(found.boundReached === true ? ["candidate-bound-reached"] : []),
+    ...(parsed.some((segment) => segment.overCeiling) ? ["byte-ceiling"] : []),
+  ];
   return {
     schema: SCHEMA,
     status: "available",
     runner,
     sessionId,
+    // Totals below are only totals of what was read: a consumer must read this field with them.
+    completeness: incompleteReasons.length === 0 ? "complete" : "partial",
+    incompleteReasons,
+    childSessions: "not-inferred",
     segmentCount: parsed.length,
     segmentOrder: EXPORT_SEGMENT_ORDER,
     recordCount: parsed.reduce((total, segment) => total + segment.records.length, 0),

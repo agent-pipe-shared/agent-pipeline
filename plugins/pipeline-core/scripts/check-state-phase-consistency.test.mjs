@@ -93,6 +93,7 @@ function lifecycleDeps(dir, planPath) {
     poGateAuthority: injectedPoGateAuthority(planPath),
     poGateProfile: injectedPoGateProfile(),
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
   };
 }
 

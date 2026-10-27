@@ -96,14 +96,16 @@ export function parseNativeGoldfishBriefing(prompt) {
 }
 
 /** Validate one plain-JSON final result; prose, fences and duplicate keys fail closed. */
-export function validateNativeGoldfishFinal(text, { binding } = {}) {
+// D31: `allowCheckpoint` is opt-in. Only the SubagentStop route passes it, because a budget stop settles there without
+// a commit; every other route (foreground PostToolUse, Codex) keeps admitting a success only.
+export function validateNativeGoldfishFinal(text, { binding, allowCheckpoint = false } = {}) {
   if (typeof text !== "string" || text.length === 0 || Buffer.byteLength(text, "utf8") > 2 * 1024 * 1024
     || !binding || !ID.test(binding.dispatchId ?? "") || !OID.test(binding.candidateCommit ?? "")) return fail("NGHR-FINAL-INPUT");
   let value;
   try { value = parseStrictJson(text); } catch { return fail("NGHR-FINAL-JSON"); }
   if (!exact(value, FINAL_FIELDS) || value.schema !== NATIVE_GOLDFISH_RETURN_SCHEMA
     || value.dispatchId !== binding.dispatchId || value.candidateCommit !== binding.candidateCommit
-    || value.outcome !== "succeeded" || typeof value.report !== "string"
+    || !(value.outcome === "succeeded" || (allowCheckpoint === true && value.outcome === "checkpoint")) || typeof value.report !== "string"
     || value.report.trim() === "" || Buffer.byteLength(value.report, "utf8") > 1024 * 1024
     || !Array.isArray(value.changedPaths) || value.changedPaths.length === 0 || value.changedPaths.length > 64
     || !value.changedPaths.every(normalizedPath) || new Set(value.changedPaths).size !== value.changedPaths.length

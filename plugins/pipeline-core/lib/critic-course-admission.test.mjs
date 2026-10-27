@@ -644,4 +644,81 @@ test("D167-PF78 (3) a diagnostic whose full-verify member is the fixed evidence/
   assert.match(result.message ?? JSON.stringify(result), /--full-verify/u);
   assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
 });
+// G18 slice B: every reviewer-admission refusal code names a recovery or an explicit no-route.
+const ccaCodes = [...new Set(readFileSync(new URL("./critic-course-admission.mjs", import.meta.url), "utf8").match(/CCA-[A-Z0-9]+(?:-[A-Z0-9]+)*/gu))].sort();
+test("G18B (a) the enumerated CCA code set is non-trivial and includes the three repaired codes", () => {
+  assert.ok(ccaCodes.length > 40, String(ccaCodes.length));
+  for (const code of ["CCA-DETERMINISTIC-UNAVAILABLE", "CCA-REVIEW-UNIT-REQUIRED", "CCA-MANIFEST-READ"]) assert.ok(ccaCodes.includes(code), code);
+});
+test("G18B (b) every CCA refusal code yields a non-null recovery or an explicit no-route naming who decides", () => {
+  for (const code of ccaCodes) {
+    const repair = criticCourseRepair(code);
+    assert.notEqual(repair, null, code);
+    if (typeof repair === "string") { assert.ok(repair.length > 20, code); continue; }
+    assert.equal(repair.route, "none", code);
+    assert.ok(["PO", "Coordinator"].includes(repair.decidedBy), code);
+    assert.equal(typeof repair.reason, "string", code);
+    assert.ok(repair.reason.length > 0, code);
+  }
+});
+test("G18B (c) the three existing repairs keep their exact text and non-CCA input stays null", () => {
+  const sha = (v) => hash(Buffer.from(v));
+  assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "82c0cb9fd7335a83a67eb42e85f7f43cd33e413975da46e4008b6c093f331d32");
+  assert.equal(sha(criticCourseRepair("CCA-REVIEW-UNIT-REQUIRED")), "5529bda66d4b0b02095cf06d726b032e7360a4692a00e859cb3801659162a4c4");
+  assert.equal(sha(criticCourseRepair("CCA-MANIFEST-READ")), "4deceb8240578c2c85665690fe09bbac7d3ef571c450e98a84ac597a8d016def");
+  assert.equal(criticCourseRepair("CDP-COURSE-UNAVAILABLE"), null);
+  assert.equal(criticCourseRepair(undefined), null);
+});
+// D51-CARRY: diagnostic evidence bound to an ancestor commit A is carried to a later candidate B only across a registered evidence-only range.
+function carryFixture() {
+  const fx = diagFixture();
+  fx.git("add", ".");
+  fx.git("reset", "-q", "--", fx.logPath, fx.jsonPath);
+  fx.git("commit", "-qm", "topology without diagnostic");
+  const evidenced = fx.git("rev-parse", "HEAD");
+  fx.write({...fx.value, candidate: {commit: evidenced, tree: fx.git("rev-parse", `${evidenced}^{tree}`)}});
+  const result = fx.register();
+  assert.equal(result.status, "diagnostic-added", JSON.stringify(result));
+  fx.git("add", "."); fx.git("commit", "-qm", "register diagnostic for the evidenced commit");
+  const registered = fx.git("rev-parse", "HEAD");
+  const entries = [{path: fx.jsonPath, sha256: hash(readFileSync(join(fx.root, fx.jsonPath)))}];
+  const admit = (candidate, registrationCommit = candidate) =>
+    readCriticCourseAdmission(runtimeRequest({root: fx.root, featureId: fx.featureId, genesisCommit: fx.base, candidateCommit: candidate}, {requestedMode: "full", registrationCommit}));
+  return {...fx, evidenced, registered, entries, admit};
+}
+test("D51-CARRY (a) evidence for A is accepted for B across a registered evidence-only range and the carry proof is in the digest", () => {
+  const fx = carryFixture();
+  const actual = fx.admit(fx.registered);
+  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+  assert.match(actual.deterministicEvidenceSha256 ?? "", /^[0-9a-f]{64}$/u, JSON.stringify(actual));
+  assert.notEqual(actual.deterministicEvidenceSha256, sha256Canonical(fx.entries));
+});
+test("D51-CARRY (b) evidence is not carried when a non-evidence file changed in the range", () => {
+  const fx = carryFixture();
+  writeFileSync(join(fx.root, "src/code.mjs"), "export const delivered = 3;\n");
+  fx.git("add", "."); fx.git("commit", "-qm", "source change after evidence");
+  const actual = fx.admit(fx.git("rev-parse", "HEAD"));
+  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+});
+test("D51-CARRY (c) evidence is not carried when the spec content differs at B", () => {
+  const fx = carryFixture();
+  writeFileSync(join(fx.root, fx.specPath), "# Spec\nAC-1 changed behavior\n");
+  fx.git("add", "."); fx.git("commit", "-qm", "spec change after evidence");
+  const actual = fx.admit(fx.git("rev-parse", "HEAD"));
+  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+});
+test("D51-CARRY (d) evidence is not carried when a correction commit exists in the range", () => {
+  const fx = carryFixture();
+  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
+  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify({...manifest, feature: {...manifest.feature, rigor: 2}})}\n`);
+  fx.git("add", "."); fx.git("commit", "-qm", "manifest correction after evidence");
+  const actual = fx.admit(fx.git("rev-parse", "HEAD"));
+  assert.equal(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+});
+test("D51-CARRY (e) exact-commit evidence behaves as before and records no carry in the digest", () => {
+  const fx = carryFixture();
+  const actual = fx.admit(fx.evidenced, fx.registered);
+  assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+  assert.equal(actual.deterministicEvidenceSha256, sha256Canonical(fx.entries), JSON.stringify(actual));
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

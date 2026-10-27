@@ -224,7 +224,8 @@ async function routeFixture(t, { ignored = null } = {}) {
     finally { Object.assign(console, saved); }
   };
   const submitted = drive(["submit-plan", "--by", "coordinator", "--profile", "feature"],
-    { poGateAuthority: () => authority, poGateProfile: () => profile });
+    { poGateAuthority: () => authority, poGateProfile: () => profile,
+      architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }) });
   assert.equal(submitted.status, 0, `submit-plan must succeed on the fixture: ${submitted.stderr}`);
   const readState = () => JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
   const requests = () => {

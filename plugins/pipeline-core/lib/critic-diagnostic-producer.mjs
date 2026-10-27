@@ -11,6 +11,7 @@ import {
   readDiagnosticArtifact,
   validateCriticDiagnostic,
 } from "./critic-diagnostic-evidence.mjs";
+import { deriveRequiredCriticGuardrails } from "./critic-required-guardrails.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 function fail(code) { const error = new Error(code); error.code = code; throw error; }
@@ -34,8 +35,15 @@ function source(root, candidate, path) {
 }
 
 /** Execute, capture and bind an actual targeted run. No caller-supplied success flag. */
-export function produceCriticDiagnostic({ root, candidate = "HEAD", specPath, guardrailPaths = [], command, label = "targeted-check", logPath, fullVerifyPath = null, pending = [] }) {
+export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = undefined, specPath, guardrailPaths = [], command, label = "targeted-check", logPath, fullVerifyPath = null, pending = [] }) {
   const bound = candidateBinding(root, candidate);
+  if (baseRef !== undefined) {
+    let base;
+    try { base = git(root, ["rev-parse", "--verify", `${baseRef}^{commit}`]).trim(); } catch { fail("CDI-BASE"); }
+    if (!OID.test(base)) fail("CDI-BASE");
+    try { guardrailPaths = deriveRequiredCriticGuardrails({ root, candidate: bound.commit, base, explicitGuardrails: guardrailPaths }).paths; }
+    catch (error) { fail(error?.code ?? "CDI-GUARDRAIL-DERIVATION"); }
+  }
   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
   newDiagnosticPath(root, logPath);
   if (diagnosticEvidenceLocation(logPath) === null || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");

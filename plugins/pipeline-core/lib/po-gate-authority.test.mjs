@@ -826,6 +826,7 @@ function submitFixturePlan(primary, authority, profile) {
     now: () => NOW,
     poGateAuthority: () => authority,
     poGateProfile: () => profile,
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
   });
   assert.equal(status, 0);
   // NVA-R22-PLANSHOWN: approve-plan now refuses an approval of unseen content

@@ -3,7 +3,7 @@ name: goldfish-implementor
 description: "Agent-Pipeline Goldfish (implementor tier, effort medium - THE STANDARD for clearly-briefed implementation) - fresh-context executor for exactly ONE briefed task (implementation, mass edit, research, review preparation) without in-task design latitude. Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); never for open-ended exploration. Guardrail/hook/canon code, test-suite/verify authorship, or genuine in-task design latitude belong to goldfish-deep (effort xhigh) instead; purely mechanical/uniform/pure-plan-execution work belongs to goldfish-mechanic (effort low). Delivers diff + condensed evidence-backed report, or a clean stop."
 model: sonnet
 effort: medium
-maxTurns: 50
+maxTurns: 76
 tools: [Read, Edit, Write, Grep, Glob, Bash]
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
 #   pipeline learns via the versioned operating model, not via agent memory.
@@ -29,7 +29,7 @@ tools: [Read, Edit, Write, Grep, Glob, Bash]
 #   weaker (weakest-tier) model for implementation remains FORBIDDEN regardless of tier (MP-03). NOTE:
 #   `effort` as an agent-frontmatter key (MP-02/MP-27); if the harness does not honor it, the dispatch
 #   invocation parameter carries the effort.
-# maxTurns: 50 = hard leash (docs/operating-model.md, Rigor, risk and gates, stage 1); start value, calibrate via telemetry.
+# maxTurns: 76 = hard leash (docs/operating-model.md, Rigor, risk and gates, stage 1); PO decision 2026-10-27: one budget grant may take a Goldfish to a total of 70 calls (ceiling = maxTurns - 6; working cap = maxTurns - 15, so the briefed base is 40 and the single-grant headroom 30).
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
 #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back
 #   to shell listing via Bash.

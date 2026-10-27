@@ -125,6 +125,13 @@ commit/tree values match. A mismatched candidate fails binding; an unsupported
 schema fails schema admission. Recompute the candidate binding for each review
 and let preflight validate the concrete artifact before dispatch.
 
+**Diagnostic evidence route (in this order):** produce the artifact with
+`scripts/critic-diagnostic-evidence.mjs`, commit the artifact, register it with
+`scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>`,
+commit the manifest, then rerun `scripts/critic-dispatch-preflight.mjs` with
+`--registration-commit` naming that manifest commit. Script paths resolve under
+the plugin root the bootstrap prints, never a machine-specific path.
+
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
 invoke its compact `critic` role; an omitted adapter argument must not select

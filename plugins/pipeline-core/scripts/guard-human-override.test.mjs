@@ -46,8 +46,10 @@ import { PTY_HOST_LIMIT, runMainUnderPty } from "../lib/test-hgo-cli-pty-fixture
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(HERE, "..");
 const SCRIPT = join(HERE, "guard-human-override.mjs");
+// An absolute directory outside every fixture repository; it need not exist (the hand-off only names the proof file).
+const SYNTHETIC_PROOF_DIRECTORY = join(tmpdir(), "synthetic-po-key-directory");
 
-const pair = generateKeyPairSync("ed25519");
+const pair =generateKeyPairSync("ed25519");
 const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
 const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
 const KEY_REFERENCE = "hgo-cli-test-key";
@@ -721,7 +723,7 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
 
     const first = io();
     const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], first, {
-      configuredMachinePoKeyDirectory: () => null,
+      proofDirectory: SYNTHETIC_PROOF_DIRECTORY,
     });
     assert.equal(status, 0, first.stderr);
     const value = JSON.parse(first.stdout);
@@ -757,14 +759,16 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
         "--repo", root,
         "--request-sha256", recorded.requestSha256,
         "--plan-sha256", value.planSha256,
-        "--proof", "<external-proof.json>",
+        "--proof", join(SYNTHETIC_PROOF_DIRECTORY, `proof-${value.intentSha256}.json`),
       ],
       mutation: true,
       requiresConfirmation: true,
       executionBoundary: "local-process",
     });
+    // SIG-A (PO decision 2026-10-27, revises the two-block hand-off): the operator channel carries
+    // the one signing command only; the import is an agent action in the JSON channel.
     assert.match(first.stderr, /Step: sign-intent\nPOSIX:/u);
-    assert.match(first.stderr, /Step: authorize-by-signature\nPOSIX:/u);
+    assert.doesNotMatch(first.stderr, /Step: authorize-by-signature/u);
     assert.match(first.stderr, /PowerShell:/u);
     assert.equal(first.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, first.stderr);
     assert.doesNotMatch(first.stderr, /available on demand|render-copy-safe/u);
@@ -785,7 +789,13 @@ test("prepare-for-signature emits the exact §3.3 output shape, with real resolv
   }
 });
 
-test("prepare-for-signature resolves the configured machine key directory without printing its private path", () => {
+// SIG-A pin revision (PO decision 2026-10-27, backlog item signature-ceremony-requires-operator-work-and-breaks).
+// The earlier pin was "resolves the configured machine key directory without printing its private path": no
+// output channel named the key directory. The PO chose the FULL proof path over a placeholder or a bare file
+// name, so the agent-facing JSON channel (stdout) now names the proof file, which lies in that directory.
+// What stays pinned: the operator-facing channel (stderr, the block a person copies) never contains the
+// directory, the sign-intent argv carries no --directory flag, and no key material or key file name appears.
+test("SIG-A1 prepare-for-signature names the full proof path in the agent channel only; the operator block never contains the key directory", () => {
   const root = fixture();
   try {
     const recorded = recordHumanGuardDenial({
@@ -794,13 +804,145 @@ test("prepare-for-signature resolves the configured machine key directory withou
       denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
     });
     const captured = io();
-    const keyDirectory = "/mnt/c/Users/Andre/OneDrive/Documents/06_Dev/agent-pipeline-key";
-    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured), 0, captured.stderr);
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY }), 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
     assert.ok(!value.signIntentCommand.argv.includes("--directory"));
+    assert.equal(value.proofPath, join(SYNTHETIC_PROOF_DIRECTORY, `proof-${value.intentSha256}.json`));
     assert.match(captured.stderr, /Step: sign-intent/u);
-    assert.doesNotMatch(captured.stderr, new RegExp(keyDirectory.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
-    assert.doesNotMatch(captured.stderr, /external-po-material-directory/u);
+    assert.ok(!captured.stderr.includes(SYNTHETIC_PROOF_DIRECTORY), captured.stderr);
+    assert.doesNotMatch(captured.stderr, /external-po-material-directory|private\.pem|private-key|\.key\b/u);
+    assert.doesNotMatch(captured.stdout, /private\.pem|private-key|BEGIN [A-Z ]*PRIVATE KEY/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SIG-A2 the operator hand-off is one command with no placeholder anywhere, and the import is a separate agent action", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "one operator command" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    const captured = io();
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY }), 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    assert.equal(value.operatorCommandCount, 1);
+    assert.equal((captured.stderr.match(/^Step: /gmu) ?? []).length, 1, captured.stderr);
+    assert.equal((captured.stderr.match(/\bnode\b|process\.execPath|\.mjs/gu) ?? []).length > 0, true);
+    assert.doesNotMatch(`${captured.stdout}\n${captured.stderr}`, /<external-proof\.json>|<[a-z-]+\.json>|<proof/u);
+    assert.equal(value.signIntentCommand.executionBoundary, "attended-external-terminal");
+    assert.equal(value.authorizeBySignatureCommand.executionBoundary, "local-process");
+    assert.equal(value.authorizeBySignatureCommand.mutation, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SIG-A3 the agent action carries the same proof path, request, plan and intent digest as the signing command", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "same digests" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    const captured = io();
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY }), 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    const agent = value.authorizeBySignatureCommand.argv;
+    const proofFlag = agent.indexOf("--proof");
+    assert.equal(agent[proofFlag + 1], value.proofPath);
+    assert.equal(agent[agent.indexOf("--request-sha256") + 1], recorded.requestSha256);
+    assert.equal(agent[agent.indexOf("--plan-sha256") + 1], value.planSha256);
+    const sign = value.signIntentCommand.argv;
+    assert.equal(sign[sign.indexOf("--intent-sha256") + 1], value.intentSha256);
+    assert.equal(value.proofPath.endsWith(`proof-${value.intentSha256}.json`), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SIG-A4 a proof inside the repository is still refused, even at the exact path the hand-off would otherwise name", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "in-repository proof" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    const prepared = io();
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], prepared, { proofDirectory: join(root, "scratch") }), 0, prepared.stderr);
+    const value = JSON.parse(prepared.stdout);
+    mkdirSync(join(root, "scratch"), { recursive: true });
+    writeFileSync(value.proofPath, "{}\n");
+    const imported = io();
+    const status = main(value.authorizeBySignatureCommand.argv.slice(1), imported);
+    assert.equal(status, 2);
+    assert.match(imported.stderr, /--proof must be supplied outside the repository/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SIG-A5 the operator block stays within 72 columns for a very long key directory, because the path is never in it", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "long path" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    const longDirectory = join(SYNTHETIC_PROOF_DIRECTORY, ...Array.from({ length: 6 }, (_, index) => `a-deliberately-long-directory-segment-${index}`));
+    const captured = io();
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory: longDirectory }), 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    assert.ok(value.proofPath.length > 150, value.proofPath);
+    assert.equal(captured.stderr.trimEnd().split(/\r?\n/u).every((line) => line.length <= 72), true, captured.stderr);
+    assert.doesNotMatch(captured.stderr, /\\\n|`\n/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SIG-A7 importing before the signing command has written the proof says so and authorizes nothing", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "proof not yet written" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    const prepared = io();
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], prepared, { proofDirectory: SYNTHETIC_PROOF_DIRECTORY }), 0, prepared.stderr);
+    const value = JSON.parse(prepared.stdout);
+    const imported = io();
+    assert.equal(main(value.authorizeBySignatureCommand.argv.slice(1), imported), 2);
+    assert.match(imported.stderr, /--proof file does not exist yet: the signing command has not written it/u);
+    assert.equal(imported.stdout, "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("SIG-A6 without a resolvable key directory no path and no placeholder are invented: the agent command is null", () => {
+  const root = fixture();
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "unresolved key directory" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    for (const proofDirectory of [undefined, null, "relative/dir", ""]) {
+      const captured = io();
+      assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], captured, { proofDirectory }), 0, captured.stderr);
+      const value = JSON.parse(captured.stdout);
+      assert.equal(value.proofPath, null);
+      assert.equal(value.authorizeBySignatureCommand, null);
+      assert.doesNotMatch(`${captured.stdout}\n${captured.stderr}`, /<external-proof\.json>/u);
+      assert.match(captured.stderr, /Step: sign-intent/u);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

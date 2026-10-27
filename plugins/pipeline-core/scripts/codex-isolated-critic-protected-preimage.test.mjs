@@ -72,4 +72,22 @@ check("F1 inventory records full lowercase SHA-256 values", () => {
   for (const entry of inventory.files) assert.match(entry.rawSha256, /^[0-9a-f]{64}$/);
 });
 
+check("D41 the Critic skill states the diagnostic evidence route (producer, registrar flag, preflight flag)", () => {
+  const skill = readFileSync(join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review", "SKILL.md"), "utf8");
+  const flat = skill.replace(/\s+/g, " ");
+  const anchor = flat.indexOf("Diagnostic evidence route");
+  assert.equal(anchor >= 0, true, "the Diagnostic evidence route heading is present");
+  const route = flat.slice(anchor);
+  const producer = route.indexOf("scripts/critic-diagnostic-evidence.mjs");
+  const registrar = route.indexOf("scripts/register-feature-package.mjs");
+  const addFlag = route.indexOf("--add-diagnostic-evidence");
+  const preflight = route.indexOf("scripts/critic-dispatch-preflight.mjs");
+  const regCommit = route.indexOf("--registration-commit");
+  assert.equal(producer >= 0, true, "producer script is named");
+  assert.equal(registrar > producer, true, "registrar script follows the producer");
+  assert.equal(addFlag > registrar, true, "registrar flag --add-diagnostic-evidence follows the registrar");
+  assert.equal(preflight > addFlag, true, "preflight script follows the registration step");
+  assert.equal(regCommit > preflight, true, "preflight flag --registration-commit follows the preflight script");
+});
+
 process.stdout.write(`1..${passed}\n`);

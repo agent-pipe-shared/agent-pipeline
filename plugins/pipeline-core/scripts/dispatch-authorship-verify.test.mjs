@@ -1109,3 +1109,51 @@ test("signed integration reader fails wrong-parent and postimage path, content o
     } finally { rmSync(item.root, { recursive: true, force: true }); }
   }
 });
+
+// D56 slice 3: an orchestrator-attested delivery gets its own weaker verdict. It is never PASS and never host-observed.
+function attestedAuthored(taskId, sha) {
+  const report = { text: "Orchestrator-committed hand-back.", changedFiles: ["src/thing.mjs"] };
+  return {
+    schema: "pipeline.dispatch-record.v4", taskId, agentType: "goldfish-implementor",
+    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
+    candidateCommit: sha, resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"), outcome: "completed-orchestrator-attested",
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" }, commits: [sha],
+    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], report,
+    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
+    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "e".repeat(64), handbackSha256: "f".repeat(64) },
+  };
+}
+
+test("D56-3a an orchestrator-attested delivery is UNVERIFIABLE with its own label, never PASS and never host-observed", () => {
+  const sha = "5".repeat(40);
+  writeRecord("DOD-ATT-1", attestedAuthored("DOD-ATT-1", sha));
+  const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-1 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "orchestrator-attested-delivery");
+  assert.equal(verdict.assurance, "orchestrator-attested");
+  assert.notEqual(verdict.verdict, VERDICT.pass);
+  assert.equal("modelCheck" in verdict, false, "no host-observed model classification is attached");
+  assert.equal(String(verdict.classification).startsWith("host-observed"), false);
+});
+
+test("D56-3b an attested record for a different commit, or one whose diff the record does not cover, FAILs", () => {
+  const sha = "6".repeat(40);
+  writeRecord("DOD-ATT-2", attestedAuthored("DOD-ATT-2", sha));
+  const wrongCommit = verifyCommit("7".repeat(40), commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(wrongCommit.verdict, VERDICT.fail);
+  assert.equal(wrongCommit.classification, "record-names-different-commit");
+  const uncovered = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs", "src/other.mjs"] }));
+  assert.equal(uncovered.verdict, VERDICT.fail);
+  assert.equal(uncovered.classification, "record-paths-do-not-cover");
+  assert.deepEqual(uncovered.uncovered, ["src/other.mjs"]);
+});
+
+test("D56-3c the other non-authoring kinds keep their FAIL, so only the attested kind gets the weaker verdict", () => {
+  const sha = "8".repeat(40);
+  const readOnly = { ...attestedAuthored("DOD-ATT-3", sha), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], criticSkip: skip() };
+  delete readOnly.attestation; delete readOnly.criticRequired;
+  writeRecord("DOD-ATT-3", readOnly);
+  const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-3 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "record-outcome-does-not-attest-authorship");
+});

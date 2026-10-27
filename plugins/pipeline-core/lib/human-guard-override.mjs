@@ -4269,6 +4269,7 @@ export function prepareHumanGuardOverrideForSignature({
   scriptPath,
   humanApprovalScriptPath,
   authorSourceRoot = null,
+  proofDirectory = null,
 } = {}) {
   // A signature is a scarce human credential. Authenticate the audit sink before
   // producing any signable material, so a standing ledger fault cannot consume a
@@ -4325,6 +4326,14 @@ export function prepareHumanGuardOverrideForSignature({
   }
   const indexed = indexHumanGuardOverrideSelection({rootDir,pluginRoot,requestSha256,planSha256:planned.planSha256,authorSourceRoot,nowMs,spawn,scriptPath});
   if (indexed.intentSha256 !== intent.sha256) fail("HGO-DISCLOSURE-INDEX", "prepared disclosure intent conflicts");
+  // PO decision 2026-10-27: the operator runs exactly ONE command (sign-intent); the agent imports the
+  // proof itself. `sign-intent` writes `proof-<intentSha256>.json` into the resolved key directory
+  // (scripts/po-human-approval.mjs), so the full path is derivable here and handed to the agent in the
+  // machine-readable result only. Without a resolvable directory there is no path to hand over, and
+  // no placeholder is invented: the agent command is null and the key-directory readiness finding
+  // carries the repair. A proof inside the repository stays refused at the import (ADR-0059 Decision 1).
+  const proofPath = typeof proofDirectory === "string" && isAbsolute(proofDirectory)
+    ? join(proofDirectory, `proof-${intent.sha256}.json`) : null;
   return {
     schema: "pipeline.human-guard-override-prepare-for-signature.v1",
     status: "prepared",
@@ -4349,7 +4358,9 @@ export function prepareHumanGuardOverrideForSignature({
       requiresConfirmation: true,
       executionBoundary: "attended-external-terminal",
     },
-    authorizeBySignatureCommand: {
+    operatorCommandCount: 1,
+    proofPath,
+    authorizeBySignatureCommand: proofPath === null ? null : {
       executable: process.execPath,
       argv: [
         scriptPath,
@@ -4361,7 +4372,7 @@ export function prepareHumanGuardOverrideForSignature({
         "--plan-sha256",
         planned.planSha256,
         "--proof",
-        "<external-proof.json>",
+        proofPath,
         ...(planned.authorSourceRoot === null
           ? [] : ["--author-source-root", planned.authorSourceRoot]),
       ],

@@ -50,7 +50,20 @@ function commitPlan(root, result) {
   return { commitPaths: [result.manifestPath, result.envelopePath, ...generatedPaths], envelopeTracked: trackedEnvelope, envelopeIgnored: forceEnvelope, order: steps };
 }
 
+export const REGISTER_FEATURE_PACKAGE_HELP = [
+  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]",
+  "",
+  "Critic diagnostic evidence route (run in this order):",
+  "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs.",
+  "  2. Commit the produced artifact and its log.",
+  "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+  "  4. Commit the manifest the registration names.",
+  "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
+  "",
+].join("\n");
+
 export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
+  if (argv.length === 1 && argv[0] === "--help") { out(REGISTER_FEATURE_PACKAGE_HELP); return 0; }
   const rootIndex = argv.indexOf("--root");
   const rootValue = rootIndex >= 0 ? argv[rootIndex + 1] : undefined;
   // PF-34: `--add-review-unit` adds the Critic review unit to a feature registered before it existed.

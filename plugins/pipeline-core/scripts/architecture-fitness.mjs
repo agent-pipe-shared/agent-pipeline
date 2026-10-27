@@ -541,6 +541,7 @@ export function evaluateVerificationLocality({ rootDir, inventory }) {
   for (const mod of modules) {
     const entryPoints = mod.verificationEntryPoints || [];
     if (entryPoints.length === 0) {
+      if (mod.kind === "documentation") continue;
       violations.push({
         ruleId: "missing-verification-entry-point",
         module: mod.id,

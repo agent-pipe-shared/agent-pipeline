@@ -42,19 +42,19 @@ import { readRuntimeNextAction } from "../lib/runtime-handover-projection.mjs";
 import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
 import { prepareAdoptionAuthority } from "../lib/architecture-adoption-authority.mjs";
 import { inspectArchitectureEntryReadiness, summarizePlanningDecisionApplicability } from "../lib/architecture-entry-readiness.mjs";
-import { applyAdoptionDecision } from "./architecture-adoption.mjs";
+import { materializeArchitectureDesignFixture } from "../lib/architecture-design-test-fixture.mjs";
 
-function prepareCalibrationArchitectureFixture(root) {
-  const source = fileURLToPath(new URL("../../..", import.meta.url));
-  cpSync(join(source, "architecture"), join(root, "architecture"), { recursive: true });
-  cpSync(join(source, "AGENTS.md"), join(root, "AGENTS.md"));
-  const adoption = { rootDir: root, decision: "deferred", scope: ["specs/", "architecture/map/"],
-    rationale: "Contained fixture physical architecture deferral", decidedAt: "2026-10-24T12:00:00.000Z",
-    reviewDate: "2099-01-01", decisionRef: "TEST-K156" };
-  const request = prepareAdoptionAuthority(adoption);
-  applyAdoptionDecision({ ...adoption, approvalRequest: request, chatApproval: {
-    mode: "chat-attributed-unattested", by: "Synthetic fixture PO", decisionRef: "TEST-K156", intentSha256: request.intent.sha256,
-  } });
+function prepareCalibrationArchitectureFixture(root, calibrationBytes = null) {
+  // The adopted profile binds project/pipeline.json; a calibration committed after adoption is profile drift, so a
+  // caller that commits a calibration passes the same bytes here and the adoption is taken over them.
+  if (calibrationBytes !== null) {
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "pipeline.json"), calibrationBytes);
+  }
+  // Sanctioned design-package materialization (measured map, fitness model and baseline for this fixture repository,
+  // a resolvable decision source and a real approved-scoped adoption). The deferred adoption this fixture used to
+  // apply is answered with ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED since D162 S3.
+  materializeArchitectureDesignFixture({ rootDir: root, planPath: "specs/unit/prd_unit.md", sourcePath: "src/change.mjs", decisionRef: "TEST-K156", by: "Synthetic fixture PO" });
   const readiness = inspectArchitectureEntryReadiness({ rootDir: root, taskScope: "specs/unit/prd_unit.md" });
   assert.equal(readiness.status, "ready", readiness.code);
 }
@@ -1273,6 +1273,9 @@ function planAuthorityFixture({ featureId, planPath, specPath, advisorUnavailabl
         ? { ok: true } : { ok: false, code: "DWP-TEST-HOST-BINDING" },
     readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchors: [poTestAnchor] }),
     designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }),
+    // D165-S4: submit-plan now consults architecture readiness; the shared fixture has no
+    // architecture map, so it supplies a ready stub (the D165-S4 cases override it).
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: () => ({
       ok: true,
@@ -1439,6 +1442,67 @@ for (const scenario of ["missing-head", "malformed-criterion", "missing-source",
     assert.equal(state.planApproved, true, "an ordinary specs/ path must approve normally");
     assert.equal(state.planApprovalAttribution, undefined,
       "the default signature posture must not acquire a chat-attribution record");
+  }
+}
+
+// D165-S4 (AC-127): submit-plan refuses a brownfield architecture hurdle BEFORE
+// the PO signs, instead of letting set-phase implementation refuse it later.
+{
+  const BROWNFIELD_CODES = [
+    "ARCHITECTURE-MAP-MISSING", "ARCHITECTURE-MAP-INVALID", "ARCHITECTURE-FITNESS-MODEL-INVALID",
+    "ARCHITECTURE-BASELINE-INVALID", "ARCHITECTURE-ADOPTION-DISPOSITION-REQUIRED",
+    "ARCHITECTURE-ADOPTION-MIGRATION-REQUIRED", "ARCHITECTURE-ENTRY-MAP-POINTER-MISSING",
+    "ARCHITECTURE-CHECKPOINT-DEBT-OPEN", "ARCHITECTURE-CHECKPOINT-DEBT-UNAVAILABLE",
+    "ARCHITECTURE-FITNESS-NOT-READY",
+  ];
+  const s4Run = (code, extraDeps = {}) => {
+    const featureId = "d165-s4-precheck";
+    const planPath = `specs/${featureId}/prd_${featureId}.md`;
+    const specPath = `specs/${featureId}/spec.md`;
+    const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+    let calls = 0;
+    const seen = [];
+    const blocked = code === null ? { status: "ready", code: null, nextAction: null }
+      : { status: "blocked", code, message: `fixture ${code}`, nextAction: { kind: "fixture-next-action", code } };
+    const stubbed = { ...deps, architectureEntryReadiness: (req) => { calls += 1; seen.push(req); return blocked; }, ...extraDeps };
+    const before = readFileSync(statePath(root), "utf8");
+    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], stubbed));
+    return { root, attempt, before, calls: () => calls, seen };
+  };
+  for (const code of BROWNFIELD_CODES) {
+    const { root, attempt, before, calls, seen } = s4Run(code);
+    assert.equal(attempt.result, 2, `${code}: ${attempt.lines.join(" ")}`);
+    const text = attempt.lines.join("\n");
+    assert.ok(text.includes(code), `${code}: stderr must name the code: ${text}`);
+    assert.ok(text.includes("fixture-next-action"), `${code}: stderr must name the next action: ${text}`);
+    assert.ok(text.includes("No submission or signature request was recorded"), code);
+    assert.equal(readFileSync(statePath(root), "utf8"), before, `${code}: State must be byte-identical`);
+    assert.equal(calls(), 1, `${code}: readiness seam called exactly once`);
+    assert.equal(seen[0].taskScope, `specs/d165-s4-precheck/prd_d165-s4-precheck.md`, `${code}: scoped to the plan path`);
+  }
+  {
+    const { attempt, calls } = s4Run(null);
+    assert.equal(attempt.result, 0, `ready readiness must proceed: ${attempt.lines.join(" ")}`);
+    assert.equal(calls(), 1, "ready: seam called exactly once");
+  }
+  for (const code of ["ARCHITECTURE-MATERIALIZATION-REQUIRED", "ARCHITECTURE-DESIGN-PACKAGE-REQUIRED", "ARCHITECTURE-PLAN-SURFACE-MISSING", "ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED", "ARCHITECTURE-FITNESS-UNAVAILABLE"]) {
+    const { attempt, calls } = s4Run(code);
+    assert.equal(attempt.result, 0, `${code} is not a brownfield hurdle and must not refuse submit-plan: ${attempt.lines.join(" ")}`);
+    assert.equal(calls(), 1, `${code}: seam called exactly once`);
+  }
+  {
+    // The mini profile never inspects a design draft, so no design package applies: the check runs.
+    const featureId = "d165-s4-mini";
+    const planPath = `specs/${featureId}/prd_${featureId}.md`;
+    const specPath = `specs/${featureId}/spec.md`;
+    const { root, deps } = planAuthorityFixture({ featureId, planPath, specPath });
+    let calls = 0;
+    const before = readFileSync(statePath(root), "utf8");
+    const attempt = capturedStderr(() => run(["submit-plan", "--by", "coordinator", "--profile", "mini"],
+      { ...deps, architectureEntryReadiness: () => { calls += 1; return { status: "blocked", code: "ARCHITECTURE-MAP-MISSING", message: "m", nextAction: { kind: "x" } }; } }));
+    assert.equal(attempt.result, 2, `mini: ${attempt.lines.join(" ")}`);
+    assert.equal(calls, 1);
+    assert.equal(readFileSync(statePath(root), "utf8"), before);
   }
 }
 
@@ -2125,7 +2189,7 @@ function awaitingApprovalFixture() {
     // original zero-write assertions and setup.
     const root = mkdtempSync(join(nativeContractFixtureParent(), `phase-calibration-${label}-`));
     prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
-    prepareCalibrationArchitectureFixture(root);
+    prepareCalibrationArchitectureFixture(root, options.neutral !== undefined ? `${JSON.stringify(baseline, null, 2)}\n` : null);
     const stateFile = statePath(root);
     const state = JSON.parse(readFileSync(stateFile, "utf8"));
     writeFileSync(stateFile, `${JSON.stringify({ ...state, activeFeature: { ...state.activeFeature, phase: "design" } }, null, 2)}\n`, { mode: 0o600 });

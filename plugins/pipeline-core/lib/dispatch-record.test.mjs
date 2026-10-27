@@ -234,7 +234,50 @@ check("v4 authored reports accept bounded multiline prose while v3 metadata rule
     report: { ...value.report, text: atBound } }).report.text.length, 16384);
 });
 
-assert.equal(cases.length, 13, "the complete dispatch-record corpus must be registered before execution begins");
+// D56 slice 1: the orchestrator-attested record kind (the orchestrator wrote the commit and says so; weaker than a
+// host-observed authored commit). The attestation is a new closed top-level key, never a classification field.
+const ATTESTED_KIND = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" };
+const ATTESTATION = () => ({ schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "e".repeat(64), handbackSha256: "f".repeat(64) });
+const attested = () => {
+  const report = { text: "Orchestrator-committed hand-back.", changedFiles: ["src/x.mjs"] };
+  const { criticSkip: _skip, ...rest } = terminal();
+  return { ...rest, schema: "pipeline.dispatch-record.v4", outcome: "completed-orchestrator-attested", resultSha256: reportSha256(report.text), report,
+    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }],
+    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
+    outcomeClassification: ATTESTED_KIND, attestation: ATTESTATION() };
+};
+check("DRC-A1 an orchestrator-attested terminal v4 record with the closed attestation validates and round-trips", () => {
+  const value = attested();
+  assert.deepEqual(validateDispatchRecord(value), value);
+});
+check("DRC-A2 an attestation on any other kind is refused, and the attested kind without one is refused", () => {
+  assert.throws(() => validateDispatchRecord({ ...attested(), outcomeClassification: { ...ATTESTED_KIND, kind: "authored-commit" }, outcome: "completed" }), (error) => error?.code === "record-outcome-classification");
+  const { attestation: _drop, ...without } = attested();
+  assert.throws(() => validateDispatchRecord(without), (error) => error?.code === "record-outcome-classification");
+});
+check("DRC-A3 the attestation object is closed and its assurance and digests are checked", () => {
+  for (const change of [{ assurance: "host-observed" }, { briefingSha256: "short" }, { handbackSha256: undefined }, { extra: true }]) {
+    const value = attested();
+    value.attestation = { ...value.attestation, ...change };
+    if (change.handbackSha256 === undefined && Object.hasOwn(change, "handbackSha256")) delete value.attestation.handbackSha256;
+    assert.throws(() => validateDispatchRecord(value), (error) => ["record-attestation", "record-shape"].includes(error?.code), JSON.stringify(change));
+  }
+});
+check("DRC-A4 the attested kind binds the final commit like an authored commit and carries criticRequired, not criticSkip", () => {
+  assert.throws(() => validateDispatchRecord({ ...attested(), commits: [] }), (error) => error?.code === "record-commit-binding");
+  const skipped = attested();
+  delete skipped.criticRequired;
+  skipped.criticSkip = skip();
+  assert.throws(() => validateDispatchRecord(skipped), (error) => error?.code === "record-critic-disposition");
+});
+check("DRC-A5 existing kinds are unchanged: authored-commit v4 without attestation still validates", () => {
+  const report = { text: "Done.", changedFiles: ["src/x.mjs"] };
+  const value = { ...terminal(), schema: "pipeline.dispatch-record.v4", resultSha256: reportSha256(report.text), report,
+    outcomeClassification: { ...ATTESTED_KIND, kind: "authored-commit" } };
+  assert.deepEqual(validateDispatchRecord(value), value);
+});
+
+assert.equal(cases.length, 18, "the complete dispatch-record corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

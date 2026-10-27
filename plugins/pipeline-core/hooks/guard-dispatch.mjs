@@ -68,7 +68,7 @@
  * sides cannot drift. Canonical form: CRLF normalised to LF, nothing else stripped or altered.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -95,6 +95,38 @@ import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+
+// W7 A: the template markers a shipped Goldfish or Critic briefing carries (templates/prompts/goldfish-task.md, critic-review.md).
+const GOLDFISH_SHAPE_MARKERS = ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"];
+const CRITIC_SHAPE_MARKERS = ["Fail-closed reference boundary", "## Phase A", "## Phase B"];
+export function promptTemplateShapeWarning({ subagentType, prompt } = {}) {
+  if (typeof subagentType !== "string" || typeof prompt !== "string" || !subagentType.startsWith("pipeline-core:")) return "";
+  const bare = subagentType.slice("pipeline-core:".length);
+  const goldfish = bare.startsWith("goldfish-");
+  if (!goldfish && bare !== "critic") return "";
+  const missing = (goldfish ? GOLDFISH_SHAPE_MARKERS : CRITIC_SHAPE_MARKERS).filter((marker) => !prompt.includes(marker));
+  if (missing.length === 0) return "";
+  const template = goldfish ? "templates/prompts/goldfish-task.md" : "templates/prompts/critic-review.md";
+  return `WARNING (guard-dispatch): GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED: the ${subagentType} prompt lacks ${missing.length} template marker(s) (${missing.join("; ")}); build it by filling ${template}, not freehand. Admitted anyway.\n`;
+}
+
+// W7 B: per-session memory of refused dispatches, under <git common dir>/agent-pipeline/refused-dispatch-retry/<sha(session)>/<sha(type NUL prompt)>.json.
+const REFUSED_RETRY_POINTER = "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md";
+const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
+// Returns true when this exact dispatch was already refused in this session; otherwise records it. Fails open (false) with no session id or common dir.
+export function refusedDispatchRetrySeen({ sessionId, dispatch, rootDir } = {}) {
+  if (typeof sessionId !== "string" || sessionId === "" || typeof dispatch?.prompt !== "string") return false;
+  try {
+    const commonDir = resolveGitCommonDir(rootDir);
+    if (typeof commonDir !== "string" || commonDir === "") return false;
+    const dir = join(commonDir, "agent-pipeline", "refused-dispatch-retry", sha256Hex(sessionId));
+    const file = join(dir, `${sha256Hex(`${dispatch.subagentType}\0${dispatch.prompt}`)}.json`);
+    try { statSync(file); return true; } catch { /* first refusal */ }
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, JSON.stringify({ schema: "pipeline.refused-dispatch-retry.v1", subagentType: dispatch.subagentType }));
+    return false;
+  } catch { return false; }
+}
 
 const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url)); const LIVENESS_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url)); const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
 // D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports the cause and the exact command that clears it.
@@ -809,10 +841,22 @@ if (isDirectInvocation(import.meta.url)) {
     policy: dispatchFindings(dispatch),
     budget: dispatchBudgetBinding(dispatch),
   }));
+  // W7 A: a pipeline-core Goldfish or Critic dispatch whose prompt is not template-shaped is announced, never refused for it.
+  for (const { dispatch } of evaluated) {
+    const shape = promptTemplateShapeWarning(dispatch);
+    if (shape) process.stderr.write(shape);
+  }
   for (const { dispatch } of evaluated) {
     const carrier = writeCapableCarrierAdmission(dispatch);
     if (carrier) {
-      process.stderr.write(`BLOCKED (guard-dispatch): ${carrier.code}: ${carrier.message}\n`);
+      // W7 B: name the single admitted route for Explore/Plan, and stop an unchanged retry in the same session with a pointer.
+      const retryRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+      if (refusedDispatchRetrySeen({ sessionId: input?.session_id, dispatch, rootDir: retryRoot })) {
+        process.stderr.write(`BLOCKED (guard-dispatch): GUARD-DISPATCH-REFUSED-RETRY: this exact dispatch was already refused in this session (${carrier.code}); retrying it unchanged cannot succeed. See ${REFUSED_RETRY_POINTER}\n`);
+        process.exit(2);
+      }
+      const route = ["Explore", "Plan"].includes(dispatch.subagentType) ? ` admitted route: Explore through a direct Agent call (read-only research); anything that writes goes through a pipeline-core:goldfish-* role.` : "";
+      process.stderr.write(`BLOCKED (guard-dispatch): ${carrier.code}: ${carrier.message}${route}\n`);
       process.exit(2);
     }
   }
@@ -1019,7 +1063,7 @@ if (isDirectInvocation(import.meta.url)) {
         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
         const prepared = prepareNativeGoldfishHostState({
           root: rootDir, runner: nativeRunner, input,
-          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 200000 },
+          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 300000 },
           subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
         });
         if (prepared.ok) nativePendingPrepared = true;

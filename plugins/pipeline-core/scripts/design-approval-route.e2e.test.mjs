@@ -143,6 +143,7 @@ import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, open
 import { userInfo } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { materializeArchitectureDesignFixture } from "../lib/architecture-design-test-fixture.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(HERE, "..");
@@ -512,6 +513,10 @@ async function buildSubmittedFeature(prefix, { fallback } = {}) {
 
   git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, "project/critical-human-proof.json", "specs/e2e/acceptance.md", "specs/e2e/result.md");
   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
+  // The real submit-plan refuses a governed root whose architecture is not ready (D165-S4): materialize the sanctioned design package.
+  materializeArchitectureDesignFixture({ rootDir: dir, planPath: PLAN_PATH, sourcePath: "src/index.mjs", decisionRef: "TEST-DAR-ROUTE", by: "Design route fixture PO" });
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "fixture: architecture design package");
 
   const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", PLAN_PATH]);
   if (featureSet.status !== 0) throw new Error(`fixture set-feature failed: ${featureSet.stderr}`);

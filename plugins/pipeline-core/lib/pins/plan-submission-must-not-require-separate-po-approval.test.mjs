@@ -82,6 +82,8 @@ function fixture(featureId, { intake = false } = {}) {
     dir: root, now: () => NOW,
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: () => ({ ok: true, value: authorityValue }),
+    // D165-S4: submit-plan consults architecture readiness; this fixture has no architecture map, so it supplies a ready stub.
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }),
   };
   return { root, deps, planPath, specPath, planSha256, specSha256, profile, authorityValue };
 }

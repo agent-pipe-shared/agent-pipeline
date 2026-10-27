@@ -8,7 +8,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export function runCriticDiagnosticCli(argv) {
   const split = argv.indexOf("--");
-  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS");
+  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--base REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS");
   const options = { guardrailPaths: [], pending: [], command: argv.slice(split + 1) };
   let out;
   for (let i = 0; i < split; i += 2) {
@@ -18,7 +18,7 @@ export function runCriticDiagnosticCli(argv) {
     else if (flag === "--pending") options.pending.push(value);
     else if (flag === "--out") out = value;
     else {
-      const key = { "--root": "root", "--spec": "specPath", "--log": "logPath", "--candidate": "candidate", "--full-verify": "fullVerifyPath", "--label": "label" }[flag];
+      const key = { "--root": "root", "--spec": "specPath", "--log": "logPath", "--candidate": "candidate", "--base": "baseRef","--full-verify": "fullVerifyPath", "--label": "label" }[flag];
       if (!key || Object.hasOwn(options, key)) throw new Error("Unknown or duplicate argument");
       options[key] = value;
     }
@@ -31,7 +31,19 @@ export function runCriticDiagnosticCli(argv) {
   writeFileSync(target, JSON.stringify(evidence, null, 2) + "\n", { flag: "wx" });
   return { schema: "pipeline.critic-diagnostic-production.v1", path: out, fullVerify: evidence.fullVerify.status, targeted: evidence.targeted.status, releaseQualified: false };
 }
+export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
+  "critic-diagnostic-evidence.mjs --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS",
+  "",
+  "Evidence route (run in this order):",
+  "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs (this script).",
+  "  2. Commit the produced artifact and its log.",
+  "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+  "  4. Commit the manifest the registration names.",
+  "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
+  "",
+].join("\n");
 if (isDirectInvocation(import.meta.url)) {
+  if (process.argv.length === 3 && process.argv[2] === "--help") { process.stdout.write(CRITIC_DIAGNOSTIC_EVIDENCE_HELP); process.exit(0); }
   try { console.log(JSON.stringify(runCriticDiagnosticCli(process.argv.slice(2)))); }
   catch (error) { console.error(error.code ?? error.message); process.exitCode = 1; }
 }

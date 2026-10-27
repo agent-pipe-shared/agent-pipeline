@@ -41,7 +41,7 @@ const rule = (overrides = {}) => ({
   schema: DISPATCH_BUDGET_CALIBRATION_RULE_SCHEMA,
   fixedCalls: 10,
   callsPerFile: { correction: 6, documentation: 8, implementation: 5, investigation: 3, review: 4 },
-  maxTurnsByTier: { mechanic: 50, implementor: 50, deep: 80 },
+  maxTurnsByTier: { mechanic: 50, implementor: 76, deep: 80 },
   ...overrides,
 });
 const sample = (overrides = {}) => ({
@@ -74,13 +74,17 @@ test("the evaluator exposes both a weak formula and a tier cap that truncates a 
   assert.equal(weak.evaluations[0].classification, "undercut-terminal-bound");
   assert.equal(weak.evaluations[0].requiredBaseCalls, 71);
 
+  // Derived from the rule helper's implementor limit (76 -> working cap 61), not a literal: the tier cap truncates the stronger formula (68).
+  // The observed call count equals that cap, so the required base (observed + 5 closing) still exceeds what the tier allows: the undercut survives the higher limit.
+  const implementorCap = dispatchWorkingCap(rule().maxTurnsByTier.implementor);
   const capped = evaluateDispatchBudgetCalibration({
     rule: rule({ fixedCalls: 60 }),
-    samples: [sample({ tier: "implementor", fileCount: 1, observedCalls: 40 })],
+    samples: [sample({ tier: "implementor", fileCount: 1, observedCalls: implementorCap })],
   });
   assert.equal(capped.evaluations[0].proposedBaseCalls, 68);
-  assert.equal(capped.evaluations[0].workingCap, 35);
-  assert.equal(capped.evaluations[0].effectiveBaseCalls, 35);
+  assert.ok(implementorCap < 68, "the tier cap must sit below the proposed formula for this case to truncate it");
+  assert.equal(capped.evaluations[0].workingCap, implementorCap);
+  assert.equal(capped.evaluations[0].effectiveBaseCalls, implementorCap);
   assert.equal(capped.evaluations[0].tierLimited, true);
   assert.equal(capped.evaluations[0].undercutsObservedBound, true);
 });

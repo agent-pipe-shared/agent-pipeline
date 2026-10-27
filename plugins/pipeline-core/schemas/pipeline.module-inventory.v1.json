@@ -18,6 +18,7 @@
     "verificationEntryPoints": {"type": "array", "items": {"type": "string"}},
     "adrReferences": {"type": "array", "items": {"type": "string"}},
     "profileSource": {"type": "string"},
+    "kind": {"type": "string", "enum": ["documentation"]},
     "provisional": {"type": "boolean"},
     "candidateBinding": {"type": "object", "properties": {"commit": {"type": "string"}, "tree": {"type": "string"}, "artifactDigests": {"type": "array", "items": {"type": "string"}}}}
   }

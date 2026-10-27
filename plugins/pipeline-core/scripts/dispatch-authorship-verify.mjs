@@ -560,6 +560,30 @@ export function verifyCommit(sha, deps) {
     catch { portableForRecord = { ok: false, code: "agy-export-readback-error" }; }
     return portableForRecord;
   };
+  if (isV4 && record.outcomeClassification?.kind === "orchestrator-attested") {
+    // D56: the orchestrator committed the delivery itself and attested it. This is a weaker, distinct verdict, never PASS and
+    // never host-observed: no Native-Host-Observed marker or private receipt backs it, so none of the host branches below
+    // may run. The commit must still be the record's own and the diff must stay inside what the record reports.
+    if (!isTerminalOutcome(record.outcome)) {
+      return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
+    }
+    const attestedShas = declaredCommits(record);
+    if (record.candidateCommit !== sha || !record.commits.includes(sha)) {
+      return result(sha, VERDICT.fail, "record-names-different-commit", `${record.schema} record is bound to a different candidate commit`, { taskId, declaredShas: attestedShas });
+    }
+    let attestedChanged;
+    try { attestedChanged = readChangedPaths(sha); } catch (error) {
+      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId });
+    }
+    const attestedDeclared = declaredPaths(record);
+    const attestedUncovered = attestedDeclared === null ? attestedChanged : attestedChanged.filter((path) => coveringPath(path, attestedDeclared) === null);
+    if (attestedUncovered.length > 0) {
+      return result(sha, VERDICT.fail, "record-paths-do-not-cover", `record does not declare ${attestedUncovered.length} changed path(s): ${attestedUncovered.join(", ")}`, { taskId, uncovered: attestedUncovered });
+    }
+    return result(sha, VERDICT.unverifiable, "orchestrator-attested-delivery",
+      `record for \`${taskId}\` is an orchestrator-attested delivery of commit \`${sha}\`: the orchestrator vouches for it, no host observation backs it, so it is weaker than a host-observed authored commit`,
+      { taskId, assurance: "orchestrator-attested", declaredShas: attestedShas });
+  }
   if (isV4 && !isCommitAuthorshipOutcome(record)) {
     return result(
       sha,

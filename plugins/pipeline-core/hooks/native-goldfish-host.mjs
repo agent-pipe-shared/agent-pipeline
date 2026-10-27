@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /** Claude/Codex native hook bridge for the explicitly marked Goldfish host-commit route. */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
 import { finalizeNativeGoldfishHostReturn } from "../lib/native-goldfish-host-finalizer.mjs";
@@ -19,7 +21,40 @@ export function qualifyNativeGoldfishHookDelivery({root,result}={}) {
   return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256})};
 }
 
-export function nativeGoldfishHookMessage(result) {
+const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+
+/** Newest stop-failure diagnostic the SubagentStop completion left (PF-61), or null. Diagnostic only: any fault reads as none. */
+export function readNativeGoldfishStopFailure({ commonDir } = {}) {
+  try {
+    if (typeof commonDir !== "string" || commonDir.length === 0) return null;
+    const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+    let newest = null;
+    for (const name of readdirSync(directory)) {
+      if (!/^stop-failure-[0-9a-f]+\.json$/u.test(name) && !/^stop-failure-[A-Za-z0-9_-]+\.json$/u.test(name)) continue;
+      let entry;
+      try { entry = JSON.parse(readFileSync(join(directory, name), "utf8")); } catch { continue; }
+      if (entry?.schema !== STOP_FAILURE_SCHEMA || typeof entry.code !== "string") continue;
+      const observedAt = typeof entry.observedAt === "string" ? entry.observedAt : "";
+      if (!newest || observedAt > newest.observedAt) {
+        newest = { code: entry.code, dispatchId: typeof entry.dispatchId === "string" ? entry.dispatchId : null, observedAt };
+      }
+    }
+    return newest;
+  } catch { return null; }
+}
+
+function stopFailureNotice(failure) {
+  if (!failure || typeof failure.code !== "string") return null;
+  return `A background Goldfish host commit failed at its stop (${failure.code})${failure.dispatchId ? ` for ${failure.dispatchId}` : ""}${failure.observedAt ? ` at ${failure.observedAt}` : ""}. No commit or authorship record is claimed; inspect the worktree and recover explicitly.`;
+}
+
+export function nativeGoldfishHookMessage(result, { stopFailure = null } = {}) {
+  const base = nativeGoldfishHookBaseMessage(result);
+  const notice = stopFailureNotice(stopFailure);
+  return base && notice ? `${base} ${notice}` : base ?? notice;
+}
+
+function nativeGoldfishHookBaseMessage(result) {
   if (!result || result.status === "not-applicable" || result.status === "agent-bound") return null;
   if (result.status === "authored-commit-recorded") {
     return `Goldfish host commit verified: ${result.commit}; v4 dispatch record: ${result.record?.target ?? "written"}.${result.delivery?` Item checks ${result.delivery.checkStatus?.verdict??"unqualified"}; Main integration ${result.integration?.status??"pending"} (${result.integration?.code??"held"}).`:""}`;
@@ -30,11 +65,11 @@ export function nativeGoldfishHookMessage(result) {
   }
   if (result.code === "NGHF-PENDING-UNAVAILABLE") {
     const why = result.reason === "async-launch"
-      ? "this Agent call ran in the background (run_in_background true, or an async_launched result), so no final return reached this hook and no pending host-commit state could complete it"
+      ? "this Agent call ran in the background (run_in_background true, or an async_launched result) and no pending host-commit state existed at PostToolUse time, so nothing can complete it at its stop"
       : "no pending host-commit state was prepared for this launch (the PreToolUse WARNING names the preparation code)";
     // PF-26B: when the PreToolUse guard recorded why preparation failed, name that exact code instead of pointing at a warning.
     const prepared = typeof result.preparationCode === "string" ? ` The pre-launch preparation failed with ${result.preparationCode}.` : "";
-    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Orchestrator route: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
+    return `Goldfish host commit was not completed (${result.code}): ${why}.${prepared} No commit or authorship record is claimed. Interim route: verify the child's diff yourself and commit it as the Elephant with the "Dispatch: <dispatchId> (goldfish)" trailer; that commit is not host-observed evidence. scripts/dispatch-record-write.mjs refuses a v4 authored-commit Claude record without host observation, so do not expect it to accept one for this launch.`;
   }
   if (result.code === "AGY-HOST-COMMIT-PIPELINE-PATH-UNIGNORED") {
     return `Goldfish host commit was not completed (${result.code}): the Pipeline's own working files (evidence/dispatch-route-*.json, scratch/) are not ignored by this project's .gitignore, so they count as changes the child never made. No commit or authorship record is claimed. Repair: add the lines /evidence/ and /scratch/ to the project's .gitignore and commit that change. Orchestrator route for this dispatch: verify the child's diff yourself, commit it with the "Dispatch: <dispatchId> (goldfish)" trailer, and write the dispatch record via scripts/dispatch-record-write.mjs.`;
@@ -59,7 +94,13 @@ if (isDirectInvocation(import.meta.url)) {
   // A stop hook must never block the stop: a fault after the finalizer ran degrades to the recovery message, exit 0.
   try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
-  const message = nativeGoldfishHookMessage(result);
+  // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
+  let stopFailure = null;
+  if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
+    try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()) }); }
+    catch { stopFailure = null; }
+  }
+  const message = nativeGoldfishHookMessage(result, { stopFailure });
   if (!message) process.exit(0);
   if (runner === "claude" && input.hook_event_name === "PostToolUse") {
     process.stdout.write(`${JSON.stringify({ hookSpecificOutput: {

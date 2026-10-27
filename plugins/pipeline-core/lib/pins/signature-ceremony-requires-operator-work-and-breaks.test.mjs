@@ -13,6 +13,7 @@
 import assert from "node:assert/strict";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -64,7 +65,7 @@ function io() {
   };
 }
 
-function prepare(root) {
+function prepare(root, options = {}) {
   const recorded = recordHumanGuardDenial({
     rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
     toolInput: { file_path: "notes.md", content: "ac258\n" },
@@ -72,7 +73,7 @@ function prepare(root) {
   });
   assert.equal(recorded.status, "planned");
   const out = io();
-  const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], out);
+  const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], out, options);
   return { status, out };
 }
 
@@ -85,19 +86,27 @@ test("signature preparation works in an unborn-HEAD repository (AC-258; formerly
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("the agent prepares: one call yields both commands; only sign-intent is the human's external step", () => {
+// Revised 2026-10-27 by PO decision (slice A, backlog item signature-ceremony-requires-operator-work-and-breaks):
+// the former pin was "one call yields both commands" and the second command carried the placeholder
+// <external-proof.json>. Now the person gets exactly ONE command, and the import is an agent action whose --proof
+// is the full path sign-intent writes. A proof inside the repository stays refused (ADR-0059 Decision 1).
+test("the agent prepares: the human gets one command (sign-intent); the proof import is an agent action with the full proof path", () => {
   const root = fixture({ born: true });
   try {
-    const { status, out } = prepare(root);
+    const proofDirectory = join(tmpdir(), "synthetic-po-key-directory");
+    const { status, out } = prepare(root, { proofDirectory });
     assert.equal(status, 0, out.stderr);
     const v = JSON.parse(out.stdout);
     assert.equal(v.status, "prepared");
+    assert.equal(v.operatorCommandCount, 1);
     assert.equal(v.signIntentCommand.executionBoundary, "attended-external-terminal");
     assert.equal(v.signIntentCommand.mutation, false);
     // proof import is an agent-side local-process command, not human copy-back
     assert.equal(v.authorizeBySignatureCommand.executionBoundary, "local-process");
-    assert.ok(v.authorizeBySignatureCommand.argv.includes("--proof"));
+    assert.equal(v.authorizeBySignatureCommand.argv[v.authorizeBySignatureCommand.argv.indexOf("--proof") + 1], join(proofDirectory, `proof-${v.intentSha256}.json`));
+    assert.doesNotMatch(`${out.stdout}\n${out.stderr}`, /<external-proof\.json>/u, "no placeholder anywhere in the hand-off");
     assert.doesNotMatch(out.stdout, /Step:|POSIX:|PowerShell:/u, "stdout stays machine-readable");
+    assert.doesNotMatch(out.stderr, /authorize-by-signature/u, "the operator channel names no second command");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -351,7 +360,10 @@ describe("unborn-HEAD signature ceremony on a scratch mirror of the live plugin 
     assert.match(prepared.intentSha256, /^[a-f0-9]{64}$/u);
     assert.ok(prepared.signIntentCommand.argv.includes(prepared.intentSha256), "the human is handed the digest the agent computed");
     assert.equal(prepared.signIntentCommand.executionBoundary, "attended-external-terminal");
-    assert.equal(prepared.authorizeBySignatureCommand.executionBoundary, "local-process");
+    // slice A (PO decision 2026-10-27): without a resolvable key directory no proof path is invented and no placeholder is
+    // handed over; the agent command is null and the operator still gets the one signing command.
+    assert.equal(prepared.authorizeBySignatureCommand, null);
+    assert.equal(prepared.operatorCommandCount, 1);
     assert.ok(ubIsUnborn(root), "preparing must not create a commit");
   });
 
@@ -535,11 +547,12 @@ function why(out) {
 
 function assertSigningBlocks(out) {
   const note = why(out);
-  assert.deepEqual([...out.stderr.matchAll(/^Step: (\S+)$/gmu)].map((m) => m[1]), ["sign-intent", "authorize-by-signature"], note);
-  assert.equal(countOf(out.stderr, "POSIX:"), 2, note);
-  assert.equal(countOf(out.stderr, "PowerShell:"), 2, note);
-  assert.equal(countOf(out.stderr, 'eval "$CMD"'), 2, note);
-  assert.equal(countOf(out.stderr, "Invoke-Expression $CMD"), 2, note);
+  // Revised 2026-10-27 (slice A): one operator block (sign-intent) per refusal; the proof import is an agent action.
+  assert.deepEqual([...out.stderr.matchAll(/^Step: (\S+)$/gmu)].map((m) => m[1]), ["sign-intent"], note);
+  assert.equal(countOf(out.stderr, "POSIX:"), 1, note);
+  assert.equal(countOf(out.stderr, "PowerShell:"), 1, note);
+  assert.equal(countOf(out.stderr, 'eval "$CMD"'), 1, note);
+  assert.equal(countOf(out.stderr, "Invoke-Expression $CMD"), 1, note);
 }
 
 describe("commit-scoped override course through the real pre-commit hook (AC-258)", () => {

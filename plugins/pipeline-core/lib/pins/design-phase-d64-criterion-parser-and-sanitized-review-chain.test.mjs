@@ -128,7 +128,9 @@ function submittedRoot(spec, { governed = true, legacySubmission = false, expect
   const deps = { dir: root, now: () => now, gitCandidate: () => ({ ok: true, ...CANDIDATE }), gitHead: () => ({ ok: true, commit: CANDIDATE.commit }),
     gitUserName: () => "Fixture", poGateProfile: () => ({ ok: true, value: evidence }),
     poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: sha(plan), specPath, specSha256: sha(spec) } }),
-    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex" };
+    designAdvisoryAdmission: () => ({ ok: true, id: "a".repeat(64) }), runner: "codex",
+    // D165-S4: submit-plan consults architecture readiness; this fixture has no architecture map, so it supplies a ready stub.
+    architectureEntryReadiness: () => ({ status: "ready", code: null, nextAction: null }) };
   const beforeSubmission = readFileSync(statePath(root), "utf8");
   let submitted;
   if (legacySubmission) {

@@ -949,3 +949,64 @@ describe("D162 S1 architecture measure", () => {
     assert.equal(JSON.parse(bad.stdout).code, "ARCHITECTURE-MEASURE-NO-COMMIT");
   });
 });
+
+describe("Class 6 and a module declared kind documentation (D9, part 4)", () => {
+  const writeMap = (rows) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "fit-doc-"));
+    fs.mkdirSync(path.join(root, "architecture/map"), { recursive: true });
+    fs.writeFileSync(path.join(root, "architecture/map/index.md"), "# Map\n");
+    for (const row of rows) {
+      const lines = Object.entries(row).flatMap(([k, v]) => (Array.isArray(v)
+        ? (v.length === 0 ? [`${k}: []`] : [`${k}:`, ...v.map((item) => `  - ${JSON.stringify(item)}`)])
+        : [`${k}: ${JSON.stringify(v)}`]));
+      fs.writeFileSync(path.join(root, "architecture/map", `${row.id}.md`), ["---", ...lines, "---", ""].join("\n"));
+    }
+    return root;
+  };
+  const base = (extra = {}) => ({ id: "docs", responsibility: "Documentation", nonResponsibilities: [], ownedPaths: ["docs/**"], publicContracts: [], allowedDependencies: [], authorityEffects: [], verificationEntryPoints: [], adrReferences: [], ...extra });
+  const class6 = (root) => {
+    const bundle = loadMapBundle(root);
+    assert.equal(bundle.ok, true, JSON.stringify(bundle.errors));
+    return { bundle, res: evaluateVerificationLocality({ rootDir: root, inventory: bundle }) };
+  };
+
+  it("the loader carries kind only when the concept declares it", () => {
+    const root = writeMap([base({ kind: "documentation" }), base({ id: "plain" })]);
+    const { bundle } = class6(root);
+    assert.equal(bundle.modules.find((m) => m.id === "docs").kind, "documentation");
+    assert.equal(Object.hasOwn(bundle.modules.find((m) => m.id === "plain"), "kind"), false);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("existing rows without kind keep exactly the previous key set", () => {
+    const root = writeMap([base()]);
+    const { bundle } = class6(root);
+    assert.deepEqual(Object.keys(bundle.modules[0]), ["type", "id", "responsibility", "nonResponsibilities", "ownedPaths", "publicContracts", "allowedDependencies", "authorityEffects", "verificationEntryPoints", "adrReferences", "profileSource", "provisional", "candidateBinding", "conceptFilePath"]);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("a documentation module with no entry points passes class 6", () => {
+    const root = writeMap([base({ kind: "documentation" })]);
+    const { res } = class6(root);
+    assert.equal(res.outcome, OUTCOME_PASS, JSON.stringify(res.violations));
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("the same module without kind yields missing-verification-entry-point with target none", () => {
+    const root = writeMap([base()]);
+    const { res } = class6(root);
+    assert.equal(res.outcome, OUTCOME_FINDING);
+    assert.equal(res.violations[0].ruleId, "missing-verification-entry-point");
+    assert.equal(res.violations[0].target, "none");
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("a documentation module whose declared entry point file is missing still yields the finding", () => {
+    const root = writeMap([base({ kind: "documentation", verificationEntryPoints: ["docs/check.mjs"] })]);
+    const { res } = class6(root);
+    assert.equal(res.outcome, OUTCOME_FINDING);
+    assert.equal(res.violations[0].ruleId, "missing-verification-entry-point");
+    assert.equal(res.violations[0].target, "docs/check.mjs");
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});

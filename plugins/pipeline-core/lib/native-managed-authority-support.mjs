@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 // Domain-specific physical source adapters. No handles or authority callbacks are minted here.
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { canonical } from './po-approval-proof.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
@@ -50,10 +50,41 @@ export const nativeManagedPostTerminalRecord = relativePath => /\/(advisor|readi
 /** The readiness host store publishes its private receipt next to processes/ after every complete run: <fingerprint>/receipts/<receipt id>.json. */
 const readinessReceiptPath = /^([a-f0-9]{64})\/receipts\/(drh_[a-f0-9]{32})\.json$/;
 const readinessNamespaceId = 'design-readiness-processes';
-export function readNativeManagedInventory(repository, domain) {
+// One dispatch admission re-reads the native-goldfish namespace once per registry boundary and per operation (hundreds of times for
+// the same unchanged files, ~35 ms each). A read is reused only while ALL of these hold: POSIX; the namespace's every directory and
+// file still has the identical (dev, ino, mode, nlink, size, mtime, ctime) as when it was read; the newest mtime/ctime is older than
+// the racy window (so a same-tick rewrite can never hide behind an equal stamp, as git's "racily clean" rule); and the read is younger
+// than the max age (a bounded staleness for the repository check, never a standing cache). Anything else re-reads in full.
+const inventoryReads = new Map();
+const INVENTORY_REUSE_MAX_AGE_MS = 1000;
+const INVENTORY_REUSE_RACY_MS = 2000;
+function inventoryFileSignature(rootPath, racyMs) {
+  if (process.platform === 'win32') return null;
+  const rows = []; let newest = 0n; let count = 0;
+  const visit = (path, depth) => {
+    if (depth > 6 || ++count > 4096) throw new Error('inventory-signature-bound');
+    const stat = lstatSync(path, { bigint: true });
+    if (stat.mtimeNs > newest) newest = stat.mtimeNs;
+    if (stat.ctimeNs > newest) newest = stat.ctimeNs;
+    rows.push(`${relative(rootPath, path)}|${stat.dev}|${stat.ino}|${stat.mode}|${stat.nlink}|${stat.size}|${stat.mtimeNs}|${stat.ctimeNs}`);
+    if (stat.isDirectory()) for (const name of readdirSync(path).sort()) visit(join(path, name), depth + 1);
+  };
+  try { visit(rootPath, 0); } catch { return null; }
+  return Date.now() - Number(newest / 1000000n) < racyMs ? null : rows.join('\n');
+}
+export function readNativeManagedInventory(repository, domain, { reuseMaxAgeMs = INVENTORY_REUSE_MAX_AGE_MS, reuseRacyMs = INVENTORY_REUSE_RACY_MS } = {}) {
   nativeManagedRepository(repository);
   const roots = domain === 'native-goldfish' ? [['native-goldfish-host-commit', join(repository.commonDir, 'agent-pipeline/run/native-goldfish-host-commit')]]
     : [[readinessNamespaceId, join(repository.commonDir, 'agent-pipeline/design-readiness-codex')], ['advisor-processes', join(repository.commonDir, 'agent-pipeline/advisor-codex')]];
+  const signature = domain === 'native-goldfish' ? inventoryFileSignature(roots[0][1], reuseRacyMs) : null;
+  const reusable = signature ? inventoryReads.get(roots[0][1]) : null;
+  if (reusable && reusable.signature === signature && Date.now() - reusable.at < reuseMaxAgeMs) return reusable.result;
+  const result = readNativeManagedInventoryFresh(repository, domain, roots);
+  if (signature) inventoryReads.set(roots[0][1], { signature, at: Date.now(), result });
+  else if (domain === 'native-goldfish') inventoryReads.delete(roots[0][1]);
+  return result;
+}
+function readNativeManagedInventoryFresh(repository, domain, roots) {
   // A readiness receipt is classified below and stays in the namespace membership, but it is not an operation journal entry:
   // the journal scan groups entries by directory and requires every group to hold an intent, which receipts/ never does.
   const withoutReceiptEntries = (namespaceId, scan) => namespaceId === readinessNamespaceId ? { ...scan, entries: scan.entries.filter(entry => !readinessReceiptPath.test(entry.relativePath)) } : scan;

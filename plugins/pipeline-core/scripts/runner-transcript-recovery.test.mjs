@@ -167,12 +167,20 @@ test("read emits byte-identical selected JSONL while current, foreign, and unkno
     const originalCodexHome = process.env.CODEX_HOME;
     process.stdout.write = (chunk) => { chunks.push(Buffer.from(chunk)); return true; };
     process.env.CODEX_HOME = codexHome;
+    // Justification (G23.forensics Slice B): pin the host identity to the claim so an ambient host session cannot conflict.
+    const savedIdentity = { CODEX_SESSION_ID: process.env.CODEX_SESSION_ID, CODEX_THREAD_ID: process.env.CODEX_THREAD_ID };
+    process.env.CODEX_SESSION_ID = "current-session";
+    process.env.CODEX_THREAD_ID = "current-session";
     try {
       main(["read", "--root", project, "--runner", "codex", "--exclude-session", "current-session", "--session-id", "prior-design"]);
     } finally {
       process.stdout.write = originalWrite;
       if (originalCodexHome === undefined) delete process.env.CODEX_HOME;
       else process.env.CODEX_HOME = originalCodexHome;
+      for (const [key, value] of Object.entries(savedIdentity)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
     const stdout = Buffer.concat(chunks);
     assert.deepEqual(stdout, readFileSync(prior));
@@ -294,9 +302,11 @@ test("export merges a multi-segment Codex session in first-record-timestamp orde
 
     // Data-minimising: counts, digests and timestamps only.
     assert.deepEqual(Object.keys(result).sort(), [
-      "firstTimestamp", "lastTimestamp", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
+      "childSessions", "completeness", "firstTimestamp", "incompleteReasons", "lastTimestamp", "recordCount", "runner", "schema", "segmentCount", "segmentOrder",
       "segments", "sessionId", "status", "unparsedLineCount", "usage",
     ]);
+    // Justification (G23.forensics Slice A): the key set is pinned on purpose; the three new keys are the completeness marker.
+    assert.equal(result.completeness, "partial", "this session holds a damaged line");
     for (const segment of result.segments) {
       assert.deepEqual(Object.keys(segment).sort(), ["byteLength", "firstTimestamp", "lastTimestamp", "ordinal", "recordCount", "sha256", "unparsedLineCount"]);
     }
@@ -471,7 +481,8 @@ test("the export CLI operation prints the same data-minimised JSON and rejects e
     codexSegment(codexHome, "prior.jsonl", { cwd: project, sessionId: "prior", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
     codexSegment(codexHome, "current.jsonl", { cwd: project, sessionId: "current-session" });
     claudeSegment(claudeHome, project, "prior.jsonl", [claudeUser("claude-prior", project, stamp("04:00:00")), claudeAssistant("claude-prior", project, stamp("04:00:01"), "msg_a", { input_tokens: 4, output_tokens: 2 })]);
-    const env = { CODEX_HOME: codexHome, CLAUDE_CONFIG_DIR: claudeHome };
+    // Justification (G23.forensics Slice B): main reads the process environment, so the host identity is pinned to the claim here.
+    const env = { CODEX_HOME: codexHome, CLAUDE_CONFIG_DIR: claudeHome, CODEX_SESSION_ID: "current-session", CODEX_THREAD_ID: "current-session", CLAUDE_CODE_SESSION_ID: "current-session" };
     for (const [runner, sessionId] of [["codex", "prior"], ["claude", "claude-prior"], ["antigravity", "prior"]]) {
       const expected = recovery.exportRunnerTranscript({ rootDir: project, runner, excludeSession: "current-session", sessionId, env });
       const stdout = runMain(["export", "--root", project, "--runner", runner, "--exclude-session", "current-session", "--session-id", sessionId], env);
@@ -488,5 +499,139 @@ test("the export CLI operation prints the same data-minimised JSON and rejects e
     ]) {
       assert.deepEqual(JSON.parse(runMain(argv, env)), invalid, argv.join(" "));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// G23.forensics Slice A: the export says whether it saw the whole session, and why not.
+// ---------------------------------------------------------------------------------------------
+
+test("export marks completeness: a clean session is complete, a skipped line makes it partial, children are never inferred", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, "clean.jsonl", { cwd: project, sessionId: "clean", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
+    codexSegment(codexHome, "damaged.jsonl", { cwd: project, sessionId: "damaged", metaTimestamp: stamp("06:00:00"), records: [tokenCount(stamp("06:01:00"), 9)], rawLines: ["{ damaged"] });
+    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", env: { CODEX_HOME: codexHome } };
+    const clean = recovery.exportRunnerTranscript({ ...args, sessionId: "clean" });
+    assert.equal(clean.status, "available");
+    assert.equal(clean.completeness, "complete");
+    assert.deepEqual(clean.incompleteReasons, []);
+    assert.equal(clean.childSessions, "not-inferred");
+    const damaged = recovery.exportRunnerTranscript({ ...args, sessionId: "damaged" });
+    assert.equal(damaged.status, "available");
+    assert.equal(damaged.completeness, "partial");
+    assert.deepEqual(damaged.incompleteReasons, ["records-skipped"]);
+    assert.equal(damaged.childSessions, "not-inferred");
+  });
+});
+
+test("export reports candidate-bound-reached for Codex and Claude when the enumeration cap truncates, and complete at exactly the cap", () => {
+  withExportFixture(({ project, codexHome, claudeHome }) => {
+    for (const name of ["w1", "w2", "w3"]) {
+      codexSegment(codexHome, `${name}.jsonl`, { cwd: project, sessionId: "wide", metaTimestamp: stamp("05:00:00"), records: [{ type: "note", name }] });
+      claudeSegment(claudeHome, project, `${name}.jsonl`, [claudeUser("wide", project, stamp("05:00:00"))]);
+    }
+    const env = { CODEX_HOME: codexHome, CLAUDE_CONFIG_DIR: claudeHome };
+    for (const runner of ["codex", "claude"]) {
+      const cut = recovery.exportRunnerTranscript({ rootDir: project, runner, excludeSession: "current-session", sessionId: "wide", env, limits: { maxCandidates: 2 } });
+      assert.equal(cut.status, "available", runner);
+      assert.equal(cut.completeness, "partial", runner);
+      assert.ok(cut.incompleteReasons.includes("candidate-bound-reached"), runner);
+      assert.equal(cut.childSessions, "not-inferred", runner);
+    }
+    // Exactly at the cap nothing was left unread: the Codex store holds only 2 of the 'exact' files in a directory of its own.
+    const exactCodex = join(codexHome, "exact-store");
+    for (const name of ["e1", "e2"]) codexSegment(exactCodex, `${name}.jsonl`, { cwd: project, sessionId: "exact", metaTimestamp: stamp("06:00:00"), records: [{ type: "note", name }] });
+    const atCap = recovery.exportRunnerTranscript({ rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: "exact", env: { CODEX_HOME: exactCodex }, limits: { maxCandidates: 2 } });
+    assert.equal(atCap.completeness, "complete");
+    assert.deepEqual(atCap.incompleteReasons, []);
+  });
+});
+
+test("export reports byte-ceiling when an optional seam ceiling truncates a segment, without failing or hiding the full digest", () => {
+  withExportFixture(({ project, codexHome }) => {
+    const path = codexSegment(codexHome, "big.jsonl", {
+      cwd: project, sessionId: "big", metaTimestamp: stamp("05:00:00"),
+      records: [tokenCount(stamp("05:01:00"), 1), tokenCount(stamp("05:02:00"), 2), tokenCount(stamp("05:03:00"), 3)],
+    });
+    const full = readFileSync(path);
+    const args = { rootDir: project, runner: "codex", excludeSession: "current-session", sessionId: "big", env: { CODEX_HOME: codexHome } };
+    const whole = recovery.exportRunnerTranscript(args);
+    assert.equal(whole.completeness, "complete");
+    assert.equal(whole.recordCount, 4);
+    const cut = recovery.exportRunnerTranscript({ ...args, limits: { maxSegmentBytes: Math.floor(full.length / 2) } });
+    assert.equal(cut.status, "available");
+    assert.equal(cut.completeness, "partial");
+    assert.deepEqual(cut.incompleteReasons, ["byte-ceiling"]);
+    assert.ok(cut.recordCount < 4, "records beyond the ceiling are not counted");
+    assert.equal(cut.segments[0].byteLength, full.length, "the segment digest and length still identify the whole file");
+    assert.equal(cut.segments[0].sha256, sha256Of(full));
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// G23.forensics Slice B: a claimed current session is checked against the host identity on every
+// transcript operation, not only audit-current.
+// ---------------------------------------------------------------------------------------------
+
+const IDENTITY_CONFLICT = "MODEL-ROLE-SESSION-IDENTITY-CONFLICT";
+
+test("export, list and read refuse a claimed current session that differs from the host identity, and still pass when it matches", () => {
+  withExportFixture(({ project, codexHome, claudeHome }) => {
+    codexSegment(codexHome, "prior.jsonl", { cwd: project, sessionId: "prior", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
+    claudeSegment(claudeHome, project, "prior.jsonl", [claudeUser("claude-prior", project, stamp("04:00:00"))]);
+    const base = { rootDir: project, excludeSession: "claimed-session" };
+    const codexEnv = (extra) => ({ CODEX_HOME: codexHome, ...extra });
+    const refused = (runner, env) => ({ schema: SCHEMA, status: "unavailable", runner, reason: IDENTITY_CONFLICT, env });
+    void refused;
+    const expectRefusal = (result, runner, label) => {
+      assert.equal(result.status, "unavailable", label);
+      assert.equal(result.runner, runner, label);
+      assert.equal(result.reason, IDENTITY_CONFLICT, label);
+    };
+    // Codex: the host says "host-session", the caller claims "claimed-session".
+    const mismatch = { ...base, runner: "codex", env: codexEnv({ CODEX_THREAD_ID: "host-session" }) };
+    expectRefusal(recovery.exportRunnerTranscript({ ...mismatch, sessionId: "prior" }), "codex", "export");
+    expectRefusal(recovery.listRunnerTranscripts(mismatch), "codex", "list");
+    expectRefusal(recovery.readRunnerTranscript({ ...mismatch, sessionId: "prior" }), "codex", "read");
+    // Claude export: the single CLAUDE_CODE_SESSION_ID disagrees with the claim.
+    expectRefusal(recovery.exportRunnerTranscript({ ...base, runner: "claude", env: { CLAUDE_CONFIG_DIR: claudeHome, CLAUDE_CODE_SESSION_ID: "host-session" }, sessionId: "claude-prior" }), "claude", "claude export");
+    // A matching claim passes on every operation.
+    const match = { ...base, runner: "codex", env: codexEnv({ CODEX_THREAD_ID: "claimed-session", CODEX_SESSION_ID: "claimed-session" }) };
+    assert.equal(recovery.exportRunnerTranscript({ ...match, sessionId: "prior" }).status, "available");
+    assert.equal(recovery.listRunnerTranscripts(match).status, "available");
+    assert.equal(recovery.readRunnerTranscript({ ...match, sessionId: "prior" }).status, "available");
+    assert.equal(recovery.exportRunnerTranscript({ ...base, runner: "claude", env: { CLAUDE_CONFIG_DIR: claudeHome, CLAUDE_CODE_SESSION_ID: "claimed-session" }, sessionId: "claude-prior" }).status, "available");
+  });
+});
+
+test("export, list and read refuse conflicting CODEX_SESSION_ID and CODEX_THREAD_ID even when the claim equals one of them", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, "prior.jsonl", { cwd: project, sessionId: "prior", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
+    const conflicting = { rootDir: project, runner: "codex", excludeSession: "claimed-session", env: { CODEX_HOME: codexHome, CODEX_SESSION_ID: "claimed-session", CODEX_THREAD_ID: "other-thread" } };
+    for (const [label, result] of [
+      ["export", recovery.exportRunnerTranscript({ ...conflicting, sessionId: "prior" })],
+      ["list", recovery.listRunnerTranscripts(conflicting)],
+      ["read", recovery.readRunnerTranscript({ ...conflicting, sessionId: "prior" })],
+    ]) {
+      assert.equal(result.status, "unavailable", label);
+      assert.equal(result.reason, IDENTITY_CONFLICT, label);
+    }
+  });
+});
+
+test("the CLI refuses a claimed current session that conflicts with the host identity", () => {
+  withExportFixture(({ project, codexHome }) => {
+    codexSegment(codexHome, "prior.jsonl", { cwd: project, sessionId: "prior", metaTimestamp: stamp("05:00:00"), records: [tokenCount(stamp("05:01:00"), 7)] });
+    const hostEnv = { CODEX_HOME: codexHome, CODEX_SESSION_ID: "host-session", CODEX_THREAD_ID: "host-session" };
+    for (const argv of [
+      ["export", "--root", project, "--runner", "codex", "--exclude-session", "claimed-session", "--session-id", "prior"],
+      ["list", "--root", project, "--runner", "codex", "--exclude-session", "claimed-session"],
+    ]) {
+      const printed = JSON.parse(runMain(argv, hostEnv));
+      assert.equal(printed.status, "unavailable", argv[0]);
+      assert.equal(printed.reason, IDENTITY_CONFLICT, argv[0]);
+    }
+    const ok = JSON.parse(runMain(["export", "--root", project, "--runner", "codex", "--exclude-session", "host-session", "--session-id", "prior"], hostEnv));
+    assert.equal(ok.status, "available");
   });
 });

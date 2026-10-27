@@ -292,6 +292,32 @@ test("AC-179 (one refresh for all hooks): the rendered refusal of both hooks nam
   assert.equal(refusalCommand(renderPreCommitImpl({ pluginLibDir: snapshotLib, pluginHooksDir: "/h", pluginScriptsDir: "/s", sourcePluginLibDir: lib })), `node "${resolve(PLUGIN, "scripts", "pre-commit-hook-install.mjs")}" --install`);
 });
 
+test("AC-179 (no bypass, D52): the rendered stale refusal of both hooks names the refresh command and states that bypassing the hook is forbidden", () => {
+  const lib = join(PLUGIN, "lib"), root = join(REPO, "scratch", "one-refresh-root");
+  const snapshotLib = "/state/runtime-" + "a".repeat(64) + "/lib";
+  const rendered = {
+    "commit-msg": renderCommitMsgImpl(snapshotLib, lib, root),
+    "pre-commit": renderPreCommitImpl({ pluginLibDir: snapshotLib, pluginHooksDir: "/h", pluginScriptsDir: "/s", sourcePluginLibDir: lib, rootDir: root }),
+  };
+  for (const [name, text] of Object.entries(rendered)) {
+    assert.match(text, /refresh-mandatory-hooks\.mjs/u, `${name} still names the refresh command`);
+    assert.match(text, /--no-verify/u, `${name} names --no-verify as the forbidden bypass`);
+    assert.match(text, /bypass[^"\n]*forbidden/iu, `${name} states that bypassing is forbidden`);
+  }
+});
+
+test("AC-179 (no bypass, D52, installed hooks): the printed stale refusal tells the committer not to bypass the hook", { timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS }, (t) => {
+  for (const hook of Object.values(HOOKS)) {
+    const world = installedHookWorld(t, { consumer: false });
+    assert.equal(hook.apply(world.project, world.pluginRoot).status, "installed");
+    world.updatePlugin();
+    const refused = world.commit();
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /--no-verify/u, refused.stderr);
+    assert.match(refused.stderr, /bypass[^\n]*forbidden/iu, refused.stderr);
+  }
+});
+
 test("AC-179 (consumer layout): with the plugin installed outside the project, staleness binds to the installed plugin and the printed refresh command repairs it", { timeout: INSTALLED_HOOK_TEST_TIMEOUT_MS }, (t) => {
   const world = installedHookWorld(t, { consumer: true });
   const hook = HOOKS["commit-msg"];

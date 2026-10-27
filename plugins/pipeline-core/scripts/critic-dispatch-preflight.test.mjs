@@ -978,4 +978,37 @@ test("a new feature ID cannot reset logical work after an actual feature packet 
   } finally {rmSync(fx.root,{recursive:true,force:true});}
 });
 
+test("the shared guardrail derivation lists a changed JSON manifest as required with reason changed-manifest", async () => {
+  const fx = fixture();
+  try {
+    writeFileSync(join(fx.root, ".claude", "pipeline.json"), "{}\n");
+    const candidate = commit(fx.root, "change the JSON manifest");
+    const { deriveRequiredCriticGuardrails } = await import("../lib/critic-required-guardrails.mjs");
+    const result = deriveRequiredCriticGuardrails({ root: fx.root, candidate, base: fx.candidate, explicitGuardrails: [] });
+    const manifest = result.required.find(({ path }) => path === ".claude/pipeline.json");
+    assert.ok(manifest, JSON.stringify(result.required));
+    assert.deepEqual(manifest.reasons, ["changed-manifest"]);
+    assert.deepEqual(result.paths, result.required.map(({ path }) => path));
+    assert.deepEqual([...result.paths].sort(), result.paths);
+    assert.deepEqual(result.paths, [".claude/pipeline.json", ".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"]);
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+test("a diagnostic lacking required guardrails fails CDI-GUARDRAILS and the failure lists exactly the required paths", () => {
+  const fx = fixture();
+  try {
+    const value = produceCriticDiagnostic({ root: fx.root, specPath: "specs/spec.md", guardrailPaths: [], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/lacking.log" });
+    writeFileSync(join(fx.root, "evidence/lacking.json"), JSON.stringify(value));
+    const required = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
+    assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/lacking.json"] })), (error) => {
+      assert.ok(error instanceof CriticDispatchPreflightError);
+      assert.equal(error.code, "CDP-EVIDENCE-MODE");
+      assert.equal(error.details.diagnosticCode, "CDI-GUARDRAILS");
+      assert.deepEqual(error.details.requiredGuardrailPaths, required);
+      for (const path of required) assert.ok(error.message.includes(path), error.message);
+      return true;
+    });
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});

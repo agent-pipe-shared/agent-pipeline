@@ -250,6 +250,16 @@ const PROJECT_IGNORE_SEED = [
 // gap check (below) can never silently drift apart the way a duplicated
 // literal array would.
 const REQUIRED_PROJECT_IGNORE_PATTERNS = PROJECT_IGNORE_SEED.split("\n").filter((line) => line.startsWith("/"));
+// D47: digest-bound evidence bytes must survive a checkout with core.autocrlf=true.
+// Same single-source rule as the ignore patterns: the required lines are derived from
+// the seed. Seeded only for a project that owns no .gitattributes; an owned file is
+// never rewritten, only asked about (mutation:false).
+const PROJECT_ATTRIBUTES_SEED = [
+  "specs/**/evidence/** text eol=lf",
+  "evidence/** text eol=lf",
+  "",
+].join("\n");
+const REQUIRED_PROJECT_ATTRIBUTE_LINES = PROJECT_ATTRIBUTES_SEED.split("\n").filter((line) => line.length > 0);
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const SETTINGS_ALLOWLIST_MERGE_SCRIPT = fileURLToPath(new URL("../scripts/settings-allowlist-merge.mjs", import.meta.url));
 const ONBOARDING_INIT_DRIVER = fileURLToPath(new URL("../scripts/onboarding-init.mjs", import.meta.url));
@@ -5712,6 +5722,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   // and it throws on a target that appeared during activation), so a project that
   // already owns a `.gitignore` is never touched -- it simply gets no such target.
   const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
+  const seedsProjectAttributes = !(inspected.entries ?? []).includes(".gitattributes");
   // Both scaffold producers answer only to a fresh classification. An `existing-unmanaged`
   // root that the bounded walk proves code-free is presented to them as `fresh`, so the
   // bytes stay identical to what the PRD gate and the design inspection compare against.
@@ -5730,6 +5741,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     { path: SOURCE, bytes: renderYaml(intent) },
     { path: CONSUMER_VERIFY_ADAPTER_PATH, bytes: CONSUMER_VERIFY_ADAPTER },
     ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
+    ...(seedsProjectAttributes ? [{ path: ".gitattributes", bytes: PROJECT_ATTRIBUTES_SEED }] : []),
   ].sort((left, right) => {
     // Publish the physical map before its root entry pointer. The remaining
     // scaffold retains deterministic path order; apply uses this same array.
@@ -5741,8 +5753,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     // The project entry and ignore file are not compiled V3 runtime targets.
     kind: target.path === SOURCE
       ? "source"
-      : (target.path === ".gitignore"
-        ? "project-ignore"
+      : (target.path === ".gitignore" || target.path === ".gitattributes"
+        ? (target.path === ".gitignore" ? "project-ignore" : "project-attributes")
         : (target.path === "AGENTS.md" ? "project-entry" : (target.path.startsWith("docs/adr/") ? "project-decision-records"
           : (target.path.startsWith("project/") ? "project-authority" : "runtime")))),
     before: describe(null),
@@ -5841,6 +5853,39 @@ function collectProjectIgnoreGapAction(missing) {
     mutation: false,
     requiresConfirmation: false,
     guidance: `this repository already owns a .gitignore, so onboarding never rewrote it -- but it is missing ${missing.join(" and ")}, exactly the paths the Pipeline's own evidence and security producers write into. Left out, their output can dirty the working tree AFTER a push signature already exists, with no way back: the signature is bound to the exact commit it was produced for, and committing the producers' output moves that commit. Ask the PO, then append these anchored lines to this repository's own .gitignore yourself, with ordinary tools -- onboarding will never write to a file the project owns: ${missing.join(" ")}. Reply with a short acknowledgment ("done" or "skip") once the PO has seen this, whether or not they acted on it now.`,
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
+// D47 siblings of the .gitignore gap functions above: content-based, exact trimmed
+// lines, an owned file is only ever asked about, never rewritten.
+function missingProjectAttributeLines(attributesText) {
+  const present = new Set(String(attributesText ?? "").split(/\r?\n/u).map((line) => line.trim()));
+  return REQUIRED_PROJECT_ATTRIBUTE_LINES.filter((line) => !present.has(line));
+}
+function readProjectAttributesText(root, fs) {
+  try {
+    const path = safePath(root, ".gitattributes", fs);
+    return fs.existsSync(path) ? fs.readFileSync(path, "utf8") : "";
+  } catch {
+    return "";
+  }
+}
+function collectProjectAttributesGapAction(missing) {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "projectAttributesGapAcknowledged",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: PROJECT_IGNORE_GAP_ACK_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `this repository already owns a .gitattributes, so onboarding never rewrote it -- but it is missing ${missing.join(" and ")}, the line-ending attributes for the paths the Pipeline's digest-bound evidence is written into. Without them a checkout with core.autocrlf=true rewrites those bytes to CRLF and their digests no longer match. Ask the PO, then append these exact lines to this repository's own .gitattributes yourself, with ordinary tools -- onboarding will never write to a file the project owns: ${missing.join(" ")}. Reply with a short acknowledgment ("done" or "skip") once the PO has seen this, whether or not they acted on it now.`,
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
 }
@@ -6266,10 +6311,12 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     // for that case without needing to know which branch produced the file.
     const missingIgnorePatterns = state.hostManaged ? [] : missingProjectIgnorePatterns(readProjectIgnoreText(root, fs));
     const projectIgnoreGap = missingIgnorePatterns.length > 0 ? { projectIgnoreGapAction: collectProjectIgnoreGapAction(missingIgnorePatterns) } : {};
+    const missingAttributeLines = state.hostManaged ? [] : missingProjectAttributeLines(readProjectAttributesText(root, fs));
+    const projectAttributesGap = missingAttributeLines.length > 0 ? { projectAttributesGapAction: collectProjectAttributesGapAction(missingAttributeLines) } : {};
     if (missingIdentity.length > 0) {
-      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, governanceEnrollment, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap };
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, governanceEnrollment, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [], ...projectIgnoreGap, ...projectAttributesGap };
     }
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, governanceEnrollment, diagnostics: [], ...projectIgnoreGap };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, runnerPermissions, prePushHookInstall, preCommitHookInstall, commitMsgHookInstall, governanceEnrollment, diagnostics: [], ...projectIgnoreGap, ...projectAttributesGap };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
@@ -6925,6 +6972,7 @@ function withPendingAsksSurfacedOnNextAction(observed, fs) {
     initialAnswersAction === null ? observed.pushApprovalSetupAction : null,
     trustSetupBundled || publicAnchorPlan !== null ? null : observed.trustAnchorGuidanceAction,
     observed.projectIgnoreGapAction,
+    observed.projectAttributesGapAction,
   ].filter(Boolean);
   if (observed.nextAction == null) return observed;
   // Keep the current genuine primary question. Once answered, the ordinary
@@ -7226,6 +7274,15 @@ function withPendingProjectIgnoreGapAsk(observed, fs) {
   return { ...observed, projectIgnoreGapAction: collectProjectIgnoreGapAction(missing) };
 }
 
+// D47 sibling of withPendingProjectIgnoreGapAsk(): same gating, content-based.
+function withPendingProjectAttributesGapAsk(observed, fs) {
+  if (observed.repository?.mode !== "local") return observed;
+  if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  const missing = missingProjectAttributeLines(readProjectAttributesText(observed.root, fs));
+  if (missing.length === 0) return observed;
+  return { ...observed, projectAttributesGapAction: collectProjectAttributesGapAction(missing) };
+}
+
 // NVA-V13-ASKWINDOW (backlog: the onboarding asks survive past the one call
 // that publishes them): the five-wrapper ask chain used to be spelled out
 // TWICE, verbatim, on the two `applyLifecycle()` "portable" branch return
@@ -7237,7 +7294,7 @@ function withPendingProjectIgnoreGapAsk(observed, fs) {
 // instead. Byte-for-byte the same composition the two call sites spelled out
 // before this refactor -- a pure extraction, not a behavior change.
 function withAllPendingOnboardingAsksAttached(observed, fs) {
-  return withPendingAsksSurfacedOnNextAction(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs);
+  return withPendingAsksSurfacedOnNextAction(withPendingProjectAttributesGapAsk(withPendingProjectIgnoreGapAsk(withPendingTrustAnchorGuidanceAsk(withPendingVerifyContractAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(observed, fs), fs)), fs), fs), fs), fs);
 }
 
 // Sibling of `withAllPendingOnboardingAsksAttached()` immediately above, for

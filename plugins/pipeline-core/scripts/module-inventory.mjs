@@ -100,6 +100,7 @@ export function loadConceptFile(filePath, schema = getModuleInventorySchema()) {
     allowedDependencies: parsedFrontmatter.allowedDependencies || [],
     authorityEffects: parsedFrontmatter.authorityEffects || [],
     verificationEntryPoints: parsedFrontmatter.verificationEntryPoints || [],
+    ...(parsedFrontmatter.kind === undefined ? {} : { kind: parsedFrontmatter.kind }),
     adrReferences: parsedFrontmatter.adrReferences || [],
     profileSource: parsedFrontmatter.profileSource || "inherited-agent-first",
     provisional: Boolean(parsedFrontmatter.provisional),

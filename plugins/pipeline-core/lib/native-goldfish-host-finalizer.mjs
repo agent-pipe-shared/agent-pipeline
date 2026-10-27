@@ -9,7 +9,7 @@ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, wri
 import { parseStrictJson } from './governance-event.mjs';
 /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
 import { realpathSync } from "node:fs";
-import { mkdirSync as stopMkdir, writeFileSync as stopWrite, unlinkSync as stopUnlink } from "node:fs";
+import { mkdirSync as stopMkdir, writeFileSync as stopWrite, unlinkSync as stopUnlink, readdirSync as stopReaddir, readFileSync as stopRead } from "node:fs";
 import { createHash as stopHash } from "node:crypto";
 import { resolve, dirname, isAbsolute, join } from "node:path";
 import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit, NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA } from "./agy-host-commit-admission.mjs";
@@ -136,7 +136,9 @@ function observeClaudeSubagentStop(input, pending, mark) {
   const state = pending.state;
   if (typeof input.session_id !== "string" || input.session_id !== state.sessionId
     || state.runner !== "claude" || state.binding?.runner !== "claude") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
-  const bind = (text) => validateNativeGoldfishFinal(text, { binding: state.binding });
+  // D31: a budget-stop hand-back is a typed "checkpoint" outcome of the shared return validator; only this SubagentStop
+  // route allows it, so the foreground and Codex routes keep admitting a success only.
+  const bind = (text) => validateNativeGoldfishFinal(text, { binding: state.binding, allowCheckpoint: true });
   let final = typeof input.last_assistant_message === "string" ? bind(input.last_assistant_message)
     : { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
   if (!final.ok) {
@@ -149,16 +151,33 @@ function observeClaudeSubagentStop(input, pending, mark) {
 }
 
 // PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
-// leaves a small diagnostic next to its pending state, naming the exact code. A later success removes it. Diagnostic only:
+// leaves a small diagnostic next to its pending state, naming the exact code. A later success removes every diagnostic
+// recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
 // any fault here is swallowed, the hook stays non-blocking.
 const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
-function recordSubagentStopOutcome({ stop }, result) {
-  if (!stop) return;
+function recordSubagentStopOutcome({ stop, dispatch }, result) {
+  if (!stop && !dispatch) return;
   try {
     // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
-    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+    const commonDir = stop ? stop.commonDir : dispatch.commonDir;
+    const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+    if (result?.status === "authored-commit-recorded") {
+      const dispatchId = stop ? stop.state.binding.dispatchId : dispatch.dispatchId;
+      let entries = [];
+      try { entries = stopReaddir(directory); } catch { /* none to remove */ }
+      for (const entry of entries) {
+        if (!/^stop-failure-.+\.json$/u.test(entry)) continue;
+        try {
+          const recorded = JSON.parse(stopRead(join(directory, entry), "utf8"));
+          if (typeof recorded?.dispatchId === "string" && recorded.dispatchId === dispatchId) stopUnlink(join(directory, entry));
+        } catch { /* unreadable or foreign: left alone */ }
+      }
+      return;
+    }
+    if (!stop) return;
+    // D31: a checkpoint is not a failure; it writes no diagnostic.
+    if (result?.status === "checkpoint-recorded") return;
     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
-    if (result?.status === "authored-commit-recorded") { try { stopUnlink(join(directory, name)); } catch { /* none to remove */ } return; }
     // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
     if (!stop.viaHandback) return;
     stopMkdir(directory, { recursive: true, mode: 0o700 });
@@ -277,8 +296,14 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
   } else return fail("NGHF-NOT-APPLICABLE", "not-applicable");
 
   const state = pending.state;
+  diagnostic.dispatch = { commonDir, dispatchId: state.binding.dispatchId };
   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
   if (!observation?.ok) return fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized");
+  // D31: a checkpoint is an interim hand-back of a budget stop. Nothing is consumed, committed, released or cancelled, so
+  // the reservation stays live and a repeat is idempotent; the result names the two continuation routes.
+  if (observation.final.outcome === "checkpoint") return { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE",
+    dispatchId: state.binding.dispatchId, commit: null, record: null, reservation: "live",
+    continuation: { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" } };
   if (observation.final.outcome !== "succeeded") return fail("NGHF-RETURN-NOT-SUCCESS", "not-finalized");
 
   const concurrent=state.binding.itemDelivery&&state.baseline?.schema===NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA;

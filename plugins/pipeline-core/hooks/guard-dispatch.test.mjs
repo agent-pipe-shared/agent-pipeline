@@ -1048,7 +1048,76 @@ manualCheck("GD66 the kept-queue-row warning names the cancel with --class and o
   }
 });
 
-assert.equal(cases.length, 67, "the complete dispatch guard corpus must register before execution");
+// W7 slice A -- a Goldfish or Critic dispatch whose prompt is not template-shaped is WARNED about, never refused for the shape.
+const SHAPE_WARNING_CODE = "GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED";
+const shapeWarningLine = (stderr) => stderr.split("\n").find((line) => line.includes(SHAPE_WARNING_CODE)) ?? "";
+manualCheck("GD67 a pipeline-core goldfish dispatch without the six template headings is warned about, naming goldfish-task.md (W7 A-i)", () => {
+  const { stderr } = run({ tool_use_id: "gd67", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: "Please implement the feature quickly, details are in my head." } });
+  const line = shapeWarningLine(stderr);
+  assert.ok(line.startsWith("WARNING (guard-dispatch):"), `a WARNING line is expected -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.ok(line.includes("templates/prompts/goldfish-task.md"), line);
+  assert.ok(!line.includes("BLOCKED"), line);
+});
+manualCheck("GD68 a template-shaped goldfish or critic prompt emits no shape warning (W7 A-ii)", () => {
+  const goldfish = run({ tool_use_id: "gd68a", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") } });
+  assert.equal(shapeWarningLine(goldfish.stderr), "", goldfish.stderr.slice(0, 300));
+  const critic = run({ tool_use_id: "gd68b", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" }) } });
+  assert.equal(shapeWarningLine(critic.stderr), "", critic.stderr.slice(0, 300));
+});
+manualCheck("GD69 a pipeline-core critic dispatch without the review-template headings is warned about and still admitted (W7 A-iii)", () => {
+  const { code, stderr } = run({ tool_use_id: "gd69", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: CLEAN_CRITIC } });
+  const line = shapeWarningLine(stderr);
+  assert.equal(code, ALLOW, `the shape warning must never refuse -- ${stderr.trim().slice(0, 300)}`);
+  assert.ok(line.startsWith("WARNING (guard-dispatch):") && line.includes("templates/prompts/critic-review.md"), `got ${JSON.stringify(stderr.slice(0, 300))}`);
+});
+manualCheck("GD70 a non-pipeline agent type with a free prompt emits no shape warning (W7 A-iv)", () => {
+  for (const builtIn of ["Explore", "general-purpose"]) {
+    const { stderr } = run({ tool_use_id: `gd70-${builtIn}`, tool_name: "Agent", tool_input: { subagent_type: builtIn, model: "sonnet", description: "research", prompt: "Read the repository and report where X is defined." } });
+    assert.equal(shapeWarningLine(stderr), "", `${builtIn}: ${stderr.slice(0, 300)}`);
+  }
+});
+
+// W7 slice B -- a refused Plan dispatch names the admitted route; an unchanged retry in the same session is stopped with a pointer.
+const planPayload = (id, prompt = "Plan the refactor of module X and list the steps.") => ({ session_id: `gd71-session-${process.pid}`, tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: "Plan", model: "sonnet", description: "plan", prompt } });
+manualCheck("GD71 a refused Plan dispatch names the single admitted route in its message (W7 B-i)", () => {
+  const { code, stderr } = run({ ...planPayload("gd71"), session_id: `gd71-first-${process.pid}` });
+  assert.equal(code, BLOCK, stderr.slice(0, 300));
+  assert.ok(stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), stderr.slice(0, 300));
+  assert.match(stderr, /admitted route: [^\n]*Explore/u, stderr.slice(0, 400));
+});
+manualCheck("GD72 an unchanged retry of a refused Plan dispatch in the same session is refused with a pointer instead of the full text; a changed prompt or another session gets the full text (W7 B-ii)", () => {
+  const first = run(planPayload("gd72a"));
+  assert.equal(first.code, BLOCK, first.stderr.slice(0, 300));
+  assert.ok(first.stderr.includes("a write-capable dispatch requires"), first.stderr.slice(0, 300));
+  const retry = run(planPayload("gd72b"));
+  assert.equal(retry.code, BLOCK, retry.stderr.slice(0, 300));
+  assert.ok(retry.stderr.includes("GUARD-DISPATCH-REFUSED-RETRY"), retry.stderr.slice(0, 300));
+  assert.ok(retry.stderr.includes("backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md"), retry.stderr.slice(0, 300));
+  assert.ok(!retry.stderr.includes("a write-capable dispatch requires"), "the retry must not repeat the full text");
+  const changed = run(planPayload("gd72c", "A different planning prompt."));
+  assert.ok(changed.stderr.includes("a write-capable dispatch requires") && !changed.stderr.includes("GUARD-DISPATCH-REFUSED-RETRY"), changed.stderr.slice(0, 300));
+  const other = run({ ...planPayload("gd72d"), session_id: `gd72-other-${process.pid}` });
+  assert.ok(other.stderr.includes("a write-capable dispatch requires") && !other.stderr.includes("GUARD-DISPATCH-REFUSED-RETRY"), other.stderr.slice(0, 300));
+});
+
+// Admission budget (PO direction 2026-10-27): a dispatch admission was measured at 102 to 112 s and was refused by its own
+// 100 s budget (GUARD-DISPATCH-SLOW). The budget handed to the host-state preparation is 300 s, and the hook timeout in the
+// shipped hooks.json leaves a margin of at least 20 s above it so the runtime never kills the hook before its own budget.
+const ADMISSION_BUDGET_MS = 300000;
+manualCheck("GD73 the admission deadline handed to the host-state preparation is 300000 ms (one literal in the guard)", () => {
+  const source = readFileSync(GUARD, "utf8");
+  const found = [...source.matchAll(/admissionDeadline:\s*\{\s*startMs:\s*HOOK_ENTRY_MS,\s*budgetMs:\s*(\d+)\s*\}/gu)].map((match) => Number(match[1]));
+  assert.deepEqual(found, [ADMISSION_BUDGET_MS], `admission deadline literals: ${JSON.stringify(found)}`);
+});
+manualCheck("GD74 the shipped hooks.json timeout of the dispatch guard is at least the admission budget plus 20 s", () => {
+  const hooks = JSON.parse(readFileSync(join(dirname(GUARD), "hooks.json"), "utf8"));
+  const entries = Object.values(hooks.hooks ?? {}).flat().flatMap((matcher) => matcher.hooks ?? [])
+    .filter((hook) => typeof hook.command === "string" && hook.command.includes("hooks/guard-dispatch.mjs"));
+  assert.equal(entries.length, 1, `guard-dispatch hook entries: ${entries.length}`);
+  assert.ok(entries[0].timeout >= ADMISSION_BUDGET_MS / 1000 + 20, `hook timeout ${entries[0].timeout}s is below the admission budget plus 20 s`);
+});
+
+assert.equal(cases.length, 75, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

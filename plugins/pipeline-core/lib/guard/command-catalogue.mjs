@@ -203,6 +203,8 @@ function sanctionedModelRoleDispatchSelectArgs(args, root) {
 }
 
 function sanctionedRegisterFeaturePackageArgs(args, root) {
+  // D41: a sole `--help` prints the evidence route; it takes no root and combines with nothing.
+  if (args.length === 1 && args[0] === "--help") return true;
   if (!exactRoot(args, root, 0)) return false;
   if (args.length === 2) return true;
   if (args.length === 3) return args[2] === "--add-review-unit";
