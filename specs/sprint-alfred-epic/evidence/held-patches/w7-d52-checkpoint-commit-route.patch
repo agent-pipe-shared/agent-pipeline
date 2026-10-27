@@ -1,0 +1,296 @@
+diff --git a/plugins/pipeline-core/scripts/checkpoint-commit.test.mjs b/plugins/pipeline-core/scripts/checkpoint-commit.test.mjs
+new file mode 100644
+index 000000000..1ce033002
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/checkpoint-commit.test.mjs
+@@ -0,0 +1,147 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Regression suite for `checkpoint-commit.mjs` (D52): the sanctioned checkpoint-commit route
++ * for the Elephant. Cases run against a temporary repository with one initial commit, a
++ * repository-local author and a real pre-commit hook, so "the hooks stay on" is observed
++ * (the hook leaves a marker file), not assumed.
++ *
++ * Run: node --test plugins/pipeline-core/scripts/checkpoint-commit.test.mjs
++ */
++import assert from "node:assert/strict";
++import { spawnSync } from "node:child_process";
++import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join } from "node:path";
++import { after, test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++import { runCheckpointCommit } from "./checkpoint-commit.mjs";
++
++const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "checkpoint-commit.mjs");
++const roots = [];
++after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
++
++const git = (cwd, args, input) => spawnSync("git", args, { cwd, encoding: "utf8", shell: false, input });
++const put = (root, rel, text) => {
++  mkdirSync(dirname(join(root, rel)), { recursive: true });
++  writeFileSync(join(root, rel), text, "utf8");
++};
++
++function makeRepo() {
++  const root = mkdtempSync(join(tmpdir(), "checkpoint-commit-"));
++  roots.push(root);
++  git(root, ["init", "-q", "-b", "work"]);
++  git(root, ["config", "user.name", "Test Author"]);
++  git(root, ["config", "user.email", "author@example.invalid"]);
++  git(root, ["config", "commit.gpgsign", "false"]);
++  put(root, "README.md", "readme\n");
++  put(root, "docs/state.md", "state 1\n");
++  put(root, "project/pipeline-state.json", "{\"n\":1}\n");
++  git(root, ["add", "--", "README.md", "docs/state.md", "project/pipeline-state.json"]);
++  const initial = git(root, ["commit", "-q", "-m", "chore: initial"]);
++  assert.equal(initial.status, 0, initial.stderr);
++  // A real hook: leaves a marker so a commit that skipped hooks is visible.
++  put(root, ".git/hooks/pre-commit", "#!/bin/sh\necho ran > \"$(git rev-parse --git-dir)/hook-ran\"\n");
++  chmodSync(join(root, ".git/hooks/pre-commit"), 0o755);
++  put(root, "scratch/msg.txt", "chore(state): checkpoint the handover\n\nBody line.\n");
++  return root;
++}
++const head = (root) => git(root, ["rev-parse", "HEAD"]).stdout.trim();
++const recordingGit = (log) => (args, options = {}) => {
++  log.push(args);
++  const r = spawnSync("git", args, { cwd: options.cwd, encoding: "utf8", shell: false, input: options.input });
++  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
++};
++
++test("(i) allowlisted paths only: commit created with both trailers, hooks on, no --no-verify", () => {
++  const root = makeRepo();
++  put(root, "docs/state.md", "state 2\n");
++  put(root, "project/pipeline-state.json", "{\"n\":2}\n");
++  put(root, "specs/topic/slice-queue.json", "{}\n");
++  put(root, "specs/topic/evidence/accepted-delivery-contract-1.json", "{}\n");
++  const log = [];
++  const before = head(root);
++  const out = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/msg.txt", dryRun: false }, { git: recordingGit(log) });
++  assert.equal(out.ok, true, JSON.stringify(out));
++  assert.notEqual(head(root), before);
++  assert.equal(out.receipt.commit, head(root));
++  const message = git(root, ["log", "-1", "--format=%B"]).stdout.trimEnd().split("\n");
++  assert.deepEqual(message.slice(-2), ["AI-Assisted: true", "Checkpoint-Act: elephant"]);
++  assert.equal(message.at(-3), "");
++  assert.ok(existsSync(join(root, ".git", "hook-ran")), "the pre-commit hook must have run");
++  const commitCalls = log.filter((args) => args[0] === "commit");
++  assert.equal(commitCalls.length, 1);
++  assert.ok(!commitCalls[0].some((a) => a === "--no-verify" || a === "-n"), "commit must not skip hooks");
++  const paths = git(root, ["show", "--name-only", "--format=", "HEAD"]).stdout.trim().split("\n").sort();
++  assert.deepEqual(paths, ["docs/state.md", "project/pipeline-state.json", "specs/topic/evidence/accepted-delivery-contract-1.json", "specs/topic/slice-queue.json"]);
++  assert.equal(git(root, ["status", "--porcelain", "-uall"]).stdout.includes("docs/state.md"), false);
++});
++
++test("(ii) one disallowed path (a .mjs under plugins/) refuses and commits nothing", () => {
++  const root = makeRepo();
++  put(root, "docs/state.md", "state 2\n");
++  put(root, "plugins/x/foo.mjs", "export {};\n");
++  const before = head(root);
++  const out = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/msg.txt", dryRun: false });
++  assert.equal(out.ok, false);
++  assert.equal(out.code, "CHECKPOINT-PATH-OUTSIDE-ALLOWLIST");
++  assert.deepEqual(out.paths, ["plugins/x/foo.mjs"]);
++  assert.equal(head(root), before);
++  assert.equal(git(root, ["diff", "--cached", "--name-only"]).stdout, "", "nothing may be staged by a refused run");
++});
++
++test("(iii) a staged path outside the allowlist refuses", () => {
++  const root = makeRepo();
++  put(root, "plugins/x/foo.mjs", "export {};\n");
++  git(root, ["add", "--", "plugins/x/foo.mjs"]);
++  put(root, "docs/state.md", "state 2\n");
++  const before = head(root);
++  const out = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/msg.txt", dryRun: false });
++  assert.equal(out.ok, false);
++  assert.equal(out.code, "CHECKPOINT-INDEX-OUTSIDE-ALLOWLIST");
++  assert.deepEqual(out.paths, ["plugins/x/foo.mjs"]);
++  assert.equal(head(root), before);
++});
++
++test("(iv) an empty change refuses", () => {
++  const root = makeRepo();
++  const before = head(root);
++  const out = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/msg.txt", dryRun: false });
++  assert.equal(out.ok, false);
++  assert.equal(out.code, "CHECKPOINT-EMPTY");
++  assert.equal(head(root), before);
++});
++
++test("(v) --dry-run prints the receipt shape and commits nothing", () => {
++  const root = makeRepo();
++  put(root, "docs/state.md", "state 2\n");
++  const before = head(root);
++  const run = spawnSync(process.execPath, [SCRIPT, "--repo-root", root, "--message-file", "scratch/msg.txt", "--dry-run"], { encoding: "utf8", shell: false });
++  assert.equal(run.status, 0, run.stderr);
++  const receipt = JSON.parse(run.stdout);
++  assert.equal(receipt.schema, "pipeline.checkpoint-commit-receipt.v1");
++  assert.equal(receipt.dryRun, true);
++  assert.equal(receipt.committed, false);
++  assert.deepEqual(receipt.paths, ["docs/state.md"]);
++  assert.deepEqual(receipt.trailers, ["AI-Assisted: true", "Checkpoint-Act: elephant"]);
++  assert.equal(head(root), before);
++  assert.equal(git(root, ["diff", "--cached", "--name-only"]).stdout, "");
++  assert.equal(run.stdout.includes(root), false, "a receipt carries no absolute path");
++});
++
++test("(viii) a message file outside scratch/ or already carrying provenance trailers refuses", () => {
++  const root = makeRepo();
++  put(root, "docs/state.md", "state 2\n");
++  put(root, "notes.txt", "chore: x\n");
++  const outside = runCheckpointCommit({ repoRoot: root, messageFile: "notes.txt", dryRun: false });
++  assert.equal(outside.code, "CHECKPOINT-MESSAGE-FILE-INVALID");
++  const traversal = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/../notes.txt", dryRun: false });
++  assert.equal(traversal.code, "CHECKPOINT-MESSAGE-FILE-INVALID");
++  put(root, "scratch/own.txt", "chore: x\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n");
++  const own = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/own.txt", dryRun: false });
++  assert.equal(own.code, "CHECKPOINT-MESSAGE-HAS-PROVENANCE");
++  put(root, "scratch/co.txt", "chore: x\n\nCo-Authored-By: Some Model <noreply@example.invalid>\n");
++  const co = runCheckpointCommit({ repoRoot: root, messageFile: "scratch/co.txt", dryRun: false });
++  assert.equal(co.code, "CHECKPOINT-MESSAGE-CORRELATION");
++  assert.equal(readFileSync(join(root, "docs/state.md"), "utf8"), "state 2\n");
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+index c61833c8c..900197f4a 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+@@ -152,6 +152,33 @@ export const ELEPHANT_STAGE0_ID = "stage-0";
+  */
+ export const ELEPHANT_STAGE0_MAX_PATHS = 10;
+ 
++/**
++ * D52: the paths a `Checkpoint-Act: elephant` commit may touch. ONE constant, read by both
++ * `checkpoint-commit.mjs` (which refuses to stage anything else) and `verifyCommit` (which
++ * refuses the trailer on a commit that touches anything else), so a hand-written trailer cannot
++ * smuggle code. Deliberately narrow and easy to shrink: delete an entry. Gate-strength files
++ * (`project/pipeline.json`, `project/guard-config.json`, ...) are NOT here and never match.
++ * Executable extensions are refused even under `evidence/`, so evidence cannot carry code.
++ */
++export const CHECKPOINT_ALLOWLIST = Object.freeze({
++  exact: Object.freeze(["docs/state.md", "project/pipeline-state.json"]),
++  patterns: Object.freeze([
++    /^specs\/[A-Za-z0-9._-]+\/slice-queue\.json$/u,
++    /^specs\/[A-Za-z0-9._-]+\/evidence\/.+$/u,
++  ]),
++  deniedExtensions: Object.freeze([".mjs", ".js", ".cjs", ".ts", ".sh", ".bash", ".ps1", ".py"]),
++});
++
++/** True when a repo-relative, forward-slash path may ride a checkpoint commit. */
++export function isCheckpointPath(path) {
++  if (typeof path !== "string" || path === "" || path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
++  if (path.split("/").some((segment) => segment === ".." || segment === "." || segment === "")) return false;
++  if (CHECKPOINT_ALLOWLIST.exact.includes(path)) return true;
++  const lower = path.toLowerCase();
++  if (CHECKPOINT_ALLOWLIST.deniedExtensions.some((ext) => lower.endsWith(ext))) return false;
++  return CHECKPOINT_ALLOWLIST.patterns.some((pattern) => pattern.test(path));
++}
++
+ /**
+  * Direction 3 Option B (`2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-
+  * vouches-for.md`): `Dispatch: <generator-script-path> (elephant-generated)` is verified by
+@@ -344,6 +371,34 @@ export function verifyCommit(sha, deps) {
+     const inspected = inspectAdministrativeCommit({repoRoot:deps.repoRoot,message,commitSha:sha});
+     return result(sha,inspected.ok ? VERDICT.pass : VERDICT.fail,"elephant-administrative",inspected.code);
+   }
++  const checkpointActs = finalBlock.filter((entry) => entry.key.toLowerCase() === "checkpoint-act");
++  if (checkpointActs.length > 0) {
++    // D52: a checkpoint commit of runtime files, evidence or the handover. A distinct, weaker class than a
++    // dispatch record: it vouches for nothing about code, and the path allowlist is what keeps it so.
++    const alsoDispatch = finalBlock.some((entry) => entry.key.toLowerCase() === "dispatch");
++    if (checkpointActs.length !== 1 || checkpointActs[0].value !== "elephant" || alsoDispatch) {
++      return result(sha, VERDICT.fail, "elephant-checkpoint-malformed",
++        "exactly one `Checkpoint-Act: elephant` trailer is admitted, and never together with a `Dispatch:` trailer: two authorship claims on one commit are not resolved here");
++    }
++    let checkpointPaths;
++    try {
++      checkpointPaths = readChangedPaths(sha);
++    } catch (error) {
++      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`);
++    }
++    if (checkpointPaths.length === 0) {
++      return result(sha, VERDICT.fail, "elephant-checkpoint-empty", "a checkpoint commit with no changed path binds nothing");
++    }
++    const outside = checkpointPaths.filter((path) => !isCheckpointPath(path));
++    if (outside.length > 0) {
++      return result(sha, VERDICT.fail, "elephant-checkpoint-outside-allowlist",
++        `\`Checkpoint-Act: elephant\` is admitted only for runtime files, evidence and the handover; ${outside.length} path(s) lie outside that allowlist, so the trailer cannot vouch for this commit`,
++        { outside, pathCount: checkpointPaths.length });
++    }
++    return result(sha, VERDICT.pass, "elephant-checkpoint",
++      `declared Elephant checkpoint (\`Checkpoint-Act: elephant\`), ${checkpointPaths.length} path(s), all inside the checkpoint allowlist; weaker than a dispatch record and never delivery authorship for code`,
++      { assurance: "checkpoint-elephant", pathCount: checkpointPaths.length });
++  }
+   const dispatch = parseDispatchTrailer(message);
+   if (!dispatch) {
+     return result(
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+index 4bd3b7b4f..33dc36e78 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+@@ -40,6 +40,7 @@ import {
+   runGeneratorInIsolatedParentTree,
+   verifyCommit,
+ } from "./dispatch-authorship-verify.mjs";
++import * as verifierNs from "./dispatch-authorship-verify.mjs";
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
+ 
+@@ -1157,3 +1158,57 @@ test("D56-3c the other non-authoring kinds keep their FAIL, so only the attested
+   assert.equal(verdict.verdict, VERDICT.fail);
+   assert.equal(verdict.classification, "record-outcome-does-not-attest-authorship");
+ });
++
++// D52: the checkpoint-commit binding. Namespace access keeps a missing export a failing case, not a file-level import error.
++const CP_TRAILERS = "\n\nAI-Assisted: true\nCheckpoint-Act: elephant\n";
++
++test("D52-1 (vi) a Checkpoint-Act commit touching only allowlisted paths binds as checkpoint (elephant)", () => {
++  const verdict = verifyCommit("c".repeat(40), commit({
++    message: `chore(state): checkpoint${CP_TRAILERS}`,
++    paths: ["docs/state.md", "project/pipeline-state.json", "specs/t/slice-queue.json", "specs/t/evidence/accepted-delivery-contract-1.json"],
++  }));
++  assert.equal(verdict.classification, "elephant-checkpoint");
++  assert.equal(verdict.verdict, VERDICT.pass);
++  assert.equal(verdict.assurance, "checkpoint-elephant");
++});
++
++test("D52-2 (vi) the same trailer on a commit that also touches code is refused, naming the offending paths", () => {
++  const verdict = verifyCommit("d".repeat(40), commit({
++    message: `chore(state): checkpoint${CP_TRAILERS}`,
++    paths: ["docs/state.md", "plugins/pipeline-core/scripts/x.mjs", "project/pipeline.json", "specs/t/evidence/run.mjs"],
++  }));
++  assert.equal(verdict.verdict, VERDICT.fail);
++  assert.equal(verdict.classification, "elephant-checkpoint-outside-allowlist");
++  assert.deepEqual(verdict.outside, ["plugins/pipeline-core/scripts/x.mjs", "project/pipeline.json", "specs/t/evidence/run.mjs"]);
++});
++
++test("D52-3 (vi) a Checkpoint-Act trailer alongside a Dispatch trailer, a wrong value, a duplicate or an empty path list is refused", () => {
++  const both = verifyCommit("e".repeat(40), commit({ message: "chore: x\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\nCheckpoint-Act: elephant\n", paths: ["docs/state.md"] }));
++  assert.equal(both.verdict, VERDICT.fail);
++  assert.equal(both.classification, "elephant-checkpoint-malformed");
++  const wrong = verifyCommit("e".repeat(40), commit({ message: "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: goldfish\n", paths: ["docs/state.md"] }));
++  assert.equal(wrong.classification, "elephant-checkpoint-malformed");
++  const dup = verifyCommit("e".repeat(40), commit({ message: "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: elephant\nCheckpoint-Act: elephant\n", paths: ["docs/state.md"] }));
++  assert.equal(dup.classification, "elephant-checkpoint-malformed");
++  const empty = verifyCommit("e".repeat(40), commit({ message: `chore: x${CP_TRAILERS}`, paths: [] }));
++  assert.equal(empty.verdict, VERDICT.fail);
++  assert.equal(empty.classification, "elephant-checkpoint-empty");
++});
++
++test("D52-4 the allowlist is one exported constant; protected project files and traversal never match", () => {
++  const ns = verifierNs;
++  assert.equal(typeof ns.isCheckpointPath, "function");
++  assert.ok(ns.CHECKPOINT_ALLOWLIST && Array.isArray(ns.CHECKPOINT_ALLOWLIST.exact));
++  for (const ok of ["docs/state.md", "project/pipeline-state.json", "specs/a-b/slice-queue.json", "specs/a-b/evidence/x/y.json"]) assert.equal(ns.isCheckpointPath(ok), true, ok);
++  for (const bad of ["project/pipeline.json", "project/guard-config.json", ".claude/pipeline.json", "specs/a/evidence/../../x", "specs/a/spec.md", "plugins/x/y.mjs", "specs/a/evidence/run.mjs", "/docs/state.md", "docs/state.md/x"]) assert.equal(ns.isCheckpointPath(bad), false, bad);
++});
++
++test("D52-5 (vii) the existing stage-0, design and administrative bindings are unchanged", () => {
++  const stage0 = verifyCommit("f".repeat(40), commit({ message: "fix(x): y\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n", paths: ["docs/state.md"] }));
++  assert.equal(stage0.classification, "elephant-direct-declared");
++  assert.equal(stage0.verdict, VERDICT.pass);
++  const design = verifyCommit("f".repeat(40), commit({ message: "docs(x): y\n\nDispatch: design (elephant)\nAI-Assisted: true\n", paths: ["specs/a/spec.md"] }));
++  assert.equal(design.classification, "elephant-direct-declared");
++  const undeclared = verifyCommit("f".repeat(40), commit({ message: "docs(x): y\n", paths: ["docs/state.md"] }));
++  assert.equal(undeclared.classification, "elephant-direct-undeclared");
++});
