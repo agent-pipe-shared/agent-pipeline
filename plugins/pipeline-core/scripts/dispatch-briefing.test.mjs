@@ -1367,7 +1367,8 @@ test("PF-65 an estimate absent or below 8 + 3 x paths warns DBG-PACKAGE-ESTIMATE
 // --- PF-61 reader: a persisted background-Goldfish stop-failure diagnostic is surfaced as a non-blocking warning ---
 
 const STOP_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
-const STOP_DIR = "agent-pipeline/run/native-goldfish-host-commit";
+const STOP_DIR = "agent-pipeline/run/native-goldfish-host-diagnostics";
+const LEGACY_STOP_DIR = "agent-pipeline/run/native-goldfish-host-commit";
 const stopFailure = (over = {}) => ({ schema: STOP_SCHEMA, dispatchId: "ALF-BG", toolUseId: "toolu_1", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: COMMIT, observedAt: "2026-10-26T10:00:00.000Z", ...over });
 const stopWarnings = (result) => result.warnings.filter((entry) => entry.code === "DBG-HOST-COMMIT-STOP-FAILURE");
 
@@ -1442,4 +1443,52 @@ test("PF-61 reader the default reader lists real files of the run directory, ign
   assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-REAL"], JSON.stringify(result.warnings));
   assert.equal(found[0].path, `${STOP_DIR}/stop-failure-aaa.json`);
   assert.deepEqual(readdirSync(dir).sort(), ["other.json", "stop-failure-aaa.json", "stop-failure-bad.json", "stop-failure-link.json"]);
+});
+
+function realDepsIn(fx) {
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+  const git = (...args) => {
+    const r = spawnSync("git", ["-C", fx.root, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+      "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stderr);
+  };
+  git("init", "-q"); git("add", "-A"); git("commit", "-q", "-m", "fixture");
+  const real = { ...depsOf(fx) };
+  delete real.git;
+  return real;
+}
+const plantStop = (fx, rel, name, over) => {
+  const dir = join(fx.root, ".git", rel);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, name), JSON.stringify(stopFailure(over)));
+};
+
+test("D180b PF-61 reader surfaces a record in the diagnostics directory", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const real = realDepsIn(fx);
+  plantStop(fx, STOP_DIR, "stop-failure-new.json", { dispatchId: "ALF-NEWDIR" });
+  const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
+  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-NEWDIR"]);
+  assert.equal(found[0].path, `${STOP_DIR}/stop-failure-new.json`);
+});
+
+test("D180b PF-61 reader still surfaces a record left in the legacy host-commit directory", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const real = realDepsIn(fx);
+  plantStop(fx, LEGACY_STOP_DIR, "stop-failure-old.json", { dispatchId: "ALF-LEGACY" });
+  const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
+  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-LEGACY"]);
+  assert.equal(found[0].path, `${LEGACY_STOP_DIR}/stop-failure-old.json`);
+});
+
+test("D180b PF-61 reader does not double-count the same file name present in both directories", async () => {
+  const { runDispatchBriefing } = await lib();
+  const fx = makeFixture();
+  const real = realDepsIn(fx);
+  plantStop(fx, STOP_DIR, "stop-failure-same.json", { dispatchId: "ALF-SAME" });
+  plantStop(fx, LEGACY_STOP_DIR, "stop-failure-same.json", { dispatchId: "ALF-SAME" });
+  const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
+  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-SAME"], JSON.stringify(found));
 });

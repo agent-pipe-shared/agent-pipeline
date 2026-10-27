@@ -487,6 +487,20 @@ const cases = [
     assert.equal(released.result.status, "released", JSON.stringify(released.result));
     assert.equal(released.code, 0);
   }) },
+  { id: "SAR16", name: "D180b a stop-failure diagnostic written AFTER registry init, into the diagnostics directory outside the native Goldfish namespace, leaves the registry readable and the native-goldfish producer ok", run: () => fixture(({ root }) => {
+    const { repository, dispatch } = course(root);
+    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
+    // The dispatch above already initialised the registry; initialising again is idempotent and the baseline is taken here.
+    assert.ok(["initialized", "already-initialized"].includes(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status));
+    const diagnostics =join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-diagnostics");
+    mkdirSync(diagnostics, { recursive: true, mode: 0o700 });
+    writeFileSync(join(diagnostics, `stop-failure-${"a".repeat(32)}.json`), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "DELIVER-AC-1", toolUseId: "native-tool-one", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
+    const found = repair("inspect", "--root", root).result;
+    assert.notEqual(found.registry.status, "refused", JSON.stringify(found.registry));
+    const goldfish = found.registry.producers.find((row) => row.producerId === "native-goldfish");
+    assert.ok(goldfish, JSON.stringify(found.registry));
+    assert.equal(goldfish.status, "ok", JSON.stringify(goldfish));
+  }) },
 ];
 
 const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined

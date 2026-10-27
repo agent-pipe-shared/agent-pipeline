@@ -155,7 +155,8 @@ const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure
 function recordSubagentStopOutcome({ stop }, result) {
   if (!stop) return;
   try {
-    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
+    // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
+    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
     if (result?.status === "authored-commit-recorded") { try { stopUnlink(join(directory, name)); } catch { /* none to remove */ } return; }
     // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).

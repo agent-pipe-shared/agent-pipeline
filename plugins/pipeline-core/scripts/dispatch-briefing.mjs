@@ -266,7 +266,9 @@ function defaultQueueRow(root, sliceId) {
 const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
 
 const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
-const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
+// D180b: the diagnostic lives outside the inventoried native Goldfish namespace; the legacy directory is still read.
+const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-diagnostics"];
+const STOP_FAILURE_LEGACY_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
 const STOP_FAILURE_NAME = /^stop-failure-[A-Za-z0-9._-]+\.json$/u;
 
 /**
@@ -278,10 +280,20 @@ function defaultStopFailures(root) {
   try {
     const common = resolveGitCommonDir(root);
     if (typeof common !== "string") return [];
-    const dir = resolve(common, ...STOP_FAILURE_DIR);
-    const names = readdirSync(dir).filter((name) => STOP_FAILURE_NAME.test(name)).sort().slice(0, 20);
+    const candidates = [];
+    const seen = new Set();
+    for (const parts of [STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR]) {
+      try {
+        const directory = resolve(common, ...parts);
+        for (const name of readdirSync(directory).filter((entry) => STOP_FAILURE_NAME.test(entry)).sort()) {
+          if (seen.has(name)) continue;
+          seen.add(name);
+          candidates.push({ name, dir: directory, rel: parts.join("/") });
+        }
+      } catch { /* an absent directory holds no diagnostic */ }
+    }
     const kept = [];
-    for (const name of names) {
+    for (const { name, dir, rel } of candidates.slice(0, 20)) {
       try {
         const file = resolve(dir, name);
         const info = lstatSync(file);
@@ -295,7 +307,7 @@ function defaultStopFailures(root) {
           text = buffer.subarray(0, length).toString("utf8");
         } finally { closeSync(fd); }
         const value = JSON.parse(text);
-        if (value && typeof value === "object" && value.schema === STOP_FAILURE_SCHEMA && typeof value.dispatchId === "string" && typeof value.code === "string") kept.push({ ...value, file: name });
+        if (value && typeof value === "object" && value.schema === STOP_FAILURE_SCHEMA && typeof value.dispatchId === "string" && typeof value.code === "string") kept.push({ ...value, file: name, directory: rel });
       } catch { /* an unreadable entry is no diagnostic */ }
     }
     return kept;
@@ -698,7 +710,7 @@ export function generateDispatchBinding(options, deps = {}) {
     .sort((a, b) => String(a.observedAt ?? "").localeCompare(String(b.observedAt ?? "")) || a.dispatchId.localeCompare(b.dispatchId));
   for (const entry of stopEntries) {
     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
-    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
+    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
   }
 
   // Agent definition: effort, model alias and the maxTurns cliff.

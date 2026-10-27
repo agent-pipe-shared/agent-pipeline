@@ -470,7 +470,10 @@ function writeTranscript(dir, name, lines) {
 }
 const withTranscript = (lines, lastMessage) => ({ lastMessage, prepare: (dir, name) => writeTranscript(dir, name, lines) });
 const contractWith = (fx, patch) => JSON.stringify({ ...JSON.parse(finalText(fx)), ...patch });
-const stopFailureFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
+// D180b: the diagnostic lives in a sibling directory no authority scan inventories, never in the native Goldfish namespace.
+const diagnosticDirectory = (fx) => join(fx.root, ".git", "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+const stopFailureFiles = (fx) => existsSync(diagnosticDirectory(fx)) ? readdirSync(diagnosticDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
+const namespaceStopFailureFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
 function launchedBackground(name, toolUseId) {
   const fx = buildConsumer(name);
   launchedPending(fx, toolUseId, {});
@@ -480,7 +483,7 @@ function launchedBackground(name, toolUseId) {
   return fx;
 }
 function assertRefusedAtStop(fx, toolUseId, variant, label, expectedCode) {
-  for (const file of stopFailureFiles(fx)) rmSync(join(stateDirectory(fx), file), { force: true });
+  for (const file of stopFailureFiles(fx)) rmSync(join(diagnosticDirectory(fx), file), { force: true });
   fx.stopVariant = variant;
   const stopped = stopHook(fx, toolUseId);
   assert.equal(stopped.status, 0, `${label}: the stop hook never blocks -- ${stopped.stderr}`);
@@ -490,7 +493,8 @@ function assertRefusedAtStop(fx, toolUseId, variant, label, expectedCode) {
   assert.equal(pendingFiles(fx).length, 1, `${label}: the pending state is not consumed`);
   const files = stopFailureFiles(fx);
   assert.equal(files.length, 1, `${label}: one diagnostic is persisted next to the pending state -- ${stopped.stderr.slice(0, 300)}`);
-  const diagnostic = JSON.parse(readFileSync(join(stateDirectory(fx), files[0]), "utf8"));
+  assert.deepEqual(namespaceStopFailureFiles(fx), [], `${label}: D180b the inventoried native Goldfish directory holds no stop-failure file`);
+  const diagnostic = JSON.parse(readFileSync(join(diagnosticDirectory(fx), files[0]), "utf8"));
   assert.equal(diagnostic.dispatchId, fx.dispatchId, label);
   assert.match(diagnostic.code, /^NGH[A-Z]*-[A-Z0-9-]+$/u, `${label}: ${diagnostic.code}`);
   if (expectedCode) assert.equal(diagnostic.code, expectedCode, label);
@@ -520,6 +524,15 @@ test("(x) SubagentHandback: an invalid or foreign handback, or any record other 
   assertRefusedAtStop(fx, id, withTranscript([handbackRecord(finalText(fx), "Task")], undefined), "a valid contract carried by another tool name");
   assertRefusedAtStop(fx, id, withTranscript([proseRecord("Working."), userRecord(finalText(fx))], undefined), "a valid contract in a user record");
   assertRefusedAtStop(fx, id, withTranscript([], undefined), "an empty transcript");
+});
+
+test("(xi) D180b: after a non-succeeded return the stop-failure file is in the diagnostics directory and the host-commit directory holds none", () => {
+  const fx = launchedBackground("d180b-location", "toolu_d180b_location");
+  fx.stopVariant = withTranscript([handbackRecord("All done, nothing to see.")], undefined);
+  const stopped = stopHook(fx, "toolu_d180b_location");
+  assert.equal(stopped.status, 0, stopped.stderr);
+  assert.equal(stopFailureFiles(fx).length, 1, "one diagnostic in native-goldfish-host-diagnostics");
+  assert.deepEqual(namespaceStopFailureFiles(fx), [], "the inventoried native-goldfish-host-commit directory holds no stop-failure file");
 });
 
 test("(xi) SubagentHandback: an unparsable, oversized or symlinked child transcript is refused as unsafe and commits nothing (PF-61)", { skip: process.platform === "win32" ? "needs symlink privileges" : false }, () => {
