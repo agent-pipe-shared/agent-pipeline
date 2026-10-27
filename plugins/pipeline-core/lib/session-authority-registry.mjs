@@ -684,6 +684,21 @@ export function inspectSourceOwnedSessionAuthorityMemberRecord(input) {
   if(!member)fail('SDC-AUTHORITY-CAS','member-record-not-current');
   return freeze({memberRef:member.ref,producerRef:current.rows[index].record.ref,catalogueRef:current.catalogue.ref,record:structuredClone(member.value),releaseRef:member.release?.ref??null,releaseRecord:member.release?structuredClone(member.release.value):null});
 }
+// D182: the same read-only inspection for many members from ONE state read. inspectSourceOwnedSessionAuthorityMemberRecord reads
+// (and reconciles) the whole registry per call, so walking 25 members cost 25 reads; this returns the identical rows, in the
+// order of memberRefs, from a single read, and refuses a ref that is not current exactly as the single form does.
+export function inspectSourceOwnedSessionAuthorityMemberRecords(input) {
+  exact(input,['boundary','producerPort','memberRefs'],'member-records-inspection');
+  if(!Array.isArray(input.memberRefs))fail('SDC-AUTHORITY-CAS','member-records-refs');
+  const repo=boundary(input.boundary),{pairs,index}=selectPort(repo,input.boundary,input.producerPort);
+  input.memberRefs.forEach(memberRef=>ref(memberRef));
+  const current=stateRead(repo,pairs),members=current.rows[index].members;
+  return freeze(input.memberRefs.map(memberRef=>{
+    const member=members.find(m=>equal(m.ref,memberRef));
+    if(!member)fail('SDC-AUTHORITY-CAS','member-record-not-current');
+    return freeze({memberRef:member.ref,producerRef:current.rows[index].record.ref,catalogueRef:current.catalogue.ref,record:structuredClone(member.value),releaseRef:member.release?.ref??null,releaseRecord:member.release?structuredClone(member.release.value):null});
+  }));
+}
 export function inspectSourceOwnedSessionAuthorityStateRefresh(input) {
   exact(input,['boundary','producerPort','stateWriteHandle','ownerWitness'],'state-refresh-inspection');
   const repo=boundary(input.boundary),ticket=stateWriteRefreshTickets.get(input.ownerWitness);

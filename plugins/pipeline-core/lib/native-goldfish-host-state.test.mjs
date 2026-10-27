@@ -126,6 +126,40 @@ const cases = [
     memoPerAdmission(null, "k1", compute); memoPerAdmission(null, "k1", compute);
     assert.equal(calls, 5, "no boundary object: never memoised");
   } },
+  { id: "D177-b-member-records-once-per-admission", name: "D182 the member records of one admission are inspected once per member set and boundary, and a changed member set or another boundary reads again", run: async () => {
+    const { inspectNativeMemberRecords } = await import("./native-goldfish-host-state.mjs");
+    const boundary = {}, other = {}, port = { name: "port" };
+    const producerOf = (refs) => ({ record: { members: refs.map((memberRef) => ({ memberRef })) } });
+    let reads = 0;
+    const inspect = ({ producerPort, memberRefs }) => { reads += 1; assert.equal(producerPort, port); return memberRefs.map((memberRef) => ({ record: { phase: "released", bindingSha256: `h-${memberRef}` } })); };
+    const refs = ["m1", "m2", "m3"];
+    const first = inspectNativeMemberRecords({ boundary, port, producer: producerOf(refs), inspectMany: inspect });
+    assert.equal(reads, 1, "all members come from one registry read");
+    const second = inspectNativeMemberRecords({ boundary, port, producer: producerOf(refs), inspectMany: inspect });
+    assert.equal(reads, 1, "the integrated-slice computation, the released-reservation read and the concurrent plan share one pass");
+    assert.equal(second, first);
+    assert.deepEqual(second.map((member) => member.record.bindingSha256), ["h-m1", "h-m2", "h-m3"], "order and content follow the producer record");
+    inspectNativeMemberRecords({ boundary, port, producer: producerOf([...refs, "m4"]), inspectMany: inspect });
+    assert.equal(reads, 2, "a changed member set is never served from the memo");
+    inspectNativeMemberRecords({ boundary: other, port, producer: producerOf(refs), inspectMany: inspect });
+    assert.equal(reads, 3, "a later admission has its own boundary and reads again");
+    inspectNativeMemberRecords({ boundary: null, port, producer: producerOf(refs), inspectMany: inspect }); inspectNativeMemberRecords({ boundary: null, port, producer: producerOf(refs), inspectMany: inspect });
+    assert.equal(reads, 5, "no boundary object: never memoised");
+  } },
+  { id: "D177-c-batch-member-records-equal-single", name: "D182 the batch member inspection returns exactly the rows of the single inspection in the order asked, from one read, and refuses a ref that is not current", run: async () => { const registry = await import("./session-authority-registry.mjs"); return fixture(({ root }) => {
+    const { runtime } = d177Setup(root), repo = inspectSignedDescriptorCustodyRepository(root), port = createNativeGoldfishAuthorityProducerPort({ repository: repo });
+    runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, (boundary) => {
+      const producer = inspectSourceOwnedSessionAuthorityProducerRecord({ boundary, producerPort: port });
+      const refs = producer.record.members.map((row) => row.memberRef);
+      assert.ok(refs.length >= 2, "the fixture dispatched two items");
+      const single = refs.map((memberRef) => registry.inspectSourceOwnedSessionAuthorityMemberRecord({ boundary, producerPort: port, memberRef }));
+      assert.deepEqual(registry.inspectSourceOwnedSessionAuthorityMemberRecords({ boundary, producerPort: port, memberRefs: refs }), single);
+      assert.deepEqual(registry.inspectSourceOwnedSessionAuthorityMemberRecords({ boundary, producerPort: port, memberRefs: [...refs].reverse() }), [...single].reverse(), "the order asked is the order returned");
+      assert.deepEqual(registry.inspectSourceOwnedSessionAuthorityMemberRecords({ boundary, producerPort: port, memberRefs: [] }), []);
+      assert.throws(() => registry.inspectSourceOwnedSessionAuthorityMemberRecords({ boundary, producerPort: port, memberRefs: [{ ...refs[0], sha256: "f".repeat(64) }] }), (error) => error.code === "SDC-AUTHORITY-CAS");
+      assert.throws(() => registry.inspectSourceOwnedSessionAuthorityMemberRecords({ boundary, producerPort: port, memberRefs: "not-an-array" }), (error) => error.code === "SDC-AUTHORITY-CAS");
+    }));
+  }); } },
   { id: "D177-differential-settled", name: "D177 the skip and the memo leave the integrated, released and settled results identical to the unfiltered computation, and a memo hit reads no repository", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({ root }) => {
     assert.equal(typeof mod.readNativeIntegratedSlices, "function", "the unfiltered reader is reachable for the differential");
     assert.equal(typeof mod.settledItemSlices, "function");

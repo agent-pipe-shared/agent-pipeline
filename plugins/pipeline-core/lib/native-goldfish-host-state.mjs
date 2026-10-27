@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
-import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
 /** Private runner-hook correlation state for native Goldfish host commits. */
@@ -529,7 +529,7 @@ function authenticatedNativePendingState(stored) {
 export function readNativeReservedItemScopes({repository,boundary}={}) {
   const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository});
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
-  const released=new Set(producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}).record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
+  const released=new Set(inspectNativeMemberRecords({boundary,port,producer}).map(member=>member.record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
   const read=nativeAuthorityScan(owner),reservations=[],settled=readSettledItemSliceIds({repository,boundary});
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-'))) {
     const operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256);
@@ -546,7 +546,7 @@ function nativeConcurrentPlan({repository,boundary,allowedPaths,baseCommit,ownPe
   const owner=nativeAuthorityOwner(repository),port=createNativeGoldfishAuthorityProducerPort({repository}),current=nativeManagedCurrentOwner(repository);
   if(current.association.state!=='bound')throw nativeManagedFault('native-concurrent-owner-unbound');
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
-  const members=new Map(producer.record.members.map(row=>{const record=inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}).record;return [record.bindingSha256,record];}));
+  const members=new Map(inspectNativeMemberRecords({boundary,port,producer}).map(member=>[member.record.bindingSha256,member.record]));
   const read=nativeAuthorityScan(owner),foreignPaths=new Set(),foreignCommits=[],settled=readSettledItemSliceIds({repository,boundary});
   for(const entry of read.entries.filter(row=>row.relativePath.startsWith('pending-')&&row.sourceFact.sha256!==ownPendingSha256)) {
     const pending=effectiveNativePendingState(read,entry),operation=[...owner.operations.values()].find(row=>row.pendingSha256===entry.sourceFact.sha256),member=members.get(operation.bindingSha256);
@@ -1543,7 +1543,7 @@ export function readGovernedItemIntegrationReadiness(handle,queue) {
 export function readNativeReleasedItemReservations({repository,boundary}) {
   const port=createNativeGoldfishAuthorityProducerPort({repository});
   const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port});
-  const released=new Set(producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}).record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
+  const released=new Set(inspectNativeMemberRecords({boundary,port,producer}).map(member=>member.record).filter(row=>row.phase==='released').map(row=>row.bindingSha256));
   const owner=nativeAuthorityOwner(repository);nativeAuthorityScan(owner);
   return {releasedPendingHashes:[...owner.operations.values()].filter(row=>released.has(row.bindingSha256)).map(row=>row.pendingSha256)};
 }
@@ -1557,6 +1557,13 @@ export function memoPerAdmission(boundary,key,compute){
   if(!memo.has(key))memo.set(key,compute());
   return memo.get(key);
 }
+// D182: every member record is a full registry read (about 0.8 s each with 25 members). The integrated-slice computation and the
+// released-reservation read both walked all members, and the computation itself ran once per (skipCancelled, only) shape, so one
+// admission read every member four times. The records are read ONCE per admission and member set; the memo lives on the boundary.
+export function inspectNativeMemberRecords({boundary,port,producer,inspectMany=inspectSourceOwnedSessionAuthorityMemberRecords}) {
+  const refs=producer.record.members.map(row=>row.memberRef);
+  return memoPerAdmission(boundary,JSON.stringify(['native-member-records',refs]),()=>inspectMany({boundary,producerPort:port,memberRefs:refs}));
+}
 export function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
   const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null]);
   const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}));
@@ -1566,7 +1573,7 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
   const cancelled=new Set(skipCancelled?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[]);
   const port=createNativeGoldfishAuthorityProducerPort({repository});
       const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port}),read=readNativeManagedInventory(repository,'native-goldfish')[0];
-      const members=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}));
+      const members=inspectNativeMemberRecords({boundary,port,producer});
       const integrated=[],{releasedPendingHashes}=readNativeReleasedItemReservations({repository,boundary});
       for(const row of read.entries.filter(entry=>entry.relativePath.startsWith('authority-integration-'))) {
         if(!members.some(member=>member.record.phase==='released'&&member.record.bindingSha256===row.value.bindingSha256))continue;
