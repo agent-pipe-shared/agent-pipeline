@@ -21,18 +21,31 @@ w7-elephant-context-guard-dispatch-c2, w7-d52-stale-snapshot-refusal-text, w7-d3
 
 NOT in the bundle (partial or not run, never apply): w7-pf86-scan-outside-registry-lock (c1, interim),
 w7-pf86-registry-read-api (c2, NGHS46 red), w7-elephant-context-guard-dispatch (superseded by c2),
-and the slices not yet done (admission read cost, PF-86 c3, signature slice A, D56 slices 2-5).
+and the slices not yet done (PF-86 c3, signature slice A, D56 slices 2-5).
 `w7-d31-checkpoint-outcome` is complete on its own side; the schema half that lets the return validator
 accept the checkpoint outcome is in the increment below.
 
-## Second file: the increment (`w7-increment-2026-10-27.patch`, 8 files, +103/-21)
+## Second file: the increment (`w7-increment-2026-10-27.patch`, 11 files, +221/-25)
 
 Cut on top of the bundle (Elephant-implemented in a scratch clone, RED to GREEN tests). Contents:
 D31 schema half (`native-goldfish-host-return.mjs` `allowCheckpoint` option, finalizer shim removed,
 NGHR07/NGHR08), admission budget 300 s in `guard-dispatch.mjs` with hook timeout 330 s in
 `hooks/hooks.json` (hooks.json is TP-4 protected: it needs the PO approval ceremony, the budget
 literal alone is not enough because the hook timeout is the real ceiling), and the D56
-orchestrator-attested record validator slice 1 (`lib/dispatch-record.mjs`, DRC14-DRC18, 18/18).
+orchestrator-attested record validator slice 1 (`lib/dispatch-record.mjs`, DRC14-DRC18, 18/18), and the
+admission read cost. Profile finding (2026-10-27, replaces the earlier "pending-inventory 15 s" guess): one
+inventory read of 158 files costs 44 ms, but one admission repeated it ~960 times, and every file read
+zero-filled 64 KB buffers twice. Fixes: `Buffer.allocUnsafe` in `boundedRead` and `readModuleContext`
+(only the read prefix is ever used), and a reuse of the native-goldfish namespace read in
+`readNativeManagedInventory` while every directory and file still has the identical
+(dev, ino, mode, nlink, size, mtime, ctime), the newest stamp is older than 2 s (racily-clean rule),
+the read is younger than 1 s, on POSIX only; the repository check still runs on every call.
+Measured against the real repository state (boundary empty / integrated slices / settled slices):
+before 8.1 / 18.2 / 19.3 s, after 2.4 / 4.7 / 5.5 s. New suite `native-managed-inventory-reuse.test.mjs`
+NMIR01-05, 5/5. Neighbour suites red/green identical to the pre-change commit (host-state 24 named reds
+before and after, the four D177/NGHS07 timing reds became green; MFHS, AGYID04/05, session-power,
+finalizer and registry suites fail identically in isolated clones). The reuse changes an authority
+read, so it goes to the batch Critic.
 Neighbour suites green on the chained clone (dispatch-record-write 19/19, authorship-verify 65/65,
 check-critic-skip-coverage 40/40, liveness 16/16, strip 12/12, return 8/8, finalizer 21/21,
 hooks-manifest-shape ok); guard-dispatch 75 tests, the 22 carrier-policy failures are the baseline-identical ones.

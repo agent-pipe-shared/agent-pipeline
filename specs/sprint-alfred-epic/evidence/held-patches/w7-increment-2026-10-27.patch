@@ -230,3 +230,170 @@ index 03534974f..372f0741b 100644
  
  ];
  
+diff --git a/plugins/pipeline-core/lib/native-managed-authority-support.mjs b/plugins/pipeline-core/lib/native-managed-authority-support.mjs
+index f27df85a8..d78974462 100644
+--- a/plugins/pipeline-core/lib/native-managed-authority-support.mjs
++++ b/plugins/pipeline-core/lib/native-managed-authority-support.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ // Domain-specific physical source adapters. No handles or authority callbacks are minted here.
+ import { createHash } from 'node:crypto';
+-import { existsSync, lstatSync, realpathSync } from 'node:fs';
++import { existsSync, lstatSync, readdirSync, realpathSync } from 'node:fs';
+ import { join, relative, sep } from 'node:path';
+ import { canonical } from './po-approval-proof.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+@@ -50,10 +50,41 @@ export const nativeManagedPostTerminalRecord = relativePath => /\/(advisor|readi
+ /** The readiness host store publishes its private receipt next to processes/ after every complete run: <fingerprint>/receipts/<receipt id>.json. */
+ const readinessReceiptPath = /^([a-f0-9]{64})\/receipts\/(drh_[a-f0-9]{32})\.json$/;
+ const readinessNamespaceId = 'design-readiness-processes';
+-export function readNativeManagedInventory(repository, domain) {
++// One dispatch admission re-reads the native-goldfish namespace once per registry boundary and per operation (hundreds of times for
++// the same unchanged files, ~35 ms each). A read is reused only while ALL of these hold: POSIX; the namespace's every directory and
++// file still has the identical (dev, ino, mode, nlink, size, mtime, ctime) as when it was read; the newest mtime/ctime is older than
++// the racy window (so a same-tick rewrite can never hide behind an equal stamp, as git's "racily clean" rule); and the read is younger
++// than the max age (a bounded staleness for the repository check, never a standing cache). Anything else re-reads in full.
++const inventoryReads = new Map();
++const INVENTORY_REUSE_MAX_AGE_MS = 1000;
++const INVENTORY_REUSE_RACY_MS = 2000;
++function inventoryFileSignature(rootPath, racyMs) {
++  if (process.platform === 'win32') return null;
++  const rows = []; let newest = 0n; let count = 0;
++  const visit = (path, depth) => {
++    if (depth > 6 || ++count > 4096) throw new Error('inventory-signature-bound');
++    const stat = lstatSync(path, { bigint: true });
++    if (stat.mtimeNs > newest) newest = stat.mtimeNs;
++    if (stat.ctimeNs > newest) newest = stat.ctimeNs;
++    rows.push(`${relative(rootPath, path)}|${stat.dev}|${stat.ino}|${stat.mode}|${stat.nlink}|${stat.size}|${stat.mtimeNs}|${stat.ctimeNs}`);
++    if (stat.isDirectory()) for (const name of readdirSync(path).sort()) visit(join(path, name), depth + 1);
++  };
++  try { visit(rootPath, 0); } catch { return null; }
++  return Date.now() - Number(newest / 1000000n) < racyMs ? null : rows.join('\n');
++}
++export function readNativeManagedInventory(repository, domain, { reuseMaxAgeMs = INVENTORY_REUSE_MAX_AGE_MS, reuseRacyMs = INVENTORY_REUSE_RACY_MS } = {}) {
+   nativeManagedRepository(repository);
+   const roots = domain === 'native-goldfish' ? [['native-goldfish-host-commit', join(repository.commonDir, 'agent-pipeline/run/native-goldfish-host-commit')]]
+     : [[readinessNamespaceId, join(repository.commonDir, 'agent-pipeline/design-readiness-codex')], ['advisor-processes', join(repository.commonDir, 'agent-pipeline/advisor-codex')]];
++  const signature = domain === 'native-goldfish' ? inventoryFileSignature(roots[0][1], reuseRacyMs) : null;
++  const reusable = signature ? inventoryReads.get(roots[0][1]) : null;
++  if (reusable && reusable.signature === signature && Date.now() - reusable.at < reuseMaxAgeMs) return reusable.result;
++  const result = readNativeManagedInventoryFresh(repository, domain, roots);
++  if (signature) inventoryReads.set(roots[0][1], { signature, at: Date.now(), result });
++  else if (domain === 'native-goldfish') inventoryReads.delete(roots[0][1]);
++  return result;
++}
++function readNativeManagedInventoryFresh(repository, domain, roots) {
+   // A readiness receipt is classified below and stays in the namespace membership, but it is not an operation journal entry:
+   // the journal scan groups entries by directory and requires every group to hold an intent, which receipts/ never does.
+   const withoutReceiptEntries = (namespaceId, scan) => namespaceId === readinessNamespaceId ? { ...scan, entries: scan.entries.filter(entry => !readinessReceiptPath.test(entry.relativePath)) } : scan;
+diff --git a/plugins/pipeline-core/lib/native-managed-inventory-reuse.test.mjs b/plugins/pipeline-core/lib/native-managed-inventory-reuse.test.mjs
+new file mode 100644
+index 000000000..99671e59b
+--- /dev/null
++++ b/plugins/pipeline-core/lib/native-managed-inventory-reuse.test.mjs
+@@ -0,0 +1,83 @@
++// SPDX-License-Identifier: SUL-1.0
++// NMIR: the native-goldfish namespace read is reused only while every file is provably unchanged, outside the racy window,
++// and younger than the max age. A rewrite, a fresh write, or an elapsed age always reads the files again.
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { execFileSync } from 'node:child_process';
++import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { readNativeManagedInventory } from './native-managed-authority-support.mjs';
++import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
++
++const linuxOnly = { skip: process.platform !== 'linux' && 'the signature reuse is POSIX-only' };
++const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
++const hex = c => c.repeat(64);
++const ownerRecord = bindingChar => ({ schema: 'pipeline.native-goldfish-authority-owner.v1', pendingSha256: hex('a'), association: { state: 'unbound', target: null }, bindingSha256: hex(bindingChar) });
++
++function fixture(t) {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), 'native-inventory-reuse-')));
++  t.after(() => rmSync(root, { recursive: true, force: true }));
++  const git = args => execFileSync('git', args, { cwd: root, timeout: 10000, maxBuffer: 524288, stdio: ['ignore', 'pipe', 'pipe'] });
++  git(['init', '--quiet']);
++  git(['-c', 'user.email=fixture@example.invalid', '-c', 'user.name=Synthetic fixture', 'commit', '--allow-empty', '--quiet', '-m', 'pin']);
++  const repository = inspectSignedDescriptorCustodyRepository(root);
++  const directory = join(repository.commonDir, 'agent-pipeline/run/native-goldfish-host-commit');
++  mkdirSync(directory, { recursive: true, mode: 0o700 });
++  const file = join(directory, `authority-owner-${hex('b')}.json`);
++  const write = bindingChar => writeFileSync(file, JSON.stringify(ownerRecord(bindingChar)), { mode: 0o600 });
++  write('c');
++  return { repository, write };
++}
++// Short windows keep the suite fast; the production defaults are 2 s (racy) and 1 s (max age).
++const fast = { reuseRacyMs: 300, reuseMaxAgeMs: 5000 };
++
++test('NMIR01 an unchanged namespace outside the racy window is read once and reused', linuxOnly, async t => {
++  const { repository } = fixture(t);
++  await sleep(450);
++  const first = readNativeManagedInventory(repository, 'native-goldfish', fast);
++  const second = readNativeManagedInventory(repository, 'native-goldfish', fast);
++  assert.equal(second, first);
++  assert.equal(first[0].entries.length, 1);
++});
++
++test('NMIR02 a rewrite of the same size is never served from the earlier read', linuxOnly, async t => {
++  const { repository, write } = fixture(t);
++  await sleep(450);
++  const first = readNativeManagedInventory(repository, 'native-goldfish', fast);
++  assert.equal(first[0].entries[0].value.bindingSha256, hex('c'));
++  write('d');
++  const second = readNativeManagedInventory(repository, 'native-goldfish', fast);
++  assert.notEqual(second, first);
++  assert.equal(second[0].entries[0].value.bindingSha256, hex('d'));
++});
++
++test('NMIR03 a read taken inside the racy window is not reusable, so a same-tick rewrite is always seen', linuxOnly, t => {
++  const { repository, write } = fixture(t);
++  const first = readNativeManagedInventory(repository, 'native-goldfish', { reuseRacyMs: 60000, reuseMaxAgeMs: 60000 });
++  write('e');
++  const second = readNativeManagedInventory(repository, 'native-goldfish', { reuseRacyMs: 60000, reuseMaxAgeMs: 60000 });
++  assert.notEqual(second, first);
++  assert.equal(second[0].entries[0].value.bindingSha256, hex('e'));
++});
++
++test('NMIR04 a read older than the max age is repeated even when nothing changed', linuxOnly, async t => {
++  const { repository } = fixture(t);
++  await sleep(450);
++  const first = readNativeManagedInventory(repository, 'native-goldfish', { reuseRacyMs: 300, reuseMaxAgeMs: 100 });
++  await sleep(150);
++  const second = readNativeManagedInventory(repository, 'native-goldfish', { reuseRacyMs: 300, reuseMaxAgeMs: 100 });
++  assert.notEqual(second, first);
++  assert.equal(second[0].entries.length, 1);
++});
++
++test('NMIR05 an added file changes the namespace signature and is read', linuxOnly, async t => {
++  const { repository } = fixture(t);
++  await sleep(450);
++  const first = readNativeManagedInventory(repository, 'native-goldfish', fast);
++  const directory = join(repository.commonDir, 'agent-pipeline/run/native-goldfish-host-commit');
++  writeFileSync(join(directory, `authority-owner-${hex('f')}.json`), JSON.stringify(ownerRecord('1')), { mode: 0o600 });
++  const second = readNativeManagedInventory(repository, 'native-goldfish', fast);
++  assert.notEqual(second, first);
++  assert.equal(second[0].entries.length, 2);
++});
+diff --git a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+index ebb2e4b09..8bef3d4c4 100644
+--- a/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
++++ b/plugins/pipeline-core/lib/session-authority-domain-owner.mjs
+@@ -114,7 +114,7 @@ function pluginRootBoundary(filePath){
+ function readModuleContext(filePath){
+   if(process.platform==='win32'){if(!chain(dirname(filePath),pluginRootBoundary(filePath)))authorityOwnerFailure('domain-source-context-path');const native=nativeJoinedRead(filePath,false);return {pathSha256:digest(filePath),sha256:hash(native.bytes),identity:native.identity,size:native.bytes.length,nativeFactsSha256:native.nativeFactsSha256};}
+   if(!chain(dirname(filePath))||realpathSync(filePath)!==filePath)authorityOwnerFailure('domain-source-context-path');
+-  let fd;try{const before=lstatSync(filePath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o022)!==0||before.size>LIMIT.file)authorityOwnerFailure('domain-source-context-ownership');fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);if(!same(stability(before),stability(opened)))authorityOwnerFailure('domain-source-context-race');const buffer=Buffer.alloc(LIMIT.file+1);let size=0;while(size<buffer.length){const count=readSync(fd,buffer,size,buffer.length-size,size);if(!count)break;size+=count;}const after=lstatSync(filePath),final=fstatSync(fd);if(size>LIMIT.file||size!==final.size||!same(stability(opened),stability(final))||!same(stability(final),stability(after)))authorityOwnerFailure('domain-source-context-race');return {pathSha256:digest(filePath),sha256:hash(buffer.subarray(0,size)),identity:identity(final),size};}finally{if(fd!==undefined)closeSync(fd);}
++  let fd;try{const before=lstatSync(filePath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||(before.mode&0o022)!==0||before.size>LIMIT.file)authorityOwnerFailure('domain-source-context-ownership');fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);if(!same(stability(before),stability(opened)))authorityOwnerFailure('domain-source-context-race');const buffer=Buffer.allocUnsafe(LIMIT.file+1);let size=0;while(size<buffer.length){const count=readSync(fd,buffer,size,buffer.length-size,size);if(!count)break;size+=count;}const after=lstatSync(filePath),final=fstatSync(fd);if(size>LIMIT.file||size!==final.size||!same(stability(opened),stability(final))||!same(stability(final),stability(after)))authorityOwnerFailure('domain-source-context-race');return {pathSha256:digest(filePath),sha256:hash(buffer.subarray(0,size)),identity:identity(final),size};}finally{if(fd!==undefined)closeSync(fd);}
+ }
+ export function readAuthoritySourceFile({namespaceId,filePath,semantic}){
+   if(typeof namespaceId!=='string'||!namespaceId||typeof semantic!=='function'||!chain(dirname(filePath),windowsAuthorityBoundary(filePath)))authorityOwnerFailure('domain-source-input');
+@@ -123,7 +123,7 @@ export function readAuthoritySourceFile({namespaceId,filePath,semantic}){
+     const before=lstatSync(filePath);owned(before);if(before.size>LIMIT.file)authorityOwnerFailure('domain-source-size');
+     fd=openSync(filePath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd);owned(opened);
+     if(!same(stability(before),stability(opened)))authorityOwnerFailure('domain-source-race');
+-    function boundedRead(){const chunks=[];let offset=0;while(offset<=LIMIT.file){const chunk=Buffer.alloc(Math.min(65536,LIMIT.file+1-offset)),size=readSync(fd,chunk,0,chunk.length,offset);if(size===0)break;chunks.push(chunk.subarray(0,size));offset+=size;}if(offset>LIMIT.file)authorityOwnerFailure('domain-source-size');return Buffer.concat(chunks,offset);}
++    function boundedRead(){const chunks=[];let offset=0;while(offset<=LIMIT.file){const chunk=Buffer.allocUnsafe(Math.min(65536,LIMIT.file+1-offset)),size=readSync(fd,chunk,0,chunk.length,offset);if(size===0)break;chunks.push(chunk.subarray(0,size));offset+=size;}if(offset>LIMIT.file)authorityOwnerFailure('domain-source-size');return Buffer.concat(chunks,offset);}
+     const bytes=boundedRead(),afterRead=fstatSync(fd),again=boundedRead(),final=fstatSync(fd),after=lstatSync(filePath);owned(afterRead);owned(final);owned(after);
+     if(!same(stability(opened),stability(afterRead))||!same(stability(afterRead),stability(final))||!same(stability(final),stability(after))||bytes.length!==after.size||!bytes.equals(again))authorityOwnerFailure('domain-source-race');
+     const value=json(bytes),meaning=semantic({value,bytes});if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
