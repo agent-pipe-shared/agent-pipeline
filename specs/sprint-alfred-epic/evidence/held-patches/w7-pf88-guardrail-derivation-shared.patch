@@ -1,0 +1,325 @@
+diff --git a/plugins/pipeline-core/lib/critic-required-guardrails.mjs b/plugins/pipeline-core/lib/critic-required-guardrails.mjs
+new file mode 100644
+index 000000000..57a26640f
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-required-guardrails.mjs
+@@ -0,0 +1,137 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * One derivation of the guardrail paths a Critic review requires, shared by the
++ * dispatch preflight (and, in a later slice, the diagnostic evidence producer).
++ *
++ * The required set is the union of: the explicit guardrails the caller names,
++ * the governance-derived paths (candidate manifest, governance guidelines and
++ * policies, and every changed path that triggers a requirement such as
++ * `changed-manifest`), and the declared requirement-map path. Every path is
++ * read from the frozen candidate tree; nothing here writes.
++ *
++ * Failures throw CriticGuardrailDerivationError carrying the CDP-* code the
++ * preflight has always used, so the caller can re-raise them unchanged.
++ */
++import { spawnSync } from "node:child_process";
++import { isAbsolute } from "node:path";
++
++import { parseYaml } from "./yaml-lite.mjs";
++import { isSuccessfulSpawn } from "./successful-spawn.mjs";
++import {
++  CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
++  deriveCriticPacketGovernance,
++} from "./critic-packet-governance.mjs";
++
++const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
++const PATH_MAX = 240;
++const CANDIDATE_SOURCE_MAX_BYTES = 16 * 1024 * 1024;
++const MANIFEST_PATH = ".claude/pipeline.yaml";
++
++export class CriticGuardrailDerivationError extends Error {
++  constructor(code, message) {
++    super(message);
++    this.name = "CriticGuardrailDerivationError";
++    this.code = code;
++  }
++}
++
++function fail(code, message) { throw new CriticGuardrailDerivationError(code, message); }
++function compare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
++
++function normalizePath(value, label) {
++  if (typeof value !== "string" || value.length === 0 || value.length > PATH_MAX || value.trim() !== value
++    || value.includes("\\") || value.includes("\0") || isAbsolute(value) || value.startsWith("./") || value.endsWith("/")) {
++    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
++  }
++  if (value.split("/").some((part) => part === "" || part === "." || part === "..")) {
++    fail("CDP-PATH", `${label} must be a bounded normalized repository-relative path.`);
++  }
++  return value;
++}
++
++function git(root, args) {
++  const result = spawnSync("git", ["-C", root, ...args], {
++    encoding: "utf8",
++    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
++    shell: false,
++    timeout: 10_000,
++    maxBuffer: 16 * 1024 * 1024,
++  });
++  if (!isSuccessfulSpawn(result)) fail("CDP-GIT", `Git observation failed for ${args[0]}.`);
++  return String(result.stdout).trim();
++}
++
++function candidateInventory(root, candidate) {
++  const rows = git(root, ["ls-tree", "-r", "-z", candidate]);
++  const files = [];
++  for (const row of rows.split("\0")) {
++    if (!row) continue;
++    const match = row.match(/^(\d{6}) (blob) ([a-f0-9]+)\t(.+)$/s);
++    if (!match || !OID.test(match[3])) fail("CDP-TREE", "Candidate tree inventory is malformed.");
++    files.push({ path: normalizePath(match[4], "candidate path"), blobOid: match[3], readable: match[1] !== "120000" });
++  }
++  files.sort((left, right) => compare(left.path, right.path));
++  if (new Set(files.map(({ path }) => path)).size !== files.length) fail("CDP-TREE", "Candidate tree contains duplicate paths.");
++  return files;
++}
++
++function candidateText(root, candidate, path) {
++  const result = spawnSync("git", ["-C", root, "show", `${candidate}:${path}`], {
++    encoding: "utf8",
++    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
++    shell: false,
++    timeout: 10_000,
++    maxBuffer: CANDIDATE_SOURCE_MAX_BYTES,
++  });
++  if (!isSuccessfulSpawn(result)) fail("CDP-CANDIDATE-READ", `Cannot read candidate path: ${path}`);
++  return String(result.stdout);
++}
++
++/**
++ * @param {object} input
++ * @param {string} input.root repository root
++ * @param {string} input.candidate candidate commit
++ * @param {string|null} input.base review base (commit or empty-tree oid); unused when changedPaths is given
++ * @param {string[]|null} [input.changedPaths] explicit changed paths (current-artifact scope)
++ * @param {string[]} input.explicitGuardrails already normalized explicit guardrail paths
++ * @param {(ctx: {files: object[], byPath: Map<string, object>}) => string[]} [input.requirementPaths]
++ *   invoked after governance derivation; returns the requirement-map paths
++ * @param {(stage: string) => void} [input.onStage] receives "inventory", "manifest", "governance"
++ * @returns {{files: object[], byPath: Map<string, object>, governance: object,
++ *   required: {path: string, reasons: string[]}[], paths: string[]}}
++ */
++export function deriveRequiredCriticGuardrails({ root, candidate, base = null, changedPaths = null, explicitGuardrails = [], requirementPaths = () => [], onStage = () => {} }) {
++  onStage("inventory");
++  const files = candidateInventory(root, candidate);
++  const byPath = new Map(files.map((file) => [file.path, file]));
++  onStage("manifest");
++  const manifestFile = byPath.get(MANIFEST_PATH);
++  if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
++  let manifest;
++  try { manifest = parseYaml(candidateText(root, candidate, MANIFEST_PATH)); }
++  catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
++  onStage("governance");
++  const changed = changedPaths !== null
++    ? changedPaths
++    : git(root, ["diff", "--name-only", "-z", base, candidate, "--"])
++      .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare);
++  const governance = deriveCriticPacketGovernance({
++    schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
++    manifest,
++    candidateFiles: files,
++    changedPaths: changed,
++  });
++  const reasons = new Map();
++  const add = (path, reason) => {
++    const set = reasons.get(path) ?? new Set();
++    set.add(reason);
++    reasons.set(path, set);
++  };
++  for (const path of explicitGuardrails) add(path, "explicit");
++  for (const { path, reasons: why } of governance.required) for (const reason of why) add(path, reason);
++  for (const path of requirementPaths({ files, byPath })) add(path, "requirement-map");
++  const required = [...reasons.entries()]
++    .map(([path, set]) => ({ path, reasons: [...set].sort(compare) }))
++    .sort((left, right) => compare(left.path, right.path));
++  return { files, byPath, governance, required, paths: required.map(({ path }) => path) };
++}
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 82a8078ce..946ac7b5f 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -17,12 +17,11 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+ import { isAbsolute, relative, resolve, sep } from "node:path";
+ import { spawnSync } from "node:child_process";
+ 
+-import { parseYaml } from "../lib/yaml-lite.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import {
+-  CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
+-  deriveCriticPacketGovernance,
+-} from "../lib/critic-packet-governance.mjs";
++  CriticGuardrailDerivationError,
++  deriveRequiredCriticGuardrails,
++} from "../lib/critic-required-guardrails.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import {
+   RequirementTraceabilityError,
+@@ -165,20 +164,6 @@ function resolveBase(root, base) {
+   fail("CDP-GIT", "Git observation failed for rev-parse.");
+ }
+ 
+-function candidateInventory(root, candidate) {
+-  const rows = git(root, ["ls-tree", "-r", "-z", candidate]);
+-  const files = [];
+-  for (const row of rows.split("\0")) {
+-    if (!row) continue;
+-    const match = row.match(/^(\d{6}) (blob) ([a-f0-9]+)\t(.+)$/s);
+-    if (!match || !OID.test(match[3])) fail("CDP-TREE", "Candidate tree inventory is malformed.");
+-    files.push({ path: normalizePath(match[4], "candidate path"), blobOid: match[3], readable: match[1] !== "120000" });
+-  }
+-  files.sort((left, right) => compare(left.path, right.path));
+-  if (new Set(files.map(({ path }) => path)).size !== files.length) fail("CDP-TREE", "Candidate tree contains duplicate paths.");
+-  return files;
+-}
+-
+ function candidateText(root, candidate, path) {
+   const result = spawnSync("git", ["-C", root, "show", `${candidate}:${path}`], {
+     encoding: "utf8",
+@@ -248,7 +233,12 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path,
+     else fail("CDP-EVIDENCE-SCHEMA", `Unsupported evidence schema: ${path}`);
+   } catch (error) {
+     if (error instanceof CriticDispatchPreflightError) throw error;
+-    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode: error.code ?? "CDI-INVALID" });
++    const diagnosticCode = error.code ?? "CDI-INVALID";
++    if (diagnosticCode === "CDI-GUARDRAILS") {
++      const requiredGuardrailPaths = guardrails.map((entry) => entry.path);
++      fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}; the diagnostic lacks required guardrails: ${requiredGuardrailPaths.join(", ")}`, { diagnosticCode, requiredGuardrailPaths });
++    }
++    fail("CDP-EVIDENCE-MODE", `Invalid Critic diagnostic evidence: ${path}`, { diagnosticCode });
+   }
+   return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree }, diagnostic };
+ }
+@@ -297,49 +287,47 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   const prior = priorCriticEvidencePath === null ? null : normalizePath(priorCriticEvidencePath, "prior Critic evidence path");
+   if (prior !== null && evidence.includes(prior)) fail("CDP-PRIOR-ALIASED", "Prior Critic evidence cannot satisfy fresh candidate evidence.");
+ 
+-  stage = "inventory";
+-  const files = candidateInventory(realRoot, candidateCommit);
+-  const byPath = new Map(files.map((file) => [file.path, file]));
+-  stage = "manifest";
+-  const manifestFile = byPath.get(".claude/pipeline.yaml");
+-  if (!manifestFile?.readable) fail("CDP-MANIFEST", "Candidate manifest is absent or unreadable.");
+-  let manifest;
+-  try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
+-  catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
+-  stage = "governance";
+-  const changedPaths = scope === null
+-    ? git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
+-      .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare)
+-    : scope.paths;
+-  const governance = deriveCriticPacketGovernance({
+-    schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
+-    manifest,
+-    candidateFiles: files,
+-    changedPaths,
+-  });
+-  const governancePaths = governance.required.map(({ path }) => path);
++  // The required-guardrail derivation lives in one shared module; the
++  // requirement-map evaluation stays here and runs inside it, after governance.
+   let requirementTraceability;
++  let derived;
+   try {
+-    requirementTraceability = evaluateRequirementTraceability({
+-      specPath: spec,
+-      candidate: { commit: candidateCommit, tree: candidateTree },
+-      candidateFiles: byPath,
+-      readCandidateFile: (path) => candidateBytes(realRoot, candidateCommit, path),
++    derived = deriveRequiredCriticGuardrails({
++      root: realRoot,
++      candidate: candidateCommit,
++      base: baseCommit ?? baseTree,
++      changedPaths: scope === null ? null : scope.paths,
++      explicitGuardrails: guardrails,
++      onStage: (next) => { stage = next; },
++      requirementPaths: ({ byPath }) => {
++        try {
++          requirementTraceability = evaluateRequirementTraceability({
++            specPath: spec,
++            candidate: { commit: candidateCommit, tree: candidateTree },
++            candidateFiles: byPath,
++            readCandidateFile: (path) => candidateBytes(realRoot, candidateCommit, path),
++          });
++        } catch (error) {
++          if (error instanceof RequirementTraceabilityError) {
++            fail("CDP-REQUIREMENT-MAP", `${error.code}: ${error.message}`);
++          }
++          throw error;
++        }
++        if (requirementTraceability.missingCriteria.length > 0) {
++          const names = requirementTraceability.missingCriteria.map(({ id }) => id).join(", ");
++          fail("CDP-REQUIREMENT-ABSENT", `Candidate is missing named requirements: ${names}`, {
++            missingCriteria: requirementTraceability.missingCriteria,
++          });
++        }
++        return requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
++      },
+     });
+   } catch (error) {
+-    if (error instanceof RequirementTraceabilityError) {
+-      fail("CDP-REQUIREMENT-MAP", `${error.code}: ${error.message}`);
+-    }
++    if (error instanceof CriticGuardrailDerivationError) fail(error.code, error.message);
+     throw error;
+   }
+-  if (requirementTraceability.missingCriteria.length > 0) {
+-    const names = requirementTraceability.missingCriteria.map(({ id }) => id).join(", ");
+-    fail("CDP-REQUIREMENT-ABSENT", `Candidate is missing named requirements: ${names}`, {
+-      missingCriteria: requirementTraceability.missingCriteria,
+-    });
+-  }
+-  const requirementPaths = requirementTraceability.mode === "declared" ? [requirementTraceability.map.path] : [];
+-  const allGuardrails = [...new Set([...guardrails, ...governancePaths, ...requirementPaths])].sort(compare);
++  const { byPath, governance } = derived;
++  const allGuardrails = derived.paths;
+   stage = "candidate-files";
+   const specReadback = requiredCandidateReadback(realRoot, candidateCommit, byPath, [spec], "Spec")[0];
+   sourceSpecSha256 = specReadback.sha256;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 3ba7e9cf0..b88d5e109 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -978,4 +978,37 @@ test("a new feature ID cannot reset logical work after an actual feature packet
+   } finally {rmSync(fx.root,{recursive:true,force:true});}
+ });
+ 
++test("the shared guardrail derivation lists a changed JSON manifest as required with reason changed-manifest", async () => {
++  const fx = fixture();
++  try {
++    writeFileSync(join(fx.root, ".claude", "pipeline.json"), "{}\n");
++    const candidate = commit(fx.root, "change the JSON manifest");
++    const { deriveRequiredCriticGuardrails } = await import("../lib/critic-required-guardrails.mjs");
++    const result = deriveRequiredCriticGuardrails({ root: fx.root, candidate, base: fx.candidate, explicitGuardrails: [] });
++    const manifest = result.required.find(({ path }) => path === ".claude/pipeline.json");
++    assert.ok(manifest, JSON.stringify(result.required));
++    assert.deepEqual(manifest.reasons, ["changed-manifest"]);
++    assert.deepEqual(result.paths, result.required.map(({ path }) => path));
++    assert.deepEqual([...result.paths].sort(), result.paths);
++    assert.deepEqual(result.paths, [".claude/pipeline.json", ".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"]);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("a diagnostic lacking required guardrails fails CDI-GUARDRAILS and the failure lists exactly the required paths", () => {
++  const fx = fixture();
++  try {
++    const value = produceCriticDiagnostic({ root: fx.root, specPath: "specs/spec.md", guardrailPaths: [], command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/lacking.log" });
++    writeFileSync(join(fx.root, "evidence/lacking.json"), JSON.stringify(value));
++    const required = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
++    assert.throws(() => preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/lacking.json"] })), (error) => {
++      assert.ok(error instanceof CriticDispatchPreflightError);
++      assert.equal(error.code, "CDP-EVIDENCE-MODE");
++      assert.equal(error.details.diagnosticCode, "CDI-GUARDRAILS");
++      assert.deepEqual(error.details.requiredGuardrailPaths, required);
++      for (const path of required) assert.ok(error.message.includes(path), error.message);
++      return true;
++    });
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
