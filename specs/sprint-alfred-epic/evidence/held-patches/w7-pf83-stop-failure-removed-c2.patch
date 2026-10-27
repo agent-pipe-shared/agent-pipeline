@@ -1,0 +1,120 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 9915d8e30..1690c9e43 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -9,7 +9,7 @@ import { constants, lstatSync, openSync, fstatSync, readFileSync, closeSync, wri
+ import { parseStrictJson } from './governance-event.mjs';
+ /** Host-owned Claude/Codex Goldfish completion: validate, commit, receipt, then v4 record. */
+ import { realpathSync } from "node:fs";
+-import { mkdirSync as stopMkdir, writeFileSync as stopWrite, unlinkSync as stopUnlink } from "node:fs";
++import { mkdirSync as stopMkdir, writeFileSync as stopWrite, unlinkSync as stopUnlink, readdirSync as stopReaddir, readFileSync as stopRead } from "node:fs";
+ import { createHash as stopHash } from "node:crypto";
+ import { resolve, dirname, isAbsolute, join } from "node:path";
+ import { assessAgyHostCommit, assessSourceOwnedNativeHostCommit, NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA } from "./agy-host-commit-admission.mjs";
+@@ -149,16 +149,31 @@ function observeClaudeSubagentStop(input, pending, mark) {
+ }
+ 
+ // PF-61 visibility: SubagentStop has no channel the Coordinator reads, so a failed completion of a marked Goldfish also
+-// leaves a small diagnostic next to its pending state, naming the exact code. A later success removes it. Diagnostic only:
++// leaves a small diagnostic next to its pending state, naming the exact code. A later success removes every diagnostic
++// recorded for that dispatch (whatever tool use id or route wrote it). Diagnostic only:
+ // any fault here is swallowed, the hook stays non-blocking.
+ const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+-function recordSubagentStopOutcome({ stop }, result) {
+-  if (!stop) return;
++function recordSubagentStopOutcome({ stop, dispatch }, result) {
++  if (!stop && !dispatch) return;
+   try {
+     // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
+-    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++    const commonDir = stop ? stop.commonDir : dispatch.commonDir;
++    const directory = join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++    if (result?.status === "authored-commit-recorded") {
++      const dispatchId = stop ? stop.state.binding.dispatchId : dispatch.dispatchId;
++      let entries = [];
++      try { entries = stopReaddir(directory); } catch { /* none to remove */ }
++      for (const entry of entries) {
++        if (!/^stop-failure-.+\.json$/u.test(entry)) continue;
++        try {
++          const recorded = JSON.parse(stopRead(join(directory, entry), "utf8"));
++          if (typeof recorded?.dispatchId === "string" && recorded.dispatchId === dispatchId) stopUnlink(join(directory, entry));
++        } catch { /* unreadable or foreign: left alone */ }
++      }
++      return;
++    }
++    if (!stop) return;
+     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
+-    if (result?.status === "authored-commit-recorded") { try { stopUnlink(join(directory, name)); } catch { /* none to remove */ } return; }
+     // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
+     if (!stop.viaHandback) return;
+     stopMkdir(directory, { recursive: true, mode: 0o700 });
+@@ -277,6 +292,7 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   } else return fail("NGHF-NOT-APPLICABLE", "not-applicable");
+ 
+   const state = pending.state;
++  diagnostic.dispatch = { commonDir, dispatchId: state.binding.dispatchId };
+   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
+   if (!observation?.ok) return fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized");
+   if (observation.final.outcome !== "succeeded") return fail("NGHF-RETURN-NOT-SUCCESS", "not-finalized");
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index a07d00699..08e866d65 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -67,6 +67,12 @@ const snapshot = (commonDir) => JSON.stringify(readdirSync(privateDir(commonDir)
+   .map((name) => [name, readFileSync(join(privateDir(commonDir), name), "utf8")]));
+ const readReceipt = (commonDir) => { const names = privateEntries(commonDir, "observation-claude-"); assert.equal(names.length, 1);
+   return JSON.parse(readFileSync(join(privateDir(commonDir), names[0]), "utf8")); };
++// PF-83: the stop-failure diagnostics live beside, not inside, the host-commit private directory (D180b).
++const diagDir = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++const diagEntries = (commonDir) => (existsSync(diagDir(commonDir)) ? readdirSync(diagDir(commonDir)).sort() : []);
++const plantDiagnostic = (commonDir, name, content) => { mkdirSync(diagDir(commonDir), { recursive: true, mode: 0o700 }); writeFileSync(join(diagDir(commonDir), name), content); };
++const diagRecord = (dispatchId, toolUseId) => `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId, toolUseId,
++  status: "not-finalized", code: "NGHR-FINAL-JSON", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`;
+ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
+   const root=fixtureRoot("native-goldfish-host-finalizer-"); const commonDir=join(root,".git");
+   const stopDir=fixtureRoot("native-goldfish-stop-hook-"); const background=options.background===true;
+@@ -409,6 +415,44 @@ const cases = [
+     assert.equal("checks" in result, false);
+     assert.deepEqual(readdirSync(join(root, "evidence")).filter((name) => name.startsWith("dispatch-checks-")), []);
+   }) },
++  // NGHF14-NGHF16 -- PF-83: a stop-failure diagnostic is removed once its dispatch has succeeded, matched by the recorded dispatch id.
++  { id: "NGHF14", name: "A handback stop failure leaves a diagnostic; a later success without a handback removes every diagnostic of that dispatch, whatever its tool-use id", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"),`${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: "All done, no JSON here." } }] } })}\n`);
++    const failed = finalize(stopInput(binding, undefined));
++    assert.equal(failed.status, "not-finalized", failed.code);
++    assert.equal(diagEntries(commonDir).length, 1, `${failed.code} ${JSON.stringify(failed)}`);
++    plantDiagnostic(commonDir, `stop-failure-${"1".repeat(32)}.json`, diagRecord(binding.dispatchId, "tool-earlier-launch"));
++    assert.equal(diagEntries(commonDir).length, 2);
++    const accepted = finalize(stopInput(binding, finalText(binding)));
++    assert.equal(accepted.status, "authored-commit-recorded", accepted.code);
++    assert.equal(facts.commits, 1);
++    assert.deepEqual(diagEntries(commonDir), []);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF15", name: "A dispatch that succeeded through a foreground PostToolUse never leaves a stop-failure diagnostic behind", run: () => fixture(({ root, commonDir, binding, dependencies }) => {
++    plantDiagnostic(commonDir, `stop-failure-${"2".repeat(32)}.json`, diagRecord(binding.dispatchId, "tool-earlier-launch"));
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
++      tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
++      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } } }, dependencies);
++    assert.equal(result.status, "authored-commit-recorded", result.code);
++    assert.deepEqual(diagEntries(commonDir), []);
++  }) },
++  { id: "NGHF16", name: "The success of one dispatch never removes a diagnostic of another dispatch, an unreadable file or one without a dispatch id", run: () => fixture(({ root, commonDir, binding, dependencies }) => {
++    plantDiagnostic(commonDir, `stop-failure-${"3".repeat(32)}.json`, diagRecord("NGHF-OTHER", "tool-claude"));
++    plantDiagnostic(commonDir, `stop-failure-${"4".repeat(32)}.json`, "{ not json");
++    plantDiagnostic(commonDir, `stop-failure-${"5".repeat(32)}.json`, `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", toolUseId: "tool-claude" })}\n`);
++    plantDiagnostic(commonDir, `stop-failure-${"6".repeat(32)}.json`, diagRecord(binding.dispatchId, "tool-earlier-launch"));
++    const before = diagEntries(commonDir);
++    const result = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: { hook_event_name: "PostToolUse", tool_name: "Agent", session_id: "session-claude",
++      tool_use_id: "tool-claude", tool_input: { subagent_type: binding.role, prompt: "marked" },
++      tool_response: { status: "completed", resolvedModel: binding.model, modelsUsed: [binding.model], content: [{ type: "text", text: finalText(binding) }] } } }, dependencies);
++    assert.equal(result.status, "authored-commit-recorded", result.code);
++    assert.deepEqual(diagEntries(commonDir), before.filter((name) => !name.includes("6".repeat(32))));
++    assert.equal(diagEntries(commonDir).length, 3);
++  }) },
+ 
+ ];
+ 
