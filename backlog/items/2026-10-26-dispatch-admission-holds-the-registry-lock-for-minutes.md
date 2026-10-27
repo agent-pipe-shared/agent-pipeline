@@ -69,6 +69,29 @@ done_when: manual
   measurement: time `collision-check` with the stale set excluded in a scratch clone.
 - Acceptance stays: two `Agent` calls in one message are both admitted, each in well under 30 s.
 
+## D182 result and what stays open (2026-10-27)
+
+- Root cause found by a CPU profile of the admission with D177 installed (110 s, 92 s of it inside the registry lock):
+  `inspectSourceOwnedSessionAuthorityMemberRecord` reads and reconciles the WHOLE registry per member (about 0.8 s each with 25
+  members). `computeNativeIntegratedSlices` (once per (skipCancelled, only) shape, so twice per admission, memo keys differ),
+  `readNativeReleasedItemReservations` and `nativeConcurrentPlan` each walked every member: four full passes, about 85 s.
+  D177's memo cannot hit across shapes and does not touch the per-member read.
+- D182 (Elephant exception by PO decision 2026-10-27, commit `e41348d1c`): a batch `inspectSourceOwnedSessionAuthorityMemberRecords`
+  reads the registry once; `inspectNativeMemberRecords` memoises that pass per admission and member set. Measured with the repo
+  copy of the hook: integrated-slice-read 49 s to about 5 s, collision-check 48 s to about 2.5 s, whole admission 110 s to about
+  20 s (until the baseline phase). Not yet verified on the installed copy, not yet re-measured as a fan-out of two.
+- Still open and deliberately NOT part of D182:
+  1. The registry is append-only: released member rows are never compacted, so the single pass grows linearly with every
+     dispatch (about 0.8 s today plus 25 rows to parse). Compaction of settled members is a core-registry decision (audit
+     semantics, protected path) and needs its own slice and Critic review. Right place: a `compact` verb of
+     `session-authority-repair.mjs` that archives released members older than the candidate into a sealed archive record,
+     called from the bootstrap housekeeping step (Wanted 7) and from `heal`, never from the admission hook.
+  2. The registry lock is still held for the whole remaining admission (about 20 s), so two Agent calls in one message still
+     serialize on `SDC-LOCK-HELD` after 1.5 s. Wanted 1 (no scan inside the lock) is the fix for fan-out; D182 only makes the
+     serialized path fast.
+  3. `GUARD-DISPATCH-SECOND-WRITER-UNJUDGED` still lists about 70 stale `evidence/dispatch-record-*.json` records on every call
+     (Wanted 6 retire route); measured cost is small (0.3 s plus 4 s for the scope overlap), but the output is noise.
+
 ## Wanted
 
 1. No git or file-tree scan inside the registry lock: compute the integration and baseline facts first, then take the lock
