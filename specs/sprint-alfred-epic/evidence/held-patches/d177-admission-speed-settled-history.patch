@@ -1,96 +1,209 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index d36602848..5f00ec0e9 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -86,6 +86,8 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { appendEvent, liveSlices } from "../lib/fanout-ledger.mjs";
+ import { CANCEL_CLASS_HELP, CANCEL_CLASSES, loadSliceQueue, normalizeScope, readyAndLive, scopesOverlap } from "../lib/slice-queue.mjs";
+ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, resolveGovernedItemQueue, prepareGovernedItemQueue, rollbackGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
++// D177: hook entry time (module evaluation is the hook's start); the admission deadline measures from here.
++const HOOK_ENTRY_MS = Date.now();
+ import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+ import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+ import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
+@@ -1017,6 +1019,7 @@ if (isDirectInvocation(import.meta.url)) {
+         const rootDir = process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd();
+         const prepared = prepareNativeGoldfishHostState({
+           root: rootDir, runner: nativeRunner, input,
++          admissionDeadline: { startMs: HOOK_ENTRY_MS, budgetMs: 100000 },
+           subagentStopCompletionRegistered: nativeRunner === "claude" && claudeSubagentStopCompletionRegistered(),
+         });
+         if (prepared.ok) nativePendingPrepared = true;
 diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
-index 27a48cd22..eba1671fe 100644
+index eba1671fe..df335f113 100644
 --- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
 +++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
-@@ -728,8 +728,9 @@ function publishNativeAuthorityState(commonDir,name,state){
-       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
+@@ -181,7 +181,7 @@ export function prepareNativeGoldfishHostState(args = {}, dependencies = {}) {
+   if (result?.ok !== true) for (const row of written.reverse()) rollbackGovernedItemQueue(row);
+   return result;
+ }
+-function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered } = {}, dependencies = {}, written = []) {
++function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopCompletionRegistered, admissionDeadline = null } = {}, dependencies = {}, written = []) {
+   if (!safeRunner(runner)) return fail("NGHS-RUNNER");
+   const fields = toolFields(runner, input);
+   if (!fields || !safeCorrelation(fields.correlation) || !ID.test(fields.sessionId ?? "")) return { ok: true, code: "NGHS-NOT-APPLICABLE" };
+@@ -248,7 +248,7 @@ function prepareNativeGoldfishHostStateOnce({ root, runner, input, subagentStopC
+     ...(backgroundCompletion ? { completionRoute: NATIVE_GOLDFISH_SUBAGENT_STOP_COMPLETION_ROUTE } : {}),
+   };
+   let stored;
+-  try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state); }
++  try { stored = publishNativeAuthorityState(commonDir, key("pending", runner, `${fields.sessionId}\0${fields.correlation}`), state, admissionDeadline); }
+   catch(error) { return {ok:false,code:error.code??"NGHS-ADMISSION-UNAVAILABLE",reason:error.reason??error.message??null,...(typeof error.repair==='string'?{repair:error.repair}:{})}; }
+   return stored.ok ? { ...stored, runner, dispatchId: binding.dispatchId } : stored;
+ }
+@@ -701,7 +701,23 @@ export function inspectSourceOwnedNativeConfiguredObservation({root,sessionId,to
+   });
+ }
+ 
+-function publishNativeAuthorityState(commonDir,name,state){
++// D177: a phase checkpoint, not a timer. Called at the admission's phase boundaries; one stderr line per call, and a typed
++// GUARD-DISPATCH-SLOW refusal when the elapsed time already exceeds the budget. withSessionAuthorityBoundary releases the
++// registry lock on the throw. Without a deadline argument it does nothing (no line, no throw).
++export function createAdmissionCheckpoint(deadline){
++  if(!deadline||typeof deadline!=='object')return ()=>{};
++  const now=typeof deadline.now==='function'?deadline.now:Date.now,write=typeof deadline.write==='function'?deadline.write:line=>process.stderr.write(line);
++  return phase=>{
++    const elapsed=now()-deadline.startMs,seconds=(elapsed/1000).toFixed(1);
++    write(`guard-dispatch: phase ${phase} at ${seconds}s\n`);
++    if(elapsed>deadline.budgetMs){
++      // No repository fault helper carries a custom code, so the fault is an Error with the code property set.
++      throw Object.assign(new Error(`GUARD-DISPATCH-SLOW: admission phase ${phase} reached ${seconds}s, over the ${(deadline.budgetMs/1000).toFixed(1)}s budget`),{code:'GUARD-DISPATCH-SLOW',reason:`GUARD-DISPATCH-SLOW: admission phase ${phase} reached ${seconds}s, over the ${(deadline.budgetMs/1000).toFixed(1)}s budget`});
++    }
++  };
++}
++function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null){
++  const checkpoint=createAdmissionCheckpoint(admissionDeadline);
+   const repository=inspectSignedDescriptorCustodyRepository(state.root);
+   if(repository.commonDir!==commonDir)throw nativeManagedFault('native-authority-common-drift');
+   // PF-52: a catalogue left by another plugin version is moved aside before presence is decided.
+@@ -729,6 +745,7 @@ function publishNativeAuthorityState(commonDir,name,state){
        // PF-49: one integration source for every check of a dispatch — native records united with the D40 commit
        // evidence, exactly as observeGovernedItemIntegrationReadiness reads it for the admission before this.
--      const integration=readNativeIntegratedSlices({governed,repository,boundary});
--      const integratedIds=new Set([...integration.integrated,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})]);
-+      // D177: only the item's own dependencies are proven here; the settled set below is computed once per admission.
-+      const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
-+      const integratedIds=new Set([...integration.integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))]);
+       // D177: only the item's own dependencies are proven here; the settled set below is computed once per admission.
++      checkpoint('integrated-slice-read');
+       const integration=readNativeIntegratedSlices({governed,repository,boundary,only:new Set(item.dependsOn)});
+       const integratedIds=new Set([...integration.integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))]);
        const heldIds=item.dependsOn.filter(id=>!integratedIds.has(id));
-       if(heldIds.length)throw nativeManagedFault(`item-delivery-integration-dependency-held: ${heldDependencyReason(heldIds,governed.normalized.slices)}`);
-       const agy=readAgyAuthorityInventory({repository,namespaceIds:['registered-opaque-context-lifetimes']});
-@@ -742,7 +743,7 @@ function publishNativeAuthorityState(commonDir,name,state){
+@@ -743,6 +760,7 @@ function publishNativeAuthorityState(commonDir,name,state){
          if(!prior||(rank[row.value.phase]??0)>(rank[prior.value.phase]??0)||row.value.phase===prior.value.phase&&(row.value.revision??0)>(prior.value.revision??0))latest.set(row.value.operationId,row);
        }
        // D51 (2): a reservation whose slice is integrated (native record or D40/D40b commit evidence) or cancelled no longer collides.
--      const settled=settledItemSlices(integratedIds,governed);
-+      const settled=readSettledItemSliceIds({repository,boundary,governed});
++      checkpoint('collision-check');
+       const settled=readSettledItemSliceIds({repository,boundary,governed});
        for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
          const pending=entry.value.basis.itemDelivery;
-         if(pending.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.sliceId);
-@@ -1527,7 +1528,22 @@ export function readNativeReleasedItemReservations({repository,boundary}) {
-   return {releasedPendingHashes:[...owner.operations.values()].filter(row=>released.has(row.bindingSha256)).map(row=>row.pendingSha256)};
+@@ -765,13 +783,15 @@ function publishNativeAuthorityState(commonDir,name,state){
+     // PF-55: every check that can still refuse runs before the registry member is reserved, so a
+     // refused dispatch leaves no orphaned reserved member behind.
+     if(state.binding.itemDelivery){
++      checkpoint('mint');
+       const authority=mintNativeConcurrentAuthority({repository,boundary,allowedPaths:state.binding.allowedPaths,baseCommit:state.binding.candidateCommit,ownPendingSha256:null});
+-      try {const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
++      try {checkpoint('baseline-capture');const captured=captureSourceOwnedNativeHostCommitBaseline({root:state.root,candidateCommit:state.binding.candidateCommit,resultPath:state.resultPath,authority});if(!captured.ok)throw baselineFault(captured);state.baseline=captured.baseline;}
+       finally{nativeConcurrentAuthorities.delete(authority);}
+     }
+     // Productive native delivery publishes its bounded Source-owned receipts here.
+     // Prepare the empty directory before launch/authoring; no product bytes or baseline waiver.
+     if(state.delivery){const evidencePath=join(repository.primaryRoot,"evidence");let present;try{present=lstatSync(evidencePath);}catch(error){if(error.code!=="ENOENT")throw error;mkdirSync(evidencePath,{mode:0o700});present=lstatSync(evidencePath);}if(!present.isDirectory()||present.isSymbolicLink()||realpathSync(evidencePath)!==evidencePath)throw nativeManagedFault("native-evidence-parent-unsafe");}
++    checkpoint('reserve');
+     nativeAuthorityOperations.set(handle,{owner,operation});owner.operations.set(name,operation);
+     const reserved=reserveSessionAuthorityMember({boundary,producerPort:port,association:operation.association,operationHandle:handle});
+     operation.memberHandle=reserved.memberHandle;operation.memberRef=reserved.memberRef;
+@@ -1537,7 +1557,7 @@ export function memoPerAdmission(boundary,key,compute){
+   if(!memo.has(key))memo.set(key,compute());
+   return memo.get(key);
  }
- 
--function readNativeIntegratedSlices({governed,repository,boundary}) {
-+// D177: one computation per (boundary, governed queue sha256, candidate commit, shape) within ONE admission. The memo lives on a
-+// WeakMap keyed by the boundary object, so it dies with the admission and is never module-global state that survives one.
-+const admissionMemos=new WeakMap();
-+export function memoPerAdmission(boundary,key,compute){
-+  if(!boundary||typeof boundary!=='object')return compute();
-+  let memo=admissionMemos.get(boundary);if(!memo){memo=new Map();admissionMemos.set(boundary,memo);}
-+  if(!memo.has(key))memo.set(key,compute());
-+  return memo.get(key);
-+}
-+function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
-+  const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null]);
-+  const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}));
-+  return {integrated:[...memo.integrated],releasedPendingHashes:[...memo.releasedPendingHashes]};
-+}
-+function computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}) {
-+  const cancelled=new Set(skipCancelled?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[]);
-   const port=createNativeGoldfishAuthorityProducerPort({repository});
-       const producer=inspectSourceOwnedSessionAuthorityProducerRecord({boundary,producerPort:port}),read=readNativeManagedInventory(repository,'native-goldfish')[0];
-       const members=producer.record.members.map(row=>inspectSourceOwnedSessionAuthorityMemberRecord({boundary,producerPort:port,memberRef:row.memberRef}));
-@@ -1535,6 +1551,11 @@ function readNativeIntegratedSlices({governed,repository,boundary}) {
-       for(const row of read.entries.filter(entry=>entry.relativePath.startsWith('authority-integration-'))) {
-         if(!members.some(member=>member.record.phase==='released'&&member.record.bindingSha256===row.value.bindingSha256))continue;
-         releasedPendingHashes.push(row.value.pendingSha256);
-+        // D177: the per-row proof (a git read per row) runs only for rows the caller can still use. A settled-set caller
-+        // unions the cancelled slices anyway, and a dependency caller needs only its own dependsOn ids; releasedPendingHashes
-+        // above stays complete in every shape.
-+        if(only&&!only.has(row.value.sliceId))continue;
-+        if(cancelled.has(row.value.sliceId))continue;
-         const pending=read.entries.find(entry=>entry.relativePath.startsWith('pending-')&&entry.sourceFact.sha256===row.value.pendingSha256);
-         const item=governed.normalized.slices.find(item=>item.id===row.value.sliceId&&item.delivery.itemId===row.value.itemId);
-         if(!pending?.value.binding.itemDelivery||!item)continue;
-@@ -1557,8 +1578,8 @@ function settledItemSlices(integratedIds,governed){
+-function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
++export function readNativeIntegratedSlices({governed,repository,boundary,skipCancelled=false,only=null}) {
+   const key=JSON.stringify(['native-integrated',governed.sha256,repository.candidate.commit,skipCancelled,only?[...only].sort():null]);
+   const memo=memoPerAdmission(boundary,key,()=>computeNativeIntegratedSlices({governed,repository,boundary,skipCancelled,only}));
+   return {integrated:[...memo.integrated],releasedPendingHashes:[...memo.releasedPendingHashes]};
+@@ -1573,7 +1593,7 @@ function computeNativeIntegratedSlices({governed,repository,boundary,skipCancell
+ /** D51 (2): the slices whose item reservations no longer block an owner, criterion or write-scope check:
+  * integrated by a native record or by D40/D40b commit evidence, or cancelled in the governed queue.
+  * Every native and AGY collision check reads this one definition. */
+-function settledItemSlices(integratedIds,governed){
++export function settledItemSlices(integratedIds,governed){
+   return new Set([...integratedIds,...(governed?.status==='required'?governed.normalized.slices.filter(row=>row.state==='cancelled').map(row=>row.id):[])]);
  }
  export function readSettledItemSliceIds({repository,boundary,governed=resolveGovernedItemQueue({root:repository.primaryRoot})}={}) {
-   if(governed?.status!=='required')return new Set();
--  const {integrated}=readNativeIntegratedSlices({governed,repository,boundary});
--  return settledItemSlices([...integrated,...readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})],governed);
-+  const {integrated}=readNativeIntegratedSlices({governed,repository,boundary,skipCancelled:true});
-+  return settledItemSlices([...integrated,...memoPerAdmission(boundary,JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]),()=>readOrchestratorCommitIntegratedSlices({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}))],governed);
- }
- /** The repair a reservation collision names: the slice that still holds it and the commands that release it. */
- export function itemReservationRepair(sliceId) {
 diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
-index 4c0700fe1..34ee39451 100644
+index 34ee39451..7e57e680b 100644
 --- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
 +++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
-@@ -88,6 +88,19 @@ function itemContinuity() {
+@@ -87,8 +87,33 @@ function itemContinuity() {
+     capacity:{concurrencyLimit:3,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:"defer"}};
  }
  
++function d177Item(runtime, root, original, id, path, locator, extra = {}) {
++  const itemDelivery = { schema: "pipeline.item-delivery-briefing.v1", sliceId: id, itemId: id, criterionLocator: locator, checks: [{ id: "original-criterion", path: `src/${path}.test.mjs`, dependencies: [`src/${path}.mjs`, `src/${path}.test.mjs`] }] };
++  const binding = { ...makeBinding({ dispatchId: id, commit: original.candidate.commit, tree: original.candidate.tree }), allowedPaths: [`src/${path}.mjs`], schema: "pipeline.native-goldfish-host-briefing.v3", model: "sonnet", effort: "medium", itemDelivery };
++  const input = toolInput("claude", { root, session: `session-${id}`, toolUseId: `tool-${id}`, binding });
++  input.tool_input.prompt = input.tool_input.prompt.replace("host-commit:v1", "host-commit:v3") + `\nSlice: ${id}\nWrite scope: src/${path}.mjs\n`;
++  const prepared = runtime.run(() => prepareNativeGoldfishHostState({ root, runner: "claude", input, ...extra }));
++  return { binding, input, prepared, path };
++}
++// Two admitted original items (LEFT, RIGHT) in an enrolled fixture, the NGHS17 shape. prepareBoth=false returns before preparing.
++function d177Setup(root, prepareBoth = true) {
++  const controller = createGovernanceScopeController({ hostStateRoot: join(root, "fixture-host") }), plan = controller.planDecision({ rootDir: root, decision: "enroll", by: "fixture explicit original course" });
++  assert.equal(controller.applyDecision(plan, { activate: true, planSha256: plan.planSha256 }).state, "active");
++  mkdirSync(join(root, "src"), { recursive: true });
++  writeFileSync(join(root, "src/second.mjs"), "export const value='expected';\n");
++  writeFileSync(join(root, "src/second.test.mjs"), "import test from 'node:test';import assert from 'node:assert/strict';import {value} from './second.mjs';test('second original criterion',()=>assert.equal(value,'expected'));\n");
++  const original = prepareApprovedItemCourseFixture({ root, additionalCriteria: [{ id: "AC-2", text: "The independent second dependency returns expected bytes." }] }), repository = inspectSignedDescriptorCustodyRepository(root);
++  const runtime = createControlledMethodRuntimeFixture({ repository, fixtureRoot: join(repository.commonDir, "agent-pipeline/controlled-method-fixtures/parallel-original"), sessionId: "parallel-original-owner" });
++  initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository }));
++  const items = {};
++  if (prepareBoth) for (const [id, path, locator] of [["LEFT", "change", original.criterionLocator], ["RIGHT", "second", original.criterionLocators["AC-2"]]]) {
++    items[id] = d177Item(runtime, root, original, id, path, locator); assert.equal(items[id].prepared.ok, true, JSON.stringify(items[id].prepared));
++  }
++  return { original, repository, runtime, items };
++}
++
  const cases = [
-+  { id: "D177-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
-+    const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
-+    const first = {}, second = {}; let calls = 0;
-+    const compute = () => { calls += 1; return { calls }; };
-+    assert.equal(memoPerAdmission(first, "k1", compute), memoPerAdmission(first, "k1", compute));
-+    assert.equal(calls, 1, "same boundary and key: one computation");
-+    memoPerAdmission(first, "k2", compute); // a changed queue sha or candidate commit changes the key
-+    assert.equal(calls, 2, "changed key: fresh computation");
-+    memoPerAdmission(second, "k1", compute); // a later admission has its own boundary object
-+    assert.equal(calls, 3, "another boundary: no leak");
-+    memoPerAdmission(null, "k1", compute); memoPerAdmission(null, "k1", compute);
-+    assert.equal(calls, 5, "no boundary object: never memoised");
-+  } },
+-  { id: "D177-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
++  { id: "D177-a-memo-per-admission", name: "D177 the admission memo computes once per key and boundary and does not leak across boundaries", run: async () => {
+     const { memoPerAdmission } = await import("./native-goldfish-host-state.mjs");
+     const first = {}, second = {}; let calls = 0;
+     const compute = () => { calls += 1; return { calls }; };
+@@ -101,6 +126,50 @@ const cases = [
+     memoPerAdmission(null, "k1", compute); memoPerAdmission(null, "k1", compute);
+     assert.equal(calls, 5, "no boundary object: never memoised");
+   } },
++  { id: "D177-differential-settled", name: "D177 the skip and the memo leave the integrated, released and settled results identical to the unfiltered computation, and a memo hit reads no repository", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({ root }) => {
++    assert.equal(typeof mod.readNativeIntegratedSlices, "function", "the unfiltered reader is reachable for the differential");
++    assert.equal(typeof mod.settledItemSlices, "function");
++    const { original, repository, runtime, items } = d177Setup(root);
++    const returned = (id) => { const item = items[id]; return { ...item.input, hook_event_name: "PostToolUse", tool_response: { status: "completed", resolvedModel: item.binding.model, content: [{ type: "text", text: JSON.stringify({ schema: "pipeline.native-goldfish-host-return.v1", dispatchId: id, candidateCommit: item.binding.candidateCommit, outcome: "succeeded", report: "D177 fixture return.", changedPaths: [`src/${item.path}.mjs`] }) }] } }; };
++    writeFileSync(join(root, "src/change.mjs"), "export const value='expected'; // D177 LEFT\n");
++    const finalized = runtime.run(() => finalizeNativeGoldfishHostReturn({ root, runner: "claude", input: returned("LEFT") }));
++    assert.equal(finalized.status, "authored-commit-recorded", JSON.stringify(finalized));
++    assert.equal(runtime.run(() => integrateNativeGoldfishItemDelivery({ root, pendingSha256: items.LEFT.prepared.sha256 })).status, "integrated");
++    const repo = inspectSignedDescriptorCustodyRepository(root), governed = resolveGovernedItemQueue({ root });
++    // integrated LEFT, open RIGHT; a second view marks RIGHT cancelled (a new queue sha256, so a fresh computation)
++    const views = [governed, { ...governed, sha256: "c".repeat(64), normalized: { ...governed.normalized, slices: governed.normalized.slices.map((row) => row.id === "RIGHT" ? { ...row, state: "cancelled" } : row) } }];
++    for (const view of views) {
++      const got = runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, (boundary) => {
++        const unfiltered = mod.readNativeIntegratedSlices({ governed: view, repository: repo, boundary });
++        const commit = readOrchestratorCommitIntegratedSlices({ root: repo.primaryRoot, candidateCommit: repo.candidate.commit, slices: view.normalized.slices });
++        const oldSettled = mod.settledItemSlices([...unfiltered.integrated, ...commit], view);
++        const fresh = mod.readSettledItemSliceIds({ repository: repo, boundary, governed: view });
++        const skipped = mod.readNativeIntegratedSlices({ governed: view, repository: repo, boundary, skipCancelled: true });
++        const only = mod.readNativeIntegratedSlices({ governed: view, repository: repo, boundary, only: new Set(["LEFT"]) });
++        let reads = 0;
++        const counted = new Proxy(repo, { get(target, key) { if (key === "primaryRoot") reads += 1; return target[key]; } });
++        mod.readSettledItemSliceIds({ repository: counted, boundary, governed: view });
++        return { unfiltered, oldSettled: [...oldSettled].sort(), fresh: [...fresh].sort(), skipped, only, reads };
++      }));
++      assert.deepEqual(got.fresh, got.oldSettled, "settled set identical to the unfiltered computation");
++      assert.ok(got.unfiltered.integrated.includes("LEFT"), "the fixture has an integrated row");
++      assert.deepEqual([...got.skipped.releasedPendingHashes].sort(), [...got.unfiltered.releasedPendingHashes].sort(), "releasedPendingHashes complete in every shape");
++      assert.deepEqual(got.only.integrated, got.unfiltered.integrated.filter((id) => id === "LEFT"), "only: the dependency ids that were asked for");
++      assert.equal(got.reads, 0, "a memo hit performs no repository-root read (no per-row git proof)");
++    }
++  }); } },
++  { id: "D177-slow-phase-releases-lock", name: "D177 a stubbed clock past the budget yields GUARD-DISPATCH-SLOW naming the phase, one stderr-style line per phase, and the registry lock is free afterwards", run: () => fixture(({ root }) => {
++    const { original, repository, runtime, items } = d177Setup(root, false);
++    const lines = []; let calls = 0;
++    const admissionDeadline = { startMs: 0, budgetMs: 100000, now: () => (calls++ < 1 ? 0 : 200000), write: (line) => lines.push(line) };
++    const item = d177Item(runtime, root, original, "LEFT", "change", original.criterionLocator, { admissionDeadline });
++    assert.equal(item.prepared.ok, false);
++    assert.equal(item.prepared.code, "GUARD-DISPATCH-SLOW");
++    assert.match(String(item.prepared.reason), /integrated-slice-read|collision-check/u);
++    assert.ok(lines.length >= 1 && lines.every((line) => /^guard-dispatch: phase [a-z-]+ at \d+(\.\d+)?s\n?$/u.test(line)), JSON.stringify(lines));
++    const repo = inspectSignedDescriptorCustodyRepository(root);
++    assert.equal(runtime.run(() => withSessionAuthorityBoundary({ repository: repo }, () => "free")), "free", "the throw released the registry lock");
++  }) },
    { id: "NGHS01", name: "unmarked native dispatch stays untouched", run: () => fixture(({ root, commit, tree }) => {
      const input = toolInput("claude", { root, session: "session-1", toolUseId: "tool-1", binding: makeBinding({ dispatchId: "TASK-1", commit, tree }) });
      input.tool_input.prompt = "ordinary Goldfish briefing";
