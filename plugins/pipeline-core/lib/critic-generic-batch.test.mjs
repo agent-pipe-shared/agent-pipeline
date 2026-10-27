@@ -16,7 +16,7 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
 import {readdirSync,readlinkSync} from "node:fs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -473,5 +473,32 @@ test("D165-PF75A malformed declarationCommit fails the review-unit binding",()=>
     for(const bad of ["not-an-oid","ABCDEF".repeat(7)+"ABCD",fx.base.slice(0,12),"0".repeat(40),blob,fx.tree])
       rejected(()=>readCriticReviewUnit(unitInput(fx,{declarationCommit:bad})),"CGB-REVIEW-UNIT-BINDING");
   }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+const FEAT_REF="refs/heads/feat/x";
+function featFixture(){return fixture({unitOverride:{deliveryBoundary:{mainRef:FEAT_REF}}});}
+test("D-W7M feat/ mainRef is accepted when the primary checkout is on main and the candidate is its ancestor",()=>{
+  const fx=featFixture();try{
+    assert.equal(git(fx.root,["symbolic-ref","HEAD"]),"refs/heads/main");
+    const result=readCriticReviewUnit(unitInput(fx));
+    assert.equal(result.declaration.deliveryBoundary.mainRef,FEAT_REF);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D-W7M feat/ mainRef is refused when the primary checkout sits on an unrelated branch",()=>{
+  const fx=featFixture();try{
+    git(fx.root,["checkout","-q","-b","other"]);
+    rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D-W7M feat/ mainRef is refused when the candidate is not an ancestor of the primary main",()=>{
+  const fx=featFixture();try{
+    git(fx.root,["reset","-q","--hard",fx.base]);
+    rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D-W7M a non-feat/ mainRef that differs from the primary checkout stays refused",()=>{
+  for(const ref of ["refs/heads/release/x","refs/heads/featx","refs/heads/other","refs/tags/feat/x","refs/heads/feat/"]){
+    const fx=fixture({unitOverride:{deliveryBoundary:{mainRef:ref}}});
+    try{rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");}finally{rmSync(fx.root,{recursive:true,force:true});}
+  }
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

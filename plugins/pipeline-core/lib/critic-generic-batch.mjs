@@ -295,7 +295,10 @@ function reviewUnitSource(root, d, work) {
   shape(declaration.deliveryBoundary, ["mainRef"]);
   const repo = discoverRepository(realpathSync(root));
   const primaryRef = git(repo.primaryRoot, ["symbolic-ref", "HEAD"]).trim();
-  if (declaration.deliveryBoundary.mainRef !== primaryRef || !primaryRef.startsWith("refs/heads/")) fail("CGB-MAIN-INTEGRATION");
+  // A feat/ mainRef is admitted only while the primary checkout is on main (candidate ancestry is checked below).
+  const mainRef = declaration.deliveryBoundary.mainRef;
+  const featOnMain = typeof mainRef === "string" && /^refs\/heads\/feat\/[^\s]+$/u.test(mainRef) && primaryRef === "refs/heads/main";
+  if ((mainRef !== primaryRef && !featOnMain) || !primaryRef.startsWith("refs/heads/")) fail("CGB-MAIN-INTEGRATION");
   try { git(root, ["merge-base", "--is-ancestor", declarationCommit, d.candidateCommit]); }
   catch { fail("CGB-REVIEW-UNIT-BINDING"); }
   git(root, ["merge-base", "--is-ancestor", d.baseCommit, d.candidateCommit]);
