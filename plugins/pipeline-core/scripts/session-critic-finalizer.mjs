@@ -88,6 +88,31 @@ export class SessionCriticFinalizerError extends Error {
 }
 
 function fail(code) { throw new SessionCriticFinalizerError(code); }
+
+// Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
+// No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
+// the caller's options (never a request file) lets finalization complete, with a weaker marker.
+const ORIGINAL_SOURCE_RETURN_SCHEMA = "pipeline.session-critic-source-return.v1";
+const ORIGINAL_SOURCE_RETURN_KEYS = Object.freeze(["schema", "issuer", "packetId", "packetDigest", "claimant", "sessionId", "verdictSha256", "issuedAtMs", "expiresAtMs"]);
+function unavailableOriginalSourceReader() { fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE"); }
+function originGate(query, options, deps) {
+  let record = null;
+  try { record = (deps.readOriginalSourceReturnFn ?? unavailableOriginalSourceReader)(query); } catch { record = null; }
+  if (record === null || record === undefined) {
+    if (options.allowCallerAuthoredFallback === true) {
+      return Object.freeze({ independence: "caller-authored-fallback", origin: "caller-authored", nativeAttestation: false });
+    }
+    fail("SCF-ORIGINAL-SOURCE-UNAVAILABLE");
+  }
+  const now = (deps.originNowMsFn ?? Date.now)();
+  if (!exact(record, ORIGINAL_SOURCE_RETURN_KEYS) || record.schema !== ORIGINAL_SOURCE_RETURN_SCHEMA || record.issuer !== "source"
+    || record.packetId !== query.packetId || record.packetDigest !== query.packetDigest
+    || canonicalJson(record.claimant) !== canonicalJson(query.claimant)
+    || record.sessionId !== query.sessionId || record.verdictSha256 !== query.verdictSha256
+    || !Number.isSafeInteger(record.issuedAtMs) || !Number.isSafeInteger(record.expiresAtMs)
+    || record.issuedAtMs > now || now >= record.expiresAtMs) fail("SCF-ORIGINAL-SOURCE-BINDING");
+  return Object.freeze({ independence: "source-issued-origin", origin: "source", nativeAttestation: false });
+}
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) {
   return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
@@ -518,6 +543,9 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
   validateResult(result, prepared.packet);
   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
+  const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
+    claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
+    sessionId: id, verdictSha256: expectedReceipt.verdictSha256 }, options, deps);
   const recorded = (deps.recordCandidateResultFn ?? recordCandidateResult)({ controlRoot: controlRootFor(root), packetId, result }, deps.packetDependencies);
   const receipt = validateSessionCriticReceipt(receiptFor(recorded.record.body));
   if (canonicalJson(receipt) !== canonicalJson(expectedReceipt)) fail("SCF-RECEIPT-BINDING");
@@ -545,6 +573,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
         schema: SESSION_CRITIC_FINALIZE_RESULT_SCHEMA,
         status: "source-complete/event-unavailable",
         receipt,
+        ...independence,
         code: error?.code ?? "GRA-OUTPUT-UNAVAILABLE",
         retry: buildGovernanceReviewRetry({ eventOutPath: options.eventOutPath, event }),
       });
@@ -557,6 +586,7 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     schema: SESSION_CRITIC_FINALIZE_RESULT_SCHEMA,
     status: "completed",
     receipt,
+    ...independence,
     ...(event === null ? {} : { event }),
   });
 }

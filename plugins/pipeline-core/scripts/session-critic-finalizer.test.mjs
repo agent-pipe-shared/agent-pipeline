@@ -27,10 +27,24 @@ import {
   SessionCriticFinalizerError,
   admitSessionCriticReview,
   exportSessionCriticEvidence,
-  finalizeSessionCriticReview,
+  finalizeSessionCriticReview as finalizeRaw,
   runSessionCriticFinalizerCli,
   validateSessionCriticReceipt,
 } from "./session-critic-finalizer.mjs";
+
+// Cut A: finalization needs a Source-issued origin record. The pre-existing cases exercise everything
+// except the origin gate, so they get a bound stub through deps; the origin cases below call finalizeRaw.
+const ORIGIN_SCHEMA = "pipeline.session-critic-source-return.v1";
+function originStub(overrides = {}) {
+  return (query) => ({
+    schema: ORIGIN_SCHEMA, issuer: "source", packetId: query.packetId, packetDigest: query.packetDigest,
+    claimant: query.claimant, sessionId: query.sessionId, verdictSha256: query.verdictSha256,
+    issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000, ...overrides,
+  });
+}
+function finalizeSessionCriticReview(options, deps = {}) {
+  return finalizeRaw(options, { readOriginalSourceReturnFn: originStub(), ...deps });
+}
 
 function git(root, args, options = {}) {
   const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", ...options });
@@ -549,7 +563,8 @@ test("closed CLI admits before verdict and finalizes only that durable packet", 
     assert.equal(admission.output.schema, "pipeline.session-critic-prelaunch-admission.v1");
     assert.equal(admission.output.packetId, "6".repeat(32));
     writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
-    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath],
+      { readOriginalSourceReturnFn: originStub() });
     assert.equal(result.exitCode, 0);
     assert.equal(result.output.status, "completed");
     assert.equal(result.output.receipt.session.id, "session-cli-1");
@@ -586,6 +601,107 @@ test("CLI closes argv/request vocabulary and reports typed exit-2 errors", () =>
       assert.equal(result.output.code, code);
     }
     assert.equal(existsSync(join(fx.root, ".git", "agent-pipeline", "critic-packets")), false);
+  } finally { cleanup(fx); }
+});
+
+const ORIGIN_UNAVAILABLE = "SCF-ORIGINAL-SOURCE-UNAVAILABLE";
+const ORIGIN_BINDING = "SCF-ORIGINAL-SOURCE-BINDING";
+function codeIs(code) { return (error) => error instanceof SessionCriticFinalizerError && error.code === code; }
+
+test("Cut A (1) a caller-authored verdict with no Source origin is refused typed, and the packet stays unconsumed", () => {
+  const fx = fixture();
+  try {
+    const request = preadmitted(fx, { packetId: "7".repeat(32) });
+    assert.throws(() => finalizeRaw(request), codeIs(ORIGIN_UNAVAILABLE));
+    assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: () => { throw new Error("no producer"); } }), codeIs(ORIGIN_UNAVAILABLE));
+    // Nothing was recorded or consumed, so the same admitted packet still finalizes once an origin exists.
+    const done = finalizeRaw(request, { readOriginalSourceReturnFn: originStub() });
+    assert.equal(done.status, "completed");
+  } finally { cleanup(fx); }
+});
+
+test("Cut A (2) an origin record offered by the caller is never accepted", () => {
+  const fx = fixture();
+  try {
+    const request = preadmitted(fx, { packetId: "8".repeat(32) });
+    const query = { packetId: request.packetId };
+    // A record smuggled through the finalize options is ignored; only the injected reader counts.
+    const forged = { ...request, originalSourceReturn: originStub()({ ...query, packetDigest: "a".repeat(64), claimant: {}, sessionId: request.sessionId, verdictSha256: "b".repeat(64) }) };
+    assert.throws(() => finalizeRaw(forged), codeIs(ORIGIN_UNAVAILABLE));
+    // A record smuggled into the verdict is not a verdict key.
+    assert.throws(() => finalizeRaw({ ...request, verdict: verdict({ sourceReturn: { issuer: "source" } }) }),
+      (error) => error instanceof SessionCriticFinalizerError && (error.code === "SCF-VERDICT-SCHEMA" || error.code === ORIGIN_UNAVAILABLE));
+    // A record smuggled into the closed CLI request file is a request violation.
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    const path = writeScratchRequest(fx, "origin-request.json", { ...cliBatchRequest(fx), origin: { issuer: "source" } });
+    const cli = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", path]);
+    assert.equal(cli.exitCode, 2);
+    assert.equal(cli.output.code, "SCF-REQUEST");
+  } finally { cleanup(fx); }
+});
+
+test("Cut A (3) a record bound to anything else, an expired record, and a replay are refused", () => {
+  const fx = fixture();
+  try {
+    const request = preadmitted(fx, { packetId: "9".repeat(32) });
+    for (const overrides of [
+      { packetDigest: "c".repeat(64) },
+      { sessionId: "another-session-1" },
+      { claimant: { runner: "claude", adapter: "other-adapter" } },
+      { verdictSha256: "d".repeat(64) },
+      { packetId: "f".repeat(32) },
+      { issuer: "caller" },
+      { schema: "pipeline.something-else.v1" },
+      { expiresAtMs: Date.now() - 1 },
+      { extra: true },
+    ]) {
+      assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub(overrides) }), codeIs(ORIGIN_BINDING), JSON.stringify(overrides));
+    }
+    assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: () => null }), codeIs(ORIGIN_UNAVAILABLE));
+    assert.equal(finalizeRaw(request, { readOriginalSourceReturnFn: originStub() }).status, "completed");
+    // Replay: the packet is consumed, so the same record cannot finalize a second time.
+    assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub() }), (error) => error instanceof SessionCriticFinalizerError);
+  } finally { cleanup(fx); }
+});
+
+test("Cut A (4) a bound Source record completes with the receipt unchanged and states origin source, not native attestation", () => {
+  const fx = fixture();
+  try {
+    const result = finalizeRaw(preadmitted(fx, { packetId: "a1".repeat(16) }), { readOriginalSourceReturnFn: originStub() });
+    assert.equal(result.status, "completed");
+    assert.equal(result.independence, "source-issued-origin");
+    assert.equal(result.origin, "source");
+    assert.equal(result.nativeAttestation, false);
+    assert.equal(validateSessionCriticReceipt(result.receipt), result.receipt);
+    assert.equal(Object.hasOwn(result.receipt, "independence"), false);
+  } finally { cleanup(fx); }
+});
+
+test("Cut A (5) the explicit fallback completes with the weaker marker, keeps reviewPass, and never masks a bad binding", () => {
+  const fx = fixture();
+  try {
+    const request = preadmitted(fx, { packetId: "b2".repeat(16), allowCallerAuthoredFallback: true });
+    assert.throws(() => finalizeRaw(request, { readOriginalSourceReturnFn: originStub({ verdictSha256: "d".repeat(64) }) }), codeIs(ORIGIN_BINDING));
+    assert.throws(() => finalizeRaw({ ...request, allowCallerAuthoredFallback: "yes" }), codeIs(ORIGIN_UNAVAILABLE));
+    const result = finalizeRaw(request);
+    assert.equal(result.status, "completed");
+    assert.equal(result.independence, "caller-authored-fallback");
+    assert.equal(result.origin, "caller-authored");
+    assert.equal(result.receipt.reviewPass, true);
+    assert.equal(Object.hasOwn(result.receipt, "independence"), false);
+  } finally { cleanup(fx); }
+});
+
+test("Cut A (6) CLI finalize without an origin exits 2 with the typed code, not SCF-INTERNAL", () => {
+  const fx = fixture();
+  try {
+    const requestPath = writeScratchRequest(fx, "finalize-request.json", cliBatchRequest(fx));
+    assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
+    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
+    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath]);
+    assert.equal(result.exitCode, 2);
+    assert.equal(result.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
+    assert.equal(result.output.code, ORIGIN_UNAVAILABLE);
   } finally { cleanup(fx); }
 });
 
