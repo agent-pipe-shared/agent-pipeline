@@ -1,0 +1,52 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 9a63b9096..9c18235ec 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -203,6 +203,8 @@ function sanctionedModelRoleDispatchSelectArgs(args, root) {
+ }
+ 
+ function sanctionedRegisterFeaturePackageArgs(args, root) {
++  // D41: a sole `--help` prints the evidence route; it takes no root and combines with nothing.
++  if (args.length === 1 && args[0] === "--help") return true;
+   if (!exactRoot(args, root, 0)) return false;
+   if (args.length === 2) return true;
+   if (args.length === 3) return args[2] === "--add-review-unit";
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 8b79ac112..e3125feed 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -556,3 +556,34 @@ test("D64 model-role bootstrap admits a host session and is a decision, not an a
+     bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex"), f, "bootstrap");
+   });
+ });
++
++// ---- D41 follow-up: a sole `--help` lets an agent read the feature package registrar's evidence route ----
++test("D41 feature-package registrar: a sole --help is admitted by the catalogue and the real guard", () => {
++  withFixture("feature", f => {
++    bothAdmit(scriptAction(registerScript, "--help"), f, "sole --help");
++  });
++});
++
++test("D41 feature-package registrar: --help combined with anything else stays refused", () => {
++  withFixture("feature", f => {
++    for (const [label, argv] of [["help with a second argument", ["--help", "--add-review-unit"]],
++      ["help with a root value", ["--help", f.root]], ["help after the root flag", ["--root", "--help"]],
++      ["help after the root", ["--root", f.root, "--help"]], ["help twice", ["--help", "--help"]],
++      ["short help", ["-h"]], ["bare help word", ["help"]], ["another flag alone", ["--add-review-unit"]],
++      ["help with a diagnostic path", ["--help", "--add-diagnostic-evidence", "specs/feature/evidence/d.json"]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
++  });
++});
++
++test("D41 feature-package registrar: the existing admitted shapes and path refusals are unchanged", () => {
++  withFixture("feature", f => {
++    bothAdmit(scriptAction(registerScript, "--root", f.root), f, "register");
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-unit"), f, "add review unit");
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", "specs/feature/evidence/diagnostic.json"), f, "clean relative path");
++    for (const [label, path] of [["dash", "--force"], ["absolute", join(f.root, "d.json")], ["drive letter", "C:x.json"],
++      ["backslash", "specs\\d.json"], ["dot-dot", "specs/../x.json"]]) {
++      bothRefuse(scriptAction(registerScript, "--root", f.root, "--add-diagnostic-evidence", path), f, path === "--force" ? label : label);
++    }
++  });
++});
