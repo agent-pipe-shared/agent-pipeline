@@ -1,0 +1,139 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index 9c18235ec..a7d0fded2 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,9 +11,9 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DISPATCH_RECORD_WRITE_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+-import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
++import { resolveSanctionedScriptInvocation, sanctionedDispatchRecordAttestedWriterArgs, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+ 
+ const DESIGN_COURSE_SOURCES = ["input", "prd", "spec", "design", "traceability"];
+@@ -463,6 +463,7 @@ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
+   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
+   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
+   if (script === SESSION_CRITIC_FINALIZER_SCRIPT) return sanctionedSessionCriticFinalizerArgs(args, root);
++  if (script === DISPATCH_RECORD_WRITE_SCRIPT) return sanctionedDispatchRecordAttestedWriterArgs(args, root);
+   if (script === PIPELINE_STATE_SCRIPT) {
+     // Explicit public prose publication; exact no-argument form only. This
+     // remains subject to READY and all outer command/write policies.
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index 5f64ea4dd..e699e89b2 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -180,6 +180,9 @@ export const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../../scripts/sessi
+ 
+ export const SESSION_CRITIC_FINALIZER_SCRIPT = fileURLToPath(new URL("../../scripts/session-critic-finalizer.mjs", import.meta.url));
+ 
++// D56: the attested dispatch-record writer; only its `--repo-root` + `--attested-request` argv is admitted (sanctioned-args-scripts.mjs).
++export const DISPATCH_RECORD_WRITE_SCRIPT = fileURLToPath(new URL("../../scripts/dispatch-record-write.mjs", import.meta.url));
++
+ export const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/session-capability-diagnose.mjs", import.meta.url));
+ 
+ export const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));
+diff --git a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+index b8836a506..d04ef8929 100644
+--- a/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
++++ b/plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs
+@@ -153,4 +153,61 @@ for (const [name, suffix] of [
+   }
+ });
+ 
++// D56: the Elephant's attested dispatch-record writer argv. Only the exact two-flag shape is admitted;
++// the host route spelling (--request) of the same script stays refused.
++const { symlinkSync, writeFileSync } = await import('node:fs');
++const writerScript = fileURLToPath(new URL('../../scripts/dispatch-record-write.mjs', import.meta.url));
++const finalizerScript = fileURLToPath(new URL('../../scripts/session-critic-finalizer.mjs', import.meta.url));
++mkdirSync(join(root, 'scratch'), { recursive: true });
++writeFileSync(join(root, 'scratch/attested.json'), '{}');
++writeFileSync(join(root, 'outside-target.json'), '{}');
++const attestedLink = join(root, 'scratch/attested-link.json');
++try { symlinkSync(join(root, 'outside-target.json'), attestedLink); } catch (error) { if (error?.code !== 'EEXIST') throw error; }
++const attestedCommand = (executable, args) => recoveryCommandFor({ executable, argv: args });
++const attestedAdmitted = args => isSanctionedLifecycleCommand(attestedCommand(process.execPath, args), root, { processExecPath: process.execPath });
++check('attested writer exact argv is admitted for the Elephant', () => {
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', 'scratch/attested.json']), true);
++});
++check('attested writer admission is order-insensitive and accepts the "." root', () => {
++  assert.equal(attestedAdmitted([writerScript, '--attested-request', 'scratch/attested.json', '--repo-root', root]), true);
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', '.', '--attested-request', 'scratch/attested.json']), true,
++    'the value is the exact root or ".", the same discipline as the finalizer sibling');
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', '..', '--attested-request', 'scratch/attested.json']), false);
++});
++check('attested writer refuses the host route spelling --request', () => {
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--request', 'scratch/attested.json']), false);
++});
++for (const [name, request] of [
++  ['an absolute request path', join(root, 'scratch/attested.json')],
++  ['a request path outside scratch/', 'evidence/attested.json'],
++  ['a request path with ..', 'scratch/../scratch/attested.json'],
++  ['a non-.json request file', 'scratch/attested.txt'],
++  ['a symlink escaping scratch/', 'scratch/attested-link.json'],
++]) check('attested writer refuses ' + name, () => {
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', request]), false);
++});
++check('attested writer refuses a missing --repo-root', () => {
++  assert.equal(attestedAdmitted([writerScript, '--attested-request', 'scratch/attested.json']), false);
++});
++check('attested writer refuses a missing --attested-request', () => {
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', root]), false);
++});
++check('attested writer refuses a foreign repo root', () => {
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', join(root, 'foreign'), '--attested-request', 'scratch/attested.json']), false);
++});
++check('attested writer refuses an extra flag', () => {
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', 'scratch/attested.json', '--unexpected']), false);
++  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', 'scratch/attested.json', '--request', 'scratch/attested.json']), false);
++});
++check('attested writer validator does not admit another script with the same flags', () => {
++  assert.equal(attestedAdmitted([join(root, 'other.mjs'), '--repo-root', root, '--attested-request', 'scratch/attested.json']), false);
++  assert.equal(attestedAdmitted([onboardingScript, '--repo-root', root, '--attested-request', 'scratch/attested.json']), false);
++});
++check('attested writer admission leaves the finalizer and reopen-design dry-run admissions unchanged', () => {
++  assert.equal(attestedAdmitted([finalizerScript, 'admit', '--root', root, '--request', 'scratch/attested.json']), true);
++  assert.equal(attestedAdmitted([finalizerScript, 'admit', '--root', root, '--attested-request', 'scratch/attested.json']), false);
++  assert.equal(attestedAdmitted([script, 'reopen-design', '--by', 'fixture-actor', '--dry-run']), true);
++  assert.equal(attestedAdmitted([script, 'reopen-design', '--by', 'fixture-actor', '--dry-run', '--attested-request', 'scratch/attested.json']), false);
++});
++
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 16384 });
+diff --git a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+index ca4a4f9cd..7dbb098f4 100644
+--- a/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
++++ b/plugins/pipeline-core/lib/guard/sanctioned-args-scripts.mjs
+@@ -30,6 +30,30 @@ export function sanctionedSessionCriticFinalizerArgs(args, root) {
+     && isPhysicalScratchTarget(request, { rootDir: root });
+ }
+ 
++/**
++ * D56: the Elephant's argv for the attested dispatch-record writer. Exactly
++ * `--repo-root <root|.> --attested-request <scratch/...json>` (order-insensitive, nothing else).
++ * The request obeys the finalizer's physical-scratch and realpath-containment rules; the
++ * host route spelling (`--request`) is deliberately not part of this shape.
++ */
++export function sanctionedDispatchRecordAttestedWriterArgs(args, root) {
++  if (args.length !== 4) return false;
++  const rootValue = (value) => value === root
++    || (value === "." && resolve(root, value) === resolve(root) && isRealpathedWithinBoundary(resolve(root, value), root));
++  const requestValue = (request) => {
++    if (typeof request !== "string" || request.length === 0 || request.length > 256
++      || request.includes("\\") || request.includes("\0") || isAbsolute(request)
++      || !request.endsWith(".json")) return false;
++    const components = request.split("/");
++    if (components[0] !== "scratch" || components.some((part) => part === "" || part === "." || part === "..")) return false;
++    return isRealpathedWithinBoundary(resolve(root, request), root)
++      && isPhysicalScratchTarget(request, { rootDir: root });
++  };
++  return matchFlagSpec(args, {
++    requiredValue: { "--repo-root": rootValue, "--attested-request": requestValue },
++  });
++}
++
+ /**
+  * NVA-K-DRIVERREACH: the guided driver's own exact argv surface (`parseArgs()` in
+  * scripts/onboarding-init.mjs). The ordinary driving shape keeps `--root <root>` required,
