@@ -1,0 +1,63 @@
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
+index c291bbd7c..79625fc07 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
+@@ -21,6 +21,8 @@ import {
+   readConsumedCandidateReceipt,
+   recordCandidateResult,
+ } from "./critic-packet-preflight.mjs";
++import { createLocalDispatchEvidenceBinding } from "./check-critic-skip-coverage.mjs";
++import { sha256Canonical } from "../lib/review-economy.mjs";
+ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+@@ -399,7 +401,48 @@ check("signed import anchor rejects candidate drift and canonical verifier denia
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 12, "the complete candidate packet corpus must be registered before execution begins");
++// D56 slice 4b: the local dispatch evidence binding carries the record assurance as one more closed key.
++function bindingWith(real, overrides) {
++  const { snapshotId: _drop, ...rest } = real;
++  const binding = { ...rest, ...overrides };
++  for (const key of Object.keys(binding)) if (binding[key] === undefined) delete binding[key];
++  return { ...binding, snapshotId: sha256Canonical(binding) };
++}
++
++check("CPPA-1 the minted local dispatch evidence binding carries assurance null for a host-observed record", () => {
++  const f = fixture();
++  try {
++    const result = prepareCandidatePacket(options(f, "a".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 31) });
++    assert.equal(result.packet.coordinatorOnly.localDispatchEvidence.assurance, null);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++check("CPPA-2 a binding whose assurance was tampered fails the snapshot recomputation", () => {
++  const f = fixture();
++  try {
++    const real = createLocalDispatchEvidenceBinding({ root: f.root, taskId: options(f).taskId, baseCommit: f.base, reviewCandidateCommit: f.candidate });
++    assert.equal(real.assurance, null);
++    const tampered = { ...real, assurance: "orchestrator-attested" };
++    assert.throws(() => prepareCandidatePacket(options(f, "b".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => tampered }), expectCode("CPP-COORDINATOR-BINDING"));
++    const forged = bindingWith(real, { assurance: "host-observed" });
++    assert.throws(() => prepareCandidatePacket(options(f, "c".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => forged }), expectCode("CPP-COORDINATOR-BINDING"));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++check("CPPA-3 a binding without the assurance key is refused as not closed", () => {
++  const f = fixture();
++  try {
++    const real = createLocalDispatchEvidenceBinding({ root: f.root, taskId: options(f).taskId, baseCommit: f.base, reviewCandidateCommit: f.candidate });
++    const withoutKey = bindingWith(real, { assurance: undefined });
++    assert.equal("assurance" in withoutKey, false);
++    assert.throws(() => prepareCandidatePacket(options(f, "d".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => withoutKey }), expectCode("CPP-COORDINATOR-BINDING"));
++    const attested = bindingWith(real, { assurance: "orchestrator-attested" });
++    const ok = prepareCandidatePacket(options(f, "e".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => attested, now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 32) });
++    assert.equal(ok.packet.coordinatorOnly.localDispatchEvidence.assurance, "orchestrator-attested");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++assert.equal(cases.length, 15, "the complete candidate packet corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
