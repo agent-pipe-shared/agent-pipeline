@@ -1,0 +1,177 @@
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index b3464ba97..9a63b9096 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -11,7 +11,7 @@ import { inspectOwningVerificationControllerTaskSource } from "../../scripts/own
+ import { inspectProjectOnboardingV3 } from "../project-onboarding-v3.mjs";
+ import { observePipelineStartPreflight } from "../../scripts/pipeline-start-preflight.mjs";
+ import { readState as readDesignCourseState } from "../../scripts/pipeline-state.mjs";
+-import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
++import { AUDIT_PACK_SCRIPT, AUTHORITY_RESTORE_SCRIPT, ARCHITECTURE_BASELINE_SCRIPT, ARCHITECTURE_ADOPTION_SCRIPT, ARCHITECTURE_MEASURE_SCRIPT, ARCHITECTURE_FITNESS_SCRIPT, PHOENIX_AUTHORITY_REVISION_SCRIPT, DISPATCH_RECOVERY_SCRIPT, DESIGN_REVIEW_RECEIPT_SCRIPT, MODEL_ROLE_DISPATCH_SELECT_SCRIPT, REGISTER_FEATURE_PACKAGE_SCRIPT, APP_SERVER_SCRIPT, CLONE_HOOK_READINESS_SCRIPT, DOC_READER_COURSE_SCRIPT, DESIGN_COURSE_SCRIPT, DRIVER_SCRIPT, HEX, HOST_REPOSITORY_INIT_SCRIPT, HUMAN_OVERRIDE_SCRIPT, LAUNCH_SCRIPT, MIGRATION_SCRIPT, OBSERVATION_GOVERNANCE_BOOTSTRAP_SCRIPT, ONBOARDING_CONSENT_MARK_SCRIPT, ONBOARDING_SCRIPT, PIPELINE_STATE_SCRIPT, PO_HUMAN_APPROVAL_SCRIPT, PO_PROFILE_REPAIR_SCRIPT, PRE_PUSH_HOOK_INSTALL_SCRIPT, PRIVATE_OVERLAY_SCRIPT, PROJECT_AUTHORITY_MIGRATION_SCRIPT, PUSH_INIT_SCRIPT, READBACK_SCRIPT, REFRESH_MANDATORY_HOOKS_SCRIPT, REPAIR_MAP_SCRIPT, SESSION_CAPABILITY_DIAGNOSE_SCRIPT, SESSION_CLEANUP_SCRIPT, SESSION_CRITIC_FINALIZER_SCRIPT, SETTINGS_ALLOWLIST_MERGE_SCRIPT, START_PREFLIGHT_SCRIPT, TRANSCRIPT_RECOVERY_SCRIPT, V3_BOOTSTRAP_AUTHORITY_SCRIPT, VALID_RUNNERS } from "./constants.mjs";
+ import { exactRoot, matchFlagSpec, simpleWords } from "./shell-grammar.mjs";
+ import { resolveSanctionedScriptInvocation, sanctionedDocReaderCourseArgs, sanctionedDriverArgs, sanctionedHumanOverrideArgs, sanctionedMigrationArgs, sanctionedOnboardingConsentMarkArgs, sanctionedPipelineStateArgs, sanctionedPoProfileRepairArgs, sanctionedProjectAuthorityMigrationArgs, sanctionedPushInitArgs, sanctionedSessionCleanupArgs, sanctionedSessionCriticFinalizerArgs, sanctionedTranscriptRecoveryArgs } from "./sanctioned-args-scripts.mjs";
+ import { sanctionedOnboardingArgs } from "./sanctioned-args-onboarding.mjs";
+@@ -364,7 +364,27 @@ function sanctionedArchitectureAdoptionToolArgs(script, args, root) {
+   });
+ }
+ 
++// D166-PH (PO 2026-10-27): exactly the read-only `plan` argv of phoenix-authority-revision.mjs; `apply` stays refused.
++// The external --directory is absolute with no dot segment and no NUL; the proposal is a scratch|evidence .json; --out stays under scratch/.
++function phoenixExternalDirectory(value) {
++  return typeof value === "string" && value.length > 0 && value.length <= 1024 && !value.includes("\0")
++    && (posix.isAbsolute(value) || win32.isAbsolute(value)) && !value.split(/[\\/]/u).some((part) => part === "." || part === "..");
++}
++function sanctionedPhoenixRevisionArgs(args, root) {
++  if (args[0] !== "plan") return false;
++  const noDot = (value) => !value.split("/").some((part) => part === "." || part === "..");
++  return matchFlagSpec(args.slice(1), {
++    requiredValue: {
++      "--repo-root": (value) => value === root,
++      "--directory": phoenixExternalDirectory,
++      "--proposal-file": (value) => NATIVE_DISPATCH_REQUEST.test(value) && noDot(value),
++    },
++    optionalValue: { "--out": (value) => ADOPTION_OUT.test(value) && adoptionPhysicalOut(root, value) },
++  });
++}
++
+ function sanctionedLifecycleScriptArgs(script, args, root, options = {}) {
++  if (script === PHOENIX_AUTHORITY_REVISION_SCRIPT) return sanctionedPhoenixRevisionArgs(args, root);
+   if (script === ARCHITECTURE_ADOPTION_SCRIPT || script === ARCHITECTURE_MEASURE_SCRIPT || script === ARCHITECTURE_FITNESS_SCRIPT) {
+     return sanctionedArchitectureAdoptionToolArgs(script, args, root);
+   }
+diff --git a/plugins/pipeline-core/lib/guard/constants.mjs b/plugins/pipeline-core/lib/guard/constants.mjs
+index ffb867a42..5f64ea4dd 100644
+--- a/plugins/pipeline-core/lib/guard/constants.mjs
++++ b/plugins/pipeline-core/lib/guard/constants.mjs
+@@ -195,6 +195,8 @@ export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scri
+ export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
+ // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
+ export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
++// D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).
++export const PHOENIX_AUTHORITY_REVISION_SCRIPT = fileURLToPath(new URL("../../scripts/phoenix-authority-revision.mjs", import.meta.url));
+ export const ARCHITECTURE_MEASURE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-measure.mjs", import.meta.url));
+ export const ARCHITECTURE_FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
+ 
+diff --git a/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs b/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs
+index 776bd761e..21c622756 100644
+--- a/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs
++++ b/plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs
+@@ -24,7 +24,7 @@ const action = Object.freeze({ kind: 'command', executable: 'node',
+ const observed = Object.freeze({ schema: 'pipeline.project-onboarding.v4', status: 'partial', root,
+   intent: 'session', diagnostics: [], nextAction: action });
+ const commandFor = value => [value.executable, ...value.argv].map(word => JSON.stringify(word)).join(' ');
+-function dependencies(observation = observed) {
++function dependencies(observation = observed, lifecycleStatus = 'approved') {
+   return {
+     inspectProjectOnboardingV3Fn(input) {
+       assert.equal(input.rootDir, root);
+@@ -32,7 +32,7 @@ function dependencies(observation = observed) {
+     },
+     devPlanGateVerdictFn(input) {
+       assert.equal(input.projectDir, root);
+-      return { verdict: 'block', reason: 'fixture approved lifecycle', lifecycleStatus: 'approved' };
++      return { verdict: 'block', reason: `fixture ${lifecycleStatus} lifecycle`, lifecycleStatus };
+     },
+   };
+ }
+@@ -69,4 +69,55 @@ check('node scratch script with an extra argument is not admitted', () => {
+   assert.notEqual(hit, null, `node scratch with extra arg admitted: lane returned ${JSON.stringify(hit)}`);
+ });
+ 
++// D166-PH (recon scratch/wave3/recon-draft-guard-recovery-wrappers.md; PO 2026-10-27): the read-only
++// `phoenix-authority-revision.mjs plan` argv crosses the blocking devplan lane in draft and approved;
++// `apply` and every widening of the argv stay refused. An absolute external --directory without a dot
++// segment or NUL is admitted.
++const phoenixScript = fileURLToPath(new URL('../../scripts/phoenix-authority-revision.mjs', import.meta.url));
++const approvalScript = fileURLToPath(new URL('../../scripts/phoenix-authority-approval.mjs', import.meta.url));
++const externalDirectory = join(repository, '..', 'phoenix-external-fixture').replace(/\\/gu, '/');
++const phoenix = (words, script = phoenixScript) => [ 'node', script, ...words ].map(word => JSON.stringify(word)).join(' ');
++const planWords = (extra = []) => ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'scratch/p.json', ...extra];
++for (const status of ['draft', 'approved']) {
++  check(`${status}: phoenix plan with an external directory is admitted`, () => {
++    const hit = devPlanShellRefusalHit(phoenix(planWords()), root, dependencies(observed, status));
++    assert.equal(hit, null, `unexpected hit: ${JSON.stringify(hit)}`);
++  });
++  check(`${status}: phoenix plan with --out under scratch/ is admitted`, () => {
++    const hit = devPlanShellRefusalHit(phoenix(planWords(['--out', 'scratch/plan.json'])), root, dependencies(observed, status));
++    assert.equal(hit, null, `unexpected hit: ${JSON.stringify(hit)}`);
++  });
++  check(`${status}: phoenix apply and every widened plan argv stay refused`, () => {
++    const bad = [
++      ['apply', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'scratch/p.json'],
++      planWords(['--lock-token', 'abcdefgh']), planWords(['--request-file', 'scratch/r.json']), planWords(['--request-sha256', 'a'.repeat(64)]),
++      ['plan', '--repo-root', join(repository, 'other'), '--directory', externalDirectory, '--proposal-file', 'scratch/p.json'],
++      ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'docs/p.json'],
++      ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', '/etc/p.json'],
++      ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'scratch/../p.json'],
++      planWords(['--out', 'docs/x.json']), planWords(['--out', 'scratch/../x.json']), planWords(['--out', 'scratch/a.json', '--out', 'scratch/b.json']),
++      [...planWords(), 'extra'], planWords(['--unknown', 'x']),
++      ['plan', '--repo-root', root, '--proposal-file', 'scratch/p.json'],
++      ['plan', '--repo-root', root, '--directory', 'relative/dir', '--proposal-file', 'scratch/p.json'],
++      ['plan', '--repo-root', root, '--directory', `${externalDirectory}/../x`, '--proposal-file', 'scratch/p.json'],
++    ];
++    for (const words of bad) {
++      assert.notEqual(devPlanShellRefusalHit(phoenix(words), root, dependencies(observed, status)), null, `admitted: ${words.join(' ')}`);
++    }
++  });
++  check(`${status}: the neighbouring phoenix approval script stays refused`, () => {
++    assert.notEqual(devPlanShellRefusalHit(phoenix(planWords(), approvalScript), root, dependencies(observed, status)), null);
++  });
++  check(`${status}: materialize-architecture stays admitted`, () => {
++    assert.equal(devPlanShellRefusalHit(commandFor(action), root, dependencies(observed, status)), null);
++  });
++}
++check('phoenix script usage names --out and the bounded --lock-token', async () => {
++  const { spawnSync } = await import('node:child_process');
++  const result = spawnSync(process.execPath, [phoenixScript, 'plan'], { encoding: 'utf8', shell: false });
++  const text = `${result.stdout}${result.stderr}`;
++  assert.match(text, /--out <scratch/u);
++  assert.match(text, /--lock-token <8-128 chars>/u);
++});
++
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 16384 });
+diff --git a/plugins/pipeline-core/scripts/phoenix-authority-revision.mjs b/plugins/pipeline-core/scripts/phoenix-authority-revision.mjs
+index 64b1ce326..fe92b55de 100644
+--- a/plugins/pipeline-core/scripts/phoenix-authority-revision.mjs
++++ b/plugins/pipeline-core/scripts/phoenix-authority-revision.mjs
+@@ -3,13 +3,29 @@
+ /** Proof-gated wrapper around the existing continuity authority revision writer. */
+ import { run as approve } from "./phoenix-authority-approval.mjs";
+ import { run as pipelineState } from "./pipeline-state.mjs";
+-import { realpathSync } from "node:fs";
++import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
++import { dirname, resolve } from "node:path";
++
++// D166-PH: `plan` may also write its (read-only) plan JSON to --out, a path under scratch/; UTF-8, no BOM.
++const OUT_PATH = /^scratch\/[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/u;
++function planWithOut(values, deps) {
++  const args = ["continuity-authority-revision-plan", "--proposal-file", values.proposalFile];
++  if (values.out === undefined) return pipelineState(args, deps);
++  if (!OUT_PATH.test(values.out) || values.out.split("/").some((part) => part === "" || part === "." || part === "..")) throw new Error("invalid --out");
++  const lines = []; const original = console.log;
++  console.log = (...parts) => { lines.push(parts.join(" ")); };
++  let code;
++  try { code = pipelineState(args, deps); } finally { console.log = original; }
++  if (code === 0) { const target = resolve(values.repoRoot, values.out); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, `${lines.join("\n")}\n`, "utf8"); }
++  for (const line of lines) console.log(line);
++  return code;
++}
+ import { fileURLToPath } from "node:url";
+ 
+ function parse(argv) {
+   const [command, ...rest] = argv; const values = { command };
+   for (let index = 0; index < rest.length; index += 2) { if (!rest[index]?.startsWith("--") || !rest[index + 1]) throw new Error("invalid arguments"); values[rest[index].slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase())] = rest[index + 1]; }
+-  if (!new Set(["plan", "apply"]).has(command) || !values.repoRoot || !values.directory || !values.proposalFile) throw new Error("Usage: phoenix-authority-revision.mjs plan|apply --repo-root <repo> --directory <external-dir> --proposal-file <repo-file> [--request-file <repo-file> --request-sha256 <sha> --lock-token <token>]");
++  if (!new Set(["plan", "apply"]).has(command) || !values.repoRoot || !values.directory || !values.proposalFile) throw new Error("Usage: phoenix-authority-revision.mjs plan|apply --repo-root <repo> --directory <external-dir> --proposal-file <repo-file> [--out <scratch/file> (plan only)] [--request-file <repo-file> --request-sha256 <sha> --lock-token <8-128 chars>]");
+   return values;
+ }
+ export function run(argv = process.argv.slice(2)) {
+@@ -18,7 +34,7 @@ export function run(argv = process.argv.slice(2)) {
+   if (!verified.ok) return 2;
+   const deps = { dir: values.repoRoot, authorityRevisionApproval: ({ repoRoot, ...approval }) => JSON.stringify(approval) === JSON.stringify(verified.approval) ? { ok: true, value: approval } : { ok: false, code: "PHOENIX-AUTHORITY-PROOF-MISMATCH" } };
+   return values.command === "plan"
+-    ? pipelineState(["continuity-authority-revision-plan", "--proposal-file", values.proposalFile], deps)
++    ? planWithOut(values, deps)
+     : pipelineState(["continuity-authority-revision-apply", "--request-file", values.requestFile, "--request-sha256", values.requestSha256, "--lock-token", values.lockToken], deps);
+ }
+ function isMainModule() {
