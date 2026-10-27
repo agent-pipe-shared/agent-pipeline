@@ -254,3 +254,41 @@ test("the read-only CLI reports unresolved legacy input as a nonblocking warning
   assert.equal(blocked.output.code, "ARCH-DECISION-EFFECTIVE-UNRESOLVED");
   assert.equal(runArchitectureEffectiveCli(["--root", ".", "--area", "pipeline-core"]).exitCode, 2);
 });
+
+test("D179 a project without docs/adr has the same inspection result as one with an empty docs/adr", (t) => {
+  const emptyRoot = fixture(t);
+  const absentRoot = fixture(t);
+  rmSync(join(absentRoot, "docs", "adr"), { recursive: true });
+  const empty = inspect(emptyRoot);
+  const absent = inspect(absentRoot);
+  assert.equal(absent.status, empty.status);
+  assert.equal(absent.code, empty.code);
+  assert.deepEqual(absent.decisions, empty.decisions);
+  assert.deepEqual(absent.activeExceptions, empty.activeExceptions);
+  assert.deepEqual(absent.findings, empty.findings);
+  assert.equal(absent.projectionSha256, empty.projectionSha256);
+  assert.notEqual(absent.code, "ARCH-DECISION-SOURCE-UNAVAILABLE");
+});
+
+test("D179 docs/adr as a regular file still blocks and names docs/adr", (t) => {
+  const root = fixture(t);
+  rmSync(join(root, "docs", "adr"), { recursive: true });
+  writeFileSync(join(root, "docs", "adr"), "not a directory\n");
+  const result = inspect(root);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "ARCH-DECISION-SOURCE-UNAVAILABLE");
+  assert.ok(result.findings.some(({ path }) => path === "docs/adr"));
+});
+
+test("D179 docs/adr as a symlink to a directory still blocks and names docs/adr", (t) => {
+  const root = fixture(t);
+  const real = join(root, "elsewhere");
+  mkdirSync(real);
+  rmSync(join(root, "docs", "adr"), { recursive: true });
+  try { symlinkSync(real, join(root, "docs", "adr"), "dir"); }
+  catch (error) { t.skip(`symlink-unsupported-on-platform: ${error.code}`); return; }
+  const result = inspect(root);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.code, "ARCH-DECISION-SOURCE-UNAVAILABLE");
+  assert.ok(result.findings.some(({ path }) => path === "docs/adr"));
+});

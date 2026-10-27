@@ -82,9 +82,18 @@ function inspectStructuralArchitectureDecisions({ rootDir, area, now = new Date(
   const loaded = [];
   let entries;
   try {
-    if (realpathSync(root) !== root || lstatSync(dir).isSymbolicLink() || !lstatSync(dir).isDirectory()
-      || realpathSync(dir) !== dir) throw new Error("unsafe-directory");
-    entries = readdirSync(dir).filter((name) => /\.(?:json|md)$/u.test(name)).sort();
+    if (realpathSync(root) !== root) throw new Error("unsafe-directory");
+    let absent = false;
+    try { lstatSync(dir); } catch (error) {
+      if (error?.code === "ENOENT" || error?.code === "ENOTDIR") absent = true;
+      else throw error;
+    }
+    if (absent) entries = [];
+    else {
+      if (lstatSync(dir).isSymbolicLink() || !lstatSync(dir).isDirectory()
+        || realpathSync(dir) !== dir) throw new Error("unsafe-directory");
+      entries = readdirSync(dir).filter((name) => /\.(?:json|md)$/u.test(name)).sort();
+    }
   } catch {
     return { schema: SCHEMA, status: "blocked", code: "ARCH-DECISION-SOURCE-UNAVAILABLE", area,
       decisions: [], activeExceptions: [], findings: [finding("adr-directory-unavailable", "docs/adr")], projectionSha256: null };
