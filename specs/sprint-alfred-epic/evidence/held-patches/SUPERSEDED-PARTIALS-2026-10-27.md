@@ -24,6 +24,8 @@ and must NOT be applied. Apply only the replacement.
 | `w7-preflight-scanner-findings.patch` | `w7-preflight-scanner-findings-c2.patch` | interim; c2 is 49/49 against 44/44 |
 | `w7-phoenix-reopen-design-dry-run.patch` | `w7-phoenix-reopen-design-dry-run-c4.patch` | the observer-conformance fixture repository had no commit |
 | `w7-d52-checkpoint-commit-route.patch` | `w7-d52-checkpoint-commit-route-c2.patch` | RED test file without the script; c2 is complete (6/6, 73/73, 42/42) |
-
+| `w7-d31-briefing-checkpoint-return.patch` | `w7-d31-briefing-checkpoint-return-c2.patch` | interim; c2 is complete (pin file 17/17 against 13/13, apply check green) |
+| `w7-d56-chain-test-and-refusal-text.patch` | `w7-d56-chain-test-and-refusal-text-c3.patch` | interim; c3 is complete (17/17, 48/48, 31/31) |
+| `w7-d56-chain-test-and-refusal-text-c2.patch` | `w7-d56-chain-test-and-refusal-text-c3.patch` | CPPA-4 untrailered half still asserted the CLI string absent (preflight 15/17); c3 fixes that assertion |
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.
