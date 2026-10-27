@@ -49,7 +49,47 @@ export function planCommitNpmInvocation(args, {
   } };
 }
 
-export function prepareCommitWorktreeDependencies({ root, commit, npmExecutable = "npm", npmPrefixArgs = [] }) {
+/** Same planner as npm for any manager name; a non-npm name is launched directly (no Windows shim logic exists for it). */
+export function planCommitManagerInvocation(executable, prefixArgs, args, options) {
+  return planCommitNpmInvocation(args, { ...options, npmExecutable: executable, npmPrefixArgs: prefixArgs });
+}
+
+const exactPnpmVersion = /^pnpm@([0-9]+\.[0-9]+\.[0-9]+)(\+[A-Za-z0-9.-]+)?$/u;
+
+/**
+ * pnpm path (D174, PF-81). The pnpm lockfile is deliberately NOT parsed or compared here:
+ * "pnpm install --frozen-lockfile" refuses by itself when the lockfile does not match package.json.
+ */
+function preparePnpm({ root, commit, manifest, pnpmExecutable, pnpmPrefixArgs }) {
+  const declared = String(manifest.packageManager ?? "");
+  const named = /^([A-Za-z0-9_-]+)@/u.exec(declared)?.[1];
+  if (named !== undefined && named !== "pnpm") {
+    refuse("VEP-DEPENDENCY-MANAGER", `package.json packageManager names ${named} but the committed lockfile is pnpm-lock.yaml (pnpm); commit packageManager: pnpm@<exact-version> or the matching lockfile.`);
+  }
+  const version = exactPnpmVersion.exec(declared)?.[1];
+  if (!version) refuse("VEP-DEPENDENCY-MANAGER", "Commit packageManager: pnpm@<exact-version> in package.json before --commit Verify.");
+  if (existsSync(join(root, "node_modules"))) refuse("VEP-DEPENDENCY-EXISTING", "Candidate worktree already contains node_modules; refuse mutable dependency reuse.");
+  const environment = Object.freeze({ ...process.env });
+  let versionPlan; let installPlan;
+  try {
+    versionPlan = planCommitManagerInvocation(pnpmExecutable, pnpmPrefixArgs, ["--version"], { root, environment });
+    installPlan = planCommitManagerInvocation(pnpmExecutable, pnpmPrefixArgs, ["install", "--frozen-lockfile", "--ignore-scripts"], { root, environment });
+  } catch (error) {
+    refuse("VEP-DEPENDENCY-LAUNCH", `pnpm cannot be launched safely on this platform (${error.code ?? "unknown"}); select a supported pnpm executable and retry. Verify did not run.`);
+  }
+  const probed = spawnSync(versionPlan.executable, versionPlan.args, { ...versionPlan.options, encoding: "utf8", timeout: 30_000 });
+  if (probed.status !== 0 || String(probed.stdout).trim() !== version) {
+    refuse("VEP-DEPENDENCY-MANAGER", `The available pnpm must be exactly ${version}; install/select that version and retry.`);
+  }
+  const result = spawnSync(installPlan.executable, installPlan.args, { ...installPlan.options, stdio: "inherit", timeout: 300_000 });
+  if (result.status !== 0) refuse("VEP-DEPENDENCY-SETUP", "pnpm install --frozen-lockfile failed in the candidate worktree; resolve the committed lockfile or package source and retry. Verify did not run.");
+  if (git(root, ["rev-parse", "HEAD"]) !== commit || git(root, ["status", "--porcelain=v1"]) !== "") {
+    refuse("VEP-DEPENDENCY-CANDIDATE", "Dependency setup changed the candidate worktree; no Verify evidence was written.");
+  }
+  return { status: "prepared", manager: `pnpm@${version}` };
+}
+
+export function prepareCommitWorktreeDependencies({ root, commit, npmExecutable = "npm", npmPrefixArgs = [], pnpmExecutable = "pnpm", pnpmPrefixArgs = [] }) {
   if (git(root, ["rev-parse", "HEAD"]) !== commit || git(root, ["status", "--porcelain=v1"]) !== "") {
     refuse("VEP-DEPENDENCY-CANDIDATE", "Dependency preparation requires the clean exact candidate worktree.");
   }
@@ -64,8 +104,15 @@ export function prepareCommitWorktreeDependencies({ root, commit, npmExecutable 
     refuse("VEP-DEPENDENCY-CONFIG", "Committed package.json has invalid dependency declarations.");
   }
   if (!dependencyGroups.some(group => group && Object.keys(group).length > 0)) return { status: "not-required" };
-  if (!committedFile(root, "package-lock.json") || !ordinaryFile(root, "package-lock.json")) {
-    refuse("VEP-DEPENDENCY-LOCK", "Commit package-lock.json for this candidate before --commit Verify.");
+  const hasNpmLock = committedFile(root, "package-lock.json") && ordinaryFile(root, "package-lock.json");
+  const hasPnpmLock = committedFile(root, "pnpm-lock.yaml") && ordinaryFile(root, "pnpm-lock.yaml");
+  if (hasNpmLock && hasPnpmLock) {
+    refuse("VEP-DEPENDENCY-LOCK", "Both package-lock.json (npm) and pnpm-lock.yaml (pnpm) are committed; keep only one lockfile for this candidate before --commit Verify.");
+  }
+  if (hasPnpmLock) return preparePnpm({ root, commit, manifest, pnpmExecutable, pnpmPrefixArgs });
+  if (!hasNpmLock) {
+    const yarn = committedFile(root, "yarn.lock") ? " yarn.lock is committed but not supported by --commit Verify." : "";
+    refuse("VEP-DEPENDENCY-LOCK", `Commit package-lock.json (npm) or pnpm-lock.yaml (pnpm) for this candidate before --commit Verify.${yarn}`);
   }
   let lock;
   try { lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")); }

@@ -1043,6 +1043,74 @@ test("a named candidate prepares committed npm dependencies before Verify withou
   } finally { rmSync(root, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); }
 });
 
+/** D174 (PF-81): a tiny real git repo whose single commit carries the given files; a stub manager script that logs argv. */
+function pnpmCandidate({ files, stubVersion = "9.1.0" }) {
+  const root = mkdtempSync(join(tmpdir(), "d174-pnpm-"));
+  const bin = mkdtempSync(join(tmpdir(), "d174-pnpm-bin-"));
+  git(root, ["init", "-q", "--initial-branch=main"]);
+  for (const [name, content] of Object.entries(files)) writeFileSync(join(root, name), content);
+  git(root, ["add", ...Object.keys(files)]);
+  git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "candidate"]);
+  const log = join(bin, "calls.jsonl");
+  const stub = join(bin, "stub-pnpm.mjs");
+  writeFileSync(stub, `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n');\nif (process.argv[2] === '--version') console.log(${JSON.stringify(stubVersion)});\n`);
+  const prepare = () => prepareCommitWorktreeDependencies({ root, commit: git(root, ["rev-parse", "HEAD"]), pnpmExecutable: process.execPath, pnpmPrefixArgs: [stub] });
+  const calls = () => (existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").map(JSON.parse) : []);
+  return { prepare, calls, cleanup: () => { rmSync(root, { recursive: true, force: true }); rmSync(bin, { recursive: true, force: true }); } };
+}
+const d174Manifest = (extra = {}) => JSON.stringify({ name: "d174", version: "1.0.0", dependencies: { dep: "1.0.0" }, ...extra });
+
+test("D174 a committed pnpm-lock.yaml with packageManager pnpm is prepared with a frozen-lockfile install", () => {
+  const c = pnpmCandidate({ files: { "package.json": d174Manifest({ packageManager: "pnpm@9.1.0" }), "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" } });
+  try {
+    assert.deepEqual(c.prepare(), { status: "prepared", manager: "pnpm@9.1.0" });
+    assert.deepEqual(c.calls(), [["--version"], ["install", "--frozen-lockfile", "--ignore-scripts"]]);
+  } finally { c.cleanup(); }
+});
+
+test("D174 a project with neither lockfile is refused naming both supported lockfiles", () => {
+  const c = pnpmCandidate({ files: { "package.json": d174Manifest({ packageManager: "pnpm@9.1.0" }) } });
+  try {
+    assert.throws(() => c.prepare(), error => error.code === "VEP-DEPENDENCY-LOCK"
+      && error.message.includes("package-lock.json (npm) or pnpm-lock.yaml (pnpm)"));
+    assert.deepEqual(c.calls(), []);
+  } finally { c.cleanup(); }
+});
+
+test("D174 both lockfiles committed is refused naming both", () => {
+  const c = pnpmCandidate({ files: { "package.json": d174Manifest({ packageManager: "pnpm@9.1.0" }), "pnpm-lock.yaml": "x\n", "package-lock.json": "{}" } });
+  try {
+    assert.throws(() => c.prepare(), error => error.code === "VEP-DEPENDENCY-LOCK"
+      && error.message.includes("package-lock.json") && error.message.includes("pnpm-lock.yaml"));
+    assert.deepEqual(c.calls(), []);
+  } finally { c.cleanup(); }
+});
+
+test("D174 packageManager npm with only pnpm-lock.yaml is refused as a manager mismatch", () => {
+  const c = pnpmCandidate({ files: { "package.json": d174Manifest({ packageManager: "npm@10.0.0" }), "pnpm-lock.yaml": "x\n" } });
+  try {
+    assert.throws(() => c.prepare(), error => error.code === "VEP-DEPENDENCY-MANAGER"
+      && error.message.includes("npm") && error.message.includes("pnpm"));
+    assert.deepEqual(c.calls(), []);
+  } finally { c.cleanup(); }
+});
+
+test("D174 a pnpm lockfile without an exact pnpm packageManager is refused", () => {
+  const c = pnpmCandidate({ files: { "package.json": d174Manifest(), "pnpm-lock.yaml": "x\n" } });
+  try {
+    assert.throws(() => c.prepare(), error => error.code === "VEP-DEPENDENCY-MANAGER"
+      && error.message === "Commit packageManager: pnpm@<exact-version> in package.json before --commit Verify.");
+  } finally { c.cleanup(); }
+});
+
+test("D174 an available pnpm of a different version is refused before any install", () => {
+  const c = pnpmCandidate({ files: { "package.json": d174Manifest({ packageManager: "pnpm@9.1.0" }), "pnpm-lock.yaml": "x\n" }, stubVersion: "8.0.0" });
+  try {
+    assert.throws(() => c.prepare(), error => error.code === "VEP-DEPENDENCY-MANAGER");
+    assert.deepEqual(c.calls(), [["--version"]]);
+  } finally { c.cleanup(); }
+});
+
 test("candidate npm preparation uses the existing closed Windows shim vector outside the worktree", () => {
   const nodeDirectory = "C:\\tools\\node";
   const candidate = "C:\\project\\candidate";
