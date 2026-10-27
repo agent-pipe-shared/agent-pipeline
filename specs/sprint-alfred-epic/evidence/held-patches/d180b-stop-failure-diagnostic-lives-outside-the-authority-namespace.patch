@@ -1,0 +1,213 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index bc5f40487..9915d8e30 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -155,7 +155,8 @@ const SUBAGENT_STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure
+ function recordSubagentStopOutcome({ stop }, result) {
+   if (!stop) return;
+   try {
+-    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-commit");
++    // D180b: a sibling no authority scan inventories; inside native-goldfish-host-commit the file drifts the registry namespace.
++    const directory = join(stop.commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
+     if (result?.status === "authored-commit-recorded") { try { stopUnlink(join(directory, name)); } catch { /* none to remove */ } return; }
+     // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
+diff --git a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+index 0c2d1ba78..993d5ab62 100644
+--- a/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
++++ b/plugins/pipeline-core/lib/pins/claude-background-goldfish-is-host-committed-at-subagent-stop.test.mjs
+@@ -470,7 +470,10 @@ function writeTranscript(dir, name, lines) {
+ }
+ const withTranscript = (lines, lastMessage) => ({ lastMessage, prepare: (dir, name) => writeTranscript(dir, name, lines) });
+ const contractWith = (fx, patch) => JSON.stringify({ ...JSON.parse(finalText(fx)), ...patch });
+-const stopFailureFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
++// D180b: the diagnostic lives in a sibling directory no authority scan inventories, never in the native Goldfish namespace.
++const diagnosticDirectory = (fx) => join(fx.root, ".git", "agent-pipeline", "run", "native-goldfish-host-diagnostics");
++const stopFailureFiles = (fx) => existsSync(diagnosticDirectory(fx)) ? readdirSync(diagnosticDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
++const namespaceStopFailureFiles = (fx) => existsSync(stateDirectory(fx)) ? readdirSync(stateDirectory(fx)).filter((name) => name.startsWith("stop-failure-")) : [];
+ function launchedBackground(name, toolUseId) {
+   const fx = buildConsumer(name);
+   launchedPending(fx, toolUseId, {});
+@@ -480,7 +483,7 @@ function launchedBackground(name, toolUseId) {
+   return fx;
+ }
+ function assertRefusedAtStop(fx, toolUseId, variant, label, expectedCode) {
+-  for (const file of stopFailureFiles(fx)) rmSync(join(stateDirectory(fx), file), { force: true });
++  for (const file of stopFailureFiles(fx)) rmSync(join(diagnosticDirectory(fx), file), { force: true });
+   fx.stopVariant = variant;
+   const stopped = stopHook(fx, toolUseId);
+   assert.equal(stopped.status, 0, `${label}: the stop hook never blocks -- ${stopped.stderr}`);
+@@ -490,7 +493,8 @@ function assertRefusedAtStop(fx, toolUseId, variant, label, expectedCode) {
+   assert.equal(pendingFiles(fx).length, 1, `${label}: the pending state is not consumed`);
+   const files = stopFailureFiles(fx);
+   assert.equal(files.length, 1, `${label}: one diagnostic is persisted next to the pending state -- ${stopped.stderr.slice(0, 300)}`);
+-  const diagnostic = JSON.parse(readFileSync(join(stateDirectory(fx), files[0]), "utf8"));
++  assert.deepEqual(namespaceStopFailureFiles(fx), [], `${label}: D180b the inventoried native Goldfish directory holds no stop-failure file`);
++  const diagnostic = JSON.parse(readFileSync(join(diagnosticDirectory(fx), files[0]), "utf8"));
+   assert.equal(diagnostic.dispatchId, fx.dispatchId, label);
+   assert.match(diagnostic.code, /^NGH[A-Z]*-[A-Z0-9-]+$/u, `${label}: ${diagnostic.code}`);
+   if (expectedCode) assert.equal(diagnostic.code, expectedCode, label);
+@@ -522,6 +526,15 @@ test("(x) SubagentHandback: an invalid or foreign handback, or any record other
+   assertRefusedAtStop(fx, id, withTranscript([], undefined), "an empty transcript");
+ });
+ 
++test("(xi) D180b: after a non-succeeded return the stop-failure file is in the diagnostics directory and the host-commit directory holds none", () => {
++  const fx = launchedBackground("d180b-location", "toolu_d180b_location");
++  fx.stopVariant = withTranscript([handbackRecord("All done, nothing to see.")], undefined);
++  const stopped = stopHook(fx, "toolu_d180b_location");
++  assert.equal(stopped.status, 0, stopped.stderr);
++  assert.equal(stopFailureFiles(fx).length, 1, "one diagnostic in native-goldfish-host-diagnostics");
++  assert.deepEqual(namespaceStopFailureFiles(fx), [], "the inventoried native-goldfish-host-commit directory holds no stop-failure file");
++});
++
+ test("(xi) SubagentHandback: an unparsable, oversized or symlinked child transcript is refused as unsafe and commits nothing (PF-61)", { skip: process.platform === "win32" ? "needs symlink privileges" : false }, () => {
+   const fx = launchedBackground("handback-unsafe", "toolu_pf61_unsafe");
+   const id = "toolu_pf61_unsafe";
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index b74268f6b..0dc17cb60 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -266,7 +266,9 @@ function defaultQueueRow(root, sliceId) {
+ const defaultRunningDispatches = (root) => readRunningDispatches(root, { queueRowFn: defaultQueueRow, parseBriefing: parseNativeGoldfishBriefing });
+ 
+ const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+-const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
++// D180b: the diagnostic lives outside the inventoried native Goldfish namespace; the legacy directory is still read.
++const STOP_FAILURE_DIR = ["agent-pipeline", "run", "native-goldfish-host-diagnostics"];
++const STOP_FAILURE_LEGACY_DIR = ["agent-pipeline", "run", "native-goldfish-host-commit"];
+ const STOP_FAILURE_NAME = /^stop-failure-[A-Za-z0-9._-]+\.json$/u;
+ 
+ /**
+@@ -278,10 +280,20 @@ function defaultStopFailures(root) {
+   try {
+     const common = resolveGitCommonDir(root);
+     if (typeof common !== "string") return [];
+-    const dir = resolve(common, ...STOP_FAILURE_DIR);
+-    const names = readdirSync(dir).filter((name) => STOP_FAILURE_NAME.test(name)).sort().slice(0, 20);
++    const candidates = [];
++    const seen = new Set();
++    for (const parts of [STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR]) {
++      try {
++        const directory = resolve(common, ...parts);
++        for (const name of readdirSync(directory).filter((entry) => STOP_FAILURE_NAME.test(entry)).sort()) {
++          if (seen.has(name)) continue;
++          seen.add(name);
++          candidates.push({ name, dir: directory, rel: parts.join("/") });
++        }
++      } catch { /* an absent directory holds no diagnostic */ }
++    }
+     const kept = [];
+-    for (const name of names) {
++    for (const { name, dir, rel } of candidates.slice(0, 20)) {
+       try {
+         const file = resolve(dir, name);
+         const info = lstatSync(file);
+@@ -295,7 +307,7 @@ function defaultStopFailures(root) {
+           text = buffer.subarray(0, length).toString("utf8");
+         } finally { closeSync(fd); }
+         const value = JSON.parse(text);
+-        if (value && typeof value === "object" && value.schema === STOP_FAILURE_SCHEMA && typeof value.dispatchId === "string" && typeof value.code === "string") kept.push({ ...value, file: name });
++        if (value && typeof value === "object" && value.schema === STOP_FAILURE_SCHEMA && typeof value.dispatchId === "string" && typeof value.code === "string") kept.push({ ...value, file: name, directory: rel });
+       } catch { /* an unreadable entry is no diagnostic */ }
+     }
+     return kept;
+@@ -698,7 +710,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     .sort((a, b) => String(a.observedAt ?? "").localeCompare(String(b.observedAt ?? "")) || a.dispatchId.localeCompare(b.dispatchId));
+   for (const entry of stopEntries) {
+     const name = typeof entry.file === "string" && entry.file !== "" ? entry.file : `stop-failure-${entry.dispatchId}.json`;
+-    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
++    warnings.push({ code: "DBG-HOST-COMMIT-STOP-FAILURE", dispatchId: entry.dispatchId, path: `${[STOP_FAILURE_DIR, STOP_FAILURE_LEGACY_DIR].map((parts) => parts.join("/")).find((rel) => rel === entry.directory) ?? STOP_FAILURE_DIR.join("/")}/${name}`, message: `background Goldfish ${entry.dispatchId} ended without a host commit (${entry.code}, status ${entry.status}, candidate ${entry.commit}, observed ${entry.observedAt}); verify its diff, commit it yourself with the Dispatch trailer, then rebuild; the diagnostic is removed by the next successful completion` });
+   }
+ 
+   // Agent definition: effort, model alias and the maxTurns cliff.
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index a0d87dab8..cb3879f4f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1367,7 +1367,8 @@ test("PF-65 an estimate absent or below 8 + 3 x paths warns DBG-PACKAGE-ESTIMATE
+ // --- PF-61 reader: a persisted background-Goldfish stop-failure diagnostic is surfaced as a non-blocking warning ---
+ 
+ const STOP_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+-const STOP_DIR = "agent-pipeline/run/native-goldfish-host-commit";
++const STOP_DIR = "agent-pipeline/run/native-goldfish-host-diagnostics";
++const LEGACY_STOP_DIR = "agent-pipeline/run/native-goldfish-host-commit";
+ const stopFailure = (over = {}) => ({ schema: STOP_SCHEMA, dispatchId: "ALF-BG", toolUseId: "toolu_1", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: COMMIT, observedAt: "2026-10-26T10:00:00.000Z", ...over });
+ const stopWarnings = (result) => result.warnings.filter((entry) => entry.code === "DBG-HOST-COMMIT-STOP-FAILURE");
+ 
+@@ -1443,3 +1444,51 @@ test("PF-61 reader the default reader lists real files of the run directory, ign
+   assert.equal(found[0].path, `${STOP_DIR}/stop-failure-aaa.json`);
+   assert.deepEqual(readdirSync(dir).sort(), ["other.json", "stop-failure-aaa.json", "stop-failure-bad.json", "stop-failure-link.json"]);
+ });
++
++function realDepsIn(fx) {
++  const env = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
++  const git = (...args) => {
++    const r = spawnSync("git", ["-C", fx.root, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
++      "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", ...args], { encoding: "utf8", env });
++    assert.equal(r.status, 0, r.stderr);
++  };
++  git("init", "-q"); git("add", "-A"); git("commit", "-q", "-m", "fixture");
++  const real = { ...depsOf(fx) };
++  delete real.git;
++  return real;
++}
++const plantStop = (fx, rel, name, over) => {
++  const dir = join(fx.root, ".git", rel);
++  mkdirSync(dir, { recursive: true });
++  writeFileSync(join(dir, name), JSON.stringify(stopFailure(over)));
++};
++
++test("D180b PF-61 reader surfaces a record in the diagnostics directory", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const real = realDepsIn(fx);
++  plantStop(fx, STOP_DIR, "stop-failure-new.json", { dispatchId: "ALF-NEWDIR" });
++  const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
++  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-NEWDIR"]);
++  assert.equal(found[0].path, `${STOP_DIR}/stop-failure-new.json`);
++});
++
++test("D180b PF-61 reader still surfaces a record left in the legacy host-commit directory", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const real = realDepsIn(fx);
++  plantStop(fx, LEGACY_STOP_DIR, "stop-failure-old.json", { dispatchId: "ALF-LEGACY" });
++  const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
++  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-LEGACY"]);
++  assert.equal(found[0].path, `${LEGACY_STOP_DIR}/stop-failure-old.json`);
++});
++
++test("D180b PF-61 reader does not double-count the same file name present in both directories", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const real = realDepsIn(fx);
++  plantStop(fx, STOP_DIR, "stop-failure-same.json", { dispatchId: "ALF-SAME" });
++  plantStop(fx, LEGACY_STOP_DIR, "stop-failure-same.json", { dispatchId: "ALF-SAME" });
++  const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
++  assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-SAME"], JSON.stringify(found));
++});
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index c343bff21..b00290307 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -487,6 +487,20 @@ const cases = [
+     assert.equal(released.result.status, "released", JSON.stringify(released.result));
+     assert.equal(released.code, 0);
+   }) },
++  { id: "SAR16", name: "D180b a stop-failure diagnostic written AFTER registry init, into the diagnostics directory outside the native Goldfish namespace, leaves the registry readable and the native-goldfish producer ok", run: () => fixture(({ root }) => {
++    const { repository, dispatch } = course(root);
++    assert.equal(dispatch("ITEM-AC-1", "DELIVER-AC-1", "native-tool-one").ok, true);
++    // The dispatch above already initialised the registry; initialising again is idempotent and the baseline is taken here.
++    assert.ok(["initialized", "already-initialized"].includes(initializeSessionAuthorityRegistry({ repository }, createSessionAuthorityParticipantPorts({ repository })).status));
++    const diagnostics =join(repository.commonDir, "agent-pipeline/run/native-goldfish-host-diagnostics");
++    mkdirSync(diagnostics, { recursive: true, mode: 0o700 });
++    writeFileSync(join(diagnostics, `stop-failure-${"a".repeat(32)}.json`), `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId: "DELIVER-AC-1", toolUseId: "native-tool-one", status: "refused", code: "NGHF-HANDBACK-INVALID", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`, { mode: 0o600 });
++    const found = repair("inspect", "--root", root).result;
++    assert.notEqual(found.registry.status, "refused", JSON.stringify(found.registry));
++    const goldfish = found.registry.producers.find((row) => row.producerId === "native-goldfish");
++    assert.ok(goldfish, JSON.stringify(found.registry));
++    assert.equal(goldfish.status, "ok", JSON.stringify(goldfish));
++  }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
