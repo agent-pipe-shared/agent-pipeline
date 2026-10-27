@@ -1,0 +1,32 @@
+diff --git a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+index 6bf19f0cc..614db14bf 100644
+--- a/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
++++ b/plugins/pipeline-core/lib/pins/antigravity-global-refresh-recovers-and-installs-a-runner-view.test.mjs
+@@ -604,6 +604,27 @@ test('bounded storage: after two installs the older view remains when liveness i
+   assert.equal(readFileSync(join(viewBase(w), note), 'utf8'), 'operator note\n');
+ });
+ 
++test('runner continuity: after a normal second refresh the older view keeps every byte it was installed with, and the second view is a different content-addressed directory', (t) => {
++  const { w } = storageWorld(t);
++  const first = installView(w, fakeCli(w));
++  assert.equal(first.status, 'refreshed', JSON.stringify(first));
++  const oldRoot = join(viewBase(w), `view-${first.runnerView.viewSha256}`);
++  const before = files(oldRoot);
++  const beforeNames = Object.keys(before).sort();
++  assert.equal(beforeNames.length > 0, true, 'the first install wrote a non-empty view');
++  reviseSource(w, 'A second revision of the shared source.\n');
++  const second = installView(w, fakeCli(w));
++  assert.equal(second.status, 'refreshed', JSON.stringify(second));
++  assert.notEqual(second.runnerView.viewSha256, first.runnerView.viewSha256);
++  const newRoot = join(viewBase(w), `view-${second.runnerView.viewSha256}`);
++  assert.notEqual(newRoot, oldRoot);
++  assert.equal(existsSync(newRoot), true, 'the second view is a distinct directory');
++  assert.equal(existsSync(oldRoot), true, 'the older view still exists');
++  const after = files(oldRoot);
++  assert.deepEqual(Object.keys(after).sort(), beforeNames, 'the older view holds exactly the files it was installed with');
++  for (const name of beforeNames) assert.equal(Buffer.compare(after[name], before[name]), 0, `older view file ${name} is byte-identical`);
++});
++
+ test('bounded storage: a view nothing references any more is removed, a view an import source names is not', (t) => {
+   const { w, other } = storageWorld(t);
+   const unreferenced = snap.publishAgyRunnerView({ sourcePluginRoot: other, deps: w.snapshotDeps });
