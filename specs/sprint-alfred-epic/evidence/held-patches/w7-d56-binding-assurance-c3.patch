@@ -1,0 +1,240 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index e3628be80..c2e2404d0 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -245,7 +245,7 @@ function sourceTarget(root, declaration) {
+   const anchor = declaration.signedQualityImportAnchor;
+   if (anchor === null) {
+     const b = createLocalDispatchEvidenceBinding({ root, taskId: declaration.taskId, baseCommit: declaration.baseCommit, reviewCandidateCommit: declaration.candidateCommit });
+-    return { kind: "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
++    return { kind: b.assurance === "orchestrator-attested" ? "orchestrator-attested-delivery" : "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
+   }
+   shape(anchor, ["schema", "intentSha256", "integrationCommit"]);
+   if (anchor.schema !== "pipeline.signed-quality-import-review-anchor.v1" || !SHA.test(anchor.intentSha256) || !OID.test(anchor.integrationCommit)
+@@ -308,7 +308,7 @@ function reviewUnitSource(root, d, work) {
+ }
+ function targetForPacket(packet) {
+   const b = packet.coordinatorOnly?.localDispatchEvidence;
+-  if (b) return { kind: "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
++  if (b) return { kind: b.assurance === "orchestrator-attested" ? "orchestrator-attested-delivery" : "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
+   const a = packet.coordinatorOnly?.signedQualityImportAnchor;
+   if (a) return { kind: "signed-quality-import", intentSha256: a.intentSha256, integrationCommit: a.integrationCommit };
+   fail("CGB-TARGET");
+@@ -481,7 +481,7 @@ function appendCorrection(input) {
+     const parent = consumedParent(c, prior, input.parent);
+     if (parent.result.verdict.pass) fail("CGB-PASS-STOPS");
+     // Delivery owner ends at integration; one fresh fix owner carries this same batch.
+-    if (s.target.kind !== "authored-delivery") fail("CGB-CORRECTION-OWNER");
++    if (s.target.kind !== "authored-delivery" && s.target.kind !== "orchestrator-attested-delivery") fail("CGB-CORRECTION-OWNER");
+     if (prior.ordinal === 1) {
+       if (s.target.taskId === r.value.originTargets[0].taskId) fail("CGB-CORRECTION-OWNER");
+     } else {
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 6753c0e55..e47c8db47 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -16,7 +16,7 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
+ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+ import {readdirSync,readlinkSync} from "node:fs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -501,4 +501,27 @@ test("D-W7M a non-feat/ mainRef that differs from the primary checkout stays ref
+     try{rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");}finally{rmSync(fx.root,{recursive:true,force:true});}
+   }
+ });
++function registeredTargets(fx,result){return JSON.parse(readFileSync(join(fx.root,".git/agent-pipeline/critic-packets/generic-batches",result.batchRef.batchId,"registration.json")));}
++test("D56 a host-observed local dispatch binding yields the authored-delivery target kind",()=>{
++  const fx=fixture();try{
++    const result=registeredTargets(fx,register(fx));
++    assert.equal(result.originTargets[0].kind,"authored-delivery");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D56 an orchestrator-attested local dispatch binding yields the orchestrator-attested-delivery target kind",()=>{
++  const fx=fixture();try{
++    const text="done";
++    const record={schema:"pipeline.dispatch-record.v4",taskId:fx.taskId,agentType:"default",model:"gpt-5.6-luna",effort:"medium",
++      rulesetSha:"b7797309cf6abe175fd52b0a8749d82b43714ea0",dispatcher:"elephant",outcome:"completed",
++      commits:[fx.historicalCandidate],candidateCommit:fx.historicalCandidate,resultSha256:sha256(text),
++      log:[{phase:"verify",toolUseCount:1}],report:{text,changedFiles:["specs/spec.md"]},
++      criticRequired:{schema:"pipeline.critic-required-decision.v1",trigger:{schema:"pipeline.critic-trigger-input.v1",rigorLevel:2,riskClass:"high",riskFlag:true,diff:{mechanical:false,architecture:false,guardrails:true,security:false}},appliedRow:"T1"},
++      outcomeClassification:{schema:"pipeline.dispatch-outcome-classification.v1",kind:"orchestrator-attested"},
++      attestation:{schema:"pipeline.dispatch-orchestrator-attestation.v1",assurance:"orchestrator-attested",briefingSha256:"1".repeat(64),handbackSha256:"2".repeat(64)}};
++    writeFileSync(join(fx.root,fx.recordPath),`${JSON.stringify(record,null,2)}\n`);
++    fx.candidate=commit(fx.root,"attested record rewrite");
++    const result=registeredTargets(fx,register(fx));
++    assert.equal(result.originTargets[0].kind,"orchestrator-attested-delivery");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 502a48c40..e4f65d631 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -348,6 +348,7 @@ export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandida
+     recordSha256: entry.sha256,
+     sourceCandidateCommit: record.candidateCommit,
+     reviewCandidateCommit,
++    assurance: admission.assurance === "orchestrator-attested" ? "orchestrator-attested" : null,
+   };
+   return Object.freeze({ ...binding, snapshotId: sha256Canonical(binding) });
+ }
+@@ -541,7 +542,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+     if (localDispatchEvidence !== undefined) {
+       try {
+         exactObject(localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256",
+-          "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"], "private local dispatch evidence");
++          "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
+       } catch {
+         return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
+       }
+@@ -552,6 +553,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+         recordSha256: localDispatchEvidence.recordSha256,
+         sourceCandidateCommit: localDispatchEvidence.sourceCandidateCommit,
+         reviewCandidateCommit: localDispatchEvidence.reviewCandidateCommit,
++        assurance: localDispatchEvidence.assurance,
+       };
+       const packetCandidate = bound.packet.candidate?.commit;
+       const expectedPath = `evidence/dispatch-record-${addendum.taskId}.json`;
+@@ -567,6 +569,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+         || localDispatchEvidence.sourceCandidateCommit !== sourceRecord?.candidateCommit
+         || localDispatchEvidence.reviewCandidateCommit !== addendum.reviewCandidateCommit
+         || localDispatchEvidence.reviewCandidateCommit !== packetCandidate
++        || (localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
+         || localDispatchEvidence.snapshotId !== sha256Canonical(binding)
+         || bound.packet.request?.taskId !== addendum.taskId
+         || !Array.isArray(bound.packet.references)
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index aac73cbf9..356552b7a 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -66,6 +66,7 @@ function localDispatchSnapshot(taskId, recordBytes, overrides = {}) {
+     recordSha256: sha256(recordBytes),
+     sourceCandidateCommit: record.candidateCommit,
+     reviewCandidateCommit: targetReviewCommit,
++    assurance: null,
+     ...overrides,
+   };
+   return { ...binding, snapshotId: sha256Canonical(binding) };
+@@ -393,8 +394,12 @@ test("ignored historical dispatch records bind through the consumed private snap
+   const valid = evaluate(root, ["source.txt"], boundLocalDispatchReview(recordBytes, taskId, binding, root));
+   assert.equal(valid.ok, true, valid.readFindings.join("\n"));
+   assert.equal(valid.criticEvidenceRecordCount, 1);
++  assert.equal(binding.assurance, null, "an authored-commit record binds assurance null");
++  assert.equal(evaluate(root, ["source.txt"], boundLocalDispatchReview(recordBytes, taskId, localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit, assurance: "orchestrator-attested" }), root)).ok, true,
++    "a closed attested-assurance binding is accepted by the binding check");
+ 
+   for (const malformed of [
++    localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit, assurance: "host-observed" }),
+     localDispatchSnapshot("OTHER-TASK", recordBytes, { reviewCandidateCommit: candidateCommit }),
+     localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit, sourceCandidateCommit: "f".repeat(40) }),
+     localDispatchSnapshot(taskId, recordBytes, { reviewCandidateCommit: candidateCommit, recordSha256: "f".repeat(64) }),
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 1290742a4..e2ce0f08a 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -363,14 +363,16 @@ function normalizeCoordinatorOnly(value, candidate) {
+   }
+   if (exactKeys(value, ["localDispatchEvidence"])) {
+     const binding = value.localDispatchEvidence;
+-    if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])
++    if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"])
++      || (binding.assurance !== null && binding.assurance !== "orchestrator-attested")
+       || binding.schema !== "pipeline.local-dispatch-evidence.v1"
+       || !isSafeTaskId(binding.taskId) || binding.recordPath !== `evidence/dispatch-record-${binding.taskId}.json`
+       || !SHA256.test(binding.recordSha256 ?? "") || !OID.test(binding.sourceCandidateCommit ?? "")
+       || binding.sourceCandidateCommit.length !== candidate.commit.length || binding.reviewCandidateCommit !== candidate.commit
+       || binding.snapshotId !== sha256Canonical({ schema: binding.schema, taskId: binding.taskId,
+         recordPath: binding.recordPath, recordSha256: binding.recordSha256,
+-        sourceCandidateCommit: binding.sourceCandidateCommit, reviewCandidateCommit: binding.reviewCandidateCommit })) {
++        sourceCandidateCommit: binding.sourceCandidateCommit, reviewCandidateCommit: binding.reviewCandidateCommit,
++        assurance: binding.assurance })) {
+       fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
+     }
+     return Object.freeze({ localDispatchEvidence: Object.freeze({ ...binding }) });
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
+index c291bbd7c..3c8e2a4f3 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs
+@@ -21,6 +21,8 @@ import {
+   readConsumedCandidateReceipt,
+   recordCandidateResult,
+ } from "./critic-packet-preflight.mjs";
++import { createLocalDispatchEvidenceBinding } from "./check-critic-skip-coverage.mjs";
++import { sha256Canonical } from "../lib/review-economy.mjs";
+ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+@@ -303,14 +305,14 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged
+     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
+     const disposed = records.filter((record) => record.event === "DISPOSED");
+     assert.equal(records[0].event, "DECLARED");
+-    assert.equal(records[0].caseCount, 12);
+-    assert.equal(disposed.length, 12);
++    assert.equal(records[0].caseCount, 15);
++    assert.equal(disposed.length, 15);
+     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
+     assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
+     assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
+-    assert.deepEqual(records.at(-1).counts, { pass: 11, fail: 1, skip: 0, todo: 0 });
+-    assert.equal(records.at(-1).declaredCount, 12);
+-    assert.equal(records.at(-1).disposedCount, 12);
++    assert.deepEqual(records.at(-1).counts, { pass: 14, fail: 1, skip: 0, todo: 0 });
++    assert.equal(records.at(-1).declaredCount, 15);
++    assert.equal(records.at(-1).disposedCount, 15);
+   }
+ });
+ 
+@@ -399,7 +401,48 @@ check("signed import anchor rejects candidate drift and canonical verifier denia
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 12, "the complete candidate packet corpus must be registered before execution begins");
++// D56 slice 4b: the local dispatch evidence binding carries the record assurance as one more closed key.
++function bindingWith(real, overrides) {
++  const { snapshotId: _drop, ...rest } = real;
++  const binding = { ...rest, ...overrides };
++  for (const key of Object.keys(binding)) if (binding[key] === undefined) delete binding[key];
++  return { ...binding, snapshotId: sha256Canonical(binding) };
++}
++
++check("CPPA-1 the minted local dispatch evidence binding carries assurance null for a host-observed record", () => {
++  const f = fixture();
++  try {
++    const result = prepareCandidatePacket(options(f, "a".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 31) });
++    assert.equal(result.packet.coordinatorOnly.localDispatchEvidence.assurance, null);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++check("CPPA-2 a binding whose assurance was tampered fails the snapshot recomputation", () => {
++  const f = fixture();
++  try {
++    const real = createLocalDispatchEvidenceBinding({ root: f.root, taskId: options(f).taskId, baseCommit: f.base, reviewCandidateCommit: f.candidate });
++    assert.equal(real.assurance, null);
++    const tampered = { ...real, assurance: "orchestrator-attested" };
++    assert.throws(() => prepareCandidatePacket(options(f, "b".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => tampered }), expectCode("CPP-COORDINATOR-BINDING"));
++    const forged = bindingWith(real, { assurance: "host-observed" });
++    assert.throws(() => prepareCandidatePacket(options(f, "c".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => forged }), expectCode("CPP-COORDINATOR-BINDING"));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++check("CPPA-3 a binding without the assurance key is refused as not closed", () => {
++  const f = fixture();
++  try {
++    const real = createLocalDispatchEvidenceBinding({ root: f.root, taskId: options(f).taskId, baseCommit: f.base, reviewCandidateCommit: f.candidate });
++    const withoutKey = bindingWith(real, { assurance: undefined });
++    assert.equal("assurance" in withoutKey, false);
++    assert.throws(() => prepareCandidatePacket(options(f, "d".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => withoutKey }), expectCode("CPP-COORDINATOR-BINDING"));
++    const attested = bindingWith(real, { assurance: "orchestrator-attested" });
++    const ok = prepareCandidatePacket(options(f, "e".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => attested, now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 32) });
++    assert.equal(ok.packet.coordinatorOnly.localDispatchEvidence.assurance, "orchestrator-attested");
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++
++assert.equal(cases.length, 15, "the complete candidate packet corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
