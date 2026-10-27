@@ -6,7 +6,7 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25.",
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955.",
   "total": 221,
   "baseline": {
     "counts": {
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 12,
+      "25": 11,
       "50": 16,
-      "75": 193,
+      "75": 194,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 70.48
+    "index": 70.7
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -332,6 +332,12 @@
         "from": "25",
         "to": "50",
         "evidence": "specs/sprint-alfred-epic/evidence/held-patches/d170-design-package-folder-is-the-feature-id.notes.md"
+      },
+      {
+        "itemId": "pipeline.critic-finalizer-cli-reports-scf-internal-without-the-cause",
+        "from": "25",
+        "to": "75",
+        "evidence": "specs/sprint-alfred-epic/evidence/held-patches/d173-pf80-finalizer-cli-error-detail.notes.md"
       }
     ]
   },
@@ -339,7 +345,7 @@
     "critic": 211,
     "po-acceptance": 210,
     "native-host": 116,
-    "agent": 32,
+    "agent": 31,
     "po-decision": 1,
     "verify-wsl": 69,
     "historical-evidence": 1
@@ -7957,19 +7963,16 @@
     {
       "itemId": "pipeline.critic-finalizer-cli-reports-scf-internal-without-the-cause",
       "title": "The Critic finalizer CLI names the cause of an internal refusal instead of only SCF-INTERNAL",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer finding relayed 2026-10-27 (Glossover, PF-80): the admit step printed only SCF-INTERNAL. Recorded; no implementation is claimed.",
+      "reason": "PF-80 delivered (D173): describeCliError adds a bounded, path-free detail (inner code and first message line) to the finalizer CLI rejection and the local dispatch evidence errors carry typed codes. Applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. No Full Verify, Critic, native or acceptance claim.",
       "evidence": [
-        "backlog/items/2026-10-27-critic-finalizer-cli-reports-scf-internal-without-the-cause.md"
+        "backlog/items/2026-10-27-critic-finalizer-cli-reports-scf-internal-without-the-cause.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d173-pf80-finalizer-cli-error-detail.notes.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Keep the code and add a bounded, sanitised detail (inner error code and first message line), cover it with typed and untyped throw tests without the repository root in the output."
-        },
         {
           "owner": "native-host",
           "what": "Qualify in the affected consumer repository on its runner/platform."
