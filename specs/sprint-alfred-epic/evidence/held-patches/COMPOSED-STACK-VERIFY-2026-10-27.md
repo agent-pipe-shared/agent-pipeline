@@ -21,11 +21,35 @@ w7-elephant-context-guard-dispatch-c2, w7-d52-stale-snapshot-refusal-text, w7-d3
 
 NOT in the bundle (partial or not run, never apply): w7-pf86-scan-outside-registry-lock (c1, interim),
 w7-pf86-registry-read-api (c2, NGHS46 red), w7-elephant-context-guard-dispatch (superseded by c2),
-and the slices not yet done (PF-86 c3, signature slice A, D56 slices 2-5).
+and the slices not yet done (PF-86 c3, signature slice A2 for the hook texts, D56 slices 2-5).
 `w7-d31-checkpoint-outcome` is complete on its own side; the schema half that lets the return validator
 accept the checkpoint outcome is in the increment below.
 
-## Second file: the increment (`w7-increment-2026-10-27.patch`, 11 files, +221/-25)
+## Second file: the increment (`w7-increment-2026-10-27.patch`, 16 files, +443/-58)
+
+Signature slice A (PO decision 2026-10-27, custody files, batch Critic): `prepare-for-signature` now
+hands the operator exactly ONE command (sign-intent); the proof import is an agent action
+(`authorizeBySignatureCommand`) whose `--proof` is the full path `<key directory>/proof-<intentSha256>.json`
+that sign-intent writes, with no `<external-proof.json>` placeholder. The path appears in the JSON
+(agent) channel only, never in the operator block, so the 72-column bound holds for any path length.
+Without a resolvable key directory the agent command and `proofPath` are null; nothing is invented.
+A proof inside the repository stays refused (ADR-0059 Decision 1); an import before the proof exists says
+so. Files: `lib/human-guard-override.mjs` (`proofDirectory` input, `proofPath`, `operatorCommandCount`),
+`scripts/guard-human-override.mjs` (single operator block, process-entry key-directory resolution via
+`resolvePoKeyDirectory`, ENOENT message), tests SIG-A1..A7 and the revised pins in
+`guard-human-override.test.mjs`, `lib/human-guard-override.test.mjs` and
+`lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs` (the pin that the key directory
+is never printed now holds for the operator channel; the agent JSON names the proof file; justification
+in the test comments). Verified in isolated clones: guard-human-override 39/39, signing-handoff 4/4, pin file
+16/16, po-human-approval 185/185, toolchain-preflight 44/44, guard-lifecycle-ready 405 pass/3 skip,
+pre-commit-hook-install 61/61, antigravity guard green; remaining reds (Q9 D55 in the library suite,
+codex-pretool-guard, sanctioned-args-scripts) fail identically on the commit before the change.
+NOT in this slice (follow-up A2): the older hook hand-off texts that still print the placeholder
+(`hooks/guard-testpath.mjs` l.342, `scripts/repair-map.mjs` l.150). The key directory is resolved in the
+agent process; if the PO's terminal resolves a different one (per-terminal environment variable), the
+import reports the missing proof file and authorizes nothing. No signing step was run, no key touched.
+
+Earlier contents of the increment:
 
 Cut on top of the bundle (Elephant-implemented in a scratch clone, RED to GREEN tests). Contents:
 D31 schema half (`native-goldfish-host-return.mjs` `allowCheckpoint` option, finalizer shim removed,
