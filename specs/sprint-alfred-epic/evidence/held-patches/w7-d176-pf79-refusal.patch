@@ -1,0 +1,66 @@
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 7e2089b30..b79504c93 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -900,7 +900,12 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+   }
+   for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
+   if (signedImportAnchor !== null) admittedCount = 1;
+-  if (admittedCount !== 1) findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}`);
++  if (admittedCount !== 1) {
++    const missingRecordHint = admittedCount === 0
++      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none; a range with no dispatch history has no admitted route yet and needs a PO decision (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
++      : "";
++    findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
++  }
+   const ok = findings.length === 0 && admittedCount === 1;
+   return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount,
+     pendingRecordCount, pendingRecordPaths, administrativelyRetiredRecordCount, targetRecordCandidateCommit,
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index c89a7cc60..b6432a2f2 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -328,6 +328,43 @@ test("D173 the local dispatch evidence error without a source record carries a s
+       && error.message === "local dispatch evidence requires one exact source record");
+ });
+ 
++test("D176 the admission refusal without a dispatch record names the expected record, its producer and the PO-decision route", () => {
++  const root = fixture({ "evidence/.keep": "" });
++  const result = evaluateReviewAdmission({ root, taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
++  assert.equal(result.ok, false);
++  const text = result.readFindings.join("\n");
++  assert.match(text, /evidence\/dispatch-record-NEXT\.json/u);
++  assert.match(text, /host/u);
++  assert.match(text, /foreground/u);
++  assert.match(text, /cannot be authored/u);
++  assert.match(text, /PO decision/u);
++});
++
++test("D176 the admission refusal keeps its original prefix byte-identical", () => {
++  const root = fixture({ "evidence/.keep": "" });
++  const result = evaluateReviewAdmission({ root, taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
++  assert.ok(result.readFindings.some((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`)));
++});
++
++test("D176 an admitted target carries no refusal suffix", () => {
++  const root = fixture({ "evidence/dispatch-record-TARGET.json": json(v4("TARGET", { criticRequired: required() })) });
++  const result = evaluateReviewAdmission({ root, taskId: "TARGET", candidateCommit: SHA, readChangedPaths: () => [] });
++  assert.equal(result.ok, true, result.readFindings.join("\n"));
++  assert.doesNotMatch(result.readFindings.join("\n"), /dispatch-record-TARGET|foreground/u);
++});
++
++test("D176 the suffix appears exactly once when the zero-target refusal comes with other findings", () => {
++  const root = fixture({
++    "evidence/dispatch-record-OTHER.json": json(v4("OTHER", { criticRequired: required() })),
++    "evidence/dispatch-critic-addendum-OTHER.json": "{}\n",
++  });
++  const result = evaluateReviewAdmission({ root, taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
++  assert.equal(result.ok, false);
++  const text = result.readFindings.join("\n");
++  assert.match(text, /invalid critic addendum/u);
++  assert.equal(text.split("foreground").length - 1, 1);
++});
++
+ test("ignored historical dispatch records bind through the consumed private snapshot only", () => {
+   const taskId = "HISTORICAL-AUTHORED";
+   const root = fixture({ "source.txt": "reviewed source\n", "evidence/.keep": "" });
