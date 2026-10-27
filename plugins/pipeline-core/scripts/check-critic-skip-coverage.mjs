@@ -316,26 +316,26 @@ function validateStampOnlyRange(root, integrationCommit, candidateCommit) {
 /** Create a private, content-bound reference from the trusted local dispatch reader. */
 export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit, baseCommit } = {}) {
   if (typeof root !== "string" || typeof taskId !== "string" || typeof reviewCandidateCommit !== "string"
-    || !/^[a-f0-9]{40}$/u.test(reviewCandidateCommit)) throw new TypeError("local dispatch evidence input is invalid");
+    || !/^[a-f0-9]{40}$/u.test(reviewCandidateCommit)) throw Object.assign(new TypeError("local dispatch evidence input is invalid"), { code: "LDE-INPUT" });
   const historical = historicalAdmission(root,{kind:"admitted-dispatch",taskId,baseCommit,candidateCommit:reviewCandidateCommit});
   const scan = walkDispatchRecordsForReview(root,historical?.entries ?? []);
-  if (scan.findings.length > 0) throw new Error("local dispatch evidence source is unreadable");
+  if (scan.findings.length > 0) throw Object.assign(new Error("local dispatch evidence source is unreadable"), { code: "LDE-SOURCE-UNREADABLE" });
   const matches = scan.records.filter(({ record }) => record?.taskId === taskId);
-  if (matches.length !== 1) throw new Error("local dispatch evidence requires one exact source record");
+  if (matches.length !== 1) throw Object.assign(new Error("local dispatch evidence requires one exact source record"), { code: "LDE-SOURCE-RECORD-MISSING" });
   const entry = matches[0];
   const record = entry.record;
   const v3 = record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA;
   const v4 = record?.schema === DISPATCH_RECORD_SCHEMA;
-  if (!v3 && !v4) throw new Error("local dispatch evidence source is not a required authored delivery");
+  if (!v3 && !v4) throw Object.assign(new Error("local dispatch evidence source is not a required authored delivery"), { code: "LDE-SCHEMA" });
   try { (v3 ? validatePreviousDispatchRecord : validateDispatchRecord)(record); }
-  catch { throw new Error("local dispatch evidence source is not a required authored delivery"); }
+  catch { throw Object.assign(new Error("local dispatch evidence source is not a required authored delivery"), { code: "LDE-RECORD-INVALID" }); }
   if (criticDisposition(record) !== "required"
     || !/^[a-f0-9]{40}$/u.test(record.candidateCommit ?? "")) {
-    throw new Error("local dispatch evidence source is not a required authored delivery");
+    throw Object.assign(new Error("local dispatch evidence source is not a required authored delivery"), { code: "LDE-CRITIC-NOT-REQUIRED" });
   }
   const admission = evaluateReviewAdmission({ root, taskId, baseCommit, candidateCommit: reviewCandidateCommit });
   if (!admission.ok || admission.targetRecordCandidateCommit !== record.candidateCommit) {
-    throw new Error("local dispatch evidence candidate is not admitted for this task");
+    throw Object.assign(new Error("local dispatch evidence candidate is not admitted for this task"), { code: "LDE-CANDIDATE-BINDING" });
   }
   const binding = {
     schema: "pipeline.local-dispatch-evidence.v1",

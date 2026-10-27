@@ -315,6 +315,19 @@ test("Critic addendum checks the reviewed candidate's real Git blob and explicit
   assert.match(unreferenced.readFindings.join("\n"), /does not bind the exact immutable dispatch record/u);
 });
 
+test("D173 the local dispatch evidence error without a source record carries a stable code and the old message", () => {
+  const taskId = "D173-NO-SOURCE";
+  const root = fixture({ "source.txt": "reviewed source\n", "evidence/.keep": "" });
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("add", "source.txt");
+  git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "candidate");
+  const reviewCandidateCommit = git("rev-parse", "HEAD");
+  assert.throws(() => createLocalDispatchEvidenceBinding({ root, taskId, reviewCandidateCommit }),
+    (error) => error.constructor === Error && error.code === "LDE-SOURCE-RECORD-MISSING"
+      && error.message === "local dispatch evidence requires one exact source record");
+});
+
 test("ignored historical dispatch records bind through the consumed private snapshot only", () => {
   const taskId = "HISTORICAL-AUTHORED";
   const root = fixture({ "source.txt": "reviewed source\n", "evidence/.keep": "" });

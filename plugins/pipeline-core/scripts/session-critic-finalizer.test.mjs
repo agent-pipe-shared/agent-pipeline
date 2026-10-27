@@ -589,6 +589,66 @@ test("CLI closes argv/request vocabulary and reports typed exit-2 errors", () =>
   } finally { cleanup(fx); }
 });
 
+// D173 (PF-80): the CLI names the cause of an internal refusal. An argv whose first element throws reaches the
+// adapter's catch with any thrown value the case needs, without a model call or a fixture repository.
+const D173_ERROR_SCHEMA = "pipeline.session-critic-finalization-error.v1";
+function d173Cli(thrown) {
+  const argv = ["finalize", "--root", "x", "--request", "y"];
+  Object.defineProperty(argv, 0, { get() { throw thrown; } });
+  return runSessionCriticFinalizerCli(argv);
+}
+
+test("D173 an untyped throw reaching the CLI catch keeps SCF-INTERNAL and names the constructor or inner code", () => {
+  class D173CustomFailure {}
+  const bare = d173Cli(new D173CustomFailure());
+  assert.equal(bare.exitCode, 2);
+  assert.equal(bare.output.code, "SCF-INTERNAL");
+  assert.equal(bare.output.detail, "untyped error: D173CustomFailure");
+  const coded = d173Cli(Object.assign(new Error("record missing"), { code: "LDE-RECORD-MISSING" }));
+  assert.equal(coded.output.code, "SCF-INTERNAL");
+  assert.equal(coded.output.detail, "LDE-RECORD-MISSING: record missing");
+  const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-d173-"));
+  try {
+    const real = runSessionCriticFinalizerCli(["finalize", "--root", join(root, "missing"), "--request", "scratch/r.json"]);
+    assert.equal(real.output.code, "SCF-INTERNAL");
+    assert.match(real.output.detail, /^ENOENT: no such file or directory, [a-z]+ '<path>'$/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("D173 a detail never carries an absolute path", () => {
+  const result = d173Cli(new Error("failed reading /home/user/secret/file.json and C:\\Users\\x\\y.txt today"));
+  assert.equal(result.output.code, "SCF-INTERNAL");
+  assert.equal(result.output.detail, "failed reading <path> and <path> today");
+  assert.doesNotMatch(result.output.detail, /\/home|C:\\/u);
+});
+
+test("D173 a detail uses only the first line and is capped at 200 characters", () => {
+  const result = d173Cli(new Error(`${"x".repeat(300)}\nsecond line SECRET`));
+  assert.equal(result.output.detail.length, 200);
+  assert.doesNotMatch(result.output.detail, /SECRET/u);
+  const spaced = d173Cli(new Error("a   b\t c\nrest"));
+  assert.equal(spaced.output.detail, "a b c");
+});
+
+test("D173 a typed error keeps its code and gains a detail only when its message differs from the code", () => {
+  const same = new SessionCriticFinalizerError("SCF-D173-TYPED");
+  Object.defineProperty(same, "message", { value: "SCF-D173-TYPED" });
+  const typed = d173Cli(same);
+  assert.equal(typed.exitCode, 2);
+  assert.equal(typed.output.code, "SCF-D173-TYPED");
+  assert.equal(Object.hasOwn(typed.output, "detail"), false);
+  const usage = runSessionCriticFinalizerCli(["finalize", "--root", "x"]);
+  assert.equal(usage.output.code, "SCF-USAGE");
+  assert.equal(usage.output.schema, SESSION_CRITIC_CLI_ERROR_SCHEMA);
+  assert.equal(usage.output.detail, "SCF-USAGE: Session Critic finalization is invalid.");
+});
+
+test("D173 an output without a detail is byte-identical to the old shape", () => {
+  const batch = Object.assign(new Error("CGB-D173"), { name: "GenericCriticBatchError", code: "CGB-D173" });
+  assert.equal(JSON.stringify(d173Cli(batch).output), `{"schema":"${D173_ERROR_SCHEMA}","status":"rejected","code":"CGB-D173"}`);
+  assert.equal(SESSION_CRITIC_CLI_ERROR_SCHEMA, D173_ERROR_SCHEMA);
+});
+
 test("a foreign failure inside the generic batch keeps CGB-PHYSICAL and surfaces its original cause", () => {
   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-cause-"));
   try {

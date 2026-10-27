@@ -744,15 +744,45 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
     const result = finalizeSessionCriticReview({ ...common, verdict }, deps);
     return Object.freeze({ exitCode: result.status === "completed" ? 0 : 2, output: result });
   } catch (error) {
+    const typed = error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError";
+    const detail = describeCliError(error);
     return Object.freeze({
       exitCode: 2,
       output: Object.freeze({
         schema: SESSION_CRITIC_CLI_ERROR_SCHEMA,
         status: "rejected",
-        code: error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError" ? error.code : "SCF-INTERNAL",
+        code: typed ? error.code : "SCF-INTERNAL",
+        ...(detail === null ? {} : { detail }),
       }),
     });
   }
+}
+
+const CLI_ERROR_CODE = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/u;
+
+/** Pure: a bounded, path-free cause line for a CLI rejection, or null when none is worth adding. */
+export function describeCliError(error) {
+  const typed = error instanceof SessionCriticFinalizerError || error?.name === "GenericCriticBatchError";
+  let rawCode = null;
+  let rawMessage = null;
+  try {
+    rawCode = error?.code;
+    rawMessage = error?.message;
+  } catch { /* a hostile getter yields no detail source */ }
+  const message = typeof rawMessage === "string" ? rawMessage : "";
+  const first = message.split(/\r?\n/u)[0]
+    .replace(/(?:[A-Za-z]:\\|\/)[^\s'"`]*/gu, "<path>")
+    .replace(/\s+/gu, " ").trim().slice(0, 200);
+  if (typed) {
+    if (first === "" || message === rawCode) return null;
+    return typeof rawCode === "string" && CLI_ERROR_CODE.test(rawCode) ? `${rawCode}: ${first}` : first;
+  }
+  const code = typeof rawCode === "string" && CLI_ERROR_CODE.test(rawCode) ? rawCode : null;
+  if (code !== null) return first === "" ? code : `${code}: ${first}`;
+  if (first !== "") return first;
+  let name = "unknown";
+  try { name = typeof error?.constructor?.name === "string" && error.constructor.name !== "" ? error.constructor.name : "unknown"; } catch { /* keep unknown */ }
+  return `untyped error: ${name}`;
 }
 
 export const __test = Object.freeze({ buildResult, receiptFor, validateResult });
