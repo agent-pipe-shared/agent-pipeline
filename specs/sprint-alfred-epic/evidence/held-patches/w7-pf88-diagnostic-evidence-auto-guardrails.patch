@@ -1,0 +1,121 @@
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index d314f24c0..20371fc14 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -112,3 +112,65 @@ test("D167-PF78 (4) the shared predicate agrees with the producer for a table of
+     assert.ok(refused.code === "FPR-DIAG-PATH" || refused.code === "FPR-MANIFEST-MISSING", JSON.stringify(refused));
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
++// PF-88 slice 2: --base derives the required guardrails instead of the operator naming them.
++import { createHash } from "node:crypto";
++const MANIFEST_JSON = ".claude/pipeline.json";
++function commitAll(root, message) {
++  git(root, ["add", "-f", "."]);
++  git(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", message]);
++  return git(root, ["rev-parse", "HEAD"]);
++}
++function derivedFixture() {
++  const f = fixture();
++  mkdirSync(join(f.root, ".claude"), { recursive: true });
++  mkdirSync(join(f.root, "governance", "guidelines"), { recursive: true });
++  mkdirSync(join(f.root, "governance", "policies"), { recursive: true });
++  writeFileSync(join(f.root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++  writeFileSync(join(f.root, "governance", "guidelines", "review.md"), "Review changed code.\n");
++  writeFileSync(join(f.root, "governance", "policies", "checklist.md"), "- verify\n");
++  const base = commitAll(f.root, "base");
++  writeFileSync(join(f.root, MANIFEST_JSON), "{}\n");
++  const candidate = commitAll(f.root, "change the JSON manifest");
++  return { ...f, base, candidate: { commit: candidate, tree: git(f.root, ["rev-parse", "HEAD^{tree}"]) } };
++}
++const baseOptions = (f, extra = {}) => ({ root: f.root, specPath: "spec.md", guardrailPaths: [], baseRef: f.base, command: [process.execPath, "-e", "process.exit(0)"], logPath: "evidence/derived.log", ...extra });
++test("PF88-S2 (i) the CLI with --base and no --guardrail hashes the changed JSON manifest and the output validates", () => {
++  const f = derivedFixture();
++  try {
++    const script = resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs");
++    const args = [script, "--root", f.root, "--spec", "spec.md", "--base", f.base, "--log", "evidence/d.log", "--out", "evidence/d.json", "--", process.execPath, "-e", "process.exit(0)"];
++    const result = spawnSync(process.execPath, args, { encoding: "utf8" });
++    assert.equal(result.status, 0, result.stderr);
++    const value = JSON.parse(readFileSync(join(f.root, "evidence/d.json"), "utf8"));
++    const manifest = value.guardrails.find(g => g.path === MANIFEST_JSON);
++    assert.ok(manifest, JSON.stringify(value.guardrails));
++    assert.equal(manifest.sha256, createHash("sha256").update("{}\n").digest("hex"));
++    assert.ok(value.guardrails.some(g => g.path === ".claude/pipeline.yaml"));
++    assert.doesNotThrow(() => validateCriticDiagnostic(value, { root: f.root, candidate: f.candidate, spec: value.spec, guardrails: value.guardrails }));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("PF88-S2 (ii) explicit --guardrail plus derived is a deduplicated sorted union", () => {
++  const f = derivedFixture();
++  try {
++    const value = produceCriticDiagnostic(baseOptions(f, { guardrailPaths: ["guard.md", MANIFEST_JSON] }));
++    const paths = value.guardrails.map(g => g.path);
++    assert.deepEqual(paths, [...new Set(paths)].sort());
++    assert.ok(paths.includes("guard.md"));
++    assert.equal(paths.filter(p => p === MANIFEST_JSON).length, 1);
++    assert.ok(paths.includes("governance/policies/checklist.md"));
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("PF88-S2 (iii) without a base the guardrail set is exactly the explicit one", () => {
++  const f = derivedFixture();
++  try {
++    const value = produceCriticDiagnostic(baseOptions(f, { baseRef: undefined, guardrailPaths: ["guard.md"] }));
++    assert.deepEqual(value.guardrails.map(g => g.path), ["guard.md"]);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
++test("PF88-S2 (iv) a base that is not a commit fails closed with a typed error", () => {
++  const f = derivedFixture();
++  try {
++    assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: "no-such-ref" })), /CDI-BASE/u);
++    assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: `${f.candidate.tree}` })), /CDI-BASE/u);
++  } finally { rmSync(f.root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+index 37b944434..223cd1379 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-producer.mjs
+@@ -11,6 +11,7 @@ import {
+   readDiagnosticArtifact,
+   validateCriticDiagnostic,
+ } from "./critic-diagnostic-evidence.mjs";
++import { deriveRequiredCriticGuardrails } from "./critic-required-guardrails.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ function fail(code) { const error = new Error(code); error.code = code; throw error; }
+@@ -34,8 +35,15 @@ function source(root, candidate, path) {
+ }
+ 
+ /** Execute, capture and bind an actual targeted run. No caller-supplied success flag. */
+-export function produceCriticDiagnostic({ root, candidate = "HEAD", specPath, guardrailPaths = [], command, label = "targeted-check", logPath, fullVerifyPath = null, pending = [] }) {
++export function produceCriticDiagnostic({ root, candidate = "HEAD", baseRef = undefined, specPath, guardrailPaths = [], command, label = "targeted-check", logPath, fullVerifyPath = null, pending = [] }) {
+   const bound = candidateBinding(root, candidate);
++  if (baseRef !== undefined) {
++    let base;
++    try { base = git(root, ["rev-parse", "--verify", `${baseRef}^{commit}`]).trim(); } catch { fail("CDI-BASE"); }
++    if (!OID.test(base)) fail("CDI-BASE");
++    try { guardrailPaths = deriveRequiredCriticGuardrails({ root, candidate: bound.commit, base, explicitGuardrails: guardrailPaths }).paths; }
++    catch (error) { fail(error?.code ?? "CDI-GUARDRAIL-DERIVATION"); }
++  }
+   if (git(root, ["rev-parse", "HEAD"]).trim() !== bound.commit || git(root, ["diff", "--name-only", bound.commit, "--"]).trim() !== "") fail("CDI-DIRTY-CANDIDATE");
+   newDiagnosticPath(root, logPath);
+   if (diagnosticEvidenceLocation(logPath) === null || !Array.isArray(command) || command.length === 0) fail("CDI-CAPTURE-INPUT");
+diff --git a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+index b00d11707..f1ddcc3c5 100644
+--- a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+@@ -8,7 +8,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ 
+ export function runCriticDiagnosticCli(argv) {
+   const split = argv.indexOf("--");
+-  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS");
++  if (split < 0) throw new Error("Usage: critic-diagnostic-evidence --root ROOT --spec PATH --log evidence/LOG --out evidence/JSON [--candidate REF] [--base REF] [--guardrail PATH] [--full-verify PATH] [--pending ID] -- COMMAND ARGS");
+   const options = { guardrailPaths: [], pending: [], command: argv.slice(split + 1) };
+   let out;
+   for (let i = 0; i < split; i += 2) {
+@@ -18,7 +18,7 @@ export function runCriticDiagnosticCli(argv) {
+     else if (flag === "--pending") options.pending.push(value);
+     else if (flag === "--out") out = value;
+     else {
+-      const key = { "--root": "root", "--spec": "specPath", "--log": "logPath", "--candidate": "candidate", "--full-verify": "fullVerifyPath", "--label": "label" }[flag];
++      const key = { "--root": "root", "--spec": "specPath", "--log": "logPath", "--candidate": "candidate", "--base": "baseRef","--full-verify": "fullVerifyPath", "--label": "label" }[flag];
+       if (!key || Object.hasOwn(options, key)) throw new Error("Unknown or duplicate argument");
+       options[key] = value;
+     }
