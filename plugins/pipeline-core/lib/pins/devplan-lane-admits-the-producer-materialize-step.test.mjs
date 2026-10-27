@@ -24,7 +24,7 @@ const action = Object.freeze({ kind: 'command', executable: 'node',
 const observed = Object.freeze({ schema: 'pipeline.project-onboarding.v4', status: 'partial', root,
   intent: 'session', diagnostics: [], nextAction: action });
 const commandFor = value => [value.executable, ...value.argv].map(word => JSON.stringify(word)).join(' ');
-function dependencies(observation = observed) {
+function dependencies(observation = observed, lifecycleStatus = 'approved') {
   return {
     inspectProjectOnboardingV3Fn(input) {
       assert.equal(input.rootDir, root);
@@ -32,7 +32,7 @@ function dependencies(observation = observed) {
     },
     devPlanGateVerdictFn(input) {
       assert.equal(input.projectDir, root);
-      return { verdict: 'block', reason: 'fixture approved lifecycle', lifecycleStatus: 'approved' };
+      return { verdict: 'block', reason: `fixture ${lifecycleStatus} lifecycle`, lifecycleStatus };
     },
   };
 }
@@ -67,6 +67,57 @@ check('interpreter version probes stay admitted', () => {
 check('node scratch script with an extra argument is not admitted', () => {
   const hit = devPlanShellRefusalHit('node scratch/x.mjs extra-arg', root, dependencies());
   assert.notEqual(hit, null, `node scratch with extra arg admitted: lane returned ${JSON.stringify(hit)}`);
+});
+
+// D166-PH (recon scratch/wave3/recon-draft-guard-recovery-wrappers.md; PO 2026-10-27): the read-only
+// `phoenix-authority-revision.mjs plan` argv crosses the blocking devplan lane in draft and approved;
+// `apply` and every widening of the argv stay refused. An absolute external --directory without a dot
+// segment or NUL is admitted.
+const phoenixScript = fileURLToPath(new URL('../../scripts/phoenix-authority-revision.mjs', import.meta.url));
+const approvalScript = fileURLToPath(new URL('../../scripts/phoenix-authority-approval.mjs', import.meta.url));
+const externalDirectory = join(repository, '..', 'phoenix-external-fixture').replace(/\\/gu, '/');
+const phoenix = (words, script = phoenixScript) => [ 'node', script, ...words ].map(word => JSON.stringify(word)).join(' ');
+const planWords = (extra = []) => ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'scratch/p.json', ...extra];
+for (const status of ['draft', 'approved']) {
+  check(`${status}: phoenix plan with an external directory is admitted`, () => {
+    const hit = devPlanShellRefusalHit(phoenix(planWords()), root, dependencies(observed, status));
+    assert.equal(hit, null, `unexpected hit: ${JSON.stringify(hit)}`);
+  });
+  check(`${status}: phoenix plan with --out under scratch/ is admitted`, () => {
+    const hit = devPlanShellRefusalHit(phoenix(planWords(['--out', 'scratch/plan.json'])), root, dependencies(observed, status));
+    assert.equal(hit, null, `unexpected hit: ${JSON.stringify(hit)}`);
+  });
+  check(`${status}: phoenix apply and every widened plan argv stay refused`, () => {
+    const bad = [
+      ['apply', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'scratch/p.json'],
+      planWords(['--lock-token', 'abcdefgh']), planWords(['--request-file', 'scratch/r.json']), planWords(['--request-sha256', 'a'.repeat(64)]),
+      ['plan', '--repo-root', join(repository, 'other'), '--directory', externalDirectory, '--proposal-file', 'scratch/p.json'],
+      ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'docs/p.json'],
+      ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', '/etc/p.json'],
+      ['plan', '--repo-root', root, '--directory', externalDirectory, '--proposal-file', 'scratch/../p.json'],
+      planWords(['--out', 'docs/x.json']), planWords(['--out', 'scratch/../x.json']), planWords(['--out', 'scratch/a.json', '--out', 'scratch/b.json']),
+      [...planWords(), 'extra'], planWords(['--unknown', 'x']),
+      ['plan', '--repo-root', root, '--proposal-file', 'scratch/p.json'],
+      ['plan', '--repo-root', root, '--directory', 'relative/dir', '--proposal-file', 'scratch/p.json'],
+      ['plan', '--repo-root', root, '--directory', `${externalDirectory}/../x`, '--proposal-file', 'scratch/p.json'],
+    ];
+    for (const words of bad) {
+      assert.notEqual(devPlanShellRefusalHit(phoenix(words), root, dependencies(observed, status)), null, `admitted: ${words.join(' ')}`);
+    }
+  });
+  check(`${status}: the neighbouring phoenix approval script stays refused`, () => {
+    assert.notEqual(devPlanShellRefusalHit(phoenix(planWords(), approvalScript), root, dependencies(observed, status)), null);
+  });
+  check(`${status}: materialize-architecture stays admitted`, () => {
+    assert.equal(devPlanShellRefusalHit(commandFor(action), root, dependencies(observed, status)), null);
+  });
+}
+check('phoenix script usage names --out and the bounded --lock-token', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const result = spawnSync(process.execPath, [phoenixScript, 'plan'], { encoding: 'utf8', shell: false });
+  const text = `${result.stdout}${result.stderr}`;
+  assert.match(text, /--out <scratch/u);
+  assert.match(text, /--lock-token <8-128 chars>/u);
 });
 
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 16384 });

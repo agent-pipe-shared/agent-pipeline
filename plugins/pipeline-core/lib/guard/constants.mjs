@@ -195,6 +195,8 @@ export const REGISTER_FEATURE_PACKAGE_SCRIPT = fileURLToPath(new URL("../../scri
 export const ARCHITECTURE_BASELINE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-baseline.mjs", import.meta.url));
 // D165 (S1): the brownfield adoption route the preflight publishes; each is admitted by an exact argv grammar in command-catalogue.mjs.
 export const ARCHITECTURE_ADOPTION_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-adoption.mjs", import.meta.url));
+// D166-PH: the read-only `plan` form of the proof-gated Phoenix authority revision wrapper (command-catalogue.mjs).
+export const PHOENIX_AUTHORITY_REVISION_SCRIPT = fileURLToPath(new URL("../../scripts/phoenix-authority-revision.mjs", import.meta.url));
 export const ARCHITECTURE_MEASURE_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-measure.mjs", import.meta.url));
 export const ARCHITECTURE_FITNESS_SCRIPT = fileURLToPath(new URL("../../scripts/architecture-fitness.mjs", import.meta.url));
 
