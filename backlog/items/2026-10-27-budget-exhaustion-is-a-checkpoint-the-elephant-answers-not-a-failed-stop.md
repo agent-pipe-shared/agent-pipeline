@@ -28,19 +28,23 @@ control; the pipeline handles it as a fault.
 1. A typed outcome `checkpoint` in the return contract (`pipeline.native-goldfish-host-return.v1`), next to `succeeded`
    and `blocked`: it carries the progress facts (calls used, patch or notes written, what remains, a continuation card).
    It is NOT a failure: no stop-failure record, the pending state and the slice reservation stay live.
-2. The Elephant answers a checkpoint with one of: continue (the same agent is resumed with its context through
-   `SendMessage`, with a stated extension), or abort (cancel with a class). A checkpoint without an answer never blocks
-   other work; the Elephant's answer is the only transition.
-3. A hard ceiling stays: a bounded number of extensions per slice (the default is two) and an absolute call cap, then the
-   Elephant must choose abort or re-slice. "Never stops" is replaced by "never stops silently and never fails on its own
-   pacing".
-4. Progress-based extension: an extension is offered only if the checkpoint names a durable artefact written since the
-   last one (a patch, a notes file, a red test) or a measured blocker. Re-reading the same sources twice without an
-   artefact is reported as a stall, not extended.
+2. SEAMLESS PROGRESS IS THE DEFAULT (PO refinement 2026-10-27): the checkpoint is a notice to the Elephant, not a gate.
+   The dispatch keeps running into the next budget window by itself; nobody has to answer for it to continue. The
+   Elephant's only job is to notice staleness: on each notice it checks whether a diff or durable artefact emerged since
+   the previous one (patch, notes file, red test, changed paths). Diff present: nothing to do. No diff: the Elephant may
+   abort at will (cancel with a class). Abort is the exception path; continue is the silent default.
+3. Staleness is detected mechanically so the Elephant's check is one glance: the notice carries "changed paths since the
+   last checkpoint" and "calls since the last new artefact". A window with no new artefact is marked `stalled` in the
+   notice; a stalled dispatch pauses itself (it does not fail) and waits for the Elephant's continue or abort, because only
+   then does silence stop being safe.
+4. A high absolute call cap stays as a runaway backstop, not as a pacing tool; reaching it is a `checkpoint` of kind
+   `ceiling` that needs an explicit continue. It counts windows, not only calls. "Never stops" is replaced by "never fails
+   on its own pacing and never burns budget silently without an artefact".
 5. The briefing generator records the budget as soft limit, extension count and hard ceiling, so the dispatch text says
    what the agent does at the checkpoint (return `checkpoint`, wait for the answer) instead of "stop".
 6. Regression: a Goldfish that returns `checkpoint` leaves the registry readable and the next `heal`/dispatch admitted;
-   an unanswered checkpoint is listed by the inspect report; an extension beyond the ceiling is refused.
+   an unanswered notice never blocks and the dispatch continues; a `stalled` pause is listed by the inspect report; the
+   absolute cap pauses and is refused past an explicit continue.
 
 ## Open measurements
 
