@@ -13,7 +13,9 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **221 items:194 at75,16 at50,11 at25;27 below75;index70.70%** (D173,
+contains **221 items:194 at75,24 at50,3 at25;27 below75;index71.61%** (analysis
+amendment, 2026-10-27: eight analysed rows moved 25 to50 on committed recon notes and
+unapplied held patches, see `evidence/recon-2026-10-27`; D173,
 2026-10-27: PF-80 moved to75, held patch D173 applied in `e3f0d7d03`, installed in
 the stamp `e562ae955`; D172,
 2026-10-27: PO rule "75 counts when technically delivered in the candidate"; Full

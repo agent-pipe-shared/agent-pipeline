@@ -6,7 +6,7 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955.",
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed.",
   "total": 221,
   "baseline": {
     "counts": {
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 11,
-      "50": 16,
+      "25": 3,
+      "50": 24,
       "75": 194,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 70.7
+    "index": 71.61
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -7523,14 +7523,16 @@
     {
       "itemId": "pipeline.preflight-establishes-runner-prerequisites",
       "title": "Preflight establishes node, semgrep, osv-scanner and gitleaks with the user instead of only reporting them",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "PO decision D164 (3); observed on the WSL PC: node only under fnm, osv-scanner and gitleaks absent, missing scanners count as SKIPPED and clean, and the node probe judges only the preflight's own node. Analyzed and recorded; no implementation is claimed.",
+      "reason": "PO decision D164 (3); observed on the WSL PC: node only under fnm, osv-scanner and gitleaks absent, missing scanners count as SKIPPED and clean, and the node probe judges only the preflight's own node. Analyzed (read-only recon, 2026-10-27) with the slice boundaries named; the node-probe part is a held patch (w7-node-stable-probe, not applied); no implementation is claimed.",
       "evidence": [
         "backlog/items/2026-10-26-preflight-establishes-runner-prerequisites.md",
-        "specs/sprint-alfred-epic/plans/po-decisions-2026-10-25-fix-wave.md"
+        "specs/sprint-alfred-epic/plans/po-decisions-2026-10-25-fix-wave.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-preflight-runner-prerequisites.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-node-stable-probe.notes.md"
       ],
       "open": [
         {
@@ -7562,13 +7564,15 @@
     {
       "itemId": "pipeline.consumer-push-blocked-by-late-review-unit",
       "title": "A review unit added after delivery still admits a Critic range over the delivered code, so the consumer can push",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (PF-75, PF-58 addendum 2) on the D163 hotfix candidate; recorded, interim-candidate priority (D165); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (PF-75, PF-58 addendum 2) on the D163 hotfix candidate; analyzed (read-only recon, 2026-10-27) and the mainRef part is a held patch (w7-mainref-ancestor, not applied); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-consumer-push-blocked-by-late-review-unit.md"
+        "backlog/items/2026-10-26-consumer-push-blocked-by-late-review-unit.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-late-review-unit-push-block.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-mainref-ancestor.notes.md"
       ],
       "open": [
         {
@@ -7598,13 +7602,15 @@
     {
       "itemId": "pipeline.brownfield-architecture-gate-never-passes",
       "title": "A brownfield project reaches implementation: the architecture entry gate can pass after adoption or migration",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; likely interaction with the D162 patches; recorded, interim-candidate priority (D165); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; analyzed (read-only recon of the remainder, 2026-10-27) with part patches held (D165 patches, d179, w7-brownfield-e2e-regression, not applied); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-brownfield-architecture-gate-never-passes.md"
+        "backlog/items/2026-10-26-brownfield-architecture-gate-never-passes.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-brownfield-gate-remainder.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-brownfield-e2e-regression.notes.md"
       ],
       "open": [
         {
@@ -7747,13 +7753,15 @@
     {
       "itemId": "pipeline.missing-docs-adr-directory-blocks-implementation-entry",
       "title": "A project without docs/adr reaches implementation",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D8; workaround: empty docs/adr with .gitkeep. Recorded (D166); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D8; workaround: empty docs/adr with .gitkeep. Analyzed (read-only recon, 2026-10-27); the fix is a held patch (d179-missing-adr-directory-is-no-decisions, not applied); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-missing-docs-adr-directory-blocks-implementation-entry.md"
+        "backlog/items/2026-10-26-missing-docs-adr-directory-blocks-implementation-entry.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-d179-adr-missing.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/d179-missing-adr-directory-is-no-decisions.patch"
       ],
       "open": [
         {
@@ -7783,13 +7791,14 @@
     {
       "itemId": "pipeline.fitness-class-6-blocks-documentation-modules-without-a-verification-entry",
       "title": "Fitness class 6 does not block documentation modules that have no verification entry point",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D9; workaround: a thin CI entry point that cost a second adoption signature. Recorded (D166); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D9; workaround: a thin CI entry point that cost a second adoption signature. Analyzed (read-only recon, 2026-10-27); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-fitness-class-6-blocks-documentation-modules-without-a-verification-entry.md"
+        "backlog/items/2026-10-26-fitness-class-6-blocks-documentation-modules-without-a-verification-entry.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-fitness-class6.md"
       ],
       "open": [
         {
@@ -7819,13 +7828,16 @@
     {
       "itemId": "pipeline.half-moved-feature-directory-locks-every-shell-and-source-write",
       "title": "A half-moved feature directory leaves the repair path open: the guard admits repair commands and the EL-01 tripwire reads the bound spec path",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D14/D18; workaround: the PO runs git mv in the own terminal. Recorded (D166); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D14/D18; workaround: the PO runs git mv in the own terminal. Analyzed (read-only recon, 2026-10-27); the fix is two held patches (w7-tripwire-scratch-unreadable-spec, w7-half-moved-repair-lane, not applied; PowerShell parity open); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-half-moved-feature-directory-locks-every-shell-and-source-write.md"
+        "backlog/items/2026-10-26-half-moved-feature-directory-locks-every-shell-and-source-write.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-half-moved-feature-directory.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-tripwire-scratch-unreadable-spec.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-half-moved-repair-lane.notes.md"
       ],
       "open": [
         {
@@ -7855,13 +7867,15 @@
     {
       "itemId": "pipeline.draft-guard-blocks-the-sanctioned-recovery-wrappers",
       "title": "The draft guard admits the sanctioned recovery wrappers (Phoenix plan/apply, materialize-architecture) in exact argv shapes",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D21 and the open rest of D3; workaround: the PO runs the wrappers in the own terminal. Recorded (D166); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D21 and the open rest of D3; workaround: the PO runs the wrappers in the own terminal. Analyzed (read-only recon, 2026-10-27); the plan argv part is a held patch (w7-phoenix-plan-admission, not applied; apply stays refused by PO decision); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-26-draft-guard-blocks-the-sanctioned-recovery-wrappers.md"
+        "backlog/items/2026-10-26-draft-guard-blocks-the-sanctioned-recovery-wrappers.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-draft-guard-recovery-wrappers.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-phoenix-plan-admission.notes.md"
       ],
       "open": [
         {
@@ -7927,13 +7941,15 @@
     {
       "itemId": "pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have",
       "title": "The Critic packet admission has an honest route for a project without dispatch history and the dispatch record producer is documented where the consumer looks",
-      "stage": "25",
+      "stage": "50",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-27 (Glossover, PF-79) on 0.7.0+claude.20261026222010.17e002a: packet-ready, but admission demands a dispatch record the project cannot honestly have; no signed push without the Critic. Recorded; recon slice D172 dispatched; no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-27 (Glossover, PF-79) on 0.7.0+claude.20261026222010.17e002a: packet-ready, but admission demands a dispatch record the project cannot honestly have; no signed push without the Critic. Analyzed (read-only recon, 2026-10-27); the refusal text is a held patch (w7-d176-pf79-refusal, not applied); no implementation is claimed.",
       "evidence": [
-        "backlog/items/2026-10-27-critic-admission-requires-a-dispatch-record-a-project-cannot-have.md"
+        "backlog/items/2026-10-27-critic-admission-requires-a-dispatch-record-a-project-cannot-have.md",
+        "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-pf79-critic-admission.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-d176-pf79-refusal.notes.md"
       ],
       "open": [
         {
