@@ -217,6 +217,90 @@ test("AC-108: the start preflight reports a sandbox-unreachable node with a type
   assert.equal(observeNodeSandboxProbe({ execPath: "", spawn: () => ok }).status, "unknown");
 });
 
+// Wanted 3 (pipeline.preflight-establishes-runner-prerequisites): the probe reports whether a stable node exists
+// beside a version-manager node, so "running under fnm" and "no stable node anywhere" are told apart.
+const FNM_NODE = "/home/u/.local/share/fnm/node-versions/v22/installation/bin/node";
+async function nodeProbe() {
+  return (await import(pathToFileURL(join(REPO, "plugins/pipeline-core/lib/node-sandbox-probe.mjs")).href)).observeNodeSandboxProbe;
+}
+
+test("Wanted 3 (a): under a version manager, an existing runnable stable candidate is reported as stableNode.found while status stays version-manager-path", async () => {
+  const probe = await nodeProbe();
+  const calls = [];
+  const result = probe({
+    execPath: FNM_NODE, platform: "linux",
+    exists: (p) => p === "/usr/bin/node",
+    spawn: (cmd, args, opts) => { calls.push({ cmd, args, opts }); return { status: 0, stdout: "v22.0.0\n" }; },
+  });
+  assert.equal(result.status, "version-manager-path");
+  assert.equal(result.ready, false);
+  assert.deepEqual(result.stableNode, { found: true, path: "/usr/bin/node" });
+  const candidate = calls.find((c) => c.cmd === "/usr/bin/node");
+  assert.ok(candidate, "the stable candidate is run with --version");
+  assert.deepEqual(candidate.args, ["--version"]);
+  assert.equal(candidate.opts.shell, false);
+  assert.ok(candidate.opts.timeout > 0 && candidate.opts.timeout <= 3_000, "the candidate spawn is bounded");
+});
+
+test("Wanted 3 (b): with no stable candidate the probe stays not ready, keeps the typed code and gives a remedy without sudo or a pinned version", async () => {
+  const probe = await nodeProbe();
+  const result = probe({ execPath: FNM_NODE, platform: "linux", exists: () => false, spawn: () => ({ status: 0, stdout: "v22.0.0\n" }) });
+  assert.equal(result.status, "version-manager-path");
+  assert.equal(result.ready, false);
+  assert.equal(result.code, "NODE-SANDBOX-UNREACHABLE");
+  assert.deepEqual(result.stableNode, { found: false });
+  assert.equal(typeof result.remedy, "string");
+  assert.doesNotMatch(result.remedy, /sudo/iu);
+  assert.doesNotMatch(result.remedy, /\bv?\d+\.\d+(?:\.\d+)?\b/u, "no pinned version in the remedy");
+});
+
+test("Wanted 3 (c): on win32 the stable candidate is the injected ProgramFiles nodejs\\node.exe", async () => {
+  const probe = await nodeProbe();
+  const wanted = "C:\\Program Files\\nodejs\\node.exe";
+  const result = probe({
+    execPath: "C:\\Users\\u\\AppData\\Local\\fnm_multishells\\1\\node.exe", platform: "win32",
+    env: { ProgramFiles: "C:\\Program Files" },
+    exists: (p) => p === wanted,
+    spawn: () => ({ status: 0, stdout: "v22.0.0\n" }),
+  });
+  assert.equal(result.status, "version-manager-path");
+  assert.deepEqual(result.stableNode, { found: true, path: wanted });
+});
+
+test("Wanted 3 (d): a candidate that exists but fails or times out --version is not found and the probe is never ready", async () => {
+  const probe = await nodeProbe();
+  const failing = probe({
+    execPath: FNM_NODE, platform: "linux", exists: () => true,
+    spawn: (cmd) => (cmd === FNM_NODE ? { status: 0, stdout: "v22.0.0\n" } : { status: null, error: new Error("ETIMEDOUT") }),
+  });
+  assert.deepEqual(failing.stableNode, { found: false });
+  assert.equal(failing.ready, false);
+  const nonzero = probe({
+    execPath: FNM_NODE, platform: "linux", exists: () => true,
+    spawn: (cmd) => (cmd === FNM_NODE ? { status: 0, stdout: "v22.0.0\n" } : { status: 1 }),
+  });
+  assert.deepEqual(nonzero.stableNode, { found: false });
+  assert.equal(nonzero.ready, false);
+});
+
+test("Wanted 3 (e): a stable execPath scans no candidates (one spawn) and carries no stableNode", async () => {
+  const probe = await nodeProbe();
+  let spawns = 0;
+  const result = probe({ execPath: "/usr/bin/node", platform: "linux", exists: () => true, spawn: () => { spawns += 1; return { status: 0, stdout: "v22.0.0\n" }; } });
+  assert.equal(result.status, "stable-path");
+  assert.equal(result.ready, true);
+  assert.equal(spawns, 1);
+  assert.equal(Object.hasOwn(result, "stableNode"), false);
+});
+
+test("Wanted 3 (f): the probe never throws when the existence check throws", async () => {
+  const probe = await nodeProbe();
+  const result = probe({ execPath: FNM_NODE, platform: "linux", exists: () => { throw new Error("EACCES"); }, spawn: () => ({ status: 0, stdout: "v22.0.0\n" }) });
+  assert.equal(result.ready, false);
+  assert.equal(result.status, "version-manager-path");
+  assert.deepEqual(result.stableNode, { found: false });
+});
+
 // ---------------------------------------------------------------------------
 // Added 0.7.0 acceptance (2026-10-22 measurement): the main agent can update the calibrated handover
 // (docs/state.md) through an admitted route in every phase, and Critic, Advisor and Verify have an
