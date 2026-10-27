@@ -1,0 +1,90 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
+index 3f644032e..24b231d5d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget-grant-notice.test.mjs
+@@ -14,7 +14,8 @@ import { execFileSync, spawnSync } from "node:child_process";
+ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+ import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { appendGrant } from "../lib/dispatch-budget-core.mjs";
+-import { checkpointNoticeText, grantStateSentence } from "../lib/dispatch-budget-notice.mjs";
++import { checkpointNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
++import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "../lib/native-goldfish-host-return.mjs";
+ import { grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -287,7 +288,37 @@ test("PF-64: the grant script's success result carries a continuationMessage nam
+ test("PF-69: the native-host checkpoint lets a child whose every targeted check is green return succeeded, otherwise blocked with the interim report", () => {
+   const text = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
+   assert.match(text, /if every targeted check of your briefing is already green and no work remains, return the succeeded contract with your report instead of blocked/u);
+-  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "blocked" and an interim report/u);
++  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "checkpoint" \(changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form\) and a report carrying the condensed report plus a continuation card/u);
++  // D31 pin update: validateNativeGoldfishFinal accepts only succeeded|checkpoint, so asserting "blocked" here pinned a refused word.
+   const plain = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: false });
+   assert.doesNotMatch(plain, /succeeded contract/u, "only the native-host variant changes for PF-69");
+ });
++
++// ---- D31 budget notice: the native-host hand-back word must be one the return validator accepts (succeeded | checkpoint).
++const nativeNotice = () => checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
++
++test("D31-BUDGET-NOTICE-1: the native-host checkpoint notice names outcome checkpoint and the continuation card", () => {
++  const text = nativeNotice();
++  assert.match(text, /with outcome: "checkpoint"/u);
++  assert.match(text, /changedPaths/u);
++  assert.match(text, /done \/ remaining \/ next step/u);
++  assert.match(text, /CONTINUATION CARD -- done: \.\.\.; remaining: \.\.\.; next step: \.\.\./u);
++  assert.match(text, /no file changed so far, the plain-text stop report is the only legal form/u);
++});
++
++test("D31-BUDGET-NOTICE-2: no native-host budget text instructs outcome blocked any more", () => {
++  assert.doesNotMatch(nativeNotice(), /outcome: "blocked"/u);
++  for (const remaining of [0, 3]) assert.doesNotMatch(nativeHostBlockedContinuation(remaining), /outcome: "blocked"/u);
++});
++
++test("D31-BUDGET-NOTICE-3: a final built exactly as the notice describes validates against the real return validator with allowCheckpoint", () => {
++  const outcome = /with outcome: "(\w+)"/u.exec(nativeNotice())?.[1];
++  const binding = { dispatchId: "D31-NOTICE", candidateCommit: "a".repeat(40), allowedPaths: ["a.txt", "b.txt"] };
++  const final = JSON.stringify({
++    schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId, candidateCommit: binding.candidateCommit, outcome,
++    report: "done: a; remaining: b; next step: c. CONTINUATION CARD -- done: a; remaining: b; next step: c", changedPaths: ["a.txt", "b.txt"],
++  });
++  const verdict = validateNativeGoldfishFinal(final, { binding, allowCheckpoint: true });
++  assert.equal(verdict.ok, true, JSON.stringify(verdict));
++  assert.equal(verdict.final.outcome, "checkpoint");
++});
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
+index 1251d133d..10bc04504 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch-budget.test.mjs
+@@ -676,7 +676,8 @@ test("ALF-G2B2: under native-host the exhaustion refusal names the host-commit r
+   assert.match(text, /leave all changes uncommitted/u);
+   assert.match(text, /do not write a dispatch record/u);
+   assert.ok(text.includes(NATIVE_RETURN_SCHEMA));
+-  assert.match(text, /outcome: "blocked"/u);
++  // D31 pin update: the return validator accepts only succeeded|checkpoint, so the instructed word is "checkpoint".
++  assert.match(text, /outcome: "checkpoint"/u);
+   assert.doesNotMatch(text, /only these acts are permitted/u);
+   assert.doesNotMatch(text, /goldfish-commit-command-flow/u);
+   assert.doesNotMatch(text, /sanctioned public writer/u);
+@@ -698,7 +699,8 @@ test("ALF-G2B2: the 80 % checkpoint notice branches on the commit mode and stays
+     assert.match(context, /leave all changes uncommitted/u);
+     assert.match(context, /do not write a dispatch record/u);
+     assert.ok(context.includes(NATIVE_RETURN_SCHEMA));
+-    assert.match(context, /outcome: "blocked"/u);
++    // D31 pin update: same validator contract (succeeded|checkpoint only).
++    assert.match(context, /outcome: "checkpoint"/u);
+     assert.doesNotMatch(context, /commit what is already green/u);
+     assert.doesNotMatch(context, /evidence\/dispatch-record-<TASK_ID>/u);
+   }
+diff --git a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+index 7e3b34b28..06983c525 100644
+--- a/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
++++ b/plugins/pipeline-core/lib/dispatch-budget-notice.mjs
+@@ -7,7 +7,7 @@
+ import { CLOSING_ALLOWANCE } from "./dispatch-budget-core.mjs";
+ 
+ export const NATIVE_HOST_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
+-export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "blocked" and an interim report (done / remaining / next step) in its report field`;
++export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "checkpoint" (changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form) and a report carrying the condensed report plus a continuation card (done / remaining / next step) in its report field`;
+ 
+ export function nativeHostBlockedContinuation(remainingClosingCalls) {
+   return remainingClosingCalls > 0
