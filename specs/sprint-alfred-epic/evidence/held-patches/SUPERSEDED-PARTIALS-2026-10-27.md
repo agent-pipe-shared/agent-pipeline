@@ -16,6 +16,14 @@ and must NOT be applied. Apply only the replacement.
 | `w7-d56-binding-assurance.patch` | `w7-d56-binding-assurance-c3.patch` | tests only (CPPA-1 to CPPA-3), no production edit |
 | `w7-d56-binding-assurance-c2.patch` | `w7-d56-binding-assurance-c3.patch` | CPP09 count pin red and no generic-batch kind cases; c3 is complete against the same stack base (D56 slice 4/5 c2 first) |
 | `w7-d56-admit-attested-record.patch` | `w7-d56-admit-attested-record-c2.patch` | CSC-A1 to A5 fixtures were rejected by the real validator (empty log) and no baseline run; c2 is complete and applies at the candidate alone |
+| `w7-pf86-scan-outside-registry-lock.patch` | `w7-pf86-registry-read-api-c6.patch` | interim scan move, superseded by the lock-free read API |
+| `w7-pf86-registry-read-api.patch` | `w7-pf86-registry-read-api-c6.patch` | NGHS46 red |
+| `w7-pf86-registry-read-api-c3.patch` | `w7-pf86-registry-read-api-c6.patch` | duplicate case ids (TCC-CASE-DUPLICATE) and NGHS45 red |
+| `w7-pf86-registry-read-api-c4.patch` | `w7-pf86-registry-read-api-c6.patch` | NGHS45 fixture defect (SQ-OVERLAP), not run to green |
+| `w7-pf86-registry-read-api-c5.patch` | `w7-pf86-registry-read-api-c6.patch` | NGHS45 fixture fix applied but whole-file run missing; c6 holds 56/56 and eight green importer suites |
+| `w7-preflight-scanner-findings.patch` | `w7-preflight-scanner-findings-c2.patch` | interim; c2 is 49/49 against 44/44 |
+| `w7-phoenix-reopen-design-dry-run.patch` | `w7-phoenix-reopen-design-dry-run-c4.patch` | the observer-conformance fixture repository had no commit |
+| `w7-d52-checkpoint-commit-route.patch` | `w7-d52-checkpoint-commit-route-c2.patch` | RED test file without the script; c2 is complete (6/6, 73/73, 42/42) |
 
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.
