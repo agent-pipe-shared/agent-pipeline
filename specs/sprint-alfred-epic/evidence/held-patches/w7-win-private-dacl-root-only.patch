@@ -1,0 +1,212 @@
+diff --git a/plugins/pipeline-core/lib/pins/windows-private-dacl-detail-codes-and-root-only-rule.test.mjs b/plugins/pipeline-core/lib/pins/windows-private-dacl-detail-codes-and-root-only-rule.test.mjs
+new file mode 100644
+index 000000000..08be9014d
+--- /dev/null
++++ b/plugins/pipeline-core/lib/pins/windows-private-dacl-detail-codes-and-root-only-rule.test.mjs
+@@ -0,0 +1,69 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++
++/**
++ * Pin for Toolbox D50 / AC-127 slice W7-WIN-PRIVATE-DACL-ROOT-ONLY: the native private-authority check split into
++ * distinct DACL detail codes, and a root-only rule below a proven-hardened `<gitCommonDir>/agent-pipeline` root.
++ *
++ * Native PowerShell is not runnable on Linux/WSL, so these points pin the SOURCE SHAPE of the helper and the backend
++ * mapping by reading their text. No real Windows ACL is measured here; native qualification stays a PO step.
++ *
++ *   P1. The bare WIN-AUTH-DACL refusal is gone from the helper; four distinct detail codes replace it.
++ *   P2. The detail codes keep WIN-AUTH-DACL as their family: the backend reports reason WIN-AUTH-DACL plus a detail.
++ *   P3. Root-only decision table: below a proven-hardened root the protected-flag and inherited-ACE checks are relaxed;
++ *       the root itself is verified with the strict rule; owner and non-inherited foreign ACEs still fail.
++ *   P4. HELPER_SHA256 equals the digest of the helper bytes.
++ */
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import { readFileSync } from "node:fs";
++import { dirname, resolve } from "node:path";
++import { test } from "node:test";
++import { fileURLToPath } from "node:url";
++
++const LIB = resolve(dirname(fileURLToPath(import.meta.url)), "..");
++const ps1Bytes = readFileSync(resolve(LIB, "windows-owned-authority-native.ps1"));
++const ps1 = ps1Bytes.toString("utf8");
++const backend = readFileSync(resolve(LIB, "windows-owned-authority-backend.mjs"), "utf8");
++const verifyLine = ps1.split("\n").find((line) => line.includes("new RawSecurityDescriptor"));
++
++test("P1 the bare WIN-AUTH-DACL refusal is replaced by four distinct detail codes", () => {
++  assert.ok(verifyLine, "the Verify security-descriptor line exists");
++  assert.equal(/Refuse\("WIN-AUTH-DACL"\)/u.test(ps1), false, "no bare WIN-AUTH-DACL refusal remains");
++  for (const code of ["EMPTY", "UNPROTECTED", "ACE", "FOREIGN"])
++    assert.ok(ps1.includes(`Refuse("WIN-AUTH-DACL-${code}")`), `detail code ${code} is thrown`);
++});
++
++test("P1 each detail code sits on its own condition (empty, unprotected, non-common or callback ACE, foreign SID)", () => {
++  assert.match(verifyLine, /DiscretionaryAcl\.Count==0\)throw Refuse\("WIN-AUTH-DACL-EMPTY"\)/u);
++  assert.match(verifyLine, /DiscretionaryAclProtected\)==0\)throw Refuse\("WIN-AUTH-DACL-UNPROTECTED"\)/u);
++  assert.match(verifyLine, /known==null\|\|known\.IsCallback\)throw Refuse\("WIN-AUTH-DACL-ACE"\)/u);
++  assert.match(verifyLine, /throw Refuse\("WIN-AUTH-DACL-FOREIGN"\)/u);
++});
++
++test("P2 the backend keeps WIN-AUTH-DACL as the reason family and carries the detail separately", () => {
++  assert.match(backend, /error\.reason=detail\?'WIN-AUTH-DACL':reason/u);
++  assert.match(backend, /error\.detail=detail/u);
++  assert.match(backend, /\^WIN-AUTH-DACL-\(\?:EMPTY\|UNPROTECTED\|ACE\|FOREIGN\)\$/u);
++});
++
++test("P3 root-only: a hardened-root helper exists, is verified strictly, and only relaxes the inherited-ACE checks below it", () => {
++  assert.match(ps1, /static string HardenedRoot\(string p\)/u);
++  assert.ok(ps1.includes('".git"') && ps1.includes('"agent-pipeline"'), "the root is the <gitCommonDir>\\agent-pipeline directory");
++  assert.match(verifyLine, /HardenedRoot\(/u);
++  assert.match(verifyLine, /using\(var rootHandle=Open\(hardenedRoot,true,false,true\)\)\{\}/u, "the root is opened through the strict private rule");
++  assert.match(verifyLine, /if\(!below&&\(security\.ControlFlags&ControlFlags\.DiscretionaryAclProtected\)==0\)/u, "the protected flag is only required outside the root");
++  assert.match(verifyLine, /known\.SecurityIdentifier\.Value!=CurrentSid&&!\(below&&known\.IsInherited\)/u, "only inherited foreign ACEs are tolerated, and only below the root");
++  assert.match(verifyLine, /security\.Owner\.Value!=CurrentSid\)throw Refuse\("WIN-AUTH-OWNER"\)/u, "owner stays strict everywhere");
++});
++
++test("P3 decision table: the root itself is never treated as 'below'", () => {
++  const fn = ps1.slice(ps1.indexOf("static string HardenedRoot(string p)"));
++  const body = fn.slice(0, fn.indexOf("\n"));
++  assert.match(body, /i\+1<parts\.Length/u, "a path must have at least one segment after agent-pipeline to count as below it");
++});
++
++test("P4 HELPER_SHA256 equals the digest of the helper bytes", () => {
++  const pinned = /const HELPER_SHA256='([a-f0-9]{64})'/u.exec(backend)?.[1];
++  assert.equal(pinned, createHash("sha256").update(ps1Bytes).digest("hex"));
++});
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+index a6b7c1bec..c7fd03c7d 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.mjs
+@@ -32,6 +32,12 @@ export function windowsAuthorityCause(error) {
+   return NATIVE_REASON.test(error?.reason) ? error.reason : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
+ }
+ 
++const DACL_DETAIL = /^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u;
++/** The closed private-DACL detail behind a WIN-AUTH-DACL family refusal, or null. */
++export function windowsAuthorityDetail(error) {
++  return error?.reason === 'WIN-AUTH-DACL' && DACL_DETAIL.test(error?.detail) ? error.detail : null;
++}
++
+ function guidance(pathClass, reason) {
+   return { kind: 'operator-review', mutation: false,
+     summary: `Inspect the ${pathClass} path for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
+@@ -53,6 +59,7 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+     return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: 'unavailable', causes: [{ pathClass: 'input', reason: 'WIN-AUTH-PATH', nextAction: guidance('input', 'WIN-AUTH-PATH') }] };
+   }
+   const seen = new Map();
++  const details = new Map();
+   const causes = [];
+   for (const [pathClass, target, boundaryRoot] of [
+     ['project', projectRoot, projectRoot], ['plugin', pluginRoot, null], ['private', privateRoot, projectRoot],
+@@ -76,10 +83,17 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
+           const result = probe({ path, boundaryRoot, privatePath, pathClass });
+           reason = observed(result) ? null : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
+         }
+-        catch (error) { reason = windowsAuthorityCause(error); }
++        catch (error) {
++          reason = windowsAuthorityCause(error);
++          const found = windowsAuthorityDetail(error);
++          if (found) details.set(key, found);
++        }
+         seen.set(key, reason);
+       }
+-      if (reason) causes.push({ pathClass, reason, path, nextAction: guidance(pathClass, reason) });
++      if (reason) {
++        const detail = details.get(key);
++        causes.push({ pathClass, reason, ...(detail ? { detail } : {}), path, nextAction: guidance(pathClass, detail ?? reason) });
++      }
+     }
+   }
+   const stateRoot = win32.join(projectRoot, 'project');
+diff --git a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+index 699cf2ffb..2698a97dc 100644
+--- a/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
++++ b/plugins/pipeline-core/lib/windows-authority-readiness.test.mjs
+@@ -2,6 +2,7 @@
+ import assert from 'node:assert/strict';
+ import { createHash } from 'node:crypto';
+ import { registerTestCaseCompletion } from './test-case-completion.mjs';
++import * as readiness from './windows-authority-readiness.mjs';
+ import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
+ import { assessWindowsPrivateRoot } from './windows-private-state.mjs';
+ 
+@@ -193,4 +194,39 @@ test('D168-S7b preflight and runtime judge the private-state root with the same
+   assert.equal(hardened.status, 'ready');
+ });
+ 
++const windowsAuthorityDetail = (error) => readiness.windowsAuthorityDetail(error);
++const DETAILS = ['WIN-AUTH-DACL-EMPTY', 'WIN-AUTH-DACL-UNPROTECTED', 'WIN-AUTH-DACL-ACE', 'WIN-AUTH-DACL-FOREIGN'];
++const privateFailure = (error) => assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
++  probe({ path }) { if (path === roots.privateRoot) throw error; return syntheticObservation(); } });
++
++test('D50 each private DACL detail code surfaces as detail while the reason stays the WIN-AUTH-DACL family', () => {
++  for (const detail of DETAILS) {
++    const result = privateFailure(Object.assign(new Error('closed'), { reason: 'WIN-AUTH-DACL', detail }));
++    const cause = result.causes.find(row => row.path === roots.privateRoot);
++    assert.equal(cause.reason, 'WIN-AUTH-DACL', detail);
++    assert.equal(cause.detail, detail);
++  }
++});
++
++test('D50 a bare WIN-AUTH-DACL refusal stays a family-only cause without a detail key', () => {
++  const result = privateFailure(Object.assign(new Error('closed'), { reason: 'WIN-AUTH-DACL' }));
++  const cause = result.causes.find(row => row.path === roots.privateRoot);
++  assert.equal(cause.reason, 'WIN-AUTH-DACL');
++  assert.equal('detail' in cause, false);
++});
++
++test('D50 a detail outside the closed set is dropped, never copied through', () => {
++  const result = privateFailure(Object.assign(new Error('closed'), { reason: 'WIN-AUTH-DACL', detail: 'WIN-AUTH-DACL-C-USERS-OWNER' }));
++  const cause = result.causes.find(row => row.path === roots.privateRoot);
++  assert.equal(cause.reason, 'WIN-AUTH-DACL');
++  assert.equal('detail' in cause, false);
++});
++
++test('D50 windowsAuthorityDetail returns only a closed DACL detail', () => {
++  assert.equal(windowsAuthorityDetail({ reason: 'WIN-AUTH-DACL', detail: 'WIN-AUTH-DACL-FOREIGN' }), 'WIN-AUTH-DACL-FOREIGN');
++  assert.equal(windowsAuthorityDetail({ reason: 'WIN-AUTH-DACL', detail: 'anything else' }), null);
++  assert.equal(windowsAuthorityDetail({ reason: 'WIN-AUTH-OWNER', detail: 'WIN-AUTH-DACL-EMPTY' }), null);
++  assert.equal(windowsAuthorityDetail(undefined), null);
++});
++
+ registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index 7344234ff..93455237f 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -8,13 +8,13 @@ import {isAbsolute,resolve} from 'node:path';
+ import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
+ import {isSuccessfulSpawn} from './successful-spawn.mjs';
+ 
+-const HELPER_SHA256='d7d910b1da43260399c5f8e75c65c3b17e58b2ca2dc4deddb9afa37f946ba25c';
++const HELPER_SHA256='e53c759fe421781ca45802cf5d96c4a0c2709c8d0490c58972a14b8f68171679';
+ const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
+ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+ const exact=(value,keys)=>object(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
+ const factsPattern=/^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[a-f0-9]{64}$/u;
+-function fail(reason,committed=false){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;error.committed=committed;throw error;}
++function fail(reason,committed=false){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;throw error;}
+ function path(value){if(typeof value!=='string'||!isAbsolute(value)||resolve(value)!==value||value.length>32768||/[\u0000-\u001f]/u.test(value)||value.startsWith('\\\\')||value.slice(2).includes(':'))fail('WIN-AUTH-PATH');return value;}
+ function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>32768||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
+ function invoke(request){
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-native.ps1 b/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+index e2da0ef3c..44047f898 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
++++ b/plugins/pipeline-core/lib/windows-owned-authority-native.ps1
+@@ -141,13 +141,14 @@ public static class PipelineOwnedAuthorityNative {
+  // Private-file and temp handles retain their original exclusive sharing/custody checks.
+  static SafeFileHandle OpenPublicationParent(string p) { Canonical(p);var h=CreateFileW(p,0xC0020000u,3,IntPtr.Zero,3,0x02200000u,IntPtr.Zero);if(h.IsInvalid){h.Dispose();throw Refuse("WIN-AUTH-OPEN");}try{Verify(h,p,true,true);return h;}catch{h.Dispose();throw;} }
+  // Non-private paths are ordinary host/project/source integrity observations: owner and ACL bytes stay hashed into the facts, but their owner or write grants do not gate onboarding or source reads. Private Pipeline authority retains the strict current-SID owner and protected-DACL policy.
++ static string HardenedRoot(string p) { string[] parts=p.Split('\\');for(int i=1;i+1<parts.Length;i++){if(String.Equals(parts[i],"agent-pipeline",StringComparison.OrdinalIgnoreCase)&&String.Equals(parts[i-1],".git",StringComparison.OrdinalIgnoreCase))return String.Join("\\",parts,0,i+1);}return null; }
+  public static string Verify(SafeFileHandle h,string p,bool directory,bool privateOnly,bool sourceImage=false,bool humanControlled=false) {
+   if(sourceImage&&(directory||privateOnly))throw Refuse("WIN-AUTH-INPUT");
+   if(humanControlled&&(privateOnly||sourceImage||!directory))throw Refuse("WIN-AUTH-INPUT");
+   Info i;if(!GetFileInformationByHandle(h,out i))throw Refuse("WIN-AUTH-FILE-ID");
+   if((i.Attributes&0x400)!=0||((i.Attributes&0x10)!=0)!=directory||(!directory&&(sourceImage?i.Links<1:i.Links!=1))||!String.Equals(Final(h),Canonical(p),StringComparison.OrdinalIgnoreCase))throw Refuse("WIN-AUTH-ALIAS");
+   IntPtr owner,group,dacl,sacl,sd;uint rc=GetSecurityInfo(h,1,5,out owner,out group,out dacl,out sacl,out sd);if(rc!=0||sd==IntPtr.Zero)throw Refuse("WIN-AUTH-SECURITY");
+-  try{uint length=GetSecurityDescriptorLength(sd);if(length==0||length>65536)throw Refuse("WIN-AUTH-SECURITY");byte[] raw=new byte[length];Marshal.Copy(sd,raw,0,(int)length);var security=new RawSecurityDescriptor(raw,0);if(security.Owner==null||security.DiscretionaryAcl==null||security.DiscretionaryAcl.Count==0)throw Refuse("WIN-AUTH-DACL");if(privateOnly){if(security.Owner.Value!=CurrentSid)throw Refuse("WIN-AUTH-OWNER");if((security.ControlFlags&ControlFlags.DiscretionaryAclProtected)==0)throw Refuse("WIN-AUTH-DACL");foreach(GenericAce ace in security.DiscretionaryAcl){var known=ace as CommonAce;if(known==null||known.IsCallback||known.SecurityIdentifier.Value!=CurrentSid)throw Refuse("WIN-AUTH-DACL");}}
++  try{uint length=GetSecurityDescriptorLength(sd);if(length==0||length>65536)throw Refuse("WIN-AUTH-SECURITY");byte[] raw=new byte[length];Marshal.Copy(sd,raw,0,(int)length);var security=new RawSecurityDescriptor(raw,0);if(security.Owner==null||security.DiscretionaryAcl==null||security.DiscretionaryAcl.Count==0)throw Refuse("WIN-AUTH-DACL-EMPTY");if(privateOnly){if(security.Owner.Value!=CurrentSid)throw Refuse("WIN-AUTH-OWNER");string hardenedRoot=HardenedRoot(Canonical(p));bool below=hardenedRoot!=null;if(below){using(var rootHandle=Open(hardenedRoot,true,false,true)){}}if(!below&&(security.ControlFlags&ControlFlags.DiscretionaryAclProtected)==0)throw Refuse("WIN-AUTH-DACL-UNPROTECTED");foreach(GenericAce ace in security.DiscretionaryAcl){var known=ace as CommonAce;if(known==null||known.IsCallback)throw Refuse("WIN-AUTH-DACL-ACE");if(known.SecurityIdentifier.Value!=CurrentSid&&!(below&&known.IsInherited))throw Refuse("WIN-AUTH-DACL-FOREIGN");}}
+    return i.Volume+":"+i.IndexHigh+":"+i.IndexLow+":"+i.Links+":"+i.Attributes+":"+(directory?"directory":i.SizeHigh+":"+i.SizeLow)+":"+unchecked((uint)i.Creation.dwHighDateTime)+":"+unchecked((uint)i.Creation.dwLowDateTime)+":"+(directory?"directory":unchecked((uint)i.Write.dwHighDateTime)+":"+unchecked((uint)i.Write.dwLowDateTime))+":"+Hash(raw);
+   }finally{LocalFree(sd);}
+  }
