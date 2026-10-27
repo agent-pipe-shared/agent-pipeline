@@ -1,0 +1,27 @@
+diff --git a/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs b/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
+index c023231f8..e8a2e49f3 100644
+--- a/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
++++ b/plugins/pipeline-core/hooks/design-course-command-admission.test.mjs
+@@ -65,7 +65,8 @@ export function fixture(profile = 'feature') {
+     gitHead: () => ({ ok: true, commit: candidate.commit }),
+     gitUserName: () => 'Fixture', poGateProfile: () => ({ ok: true, value: evidence }),
+     poGateAuthority: () => ({ ok: true, value: { ...evidence, schema: 'pipeline.po-gate-authority.v2', planPath, planSha256: sources.prd.sha256, specPath, specSha256: sources.spec.sha256 } }),
+-    designAdvisoryAdmission: () => ({ ok: true, id: 'a'.repeat(64) }), runner: 'codex' };
++    designAdvisoryAdmission: () => ({ ok: true, id: 'a'.repeat(64) }), runner: 'codex',
++    architectureEntryReadiness: () => ({ status: 'ready', code: null, nextAction: null }) };
+   const submitted = capture(() => run(['submit-plan', '--by', 'coordinator', '--profile', profile], deps));
+   assert.equal(submitted.code, 0, submitted.stderr);
+   const state = JSON.parse(readFileSync(statePath(root), 'utf8'));
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 504761fc2..2c5eaee05 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -515,6 +515,8 @@ async function buildSubmittedFeature(prefix, { fallback } = {}) {
+   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
+   // The real submit-plan refuses a governed root whose architecture is not ready (D165-S4): materialize the sanctioned design package.
+   materializeArchitectureDesignFixture({ rootDir: dir, planPath: PLAN_PATH, sourcePath: "src/index.mjs", decisionRef: "TEST-DAR-ROUTE", by: "Design route fixture PO" });
++  git(dir, "add", "-A");
++  git(dir, "commit", "-q", "-m", "fixture: architecture design package");
+ 
+   const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", PLAN_PATH]);
+   if (featureSet.status !== 0) throw new Error(`fixture set-feature failed: ${featureSet.stderr}`);
