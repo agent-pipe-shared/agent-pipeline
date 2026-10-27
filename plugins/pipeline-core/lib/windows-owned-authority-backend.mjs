@@ -8,13 +8,13 @@ import {isAbsolute,resolve} from 'node:path';
 import {WINDOWS_POWERSHELL_PATHS,sanitizeChildEnvironment} from './windows-private-state.mjs';
 import {isSuccessfulSpawn} from './successful-spawn.mjs';
 
-const HELPER_SHA256='d7d910b1da43260399c5f8e75c65c3b17e58b2ca2dc4deddb9afa37f946ba25c';
+const HELPER_SHA256='e53c759fe421781ca45802cf5d96c4a0c2709c8d0490c58972a14b8f68171679';
 const helperPath=fileURLToPath(new URL('./windows-owned-authority-native.ps1',import.meta.url));
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const exact=(value,keys)=>object(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
 const factsPattern=/^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9]+):[a-f0-9]{64}$/u;
-function fail(reason,committed=false){const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=reason;error.committed=committed;throw error;}
+function fail(reason,committed=false){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;throw error;}
 function path(value){if(typeof value!=='string'||!isAbsolute(value)||resolve(value)!==value||value.length>32768||/[\u0000-\u001f]/u.test(value)||value.startsWith('\\\\')||value.slice(2).includes(':'))fail('WIN-AUTH-PATH');return value;}
 function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>32768||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
 function invoke(request){

@@ -32,6 +32,12 @@ export function windowsAuthorityCause(error) {
   return NATIVE_REASON.test(error?.reason) ? error.reason : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
 }
 
+const DACL_DETAIL = /^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u;
+/** The closed private-DACL detail behind a WIN-AUTH-DACL family refusal, or null. */
+export function windowsAuthorityDetail(error) {
+  return error?.reason === 'WIN-AUTH-DACL' && DACL_DETAIL.test(error?.detail) ? error.detail : null;
+}
+
 function guidance(pathClass, reason) {
   return { kind: 'operator-review', mutation: false,
     summary: `Inspect the ${pathClass} path for ${reason}; ordinary host ownership and write grants do not block Pipeline readiness. Repair only a confirmed structural or private-authority fault, then rerun readiness.`,
@@ -53,6 +59,7 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
     return { schema: WINDOWS_AUTHORITY_READINESS_SCHEMA, status: 'unavailable', causes: [{ pathClass: 'input', reason: 'WIN-AUTH-PATH', nextAction: guidance('input', 'WIN-AUTH-PATH') }] };
   }
   const seen = new Map();
+  const details = new Map();
   const causes = [];
   for (const [pathClass, target, boundaryRoot] of [
     ['project', projectRoot, projectRoot], ['plugin', pluginRoot, null], ['private', privateRoot, projectRoot],
@@ -76,10 +83,17 @@ export function assessWindowsAuthorityReadiness({ projectRoot, pluginRoot, priva
           const result = probe({ path, boundaryRoot, privatePath, pathClass });
           reason = observed(result) ? null : 'WIN-AUTH-OBSERVATION-UNAVAILABLE';
         }
-        catch (error) { reason = windowsAuthorityCause(error); }
+        catch (error) {
+          reason = windowsAuthorityCause(error);
+          const found = windowsAuthorityDetail(error);
+          if (found) details.set(key, found);
+        }
         seen.set(key, reason);
       }
-      if (reason) causes.push({ pathClass, reason, path, nextAction: guidance(pathClass, reason) });
+      if (reason) {
+        const detail = details.get(key);
+        causes.push({ pathClass, reason, ...(detail ? { detail } : {}), path, nextAction: guidance(pathClass, detail ?? reason) });
+      }
     }
   }
   const stateRoot = win32.join(projectRoot, 'project');

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { registerTestCaseCompletion } from './test-case-completion.mjs';
+import * as readiness from './windows-authority-readiness.mjs';
 import { assessWindowsAuthorityReadiness, windowsAuthorityCause } from './windows-authority-readiness.mjs';
 import { assessWindowsPrivateRoot } from './windows-private-state.mjs';
 
@@ -191,6 +192,41 @@ test('D168-S7b preflight and runtime judge the private-state root with the same 
   assert.equal(broad.causes[0].reason, 'WIN-AUTH-PRIVATE-ROOT');
   const hardened = judge('hardened', obs([me], [false]));
   assert.equal(hardened.status, 'ready');
+});
+
+const windowsAuthorityDetail = (error) => readiness.windowsAuthorityDetail(error);
+const DETAILS = ['WIN-AUTH-DACL-EMPTY', 'WIN-AUTH-DACL-UNPROTECTED', 'WIN-AUTH-DACL-ACE', 'WIN-AUTH-DACL-FOREIGN'];
+const privateFailure = (error) => assessWindowsAuthorityReadiness({ ...roots, exists: () => true,
+  probe({ path }) { if (path === roots.privateRoot) throw error; return syntheticObservation(); } });
+
+test('D50 each private DACL detail code surfaces as detail while the reason stays the WIN-AUTH-DACL family', () => {
+  for (const detail of DETAILS) {
+    const result = privateFailure(Object.assign(new Error('closed'), { reason: 'WIN-AUTH-DACL', detail }));
+    const cause = result.causes.find(row => row.path === roots.privateRoot);
+    assert.equal(cause.reason, 'WIN-AUTH-DACL', detail);
+    assert.equal(cause.detail, detail);
+  }
+});
+
+test('D50 a bare WIN-AUTH-DACL refusal stays a family-only cause without a detail key', () => {
+  const result = privateFailure(Object.assign(new Error('closed'), { reason: 'WIN-AUTH-DACL' }));
+  const cause = result.causes.find(row => row.path === roots.privateRoot);
+  assert.equal(cause.reason, 'WIN-AUTH-DACL');
+  assert.equal('detail' in cause, false);
+});
+
+test('D50 a detail outside the closed set is dropped, never copied through', () => {
+  const result = privateFailure(Object.assign(new Error('closed'), { reason: 'WIN-AUTH-DACL', detail: 'WIN-AUTH-DACL-C-USERS-OWNER' }));
+  const cause = result.causes.find(row => row.path === roots.privateRoot);
+  assert.equal(cause.reason, 'WIN-AUTH-DACL');
+  assert.equal('detail' in cause, false);
+});
+
+test('D50 windowsAuthorityDetail returns only a closed DACL detail', () => {
+  assert.equal(windowsAuthorityDetail({ reason: 'WIN-AUTH-DACL', detail: 'WIN-AUTH-DACL-FOREIGN' }), 'WIN-AUTH-DACL-FOREIGN');
+  assert.equal(windowsAuthorityDetail({ reason: 'WIN-AUTH-DACL', detail: 'anything else' }), null);
+  assert.equal(windowsAuthorityDetail({ reason: 'WIN-AUTH-OWNER', detail: 'WIN-AUTH-DACL-EMPTY' }), null);
+  assert.equal(windowsAuthorityDetail(undefined), null);
 });
 
 registerTestCaseCompletion({ cases, fd: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD ?? '3'), maxBytes: 65536 });
