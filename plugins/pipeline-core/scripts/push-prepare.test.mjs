@@ -809,6 +809,42 @@ test("retained rigor after close still requires candidate review", () => {
   assert.equal(result.report.checks.find((check) => check.id === "critic-bound-verify")?.ok, false);
 });
 
+const ROUTE_ARGV = ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"];
+const ROUTE_STATE = { activeFeature: { id: "reviewed", planPath: "specs/reviewed/prd.md" }, planSubmission: { profile: "feature" } };
+const routeCheck = (checkCriticBoundVerify, argv = ROUTE_ARGV, options) => pushPrepareReport(argv,
+  readyDeps({ readState: () => ({ status: "ok", state: ROUTE_STATE }), requiresPublicationReview: () => true, checkCriticBoundVerify }),
+  options).report.checks.find((check) => check.id === "critic-bound-verify");
+
+test("critic-bound-verify remedy for private-critic-binding-unavailable names the concrete Critic route", () => {
+  const check = routeCheck(() => ({ ok: false, code: "private-critic-binding-unavailable" }));
+  assert.equal(check.ok, false);
+  assert.match(check.remedy, /critic-dispatch-preflight\.mjs/u);
+  assert.match(check.remedy, /\$\{PIPELINE_PLUGIN_ROOT\}/u);
+  assert.match(check.remedy, /merge base/u);
+  assert.match(check.remedy, /publication target/u);
+  assert.doesNotMatch(check.remedy, /[\r\n]/u);
+});
+
+test("critic-bound-verify remedy for another failure code keeps the generic lifecycle text", () => {
+  const check = routeCheck(() => ({ ok: false, code: "verify-evidence-not-exact-green" }));
+  assert.equal(check.ok, false);
+  assert.equal(check.remedy, "complete the independent Critic review and exact-candidate Verify lifecycle before publication");
+  assert.doesNotMatch(check.remedy, /critic-dispatch-preflight|merge base/u);
+});
+
+test("critic-bound-verify carries no remedy when the candidate is qualified", () => {
+  const check = routeCheck(() => ({ ok: true, code: "critic-bound-verify-valid" }));
+  assert.equal(check.ok, true);
+  assert.equal("remedy" in check, false);
+});
+
+test("checkpoint profile still has no critic-bound-verify check with the route remedy in place", () => {
+  const check = routeCheck(() => ({ ok: false, code: "private-critic-binding-unavailable" }),
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/feat/reviewed", "--checkpoint"],
+    slimOptions);
+  assert.equal(check, undefined);
+});
+
 test("pushPrepareReport: inspection mode never folds a pending approval write", () => {
   let foldCalls = 0;
   const result = pushPrepareReport(

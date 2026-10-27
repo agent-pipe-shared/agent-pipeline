@@ -748,7 +748,9 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
       checks.push({ id: "critic-bound-verify", ok: review.ok === true,
         message: review.ok ? "independent Critic and Verify bind this exact candidate"
           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
-        ...(!review.ok ? { remedy: "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
+        ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
+          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate"
+          : "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
       });
     }
     if (securityGateActive) {
