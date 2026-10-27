@@ -55,6 +55,20 @@ done_when: manual
   would contradict the 10 s hook-budget reasoning pinned in `session-authority-lock-wait.test.mjs`. Add to Acceptance:
   two `Agent` calls in one message are both admitted.
 
+## Fan-out measurement 2, 2026-10-27 (after D177 was applied and installed in the 17-patch stamp)
+
+- Two background `Agent` calls in ONE message, right after `heal` (registry readable, 25 native reservations, all settled):
+  the first was refused by the new typed `GUARD-DISPATCH-SLOW`: phase `integrated-slice-read` at 10.6 s, `collision-check` at
+  56.5 s, `mint` at 101.2 s, over the 100 s budget. The second was refused `SDC-LOCK-HELD` (`registry-lock-held`) while the
+  first still held the lock. So D177 turned a silent kill into a typed, visible refusal, but admission itself still takes about
+  100 s: no fan-out, and not even a single dispatch, is admitted in time.
+- Phase cost: `collision-check` about 46 s and `mint` about 45 s dominate, `integrated-slice-read` about 11 s.
+- The same call prints about 70 `GUARD-DISPATCH-SECOND-WRITER-UNJUDGED` and `GUARD-DISPATCH-SCOPE-UNKNOWN` entries: open
+  `evidence/dispatch-record-*.json` records (git-ignored, 2026-10-09 era, `no-owner-claim`) whose write scope cannot be read.
+  Hypothesis, NOT yet measured: the `collision-check` cost scales with those unreadable records (Wanted 6, retire route). Next
+  measurement: time `collision-check` with the stale set excluded in a scratch clone.
+- Acceptance stays: two `Agent` calls in one message are both admitted, each in well under 30 s.
+
 ## Wanted
 
 1. No git or file-tree scan inside the registry lock: compute the integration and baseline facts first, then take the lock
