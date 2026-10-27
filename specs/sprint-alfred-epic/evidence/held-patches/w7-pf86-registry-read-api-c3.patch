@@ -1,0 +1,185 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index b59f7d587..d6b7e46b8 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
+ import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
+-import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
++import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+ import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
+ import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
+ /** Private runner-hook correlation state for native Goldfish host commits. */
+@@ -739,13 +739,15 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+   owner.assurance=current.assurance;
+   // PF-86: the boundary-independent git read runs before the registry lock; a fault falls back to the in-boundary read.
+   let prescan=null;
+-  if(state.delivery){try{prescan=prescanCommitIntegratedSlices({repository,governed:resolveGovernedItemQueue({root:state.root})});}catch{prescan=null;}}
++  let facts=null;
++  if(state.delivery){try{const pre=resolveGovernedItemQueue({root:state.root});prescan=prescanCommitIntegratedSlices({repository,governed:pre});facts=prescanAdmissionFacts({repository,governed:pre,dependsOn:pre.status==='required'?(pre.normalized.slices.find(row=>row.id===state.delivery.sliceId)?.dependsOn??[]):[]});}catch{facts=null;}}
+   return withSessionAuthorityBoundary({repository},boundary=>{
+     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
+     if(state.delivery){
+       const governed=resolveGovernedItemQueue({root:state.root});
+       if(governed.status!=='required'||governed.sha256!==state.delivery.queueSha256)throw nativeManagedFault('item-delivery-queue-drift');
+       adoptPrescanInBoundary({boundary,repository,governed,prescan});
++      adoptAdmissionFacts({boundary,repository,governed,facts});
+       if(current.association.state!=='bound')throw nativeManagedFault('item-delivery-owner-unbound');
+       const item=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
+       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
+@@ -1578,6 +1580,29 @@ export function adoptPrescanInBoundary({boundary,repository,governed,prescan,rea
+   memoPerAdmission(boundary,key,()=>read({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}));
+   return {status:prescan?'recomputed-after-drift':'computed'};
+ }
++// PF-86 c2: the registry-dependent admission facts (integrated slices for the item's dependencies, the settled set, the member records
++// they read) are computed through the lock-free registry read scope and carried with the registry generation, the queue digest and the
++// candidate commit. They are adopted into the per-admission memo under the real boundary only when all three still match; otherwise the
++// ordinary in-boundary reads run (one bounded re-read, never an adoption of stale facts). A fault in the scan returns null: same fallback.
++export function prescanAdmissionFacts({repository,governed,dependsOn=[],slowScan=null}){
++  if(governed?.status!=='required')return null;
++  const {result,generation}=withSessionAuthorityReadScope({repository},boundary=>{
++    if(typeof slowScan==='function')slowScan();
++    readNativeIntegratedSlices({governed,repository,boundary,only:new Set(dependsOn)});
++    readSettledItemSliceIds({repository,boundary,governed});
++    return [...(admissionMemos.get(boundary)??new Map())];
++  });
++  return {generation,queueSha256:governed.sha256,candidateCommit:repository.candidate.commit,entries:result};
++}
++export function adoptAdmissionFacts({boundary,repository,governed,facts}){
++  if(!facts)return {status:'computed'};
++  let current=null;try{current=readSessionAuthorityGeneration({repository});}catch{current=null;}
++  if(current!==null&&facts.generation===current&&facts.queueSha256===governed.sha256&&facts.candidateCommit===repository.candidate.commit){
++    for(const [key,value] of facts.entries)memoPerAdmission(boundary,key,()=>value);
++    return {status:'reused'};
++  }
++  return {status:'recomputed-after-drift'};
++}
+ // D182: every member record is a full registry read (about 0.8 s each with 25 members). The integrated-slice computation and the
+ // released-reservation read both walked all members, and the computation itself ran once per (skipCancelled, only) shape, so one
+ // admission read every member four times. The records are read ONCE per admission and member set; the memo lives on the boundary.
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 57509158e..9e043d6d9 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1288,7 +1288,7 @@ const cases = [
+     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
+   })}},
+ 
+-  { id: "NGHS41", name: "PF-86 (i): two admissions with disjoint scopes both succeed through the lock-free pre-scan, and a third on the first scope sees the first reservation", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
++  { id: "NGHS45", name: "PF-86 (i): two admissions with disjoint scopes both succeed through the lock-free pre-scan, and a third on the first scope sees the first reservation", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
+     assert.equal(typeof mod.prescanCommitIntegratedSlices,"function","the pre-scan is exported");
+     assert.equal(typeof mod.adoptPrescanInBoundary,"function","the compare-and-adopt step is exported");
+     const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
+@@ -1319,7 +1319,7 @@ const cases = [
+     assert.match(String(third.reason),/item-delivery-(scope|owner|criterion-owner)-collision/u);
+   })}},
+ 
+-  { id: "NGHS42", name: "PF-86 (ii): a pre-scan is adopted only when the queue digest and the candidate commit still match; a competing change is re-read, never silently overwritten", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
++  { id: "NGHS46", name: "PF-86 (ii): a pre-scan is adopted only when the queue digest and the candidate commit still match; a competing change is re-read, never silently overwritten", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
+     assert.equal(typeof mod.prescanCommitIntegratedSlices,"function");assert.equal(typeof mod.adoptPrescanInBoundary,"function");
+     const repository={primaryRoot:"/fixture-root",candidate:{commit:"c1"}};
+     const governed=(sha,ids)=>({status:"required",sha256:sha,normalized:{slices:ids.map(id=>({id}))}});
+@@ -1346,7 +1346,7 @@ const cases = [
+     assert.equal(reads.at(-1)[0],"c2");
+   }},
+ 
+-  { id: "NGHS43", name: "PF-86 (iii): the pre-scanned admission yields the same integrated set as the unchanged in-boundary read, and a pre-scan fault or an absent queue falls back to it", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
++  { id: "NGHS47", name: "PF-86 (iii): the pre-scanned admission yields the same integrated set as the unchanged in-boundary read, and a pre-scan fault or an absent queue falls back to it", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
+     assert.equal(typeof mod.prescanCommitIntegratedSlices,"function");assert.equal(typeof mod.adoptPrescanInBoundary,"function");
+     const repository={primaryRoot:"/fixture-root",candidate:{commit:"c1"}};
+     const g={status:"required",sha256:"c".repeat(64),normalized:{slices:[{id:"S1"},{id:"S2"}]}};
+@@ -1360,8 +1360,66 @@ const cases = [
+     assert.equal(mod.prescanCommitIntegratedSlices({repository,governed:{status:"absent"},read}),null);
+   }},
+ 
++  { id: "NGHS48", name: "PF-86 c2 (i): the lock-free registry read returns the same admission facts as the in-lock path for an unchanged registry", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); const reg = await import("./session-authority-registry.mjs"); return fixture((env)=>{
++    assert.equal(typeof reg.readSessionAuthorityGeneration,"function");assert.equal(typeof reg.withSessionAuthorityReadScope,"function");assert.equal(typeof mod.prescanAdmissionFacts,"function");assert.equal(typeof mod.adoptAdmissionFacts,"function");
++    const {repository,governed}=governedRegistryFixture(env);
++    const generation=reg.readSessionAuthorityGeneration({repository});
++    assert.match(generation,/^[0-9a-f]{64}$/u);
++    const facts=mod.prescanAdmissionFacts({repository,governed,dependsOn:[]});
++    assert.equal(facts.generation,generation);
++    const viaFacts=reg.withSessionAuthorityBoundary({repository},boundary=>{const status=mod.adoptAdmissionFacts({boundary,repository,governed,facts}).status;return {status,settled:[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort(),native:mod.readNativeIntegratedSlices({governed,repository,boundary,only:new Set()}).integrated};});
++    const direct=reg.withSessionAuthorityBoundary({repository},boundary=>({settled:[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort(),native:mod.readNativeIntegratedSlices({governed,repository,boundary,only:new Set()}).integrated}));
++    assert.equal(viaFacts.status,"reused");
++    assert.deepEqual({settled:viaFacts.settled,native:viaFacts.native},direct);
++  })}},
++
++  { id: "NGHS49", name: "PF-86 c2 (ii): a registry generation, queue digest or candidate commit that moved between read and publish is detected and the facts are re-read under the boundary, never adopted", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); const reg = await import("./session-authority-registry.mjs"); return fixture((env)=>{
++    const {repository,governed}=governedRegistryFixture(env);
++    const facts=mod.prescanAdmissionFacts({repository,governed,dependsOn:[]});
++    const direct=reg.withSessionAuthorityBoundary({repository},boundary=>[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort());
++    for(const forged of [{...facts,generation:"0".repeat(64)},{...facts,queueSha256:"1".repeat(64)},{...facts,candidateCommit:"2".repeat(40)}]) {
++      const got=reg.withSessionAuthorityBoundary({repository},boundary=>({status:mod.adoptAdmissionFacts({boundary,repository,governed,facts:forged}).status,settled:[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort()}));
++      assert.equal(got.status,"recomputed-after-drift");assert.deepEqual(got.settled,direct);
++    }
++    assert.equal(reg.withSessionAuthorityBoundary({repository},boundary=>mod.adoptAdmissionFacts({boundary,repository,governed,facts:null}).status),"computed");
++    // the read scope itself refuses a result whose generation moved while it ran
++    assert.throws(()=>reg.withSessionAuthorityReadScope({repository,generationOf:(()=>{let n=0;return ()=>"g"+(n++);})()},()=>"x"),/read-generation-drift/u);
++  })}},
++
++  { id: "NGHS50", name: "PF-86 c2 (iii): a slow admission scan does not hold the registry lock, a second admission acquires it while the first scan runs", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture((env)=>{
++    const {repository,governed}=governedRegistryFixture(env);
++    let child=null;
++    const facts=mod.prescanAdmissionFacts({repository,governed,dependsOn:[],slowScan:()=>{
++      child=spawnSync(process.execPath,["--input-type=module","-e","const {withSessionAuthorityBoundary}=await import(process.argv[1]);const {inspectSignedDescriptorCustodyRepository}=await import(process.argv[2]);withSessionAuthorityBoundary({repository:inspectSignedDescriptorCustodyRepository(process.argv[3])},()=>{process.stdout.write('entered');});",new URL("./session-authority-registry.mjs",import.meta.url).href,new URL("./worktree-lifecycle.mjs",import.meta.url).href,env.root],{encoding:"utf8",timeout:60000});
++    }});
++    assert.ok(facts);assert.equal(child.stdout,"entered",child.stderr);assert.equal(child.status,0);
++  })}},
++
++  { id: "NGHS51", name: "PF-86 c2 (iv): every pre-existing registry and host-state export keeps its name and arity", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); const reg = await import("./session-authority-registry.mjs");
++    for(const name of ["withSessionAuthorityBoundary","inspectSourceOwnedSessionAuthorityProducerRecord","inspectSourceOwnedSessionAuthorityMemberRecord","inspectSourceOwnedSessionAuthorityMemberRecords","initializeSessionAuthorityRegistry"])assert.equal(typeof reg[name],"function",name);
++    assert.equal(reg.withSessionAuthorityBoundary.length,2);
++    for(const name of ["readNativeIntegratedSlices","readSettledItemSliceIds","memoPerAdmission","prescanCommitIntegratedSlices","adoptPrescanInBoundary","inspectNativeMemberRecords"])assert.equal(typeof mod[name],"function",name);
++    assert.equal(mod.memoPerAdmission.length,3);
++  }},
++
+ ];
+ 
++function governedRegistryFixture({root,commit}){
++  const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
++  const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
++  controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
++  mkdirSync(join(root,".claude"));mkdirSync(join(root,"specs/unit"),{recursive:true});
++  writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
++  const statePath=join(root,".claude/pipeline-state.json");
++  writeFileSync(statePath,JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/plan.md",phase:"implementation"},planApproved:true,continuity:itemContinuity()}));
++  chmodSync(statePath,0o600);
++  const item=(id,itemId,path)=>({id,title:id,state:"ready",dependsOn:[],writeScope:[path],tier:"implementor",commitMode:"diff-only",loadClass:"light",delivery:{itemId,criteria:["CR-1"],baseCommit:commit}});
++  writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify({schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-A","AC-1","src/a.mjs"),item("ITEM-B","AC-2","src/b.mjs")]}));
++  const repository=inspectSignedDescriptorCustodyRepository(root);
++  assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,"initialized");
++  return {repository,governed:resolveGovernedItemQueue({root})};
++}
++
+ const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
+ registerTestCaseCompletion({ cases, fd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });
+diff --git a/plugins/pipeline-core/lib/session-authority-registry.mjs b/plugins/pipeline-core/lib/session-authority-registry.mjs
+index e8e2d47bf..93c4c7d93 100644
+--- a/plugins/pipeline-core/lib/session-authority-registry.mjs
++++ b/plugins/pipeline-core/lib/session-authority-registry.mjs
+@@ -329,6 +329,22 @@ export function releaseSessionAuthorityLock({repository:input,reason,judge=judge
+ }
+ 
+ export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
++// PF-86 c2: a read path WITHOUT the registry lock. The generation is the digest of the catalogue record reference (every producer or
++// member change republishes it), read before and after the scan; a scan whose generation moved is refused, never returned. The
++// token it hands the callback is a read-only brand for the inspect* readers; it never acquires, holds or releases the lock, and it
++// performs no migration or heal. A caller that publishes under the real boundary compares the generation again before adopting.
++export function readSessionAuthorityGeneration({repository:input}){const repo=repository(input);return digest(readRecord(repo,cataloguePath).ref);}
++export function withSessionAuthorityReadScope({repository:input,generationOf=null},callback){
++  const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-read-scope-callback');
++  const read=generationOf??(()=>digest(readRecord(repo,cataloguePath).ref));
++  const before=read(),token=Object.freeze({}),data={repository:repo,token,readOnly:true};
++  boundaryBrands.set(token,data);
++  let result;
++  try{result=boundaryContext.run(data,()=>{const value=callback(token);if(value&&typeof value.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-read-scope');return value;});}
++  finally{boundaryBrands.delete(token);}
++  const after=read();if(after!==before)fail('SDC-AUTHORITY-CAS','read-generation-drift');
++  return {result,generation:after};
++}
+ function boundary(token){const found=boundaryBrands.get(token);if(!found||boundaryContext.getStore()?.token!==token)fail('SDC-AUTHORITY-UNAVAILABLE','expired-boundary');repository(found.repository);return found.repository;}
+ export function isActiveSourceOwnedSessionAuthorityBoundary({boundary:token,rootDir}={}) {
+   const found=boundaryBrands.get(token);
