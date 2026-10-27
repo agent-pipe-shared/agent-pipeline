@@ -1,0 +1,141 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.mjs b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+index 5f00ec0e9..c3abc7682 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.mjs
+@@ -68,7 +68,7 @@
+  * sides cannot drift. Canonical form: CRLF normalised to LF, nothing else stripped or altered.
+  */
+ import { createHash } from "node:crypto";
+-import { lstatSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+ import { isAbsolute, join, resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { spawnSync } from "node:child_process";
+@@ -96,6 +96,38 @@ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
+ import { observeGovernanceScope } from "../lib/governance-scope.mjs";
+ import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
+ 
++// W7 A: the template markers a shipped Goldfish or Critic briefing carries (templates/prompts/goldfish-task.md, critic-review.md).
++const GOLDFISH_SHAPE_MARKERS = ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"];
++const CRITIC_SHAPE_MARKERS = ["Fail-closed reference boundary", "## Phase A", "## Phase B"];
++export function promptTemplateShapeWarning({ subagentType, prompt } = {}) {
++  if (typeof subagentType !== "string" || typeof prompt !== "string" || !subagentType.startsWith("pipeline-core:")) return "";
++  const bare = subagentType.slice("pipeline-core:".length);
++  const goldfish = bare.startsWith("goldfish-");
++  if (!goldfish && bare !== "critic") return "";
++  const missing = (goldfish ? GOLDFISH_SHAPE_MARKERS : CRITIC_SHAPE_MARKERS).filter((marker) => !prompt.includes(marker));
++  if (missing.length === 0) return "";
++  const template = goldfish ? "templates/prompts/goldfish-task.md" : "templates/prompts/critic-review.md";
++  return `WARNING (guard-dispatch): GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED: the ${subagentType} prompt lacks ${missing.length} template marker(s) (${missing.join("; ")}); build it by filling ${template}, not freehand. Admitted anyway.\n`;
++}
++
++// W7 B: per-session memory of refused dispatches, under <git common dir>/agent-pipeline/refused-dispatch-retry/<sha(session)>/<sha(type NUL prompt)>.json.
++const REFUSED_RETRY_POINTER = "backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md";
++const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
++// Returns true when this exact dispatch was already refused in this session; otherwise records it. Fails open (false) with no session id or common dir.
++export function refusedDispatchRetrySeen({ sessionId, dispatch, rootDir } = {}) {
++  if (typeof sessionId !== "string" || sessionId === "" || typeof dispatch?.prompt !== "string") return false;
++  try {
++    const commonDir = resolveGitCommonDir(rootDir);
++    if (typeof commonDir !== "string" || commonDir === "") return false;
++    const dir = join(commonDir, "agent-pipeline", "refused-dispatch-retry", sha256Hex(sessionId));
++    const file = join(dir, `${sha256Hex(`${dispatch.subagentType}\0${dispatch.prompt}`)}.json`);
++    try { statSync(file); return true; } catch { /* first refusal */ }
++    mkdirSync(dir, { recursive: true });
++    writeFileSync(file, JSON.stringify({ schema: "pipeline.refused-dispatch-retry.v1", subagentType: dispatch.subagentType }));
++    return false;
++  } catch { return false; }
++}
++
+ const SLICE_QUEUE_SCRIPT = fileURLToPath(new URL("../scripts/slice-queue.mjs", import.meta.url)); const LIVENESS_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-record-liveness.mjs", import.meta.url)); const BRIEFING_GENERATOR_SCRIPT = fileURLToPath(new URL("../scripts/dispatch-briefing.mjs", import.meta.url));
+ // D52 (2): a session-authority refusal without a repair of its own names the general repair, which reports the cause and the exact command that clears it.
+ const sessionAuthorityRepair = (code, root) => typeof code === "string" && code.startsWith("SDC-")
+@@ -809,10 +841,22 @@ if (isDirectInvocation(import.meta.url)) {
+     policy: dispatchFindings(dispatch),
+     budget: dispatchBudgetBinding(dispatch),
+   }));
++  // W7 A: a pipeline-core Goldfish or Critic dispatch whose prompt is not template-shaped is announced, never refused for it.
++  for (const { dispatch } of evaluated) {
++    const shape = promptTemplateShapeWarning(dispatch);
++    if (shape) process.stderr.write(shape);
++  }
+   for (const { dispatch } of evaluated) {
+     const carrier = writeCapableCarrierAdmission(dispatch);
+     if (carrier) {
+-      process.stderr.write(`BLOCKED (guard-dispatch): ${carrier.code}: ${carrier.message}\n`);
++      // W7 B: name the single admitted route for Explore/Plan, and stop an unchanged retry in the same session with a pointer.
++      const retryRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
++      if (refusedDispatchRetrySeen({ sessionId: input?.session_id, dispatch, rootDir: retryRoot })) {
++        process.stderr.write(`BLOCKED (guard-dispatch): GUARD-DISPATCH-REFUSED-RETRY: this exact dispatch was already refused in this session (${carrier.code}); retrying it unchanged cannot succeed. See ${REFUSED_RETRY_POINTER}\n`);
++        process.exit(2);
++      }
++      const route = ["Explore", "Plan"].includes(dispatch.subagentType) ? ` admitted route: Explore through a direct Agent call (read-only research); anything that writes goes through a pipeline-core:goldfish-* role.` : "";
++      process.stderr.write(`BLOCKED (guard-dispatch): ${carrier.code}: ${carrier.message}${route}\n`);
+       process.exit(2);
+     }
+   }
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 85d704bec..9a7d0d960 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -1048,7 +1048,59 @@ manualCheck("GD66 the kept-queue-row warning names the cancel with --class and o
+   }
+ });
+ 
+-assert.equal(cases.length, 67, "the complete dispatch guard corpus must register before execution");
++// W7 slice A -- a Goldfish or Critic dispatch whose prompt is not template-shaped is WARNED about, never refused for the shape.
++const SHAPE_WARNING_CODE = "GUARD-DISPATCH-PROMPT-NOT-TEMPLATE-SHAPED";
++const shapeWarningLine = (stderr) => stderr.split("\n").find((line) => line.includes(SHAPE_WARNING_CODE)) ?? "";
++manualCheck("GD67 a pipeline-core goldfish dispatch without the six template headings is warned about, naming goldfish-task.md (W7 A-i)", () => {
++  const { stderr } = run({ tool_use_id: "gd67", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: "Please implement the feature quickly, details are in my head." } });
++  const line = shapeWarningLine(stderr);
++  assert.ok(line.startsWith("WARNING (guard-dispatch):"), `a WARNING line is expected -- got ${JSON.stringify(stderr.slice(0, 300))}`);
++  assert.ok(line.includes("templates/prompts/goldfish-task.md"), line);
++  assert.ok(!line.includes("BLOCKED"), line);
++});
++manualCheck("GD68 a template-shaped goldfish or critic prompt emits no shape warning (W7 A-ii)", () => {
++  const goldfish = run({ tool_use_id: "gd68a", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") } });
++  assert.equal(shapeWarningLine(goldfish.stderr), "", goldfish.stderr.slice(0, 300));
++  const critic = run({ tool_use_id: "gd68b", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" }) } });
++  assert.equal(shapeWarningLine(critic.stderr), "", critic.stderr.slice(0, 300));
++});
++manualCheck("GD69 a pipeline-core critic dispatch without the review-template headings is warned about and still admitted (W7 A-iii)", () => {
++  const { code, stderr } = run({ tool_use_id: "gd69", tool_name: "Agent", tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: CLEAN_CRITIC } });
++  const line = shapeWarningLine(stderr);
++  assert.equal(code, ALLOW, `the shape warning must never refuse -- ${stderr.trim().slice(0, 300)}`);
++  assert.ok(line.startsWith("WARNING (guard-dispatch):") && line.includes("templates/prompts/critic-review.md"), `got ${JSON.stringify(stderr.slice(0, 300))}`);
++});
++manualCheck("GD70 a non-pipeline agent type with a free prompt emits no shape warning (W7 A-iv)", () => {
++  for (const builtIn of ["Explore", "general-purpose"]) {
++    const { stderr } = run({ tool_use_id: `gd70-${builtIn}`, tool_name: "Agent", tool_input: { subagent_type: builtIn, model: "sonnet", description: "research", prompt: "Read the repository and report where X is defined." } });
++    assert.equal(shapeWarningLine(stderr), "", `${builtIn}: ${stderr.slice(0, 300)}`);
++  }
++});
++
++// W7 slice B -- a refused Plan dispatch names the admitted route; an unchanged retry in the same session is stopped with a pointer.
++const planPayload = (id, prompt = "Plan the refactor of module X and list the steps.") => ({ session_id: `gd71-session-${process.pid}`, tool_use_id: id, tool_name: "Agent", tool_input: { subagent_type: "Plan", model: "sonnet", description: "plan", prompt } });
++manualCheck("GD71 a refused Plan dispatch names the single admitted route in its message (W7 B-i)", () => {
++  const { code, stderr } = run({ ...planPayload("gd71"), session_id: `gd71-first-${process.pid}` });
++  assert.equal(code, BLOCK, stderr.slice(0, 300));
++  assert.ok(stderr.includes("DISPATCH-WRITE-CARRIER-REQUIRED"), stderr.slice(0, 300));
++  assert.match(stderr, /admitted route: [^\n]*Explore/u, stderr.slice(0, 400));
++});
++manualCheck("GD72 an unchanged retry of a refused Plan dispatch in the same session is refused with a pointer instead of the full text; a changed prompt or another session gets the full text (W7 B-ii)", () => {
++  const first = run(planPayload("gd72a"));
++  assert.equal(first.code, BLOCK, first.stderr.slice(0, 300));
++  assert.ok(first.stderr.includes("a write-capable dispatch requires"), first.stderr.slice(0, 300));
++  const retry = run(planPayload("gd72b"));
++  assert.equal(retry.code, BLOCK, retry.stderr.slice(0, 300));
++  assert.ok(retry.stderr.includes("GUARD-DISPATCH-REFUSED-RETRY"), retry.stderr.slice(0, 300));
++  assert.ok(retry.stderr.includes("backlog/items/2026-10-05-elephant-main-context-spent-on-wake-ups-and-inline-reads.md"), retry.stderr.slice(0, 300));
++  assert.ok(!retry.stderr.includes("a write-capable dispatch requires"), "the retry must not repeat the full text");
++  const changed = run(planPayload("gd72c", "A different planning prompt."));
++  assert.ok(changed.stderr.includes("a write-capable dispatch requires") && !changed.stderr.includes("GUARD-DISPATCH-REFUSED-RETRY"), changed.stderr.slice(0, 300));
++  const other = run({ ...planPayload("gd72d"), session_id: `gd72-other-${process.pid}` });
++  assert.ok(other.stderr.includes("a write-capable dispatch requires") && !other.stderr.includes("GUARD-DISPATCH-REFUSED-RETRY"), other.stderr.slice(0, 300));
++});
++
++assert.equal(cases.length, 73, "the complete dispatch guard corpus must register before execution");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
