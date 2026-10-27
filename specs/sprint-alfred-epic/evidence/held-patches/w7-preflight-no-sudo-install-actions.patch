@@ -1,0 +1,190 @@
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+index 5632cbe21..889443f6f 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.mjs
+@@ -77,49 +77,28 @@ const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-c
+ const STATUS_PRECEDENCE = Object.freeze(["execution_environment", "untrusted_path", "binary_missing", "input_missing", "probe_timeout", "probe_error", "incompatible_version", "incompatible_capability"]);
+ const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"] });
+ const GUIDANCE = Object.freeze({
+-  linux: { node: "Install Node.js 24 or newer from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install OSV-Scanner 2.x in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
+-  darwin: { node: "Install Node.js 24 or newer through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install managed OSV-Scanner 2.x.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
+-  win32: { node: "Install Node.js 24 or newer through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install managed OSV-Scanner 2.x.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
++  linux: { node: "Install a Node.js release that meets the pipeline minimum from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install a supported OSV-Scanner major release in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
++  darwin: { node: "Install a Node.js release that meets the pipeline minimum through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
++  win32: { node: "Install a Node.js release that meets the pipeline minimum through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
+   unsupported: { node: "Use a supported linux, darwin, or win32 runner.", git: "Use a supported linux, darwin, or win32 runner.", gitleaks: "Use a supported runner.", "osv-scanner": "Use a supported runner.", semgrep: "Use a supported runner.", "license-check": "Use a supported runner." },
+ });
+ const INSTALLER_NAMES = Object.freeze(["apt-get", "brew", "go", "pipx", "sudo", "winget"]);
+ 
+-function installCommandFor(platform, tool, installers) {
+-  const has = (name) => installers.has(name);
+-  if (platform === "linux") {
+-    if (tool === "node" && has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y nodejs";
+-    if (tool === "git" && has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y git";
+-    if (tool === "gitleaks") {
+-      if (has("go")) return "go install github.com/zricethezav/gitleaks/v8@latest";
+-      if (has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y golang-go && go install github.com/zricethezav/gitleaks/v8@latest";
+-    }
+-    if (tool === "osv-scanner") {
+-      if (has("go")) return "go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest";
+-      if (has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y golang-go && go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest";
+-    }
+-    if (tool === "semgrep") {
+-      if (has("pipx")) return "pipx install semgrep";
+-      if (has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep";
+-    }
+-    return null;
+-  }
+-  if (platform === "darwin") {
+-    if (has("brew") && tool === "node") return "brew install node@24";
+-    if (tool === "git") return "xcode-select --install";
+-    if (has("brew") && ["gitleaks", "osv-scanner", "semgrep"].includes(tool)) return `brew install ${tool}`;
+-    if (has("go") && tool === "gitleaks") return "go install github.com/zricethezav/gitleaks/v8@latest";
+-    if (has("go") && tool === "osv-scanner") return "go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest";
+-    if (has("pipx") && tool === "semgrep") return "pipx install semgrep";
+-    return null;
+-  }
+-  if (platform === "win32") {
+-    if (has("winget") && tool === "node") return "winget install OpenJS.NodeJS.LTS";
+-    if (has("winget") && tool === "git") return "winget install Git.Git";
+-    if (has("go") && tool === "gitleaks") return "go install github.com/zricethezav/gitleaks/v8@latest";
+-    if (has("winget") && tool === "osv-scanner") return "winget install Google.OSVScanner";
+-    if (has("pipx") && tool === "semgrep") return "pipx install semgrep";
+-  }
+-  return null;
++// Capability contract (W7-2): the preflight names the tool, the probe that proves it present and the kind of
++// source the human uses. It emits no command string, no sudo and no pinned version; the human installs, then
++// re-reads the preflight. Installer discovery (INSTALLER_NAMES) is still read but no longer shapes a command.
++const PROBES = Object.freeze({ node: "node --version", git: "git --version", gitleaks: "gitleaks version", "osv-scanner": "osv-scanner --version", semgrep: "semgrep --version" });
++const SOURCE_HINTS = Object.freeze({
++  linux: { node: "the distribution package source or the official Node.js download page", git: "the distribution package source", gitleaks: "the official Gitleaks release page or a trusted package source", "osv-scanner": "the official OSV-Scanner release page or a trusted package source", semgrep: "the official Semgrep page or an isolated pipx environment" },
++  darwin: { node: "the managed macOS package source or the official Node.js download page", git: "Xcode Command Line Tools or a managed package source", gitleaks: "a managed macOS package source or the official Gitleaks release page", "osv-scanner": "a managed macOS package source or the official OSV-Scanner release page", semgrep: "a managed macOS package source or an isolated pipx environment" },
++  win32: { node: "the official Node.js download page or a managed Windows package source", git: "the official Git for Windows page", gitleaks: "the official Gitleaks release page", "osv-scanner": "the official OSV-Scanner release page", semgrep: "the official Semgrep page or an isolated pipx environment" },
++});
++function attendedContract(platform, tool) {
++  const probe = PROBES[tool];
++  if (probe === undefined) return null;
++  const source = SOURCE_HINTS[platform]?.[tool] ?? "the vendor's official page";
++  const scannerNote = ["gitleaks", "osv-scanner", "semgrep"].includes(tool) ? " npm is not an approved installer for these scanners." : "";
++  return `Capability contract for ${tool}: probe: ${probe}; source: ${source}. Run the install yourself, then re-read the preflight; the preflight installs nothing and emits no command.${scannerNote}`;
+ }
+ 
+ function semver(value) { const match = typeof value === "string" && value.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/); return match ? match.slice(1, 4).map(Number) : null; }
+@@ -129,8 +108,9 @@ function result(tool, status, observed = {}) {
+ function actionableResult(entry, platform, installers = new Set()) {
+   const prerequisiteMissing = !["ready", "not_required"].includes(entry.status);
+   const hostBoundaryFailure = ["execution_environment", "probe_timeout", "probe_error"].includes(entry.status);
+-  const installCommand = ["binary_missing", "incompatible_version", "incompatible_capability"].includes(entry.status)
+-    ? installCommandFor(platform, entry.tool, installers)
++  const installCommand = null;
++  const contract = ["binary_missing", "incompatible_version", "incompatible_capability"].includes(entry.status)
++    ? attendedContract(platform, entry.tool)
+     : null;
+   const affectedClaim = hostBoundaryFailure
+     ? `Toolchain readiness for ${entry.tool} was not observed at the current execution boundary.`
+@@ -154,15 +134,13 @@ function actionableResult(entry, platform, installers = new Set()) {
+       ? `Create the configured project inputs required by ${entry.tool}.`
+       : GUIDANCE[platform][entry.tool]
+     : null;
+-  const installerGuidance = installCommand === null && ["binary_missing", "incompatible_version", "incompatible_capability"].includes(entry.status)
+-    ? " No verified installer chain is available on this host; install a supported package manager or use the official prebuilt binary. npm is not an approved installer for these scanners."
+-    : "";
++  const installerGuidance = contract === null ? "" : ` ${contract}`;
+   return {
+     ...entry,
+     affectedClaim,
+     installCommand,
+     installAttempted: false,
+-    guidance: installCommand === null ? `${baseGuidance ?? ""}${installerGuidance}`.trim() : `${baseGuidance} Run: ${installCommand}`,
++    guidance: `${baseGuidance ?? ""}${installerGuidance}`.trim(),
+   };
+ }
+ function readyCompatibility(tool, observed) {
+diff --git a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+index ace2db024..3bd0ad2ec 100644
+--- a/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/toolchain-preflight.test.mjs
+@@ -226,9 +226,9 @@ check("a missing configured prerequisite names the blocked claim and a copyable
+     assert.equal(result.ok, false);
+     assert.equal(missing.status, "binary_missing");
+     assert.equal(missing.affectedClaim, "Security readiness cannot be claimed until semgrep is installed.");
+-    assert.equal(missing.installCommand, "pipx install semgrep");
++    assert.equal(missing.installCommand, null);
+     assert.equal(missing.installAttempted, false);
+-    assert.equal(missing.guidance.includes(missing.installCommand), true);
++    assert.match(missing.guidance, /probe: semgrep --version/u);
+     assert.equal(probeCalls, 0);
+   } finally { rmSync(repo, { recursive: true, force: true }); }
+ });
+@@ -276,8 +276,10 @@ check("missing installer prerequisites are embedded in copyable Ubuntu chains wh
+         assert.match(gitleaks.guidance, /npm is not an approved installer/u);
+         assert.match(semgrep.guidance, /npm is not an approved installer/u);
+       } else {
+-        assert.equal(gitleaks.installCommand, "sudo apt-get update && sudo apt-get install -y golang-go && go install github.com/zricethezav/gitleaks/v8@latest");
+-        assert.equal(semgrep.installCommand, "sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep");
++        assert.equal(gitleaks.installCommand, null);
++        assert.equal(semgrep.installCommand, null);
++        assert.match(gitleaks.guidance, /probe: gitleaks version; source: /u);
++        assert.match(semgrep.guidance, /probe: semgrep --version; source: /u);
+       }
+     } finally { rmSync(repo, { recursive: true, force: true }); }
+   }
+@@ -838,4 +840,58 @@ check("W7-1e: the scanner findings expose no install command text and an incompa
+     for (const id of R77_SCANNER_FINDING_IDS) assert.doesNotMatch(JSON.stringify(r77Finding(report, id)), /sudo|apt-get|go install|brew install|winget/u, `${id}: no install command text`);
+   });
+ });
++// W7-2: the attended action is a capability contract, not a hard-coded install command.
++function w7NoSudoActions() {
++  const actions = [];
++  for (const platform of ["linux", "darwin", "win32"]) {
++    for (const mode of ["missing", "incompatible"]) {
++      const repo = root();
++      try {
++        const everyInstaller = (name) => `/tools/${name}`;
++        const nodeBad = mode === "missing" ? () => ({ ok: false, status: "binary_missing" }) : () => observed("node", "20.0.0", ["spawn-shell-false"]);
++        const gitBad = mode === "missing" ? () => ({ ok: false, status: "binary_missing" }) : () => observed("git", "1.0.0", []);
++        const report = runToolchainPreflight({ rootDir: repo, platform, manifestResult: manifest({ gitleaks: { enabled: true }, "osv-scanner": { enabled: true }, semgrep: { enabled: true } }) }, {
++          probeNodeFn: nodeBad, probeGitFn: gitBad, resolveExecutableFn: () => null, resolveInstallerFn: everyInstaller, scannerProbes: {},
++        });
++        for (const result of report.results) actions.push({ platform, mode, result });
++      } finally { rmSync(repo, { recursive: true, force: true }); }
++    }
++  }
++  return actions;
++}
++const W7_ACTIONABLE = new Set(["binary_missing", "incompatible_version", "incompatible_capability"]);
++check("W7-2a: no returned action text of any tool on any supported platform contains sudo", () => {
++  const actions = w7NoSudoActions();
++  assert.ok(actions.length >= 36);
++  for (const { platform, result } of actions) assert.doesNotMatch(JSON.stringify(result), /sudo/iu, `${platform}/${result.tool}`);
++});
++check("W7-2b: no returned action text contains a fixed version pattern or @latest", () => {
++  for (const { platform, result } of w7NoSudoActions()) {
++    const text = `${result.installCommand ?? ""} ${result.guidance ?? ""}`;
++    assert.doesNotMatch(text, /\d+\.\d+|\d+\.x|@latest|node@\d+|\b(?:newer|or newer)\b.*\d/iu, `${platform}/${result.tool}`);
++    assert.doesNotMatch(text, /apt-get|go install|brew install|winget install|pipx install/u, `${platform}/${result.tool}: no hard-coded command`);
++  }
++});
++check("W7-2c: every actionable result names the tool, its probe, a source hint and the re-read instruction", () => {
++  const actionable = w7NoSudoActions().filter(({ result }) => W7_ACTIONABLE.has(result.status));
++  assert.ok(actionable.length >= 30);
++  for (const { platform, result } of actionable) {
++    const label = `${platform}/${result.tool}`;
++    assert.equal(result.installCommand, null, `${label}: no command string`);
++    assert.equal(result.installAttempted, false, label);
++    assert.ok(result.guidance.includes(result.tool), `${label}: names the tool`);
++    assert.match(result.guidance, /probe: \S+/u, `${label}: names the probe`);
++    assert.match(result.guidance, /source: \S+/u, `${label}: names a source`);
++    assert.match(result.guidance, /run the install yourself/iu, label);
++    assert.match(result.guidance, /re-read the preflight/iu, label);
++  }
++});
++check("W7-2d: the readiness status values are unchanged by the capability contract", () => {
++  for (const { mode, result } of w7NoSudoActions()) {
++    if (result.tool === "license-check") continue;
++    if (result.tool === "node") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_version", `${mode}/node`);
++    else if (result.tool === "git") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_capability", `${mode}/git`);
++    else assert.equal(result.status, "binary_missing", `${mode}/${result.tool}`);
++  }
++});
+ registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });
