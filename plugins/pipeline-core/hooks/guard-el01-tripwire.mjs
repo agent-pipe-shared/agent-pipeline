@@ -201,7 +201,12 @@ function resolveSpecPath(state) {
       return specAuthority.path;
     }
   }
-  if (typeof feature.planPath === "string" && feature.planPath !== "") {
+  return planSiblingSpecPath(feature);
+}
+
+/** spec.md beside the feature's planPath, or null when planPath has no directory. */
+function planSiblingSpecPath(feature) {
+  if (typeof feature?.planPath === "string" && feature.planPath !== "") {
     const parts = feature.planPath.split("/");
     parts.pop();
     if (parts.length > 0) return `${parts.join("/")}/spec.md`;
@@ -341,6 +346,7 @@ let state;
 let feature;
 let specPath = null;
 let riskClass = null;
+let boundSpecUnreadable = false;
 
 let stateRaw;
 try {
@@ -403,10 +409,20 @@ if (!unevaluable) {
   try {
     specText = readFileSync(resolve(projectDir, specPath), "utf8");
   } catch (e) {
-    unevaluable = {
-      cause: `the spec ${specPath} of feature "${feature.id}" cannot be read (${e?.code ?? "read error"})`,
-      repair: `create or restore ${specPath} with a "| Risk class | low, medium or high |" row in its ID card, then retry. Writes under specs/ are admitted.`,
-    };
+    boundSpecUnreadable = true;
+    const siblingPath = e?.code === "ENOENT" ? planSiblingSpecPath(feature) : null;
+    if (siblingPath && siblingPath !== specPath) {
+      try {
+        specText = readFileSync(resolve(projectDir, siblingPath), "utf8");
+        specPath = siblingPath; // bound spec missing: the planPath-sibling spec decides the risk class
+      } catch { /* fall through to unevaluable */ }
+    }
+    if (specText === undefined) {
+      unevaluable = {
+        cause: `the spec ${specPath} of feature "${feature.id}" cannot be read (${e?.code ?? "read error"})`,
+        repair: `create or restore ${specPath} with a "| Risk class | low, medium or high |" row in its ID card, or rebind the feature's continuity.authority.spec.path (or planPath) to where the spec now lives (a half-moved feature directory), then retry. Writes under specs/ and scratch/ are admitted meanwhile.`,
+      };
+    }
   }
   if (!unevaluable) {
     const row = readRiskRow(specText);
@@ -428,6 +444,11 @@ if (!unevaluable && riskClass !== "high") process.exit(0); // EL-01's "no risk f
 if (unevaluable?.selfRepairable && normalizedPath === normalize(posix.normalize(stateRel.replace(/\\/g, "/")))) {
   process.exit(0);
 }
+
+// A scratch/ write is admitted ONLY while the bound spec is unreadable (half-moved feature
+// directory): the rebind is staged there. A readable risk-high spec keeps the tripwire.
+// normalizedPath is posix-normalized above, so scratch/../src/x cannot pass this prefix test.
+if (boundSpecUnreadable && normalizedPath.startsWith("scratch/")) process.exit(0);
 
 // ---- dispatch-record match: the PO-adopted, independently-checkable signal ---------
 const openRecord = findOpenDispatchRecord(projectDir);

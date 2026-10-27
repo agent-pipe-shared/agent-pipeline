@@ -317,6 +317,65 @@ const BLOCK = 2, ALLOW = 0, WARN = 1;
   });
 }
 
+// ---- TP-11: Slice A -- scratch/ admitted only while the BOUND spec is unreadable ------------
+// Half-moved feature directory: continuity.authority.spec.path points at a missing file while
+// the planPath-sibling spec.md exists. scratch/ is not an EXEMPT prefix; it is admitted only for
+// the duration of the unreadable bound spec (so the path rebind can be staged there).
+function halfMovedDir(prefix, siblingSpec) {
+  const dir = freshGovernedDir(prefix);
+  writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
+    specPath: "specs/phx-moved/spec.md",
+    planPath: "specs/phx-example/prd_example.md",
+    viaContinuity: true,
+  }));
+  if (siblingSpec) writeText(join(dir, "specs", "phx-example", "spec.md"), siblingSpec);
+  return dir;
+}
+{
+  const dir = halfMovedDir("halfmoved-high-sibling", SPEC_HIGH);
+  check("TP-11a ALLOW: scratch/ write while the bound spec is missing (sibling spec is risk high)", "Write", "scratch/x.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("TP-11c BLOCK: sibling fallback is read -- source write follows the sibling's risk class high", "Edit", "src/foo.mjs", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["BLOCKED (guard-el01-tripwire", "risk class: high"],
+  });
+  check("TP-11d BLOCK: scratch/../src traversal is normalized and not admitted", "Edit", "scratch/../src/foo.mjs", BLOCK, {
+    projectDir: dir,
+  });
+}
+{
+  const dir = halfMovedDir("halfmoved-no-sibling", null);
+  check("TP-11b BLOCK: bound spec and sibling both missing -- source write refused, 'cannot be read', repair names the rebind", "Edit", "src/foo.mjs", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["cannot be read", "rebind"],
+  });
+  check("TP-11e ALLOW: scratch/ write while neither spec can be read", "Write", "scratch/x.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+}
+{
+  const dir = halfMovedDir("halfmoved-low-sibling", SPEC_LOW);
+  check("TP-11f ALLOW: bound spec missing, sibling spec is risk low -- verdict follows the sibling", "Edit", "src/foo.mjs", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+}
+{
+  const dir = freshGovernedDir("readable-high-scratch");
+  writeJson(join(dir, "project", "pipeline-state.json"), stateWithFeature({
+    specPath: "specs/phx-example/spec.md",
+    planPath: "specs/phx-example/prd_example.md",
+    viaContinuity: true,
+  }));
+  writeText(join(dir, "specs", "phx-example", "spec.md"), SPEC_HIGH);
+  check("TP-11g BLOCK: readable risk-high spec keeps the tripwire for scratch/ writes", "Write", "scratch/x.md", BLOCK, {
+    projectDir: dir,
+  });
+}
+
 // ---- Cleanup (restore) -----------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
