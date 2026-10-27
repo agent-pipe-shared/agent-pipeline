@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 06a60c64d..eeb32b034 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -507,7 +507,7 @@ test("a root-authored candidate keeps its empty-tree base but cannot register a
+   const fx = fixture({ rootCandidate: true });
+   try {
+     assert.equal(fx.base, git(fx.root, ["hash-object", "-t", "tree", "--stdin"], { input: "" }));
+-    assert.throws(() => batchFor(fx), (error) => error.code === "CGB-REFERENCE");
++    assert.throws(() => batchFor(fx), (error) => error.code === "CGB-REVIEW-UNIT-BINDING");
+   } finally { cleanup(fx); }
+ });
+ 
