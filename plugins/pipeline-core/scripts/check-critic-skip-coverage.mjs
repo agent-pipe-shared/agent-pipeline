@@ -900,7 +900,12 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
   }
   for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
   if (signedImportAnchor !== null) admittedCount = 1;
-  if (admittedCount !== 1) findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}`);
+  if (admittedCount !== 1) {
+    const missingRecordHint = admittedCount === 0
+      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none; a range with no dispatch history has no admitted route yet and needs a PO decision (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+      : "";
+    findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
+  }
   const ok = findings.length === 0 && admittedCount === 1;
   return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount,
     pendingRecordCount, pendingRecordPaths, administrativelyRetiredRecordCount, targetRecordCandidateCommit,
