@@ -552,6 +552,281 @@ index ebb2e4b09..8bef3d4c4 100644
      const bytes=boundedRead(),afterRead=fstatSync(fd),again=boundedRead(),final=fstatSync(fd),after=lstatSync(filePath);owned(afterRead);owned(final);owned(after);
      if(!same(stability(opened),stability(afterRead))||!same(stability(afterRead),stability(final))||!same(stability(final),stability(after))||bytes.length!==after.size||!bytes.equals(again))authorityOwnerFailure('domain-source-race');
      const value=json(bytes),meaning=semantic({value,bytes});if(!meaning||typeof meaning!=='object'||Array.isArray(meaning))authorityOwnerFailure('domain-source-semantic');
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+index 60b40a817..c61833c8c 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+@@ -560,6 +560,30 @@ export function verifyCommit(sha, deps) {
+     catch { portableForRecord = { ok: false, code: "agy-export-readback-error" }; }
+     return portableForRecord;
+   };
++  if (isV4 && record.outcomeClassification?.kind === "orchestrator-attested") {
++    // D56: the orchestrator committed the delivery itself and attested it. This is a weaker, distinct verdict, never PASS and
++    // never host-observed: no Native-Host-Observed marker or private receipt backs it, so none of the host branches below
++    // may run. The commit must still be the record's own and the diff must stay inside what the record reports.
++    if (!isTerminalOutcome(record.outcome)) {
++      return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
++    }
++    const attestedShas = declaredCommits(record);
++    if (record.candidateCommit !== sha || !record.commits.includes(sha)) {
++      return result(sha, VERDICT.fail, "record-names-different-commit", `${record.schema} record is bound to a different candidate commit`, { taskId, declaredShas: attestedShas });
++    }
++    let attestedChanged;
++    try { attestedChanged = readChangedPaths(sha); } catch (error) {
++      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId });
++    }
++    const attestedDeclared = declaredPaths(record);
++    const attestedUncovered = attestedDeclared === null ? attestedChanged : attestedChanged.filter((path) => coveringPath(path, attestedDeclared) === null);
++    if (attestedUncovered.length > 0) {
++      return result(sha, VERDICT.fail, "record-paths-do-not-cover", `record does not declare ${attestedUncovered.length} changed path(s): ${attestedUncovered.join(", ")}`, { taskId, uncovered: attestedUncovered });
++    }
++    return result(sha, VERDICT.unverifiable, "orchestrator-attested-delivery",
++      `record for \`${taskId}\` is an orchestrator-attested delivery of commit \`${sha}\`: the orchestrator vouches for it, no host observation backs it, so it is weaker than a host-observed authored commit`,
++      { taskId, assurance: "orchestrator-attested", declaredShas: attestedShas });
++  }
+   if (isV4 && !isCommitAuthorshipOutcome(record)) {
+     return result(
+       sha,
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+index a22aecedf..4bd3b7b4f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+@@ -1109,3 +1109,51 @@ test("signed integration reader fails wrong-parent and postimage path, content o
+     } finally { rmSync(item.root, { recursive: true, force: true }); }
+   }
+ });
++
++// D56 slice 3: an orchestrator-attested delivery gets its own weaker verdict. It is never PASS and never host-observed.
++function attestedAuthored(taskId, sha) {
++  const report = { text: "Orchestrator-committed hand-back.", changedFiles: ["src/thing.mjs"] };
++  return {
++    schema: "pipeline.dispatch-record.v4", taskId, agentType: "goldfish-implementor",
++    model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local", dispatcher: "Elephant",
++    candidateCommit: sha, resultSha256: createHash("sha256").update(report.text, "utf8").digest("hex"), outcome: "completed-orchestrator-attested",
++    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" }, commits: [sha],
++    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], report,
++    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: trigger({ rigorLevel: 2 }), appliedRow: "T3" },
++    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "e".repeat(64), handbackSha256: "f".repeat(64) },
++  };
++}
++
++test("D56-3a an orchestrator-attested delivery is UNVERIFIABLE with its own label, never PASS and never host-observed", () => {
++  const sha = "5".repeat(40);
++  writeRecord("DOD-ATT-1", attestedAuthored("DOD-ATT-1", sha));
++  const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-1 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
++  assert.equal(verdict.verdict, VERDICT.unverifiable);
++  assert.equal(verdict.classification, "orchestrator-attested-delivery");
++  assert.equal(verdict.assurance, "orchestrator-attested");
++  assert.notEqual(verdict.verdict, VERDICT.pass);
++  assert.equal("modelCheck" in verdict, false, "no host-observed model classification is attached");
++  assert.equal(String(verdict.classification).startsWith("host-observed"), false);
++});
++
++test("D56-3b an attested record for a different commit, or one whose diff the record does not cover, FAILs", () => {
++  const sha = "6".repeat(40);
++  writeRecord("DOD-ATT-2", attestedAuthored("DOD-ATT-2", sha));
++  const wrongCommit = verifyCommit("7".repeat(40), commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
++  assert.equal(wrongCommit.verdict, VERDICT.fail);
++  assert.equal(wrongCommit.classification, "record-names-different-commit");
++  const uncovered = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs", "src/other.mjs"] }));
++  assert.equal(uncovered.verdict, VERDICT.fail);
++  assert.equal(uncovered.classification, "record-paths-do-not-cover");
++  assert.deepEqual(uncovered.uncovered, ["src/other.mjs"]);
++});
++
++test("D56-3c the other non-authoring kinds keep their FAIL, so only the attested kind gets the weaker verdict", () => {
++  const sha = "8".repeat(40);
++  const readOnly = { ...attestedAuthored("DOD-ATT-3", sha), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], criticSkip: skip() };
++  delete readOnly.attestation; delete readOnly.criticRequired;
++  writeRecord("DOD-ATT-3", readOnly);
++  const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-3 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
++  assert.equal(verdict.verdict, VERDICT.fail);
++  assert.equal(verdict.classification, "record-outcome-does-not-attest-authorship");
++});
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+index ecfbcc771..93b5bfb27 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.mjs
+@@ -1,6 +1,7 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ import { inspectSourceOwnedNativeConfiguredRoute } from "../lib/native-goldfish-host-state.mjs";
++import { execFileSync } from "node:child_process";
+ import { randomBytes, createHash } from "node:crypto";
+ import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from "node:fs";
+ import { basename, dirname, relative, resolve } from "node:path";
+@@ -174,11 +175,51 @@ export function writeHostObservedNativeGoldfishDispatchRecord({ repoRoot, target
+   return publishDispatchRecord(root, target, record, dependencies, { hostObservedNativeGoldfish: true });
+ }
+ 
++/**
++ * D56 route for a delivery the ORCHESTRATOR committed itself (a project has no host observation to offer). The record is a
++ * weaker, visibly labelled assurance: before it is published the Git objects are reopened here, so the attestation is at
++ * least bound to real commits, each carrying this task's Dispatch trailer, in one linear chain, touching exactly the files
++ * the record reports. It cannot satisfy any host-observed predicate (the other routes refuse this kind).
++ */
++export function writeOrchestratorAttestedDispatchRecord({ repoRoot, target, record }, dependencies = {}) {
++  const root = physicalRoot(repoRoot);
++  return publishDispatchRecord(root, target, record, dependencies, { orchestratorAttestedRoute: true });
++}
++
++function gitText(root, args) {
++  return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] });
++}
++/** Reopen the attested delivery's commits. Readers are injectable so the checks are deterministic without a repository. */
++function verifyOrchestratorAttestedDelivery(root, record, dependencies) {
++  const readCommitMessage = dependencies.readCommitMessage ?? ((commit) => gitText(root, ["log", "-1", "--format=%B", commit]));
++  const readChangedPaths = dependencies.readChangedPaths ?? ((commit) => gitText(root, ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", commit]).split("\n").filter(Boolean));
++  const readParents = dependencies.readParents ?? ((commit) => gitText(root, ["rev-list", "--parents", "-n", "1", commit]).trim().split(" ").slice(1));
++  if (record.commits.length === 0 || record.report === null) fail("record-attestation-git", "an attested delivery needs commits and a report");
++  const trailer = `Dispatch: ${record.taskId} (goldfish)`;
++  const changed = new Set();
++  let previous = null;
++  for (const commit of record.commits) {
++    let message; let paths; let parents;
++    try { message = readCommitMessage(commit); paths = readChangedPaths(commit); parents = readParents(commit); }
++    catch { fail("record-attestation-git", "an attested commit is not readable in this repository"); }
++    if (message.split(/\r?\n/u).filter((line) => line === trailer).length !== 1) fail("record-attestation-git", `an attested commit must carry exactly one "${trailer}" trailer`);
++    if (!Array.isArray(parents) || parents.length !== 1) fail("record-attestation-git", "an attested commit must have exactly one parent (no merge, no root)");
++    if (previous !== null && parents[0] !== previous) fail("record-attestation-git", "attested commits must form one linear chain in the order recorded");
++    for (const path of paths) changed.add(path);
++    previous = commit;
++  }
++  const reported = [...new Set([...record.report.changedFiles, ...(record.report.orchestratorAddedFiles ?? [])])].sort();
++  if (JSON.stringify([...changed].sort()) !== JSON.stringify(reported)) fail("record-attestation-scope", "the files the attested commits touch differ from the files the record reports");
++}
++
+ function publishDispatchRecord(root, targetPath, inputRecord, dependencies,
+-  { hostObservedAgy = false, hostObservedNativeGoldfish = false } = {}) {
++  { hostObservedAgy = false, hostObservedNativeGoldfish = false, orchestratorAttestedRoute = false } = {}) {
+   const record = validateDispatchRecord(inputRecord);
+   // D77 (K6, AC-163): the empty-log refusal for a NEW terminal v3/v4 record lives here; committed v3 history stays readable.
+   assertTerminalLogForWrite(record);
++  const orchestratorAttested = record.schema === "pipeline.dispatch-record.v4" && record.outcomeClassification.kind === "orchestrator-attested";
++  if (orchestratorAttested !== orchestratorAttestedRoute) fail("record-attestation-route", "the orchestrator-attested kind is written only by the attested writer, and that writer accepts nothing else");
++  if (orchestratorAttested) verifyOrchestratorAttestedDelivery(root, record, dependencies);
+   const modelCheck = compareRecordedModel(record);
+   if (record.schema === DISPATCH_RECORD_SCHEMA && !isTerminalOutcome(record.outcome)) {
+     if (hostObservedAgy || hostObservedNativeGoldfish) fail("attempt-host-route", "terminal host route cannot publish an opening");
+diff --git a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+index 97ee738af..5599fbc00 100644
+--- a/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-record-write.test.mjs
+@@ -7,7 +7,7 @@ import { join } from "node:path";
+ import { reportSha256, validateDispatchRecord } from "../lib/dispatch-record.mjs";
+ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { VERDICT, verifyCommit } from "./dispatch-authorship-verify.mjs";
+-import { writeCriticDispositionAddendumObject, writeDispatchRecord, writeDispatchRecordObject } from "./dispatch-record-write.mjs";
++import { writeCriticDispositionAddendumObject, writeDispatchRecord, writeDispatchRecordObject, writeOrchestratorAttestedDispatchRecord } from "./dispatch-record-write.mjs";
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+ import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+@@ -430,7 +430,104 @@ check("Critic addendum writer refuses v3 in-progress and zero-commit sources", (
+   } finally { rmSync(zeroCommit.root, { recursive: true, force: true }); }
+ });
+ 
+-assert.equal(cases.length, 19, "the complete dispatch-record writer corpus must be registered before execution begins");
++// D56 slice 2: the orchestrator-attested writer. The orchestrator committed the worker's delivery and says so; the generic
++// writers never mint this kind, and the attested route reopens the Git objects before it publishes.
++const ATT_KIND = { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" };
++const ATT_COMMIT = "c".repeat(40);
++const ATT_BASE = "9".repeat(40);
++function attestedRecord(overrides = {}) {
++  const report = { text: "Orchestrator-committed hand-back.", changedFiles: ["src/x.mjs"] };
++  const { criticSkip: _skip, ...rest } = record({ taskId: "NVA-ATT-1", candidateCommit: ATT_COMMIT, commits: [ATT_COMMIT] });
++  return { ...rest, schema: "pipeline.dispatch-record.v4", outcome: "completed-orchestrator-attested", resultSha256: reportSha256(report.text), report,
++    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }],
++    criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger: { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" },
++    outcomeClassification: ATT_KIND,
++    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested", briefingSha256: "e".repeat(64), handbackSha256: "f".repeat(64) },
++    ...overrides };
++}
++function gitReaders({ message = "feat(x): delivered\n\nDispatch: NVA-ATT-1 (goldfish)\nAI-Assisted: true\n", paths = ["src/x.mjs"], parents = { [ATT_COMMIT]: [ATT_BASE] } } = {}) {
++  return {
++    readCommitMessage: (commit) => { if (!parents[commit]) throw new Error("bad object"); return typeof message === "function" ? message(commit) : message; },
++    readChangedPaths: (commit) => { if (!parents[commit]) throw new Error("bad object"); return typeof paths === "function" ? paths(commit) : paths; },
++    readParents: (commit) => { if (!parents[commit]) throw new Error("bad object"); return parents[commit]; },
++  };
++}
++function attestedRoot() { const root = mkdtempSync(join(tmpdir(), "dispatch-record-attested-")); mkdirSync(join(root, "evidence")); return root; }
++function refusedWith(code, run) { assert.throws(run, (error) => error?.code === code, `expected ${code}`); }
++
++check("attested writer: a Git-verified orchestrator delivery is published exclusively and reads back as the attested kind", () => {
++  const root = attestedRoot();
++  try {
++    const value = attestedRecord();
++    const receipt = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: value }, gitReaders());
++    const persisted = validateDispatchRecord(JSON.parse(readFileSync(join(root, receipt.target))));
++    assert.deepEqual(persisted, value);
++    assert.equal(persisted.outcomeClassification.kind, "orchestrator-attested");
++    assert.equal(receipt.taskId, "NVA-ATT-1");
++    assert.throws(() => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: value }, gitReaders()), /already exists/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("attested writer: the generic object and request writers never mint the attested kind", () => {
++  const root = attestedRoot();
++  try {
++    refusedWith("record-attestation-route", () => writeDispatchRecordObject({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord() }, gitReaders()));
++    mkdirSync(join(root, "requests"));
++    writeFileSync(join(root, "requests", "write.json"), `${JSON.stringify({ schema: "pipeline.dispatch-record-write-request.v1", target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord() })}\n`);
++    refusedWith("record-attestation-route", () => writeDispatchRecord({ repoRoot: root, requestPath: "requests/write.json" }, gitReaders()));
++    assert.equal(existsSync(join(root, "evidence/dispatch-record-NVA-ATT-1.json")), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("attested writer: a missing, duplicated or foreign Dispatch trailer is refused", () => {
++  const root = attestedRoot();
++  try {
++    for (const message of ["feat(x): delivered\n\nAI-Assisted: true\n",
++      "feat(x): delivered\n\nDispatch: NVA-ATT-1 (goldfish)\nDispatch: NVA-ATT-1 (goldfish)\nAI-Assisted: true\n",
++      "feat(x): delivered\n\nDispatch: NVA-OTHER (goldfish)\nAI-Assisted: true\n"]) {
++      refusedWith("record-attestation-git", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord() }, gitReaders({ message })));
++    }
++    assert.equal(existsSync(join(root, "evidence/dispatch-record-NVA-ATT-1.json")), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("attested writer: changed paths must equal the reported files, in either direction", () => {
++  const root = attestedRoot();
++  try {
++    for (const paths of [["src/x.mjs", "src/extra.mjs"], []]) {
++      refusedWith("record-attestation-scope", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord() }, gitReaders({ paths })));
++    }
++    assert.equal(existsSync(join(root, "evidence/dispatch-record-NVA-ATT-1.json")), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("attested writer: commits must form one linear chain, no merge, each commit readable", () => {
++  const root = attestedRoot();
++  try {
++    const first = "d".repeat(40);
++    const chain = attestedRecord({ commits: [first, ATT_COMMIT] });
++    // wrong parent: the second commit does not descend from the first
++    refusedWith("record-attestation-git", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: chain }, gitReaders({ parents: { [first]: [ATT_BASE], [ATT_COMMIT]: [ATT_BASE] }, paths: ["src/x.mjs"] })));
++    // merge commit
++    refusedWith("record-attestation-git", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord() }, gitReaders({ parents: { [ATT_COMMIT]: [ATT_BASE, first] } })));
++    // unreadable object
++    refusedWith("record-attestation-git", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: attestedRecord() }, gitReaders({ parents: {} })));
++    // a proper two-commit chain is accepted
++    const good = writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-ATT-1.json", record: chain }, gitReaders({ parents: { [first]: [ATT_BASE], [ATT_COMMIT]: [first] }, paths: (commit) => (commit === first ? ["src/x.mjs"] : ["src/x.mjs"]) }));
++    assert.equal(good.taskId, "NVA-ATT-1");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++check("attested writer: it refuses any record that is not the attested kind, and a hand-written authored commit still needs the host route", () => {
++  const root = attestedRoot();
++  try {
++    refusedWith("record-attestation-route", () => writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: "evidence/dispatch-record-NVA-WRITE-1.json", record: record() }, gitReaders()));
++    const authored = record({ schema: "pipeline.dispatch-record.v4", runner: "claude", taskId: "NVA-HAND-AUTHORED", resultSha256: reportSha256("Done."), outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "authored-commit" } });
++    refusedWith("record-host-observation", () => writeDispatchRecordObject({ repoRoot: root, target: "evidence/dispatch-record-NVA-HAND-AUTHORED.json", record: authored }));
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++assert.equal(cases.length, 25, "the complete dispatch-record writer corpus must be registered before execution begins");
+ const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+   ? openSync(devNull, "w")
+   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 diff --git a/plugins/pipeline-core/scripts/guard-human-override.mjs b/plugins/pipeline-core/scripts/guard-human-override.mjs
 index 4dd9646e3..04aefcf31 100644
 --- a/plugins/pipeline-core/scripts/guard-human-override.mjs

@@ -25,7 +25,22 @@ and the slices not yet done (PF-86 c3, signature slice A2 for the hook texts, D5
 `w7-d31-checkpoint-outcome` is complete on its own side; the schema half that lets the return validator
 accept the checkpoint outcome is in the increment below.
 
-## Second file: the increment (`w7-increment-2026-10-27.patch`, 16 files, +443/-58)
+## Second file: the increment (`w7-increment-2026-10-27.patch`, 20 files, +656/-61)
+
+D56 slices 2 and 3 (ordinary plugin source): `scripts/dispatch-record-write.mjs` gets
+`writeOrchestratorAttestedDispatchRecord`, the only route that may publish the `orchestrator-attested`
+kind. The generic object and request writers now refuse that kind (`record-attestation-route`), and the
+attested route reopens Git before publishing: each commit readable, exactly one
+`Dispatch: <taskId> (goldfish)` trailer, one parent, one linear chain in the recorded order, touched files
+equal the reported files (`record-attestation-git`, `record-attestation-scope`); DRW20-DRW25, writer suite 25/25.
+`scripts/dispatch-authorship-verify.mjs` gives the kind its own weaker verdict `orchestrator-attested-delivery`
+(UNVERIFIABLE, `assurance: orchestrator-attested`, never PASS, no host-observed field); a wrong commit or an
+uncovered diff still FAIL; other non-authoring kinds keep their FAIL; D56-3a..c, suite 68/68. Not done: slice 4
+(`check-critic-skip-coverage` admission of the kind, custody), slice 4b (binding key), slice 5 (refusal text).
+Without slice 4 an attested record is writable and labelled but Critic admission does not yet use it.
+Final chain check: bundle then increment apply on a fresh clone of HEAD; on that chained clone 8 key suites are
+green (writer 25, record 18, authorship 68, HGO CLI 39, signature pin 16, inventory reuse 5, host return 8,
+skip coverage 40).
 
 Signature slice A (PO decision 2026-10-27, custody files, batch Critic): `prepare-for-signature` now
 hands the operator exactly ONE command (sign-intent); the proof import is an agent action
