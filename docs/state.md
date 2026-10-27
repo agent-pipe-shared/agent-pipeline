@@ -13,7 +13,12 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **221 items:204 at75,14 at50,3 at25;17 below75;index72.74%** (green-in-code
+contains **221 items:211 at75,10 at50,0 at25;10 below75;index73.87%** (sitting
+amendment, 2026-10-27: the 17 held patches were applied in `624016cb1` to `6546599bc`
+and installed in `0.7.0+claude.20261027135736.6546599`; seven rows moved to75 with
+their open entries kept; D182, Elephant exception by PO decision 2026-10-27: the native
+member records are read once per admission, admission 110 s to about 20 s,
+`e41348d1c`, not yet in a stamped install; green-in-code
 amendment, 2026-10-27, PO rule "everything green in the code gets 75": five rows with
 green committed code moved 50 to75, their open entries kept; second
 row amendment, 2026-10-27, second PO tile: two rows without an agent entry left moved

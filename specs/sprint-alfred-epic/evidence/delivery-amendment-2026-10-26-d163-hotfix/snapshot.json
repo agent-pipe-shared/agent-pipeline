@@ -6,7 +6,7 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75). Green-in-code amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): five rows whose committed code and pins are green move 50 to 75 with their open entries kept: bounded reader terminal binding, design phase one review, G20 publication and close, G22 isolated dependencies, R2 branch and checkout runtime continuity.",
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75). Green-in-code amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): five rows whose committed code and pins are green move 50 to 75 with their open entries kept: bounded reader terminal binding, design phase one review, G20 publication and close, G22 isolated dependencies, R2 branch and checkout runtime continuity. Sitting amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): seven rows whose held patches were applied in the 17-patch sitting and installed move to 75 with their open entries kept: G8 design receipt, critic finalizer original independence, Verify pnpm lockfile, late review unit push block, brownfield architecture gate, missing docs/adr, draft guard Phoenix plan. Rows with a partial delivery stay at 50: preflight prerequisites (node probe only), D7 (Wanted 2 to 4), fitness class 6 (patch pending), half-moved feature directory (PowerShell parity open), PF-79 (refusal text only, honest route open).",
   "total": 221,
   "baseline": {
     "counts": {
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 3,
-      "50": 14,
-      "75": 204,
+      "25": 0,
+      "50": 10,
+      "75": 211,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 72.74
+    "index": 73.87
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -5720,9 +5720,9 @@
     {
       "itemId": "pipeline.greenfield.g8.design",
       "title": "Independent design-review receipt has actual dispatch provenance",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
-      "reason": "Identified and retained; publication/close repair does not implement or prove independent design-review provenance.",
+      "reason": "Identified and retained; publication/close repair does not implement or prove independent design-review provenance. Delivered: w7-design-receipt-attestation (6546599bc): the receipt producer refuses a self-asserted observed identity or route as unattested (typed DRC-OBSERVATION-UNATTESTED); which genuine evidence source later replaces the refusal stays an open decision. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "specs/sprint-alfred-epic/plans/plan_greenfield-followup-2026-10-24.md",
         "specs/sprint-alfred-epic/plans/greenfield-findings-2026-10-23.md"
@@ -7200,11 +7200,11 @@
     {
       "itemId": "pipeline.greenfield.r2.critic-finalizer-original-independence",
       "title": "Critic-Finalizer weist selbst verfasste Verdict-Dateien ohne Originalherkunft ab",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Second Greenfield high-priority intake analyzed and AC-mapped; no integrated candidate implementation/qualification is claimed.",
+      "reason": "Second Greenfield high-priority intake analyzed and AC-mapped; no integrated candidate implementation/qualification is claimed. Delivered: w7-critic-origin-gate (b875e5ebc) and its CLI opt-in (914bbe831): finalize requires a Source-issued origin record and marks the caller-authored fallback explicitly; no runner issues a Source record yet. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/findings.json",
         "backlog/items/2026-10-25-critic-finalizer-original-independence.md"
@@ -7564,11 +7564,11 @@
     {
       "itemId": "pipeline.consumer-push-blocked-by-late-review-unit",
       "title": "A review unit added after delivery still admits a Critic range over the delivered code, so the consumer can push",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (PF-75, PF-58 addendum 2) on the D163 hotfix candidate; analyzed (read-only recon, 2026-10-27) and the mainRef part is a held patch (w7-mainref-ancestor, not applied); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (PF-75, PF-58 addendum 2) on the D163 hotfix candidate; analyzed (read-only recon, 2026-10-27) and the mainRef part is a held patch (w7-mainref-ancestor, not applied); no implementation is claimed. Delivered: w7-pushprep-route-remedy (13e6ab727) and w7-mainref-ancestor (8dc0d90a9): the remedy names the Critic route and a feat/ mainRef is accepted when the candidate is its ancestor. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-26-consumer-push-blocked-by-late-review-unit.md",
         "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-late-review-unit-push-block.md",
@@ -7602,11 +7602,11 @@
     {
       "itemId": "pipeline.brownfield-architecture-gate-never-passes",
       "title": "A brownfield project reaches implementation: the architecture entry gate can pass after adoption or migration",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; analyzed (read-only recon of the remainder, 2026-10-27) with part patches held (D165 patches, d179, w7-brownfield-e2e-regression, not applied); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (D1-D5 and Windows side findings) on the D163 hotfix candidate; analyzed (read-only recon of the remainder, 2026-10-27) with part patches held (D165 patches, d179, w7-brownfield-e2e-regression, not applied); no implementation is claimed. Delivered: D179 (93f1a4d55) and the end-to-end regression w7-brownfield-e2e-regression (49be7a1ec) on top of the earlier D165 patches. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-26-brownfield-architecture-gate-never-passes.md",
         "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-brownfield-gate-remainder.md",
@@ -7753,11 +7753,11 @@
     {
       "itemId": "pipeline.missing-docs-adr-directory-blocks-implementation-entry",
       "title": "A project without docs/adr reaches implementation",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D8; workaround: empty docs/adr with .gitkeep. Analyzed (read-only recon, 2026-10-27); the fix is a held patch (d179-missing-adr-directory-is-no-decisions, not applied); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D8; workaround: empty docs/adr with .gitkeep. Analyzed (read-only recon, 2026-10-27); the fix is a held patch (d179-missing-adr-directory-is-no-decisions, not applied); no implementation is claimed. Delivered: D179 (93f1a4d55): a project without docs/adr has no decisions instead of an unavailable source. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-26-missing-docs-adr-directory-blocks-implementation-entry.md",
         "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-d179-adr-missing.md",
@@ -7867,11 +7867,11 @@
     {
       "itemId": "pipeline.draft-guard-blocks-the-sanctioned-recovery-wrappers",
       "title": "The draft guard admits the sanctioned recovery wrappers (Phoenix plan/apply, materialize-architecture) in exact argv shapes",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D21 and the open rest of D3; workaround: the PO runs the wrappers in the own terminal. Analyzed (read-only recon, 2026-10-27); the plan argv part is a held patch (w7-phoenix-plan-admission, not applied; apply stays refused by PO decision); no implementation is claimed.",
+      "reason": "Consumer blocker relayed 2026-10-26 (Toolbox session, Windows, build 0.7.0+claude.20261026152532.b8a2ec6), D21 and the open rest of D3; workaround: the PO runs the wrappers in the own terminal. Analyzed (read-only recon, 2026-10-27); the plan argv part is a held patch (w7-phoenix-plan-admission, not applied; apply stays refused by PO decision); no implementation is claimed. Delivered: w7-phoenix-plan-admission (77db3153e): the exact read-only phoenix plan argv is admitted (apply stays refused by PO decision). PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-26-draft-guard-blocks-the-sanctioned-recovery-wrappers.md",
         "specs/sprint-alfred-epic/evidence/recon-2026-10-27/recon-draft-guard-recovery-wrappers.md",
@@ -8012,11 +8012,11 @@
     {
       "itemId": "pipeline.verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project",
       "title": "Verify for an older commit follows the project lockfile instead of demanding package-lock.json",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Consumer finding relayed 2026-10-27 (Glossover, PF-81): Verify for an older commit asks for package-lock.json in a pnpm project. Recorded; no implementation is claimed.",
+      "reason": "Consumer finding relayed 2026-10-27 (Glossover, PF-81): Verify for an older commit asks for package-lock.json in a pnpm project. Recorded; no implementation is claimed. Delivered: D174 (624016cb1): commit Verify prepares dependencies from a committed pnpm lockfile (interim). PO rule 2026-10-27 (\"everything green in the code gets 75\"): the held patches were applied in the 17-patch sitting (operator commits 624016cb1 to 6546599bc) and installed in 0.7.0+claude.20261027135736.6546599; the open entries stay as the list of what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-27-verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project.md"
       ],
