@@ -37,6 +37,24 @@ done_when: manual
   the host baseline `AGY-HOST-BASELINE-DIRTY`, reported only after the 148 s as `SDC-AUTHORITY-UNAVAILABLE`.
   The dirty paths are named, but late.
 
+## Fan-out measurement, 2026-10-27 (why the PO sees only 1-2 parallel tasks)
+
+- Two background `Agent` calls sent in ONE message: the first was admitted, the second was refused by `guard-dispatch`
+  with `SDC-LOCK-HELD` / `registry-lock-held`. The hooks of the two calls run against the same registry lock, the
+  waiter gives up after `SESSION_AUTHORITY_LOCK_WAIT_MS` (1500 ms, pinned at most 3000 ms by
+  `lib/session-authority-lock-wait.test.mjs`), and the holder needs seconds, so concurrent dispatch loses by design.
+- A registry-touching read alone costs seconds with today's history: `session-authority-repair.mjs inspect` 3.3 s
+  (read refused while another Pipeline process was live), `heal` 6.9-7.0 s, with 25 native in-flight reservations and 25
+  queue rows (`scratch/wave3/measure-lock.mjs`). The hold time is the cause, not a stale lock; `heal` before each
+  dispatch only hides the live-holder case.
+- A second refusal class seen in the same session: `DBG-GENERATED-DIGEST-MISMATCH` when a long generated briefing is
+  re-typed by the Elephant instead of passed from the file (see `2026-10-26-briefing-dispatch-needs-hand-retyping.md`).
+  It makes every briefing transfer a gamble and defeats a fan-out of several dispatches.
+- Consequence for the fix order: Wanted 1 and 2 (no scan under the lock, cost independent of settled history; held patch
+  D177 covers the settled-history part) must land before any fan-out can be reliable; raising the 1.5 s wait instead
+  would contradict the 10 s hook-budget reasoning pinned in `session-authority-lock-wait.test.mjs`. Add to Acceptance:
+  two `Agent` calls in one message are both admitted.
+
 ## Wanted
 
 1. No git or file-tree scan inside the registry lock: compute the integration and baseline facts first, then take the lock
