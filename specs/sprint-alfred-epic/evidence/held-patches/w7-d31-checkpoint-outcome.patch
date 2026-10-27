@@ -1,0 +1,102 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+index 1690c9e43..573b8d1fa 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.mjs
+@@ -136,7 +136,18 @@ function observeClaudeSubagentStop(input, pending, mark) {
+   const state = pending.state;
+   if (typeof input.session_id !== "string" || input.session_id !== state.sessionId
+     || state.runner !== "claude" || state.binding?.runner !== "claude") return { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
+-  const bind = (text) => validateNativeGoldfishFinal(text, { binding: state.binding });
++  // D31: the shared return validator (native-goldfish-host-return.mjs) admits only outcome "succeeded". Until it types a
++  // "checkpoint" outcome itself, a budget-stop hand-back is recognised here: every other field is validated unchanged by
++  // re-binding the same document with the one outcome word substituted, and the observed outcome stays "checkpoint".
++  const bind = (text) => {
++    const bound = validateNativeGoldfishFinal(text, { binding: state.binding });
++    if (bound.ok || typeof text !== "string") return bound;
++    let value;
++    try { value = JSON.parse(text); } catch { return bound; }
++    if (value?.outcome !== "checkpoint") return bound;
++    const rebound = validateNativeGoldfishFinal(JSON.stringify({ ...value, outcome: "succeeded" }), { binding: state.binding });
++    return rebound.ok ? { ...rebound, final: { ...rebound.final, outcome: "checkpoint" } } : bound;
++  };
+   let final = typeof input.last_assistant_message === "string" ? bind(input.last_assistant_message)
+     : { ok: false, code: "NGHR-CLAUDE-STOP-CORRELATION" };
+   if (!final.ok) {
+@@ -173,6 +184,8 @@ function recordSubagentStopOutcome({ stop, dispatch }, result) {
+       return;
+     }
+     if (!stop) return;
++    // D31: a checkpoint is not a failure; it writes no diagnostic.
++    if (result?.status === "checkpoint-recorded") return;
+     const name = `stop-failure-${stopHash("sha256").update(`${stop.state.sessionId}\0${stop.state.toolUseId}`).digest("hex").slice(0, 32)}.json`;
+     // A refusal that read no handback writes nothing: a stop refusal consumes and changes nothing (NGHF08 pins the Git directory).
+     if (!stop.viaHandback) return;
+@@ -295,6 +308,11 @@ function finalizeNativeGoldfishHostReturnInner({ runner, root, input } = {}, dep
+   diagnostic.dispatch = { commonDir, dispatchId: state.binding.dispatchId };
+   if (state.root !== physical || state.commonDir !== commonDir || state.binding.runner !== runner) return fail("NGHF-STATE-ROOT-MISMATCH");
+   if (!observation?.ok) return fail(observation?.code ?? "NGHF-RETURN-INVALID", "not-finalized");
++  // D31: a checkpoint is an interim hand-back of a budget stop. Nothing is consumed, committed, released or cancelled, so
++  // the reservation stays live and a repeat is idempotent; the result names the two continuation routes.
++  if (observation.final.outcome === "checkpoint") return { status: "checkpoint-recorded", code: "NGHF-CHECKPOINT-RESERVATION-LIVE",
++    dispatchId: state.binding.dispatchId, commit: null, record: null, reservation: "live",
++    continuation: { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" } };
+   if (observation.final.outcome !== "succeeded") return fail("NGHF-RETURN-NOT-SUCCESS", "not-finalized");
+ 
+   const concurrent=state.binding.itemDelivery&&state.baseline?.schema===NATIVE_CONCURRENT_HOST_COMMIT_BASELINE_SCHEMA;
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 08e866d65..8e123c1bd 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -453,6 +453,52 @@ const cases = [
+     assert.deepEqual(diagEntries(commonDir), before.filter((name) => !name.includes("6".repeat(32))));
+     assert.equal(diagEntries(commonDir).length, 3);
+   }) },
++  // NGHF17-NGHF19 -- D31: a budget stop hands back a typed checkpoint outcome; it is neither success nor failure.
++  { id: "NGHF17", name: "A checkpoint handback writes no stop-failure diagnostic, and a following success of the same dispatch still completes", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "checkpoint", report: "Budget reached; two of three cases written, continuation card follows." }) } }] } })}\n`);
++    const interim = finalize(stopInput(binding, undefined));
++    assert.equal(interim.status, "checkpoint-recorded", `${interim.code} ${JSON.stringify(interim)}`);
++    assert.equal(interim.code, "NGHF-CHECKPOINT-RESERVATION-LIVE");
++    assert.equal(interim.commit, null);
++    assert.deepEqual(diagEntries(commonDir), []);
++    assert.equal(facts.commits, 0);
++    const accepted = finalize(stopInput(binding, finalText(binding)));
++    assert.equal(accepted.status, "authored-commit-recorded", accepted.code);
++    assert.equal(facts.commits, 1);
++    assert.deepEqual(diagEntries(commonDir), []);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF18", name: "A checkpoint leaves the reservation live and names both continuation routes; a repeated checkpoint is idempotent", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const finalize = (input) => finalizeNativeGoldfishHostReturn({ runner: "claude", root, input }, dependencies);
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "checkpoint", report: "Budget reached; notes follow." }) } }] } })}\n`);
++    const before = snapshot(commonDir);
++    const first = finalize(stopInput(binding, undefined));
++    assert.equal(first.status, "checkpoint-recorded", `${first.code} ${JSON.stringify(first)}`);
++    assert.equal(first.reservation, "live");
++    assert.deepEqual(first.continuation, { resume: "continuation-card-and-sendmessage", abandon: "slice-queue-cancel-class-budget" });
++    assert.equal(snapshot(commonDir), before, "a checkpoint consumes and changes nothing");
++    const second = finalize(stopInput(binding, undefined));
++    assert.deepEqual(second, first);
++    assert.equal(snapshot(commonDir), before);
++    assert.equal(facts.commits, 0);
++    assert.deepEqual(diagEntries(commonDir), []);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF19", name: "An outcome other than succeeded and checkpoint still writes the stop-failure diagnostic and is not finalized", run: () => fixture(({ root, commonDir, binding, dependencies, facts, writeMeta, stopInput }) => {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome: "failed" }) } }] } })}\n`);
++    const failed = finalizeNativeGoldfishHostReturn({ runner: "claude", root, input: stopInput(binding, undefined) }, dependencies);
++    assert.equal(failed.status, "not-finalized", failed.code);
++    assert.equal(diagEntries(commonDir).length, 1, JSON.stringify(failed));
++    assert.equal(facts.commits, 0);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
+ 
+ ];
+ 
