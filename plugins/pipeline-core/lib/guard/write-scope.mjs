@@ -83,6 +83,98 @@ export function w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies
   } catch { return false; }
 }
 
+// W7 Slice B (item half-moved-feature-directory-locks-every-shell-and-source-write): the bound feature directories are the
+// directories of the active feature's persisted plan / spec / design-input paths, limited to a directory of at least two
+// segments under specs/ or docs/ (so a top-level `docs/prd.md` never makes all of docs/ a repair root). null when no state
+// is readable or any readable state is unparseable -- a lane that cannot establish the directory refuses.
+const HALF_MOVED_ROOT_PREFIXES = Object.freeze(["specs", "docs"]);
+
+function w04BoundFeatureDirectories(root) {
+  const dirs = new Set();
+  let read = 0;
+  for (const state of [join(root, "project", "pipeline-state.json"), join(root, ".claude", "pipeline-state.json")]) {
+    let text;
+    try { text = w04ReadFileSync(state, "utf8"); } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      return null;
+    }
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { return null; }
+    read += 1;
+    for (const key of ["planPath", "specPath", "designInputPath"]) {
+      const value = parsed?.activeFeature?.[key];
+      if (typeof value !== "string" || value === "" || value.includes("\0")) continue;
+      const segments = w04NormalizeRelative(value).split("/");
+      segments.pop();
+      if (segments.length < 2 || !HALF_MOVED_ROOT_PREFIXES.includes(segments[0])) continue;
+      if (segments.some((segment) => segment === "" || segment === ".." || segment.startsWith(".") || segment === "node_modules")) continue;
+      dirs.add(segments.join("/"));
+    }
+  }
+  return read === 0 || dirs.size === 0 ? null : dirs;
+}
+
+/**
+ * W7 Slice B: the ONE repair shape admitted under a PORG-INVALID-OBSERVATION (session) -- exactly `git mv <src> <dst>` or
+ * `git restore <path>`, no flag, no chaining (simpleWords() accepts one simple command only), every path strictly inside
+ * ONE bound feature directory, spelled without `..`, glob/shell metacharacters or backslashes, and physically equal to its
+ * lexical spelling (no symlink anywhere on the path, so no realpath escape). A bound authority file may be renamed only
+ * within its own directory, never moved out of it. Any fault while establishing this refuses.
+ */
+export function isHalfMovedRepairCommand(command, root, dependencies = {}) {
+  try {
+    const words = simpleWords(command, root);
+    if (!words || words[0] !== "git") return false;
+    let operands;
+    if (words[1] === "mv" && words.length === 4) operands = [words[2], words[3]];
+    else if (words[1] === "restore" && words.length === 3) operands = [words[2]];
+    else return false;
+    const dirs = w04BoundFeatureDirectories(root);
+    const bound = w04BoundAuthorityPaths(root);
+    if (dirs === null || bound === null) return false;
+    const realpath = dependencies.w04RealpathSyncFn ?? w04RealpathSync;
+    const lstat = dependencies.lstatSyncFn ?? lstatSync;
+    const realRoot = realpath(root);
+    const resolved = [];
+    for (const word of operands) {
+      if (word === "" || word.startsWith("-") || /[\0\\*?[\]{}~$`!#&|;<>"'\s]/u.test(word)) return false;
+      if (word.split("/").includes("..")) return false;
+      const absolute = resolve(root, word);
+      const rel = relative(root, absolute).split(sep).join("/");
+      if (rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return false;
+      if (rel.split("/").some((segment) => segment === "" || segment.startsWith(".") || segment === "node_modules")) return false;
+      const lower = w04NormalizeRelative(rel);
+      const dir = [...dirs].find((candidate) => lower.startsWith(`${candidate}/`));
+      if (dir === undefined) return false;
+      try {
+        if (lstat(absolute).isSymbolicLink()) return false;
+      } catch (error) {
+        if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return false;
+      }
+      let current = absolute;
+      const tail = [];
+      for (;;) {
+        try { current = realpath(current); break; } catch (error) {
+          if (error?.code !== "ENOENT" && error?.code !== "ENOTDIR") return false;
+          const parent = w04Dirname(current);
+          if (parent === current) return false;
+          tail.unshift(basename(current));
+          current = parent;
+        }
+      }
+      const physical = w04NormalizeRelative(relative(realRoot, join(current, ...tail)).split(sep).join("/"));
+      if (physical !== lower) return false;
+      resolved.push({ lower, dir });
+    }
+    if (resolved.length === 2) {
+      const [source, destination] = resolved;
+      if (source.dir !== destination.dir || source.lower === destination.lower) return false;
+      if (bound.has(source.lower) && w04Dirname(source.lower) !== w04Dirname(destination.lower)) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
 /**
  * MEMPATH-1 (PO decision, 2026-08-08 -- backlog/items/2026-07-29-guard-lifecycle-ready-
  * blocks-claude-memory-writes.md, "PO decision, 2026-08-08 -- Option A"). Claude Code's own

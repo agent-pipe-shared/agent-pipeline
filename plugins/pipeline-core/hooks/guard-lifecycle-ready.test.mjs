@@ -11655,6 +11655,96 @@ test("QP3-4 W0-4 F-2: the record lane admits exactly backlog/, docs/ and scratch
   assert.equal(notebookTraversal.exitCode, 2, "NotebookEdit traversal out of scratch/ refused");
 });
 
+// W7 Slice B (AC-127, item half-moved-feature-directory-locks-every-shell-and-source-write): under a PORG-INVALID-OBSERVATION (session) the
+// lifecycle gate admits EXACTLY `git mv <src> <dst>` and `git restore <path>` with every path inside the bound feature directory (specs/f).
+function hmRoot(state = QW04_STATES.approved) {
+  const path = qw04GuardRoot(state);
+  mkdirSync(join(path, "specs", "f", "sub"), { recursive: true });
+  mkdirSync(join(path, "src"), { recursive: true });
+  for (const name of ["spec.md", "design-input.md", "a.md"]) writeFileSync(join(path, "specs", "f", name), "x\n");
+  return path;
+}
+function hmBash(path, command, outcome = "invalid") { return qw04Run(path, "Bash", { command }, outcome); }
+
+test("HM-1 an invalid session observation admits the exact git mv and git restore repair commands inside the bound feature directory", () => {
+  const path = hmRoot();
+  for (const command of [
+    "git mv specs/f/a.md specs/f/b.md",
+    "git mv specs/f/a.md specs/f/sub/a.md",
+    "git mv specs/f/spec.md specs/f/spec-renamed.md",
+    `git mv ${join(path, "specs", "f", "a.md")} ${join(path, "specs", "f", "c.md")}`,
+    "git restore specs/f/a.md",
+    "git restore specs/f/spec.md",
+    "git restore specs/f/not-yet.md",
+  ]) {
+    const result = hmBash(path, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+  }
+});
+
+test("HM-2 git mv with a destination or source outside the feature directory, a traversal, a flag or a bound authority file leaving its directory is refused", () => {
+  const path = hmRoot();
+  symlinkSync(join(path, "src"), join(path, "specs", "f", "escape"), "dir");
+  for (const command of [
+    "git mv specs/f/a.md src/a.md", "git mv src/a.md specs/f/a.md", "git mv specs/f/a.md docs/a.md",
+    "git mv specs/f/a.md specs/f/../../src/a.md", "git mv specs/f/a.md ../outside.md",
+    "git mv -f specs/f/a.md specs/f/b.md", "git mv -k specs/f/a.md specs/f/b.md", "git mv specs/f/a.md",
+    "git mv specs/f/a.md specs/f/b.md specs/f/sub", "git mv specs/f/a.md specs/f/escape/a.md",
+    "git mv specs/f/escape specs/f/b", "git mv specs/f/spec.md specs/f/sub/spec.md", "git mv specs/f specs/g", "git mv specs/f/*.md specs/f/sub",
+  ]) {
+    const result = hmBash(path, command);
+    assert.equal(result.exitCode, 2, `admitted: ${command}`);
+    assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, command);
+  }
+});
+
+test("HM-3 chaining, extra commands and any other git subcommand are never admitted by the repair lane", () => {
+  const path = hmRoot();
+  for (const command of [
+    "git mv specs/f/a.md specs/f/b.md && rm -rf src", "git mv specs/f/a.md specs/f/b.md; rm -rf src",
+    "git mv specs/f/a.md specs/f/b.md && git mv specs/f/b.md specs/f/c.md", "git restore specs/f/a.md | cat",
+    "git rm specs/f/a.md", "git checkout -- specs/f/a.md", "git reset --hard", "git clean -fd specs/f", "git add specs/f/a.md",
+  ]) {
+    const result = hmBash(path, command);
+    assert.equal(result.exitCode, 2, `admitted: ${command}`);
+  }
+});
+
+test("HM-4 git restore outside the feature directory, with a flag, a pathspec, a traversal or a symlink escape is refused", () => {
+  const path = hmRoot();
+  symlinkSync(join(path, "src"), join(path, "specs", "f", "escape"), "dir");
+  for (const command of [
+    "git restore src/prod.mjs", "git restore .", "git restore specs/f", "git restore specs", "git restore --staged specs/f/a.md",
+    "git restore -s HEAD~1 specs/f/a.md", "git restore specs/f/../../src/prod.mjs", "git restore specs/f/escape/prod.mjs",
+    "git restore specs/f/*.md", "git restore specs/f/a.md specs/f/spec.md", "git restore project/pipeline-state.json", "git restore",
+  ]) {
+    const result = hmBash(path, command);
+    assert.equal(result.exitCode, 2, `admitted: ${command}`);
+  }
+});
+
+test("HM-5 controls: a production write stays refused and the lane is session-intent PORG-INVALID-OBSERVATION only", () => {
+  const path = hmRoot();
+  for (const toolName of ["Write", "Edit"]) {
+    assert.equal(qw04Run(path, toolName, { file_path: "src/prod.mjs" }).exitCode, 2, `${toolName} src/prod.mjs`);
+    assert.equal(qw04Run(path, toolName, { file_path: "specs/f/new.md" }).exitCode, 2, `${toolName} specs/f/new.md`);
+  }
+  assert.equal(qw04Run(path, "Write", { file_path: "scratch/hm-note.md" }).exitCode, 0, "scratch record write control");
+  for (const outcome of ["invalidBootstrapIntent", "partial", "drift"]) {
+    for (const command of ["git mv specs/f/a.md specs/f/b.md", "git restore specs/f/a.md"]) {
+      assert.equal(hmBash(path, command, outcome).exitCode, 2, `${outcome}: ${command}`);
+    }
+  }
+});
+
+test("HM-6 without a readable bound feature directory in the state the repair lane admits nothing", () => {
+  for (const state of [null, "{ not json", { schema: "pipeline.state.v0", activeFeature: { id: "f", planPath: "docs/prd-bound.md" }, planApproved: true }]) {
+    const path = hmRoot(state);
+    assert.equal(hmBash(path, "git mv specs/f/a.md specs/f/b.md").exitCode, 2, `state ${JSON.stringify(state)}`);
+    assert.equal(hmBash(path, "git restore specs/f/a.md").exitCode, 2, `state ${JSON.stringify(state)} restore`);
+  }
+});
+
 // ALFRED-QP4-BUILD2: tests for the fourth signed quality package (appended to the HEAD test file); re-scoped to the guard-side changes only.
 // Contract: scratch/qp4/false-positives.md. The refusal label GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY non-admitted single read-family
 // command (isRejectedReadFamilyCommand), so R1-R3/R6 were never outside-root reads: they are refused for rg flags the closed grammar does not know

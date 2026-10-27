@@ -10,7 +10,7 @@ import { writeTargetPath } from "../tool-write-target.mjs";
 import { HOST_INIT_CROSS_VIEW_STATUSES, INTAKE_LIFECYCLE_STATUSES, LAUNCH_SCRIPT, REBASE_READINESS_LIFECYCLE_STATUSES, RESTART_RESUME_HINT_INPUT_PATH, SCRATCH_LIFECYCLE_STATUSES, WRITE_TOOLS } from "./constants.mjs";
 import { exactReadyReceipt, verdict } from "./verdict.mjs";
 import { blocked, externalRestartOnly } from "./denial-route.mjs";
-import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
+import { isBootstrapBindingScratchWrite, isIntakeLifecycleScratchMkdir, isIntakeLifecycleScratchWrite, isPartialLifecycleIncidentReportWrite, isPartialLifecycleScratchDirCreate, isRestartResumeHintCapture, isRestartResumeHintInputWrite, isRestartResumeHintInspect, restartResumeHintNearMissWrite, isHalfMovedRepairCommand, w04IsNonAuthorityRecordWrite } from "./write-scope.mjs";
 import { architectureAdoptionAuthorityVerdict, architectureFitnessAuthorityVerdict, fitnessModelQualificationObservation, minimumRigorObservation } from "./entry-gates.mjs";
 import { rootIdentityMismatch } from "./sanctioned-args-onboarding.mjs";
 import { isSourceOwnedOwningVerificationControllerCommand, isSourceOwnedContinuityVerificationCommand, isExactObservedInstalledPluginAttestationAction, isExactObservedOnboardingNextAction, isExactObservedRunnerPermissionsPlannerAction, isExactObservedRunnerPermissionsRepairAction, isSanctionedGhReadOnlyDiagnostic, isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
@@ -232,6 +232,15 @@ export function evaluateAfterGrammarAdmission(input, root, toolName, dependencie
       && !restartResumeHintNearMissWrite(input, root)
       && w04IsNonAuthorityRecordWrite(input, toolName, root, dependencies);
     if (invalidObservationRecordWrite) return verdict(0);
+    // W7 Slice B (backlog 2026-10-26-half-moved-feature-directory-locks-every-shell-and-source-write): a half-moved feature
+    // directory makes the observation invalid, and nothing could then repair it. Admit exactly `git mv`/`git restore` inside
+    // the bound feature directory (isHalfMovedRepairCommand) -- session intent, PORG-INVALID-OBSERVATION, Bash; nothing else.
+    const invalidObservationHalfMovedRepair = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-INVALID-OBSERVATION"
+      && error.intent === "session"
+      && toolName === "Bash"
+      && isHalfMovedRepairCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
+    if (invalidObservationHalfMovedRepair) return verdict(0);
     const exactObservedOnboardingNextAction = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
