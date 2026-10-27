@@ -1,0 +1,55 @@
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs
+index a47705727..0f30d1b96 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs
+@@ -72,4 +72,19 @@ check("F1 inventory records full lowercase SHA-256 values", () => {
+   for (const entry of inventory.files) assert.match(entry.rawSha256, /^[0-9a-f]{64}$/);
+ });
+ 
++check("D41 the Critic skill states the diagnostic evidence route (producer, registrar flag, preflight flag)", () => {
++  const skill = readFileSync(join(repoRoot, "plugins", "pipeline-core", "skills", "critic-review", "SKILL.md"), "utf8");
++  const flat = skill.replace(/\s+/g, " ");
++  const producer = flat.indexOf("scripts/critic-diagnostic-evidence.mjs");
++  const registrar = flat.indexOf("scripts/register-feature-package.mjs");
++  const addFlag = flat.indexOf("--add-diagnostic-evidence");
++  const preflight = flat.indexOf("scripts/critic-dispatch-preflight.mjs");
++  const regCommit = flat.indexOf("--registration-commit");
++  assert.equal(producer >= 0, true, "producer script is named");
++  assert.equal(registrar > producer, true, "registrar script follows the producer");
++  assert.equal(addFlag > registrar, true, "registrar flag --add-diagnostic-evidence follows the registrar");
++  assert.equal(preflight > addFlag, true, "preflight script follows the registration step");
++  assert.equal(regCommit > preflight, true, "preflight flag --registration-commit follows the preflight script");
++});
++
+ process.stdout.write(`1..${passed}\n`);
+diff --git a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+index 960df7a48..4dedf49c9 100644
+--- a/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
++++ b/plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json
+@@ -32,7 +32,7 @@
+     },
+     {
+       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+-      "rawSha256": "60cd00b9281b4522eff1bb2f176555084d032d54598bfca22d85223e8d92efab"
++      "rawSha256": "d440420c0fcc8f96225303ddff9f7bbd1dbdce0d622bcbdbbfda49612ed88ca7"
+     },
+     {
+       "path": "roles/critic.md",
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 54b92fd4a..772cc2901 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -125,6 +125,13 @@ commit/tree values match. A mismatched candidate fails binding; an unsupported
+ schema fails schema admission. Recompute the candidate binding for each review
+ and let preflight validate the concrete artifact before dispatch.
+ 
++**Diagnostic evidence route (in this order):** produce the artifact with
++`scripts/critic-diagnostic-evidence.mjs`, commit the artifact, register it with
++`scripts/register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>`,
++commit the manifest, then rerun `scripts/critic-dispatch-preflight.mjs` with
++`--registration-commit` naming that manifest commit. Script paths resolve under
++the plugin root the bootstrap prints, never a machine-specific path.
++
+ **Closed bootstrap role:** this skill is itself an authoritative Critic role
+ carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
+ invoke its compact `critic` role; an omitted adapter argument must not select
