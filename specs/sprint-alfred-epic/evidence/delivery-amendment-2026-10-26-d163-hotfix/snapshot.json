@@ -6,7 +6,7 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement.",
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75).",
   "total": 221,
   "baseline": {
     "counts": {
@@ -24,12 +24,12 @@
   "current": {
     "counts": {
       "25": 3,
-      "50": 21,
-      "75": 197,
+      "50": 19,
+      "75": 199,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 71.95
+    "index": 72.17
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -4539,9 +4539,9 @@
     {
       "part": "05",
       "itemId": "pipeline.retirement-reader-masks-typed-unsafe-layout-inspection",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "50",
-      "reason": "Baseline kept: pin counted 5/5 green for bullets 1-3; bullet 4 (the complete original onboarding controller, whose named test exceeded 600 s) is shown by no commit and by none of the 2026-10-23 evidence files.",
+      "reason": "Baseline kept: pin counted 5/5 green for bullets 1-3; bullet 4 (the complete original onboarding controller, whose named test exceeded 600 s) is shown by no commit and by none of the 2026-10-23 evidence files. PO decision 2026-10-27 (second tile): a row with no agent entry left, only the counted Verify run or native runner runs, the Critic and PO acceptance, counts at 75 as technically delivered; those gates follow after 75 and are not claimed here.",
       "evidence": [
         "d24f5ac31"
       ],
@@ -5191,9 +5191,9 @@
     {
       "part": "06",
       "itemId": "pipeline.three-runner-happy-path-with-two-po-approvals",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "50",
-      "reason": "The reconciled AC-264 pin reports 22 cases, 21 pass and one E-HOLD skip for the three installed runner end-to-end runs; the newer G27 renderer has 12/12 GREEN and actual acknowledgement 3/3 but does not execute case E. PO batch 10 keeps the item open for Greenfield host acceptance, so stage 50 remains.",
+      "reason": "The reconciled AC-264 pin reports 22 cases, 21 pass and one E-HOLD skip for the three installed runner end-to-end runs; the newer G27 renderer has 12/12 GREEN and actual acknowledgement 3/3 but does not execute case E. PO batch 10 keeps the item open for Greenfield host acceptance, so stage 50 remains. PO decision 2026-10-27 (second tile): a row with no agent entry left, only the counted Verify run or native runner runs, the Critic and PO acceptance, counts at 75 as technically delivered; those gates follow after 75 and are not claimed here.",
       "evidence": [
         "specs/sprint-alfred-epic/evidence/delivery-remeasure-2026-10-23/snapshot.json",
         "74055b194",
