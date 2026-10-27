@@ -13,7 +13,9 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **221 items:193 at75,16 at50,12 at25;28 below75;index70.48%** (D172,
+contains **221 items:194 at75,16 at50,11 at25;27 below75;index70.70%** (D173,
+2026-10-27: PF-80 moved to75, held patch D173 applied in `e3f0d7d03`, installed in
+the stamp `e562ae955`; D172,
 2026-10-27: PO rule "75 counts when technically delivered in the candidate"; Full
 Verify, Critic, native Windows runs and PO acceptance are the gates AFTER 75.
 D25, PF-78 and S7b moved to75 on held patches applied in `304365b68` and
@@ -36,6 +38,25 @@ remain0.7.0, mapped to existing ACs. Ten distinct second-run outcomes were
 added; no earlier identity disappeared. [Finding ledger](../specs/sprint-alfred-epic/evidence/greenfield-second-run-2026-10-25/README.md).
 75 means focused Source readiness, not native acceptance or release.
 All-at75 remains the continuation objective after transfer.
+
+**Status 2026-10-27 (held work and one blocker; Full Verify, Critic, native runs and PO acceptance pending):**
+installed candidate `0.7.0+claude.20261027062846.bdc9f83` carries D173 (PF-80) and
+D177 C1 (memoised integrated-slice proof). Held and NOT applied, in
+`specs/sprint-alfred-epic/evidence/held-patches/`: the D177 increment
+(`d177-admission-speed-settled-history.patch`, typed `GUARD-DISPATCH-SLOW` refusal
+at phase checkpoints, no wall-clock gain measured, commit message in
+`scratch/commit-msg/apply-d177-increment.txt`) and D174 PF-81
+(`d174-pf81-commit-verify-pnpm-lockfile.patch`, `verify-evidence-producer.test.mjs`
+44/44 before, 50/50 after, real pnpm install and a native Windows pnpm shim not
+exercised). PF-81 stays at25 until applied and installed. **Blocker:** the
+stopped D174 Goldfish left `stop-failure-46e6e808863ff820684496cb118d865b.json`
+in `.git/agent-pipeline/run/native-goldfish-host-commit/`; the native inventory
+refuses it (`native-managed-unknown-native-entry`), so every dispatch is blocked
+and `heal` refuses; `move-aside` did not clear it (registry retained aside as
+`20261027071029609-d037ab66-repair-move-aside`). The PO moves that one file out
+of the directory; then `heal` and the prepared D179 briefing (missing `docs/adr`,
+package in `scratch/wave3/pkg-d179-adr-missing.json`) follow. Backlog item:
+`2026-10-27-a-stop-failure-diagnostic-makes-the-native-goldfish-inventory-unreadable`.
 
 **D165 interim candidate, status 2026-10-26 (implementation complete, verify, critic and PO acceptance pending):**
 the PO applied brownfield entry D1, the PF-75 declaration patch (A), and in
