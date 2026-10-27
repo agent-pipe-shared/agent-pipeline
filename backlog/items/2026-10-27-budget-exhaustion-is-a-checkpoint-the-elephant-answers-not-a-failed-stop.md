@@ -46,6 +46,22 @@ control; the pipeline handles it as a fault.
    an unanswered notice never blocks and the dispatch continues; a `stalled` pause is listed by the inspect report; the
    absolute cap pauses and is refused past an explicit continue.
 
+7. RUNNER-NEUTRAL (PO 2026-10-27): the `checkpoint` outcome, the progress facts (changed paths and calls since the last
+   artefact), the stall rule, the grant record and the window-counting ceiling live in the runner-neutral core. Claude,
+   Codex and Antigravity each get an adapter that counts calls, emits the notice and applies the continue or abort answer.
+   Today only the Claude hook counts authenticated subagent calls (briefing field TB-09); on Codex and Antigravity the cap
+   is a briefing duty. Wanted: authenticated live-call adapters for both, or a typed `unenforced` readback that says so,
+   never a silent claim of parity. Regression: one shared test table drives all three adapters through
+   notice, continue, abort and stalled.
+
+## Measured 2026-10-27 (D180b)
+
+- A finished background agent can be resumed with `SendMessage` and keeps its context, its clones and its continuation card.
+- A chat message does not extend its budget: the agent correctly refused to act without the hook's `DISPATCH-BUDGET-GRANT`
+  notice. The sanctioned route is `dispatch-budget-grant.mjs` and then its `continuationMessage`.
+- A grant is capped at `maxTurns - 6` (44 for the implementor) and only one grant per agent is allowed, so the shipped
+  mechanism gives about nine more calls. That cannot carry "seamless by default"; the ceiling must count windows.
+
 ## Open measurements
 
 - Whether a resumed background agent (`SendMessage`) keeps its pending host-commit state under the Claude host is

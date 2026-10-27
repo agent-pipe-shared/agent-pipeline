@@ -39,6 +39,11 @@ human even though the step is the tool's own offered repair.
 5. Regression: each listed repair, run by the Elephant under the default calibration, is admitted and recorded; a finding
    outside the list is refused with the typed next step.
 
+6. RUNNER-NEUTRAL (PO 2026-10-27): the closed repair list, the `repair` verb, the default calibration and the repair
+   measure live in the runner-neutral core and apply identically to all three runners (Claude, Codex, Antigravity).
+   Runner adapters only translate; none may carry its own list. Regression: one shared test table runs the same repairs
+   through each adapter. A runner that cannot enforce a part says so in a typed readback instead of silently skipping it.
+
 ## Boundaries
 
 The PO decision of 2026-10-27 (tile answer) is the authority for this session; this item makes it durable and
