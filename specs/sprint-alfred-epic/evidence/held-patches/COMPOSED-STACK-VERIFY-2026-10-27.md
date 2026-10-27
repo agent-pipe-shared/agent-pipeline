@@ -21,9 +21,23 @@ w7-elephant-context-guard-dispatch-c2, w7-d52-stale-snapshot-refusal-text, w7-d3
 
 NOT in the bundle (partial or not run, never apply): w7-pf86-scan-outside-registry-lock (c1, interim),
 w7-pf86-registry-read-api (c2, NGHS46 red), w7-elephant-context-guard-dispatch (superseded by c2),
-and the slices not yet dispatched (admission timeout and read cost, D31 schema half, signature slice A,
-D56 validator). `w7-d31-checkpoint-outcome` is complete on its own side, but the return validator does
-not accept the checkpoint outcome until the D31 schema slice lands; nothing emits it before then.
+and the slices not yet done (admission read cost, PF-86 c3, signature slice A, D56 slices 2-5).
+`w7-d31-checkpoint-outcome` is complete on its own side; the schema half that lets the return validator
+accept the checkpoint outcome is in the increment below.
+
+## Second file: the increment (`w7-increment-2026-10-27.patch`, 8 files, +103/-21)
+
+Cut on top of the bundle (Elephant-implemented in a scratch clone, RED to GREEN tests). Contents:
+D31 schema half (`native-goldfish-host-return.mjs` `allowCheckpoint` option, finalizer shim removed,
+NGHR07/NGHR08), admission budget 300 s in `guard-dispatch.mjs` with hook timeout 330 s in
+`hooks/hooks.json` (hooks.json is TP-4 protected: it needs the PO approval ceremony, the budget
+literal alone is not enough because the hook timeout is the real ceiling), and the D56
+orchestrator-attested record validator slice 1 (`lib/dispatch-record.mjs`, DRC14-DRC18, 18/18).
+Neighbour suites green on the chained clone (dispatch-record-write 19/19, authorship-verify 65/65,
+check-critic-skip-coverage 40/40, liveness 16/16, strip 12/12, return 8/8, finalizer 21/21,
+hooks-manifest-shape ok); guard-dispatch 75 tests, the 22 carrier-policy failures are the baseline-identical ones.
+Chain check: bundle, then increment, both `git apply` cleanly on a fresh clone of the repository HEAD.
+Apply order is fixed: bundle first, increment second.
 
 ## Verification (isolated clones via scripts/run-parallel.mjs, stack vs clean HEAD)
 
@@ -46,7 +60,9 @@ patches (pf83, pf85, d31) touch native-goldfish host state; guard-dispatch.mjs (
 
 Block 1, apply and look:
 `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-final-bundle-2026-10-27.patch`
-then `git status --short`.
+then `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-increment-2026-10-27.patch`
+then `git status --short`. The `hooks/hooks.json` change inside the increment is TP-4 protected:
+apply it through the PO approval ceremony, or leave that one hunk out and keep the hook timeout at 120 s.
 
 Block 2, stage with a path limit and commit with the PO's own ceremony (the commit is the PO's;
 hooks are bypassed only through the sanctioned route): `git add -A -- plugins/pipeline-core`.
