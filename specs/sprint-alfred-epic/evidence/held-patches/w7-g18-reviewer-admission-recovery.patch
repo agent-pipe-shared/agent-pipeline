@@ -1,0 +1,62 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index e2837045b..e1dce2e25 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -41,8 +41,22 @@ const REPAIRS = Object.freeze({
+   "CCA-MANIFEST-READ": "The base commit does not hold the feature manifest. Start the first review from the commit that first added the feature manifest, or a later commit that lists it; that commit need not list the review unit. Find it with: git log --diff-filter=A --format=%H -- specs/<id>/lifecycle.json (the last line).",
+ });
+ /** Read-only repair text for a refusal code, or null when no sanctioned route exists for it. */
++const REPAIRS_EXTRA = {};
++Object.assign(REPAIRS_EXTRA, {
++  "CCA-DETERMINISTIC-FAILED": "The registered targeted check for the candidate did not pass. Fix the failing check, regenerate the diagnostic evidence with scripts/critic-diagnostic-evidence.mjs, register it, commit the manifest, then rerun critic-dispatch-preflight.mjs.",
++  "CCA-DETERMINISTIC-SELECTION": "The delta request names a different set of diagnostic evidence than the one registered. Regenerate the delta request from the currently registered diagnostic evidence paths, then rerun critic-dispatch-preflight.mjs.",
++  "CCA-DELTA-REQUIRED": "A retained review exists, so the next review must be a delta. Prepare and register a delta request for the candidate, then rerun critic-dispatch-preflight.mjs with its path.",
++  "CCA-REQUESTED-MODE": "The requested mode does not match the course: the first review is full, every later review is a delta. Rerun critic-dispatch-preflight.mjs with the mode the course history requires.",
++});
++const PO_DECIDES = new Set(["CCA-REVIEW-BUDGET-EXHAUSTED", "CCA-ACCEPTANCE", "CCA-ACCEPTANCE-REFERENCE", "CCA-ACCEPTANCE-BINDING", "CCA-GENESIS", "CCA-GENESIS-BINDING", "CCA-ALIAS-GENESIS", "CCA-ALIAS-GENESIS-UNAVAILABLE", "CCA-ALIAS-V1-GENESIS-UNAVAILABLE"]);
++/** Repair text for a CCA refusal code, an explicit no-route object naming who decides, or null for non-CCA input. */
+ export function criticCourseRepair(code) {
+-  return typeof code === "string" && Object.hasOwn(REPAIRS, code) ? REPAIRS[code] : null;
++  if (typeof code !== "string") return null;
++  if (Object.hasOwn(REPAIRS, code)) return REPAIRS[code];
++  if (Object.hasOwn(REPAIRS_EXTRA, code)) return REPAIRS_EXTRA[code];
++  if (!code.startsWith("CCA-")) return null;
++  return Object.freeze({ route: "none", decidedBy: PO_DECIDES.has(code) ? "PO" : "Coordinator",
++    reason: `No sanctioned self-service recovery exists for ${code}; the ${PO_DECIDES.has(code) ? "PO" : "Coordinator"} decides how the course proceeds.` });
+ }
+ const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+ 
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 693511785..73492883d 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -644,4 +644,29 @@ test("D167-PF78 (3) a diagnostic whose full-verify member is the fixed evidence/
+   assert.match(result.message ?? JSON.stringify(result), /--full-verify/u);
+   assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
+ });
++// G18 slice B: every reviewer-admission refusal code names a recovery or an explicit no-route.
++const ccaCodes = [...new Set(readFileSync(new URL("./critic-course-admission.mjs", import.meta.url), "utf8").match(/CCA-[A-Z0-9]+(?:-[A-Z0-9]+)*/gu))].sort();
++test("G18B (a) the enumerated CCA code set is non-trivial and includes the three repaired codes", () => {
++  assert.ok(ccaCodes.length > 40, String(ccaCodes.length));
++  for (const code of ["CCA-DETERMINISTIC-UNAVAILABLE", "CCA-REVIEW-UNIT-REQUIRED", "CCA-MANIFEST-READ"]) assert.ok(ccaCodes.includes(code), code);
++});
++test("G18B (b) every CCA refusal code yields a non-null recovery or an explicit no-route naming who decides", () => {
++  for (const code of ccaCodes) {
++    const repair = criticCourseRepair(code);
++    assert.notEqual(repair, null, code);
++    if (typeof repair === "string") { assert.ok(repair.length > 20, code); continue; }
++    assert.equal(repair.route, "none", code);
++    assert.ok(["PO", "Coordinator"].includes(repair.decidedBy), code);
++    assert.equal(typeof repair.reason, "string", code);
++    assert.ok(repair.reason.length > 0, code);
++  }
++});
++test("G18B (c) the three existing repairs keep their exact text and non-CCA input stays null", () => {
++  const sha = (v) => hash(Buffer.from(v));
++  assert.equal(sha(criticCourseRepair("CCA-DETERMINISTIC-UNAVAILABLE")), "82c0cb9fd7335a83a67eb42e85f7f43cd33e413975da46e4008b6c093f331d32");
++  assert.equal(sha(criticCourseRepair("CCA-REVIEW-UNIT-REQUIRED")), "5529bda66d4b0b02095cf06d726b032e7360a4692a00e859cb3801659162a4c4");
++  assert.equal(sha(criticCourseRepair("CCA-MANIFEST-READ")), "4deceb8240578c2c85665690fe09bbac7d3ef571c450e98a84ac597a8d016def");
++  assert.equal(criticCourseRepair("CDP-COURSE-UNAVAILABLE"), null);
++  assert.equal(criticCourseRepair(undefined), null);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
