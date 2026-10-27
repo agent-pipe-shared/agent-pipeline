@@ -13,7 +13,10 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **221 items:211 at75,10 at50,0 at25;10 below75;index73.87%** (sitting
+contains **231 items:211 at75,11 at50,9 at25;20 below75;index71.86%** (P0/P1
+intake round 3, 2026-10-27, PO message: ten P1 rows from the Toolbox hand-over and
+Glossover feedback 06 joined, no P0 open, see
+`backlog/items/2026-10-27-p0-p1-findings-round-3-toolbox-and-glossover.md`; sitting
 amendment, 2026-10-27: the 17 held patches were applied in `624016cb1` to `6546599bc`
 and installed in `0.7.0+claude.20261027135736.6546599`; seven rows moved to75 with
 their open entries kept; D182, Elephant exception by PO decision 2026-10-27: the native
