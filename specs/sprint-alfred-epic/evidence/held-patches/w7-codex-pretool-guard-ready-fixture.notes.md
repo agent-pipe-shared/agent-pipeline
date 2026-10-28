@@ -24,6 +24,13 @@ Candidate 5fea1c3a3155022c6444a2dd8f08a43f72ec5321. Scratch clones (`git clone -
 - No separate new RED/GREEN cases were written: the existing red checks are the contract; the fix corrects a stale expectation.
 - Independent Critic review is a parent-owned batch gate; Full Verify and PO acceptance pending.
 
+## Orchestrator addendum (2026-10-28, read from the green2 log after the hand-back)
+The green2 run (patched, scratch/ present, bare `node <file>`) finished: 38 of 39 ok, and `not ok 7` still fails, now with
+`AssertionError: test runner must provide a synthetic HOME` at test line 654. So the ENOENT diagnosis above is only the
+first of two environment preconditions: name 7 also requires the HOME that the repository test runner
+(`scripts/run-parallel.mjs`, private HOME and TMPDIR) provides. Class stays ENVIRONMENT, but the claim "green with scratch/
+present" is NOT confirmed by a bare-node run. Under the runner name 7 is expected green; unverified. The 12 fixture names are green in both runs.
+
 ## Proposed commit message
 test(codex-guard): walk the design authoring stop in the ready lifecycle fixture
 
