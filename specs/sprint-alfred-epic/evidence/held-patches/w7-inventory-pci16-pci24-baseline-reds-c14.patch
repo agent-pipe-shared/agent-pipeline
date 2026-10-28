@@ -1,0 +1,34 @@
+diff --git a/harness/scripts/check-product-capability-inventory.test.mjs b/harness/scripts/check-product-capability-inventory.test.mjs
+index 475cd1ea9..e075d8206 100644
+--- a/harness/scripts/check-product-capability-inventory.test.mjs
++++ b/harness/scripts/check-product-capability-inventory.test.mjs
+@@ -362,7 +362,13 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
+         trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true },
+     };
+     assert.equal(admitSessionCriticReview(criticRequest).status, "admitted");
+-    const result = finalizeSessionCriticReview(criticRequest);
++    // Cut A: a finalized verdict needs a record the Source issued; build it the way the finalizer's own suite does.
++    const sourceIssuedOrigin = (query) => ({
++      schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId,
++      packetDigest: query.packetDigest, claimant: query.claimant, sessionId: query.sessionId,
++      verdictSha256: query.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000,
++    });
++    const result = finalizeSessionCriticReview(criticRequest, { readOriginalSourceReturnFn: sourceIssuedOrigin });
+     assert.equal(result.status, "completed");
+     const prepared = preparePortableCriticExport({ gitCommonDir: join(root, ".git"),
+       criticPacketId: criticRequest.packetId, candidate: { commit: candidate, tree },
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md b/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
+index 3a1ed3454..618c6ba78 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/architecture-orientation.md
+@@ -18,7 +18,9 @@ When its status is `migration-required`, a legacy deferred adoption exists
+ and must be migrated before implementation (D162). Run the nested read-only
+ `nextAction` and show the PO the proposal's `migration` block: measure when the
+ map is missing, prepare the approved-scoped adoption, then confirm and apply it
+-through the same route as a fresh adoption. Never run the measure or apply steps
++through the same route as a fresh adoption. The measure step is the
++`scripts/architecture-measure.mjs` entry point (`Usage: node scripts/architecture-measure.mjs --root <dir> [--apply] [--json]`;
++without `--apply` it only reports). Never run the measure or apply steps
+ without the PO's go, and never offer a new deferral.
+ 
+ Orientation and proposal are not authority to write a map or make a PO
