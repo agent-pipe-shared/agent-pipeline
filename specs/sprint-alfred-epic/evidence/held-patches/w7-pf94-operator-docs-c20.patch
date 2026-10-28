@@ -73,7 +73,7 @@ index 5c6a380f3..d16f97d8c 100644
    const target = join(root, artifact.path), created = !existsSync(target);
    const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
 diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
-index 9b47f850b..d460e90fd 100644
+index 9b47f850b..2283872a4 100644
 --- a/plugins/pipeline-core/scripts/register-feature-package.mjs
 +++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
 @@ -51,7 +51,7 @@ function commitPlan(root, result) {
@@ -89,7 +89,7 @@ index 9b47f850b..d460e90fd 100644
    "  2. Register it: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>",
    "  3. Commit the manifest and the critic-lineage file the registration names, in one evidence-only commit.",
    "",
-+  "Critic delta request route (PF-94; the request of round 2 and later; run in this order):",
++  "Critic delta request route (PF-94) for round 2 and later (run in this order):",
 +  "  1. The lineage of the last round is registered and committed (route above).",
 +  "  2. Make the correction commit.",
 +  "  3. Produce and commit the diagnostic for it, then register it (--add-diagnostic-evidence, route above) and commit the manifest.",
@@ -216,7 +216,7 @@ index 772cc2901..de1c1c490 100644
  
  Arguments received: `$ARGUMENTS`
 diff --git a/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md b/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
-index a1fbe6196..0d0aaac71 100644
+index a1fbe6196..0521c4ada 100644
 --- a/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
 +++ b/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
 @@ -97,6 +97,10 @@ After registration, do not edit any file the manifest registers (PRD, Spec,
@@ -224,8 +224,8 @@ index a1fbe6196..0d0aaac71 100644
  edited PRD or Spec also fails the approval binding (`CAC-SOURCE-BINDING-MISMATCH`).
  
 +To continue a course after its first Critic round (takeover of an old batch, lineage,
-+delta request, refusal codes), follow the section "Continuing a Critic course after the
-+first round (PF-94)" in `skills/critic-review/SKILL.md`.
++delta request, refusal codes), follow the section
++"Continuing a Critic course after the first round (PF-94)" in `skills/critic-review/SKILL.md`.
 +
  The guard creates `slice-queue.json` itself from the first productive dispatch
  whose prompt opens with a generated binding carrying `itemDelivery`; without
