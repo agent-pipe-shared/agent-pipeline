@@ -92,9 +92,13 @@ Baseline reds still open after v5 (all pre-existing on the clean tree):
   2026-10-27 list. Fixed by v5: observer-conformance (through patch 7) and push-init (patches 23, 24). Measured and
   classified but not fixed (see `w7-recon-baseline-reds-c.notes.md`): parallel-work PARWORK-M6a/c/d/e/f (fixture needs a
   generator-built briefing, same family as guard-dispatch group C) and configure-verify-names (3 cases expect a
-  `repair` clause the refusal never carries; production or pin ahead of its fix, undecided). Never classified:
-  project-onboarding-v3, onboarding-continuity OBC264, approve-announce, project-onboarding-e2e,
-  plan-authority-staging-guard, measure-tofu, consumer-approved-plan (g); the Q9 D55 suite name does not resolve.
+  `repair` clause the refusal never carries; production or pin ahead of its fix, undecided). Classified by a second
+  pass, not fixed (all red in the real checkout too, none environmental): approve-announce and
+  plan-authority-staging-guard (architecture gate at `submit-plan`, fixture), onboarding-continuity OBC264
+  (`BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED`, fixture binds unauthored generated design bytes), project-onboarding-e2e
+  and measure-tofu (the driver ends `unsupported-next-action` where the pin expects an error code; needs a decision
+  which outcome is intended), consumer-approved-plan (g) (refusal wording changed, pin stale). Not measured:
+  project-onboarding-v3; the Q9 D55 suite name does not resolve.
 Not run: Antigravity pretool guard test file, any dedicated PowerShell dialect test, Full Verify.
 
 ## For the batch Critic (kernel and custody parts)
