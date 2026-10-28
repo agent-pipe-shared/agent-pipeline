@@ -1,0 +1,156 @@
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index 5d264e06f..1ab5f6125 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -188,6 +188,32 @@ check("ships a complete Draft-2020-12 schema parallel to the runtime root and ne
+   assert.equal(releaseScopeSchema.additionalProperties, false);
+ });
+ 
++check("schema path patterns accept every legitimate file name character and agree with safePath", () => {
++  const lineageSchema = JSON.parse(readFileSync(new URL("../scripts/critic-review-lineage.schema.json", import.meta.url), "utf8"));
++  const releaseSchema = JSON.parse(readFileSync(new URL("../scripts/release-critic-review-scope.schema.json", import.meta.url), "utf8"));
++  const cp = (value) => String.fromCodePoint(value);
++  const accepted = [
++    "src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx",
++    "src/with space/a.ts", `src/${cp(252)}ber/a.ts`, "src/a+b=c,d~e.ts", "src/a:b.ts", "src/a.ts ", "-lead/a.ts",
++  ];
++  const refused = [
++    `src/a${cp(10)}b.ts`, `src/a.ts${cp(10)}`, `src/a${cp(0)}b.ts`, `src/a${cp(0x85)}b.ts`, `src/a${cp(0x7f)}b.ts`,
++    `src/a${cp(92)}b.ts`, "/src/a.ts",
++  ];
++  const lineagePattern = new RegExp(lineageSchema.$defs.path.pattern);
++  const releasePattern = new RegExp(releaseSchema.$defs.path.pattern);
++  for (const path of accepted) {
++    assert.equal(lineagePattern.test(path), true, `lineage accepts ${JSON.stringify(path)}`);
++    assert.equal(releasePattern.test(path), true, `release accepts ${JSON.stringify(path)}`);
++    assert.equal(safePath(path), true, `safePath accepts ${JSON.stringify(path)}`);
++  }
++  for (const path of [...refused, "src//a.ts", "src/./a.ts", "src/../a.ts"]) {
++    assert.equal(lineagePattern.test(path), false, `lineage refuses ${JSON.stringify(path)}`);
++    assert.equal(safePath(path), false, `safePath refuses ${JSON.stringify(path)}`);
++  }
++  for (const path of refused) assert.equal(releasePattern.test(path), false, `release refuses ${JSON.stringify(path)}`);
++});
++
+ check("retains pending incomplete/null coverage verbatim and admits only its exact compiled packet", () => {
+   const lineage = compile();
+   assert.equal(lineage.coverage.complete, false);
+@@ -779,5 +805,5 @@ check("compiles and validates a lineage record whose packet diff path carries br
+   assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: ["src/a\nb.ts"] }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
+ });
+ 
+-assert.equal(passed, 16);
+-console.log(`${passed}/16 checks passed.`);
++assert.equal(passed, 17);
++console.log(`${passed}/17 checks passed.`);
+diff --git a/plugins/pipeline-core/lib/review-economy.test.mjs b/plugins/pipeline-core/lib/review-economy.test.mjs
+index 61752e633..a5910a0ce 100644
+--- a/plugins/pipeline-core/lib/review-economy.test.mjs
++++ b/plugins/pipeline-core/lib/review-economy.test.mjs
+@@ -25,6 +25,7 @@ import {
+ } from "./review-economy.mjs";
+ import reviewAttemptSchema from "../scripts/review-attempt.schema.json" with { type: "json" };
+ import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
++import { safePath } from "./critic-review-lineage-core.mjs";
+ import { readFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -606,6 +607,46 @@ ok("RE67 review-attempt schema is a closed v1 root", reviewSchema.additionalProp
+ ok("RE68 fallback receipt schema is Coordinator-only and non-delegating", fallbackSchema.properties.creatorDuty.const === "Coordinator" && fallbackSchema.properties.mayDelegate.const === false);
+ ok("RE69 course schema owns exactly brief intent and receipt forms", Array.isArray(courseSchema.oneOf) && courseSchema.oneOf.length === 3 && courseSchema.$defs.brief.additionalProperties === false);
+ 
++// RE71: the four JSON schema path patterns accept every legitimate file name character (PF-97 F2).
++const findPathPattern = (node) => {
++  if (node === null || typeof node !== "object") return null;
++  if (typeof node.path === "object" && node.path !== null && typeof node.path.pattern === "string") return node.path.pattern;
++  for (const value of Object.values(node)) { const found = findPathPattern(value); if (found !== null) return found; }
++  return null;
++};
++const schemaPathPattern = (name) => findPathPattern(JSON.parse(readFileSync(join(scriptsDir, name), "utf8")));
++const schemaPathCases = [
++  { name: "review-attempt.schema.json", dots: true, doubleSlash: true },
++  { name: "course-decision.schema.json", dots: true, doubleSlash: true },
++  { name: "critic-review-lineage.schema.json", dots: true, doubleSlash: true },
++  { name: "release-critic-review-scope.schema.json", dots: false, doubleSlash: false },
++];
++const schemaPatternRegexes = schemaPathCases.map((entry) => ({ ...entry, pattern: schemaPathPattern(entry.name) }));
++const codePoint = (value) => String.fromCodePoint(value);
++const schemaAccepted = [
++  "src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx",
++  "src/with space/a.ts", `src/${codePoint(252)}ber/a.ts`, "src/a+b=c,d~e.ts", "src/a:b.ts", "src/a.ts ", "-lead/a.ts",
++];
++const schemaRefusedCommon = [
++  `src/a${codePoint(10)}b.ts`, `src/a.ts${codePoint(10)}`, `src/a${codePoint(0)}b.ts`, `src/a${codePoint(0x85)}b.ts`,
++  `src/a${codePoint(0x7f)}b.ts`, `src/a${codePoint(92)}b.ts`, "/src/a.ts",
++];
++const schemaRefusedStructural = ["src//a.ts", "src/./a.ts", "src/../a.ts"];
++ok("RE71a all four schema path definitions carry a pattern", schemaPatternRegexes.every((entry) => typeof entry.pattern === "string"));
++ok("RE71b schema path patterns accept every legitimate file name character",
++  schemaPatternRegexes.every((entry) => typeof entry.pattern === "string" && schemaAccepted.every((path) => new RegExp(entry.pattern).test(path))));
++ok("RE71c schema path patterns refuse controls, backslash and a leading slash",
++  schemaPatternRegexes.every((entry) => typeof entry.pattern === "string" && schemaRefusedCommon.every((path) => !new RegExp(entry.pattern).test(path))));
++ok("RE71d schema path patterns with segment lookaheads refuse empty and dot segments",
++  schemaPatternRegexes.filter((entry) => entry.dots).every((entry) => typeof entry.pattern === "string"
++    && schemaRefusedStructural.every((path) => !new RegExp(entry.pattern).test(path))));
++ok("RE71e lineage and release schema patterns agree with the exported safePath predicate",
++  schemaPatternRegexes.filter((entry) => !entry.dots || entry.name.startsWith("critic-review-lineage")).every((entry) => {
++    if (typeof entry.pattern !== "string") return false;
++    const samples = [...schemaAccepted, ...schemaRefusedCommon, ...(entry.dots ? schemaRefusedStructural : [])];
++    return samples.every((path) => new RegExp(entry.pattern).test(path) === (safePath(path) === true));
++  }));
++
+ console.log(`\n${checks - failures}/${checks} checks passed.`);
+ if (failures > 0) process.exitCode = 1;
+ 
+diff --git a/plugins/pipeline-core/scripts/course-decision.schema.json b/plugins/pipeline-core/scripts/course-decision.schema.json
+index ddcd271d7..6b19c5a4e 100644
+--- a/plugins/pipeline-core/scripts/course-decision.schema.json
++++ b/plugins/pipeline-core/scripts/course-decision.schema.json
+@@ -11,7 +11,7 @@
+     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+     "sha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+-    "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
++    "path": { "type": "string", "pattern": "^(?!/)(?![\\s\\S]*//)(?![\\s\\S]*(?:^|/)\\.{1,2}(?:/|$))(?![\\s\\S]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])[\\s\\S]{1,240}$" },
+     "evidence": {
+       "type": "object", "additionalProperties": false, "required": ["id", "sha256"],
+       "properties": { "id": { "$ref": "#/$defs/safeId" }, "sha256": { "$ref": "#/$defs/sha256" } }
+diff --git a/plugins/pipeline-core/scripts/critic-review-lineage.schema.json b/plugins/pipeline-core/scripts/critic-review-lineage.schema.json
+index 3fb6a50b4..c2b00574d 100644
+--- a/plugins/pipeline-core/scripts/critic-review-lineage.schema.json
++++ b/plugins/pipeline-core/scripts/critic-review-lineage.schema.json
+@@ -442,7 +442,7 @@
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 512,
+-      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?/)(?!.*//)[A-Za-z0-9._/-]+$"
++      "pattern": "^(?!/)(?![\\s\\S]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])(?![\\s\\S]*(?:^|/)\\.\\.?/)(?![\\s\\S]*//)[\\s\\S]+$"
+     },
+     "pathSet": {
+       "type": "array",
+diff --git a/plugins/pipeline-core/scripts/release-critic-review-scope.schema.json b/plugins/pipeline-core/scripts/release-critic-review-scope.schema.json
+index 121e72eb3..5fe3d3e98 100644
+--- a/plugins/pipeline-core/scripts/release-critic-review-scope.schema.json
++++ b/plugins/pipeline-core/scripts/release-critic-review-scope.schema.json
+@@ -52,7 +52,7 @@
+     "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+     "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
+     "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+-    "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)[A-Za-z0-9._/-]{1,512}$"},
++    "path": {"type": "string", "pattern": "^(?!/)(?![\\s\\S]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])[\\s\\S]{1,512}$"},
+     "paths": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
+     "candidate": {
+       "type": "object", "additionalProperties": false,
+diff --git a/plugins/pipeline-core/scripts/review-attempt.schema.json b/plugins/pipeline-core/scripts/review-attempt.schema.json
+index 0837386fa..c5e8dfe75 100644
+--- a/plugins/pipeline-core/scripts/review-attempt.schema.json
++++ b/plugins/pipeline-core/scripts/review-attempt.schema.json
+@@ -121,7 +121,7 @@
+     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+     "sha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+-    "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
++    "path": { "type": "string", "pattern": "^(?!/)(?![\\s\\S]*//)(?![\\s\\S]*(?:^|/)\\.{1,2}(?:/|$))(?![\\s\\S]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])[\\s\\S]{1,240}$" },
+     "count": { "type": "integer", "minimum": 0 }
+   }
+ }
