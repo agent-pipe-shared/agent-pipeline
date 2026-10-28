@@ -1,0 +1,13 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index 6753c0e55..18a5186fb 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -41,7 +41,7 @@ function review(fx,member,round,pass=false){
+     dispatch:{requiredNextGate:"session-critic-dispatch",reviewerInput:{rulesetSha:fx.base}}};
+   const options={preflightInput:{root:fx.root,evidencePaths:["evidence/verify.json"]},taskId:fx.taskId,projectId:"pipeline",sessionId:`session-round-${round}`,packetId:String(round).repeat(32),
+     route:{routeId:"session-critic",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh"},
+-    genericBatchRef:{...member.batchRef,memberSha256:member.memberSha256}};
++    genericBatchRef:{...member.batchRef,memberSha256:member.memberSha256},allowCallerAuthoredFallback:true};
+   const deps={preflightCriticDispatchFn:()=>preflight,modelRoleEnvironment:{}};
+   const admitted=admitSessionCriticReview(options,deps);assert.equal(admitted.status,"admitted");
+   const verdict={findings:[],deliberately_not_flagged:["scope"],trajectory_verdict:"consistent",trajectory_evidence:"controlled fixture inspected",briefing_violations:[],pass};
