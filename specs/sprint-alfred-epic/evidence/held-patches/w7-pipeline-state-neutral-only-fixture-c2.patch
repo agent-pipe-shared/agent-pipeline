@@ -1,0 +1,30 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2922eb40c..919afcace 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -2215,8 +2215,10 @@ function awaitingApprovalFixture() {
+     assert.ok(decisionLine, `${label} must display task-scoped architecture decisions`);
+     const decisionSummary = JSON.parse(decisionLine.slice("Architecture decisions: ".length));
+     assert.equal(decisionSummary.schema, "pipeline.architecture-planning-decisions.v1");
+-    assert.deepEqual(decisionSummary.areas, [], `${label} must not invent an effective decision for the unowned planned path`);
+-    assert.deepEqual(decisionSummary.unresolvedPaths, ["src/change.mjs"], `${label} must display the actual task-scoped planning path`);
++    // The fixture's module `application` owns src/**, so the planned path is owned: it lands in areas, not unresolvedPaths
++    // (same shape as lib/architecture-entry-readiness.test.mjs, owned versus unowned planned path).
++    assert.deepEqual(decisionSummary.areas, [{ area: "application", status: "ready", decisions: [], findingCount: 0 }], `${label} must display the owned planned path's area without inventing an effective decision`);
++    assert.deepEqual(decisionSummary.unresolvedPaths, [], `${label} must leave no unresolved path for the owned planned path`);
+     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
+   }
+ 
+@@ -2248,8 +2250,11 @@ function awaitingApprovalFixture() {
+   // and uncommitted calibration now correctly fail before the writer.
+   const root = mkdtempSync(join(nativeContractFixtureParent(), "partial-calibration-io-"));
+   prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
+-  prepareCalibrationArchitectureFixture(root);
+   const calibration = { project: "partial-calibration-io", verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"", handover: "docs/state.md" };
++  // QG-04: the adopted profile binds project/pipeline.json, so the calibration committed below must be the bytes the
++  // adoption is taken over (same contract as the three layout cases above); otherwise the later commit is profile drift
++  // and the planning fitness refuses with ARCHITECTURE-FITNESS-NOT-READY before the injected writer.
++  prepareCalibrationArchitectureFixture(root, `${JSON.stringify(calibration, null, 2)}\n`);
+   const calibrationPath = join(root, "project", "pipeline.json");
+   const legacyPath = join(root, ".claude", "pipeline.json");
+   const stateFile = statePath(root);
