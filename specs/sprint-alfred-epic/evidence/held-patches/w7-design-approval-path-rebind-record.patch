@@ -1,0 +1,179 @@
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.mjs b/plugins/pipeline-core/lib/design-approval-binding.mjs
+index ed073c6f3..8e6341538 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.mjs
+@@ -57,7 +57,7 @@ const DELTA_ROUND = 2;
+ const MAX_DELTA_ENTRIES = 2 * (MAX_COMPANIONS + 2);
+ 
+ const BINDING_REQUIRED_KEYS = ["schema", "featureId", "sources", "reviewReceipts", "verdict", "openFindingIds"];
+-const BINDING_OPTIONAL_KEYS = ["unreviewedSourceDelta"];
++const BINDING_OPTIONAL_KEYS = ["unreviewedSourceDelta", "pathRebind"];
+ const REQUEST_KEYS = ["schema", "binding", "bindingSha256", "approvalIntent"];
+ const CREATE_BINDING_KEYS = ["featureId", "receipts", "currentSources"];
+ const CREATE_REQUEST_KEYS = ["binding", "candidate"];
+@@ -159,9 +159,20 @@ function isValidBinding(binding) {
+     if (binding.reviewReceipts[binding.reviewReceipts.length - 1].round !== DELTA_ROUND) return false;
+     if (!isUnreviewedDelta(binding.unreviewedSourceDelta, binding.sources)) return false;
+   }
++  if (Object.hasOwn(binding, "pathRebind") && !isPathRebind(binding.pathRebind, binding.sources)) return false;
+   return true;
+ }
+ 
++/** The closed rebind record: exactly two distinct safe directories, the second being where the bound sources now sit. */
++function isPathRebind(value, sources) {
++  if (!hasExactKeys(value, ["fromDir", "toDir"]) || !isSafePath(value.fromDir) || !isSafePath(value.toDir) || value.fromDir === value.toDir) return false;
++  const prefix = `${value.toDir}/`;
++  const dirOfPrd = sources.prd.path.slice(0, sources.prd.path.lastIndexOf("/"));
++  return dirOfPrd === value.toDir
++    && sources.spec.path.startsWith(prefix)
++    && allOf(sources.companions, (companion) => companion.path.startsWith(prefix));
++}
++
+ // ----------------------------------------------------------------------------- building
+ 
+ /** Paths whose digest differs between the reviewed and the current sources (same rule as U1). */
+@@ -177,6 +188,30 @@ function unreviewedSourceDelta(reviewedSources, currentSources) {
+   return delta;
+ }
+ 
++/**
++ * Byte-identical feature-directory rebind: `{ fromDir, toDir }` when the reviewed sources and the
++ * current sources are the same files moved from one directory to another, else null. Same rule as
++ * the review-chain comparison in design-consistency-check.mjs (implemented locally because that
++ * helper is not exported): PRD, Spec and the same number of companions, every digest equal, the
++ * old paths under the PRD's old directory and the current paths under its current directory with
++ * identical relative suffixes per role (companions paired in sorted order), the directories differ.
++ */
++function sourceRebind(reviewed, current) {
++  if (reviewed.companions.length !== current.companions.length) return null;
++  const dirOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : null);
++  const fromDir = dirOf(reviewed.prd.path);
++  const toDir = dirOf(current.prd.path);
++  if (fromDir === null || toDir === null || fromDir === toDir || !isSafePath(fromDir) || !isSafePath(toDir)) return null;
++  const relativeTo = (path, dir) => (path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : null);
++  const pairs = [[reviewed.prd, current.prd], [reviewed.spec, current.spec], ...reviewed.companions.map((old, index) => [old, current.companions[index]])];
++  for (const [old, now] of pairs) {
++    const oldRelative = relativeTo(old.path, fromDir);
++    const nowRelative = relativeTo(now.path, toDir);
++    if (oldRelative === null || oldRelative !== nowRelative || !isSha(old.sha256) || old.sha256 !== now.sha256 || !isSafePath(now.path)) return null;
++  }
++  return { fromDir, toDir };
++}
++
+ const copySources = (sources) => ({
+   prd: { path: sources.prd.path, sha256: sources.prd.sha256 },
+   spec: { path: sources.spec.path, sha256: sources.spec.sha256 },
+@@ -222,7 +257,11 @@ export function createDesignApprovalBinding(input) {
+     verdict: latest.verdict,
+     openFindingIds: [...latest.openFindingIds],
+   };
+-  if (latest.kind === "delta") {
++  // A byte-identical feature-directory move is recorded as a closed reason (the digest binds it),
++  // and is not an unreviewed delta. No move: the binding is exactly what it was before.
++  const rebind = sourceRebind(latest.sources, currentSources);
++  if (rebind !== null) binding.pathRebind = rebind;
++  if (latest.kind === "delta" && rebind === null) {
+     const delta = unreviewedSourceDelta(latest.sources, currentSources);
+     if (delta.length > 0) binding.unreviewedSourceDelta = delta;
+   }
+diff --git a/plugins/pipeline-core/lib/design-approval-binding.test.mjs b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+index 3c4baec60..b769fbbf3 100644
+--- a/plugins/pipeline-core/lib/design-approval-binding.test.mjs
++++ b/plugins/pipeline-core/lib/design-approval-binding.test.mjs
+@@ -976,3 +976,96 @@ test("U3-21i: an 81-character finding id and a list of 65 ids are DAB-SHAPE, whi
+     "65 ids": (b) => { b.openFindingIds = idList(65); },
+   });
+ });
++
++// ----------------------------------------------------------------------------- feature-directory path rebind (slice 2)
++
++const MOVED_DIR = "specs/feat-x-moved";
++const movePath = (path) => `${MOVED_DIR}${path.slice(DIR.length)}`;
++/** The same files at another feature directory: every path moved, every digest kept. */
++function movedSources(sources) {
++  return {
++    prd: { path: movePath(sources.prd.path), sha256: sources.prd.sha256 },
++    spec: { path: movePath(sources.spec.path), sha256: sources.spec.sha256 },
++    companions: sources.companions.map(({ path, sha256: digest }) => ({ path: movePath(path), sha256: digest })),
++  };
++}
++const movedScenario = (scenario) => ({ ...scenario, currentSources: movedSources(scenario.currentSources) });
++
++test("U3-22: rebind-equal moved sources give a binding with the closed pathRebind {fromDir, toDir} and a digest different from the pre-move binding", () => {
++  const scenario = passScenario();
++  const before = mustCreate(scenario);
++  const after = mustCreate(movedScenario(scenario));
++  assert.deepStrictEqual(after.binding.pathRebind, { fromDir: DIR, toDir: MOVED_DIR });
++  assert.deepStrictEqual(Object.keys(after.binding.pathRebind).sort(), ["fromDir", "toDir"]);
++  assert.equal(after.binding.sources.prd.path, `${MOVED_DIR}/prd_feat-x.md`);
++  assert.equal(after.binding.reviewReceipts[0].path, RECEIPT_1, "the receipt files stay where they are");
++  assert.notEqual(after.bindingSha256, before.bindingSha256);
++  assert.equal(after.bindingSha256, bindingShaOf(after.binding));
++  assert.equal(validateDesignApprovalBinding(after.binding).ok, true);
++});
++
++test("U3-22b: a delta receipt followed by a byte-identical move records pathRebind and no unreviewedSourceDelta", () => {
++  const made = mustCreate(movedScenario(deltaScenario()));
++  assert.deepStrictEqual(made.binding.pathRebind, { fromDir: DIR, toDir: MOVED_DIR });
++  assert.equal(Object.hasOwn(made.binding, "unreviewedSourceDelta"), false);
++});
++
++test("U3-23: without a rebind the binding bytes and digest are exactly the unchanged ones (no pathRebind key)", () => {
++  const scenario = passScenario();
++  const made = mustCreate(scenario);
++  const expected = {
++    schema: "pipeline.design-approval-binding.v1",
++    featureId: FEATURE,
++    sources: structuredClone(scenario.currentSources),
++    reviewReceipts: [{ path: RECEIPT_1, sha256: scenario.first.sha256, round: 1 }],
++    verdict: "pass",
++    openFindingIds: [],
++  };
++  assert.equal(Object.hasOwn(made.binding, "pathRebind"), false);
++  assert.equal(canonical(made.binding), canonical(expected));
++  assert.equal(made.bindingSha256, bindingShaOf(expected));
++});
++
++test("U3-24: a request created before the move is DAB-BINDING-DRIFT after the move", () => {
++  const scenario = passScenario();
++  const request = mustRequest(mustCreate(scenario)).request;
++  assertRefusal(verify(request, movedScenario(scenario)), "DAB-BINDING-DRIFT");
++});
++
++test("U3-25: a request created after the move verifies against the moved sources", () => {
++  const moved = movedScenario(passScenario());
++  const request = mustRequest(mustCreate(moved)).request;
++  const verified = verify(request, moved);
++  assert.equal(verified.ok, true, JSON.stringify(verified));
++  assert.equal(verified.bindingSha256, request.bindingSha256);
++});
++
++test("U3-26: a moved source with one changed hash is the existing refusal and records no pathRebind", () => {
++  const scenario = passScenario();
++  const changed = movedSources(sourcesWith({ design: "design-v2" }));
++  const result = create(scenario, { currentSources: changed });
++  assertRefusal(result, "DAB-REVIEW-CHAIN", ["DCC-REVIEW-RECEIPT-BINDING"]);
++  assert.equal(Object.hasOwn(result, "binding"), false);
++});
++
++test("U3-27: validate accepts pathRebind only with exactly two distinct safe-path strings that are the directory of the bound sources", () => {
++  const base = mustCreate(movedScenario(passScenario())).binding;
++  assert.equal(validateDesignApprovalBinding(base).ok, true);
++  const refused = (label, mutate) => {
++    const binding = structuredClone(base);
++    mutate(binding);
++    assertRefusal(validateDesignApprovalBinding(binding), "DAB-SHAPE", [], label);
++  };
++  refused("extra key", (b) => { b.pathRebind.reason = "x"; });
++  refused("missing toDir", (b) => { delete b.pathRebind.toDir; });
++  refused("traversal", (b) => { b.pathRebind.fromDir = "../x"; });
++  refused("absolute", (b) => { b.pathRebind.fromDir = "/specs/feat-x"; });
++  refused("backslash", (b) => { b.pathRebind.fromDir = "specs\\feat-x"; });
++  refused("trailing slash", (b) => { b.pathRebind.toDir = `${MOVED_DIR}/`; });
++  refused("number", (b) => { b.pathRebind.fromDir = 7; });
++  refused("null", (b) => { b.pathRebind.toDir = null; });
++  refused("equal dirs", (b) => { b.pathRebind.fromDir = MOVED_DIR; });
++  refused("toDir not the sources' directory", (b) => { b.pathRebind.toDir = "specs/other"; });
++  refused("not an object", (b) => { b.pathRebind = "specs/feat-x"; });
++  refused("array", (b) => { b.pathRebind = [DIR, MOVED_DIR]; });
++});
