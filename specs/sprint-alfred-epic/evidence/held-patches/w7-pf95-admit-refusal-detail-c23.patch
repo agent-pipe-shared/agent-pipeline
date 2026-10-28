@@ -1,0 +1,48 @@
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index f4a4acc6e..27660f307 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1666,6 +1666,7 @@ test("PF94 TAKEOVER (6) the same task is admitted again on the course path after
+     let refused = null;
+     try { admitSessionCriticReview({ ...fx.request, packetId: "9b".repeat(16) }); } catch (e) { refused = e; }
+     assert.ok(refused, "an untaken-over batch refuses the same task");
++    assert.ok(refused.message.includes("inspect-course-takeover"), refused.message);
+     const done = takeoverVerb(fx, "supersede-course-takeover", { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round 1 ran under an earlier course key" });
+     assert.equal(done.status, 0, JSON.stringify(done.out));
+     // The very same task id and delivery target (same authored-delivery record) is admitted again on the course path.
+@@ -1673,6 +1674,35 @@ test("PF94 TAKEOVER (6) the same task is admitted again on the course path after
+   } finally { cleanup(fx); }
+ });
+ 
++// PF-95 follow-up: the operator-visible CLI detail of a refused admit must carry both takeover verbs (the CLI keeps one line, 200 characters).
++function assertOperatorNamesTakeoverVerbs(thrown) {
++  const out = d173Cli(thrown).output;
++  assert.equal(out.code, "CGB-CONFLICT");
++  assert.ok(out.detail.startsWith("CGB-CONFLICT: "), out.detail);
++  assert.ok(out.detail.includes("inspect-course-takeover") && out.detail.includes("supersede-course-takeover"), out.detail);
++  assert.ok(!/[\r\n]/u.test(out.detail) && !/(?:[A-Za-z]:\\|\/)[^\s'"`]/u.test(out.detail), out.detail);
++  assert.ok(out.detail.length <= 220, `${out.detail.length}: ${out.detail}`);
++}
++test("PF95 admit refusal (1) the CLI output of a refused admit names both takeover verbs", () => {
++  const fx = featureCourseFixture();
++  try {
++    assert.equal(admitSessionCriticReview(fx.request).status, "admitted");
++    const verdictValue = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "controlled fixture inspected", briefing_violations: [], pass: false };
++    assert.equal(finalizeSessionCriticReview({ ...fx.request, verdict: verdictValue, allowCallerAuthoredFallback: true }).status, "completed");
++    let refused = null;
++    try { admitSessionCriticReview({ ...fx.request, packetId: "9b".repeat(16) }); } catch (e) { refused = e; }
++    assert.ok(refused, "the untaken-over batch owns the delivery target");
++    assertOperatorNamesTakeoverVerbs(refused);
++  } finally { cleanup(fx); }
++  const owner = takeoverFixture();
++  try {
++    let error = null;
++    try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: owner.root, courseKey: featureCourseKey(owner), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
++    assert.equal(error?.code, "CGB-CONFLICT");
++    assertOperatorNamesTakeoverVerbs(error);
++  } finally { cleanup(owner); }
++});
++
+ test("Cut A (5) the explicit fallback completes with the weaker marker, keeps reviewPass, and never masks a bad binding", () => {
+   const fx = fixture();
+   try {
