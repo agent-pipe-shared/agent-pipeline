@@ -1,0 +1,248 @@
+diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+index 6949ef6cd..281878aa5 100644
+--- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
+@@ -18,7 +18,7 @@ import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
+ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+ import { isAbsolute, join, resolve } from "node:path";
+ 
+-import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
++import { canonicalJson, sha256, packetDigestMatches } from "../scripts/critic-packet-preflight.mjs";
+ import { readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
+ import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
+ import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
+@@ -65,7 +65,7 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
+   try { validateSessionCriticReceipt(critic); }
+   catch { fail("CVL-CRITIC-INVALID", "Private Critic receipt is malformed."); }
+   if (!packet || packet.packetId !== criticPacketId || critic.packetId !== criticPacketId
+-    || critic.packetDigest !== sha256(canonicalJson(packet))
++    || !packetDigestMatches(packet, critic.packetDigest)
+     || packet.candidate?.base !== critic.candidate.base || packet.candidate?.commit !== critic.candidate.commit
+     || packet.candidate?.tree !== critic.candidate.tree || packet.diff?.base !== critic.reviewRange.base
+     || packet.diff?.commit !== critic.reviewRange.commit || packet.diff?.sha256 !== critic.reviewRange.diffSha256) {
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 0f7831555..9b4be8cfc 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -714,6 +714,23 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
+   return inspectClaimedSessionAdmission({ controlRoot, packetId }, { now });
+ }
+ 
++/** The packet as a claimed-session reader sees it: a stored pre-assurance coordinator binding is shown in its normalized form. */
++export function normalizedPacketView(packet) {
++  return packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
++    ? packet
++    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
++}
++
++/**
++ * True when `digest` is the digest of this exact packet: as it lies on disk (what the finalizer binds today) or as its normalized
++ * view (what the build before bound for a pre-assurance packet). Any other digest, or a changed packet, is false.
++ */
++export function packetDigestMatches(packet, digest) {
++  if (typeof digest !== "string") return false;
++  if (digest === sha256(canonicalJson(packet))) return true;
++  try { return digest === sha256(canonicalJson(normalizedPacketView(packet))); } catch { return false; }
++}
++
+ /** Re-read the exact admission while the packet is still claimed. */
+ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now = new Date() } = {}) {
+   const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now, allowLegacyPreAssurance: true });
+@@ -734,9 +751,7 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now
+     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
+   }
+   // Digest checks above use the raw packet; the returned view carries the normalized coordinator binding.
+-  const view = packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
+-    ? packet
+-    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
++  const view = normalizedPacketView(packet);
+   return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet: view, claim, admission };
+ }
+ 
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index ccb499d8b..0316830d2 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -37,6 +37,7 @@ import {
+   inspectClaimedSessionAdmission,
+   inspectClaimedCandidatePacket,
+   inspectCandidatePacket,
++  packetDigestMatches,
+   prepareCandidatePacket,
+   publishClaimedSessionAdmission,
+   readConsumedCandidateReceipt,
+@@ -515,7 +516,9 @@ function receiptFor(result) {
+ 
+ /** Pure validation only; this does not consume a packet or authorize review. */
+ export function validateSessionCriticResult(result, packet) {
+-  return validateResult(result, packet);
++  // A result of the previous build binds the normalized-view digest of a legacy packet; accept it only for the SAME packet.
++  const stored = packetDigestMatches(packet, result?.packetDigest) ? result.packetDigest : undefined;
++  return validateResult(result, packet, stored);
+ }
+ 
+ /** Pure receipt projection only; durable consumed readback remains required. */
+@@ -750,7 +753,7 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
+   try { validateSessionCriticReceipt(receipt); } catch { fail("SCF-EXPORT-UNCONSUMED"); }
+   // Same binding the Verify lifecycle demands, minus its pass gate: a review with findings is evidence too.
+   if (!record(packet) || packet.packetId !== packetId || receipt.packetId !== packetId
+-    || receipt.packetDigest !== sha256(canonicalJson(packet))
++    || !packetDigestMatches(packet, receipt.packetDigest)
+     || packet.candidate?.base !== receipt.candidate.base || packet.candidate?.commit !== receipt.candidate.commit
+     || packet.candidate?.tree !== receipt.candidate.tree || packet.diff?.base !== receipt.reviewRange.base
+     || packet.diff?.commit !== receipt.reviewRange.commit
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 3739ec141..e26f74a85 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -6,7 +6,7 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
+ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+ import { spawnSync } from "node:child_process";
+-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { chmodSync, existsSync, realpathSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -20,6 +20,7 @@ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } fro
+ import { execFileSync } from "node:child_process";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
++import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
+ 
+ import {
+   SESSION_CRITIC_ASSURANCE,
+@@ -36,6 +37,7 @@ import {
+   finalizeSessionCriticReview as finalizeRaw,
+   runSessionCriticFinalizerCli,
+   validateSessionCriticReceipt,
++  validateSessionCriticResult,
+ } from "./session-critic-finalizer.mjs";
+ 
+ // Cut A: finalization needs a Source-issued origin record. The pre-existing cases exercise everything
+@@ -1028,6 +1030,125 @@ test("PF-93 e2e a pre-assurance packet survives the whole lifecycle, and a block
+   } finally { cleanup(fx); }
+ });
+ 
++// PF-93 upgrade state: the previous build digested the NORMALIZED view of a legacy packet into the receipt and result, while the
++// journal and every reader recompute the digest of the packet as it lies on disk. The state below is written by the real
++// finalize, real journal, real consume; only the digest the finalizer binds is the previous build's (the admission it reads
++// is handed back with the view digest, which is where the previous build took it from).
++function finalizedByPreviousBuild(fx, packetId, digestOf = (current) => sha(canonicalJson(current.packet))) {
++  const request = registered(fx, { packetId });
++  admitSessionCriticReview(request);
++  rewriteAsLegacyPacket(fx, packetId, "legacy");
++  resealReservationForLegacyPacket(fx, request);
++  const deps = { inspectClaimedSessionAdmissionFn: (input, packetDeps) => {
++    const current = inspectClaimedSessionAdmission(input, packetDeps);
++    return { ...current, admission: { ...current.admission, packetDigest: digestOf(current) } };
++  } };
++  assert.equal(finalizeSessionCriticReview(request, deps).status, "completed");
++  const controlRoot = controlRootOf(fx);
++  const raw = sha(canonicalJson(JSON.parse(readFileSync(join(controlRoot, packetId, "packet.json"), "utf8"))));
++  const receipt = readConsumedCandidateReceipt({ controlRoot, packetId });
++  return { request, raw, receipt: receipt.receipt, packet: receipt.packet };
++}
++
++test("PF-93 upgrade state: a packet finalized by the previous build exports, binds to Verify and reads in the lineage", () => {
++  const fx = fixture();
++  try {
++    const packetId = "b1".repeat(16);
++    const old = finalizedByPreviousBuild(fx, packetId);
++    assert.notEqual(old.receipt.packetDigest, old.raw, "the previous build's receipt digest differs from the raw digest");
++    // export write and read back
++    criticNotes(fx);
++    assert.equal(exportSessionCriticEvidence(exportOptions(fx, packetId)).status, "exported");
++    const dir = join(fx.root, `specs/alpha/evidence/critic/${packetId}`);
++    assert.deepEqual(readdirSync(dir).sort(), [...EXPORT_FILES].sort());
++    assert.equal(JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).packetId, packetId);
++    // Verify binding reader
++    const bound = readBoundConsumedCriticReceipt({ gitCommonDir: join(fx.root, ".git"), criticPacketId: packetId,
++      candidate: { commit: old.packet.candidate.commit, tree: old.packet.candidate.tree } });
++    assert.equal(bound.critic.packetDigest, old.receipt.packetDigest);
++    // lineage / delta reader: the consumed result read the review lineage calls
++    assert.equal(readConsumedCandidateResult({ controlRoot: controlRootOf(fx), packetId }).receipt.packetDigest, old.receipt.packetDigest);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 upgrade state pin: a receipt digest that is neither the raw nor the normalized digest is still refused", () => {
++  const fx = fixture();
++  try {
++    const packetId = "b2".repeat(16);
++    finalizedByPreviousBuild(fx, packetId, () => "f".repeat(64));
++    criticNotes(fx);
++    assert.throws(() => exportSessionCriticEvidence(exportOptions(fx, packetId)), codeIs("SCF-EXPORT-UNCONSUMED"));
++    assert.throws(() => readBoundConsumedCriticReceipt({ gitCommonDir: join(fx.root, ".git"), criticPacketId: packetId,
++      candidate: { commit: readConsumedCandidateReceipt({ controlRoot: controlRootOf(fx), packetId }).packet.candidate.commit,
++        tree: readConsumedCandidateReceipt({ controlRoot: controlRootOf(fx), packetId }).packet.candidate.tree } }),
++    (error) => error.code === "CVL-CRITIC-PACKET-MISMATCH");
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 upgrade state pin: a packet whose content changed after finalize is refused", () => {
++  const fx = fixture();
++  try {
++    const packetId = "b3".repeat(16);
++    finalizedByPreviousBuild(fx, packetId);
++    const path = join(controlRootOf(fx), packetId, "packet.json");
++    const packet = JSON.parse(readFileSync(path, "utf8"));
++    packet.createdAt = "2001-01-01T00:00:00.000Z";
++    rmSync(path, { force: true });
++    writeFileSync(path, canonicalJson(packet), { mode: 0o600 });
++    criticNotes(fx);
++    assert.throws(() => exportSessionCriticEvidence(exportOptions(fx, packetId)), codeIs("SCF-EXPORT-UNCONSUMED"));
++  } finally { cleanup(fx); }
++});
++
++// The review lineage compile reads the consumed result through readConsumedCriticCourseResult, which re-validates the result against
++// the packet. The previous build's result carries the normalized-view digest, so that re-validation must accept it too.
++function courseInputFor(fx, packet, result) {
++  const common = join(fx.root, ".git");
++  return { resolvedRepository: { repoRoot: realpathSync(fx.root), gitCommonDir: realpathSync(common),
++      controlRoot: join(realpathSync(common), "agent-pipeline", "critic-packets"), registrationCommit: packet.candidate.commit },
++    packetId: packet.packetId, expectedCandidate: { commit: packet.candidate.commit, tree: packet.candidate.tree },
++    expectedRange: result.reviewRange, expectedRecord: null };
++}
++test("PF-93 upgrade state: the consumed course result reader (review lineage compile) accepts a packet finalized by the previous build", () => {
++  const fx = fixture();
++  try {
++    const packetId = "b4".repeat(16);
++    finalizedByPreviousBuild(fx, packetId);
++    const consumed = readConsumedCandidateResult({ controlRoot: controlRootOf(fx), packetId });
++    const read = readConsumedCriticCourseResult(courseInputFor(fx, consumed.packet, consumed.result));
++    assert.equal(read.ok, true, JSON.stringify(read));
++    assert.equal(read.value.receipt.packetDigest, consumed.receipt.packetDigest);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 upgrade state: the consumed session admission read accepts a packet finalized by the previous build", () => {
++  const fx = fixture();
++  try {
++    const packetId = "b5".repeat(16);
++    finalizedByPreviousBuild(fx, packetId);
++    const read = readConsumedSessionAdmission({ controlRoot: controlRootOf(fx), packetId });
++    assert.equal(read.admission.packetId, packetId);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 upgrade state pin: the consumed course result reader still refuses a foreign result digest and a changed packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "b6".repeat(16);
++    finalizedByPreviousBuild(fx, packetId);
++    const consumed = readConsumedCandidateResult({ controlRoot: controlRootOf(fx), packetId });
++    const input = courseInputFor(fx, consumed.packet, consumed.result);
++    assert.throws(() => validateSessionCriticResult({ ...consumed.result, packetDigest: "f".repeat(64) }, consumed.packet), codeIs("SCF-RESULT-BINDING"));
++    assert.equal(validateSessionCriticResult(consumed.result, consumed.packet), consumed.result);
++    const path = join(controlRootOf(fx), packetId, "packet.json");
++    const packet = JSON.parse(readFileSync(path, "utf8"));
++    packet.createdAt = "2001-01-01T00:00:00.000Z";
++    rmSync(path, { force: true });
++    writeFileSync(path, canonicalJson(packet), { mode: 0o600 });
++    assert.equal(readConsumedCriticCourseResult(input).ok, false);
++  } finally { cleanup(fx); }
++});
++
+ test("PF-93 (6) skip coverage accepts the pre-assurance binding exactly and refuses a tampered one", () => {
+   const taskId = "HISTORICAL-AUTHORED";
+   const root = mkdtempSync(join(tmpdir(), "pf93-skip-"));
