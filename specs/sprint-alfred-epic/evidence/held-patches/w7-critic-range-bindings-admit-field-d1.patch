@@ -1,0 +1,184 @@
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 340b61e29..81edf8522 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -285,7 +285,8 @@ function validateCliRequest(value) {
+     || !isSafeTaskId(value.taskId) || !SAFE_ID.test(value.projectId ?? "")
+     || !SAFE_ID.test(value.sessionId ?? "") || !PACKET_ID.test(value.packetId ?? "")
+     || !["T0", "T1", "T2", "T3"].includes(value.trigger)
+-    || !exact(value.route, ROUTE_KEYS) || !exact(value.review, version2 ? [...REVIEW_KEYS, "courseContext"] : version3 ? [...REVIEW_KEYS, "genericBatchRef"] : REVIEW_KEYS)
++    || !exact(value.route, ROUTE_KEYS) || !exact(value.review, [...(version2 ? [...REVIEW_KEYS, "courseContext"] : version3 ? [...REVIEW_KEYS, "genericBatchRef"] : REVIEW_KEYS), ...(record(value.review) && Object.hasOwn(value.review, "correctionInputBindings") ? ["correctionInputBindings"] : [])])
++    || (Object.hasOwn(value.review, "correctionInputBindings") && (typeof value.review.correctionInputBindings !== "string" || value.review.correctionInputBindings === ""))
+     || typeof value.review.base !== "string" || typeof value.review.candidate !== "string"
+     || typeof value.review.specPath !== "string" || !Array.isArray(value.review.guardrailPaths)
+     || !Array.isArray(value.review.evidencePaths)
+@@ -917,6 +918,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+         evidencePaths: request.review.evidencePaths,
+         priorCriticEvidencePath: request.review.priorCriticEvidencePath,
+         ...(request.schema === SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA ? { courseContext: request.review.courseContext } : {}),
++        ...(request.review.correctionInputBindings === undefined ? {} : { correctionInputBindings: request.review.correctionInputBindings }),
+       },
+       ...(request.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA ? { genericBatchRef: request.review.genericBatchRef } : {}),
+       taskId: request.taskId,
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index f4a4acc6e..c4ddeb85b 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -23,6 +23,7 @@ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } f
+ import * as CGB from "../lib/critic-generic-batch.mjs";
+ import * as CCA from "../lib/critic-course-admission.mjs";
+ import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
++import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ 
+ import {
+   SESSION_CRITIC_ASSURANCE,
+@@ -31,6 +32,7 @@ import {
+   SESSION_CRITIC_EXPORT_REQUEST_SCHEMA,
+   SESSION_CRITIC_EXPORT_RESULT_SCHEMA,
+   SESSION_CRITIC_FINALIZE_REQUEST_SCHEMA,
++  SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA,
+   SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA,
+   SESSION_CRITIC_RECEIPT_SCHEMA,
+   SessionCriticFinalizerError,
+@@ -66,12 +68,19 @@ function commit(root, message) {
+   git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]);
+   return git(root, ["rev-parse", "HEAD"]);
+ }
+-function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5" } = {}) {
++function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b-lnd5", handover = false } = {}) {
+   const root = mkdtempSync(join(tmpdir(), "session-critic-finalizer-"));
+   git(root, ["init", "-q", "-b", "main"]);
+   mkdirSync(join(root, ".claude"));
+   mkdirSync(join(root, "specs"));
+   mkdirSync(join(root, "evidence"));
++  if (handover) {
++    // D1: a calibration naming a handover file, committed with the base so it is readable at every later commit.
++    mkdirSync(join(root, "project"));
++    mkdirSync(join(root, "docs"));
++    writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ handover: "docs/state.md" })}\n`);
++    writeFileSync(join(root, "docs", "state.md"), "# State\nbase\n");
++  }
+   writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+   writeFileSync(join(root, "specs", "spec.md"), "# Spec\nAC-1 AC-2\n");
+   // The review-unit purpose is committed with the base, before any work, and never touched again.
+@@ -79,6 +88,7 @@ function fixture({ rootCandidate = false, targetedExitCode = 0, taskId = "nova-b
+   const emptyTree = git(root, ["hash-object", "-t", "tree", "--stdin"], { input: "" });
+   const base = rootCandidate ? emptyTree : commit(root, "base");
+   if (!rootCandidate) writeFileSync(join(root, "specs", "spec.md"), "# Spec\n\nSource candidate.\n");
++  if (handover && !rootCandidate) writeFileSync(join(root, "docs", "state.md"), "# State\nchanged inside the reviewed range\n");
+   const historicalCandidate = commit(root, rootCandidate ? "root source candidate" : "source candidate");
+   const recordPath = `evidence/dispatch-record-${taskId}.json`;
+   const record = {
+@@ -2009,3 +2019,112 @@ test("the export verb runs from a scratch request with no git on PATH and closes
+     assert.equal(existsSync(join(fx.root, unwritten)), false);
+   } finally { cleanup(fx); }
+ });
++
++// D1: the admit and finalize request carries the Critic range bindings file (review.correctionInputBindings).
++const D1_DERIVE = fileURLToPath(new URL("./critic-correction-input-bindings.mjs", import.meta.url));
++function d1Derive(fx, head, out) {
++  mkdirSync(join(fx.root, "scratch"), { recursive: true });
++  const result = spawnSync(process.execPath, [D1_DERIVE, "derive", "--root", fx.root, "--base", fx.base, "--head", head, "--out", out], { encoding: "utf8" });
++  assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
++  return out;
++}
++function d1Request(fx, bindings) {
++  const request = cliBatchRequest(fx);
++  if (bindings !== undefined) request.review = { ...request.review, correctionInputBindings: bindings };
++  return request;
++}
++function d1Admit(fx, request, name = "d1-request.json") {
++  return runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, name, request)]);
++}
++
++test("D1 walk (1) admit without the bindings field is refused and the detail names the derive command", () => {
++  const fx = fixture({ handover: true });
++  try {
++    const result = d1Admit(fx, d1Request(fx));
++    assert.equal(result.exitCode, 2);
++    assert.match(result.output.detail, /CDP-CORRECTION-INPUT-REQUIRED/u);
++    assert.match(result.output.detail, /critic-correction-input-bindings\.mjs derive/u);
++  } finally { cleanup(fx); }
++});
++
++test("D1 walk (2) the real derive command writes the bindings file under scratch/", () => {
++  const fx = fixture({ handover: true });
++  try {
++    d1Derive(fx, fx.candidate, "scratch/bindings.json");
++    const written = JSON.parse(readFileSync(join(fx.root, "scratch", "bindings.json"), "utf8"));
++    assert.match(written.digestSha256, /^[0-9a-f]{64}$/u);
++    assert.equal(written.exclusions.length > 0, true);
++  } finally { cleanup(fx); }
++});
++
++test("D1 walk (3) admit with the bindings file is admitted and the packet binds the echoed bindings", () => {
++  const fx = fixture({ handover: true });
++  try {
++    d1Derive(fx, fx.candidate, "scratch/bindings.json");
++    const request = d1Request(fx, "scratch/bindings.json");
++    const result = d1Admit(fx, request);
++    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
++    const controlRoot = join(fx.root, git(fx.root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets");
++    const readback = inspectClaimedSessionAdmission({ controlRoot, packetId: request.packetId });
++    const expected = preflightCriticDispatch({ root: fx.root, base: fx.base, candidate: fx.candidate, specPath: "specs/spec.md",
++      guardrailPaths: [".claude/pipeline.yaml"], evidencePaths: ["evidence/verify.json"], priorCriticEvidencePath: null,
++      correctionInputBindings: "scratch/bindings.json" });
++    assert.equal(expected.correctionInputBindings.path, "scratch/bindings.json");
++    assert.equal(readback.packet.request.sessionBinding.preflightSha256, createHash("sha256").update(canonicalJson(expected)).digest("hex"));
++  } finally { cleanup(fx); }
++});
++
++test("D1 walk (4) finalize with the same request and a valid verdict completes", () => {
++  const fx = fixture({ handover: true });
++  try {
++    d1Derive(fx, fx.candidate, "scratch/bindings.json");
++    const requestPath = writeScratchRequest(fx, "d1-request.json", d1Request(fx, "scratch/bindings.json"));
++    assert.equal(runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", requestPath]).exitCode, 0);
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    const result = runSessionCriticFinalizerCli(["finalize", "--root", fx.root, "--request", requestPath, FALLBACK_FLAG]);
++    assert.equal(result.exitCode, 0, JSON.stringify(result.output));
++    assert.equal(result.output.status, "completed");
++  } finally { cleanup(fx); }
++});
++
++test("D1 walk (5) a stale bindings file is refused at admit", () => {
++  const fx = fixture({ handover: true });
++  try {
++    d1Derive(fx, fx.historicalCandidate, "scratch/stale.json");
++    const result = d1Admit(fx, d1Request(fx, "scratch/stale.json"));
++    assert.equal(result.exitCode, 2);
++    assert.match(result.output.detail, /CDP-CORRECTION-INPUT-STALE/u);
++  } finally { cleanup(fx); }
++});
++
++test("D1 walk (6) v1 and v2 requests accept the optional key and pass it to the preflight; absent means no property", () => {
++  const fx = fixture();
++  try {
++    const seen = [];
++    writeFileSync(join(fx.root, "evidence", "critic-verdict.json"), `${JSON.stringify(verdict())}\n`);
++    const deps = { preflightCriticDispatchFn: (input) => { seen.push(input); throw new Error("d1-spy-stop"); } };
++    const v1 = (bindings) => cliRequest(fx, bindings === undefined ? {} : { review: { ...cliRequest(fx).review, correctionInputBindings: bindings } });
++    const v2 = (bindings) => {
++      const review = { ...cliRequest(fx).review, courseContext: null, ...(bindings === undefined ? {} : { correctionInputBindings: bindings }) };
++      return cliRequest(fx, { schema: SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA, review });
++    };
++    const v3 = (bindings) => d1Request(fx, bindings);
++    for (const [name, build] of [["v1", v1], ["v2", v2], ["v3", v3]]) {
++      for (const command of ["admit", "finalize"]) {
++        seen.length = 0;
++        const withKey = runSessionCriticFinalizerCli([command, "--root", fx.root, "--request", writeScratchRequest(fx, "d1-spy.json", build("scratch/b.json"))], deps);
++        assert.notEqual(withKey.output.code, "SCF-REQUEST", `${name} ${command}`);
++        assert.equal(seen.length, 1, `${name} ${command}`);
++        assert.equal(seen[0].correctionInputBindings, "scratch/b.json", `${name} ${command}`);
++        seen.length = 0;
++        runSessionCriticFinalizerCli([command, "--root", fx.root, "--request", writeScratchRequest(fx, "d1-spy.json", build(undefined))], deps);
++        assert.equal(seen.length, 1, `${name} ${command}`);
++        assert.equal(Object.hasOwn(seen[0], "correctionInputBindings"), false, `${name} ${command}`);
++      }
++    }
++    for (const bad of ["", 7, null]) {
++      const result = runSessionCriticFinalizerCli(["admit", "--root", fx.root, "--request", writeScratchRequest(fx, "d1-bad.json", d1Request(fx, bad))], deps);
++      assert.equal(result.output.code, "SCF-REQUEST", String(bad));
++    }
++  } finally { cleanup(fx); }
++});
