@@ -15,6 +15,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { reserveFeatureCriticReviewUnitOwnership } from "../lib/critic-generic-batch.mjs";
+import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
 import {
   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
   buildGovernanceReviewAction,
@@ -24,6 +25,7 @@ import {
 } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+import { republishGenericCriticBatchIndex } from "../lib/critic-generic-batch.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
@@ -33,6 +35,8 @@ import {
   cleanupCandidatePacket,
   consumeCandidatePacket,
   inspectClaimedSessionAdmission,
+  inspectClaimedCandidatePacket,
+  inspectCandidatePacket,
   prepareCandidatePacket,
   publishClaimedSessionAdmission,
   readConsumedCandidateReceipt,
@@ -51,6 +55,7 @@ export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finaliza
 export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
 export const GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-registration-request.v2";
 export const GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-correction-request.v2";
+export const SESSION_CRITIC_RELEASE_REQUEST_SCHEMA = "pipeline.session-critic-release-request.v1";
 export const SESSION_CRITIC_EXPORT_REQUEST_SCHEMA = "pipeline.session-critic-export-request.v1";
 export const SESSION_CRITIC_EXPORT_RESULT_SCHEMA = "pipeline.session-critic-export.v1";
 export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
@@ -331,9 +336,71 @@ function admittedRouteFor(packet, requestedRoute, trigger, preflightSha256) {
   return routeFor({ ...requestedRoute, modelTier: role.modelId }, preflightSha256);
 }
 
+/**
+ * D60: a packet of this exact task and candidate that an earlier failed admit left behind is resumed BEFORE the
+ * preflight, because the preflight would refuse the held packet itself. Generic-batch requests only (a feature
+ * request needs the preflight to know its course); anything that does not match falls through to the normal path,
+ * where a different task or candidate stays refused.
+ */
+function resumeHeldGenericPacket(options, deps) {
+  if (options?.genericBatchRef === undefined || !PACKET_ID.test(options.packetId ?? "")) return null;
+  const root = realpathSync(resolve(options.preflightInput.root));
+  const controlRoot = controlRootFor(root);
+  if (!existsSync(join(controlRoot, options.packetId))) return null;
+  const packetId = options.packetId;
+  let packet;
+  try { ({ packet } = inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); }
+  catch {
+    try { ({ packet } = inspectCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); } catch { return null; }
+  }
+  const head = spawnSync("git", ["rev-parse", "--verify", `${options.preflightInput.candidate}^{commit}`], { cwd: root, encoding: "utf8", shell: false });
+  if (!isSuccessfulSpawn(head) || head.stdout.trim() !== packet.candidate?.commit || packet.request?.taskId !== options.taskId) return null;
+  const preflightSha256 = packet.request?.sessionBinding?.preflightSha256;
+  if (!SHA256.test(preflightSha256 ?? "")) return null;
+  const reference = options.genericBatchRef;
+  if (!exact(reference, ["batchId", "registrationSha256", "memberSha256"])) return null;
+  const genericBatch = { batchRef: { batchId: reference.batchId, registrationSha256: reference.registrationSha256 }, memberSha256: reference.memberSha256 };
+  // D60 c3: the same-task, same-candidate packet was found by its directory above; its batch index may have been lost.
+  try { republishGenericCriticBatchIndex({ controlRoot, batchRef: genericBatch.batchRef }); }
+  catch (error) {
+    // D60 c4: another batch owns a logical or origins entry; surface it typed instead of falling to the preflight.
+    if (error?.code === "CGB-CONFLICT") throw error;
+    return null;
+  }
+  try {
+    const current = inspectClaimedSessionAdmission({ controlRoot, packetId }, deps.packetDependencies);
+    const retained = readReservedGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
+    const course = genericCourseFor(retained.reservation);
+    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256) fail("SCF-PRELAUNCH-BINDING");
+    return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "already-admitted", packetId,
+      packetDigest: current.admission.packetDigest, admissionSha256: sha256(canonicalJson(current.admission)), replay: true });
+  } catch (error) {
+    if (error instanceof SessionCriticFinalizerError) throw error;
+  }
+  // Half-finished: finish what the failed attempt left (claim, reservation, admission), in the same order admit uses.
+  try {
+    try { inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies); }
+    catch {
+      claimCandidatePacket({ controlRoot, packetId, adapter: packet.route.adapter,
+        claimantNonce: (deps.randomBytesFn ?? randomBytes)(32).toString("hex") }, deps.packetDependencies);
+    }
+    const reservation = reserveGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
+    const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({
+      controlRoot, packetId, preflightSha256, ...genericCourseFor(reservation.reservation),
+    }, deps.packetDependencies);
+    return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "admitted", packetId,
+      packetDigest: sha256(canonicalJson(packet)), admissionSha256: sha256(canonicalJson(admission.admission)), resumed: true });
+  } catch (error) {
+    if (error instanceof SessionCriticFinalizerError) throw error;
+    return null;
+  }
+}
+
 /** Prepare and claim the exact session packet before any fresh Critic spawn. */
 export function admitSessionCriticReview(options, deps = {}) {
-  const preflight = (deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
+  const resumed = resumeHeldGenericPacket(options, deps);
+  if (resumed !== null) return resumed;
+  const preflight =(deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
   if (preflight?.status !== "packet-ready" || preflight.dispatch?.requiredNextGate !== "session-critic-dispatch") fail("SCF-PREFLIGHT");
   const root = realpathSync(resolve(options.preflightInput.root));
   const id = sessionId(options.sessionId);
@@ -411,10 +478,10 @@ function buildResult({ packet, packetDigest, session, verdict }) {
     verdict: assertVerdict(verdict),
   });
 }
-function validateResult(result, packet) {
+function validateResult(result, packet, packetDigest = sha256(canonicalJson(packet))) {
   const sessionBinding = packet.request.sessionBinding;
   if (!exact(result, RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
-    || result.packetId !== packet.packetId || result.packetDigest !== sha256(canonicalJson(packet))
+    || result.packetId !== packet.packetId || result.packetDigest !== packetDigest
     || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
       ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
       : ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
@@ -542,11 +609,13 @@ export function finalizeSessionCriticReview(options, deps = {}) {
     || canonicalJson(packet.route) !== canonicalJson(admittedRouteFor(packet, options.route,
       options.trigger ?? "T1", preflightSha256))
     || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
-  const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
+  // The packet view may carry a normalized legacy binding; the receipt binds the digest of the packet as it lies on disk
+  // (the admission digest, already verified against the raw packet), which is what every consumed-packet reader recomputes.
+  const prepared = { packet, packetDigest: admitted.admission?.packetDigest ?? sha256(canonicalJson(packet)) };
 
   let event = null;
   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
-  validateResult(result, prepared.packet);
+  validateResult(result, prepared.packet, prepared.packetDigest);
   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
@@ -739,6 +808,13 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
     const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";
     if (Array.isArray(argv) && argv.includes("--allow-caller-authored-fallback") && !optIn) fail("SCF-USAGE");
     if (Array.isArray(argv) && argv[0] === "export") return runSessionCriticExportCli(argv, deps);
+    if (Array.isArray(argv) && argv[0] === "release") {
+      if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+      const releaseRoot = realpathSync(resolve(argv[2]));
+      const rawRelease = readPhysicalRequest(releaseRoot, argv[4]);
+      if (!exact(rawRelease, ["schema", "packetId", "reason"]) || rawRelease.schema !== SESSION_CRITIC_RELEASE_REQUEST_SCHEMA) fail("SCF-RELEASE-REQUEST");
+      return Object.freeze({ exitCode: 0, output: releaseCriticPacket({ controlRoot: controlRootFor(releaseRoot), packetId: rawRelease.packetId, reason: rawRelease.reason }) });
+    }
     if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
     const root = realpathSync(resolve(argv[2]));
     const raw = readPhysicalRequest(root, argv[4]);

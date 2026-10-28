@@ -11,7 +11,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
+import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission,
+  readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission,
+  recordCandidateExport, blockCandidatePacket } from "./critic-packet-preflight.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
@@ -296,6 +298,190 @@ test("prelaunch admission creates one claimed, digest-bound packet before the ve
     assert.equal(replayed.packetId, request.packetId);
     assert.equal(replayed.packetDigest, admitted.packetDigest);
     assert.equal(replayed.admissionSha256, admitted.admissionSha256);
+  } finally { cleanup(fx); }
+});
+
+test("D60 (a) a first admit that fails after the claim is completed by the second admit without manual deletion", () => {
+  const fx = fixture();
+  try {
+    const request = registered(fx, { packetId: "8".repeat(32) });
+    assert.throws(() => admitSessionCriticReview(request, {
+      publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); },
+    }));
+    const second = admitSessionCriticReview(request);
+    assert.ok(["admitted", "already-admitted"].includes(second.status));
+    assert.equal(second.packetId, request.packetId);
+    assert.equal(admitSessionCriticReview(request).status, "already-admitted");
+  } finally { cleanup(fx); }
+});
+
+test("D60 (b) a registration blocked by a held packet is refused with CGB-HELD naming the packet and the release verb", () => {
+  const fx = fixture();
+  try {
+    const request = registered(fx, { packetId: "7".repeat(32) });
+    admitSessionCriticReview(request);
+    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+    rmSync(join(controlRoot, "generic-batches"), { recursive: true, force: true });
+    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: {
+      taskId: fx.taskId, baseCommit: fx.base, candidateCommit: fx.candidate,
+      logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+      signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json",
+    } }), (error) => error.code === "CGB-HELD" && error.message.includes("7".repeat(32)) && error.message.includes("release"));
+  } finally { cleanup(fx); }
+});
+
+function lostIndexDeclaration(fx) {
+  return { taskId: fx.taskId, baseCommit: fx.base, candidateCommit: fx.candidate,
+    logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
+    signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" };
+}
+
+test("D60 c3 (a) the exact reported state: a claimed packet of task T and candidate C with no batch index hit is refused CGB-HELD at registration and is resumed by the second admit", () => {
+  const fx = fixture();
+  try {
+    const request = registered(fx, { packetId: "6".repeat(32) });
+    assert.throws(() => admitSessionCriticReview(request, {
+      publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); },
+    }));
+    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+    // The state the Toolbox reported: the claimed packet exists, the logical and origins index entries do not.
+    rmSync(join(controlRoot, "generic-batches", "logical"), { recursive: true, force: true });
+    rmSync(join(controlRoot, "generic-batches", "origins"), { recursive: true, force: true });
+    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: lostIndexDeclaration(fx) }),
+      (error) => error.code === "CGB-HELD" && error.message.includes("6".repeat(32)));
+    const second = admitSessionCriticReview(request);
+    assert.ok(["admitted", "already-admitted"].includes(second.status), `second admit status ${second.status}`);
+    assert.equal(second.packetId, request.packetId);
+  } finally { cleanup(fx); }
+});
+
+test("D60 c3 (b) the release verb end to end through its real CLI entry frees a held review unit and is idempotent", () => {
+  const fx = fixture();
+  try {
+    const request = registered(fx, { packetId: "5".repeat(32) });
+    admitSessionCriticReview(request);
+    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+    rmSync(join(controlRoot, "generic-batches"), { recursive: true, force: true });
+    const declaration = lostIndexDeclaration(fx);
+    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration }), (error) => error.code === "CGB-HELD");
+    const requestPath = writeScratchRequest(fx, "release-request.json", {
+      schema: "pipeline.session-critic-release-request.v1", packetId: request.packetId, reason: "toolbox held packet closure" });
+    const script = fileURLToPath(new URL("./session-critic-finalizer.mjs", import.meta.url));
+    const run = () => spawnSync(process.execPath, [script, "release", "--root", fx.root, "--request", requestPath], { encoding: "utf8" });
+    const first = run();
+    assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+    const receipt = JSON.parse(first.stdout);
+    assert.equal(receipt.status, "released");
+    assert.equal(receipt.packetId, request.packetId);
+    const audit = readFileSync(join(controlRoot, "released", "audit.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    assert.equal(audit.length, 1);
+    assert.equal(audit[0].packetId, request.packetId);
+    assert.equal(audit[0].reason, "toolbox held packet closure");
+    assert.equal(existsSync(join(controlRoot, request.packetId)), false);
+    // The same candidate no longer meets CGB-HELD.
+    const again = registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration });
+    assert.match(again.memberSha256, /^[a-f0-9]{64}$/u);
+    const second = run();
+    assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
+    assert.equal(JSON.parse(second.stdout).status, "already-released");
+    assert.equal(readFileSync(join(controlRoot, "released", "audit.jsonl"), "utf8").trim().split("\n").length, 1);
+  } finally { cleanup(fx); }
+});
+
+function failedAdmitWithLostIndex(fx, packetId) {
+  const request = registered(fx, { packetId });
+  assert.throws(() => admitSessionCriticReview(request, {
+    publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); },
+  }));
+  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
+  rmSync(join(controlRoot, "generic-batches", "logical"), { recursive: true, force: true });
+  rmSync(join(controlRoot, "generic-batches", "origins"), { recursive: true, force: true });
+  return { request, controlRoot };
+}
+
+test("D60 c4 (a) a held packet of a DIFFERENT candidate is refused CGB-HELD naming the packet and the release verb", () => {
+  const fx = fixture();
+  try {
+    const { request, controlRoot } = failedAdmitWithLostIndex(fx, "4".repeat(32));
+    writeFileSync(join(fx.root, "specs", "spec.md"), "# Spec\n\nOther candidate.\n");
+    const other = commit(fx.root, "other candidate");
+    assert.notEqual(other, fx.candidate);
+    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: { ...lostIndexDeclaration(fx), candidateCommit: other } }),
+      (error) => error.code === "CGB-HELD" && error.message.includes("4".repeat(32)) && error.message.includes("release"),
+      "D60 c4 (a): registration of another candidate must name the held packet and the release verb");
+    assert.throws(() => admitSessionCriticReview({ ...request, preflightInput: { ...request.preflightInput, candidate: other } }),
+      undefined, "D60 c4 (a): admit of another candidate must not resume the held packet");
+  } finally { cleanup(fx); }
+});
+
+test("D60 c4 (c) a republished index that conflicts with another batch fails closed with CGB-CONFLICT and keeps the foreign entry", () => {
+  const fx = fixture();
+  try {
+    const { request, controlRoot } = failedAdmitWithLostIndex(fx, "3".repeat(32));
+    const logicalDir = join(controlRoot, "generic-batches", "logical");
+    mkdirSync(logicalDir, { recursive: true, mode: 0o700 });
+    const foreignPath = join(logicalDir, `${sha256Canonical("AC-1")}.json`);
+    const foreign = { schema: "pipeline.critic-generic-index.v1", kind: "logical", identity: "AC-1",
+      batchRef: { batchId: "f".repeat(32), registrationSha256: "e".repeat(64) } };
+    writeFileSync(foreignPath, canonicalJson(foreign), { mode: 0o600 });
+    const before = readFileSync(foreignPath, "utf8");
+    assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CGB-CONFLICT",
+      "D60 c4 (c): the second admit must surface CGB-CONFLICT");
+    assert.equal(readFileSync(foreignPath, "utf8"), before, "D60 c4 (c): the foreign entry is not overwritten");
+  } finally { cleanup(fx); }
+});
+
+test("D60 path: failed admit after the claim, lost index, resume, finalize, export write and read, consumed reads", () => {
+  const fx = fixture();
+  try {
+    const packetId = "2".repeat(32);
+    const controlRoot = controlRootOf(fx);
+    const { request } = e2eStep("first admit fails after the claim; batch index lost", () => failedAdmitWithLostIndex(fx, packetId));
+    e2eStep("second admit resumes the same candidate", () => {
+      const second = admitSessionCriticReview(request);
+      assert.ok(["admitted", "already-admitted"].includes(second.status), `status ${second.status}`);
+    });
+    e2eStep("finalize", () => { assert.equal(finalizeSessionCriticReview(request).status, "completed"); });
+    e2eStep("consumed receipt read", () => { assert.equal(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt.packetId, packetId); });
+    e2eStep("consumed session admission read (the review lineage input)", () => {
+      assert.equal(readConsumedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
+    });
+    e2eStep("export write", () => {
+      criticNotes(fx);
+      assert.equal(exportSessionCriticEvidence(exportOptions(fx, packetId)).status, "exported");
+    });
+    e2eStep("export read back", () => {
+      const dir = join(fx.root, `specs/alpha/evidence/critic/${packetId}`);
+      assert.deepEqual(readdirSync(dir).sort(), [...EXPORT_FILES].sort());
+      assert.equal(JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).packetId, packetId);
+    });
+  } finally { cleanup(fx); }
+});
+
+test("D60 path release: a held packet blocking another candidate is released through the real CLI and the admitted candidate then succeeds", () => {
+  const fx = fixture();
+  try {
+    const heldId = "1a".repeat(16);
+    const { controlRoot } = e2eStep("held packet", () => failedAdmitWithLostIndex(fx, heldId));
+    e2eStep("other candidate blocked", () => {
+      writeFileSync(join(fx.root, "specs", "spec.md"), "# Spec\n\nOther candidate.\n");
+      const other = commit(fx.root, "other candidate");
+      assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: { ...lostIndexDeclaration(fx), candidateCommit: other } }),
+        (error) => error.code === "CGB-HELD");
+    });
+    e2eStep("release through the CLI", () => {
+      const requestPath = writeScratchRequest(fx, "release-request.json", {
+        schema: "pipeline.session-critic-release-request.v1", packetId: heldId, reason: "path verification" });
+      const script = fileURLToPath(new URL("./session-critic-finalizer.mjs", import.meta.url));
+      const run = spawnSync(process.execPath, [script, "release", "--root", fx.root, "--request", requestPath], { encoding: "utf8" });
+      assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
+      assert.equal(JSON.parse(run.stdout).status, "released");
+    });
+    e2eStep("next admit of the admitted candidate", () => {
+      rmSync(join(controlRoot, "generic-batches"), { recursive: true, force: true });
+      delete fx.batch;
+      assert.equal(admitSessionCriticReview(registered(fx, { packetId: "1b".repeat(16) })).status, "admitted");
+    });
   } finally { cleanup(fx); }
 });
 
@@ -635,8 +821,12 @@ function rewriteAsLegacyPacket(fx, packetId, kind) {
   packet.coordinatorOnly = { localDispatchEvidence: legacyBindingVariant(kind, body) };
   packet.bindings.coordinatorOnlySha256 = sha(canonicalJson(packet.coordinatorOnly));
   const digest = sha(canonicalJson(packet));
+  // The old creator sealed the claim over the prepared state of ITS packet digest: re-chain claim.priorStateDigest to the
+  // prepared record of the rewritten packet (readConsumedSessionAdmission recomputes exactly this record).
+  const preparedState = { ...read("state.json"), packetDigest: digest, revision: 1, priorStateDigest: null, phase: "prepared", body: { code: "CPP-PREPARED" }, timestamp: packet.createdAt };
   const state = read("state.json"); state.packetDigest = digest;
   const claim = read("claim.json"); claim.packetDigest = digest;
+  claim.priorStateDigest = sha(canonicalJson(preparedState)); state.priorStateDigest = claim.priorStateDigest;
   const admission = read("session-admission.json"); admission.packetDigest = digest; admission.claimSha256 = sha(canonicalJson(claim));
   write("packet.json", packet); write("state.json", state); write("claim.json", claim); write("session-admission.json", admission);
   return { dir, body };
@@ -698,6 +888,143 @@ test("PF-93 (2)+(7) a packet claimed in the pre-assurance form finalizes through
     const result = finalizeSessionCriticReview(request);
     assert.equal(result.status, "completed");
     assert.equal(result.receipt.reviewPass, true);
+  } finally { cleanup(fx); }
+});
+
+// PF-93 follow-up: a legacy-form packet that finalization consumed must stay readable by every read-back path.
+function finalizedLegacyPacket(fx, packetId) {
+  const request = registered(fx, { packetId });
+  admitSessionCriticReview(request);
+  rewriteAsLegacyPacket(fx, request.packetId, "legacy");
+  resealReservationForLegacyPacket(fx, request);
+  assert.equal(finalizeSessionCriticReview(request).status, "completed");
+  const stored = JSON.parse(readFileSync(join(controlRootOf(fx), packetId, "packet.json"), "utf8"));
+  assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
+  return request;
+}
+
+test("PF-93 follow-up (a) export publishes a finalized pre-assurance packet", () => {
+  const fx = fixture();
+  try {
+    const packetId = "a3".repeat(16);
+    finalizedLegacyPacket(fx, packetId);
+    criticNotes(fx);
+    const result = exportSessionCriticEvidence(exportOptions(fx, packetId));
+    assert.equal(result.status, "exported");
+    assert.deepEqual(readdirSync(join(fx.root, `specs/alpha/evidence/critic/${packetId}`)).sort(), [...EXPORT_FILES].sort());
+  } finally { cleanup(fx); }
+});
+
+test("PF-93 follow-up (b) receipt and result reads (delta round and Verify binding) accept a consumed pre-assurance packet", () => {
+  const fx = fixture();
+  try {
+    const packetId = "a4".repeat(16);
+    finalizedLegacyPacket(fx, packetId);
+    const input = { controlRoot: controlRootOf(fx), packetId };
+    const read = readConsumedCandidateReceipt(input);
+    assert.equal(read.packet.packetId, packetId);
+    assert.equal(read.receipt.packetId, packetId);
+    const result = readConsumedCandidateResult(input);
+    assert.equal(result.packet.packetId, packetId);
+    assert.deepEqual(result.receipt, read.receipt);
+  } finally { cleanup(fx); }
+});
+
+test("PF-93 follow-up (c) the consumed session admission read accepts a consumed pre-assurance packet", () => {
+  const fx = fixture();
+  try {
+    const packetId = "a5".repeat(16);
+    finalizedLegacyPacket(fx, packetId);
+    const read = readConsumedSessionAdmission({ controlRoot: controlRootOf(fx), packetId });
+    assert.equal(read.packet.packetId, packetId);
+    assert.equal(read.admission.packetId, packetId);
+  } finally { cleanup(fx); }
+});
+
+test("PF-93 follow-up (d) a claimed pre-assurance packet can be blocked", () => {
+  const fx = fixture();
+  try {
+    const request = registered(fx, { packetId: "a6".repeat(16) });
+    admitSessionCriticReview(request);
+    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
+    const blocked = blockCandidatePacket({ controlRoot: controlRootOf(fx), packetId: request.packetId, code: "CPP-TEST-BLOCK" });
+    assert.equal(blocked.code, "CPP-TEST-BLOCK");
+    assert.equal(blocked.state.phase, "blocked");
+  } finally { cleanup(fx); }
+});
+
+test("PF-93 follow-up (e) the export write on a claimed pre-assurance packet reaches the authorization check, not the binding refusal", () => {
+  const fx = fixture();
+  try {
+    const request = registered(fx, { packetId: "a7".repeat(16) });
+    admitSessionCriticReview(request);
+    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
+    assert.throws(() => recordCandidateExport({ controlRoot: controlRootOf(fx), packetId: request.packetId, receipt: {}, exportView: {}, policy: {} }),
+      (error) => error.code === "CPP-EXPORT");
+  } finally { cleanup(fx); }
+});
+
+// One lifecycle walk of a legacy packet; a failing step names itself in the error message.
+function e2eStep(name, fn) {
+  try { return fn(); } catch (error) {
+    error.message = `PF-93 e2e step "${name}" failed: ${error.message}`;
+    throw error;
+  }
+}
+
+test("PF-93 e2e a pre-assurance packet survives the whole lifecycle, and a blocked one reads back", () => {
+  const fx = fixture();
+  try {
+    const packetId = "a8".repeat(16);
+    const controlRoot = controlRootOf(fx);
+    const request = e2eStep("claimed in the pre-assurance form", () => {
+      const r = registered(fx, { packetId });
+      admitSessionCriticReview(r);
+      rewriteAsLegacyPacket(fx, packetId, "legacy");
+      resealReservationForLegacyPacket(fx, r);
+      const stored = JSON.parse(readFileSync(join(controlRoot, packetId, "packet.json"), "utf8"));
+      assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
+      assert.equal(inspectClaimedCandidatePacket({ controlRoot, packetId }, { allowLegacyPreAssurance: true }).ok, true);
+      return r;
+    });
+    e2eStep("session admission read (claimed)", () => {
+      assert.equal(inspectClaimedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
+    });
+    e2eStep("finalize", () => { assert.equal(finalizeSessionCriticReview(request).status, "completed"); });
+    e2eStep("consumed receipt read", () => { assert.equal(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt.packetId, packetId); });
+    e2eStep("consumed result read (also the only preflight read the review lineage and Verify lifecycle call)", () => {
+      assert.equal(readConsumedCandidateResult({ controlRoot, packetId }).packet.packetId, packetId);
+    });
+    e2eStep("consumed session admission read", () => {
+      assert.equal(readConsumedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
+    });
+    e2eStep("export write", () => {
+      criticNotes(fx);
+      assert.equal(exportSessionCriticEvidence(exportOptions(fx, packetId)).status, "exported");
+    });
+    e2eStep("export read back", () => {
+      const dir = join(fx.root, `specs/alpha/evidence/critic/${packetId}`);
+      assert.deepEqual(readdirSync(dir).sort(), [...EXPORT_FILES].sort());
+      assert.equal(JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).packetId, packetId);
+    });
+    // Second leg: a claimed legacy packet that is blocked, then read back from the durable state.
+    // A registered generic batch stops after its first pass, so the second leg runs in its own fixture.
+    const fx2 = fixture();
+    try {
+      const blockedId = "a9".repeat(16);
+      const controlRoot2 = controlRootOf(fx2);
+      e2eStep("blocked leg: claim legacy and block", () => {
+        const r = registered(fx2, { packetId: blockedId });
+        admitSessionCriticReview(r);
+        rewriteAsLegacyPacket(fx2, blockedId, "legacy");
+        assert.equal(blockCandidatePacket({ controlRoot: controlRoot2, packetId: blockedId, code: "CPP-TEST-BLOCK" }).state.phase, "blocked");
+      });
+      e2eStep("blocked leg: read back", () => {
+        const state = JSON.parse(readFileSync(join(controlRoot2, blockedId, "state.json"), "utf8"));
+        assert.equal(state.phase, "blocked");
+        assert.equal(state.body.code, "CPP-TEST-BLOCK");
+      });
+    } finally { cleanup(fx2); }
   } finally { cleanup(fx); }
 });
 

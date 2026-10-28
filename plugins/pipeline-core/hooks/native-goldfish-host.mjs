@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /** Claude/Codex native hook bridge for the explicitly marked Goldfish host-commit route. */
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget-core.mjs";
 import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
@@ -21,7 +22,32 @@ export function qualifyNativeGoldfishHookDelivery({root,result}={}) {
   return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256})};
 }
 
-const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
+/** D31/D32: the Claude SubagentStop block decision for a recorded checkpoint, or null.
+ * Blocks only while a verified budget grant of this agent is not yet spent (one block per recorded grant, counted in
+ * `grants/<agentId>.continued` next to the grant record) and never when a stop hook already blocked this turn
+ * (`stop_hook_active`). Any fault reads as "no block": the stop proceeds exactly as before. */
+export function nativeGoldfishCheckpointBlock({ commonDir, input, runner, result } = {}) {
+  try {
+    if (runner !== "claude" || input?.hook_event_name !== "SubagentStop" || result?.status !== "checkpoint-recorded") return null;
+    if (input.stop_hook_active === true) return null;
+    const agentId = input.agent_id;
+    if (typeof commonDir !== "string" || !isValidGrantAgentId(agentId)) return null;
+    const directory = join(commonDir, "agent-pipeline", "dispatch-budget", "grants");
+    const grantPath = join(directory, `${agentId}.json`);
+    if (!existsSync(grantPath)) return null;
+    const described = describeGrantRecord(JSON.parse(readFileSync(grantPath, "utf8")), agentId);
+    if (!described.ok) return null;
+    const countPath = join(directory, `${agentId}.continued`);
+    let used = 0;
+    if (existsSync(countPath)) { used = Number.parseInt(readFileSync(countPath, "utf8"), 10); if (!Number.isSafeInteger(used) || used < 0) return null; }
+    if (used >= described.count) return null;
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    writeFileSync(countPath, `${used + 1}\n`, { mode: 0o600 });
+    return { decision: "block", reason: `Your budget checkpoint is recorded and the slice stays started. Do not stop: continue with the remaining work of your briefing from your continuation card. The recorded budget grant (${described.count - used} of ${described.count} remaining) adds up to ${described.last.extra} further tool calls. The Elephant may cancel the slice if what you are doing is not right; hand back again only at the next checkpoint or when the work is complete.` };
+  } catch { return null; }
+}
+
+const STOP_FAILURE_SCHEMA ="pipeline.native-goldfish-host-stop-failure.v1";
 
 /** Newest stop-failure diagnostic the SubagentStop completion left (PF-61), or null. Diagnostic only: any fault reads as none. */
 export function readNativeGoldfishStopFailure({ commonDir } = {}) {
@@ -91,7 +117,9 @@ if (isDirectInvocation(import.meta.url)) {
     result = finalizeNativeGoldfishHostReturn({ runner,
       root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
   } catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION" }; }
-  // A stop hook must never block the stop: a fault after the finalizer ran degrades to the recovery message, exit 0.
+  // A stop hook never blocks the stop, with one deliberate exception (D31/D32): a recorded checkpoint with a remaining
+  // budget grant makes the Claude SubagentStop block once so the Goldfish continues. Every fault degrades to the recovery
+  // message, exit 0.
   try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
@@ -99,6 +127,13 @@ if (isDirectInvocation(import.meta.url)) {
   if (runner === "claude" && input.hook_event_name === "PostToolUse" && ["Agent", "Task"].includes(input.tool_name)) {
     try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()) }); }
     catch { stopFailure = null; }
+  }
+  let block = null;
+  try { block = nativeGoldfishCheckpointBlock({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), input, runner, result }); }
+  catch { block = null; }
+  if (block) {
+    process.stdout.write(`${JSON.stringify(block)}\n`);
+    process.exit(0);
   }
   const message = nativeGoldfishHookMessage(result, { stopFailure });
   if (!message) process.exit(0);

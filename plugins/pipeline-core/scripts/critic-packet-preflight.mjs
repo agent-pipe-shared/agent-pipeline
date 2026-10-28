@@ -421,7 +421,7 @@ export function inspectCandidatePacket({ controlRoot, packetId }, { now = new Da
 
 /** Persist exactly one recomputable, redacted pre-export authorization per assurance class. */
 export function recordCandidateExport({ controlRoot, packetId, receipt, exportView, policy }, options = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   if (currentState(packetDir, packet).phase !== "claimed") fail("CPP-EXPORT", "Packet is not claimed for export authorization.");
   if (!validateCriticExportAuthorization({ receipt, packet, exportView, policy }, options)) {
     fail("CPP-EXPORT", "Critic export authorization receipt is invalid or not authorized.");
@@ -433,7 +433,7 @@ export function recordCandidateExport({ controlRoot, packetId, receipt, exportVi
 
 /** Re-read and revalidate the immutable authorization used by a final receipt. */
 export function readCandidateExport({ controlRoot, packetId, assuranceClass, policy }, options = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   if (options.requireLiveCandidate === true) {
     assertLive(packet, options.now ?? new Date());
     revalidateCandidate(packet);
@@ -778,7 +778,8 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
 }
 
 function readConsumedCandidateSnapshot({ controlRoot, packetId }) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  // A packet claimed in the pre-assurance form is consumed by the finalizer through the explicit legacy read; read it back the same way.
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   const state = currentState(packetDir, packet);
   if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
   const receiptRecord = readJson(join(packetDir, "receipt.json"), "CPP-RECEIPT");
@@ -847,7 +848,7 @@ export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapabilit
 }
 
 export function blockCandidatePacket({ controlRoot, packetId, code, detail = null }, { now = new Date() } = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   if (typeof code !== "string" || !code.startsWith("CPP-")) fail("CPP-BLOCK", "Invalid block code.");
   const state = currentState(packetDir, packet);
   if (["consumed", "blocked"].includes(state.phase)) fail("CPP-BLOCK", "Terminal packet cannot be blocked again.");
@@ -860,7 +861,7 @@ export const __test = Object.freeze({ bindingsFor, observeCheckout, candidateInv
 /** Read the immutable prelaunch admission only after genuine journal consumption. */
 export function readConsumedSessionAdmission({ controlRoot, packetId }) {
   const consumed = readConsumedCandidateResult({ controlRoot, packetId });
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   const admissionPath = join(packetDir, "session-admission.json");
   if (!existsSync(admissionPath) || packet.request.sessionBinding === undefined) {
     fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Consumed session admission is unavailable.");

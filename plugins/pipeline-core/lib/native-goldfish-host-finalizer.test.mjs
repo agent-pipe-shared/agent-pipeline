@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
 import { createGovernanceScopeController } from "./governance-scope.mjs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { appendGrant } from "./dispatch-budget-core.mjs";
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
 import { join } from "node:path";
@@ -71,6 +72,30 @@ const readReceipt = (commonDir) => { const names = privateEntries(commonDir, "ob
 const diagDir = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
 const diagEntries = (commonDir) => (existsSync(diagDir(commonDir)) ? readdirSync(diagDir(commonDir)).sort() : []);
 const plantDiagnostic = (commonDir, name, content) => { mkdirSync(diagDir(commonDir), { recursive: true, mode: 0o700 }); writeFileSync(join(diagDir(commonDir), name), content); };
+// D31/D32 hook-level helper: write a handback transcript with the given outcome, record `grants` budget grants for agent-bg,
+// then spawn the real SubagentStop hook script with the stop input on stdin.
+const hookScript = join(fileURLToPath(new URL(".", import.meta.url)), "..", "hooks", "native-goldfish-host.mjs");
+function spawnStopHook({ root, commonDir, binding, writeMeta, stopInput }, { outcome = "checkpoint", grants = 0, runner = "claude", over = {}, plant = true } = {}) {
+  if (plant) {
+    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
+    const transcript = stopInput(binding, "x").transcript_path;
+    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
+      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome, report: "Budget reached; continuation card follows." }) } }] } })}\n`);
+  }
+  const grantFile = join(commonDir, "agent-pipeline", "dispatch-budget", "grants", "agent-bg.json");
+  if (grants > 0 && !existsSync(grantFile)) {
+    let record = null;
+    for (let i = 0; i < grants; i += 1) {
+      const appended = appendGrant({ record, agentId: "agent-bg", extra: 20, reason: "unit grant", grantedAt: "2026-10-28T10:00:00Z" });
+      assert.equal(appended.ok, true, JSON.stringify(appended)); record = appended.record;
+    }
+    mkdirSync(join(commonDir, "agent-pipeline", "dispatch-budget", "grants"), { recursive: true });
+    writeFileSync(grantFile, JSON.stringify(record));
+  }
+  const run = spawnSync(process.execPath, [hookScript, "--runner", runner], { input: JSON.stringify(stopInput(binding, undefined, over)),
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
+  return { status: run.status, stdout: run.stdout, stderr: run.stderr };
+}
 const diagRecord = (dispatchId, toolUseId) => `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId, toolUseId,
   status: "not-finalized", code: "NGHR-FINAL-JSON", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`;
 function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
@@ -498,6 +523,43 @@ const cases = [
     assert.equal(failed.status, "not-finalized", failed.code);
     assert.equal(diagEntries(commonDir).length, 1, JSON.stringify(failed));
     assert.equal(facts.commits, 0);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  // NGHF20-NGHF25 -- D31/D32 (PO design 2026-10-28): a checkpoint does not stop the Goldfish while a grant remains.
+  { id: "NGHF20", name: "A checkpoint stop with a remaining grant makes the SubagentStop hook block the stop (exit 0, block JSON), once per grant", run: () => fixture((ctx) => {
+    const first = spawnStopHook(ctx, { grants: 1 });
+    assert.equal(first.status, 0, first.stderr);
+    const decision = JSON.parse(first.stdout);
+    assert.equal(decision.decision, "block");
+    assert.equal(typeof decision.reason, "string");
+    assert.match(decision.reason, /continue/iu); assert.match(decision.reason, /cancel/iu);
+    const second = spawnStopHook(ctx, { grants: 1, plant: false });
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(second.stdout, "", "the one recorded grant is spent: the next checkpoint stop is allowed");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF21", name: "A stop with stop_hook_active true is never blocked, even with a remaining grant", run: () => fixture((ctx) => {
+    const run = spawnStopHook(ctx, { grants: 1, over: { stop_hook_active: true } });
+    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF22", name: "A checkpoint stop with no remaining grant is not blocked and keeps the checkpoint-recorded message", run: () => fixture((ctx) => {
+    const run = spawnStopHook(ctx, { grants: 0 });
+    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
+    assert.match(run.stderr, /NGHF-CHECKPOINT-RESERVATION-LIVE/u);
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF23", name: "A non-checkpoint outcome never makes the hook block", run: () => fixture((ctx) => {
+    const run = spawnStopHook(ctx, { outcome: "failed", grants: 1 });
+    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF24", name: "The Codex runner never makes the hook block", run: () => fixture((ctx) => {
+    const run = spawnStopHook(ctx, { grants: 1, runner: "codex" });
+    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
+  }, "claude", 1, "goldfish-implementor", { background: true }) },
+  { id: "NGHF25", name: "A blocked checkpoint changes no pending state (slice stays started) and the reason carries no absolute path", run: () => fixture((ctx) => {
+    const before = snapshot(ctx.commonDir);
+    const run = spawnStopHook(ctx, { grants: 1 });
+    const decision = JSON.parse(run.stdout);
+    assert.equal(snapshot(ctx.commonDir), before, "the reservation and every pending state file are untouched");
+    assert.doesNotMatch(decision.reason, /(?:^|[\s"'(=])(?:\/[A-Za-z0-9_.-]+){2,}|[A-Za-z]:\\/u);
+    assert.equal(decision.reason.includes(ctx.root), false);
   }, "claude", 1, "goldfish-implementor", { background: true }) },
 
 ];

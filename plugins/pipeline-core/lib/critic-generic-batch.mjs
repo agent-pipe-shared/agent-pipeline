@@ -37,9 +37,9 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 export class GenericCriticBatchError extends Error {
-  constructor(code) { super("Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; }
+  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; }
 }
-function fail(code) { throw new GenericCriticBatchError(code); }
+function fail(code, detail) { throw new GenericCriticBatchError(code, detail); }
 function shape(v, keys) { if (!exact(v, keys)) fail("CGB-SHAPE"); }
 function ref(v) { shape(v, ["batchId", "registrationSha256"]); if (!ID.test(v.batchId) || !SHA.test(v.registrationSha256)) fail("CGB-SHAPE"); return v; }
 function paths(v, max = 128) {
@@ -377,9 +377,9 @@ function retainedUnadoptedPacket(c, target, taskId) {
     const p = join(c.controlRoot, id, "packet.json");
     if (!existsSync(p)) continue;
     const packet = stableJson(p);
-    if (packet.request?.taskId === taskId || eq(targetForPacket(packet), target)) return true;
+    if (packet.request?.taskId === taskId || eq(targetForPacket(packet), target)) return id;
   }
-  return false;
+  return null;
 }
 function writeMember(c, batchRef, value) {
   const m = { ...value, recordSha256: sha256Canonical(value) };
@@ -411,7 +411,8 @@ function registerBatch(input) {
       const found = member(c, batchRef, sha256Canonical(origin));
       return { batchRef, memberSha256: found.value.recordSha256, replay: true };
     }
-    if (retainedUnadoptedPacket(c, s.target, input.declaration.taskId)) fail("CGB-HELD");
+    const heldPacketId = retainedUnadoptedPacket(c, s.target, input.declaration.taskId);
+    if (heldPacketId !== null) fail("CGB-HELD", `A packet of another admission holds this review unit (packet ${heldPacketId}); release it with the session-critic-finalizer release verb (packetId and reason) or resume it with admit for the same task and candidate.`);
     ensureStore(c);
     const batchId = randomBytes(16).toString("hex");
     const subject = { schema: GENERIC_CRITIC_BATCH_V2_SCHEMA, batchId, repositoryFingerprint: c.fingerprint, declaredScope: s.scope, originTargets: [s.target] };
@@ -625,6 +626,27 @@ function reserveAdmission(input) {
     return { reservation: r, replay: false };
   });
 }
+// D60 c3: a retained, complete registration whose logical/origins index entries were lost is re-bound to the same batch.
+// publishIndex refuses (CGB-CONFLICT) when another batch already owns an entry, so this never steals a review unit.
+function republishIndex(input) {
+  shape(input, ["controlRoot", "batchRef"]);
+  const c = readContext(input.controlRoot);
+  return transaction(c, () => {
+    const batchRef = ref(input.batchRef);
+    const p = join(c.root, batchRef.batchId);
+    directory(p);
+    const value = stableJson(join(p, "registration.json"));
+    shape(value, REGISTRATION);
+    const { registrationSha256, ...subject } = value;
+    if (![GENERIC_CRITIC_BATCH_SCHEMA, GENERIC_CRITIC_BATCH_V2_SCHEMA].includes(value.schema) || !eq(batchRef, { batchId: value.batchId, registrationSha256 })
+      || sha256Canonical(subject) !== registrationSha256 || value.repositoryFingerprint !== c.fingerprint || value.originTargets.length !== 1) fail("CGB-STALE");
+    if (!eq(stableJson(join(p, "registration-complete.json")), { schema: "pipeline.critic-generic-registration-complete.v1", batchRef })) fail("CGB-HELD");
+    ensureStore(c);
+    for (const identity of logical(value.declaredScope.logicalWorkIds)) publishIndex(c, "logical", identity, batchRef);
+    for (const target of value.originTargets) publishIndex(c, "origins", target, batchRef);
+    return { batchRef, republished: true };
+  });
+}
 function invoke(action) {
   try { return action(); }
   catch (error) {
@@ -639,6 +661,7 @@ function invoke(action) {
 export function registerGenericCriticBatch(input) { return invoke(() => registerBatch(input)); }
 export function appendGenericCriticBatchCorrection(input) { return invoke(() => appendCorrection(input)); }
 export function readGenericCriticBatchAdmission(input) { return invoke(() => readAdmission(input)); }
+export function republishGenericCriticBatchIndex(input) { return invoke(() => republishIndex(input)); }
 export function reserveGenericCriticBatchAdmission(input) { return invoke(() => reserveAdmission(input)); }
 export function readReservedGenericCriticBatchAdmission(input) { return invoke(() => readReservedAdmission(input)); }
 /** Diagnose a held transaction without treating a partial publication as a disposable lock. */
