@@ -13,7 +13,10 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **232 items:228 at75,3 at50,1 at25;4 below75;index74.46%** (PF-93 intake,
+contains **233 items:228 at75,3 at50,2 at25;5 below75;index74.25%** (Toolbox D58/D59
+intake, 2026-10-28: one P0 row joined at25, the Windows directory fsync refusal that
+aborts the Critic batch admit with CGB-PHYSICAL, held patch delivered and verified on
+Linux; PF-93 intake,
 2026-10-28: one P0 row joined at25, a Critic packet claimed under an older plugin
 version cannot be finalized or released; round-2
 bundle v5 amendment, 2026-10-28: the 24 held patches were applied in `c0b837599` and
