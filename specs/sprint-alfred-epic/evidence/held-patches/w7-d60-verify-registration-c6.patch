@@ -1,0 +1,112 @@
+diff --git a/harness/config/verify-case-completion-augmentations.v1.json b/harness/config/verify-case-completion-augmentations.v1.json
+index aa51dd3ce..0d7495f33 100644
+--- a/harness/config/verify-case-completion-augmentations.v1.json
++++ b/harness/config/verify-case-completion-augmentations.v1.json
+@@ -511,6 +511,21 @@
+         "maxBytes": 65536
+       }
+     },
++    {
++      "name": "critic-packet-release-tests",
++      "file": "plugins/pipeline-core/lib/critic-packet-release.test.mjs",
++      "caseCompletion": {
++        "schema": "pipeline.verify-case-completion-policy.v1",
++        "caseIds": [
++          "CPR001",
++          "CPR002",
++          "CPR003",
++          "CPR004",
++          "CPR005"
++        ],
++        "maxBytes": 65536
++      }
++    },
+     {
+       "name": "darwin-native-process-observer-tests",
+       "file": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
+diff --git a/harness/config/verify-case-completion.v1.json b/harness/config/verify-case-completion.v1.json
+index bc80ee3df..f58e04d30 100644
+--- a/harness/config/verify-case-completion.v1.json
++++ b/harness/config/verify-case-completion.v1.json
+@@ -455,6 +455,11 @@
+       "path": "plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+       "disposition": "required"
+     },
++    {
++      "name": "critic-packet-release-tests",
++      "path": "plugins/pipeline-core/lib/critic-packet-release.test.mjs",
++      "disposition": "required"
++    },
+     {
+       "name": "critic-packet-governance-tests",
+       "path": "plugins/pipeline-core/lib/critic-packet-governance.test.mjs",
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index d4690a232..6d0362fae 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -156,6 +156,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",60],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",158],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",18],
++    ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",5],
+     ["darwin-native-process-observer-tests","plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs","top-level-assertions",24],
+     ["darwin-requester-integration-tests","plugins/pipeline-core/lib/darwin-requester-integration.test.mjs","top-level-assertions",13],
+     ["design-approval-command-admission-tests","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs","top-level-assertions",5],
+@@ -235,7 +236,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+   assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length);
+   assert.equal(classified.length, result.vulnerableCount,
+     "all classified Verify registrations must have a completion-registry row");
+-  assert.equal(result.registryCount, 361);
++  assert.equal(result.registryCount, 362);
+   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
+   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
+   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
+@@ -252,6 +253,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     "critic-course-admission-tests",
+     "critic-dispatch-preflight-tests",
+     "critic-generic-batch-tests",
++    "critic-packet-release-tests",
+     "darwin-native-process-observer-tests",
+     "darwin-requester-integration-tests",
+     "design-approval-command-admission-tests",
+diff --git a/harness/verify-suites.json b/harness/verify-suites.json
+index 030c8367a..ea8e18546 100644
+--- a/harness/verify-suites.json
++++ b/harness/verify-suites.json
+@@ -2285,6 +2285,12 @@
+       "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-generic-batch.test.mjs",
+       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-generic-batch.test.mjs"
+     },
++    {
++      "name": "critic-packet-release-tests",
++      "file": "plugins/pipeline-core/lib/critic-packet-release.test.mjs",
++      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-packet-release.test.mjs",
++      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-packet-release.test.mjs"
++    },
+     {
+       "name": "verify-case-completion-augmentation-policy-tests",
+       "file": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
+diff --git a/plugins/pipeline-core/lib/critic-packet-release.test.mjs b/plugins/pipeline-core/lib/critic-packet-release.test.mjs
+index 115dbe754..7fa3880f9 100644
+--- a/plugins/pipeline-core/lib/critic-packet-release.test.mjs
++++ b/plugins/pipeline-core/lib/critic-packet-release.test.mjs
+@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
+ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+-import test from "node:test";
++import { registerTestCaseCompletion } from "./test-case-completion.mjs";
+ import { releaseCriticPacket } from "./critic-packet-release.mjs";
+ 
++const completionCaseIds = Object.freeze(["CPR001", "CPR002", "CPR003", "CPR004", "CPR005"]);
++const completionCases = [];
++function test(name, run) { completionCases.push({ id: completionCaseIds[completionCases.length], name, run }); }
++
+ const ID = "a".repeat(32);
+ function fixture(phase = "claimed") {
+   const root = realpathSync(mkdtempSync(join(tmpdir(), "critic-release-")));
+@@ -72,3 +76,4 @@ test("D60 (g) the audit record carries no absolute path", () => {
+     assert.doesNotMatch(text, /["':]\/[a-z]|[A-Za-z]:\\/u);
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
++registerTestCaseCompletion({ cases: completionCases, fd: 3, maxBytes: 8192 });
