@@ -84,8 +84,8 @@ configuration and source-relevant machine evidence remain review source,
 regardless of directory or extension.
 
 An exclusion is admissible only for a positively identified coordinator-only
-report: supply its exact repository path, its role (retained prior result or
-finding-disposition record), and the committed blob identity, SHA-256 and mode
+report: supply its exact repository path, its role (retained prior result,
+finding-disposition record or project-state record), and the committed blob identity, SHA-256 and mode
 of every version touched by the enumerated commits, including an explicit
 absence at an addition/deletion boundary. The Coordinator establishes that the
 artifact contains no source or operative contract before dispatch. These are
@@ -94,6 +94,16 @@ report body, findings, verdict label, or a summary. Never exclude `evidence/`,
 JSON, or another directory/file class wholesale. Mixed source/verdict content,
 an unbound version, or an ambiguous role rejects the input preparation; neither
 silently carve out source nor hand the mixed artifact to the fresh reviewer.
+
+The role project-state record is admissible only for the file the project
+calibration names as its handover/state file and a `pipeline-handover*.md` file
+in the same directory. It is an exclusion binding only: the Critic verifies the
+blob SHA-256 and mode without emitting bytes and never reads it, and the
+forbidden-material rule for handover, state and history is not relaxed. The
+Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
+(schema `pipeline.critic-correction-input-bindings.v1`) and the Critic verifies
+them; the command refuses a mixed path (CCI-MIXED), and an unknown role, a
+refused path or missing bindings for such paths still stops the review.
 
 The Critic verifies the commit enumeration and complete path partition using
 metadata-only Git observations before requesting any patch body. Include

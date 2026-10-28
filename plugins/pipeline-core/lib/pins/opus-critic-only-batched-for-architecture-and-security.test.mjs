@@ -207,6 +207,17 @@ test("item (e): the Mechanic tier is installed as Haiku at effort medium in agen
   assert.match(read("policies/model-policy.md"), /^\| `models\.mechanic`\s*\| Goldfish \(Mechanic\)\s*\| haiku\s*\| medium\s*\|$/m);
 });
 
+test("CCI canon names the project-state record role and the derive command in both template copies, the protocol, the role and the skill", () => {
+  const tpl = "templates/prompts/critic-review.md";
+  const tplCopy = "plugins/pipeline-core/templates/prompts/critic-review.md";
+  const docs = [tpl, tplCopy, "harness/review-protocol.md", "roles/critic.md", "plugins/pipeline-core/skills/critic-review/SKILL.md"];
+  for (const p of docs) assert.ok(read(p).includes("project-state record"), `${p} names the project-state record role`);
+  for (const p of [tpl, tplCopy, "harness/review-protocol.md", "plugins/pipeline-core/skills/critic-review/SKILL.md"]) {
+    assert.ok(read(p).includes("critic-correction-input-bindings.mjs derive"), `${p} names the derive command`);
+  }
+  assert.equal(read(tpl), read(tplCopy), "the two template copies are byte-identical");
+});
+
 test("work item 3: an Opus choice on the Requested route line also fires without rationale", () => {
   const prompt = "Ruleset SHA: abc123def456\n- Requested route: claude-opus-5 at max\nDispatch metadata: tool budget 30";
   const r = dispatchFindings({ subagentType: "pipeline-core:critic", prompt });

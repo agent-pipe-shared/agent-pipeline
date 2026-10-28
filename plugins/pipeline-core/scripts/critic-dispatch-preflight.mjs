@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
 
+import { CriticCorrectionInputBindingsError, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+
 /**
  * Read-only admission for a path-only Critic dispatch.
  *
@@ -188,6 +190,35 @@ function candidateBytes(root, candidate, path) {
   return result.stdout;
 }
 
+const CCI_COMMAND_HINT = "Run critic-correction-input-bindings.mjs derive --base <base> --head <candidate> and pass its file as correctionInputBindings";
+function checkCorrectionInputBindings(root, baseCommit, candidateCommit, reference) {
+  let derived;
+  try {
+    try { derived = deriveCriticCorrectionInputBindings({ repoRoot: root, base: baseCommit, head: candidateCommit }); }
+    catch (error) {
+      // A repository without a readable project calibration has no project-state class; retained results still count.
+      if (error instanceof CriticCorrectionInputBindingsError && error.code === "CCI-CALIBRATION") {
+        derived = deriveCriticCorrectionInputBindings({ repoRoot: root, base: baseCommit, head: candidateCommit, projectStateOptional: true });
+      } else throw error;
+    }
+  } catch (error) {
+    const code = error instanceof CriticCorrectionInputBindingsError ? error.code : "CCI-UNEXPECTED";
+    fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}.`);
+  }
+  if (reference === null || reference === undefined) {
+    if (derived.exclusions.length === 0) return null;
+    fail("CDP-CORRECTION-INPUT-REQUIRED", `${CCI_COMMAND_HINT}; the range contains project-state or retained-result paths.`);
+  }
+  const path = normalizePath(reference, "correction input bindings path");
+  if (!path.startsWith("scratch/")) fail("CDP-PATH", "correction input bindings path must be under scratch/.");
+  let given;
+  try { given = JSON.parse(localEvidence(root, path)); } catch { given = null; }
+  if (!isObject(given) || given.digestSha256 !== derived.digestSha256 || sha256Canonical(given) !== sha256Canonical(derived)) {
+    fail("CDP-CORRECTION-INPUT-STALE", `${CCI_COMMAND_HINT}; the given bindings file is unreadable or does not match this range.`);
+  }
+  return { path, digestSha256: derived.digestSha256 };
+}
+
 function currentArtifactCoverage(root, candidate, byPath, scope) {
   return scope.paths.map((path) => {
     const file = byPath.get(path);
@@ -257,7 +288,7 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
  * state. Evidence is a local, bounded JSON observation that binds the frozen
  * candidate; Spec and guardrails are always read from that candidate tree.
  */
-export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null }, observer = null) {
+export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, correctionInputBindings = null }, observer = null) {
   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
   try {
   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
@@ -278,6 +309,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
   if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
   sourceCandidate = { commit: candidateCommit, tree: candidateTree };
   if (scope === null && baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
+  const correctionInputEcho = scope === null && baseCommit !== null ? checkCorrectionInputBindings(realRoot, baseCommit, candidateCommit, correctionInputBindings) : null;
 
   stage = "paths";
   const spec = normalizePath(specPath, "spec path");
@@ -402,6 +434,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     status: "packet-ready",
     ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
     candidate: { commit: candidateCommit, tree: candidateTree },
+    ...(correctionInputEcho === null ? {} : { correctionInputBindings: correctionInputEcho }),
     spec: specReadback,
     guardrails: guardrailReadback,
     governance,
@@ -487,8 +520,9 @@ export function parseCriticDispatchPreflightArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
-    if (flag === "--root") values.root = value;
+    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+    if (flag === "--correction-input-bindings") values.correctionInputBindings = value;
+    else if (flag === "--root") values.root = value;
     else if (flag === "--base") values.base = value;
     else if (flag === "--candidate") values.candidate = value;
     else if (flag === "--spec") values.specPath = value;

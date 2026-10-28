@@ -136,7 +136,8 @@ USAGE (Elephant)
    The Coordinator reconciles
    exact ranges and retains receipt/source coverage lineage and finding
    dispositions. Do not request or read prior verdict prose or findings.
-   If the range itself contains retained prior results, prepare the exact
+   If the range itself contains retained prior results or project-state
+   records, derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` and prepare the exact
    source/report partition under `harness/review-protocol.md` §2.2 before
    dispatch. Bind base/head/trees, every intervening commit and parent, package
    source paths, and each coordinator-only report's exact path/role plus every
@@ -247,11 +248,19 @@ environment dump or a credential read; it reads such strings as text only.
   {{CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE}}. This metadata reference
   binds the exact base/head commits and trees, complete intervening commit list
   and parent relationships, package source paths, and the exact coordinator-only
-  report exclusions. Each exclusion names its path, role (retained prior result
-  or finding-disposition record), and every touched version's blob identity,
+  report exclusions. Each exclusion names its path, role (retained prior result,
+  finding-disposition record or project-state record), and every touched version's blob identity,
   SHA-256 and mode, with explicit absence at addition/deletion boundaries. It
   contains no prior verdict label, report body, finding or summary. Exclusion
   entries are not permission to read those artifacts.
+  The Coordinator produces this file with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
+  (schema `pipeline.critic-correction-input-bindings.v1`). A project-state
+  record is admissible only for the file the project calibration names as its
+  handover/state file and a `pipeline-handover*.md` file in the same directory;
+  it is an exclusion binding only: verify its blob SHA-256 and mode without
+  emitting bytes and never read it. The forbidden-material rule for handover,
+  state and history is NOT relaxed. An unknown role, a path the command refused
+  (CCI-MIXED) or missing bindings for such paths still stops the review.
   First use metadata-only Git observations to reconcile every enumerated
   commit's changes and the endpoint comparison with the source/report partition;
   verify excluded blob digests without emitting their bytes. Then reconstruct

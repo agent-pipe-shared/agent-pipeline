@@ -289,6 +289,8 @@ tool or mutating command, do not delegate, and report the exposure as a
 residual host limitation. No staleness check (the dispatch fixed the SHA); no
 handover, no history — ever.
 
+**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record or retained prior result exclusion, never readable) and pass the file as the Correction input bindings field; never invent a role.
+
 **Lifecycle-Guard inspection form (hard):** When the functional-equivalent
 lane runs under a Lifecycle Guard, perform each repository inspection as one
 simple, direct, read-only command. Do not use shell pipelines, redirects,
