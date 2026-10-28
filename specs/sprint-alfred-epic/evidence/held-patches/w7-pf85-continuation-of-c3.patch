@@ -1,0 +1,147 @@
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index 1538992cd..d75a772ce 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -170,7 +170,9 @@ export function observeCodexGoldfishReturn(input, pending) {
+  * independently by the authenticated continuation writer. */
+ export function validateItemDeliveryBriefing(value) {
+   const locator=value?.criterionLocator;
+-  if(!exact(value,['schema','sliceId','itemId','criterionLocator','checks'])||value.schema!=='pipeline.item-delivery-briefing.v1'
++  const hasContinuation=value!==null&&typeof value==='object'&&Object.hasOwn(value,'continuationOf');
++  if(!exact(value,hasContinuation?['schema','sliceId','itemId','criterionLocator','checks','continuationOf']:['schema','sliceId','itemId','criterionLocator','checks'])
++    ||(hasContinuation&&(typeof value.continuationOf!=='string'||!ID.test(value.continuationOf)))||value.schema!=='pipeline.item-delivery-briefing.v1'
+     ||!ID.test(value.sliceId??'')||!ID.test(value.itemId??'')
+     ||!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
+     ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index d6b7e46b8..884a415a3 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -54,6 +54,19 @@ function fail(code) { return { ok: false, code }; }
+ export function heldDependencyRepair() {
+   return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
+ }
++// PF-85 1a: a package may name the stopped slice it continues. Only a slice cancelled for a budget stop or a
++// wrong premise can be continued; anything else is refused before the queue is written.
++export function continuationPredecessorRefusal(continuationOf, sliceId, slices) {
++  const predecessor = continuationOf === sliceId ? undefined : (slices ?? []).find(row => row.id === continuationOf);
++  const cancelClass = predecessor?.cancelClass ?? predecessor?.cancelled?.class;
++  if (predecessor && predecessor.state === 'cancelled' && (cancelClass === 'budget' || cancelClass === 'wrong-premise')) return null;
++  const reason = continuationOf === sliceId ? `${continuationOf} cannot continue itself`
++    : !predecessor ? `${continuationOf} is absent from the slice queue`
++    : predecessor.state !== 'cancelled' ? `${continuationOf} is still ${predecessor.state}, not cancelled`
++    : `${continuationOf} was cancelled with class ${cancelClass}, not budget or wrong-premise`;
++  return { status: 'refused', code: 'NGHS-ITEM-CONTINUATION-PREDECESSOR-INVALID', reason: `${reason}; the queue was not written`,
++    repair: `cancel the predecessor first: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --class budget (or --class wrong-premise), then regenerate the binding naming it as continuationOf` };
++}
+ export function heldDependencyReason(held, slices) {
+   const why = id => {
+     const row = slices.find(entry => entry.id === id);
+@@ -1078,6 +1091,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+         raw.slices=raw.slices.map(row=>({...row,state:'deferred',holdReason:'Original item binding is required; legacy completion is retained evidence only.',delivery:{status:'unbound-legacy',itemId:row.id,legacyQueueSha256:legacyHash}}));
+       }
+       const existing=raw.slices.find(row=>row.id===itemDelivery.sliceId);
++      if(itemDelivery.continuationOf!==undefined){const refusal=continuationPredecessorRefusal(itemDelivery.continuationOf,itemDelivery.sliceId,raw.slices);if(refusal)return refusal;}
+       const delivery={itemId:itemDelivery.itemId,criteria:[locator.criterionId],baseCommit:candidate.commit,
+         criterionLocator:locator,checks:itemDelivery.checks,approvalSha256:approval.approvalSha256};
+       const canRebindLegacy=existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator
+@@ -1098,8 +1112,8 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+         }
+         return resolveGovernedItemQueue({root:physical});
+       }
+-      if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];}
+-      else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
++      if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];if(itemDelivery.continuationOf!==undefined)existing.continuationOf=itemDelivery.continuationOf;}
++      else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',...(itemDelivery.continuationOf!==undefined?{continuationOf:itemDelivery.continuationOf}:{}),dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
+       orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId,candidate.commit);
+       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
+       // A held dependency refuses before the queue is written, so a refused dispatch leaves the tree as it was.
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index c07f48db2..85267949b 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1406,6 +1406,49 @@ const cases = [
+     assert.equal(mod.memoPerAdmission.length,3);
+   }},
+ 
++  { id: "NGHS52", name: "PF-85 1a: continuationOf is admitted only for a budget or wrong-premise cancelled predecessor; any other predecessor is refused with the sanctioned repair", run: () => fixture(({ root }) => {
++    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
++    const original=prepareApprovedItemCourseFixture({root});
++    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
++    const delivery=(sliceId,extra={})=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}],...extra});
++    const prepare=(sliceId,extra)=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId,extra),candidate:original.candidate,writeScope:['src/change.mjs']}));
++    const cancel=(sliceId,cancelClass)=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'stopped',cancelClass}));
++    const queuePath=join(root,'specs/unit/slice-queue.json'),rowOf=id=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===id);
++    const refusedWith=(label,sliceId,predecessor,reason)=>{
++      const before=readFileSync(queuePath,'utf8'),refused=prepare(sliceId,{continuationOf:predecessor});
++      assert.equal(refused.status,'refused',`${label}: ${JSON.stringify(refused)}`);assert.equal(refused.code,'NGHS-ITEM-CONTINUATION-PREDECESSOR-INVALID',`${label}: ${JSON.stringify(refused)}`);
++      assert.match(refused.reason,reason,label);assert.match(refused.repair,/slice-queue\.mjs cancel <slice id> --class budget/u,label);assert.match(refused.repair,/regenerate the binding/u,label);
++      assert.equal(readFileSync(queuePath,'utf8'),before,`${label}: a refused continuation leaves the queue untouched`);
++    };
++    assert.equal(prepare('ITEM-AC-1').status,'required');
++    refusedWith('ready predecessor','ITEM-AC-2','ITEM-AC-1',/ready/u);
++    refusedWith('unknown predecessor','ITEM-AC-2','ITEM-NOPE',/ITEM-NOPE/u);
++    assert.equal(cancel('ITEM-AC-1','budget').status,'cancelled');
++    const budget=prepare('ITEM-AC-2',{continuationOf:'ITEM-AC-1'});
++    assert.equal(budget.status,'required',JSON.stringify(budget));
++    assert.equal(rowOf('ITEM-AC-2').continuationOf,'ITEM-AC-1');assert.deepEqual(rowOf('ITEM-AC-2').dependsOn,[]);
++    const stored=JSON.parse(readFileSync(queuePath,'utf8')),validated=validateSliceQueue(stored);
++    assert.equal(validated.ok,true,JSON.stringify(validated.errors));assert.equal(validated.queue.slices.find(entry=>entry.id==='ITEM-AC-2').continuationOf,'ITEM-AC-1');
++    assert.equal(cancel('ITEM-AC-2','wrong-premise').status,'cancelled');
++    const premise=prepare('ITEM-AC-3',{continuationOf:'ITEM-AC-2'});
++    assert.equal(premise.status,'required',JSON.stringify(premise));assert.equal(rowOf('ITEM-AC-3').continuationOf,'ITEM-AC-2');
++    assert.equal(cancel('ITEM-AC-3','review-defect').status,'cancelled');
++    refusedWith('other-class predecessor','ITEM-AC-4','ITEM-AC-3',/review-defect/u);
++    const plain=prepare('ITEM-AC-5');
++    assert.equal(plain.status,'required',JSON.stringify(plain));assert.equal('continuationOf' in rowOf('ITEM-AC-5'),false,'a briefing without the field leaves the row without it');
++  })},
++
++  { id: "NGHS53", name: "PF-85 1a: validateItemDeliveryBriefing accepts an absent or safe-id continuationOf and refuses any other type or shape", run: async () => {
++    const { validateItemDeliveryBriefing } = await import("./native-goldfish-host-return.mjs");
++    const base={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-2',itemId:'AC-1',criterionLocator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:'a'.repeat(64),criterionId:'AC-1',startByte:0,endByte:10,excerptSha256:'b'.repeat(64)},checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
++    assert.equal(validateItemDeliveryBriefing(base).ok,true,'no field validates as before');
++    assert.equal(validateItemDeliveryBriefing({...base,continuationOf:'ITEM-AC-1'}).ok,true,'a safe task id validates');
++    for(const bad of [7,'',null,['ITEM-AC-1'],{},'has space','../x','x'.repeat(200),true]){
++      const verdict=validateItemDeliveryBriefing({...base,continuationOf:bad});
++      assert.equal(verdict.ok,false,JSON.stringify(bad));assert.equal(verdict.code,'NGHR-ITEM-DELIVERY-SHAPE',JSON.stringify(bad));
++    }
++  }},
++
+ ];
+ 
+ function governedRegistryFixture({root,commit}){
+diff --git a/plugins/pipeline-core/lib/slice-queue.mjs b/plugins/pipeline-core/lib/slice-queue.mjs
+index 268de43ff..63dec4850 100644
+--- a/plugins/pipeline-core/lib/slice-queue.mjs
++++ b/plugins/pipeline-core/lib/slice-queue.mjs
+@@ -116,7 +116,7 @@ const TEST_LOOKING = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[a-z0-9]+$/iu;
+ const TOP_KEYS = new Set(["schema", "feature", "defaults", "limits", "monoliths", "slices"]);
+ const DEFAULT_KEYS = new Set(["commitMode", "tier", "loadClass"]);
+ const LIMIT_KEYS = new Set(["deadline", "maxAttemptsPerSlice"]);
+-const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls", "cancelClass"]);
++const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls", "cancelClass", "continuationOf"]);
+ 
+ const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+ const isSliceId = (value) => isSafeTaskId(value) && value.length <= 128 && !value.includes("..");
+@@ -611,6 +611,13 @@ export function validateSliceQueue(input, options = {}) {
+       else cancelClass = verdict.cancelClass;
+     } else if (state === "cancelled") cancelClass = UNCLASSIFIED_CANCEL;
+ 
++    // PF-85 1a: a package may name the stopped slice it continues; a record only, never a dependency.
++    let continuationOf;
++    if (raw.continuationOf !== undefined) {
++      if (isSliceId(raw.continuationOf) && raw.continuationOf !== id) continuationOf = raw.continuationOf;
++      else err("SQ-SCHEMA", `slice ${id}: continuationOf must be the id of another slice`, { sliceId: id });
++    }
++
+     let dependsOn = [];
+     if (raw.dependsOn !== undefined) {
+       if (Array.isArray(raw.dependsOn) && raw.dependsOn.every((dep) => typeof dep === "string")) dependsOn = [...new Set(raw.dependsOn)];
+@@ -680,6 +687,7 @@ export function validateSliceQueue(input, options = {}) {
+       state,
+       holdReason,
+       cancelClass,
++      ...(continuationOf !== undefined ? { continuationOf } : {}),
+       dependsOn,
+       writeScope: writeScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
+       readScope: readScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
