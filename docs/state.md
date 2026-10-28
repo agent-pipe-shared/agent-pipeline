@@ -13,7 +13,16 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **235 items:235 at75,0 at50,0 at25;0 below75;index75.00%** (round-3 follow-up bundle v2,
+contains **236 items:236 at75,0 at50,0 at25;0 below75;index75.00%** (PF-94, 2026-10-28: Glossover could
+not run round 2 of its Critic course (no sanctioned takeover of a consumed non-course batch, no lineage
+record writer, no delta request writer); the PF-94 bundle v2 was applied as one operator commit
+`d2a0f0ffb`, installed in the stamp `dd16c6935` (`0.7.0+claude.20261028151938.d2a0f0f`, installed version
+read back and equal, git hooks refreshed); the new P0 row is at75 with two agent entries (the path after
+the admitted delta is not walked; `FPR-LINEAGE-COVERAGE-CLAIM` and `CGB-TAKEOVER-COURSE` not pinned, the
+operator documentation and `--help` text missing) and the native-host entry for the real Glossover retest;
+order for Glossover: `inspect-course-takeover`, `supersede-course-takeover`, rerun of round 1 on the course
+path, `--add-review-lineage` before the next correction commit, correction commit, diagnostic evidence,
+`--add-delta-request`, commit, round 2 preflight; before it 235/0/0; round-3 follow-up bundle v2,
 2026-10-28: the first tests of the installed v1 build showed the v1 lift of PF-93 and D60 was too early
 (fixes tested against states built by the new code, not against the previous build's state on disk): PF-93
 export of a legacy packet finalized by the previous build still failed, D60 feature-request admit threw
