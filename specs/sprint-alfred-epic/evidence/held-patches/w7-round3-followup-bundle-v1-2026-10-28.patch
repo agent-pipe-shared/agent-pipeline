@@ -1,0 +1,974 @@
+diff --git a/plugins/pipeline-core/hooks/native-goldfish-host.mjs b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+index 71787af08..613f8dcb9 100644
+--- a/plugins/pipeline-core/hooks/native-goldfish-host.mjs
++++ b/plugins/pipeline-core/hooks/native-goldfish-host.mjs
+@@ -1,8 +1,9 @@
+ #!/usr/bin/env node
+ // SPDX-License-Identifier: SUL-1.0
+ /** Claude/Codex native hook bridge for the explicitly marked Goldfish host-commit route. */
+-import { readFileSync, readdirSync } from "node:fs";
++import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+ import { join } from "node:path";
++import { describeGrantRecord, isValidGrantAgentId } from "../lib/dispatch-budget-core.mjs";
+ import { resolveGitCommonDir } from "../lib/po-key-directory.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { integrateNativeGoldfishItemDelivery } from "../lib/native-goldfish-host-state.mjs";
+@@ -21,7 +22,32 @@ export function qualifyNativeGoldfishHookDelivery({root,result}={}) {
+   return {...result,integration:integrateNativeGoldfishItemDelivery({root,pendingSha256:result.delivery.pendingSha256})};
+ }
+ 
+-const STOP_FAILURE_SCHEMA = "pipeline.native-goldfish-host-stop-failure.v1";
++/** D31/D32: the Claude SubagentStop block decision for a recorded checkpoint, or null.
++ * Blocks only while a verified budget grant of this agent is not yet spent (one block per recorded grant, counted in
++ * `grants/<agentId>.continued` next to the grant record) and never when a stop hook already blocked this turn
++ * (`stop_hook_active`). Any fault reads as "no block": the stop proceeds exactly as before. */
++export function nativeGoldfishCheckpointBlock({ commonDir, input, runner, result } = {}) {
++  try {
++    if (runner !== "claude" || input?.hook_event_name !== "SubagentStop" || result?.status !== "checkpoint-recorded") return null;
++    if (input.stop_hook_active === true) return null;
++    const agentId = input.agent_id;
++    if (typeof commonDir !== "string" || !isValidGrantAgentId(agentId)) return null;
++    const directory = join(commonDir, "agent-pipeline", "dispatch-budget", "grants");
++    const grantPath = join(directory, `${agentId}.json`);
++    if (!existsSync(grantPath)) return null;
++    const described = describeGrantRecord(JSON.parse(readFileSync(grantPath, "utf8")), agentId);
++    if (!described.ok) return null;
++    const countPath = join(directory, `${agentId}.continued`);
++    let used = 0;
++    if (existsSync(countPath)) { used = Number.parseInt(readFileSync(countPath, "utf8"), 10); if (!Number.isSafeInteger(used) || used < 0) return null; }
++    if (used >= described.count) return null;
++    mkdirSync(directory, { recursive: true, mode: 0o700 });
++    writeFileSync(countPath, `${used + 1}\n`, { mode: 0o600 });
++    return { decision: "block", reason: `Your budget checkpoint is recorded and the slice stays started. Do not stop: continue with the remaining work of your briefing from your continuation card. The recorded budget grant (${described.count - used} of ${described.count} remaining) adds up to ${described.last.extra} further tool calls. The Elephant may cancel the slice if what you are doing is not right; hand back again only at the next checkpoint or when the work is complete.` };
++  } catch { return null; }
++}
++
++const STOP_FAILURE_SCHEMA ="pipeline.native-goldfish-host-stop-failure.v1";
+ 
+ /** Newest stop-failure diagnostic the SubagentStop completion left (PF-61), or null. Diagnostic only: any fault reads as none. */
+ export function readNativeGoldfishStopFailure({ commonDir } = {}) {
+@@ -91,7 +117,9 @@ if (isDirectInvocation(import.meta.url)) {
+     result = finalizeNativeGoldfishHostReturn({ runner,
+       root: process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd(), input });
+   } catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION" }; }
+-  // A stop hook must never block the stop: a fault after the finalizer ran degrades to the recovery message, exit 0.
++  // A stop hook never blocks the stop, with one deliberate exception (D31/D32): a recorded checkpoint with a remaining
++  // budget grant makes the Claude SubagentStop block once so the Goldfish continues. Every fault degrades to the recovery
++  // message, exit 0.
+   try { result=qualifyNativeGoldfishHookDelivery({root:process.env.CLAUDE_PROJECT_DIR??input.cwd??process.cwd(),result}); }
+   catch { result = { status: "recovery-required", code: "NGHF-HOOK-EXCEPTION", commit: result?.commit ?? null }; }
+   // Slice C: a PostToolUse call is the one channel the Elephant reads, so a failed background stop is shown there.
+@@ -100,6 +128,13 @@ if (isDirectInvocation(import.meta.url)) {
+     try { stopFailure = readNativeGoldfishStopFailure({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()) }); }
+     catch { stopFailure = null; }
+   }
++  let block = null;
++  try { block = nativeGoldfishCheckpointBlock({ commonDir: resolveGitCommonDir(process.env.CLAUDE_PROJECT_DIR ?? input.cwd ?? process.cwd()), input, runner, result }); }
++  catch { block = null; }
++  if (block) {
++    process.stdout.write(`${JSON.stringify(block)}\n`);
++    process.exit(0);
++  }
+   const message = nativeGoldfishHookMessage(result, { stopFailure });
+   if (!message) process.exit(0);
+   if (runner === "claude" && input.hook_event_name === "PostToolUse") {
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index c03e34c50..ffd02755a 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -37,9 +37,9 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
+   && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
+ const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+ export class GenericCriticBatchError extends Error {
+-  constructor(code) { super("Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; }
++  constructor(code, detail) { super(detail ?? "Generic Critic batch is unavailable or refused."); this.name = "GenericCriticBatchError"; this.code = code; }
+ }
+-function fail(code) { throw new GenericCriticBatchError(code); }
++function fail(code, detail) { throw new GenericCriticBatchError(code, detail); }
+ function shape(v, keys) { if (!exact(v, keys)) fail("CGB-SHAPE"); }
+ function ref(v) { shape(v, ["batchId", "registrationSha256"]); if (!ID.test(v.batchId) || !SHA.test(v.registrationSha256)) fail("CGB-SHAPE"); return v; }
+ function paths(v, max = 128) {
+@@ -377,9 +377,9 @@ function retainedUnadoptedPacket(c, target, taskId) {
+     const p = join(c.controlRoot, id, "packet.json");
+     if (!existsSync(p)) continue;
+     const packet = stableJson(p);
+-    if (packet.request?.taskId === taskId || eq(targetForPacket(packet), target)) return true;
++    if (packet.request?.taskId === taskId || eq(targetForPacket(packet), target)) return id;
+   }
+-  return false;
++  return null;
+ }
+ function writeMember(c, batchRef, value) {
+   const m = { ...value, recordSha256: sha256Canonical(value) };
+@@ -411,7 +411,8 @@ function registerBatch(input) {
+       const found = member(c, batchRef, sha256Canonical(origin));
+       return { batchRef, memberSha256: found.value.recordSha256, replay: true };
+     }
+-    if (retainedUnadoptedPacket(c, s.target, input.declaration.taskId)) fail("CGB-HELD");
++    const heldPacketId = retainedUnadoptedPacket(c, s.target, input.declaration.taskId);
++    if (heldPacketId !== null) fail("CGB-HELD", `A packet of another admission holds this review unit (packet ${heldPacketId}); release it with the session-critic-finalizer release verb (packetId and reason) or resume it with admit for the same task and candidate.`);
+     ensureStore(c);
+     const batchId = randomBytes(16).toString("hex");
+     const subject = { schema: GENERIC_CRITIC_BATCH_V2_SCHEMA, batchId, repositoryFingerprint: c.fingerprint, declaredScope: s.scope, originTargets: [s.target] };
+@@ -625,6 +626,27 @@ function reserveAdmission(input) {
+     return { reservation: r, replay: false };
+   });
+ }
++// D60 c3: a retained, complete registration whose logical/origins index entries were lost is re-bound to the same batch.
++// publishIndex refuses (CGB-CONFLICT) when another batch already owns an entry, so this never steals a review unit.
++function republishIndex(input) {
++  shape(input, ["controlRoot", "batchRef"]);
++  const c = readContext(input.controlRoot);
++  return transaction(c, () => {
++    const batchRef = ref(input.batchRef);
++    const p = join(c.root, batchRef.batchId);
++    directory(p);
++    const value = stableJson(join(p, "registration.json"));
++    shape(value, REGISTRATION);
++    const { registrationSha256, ...subject } = value;
++    if (![GENERIC_CRITIC_BATCH_SCHEMA, GENERIC_CRITIC_BATCH_V2_SCHEMA].includes(value.schema) || !eq(batchRef, { batchId: value.batchId, registrationSha256 })
++      || sha256Canonical(subject) !== registrationSha256 || value.repositoryFingerprint !== c.fingerprint || value.originTargets.length !== 1) fail("CGB-STALE");
++    if (!eq(stableJson(join(p, "registration-complete.json")), { schema: "pipeline.critic-generic-registration-complete.v1", batchRef })) fail("CGB-HELD");
++    ensureStore(c);
++    for (const identity of logical(value.declaredScope.logicalWorkIds)) publishIndex(c, "logical", identity, batchRef);
++    for (const target of value.originTargets) publishIndex(c, "origins", target, batchRef);
++    return { batchRef, republished: true };
++  });
++}
+ function invoke(action) {
+   try { return action(); }
+   catch (error) {
+@@ -639,6 +661,7 @@ function invoke(action) {
+ export function registerGenericCriticBatch(input) { return invoke(() => registerBatch(input)); }
+ export function appendGenericCriticBatchCorrection(input) { return invoke(() => appendCorrection(input)); }
+ export function readGenericCriticBatchAdmission(input) { return invoke(() => readAdmission(input)); }
++export function republishGenericCriticBatchIndex(input) { return invoke(() => republishIndex(input)); }
+ export function reserveGenericCriticBatchAdmission(input) { return invoke(() => reserveAdmission(input)); }
+ export function readReservedGenericCriticBatchAdmission(input) { return invoke(() => readReservedAdmission(input)); }
+ /** Diagnose a held transaction without treating a partial publication as a disposable lock. */
+diff --git a/plugins/pipeline-core/lib/critic-packet-release.mjs b/plugins/pipeline-core/lib/critic-packet-release.mjs
+new file mode 100644
+index 000000000..67f4f24ba
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-packet-release.mjs
+@@ -0,0 +1,85 @@
++// SPDX-License-Identifier: SUL-1.0
++/**
++ * Sanctioned release of a prepared or claimed Critic packet (Toolbox D60).
++ *
++ * A failed admit leaves a packet in the private control root that reserves its
++ * review unit and has no expiry. This module moves such a packet aside with an
++ * append-only audit record, frees the generic-batch reservation it holds, and
++ * is idempotent. It never deletes anything: the packet directory is renamed
++ * into `released/` inside the same private control root, which also takes it
++ * out of the held-packet scan (that scan only reads 32-hex directory names).
++ */
++import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync } from "node:fs";
++import { join, resolve } from "node:path";
++
++export const CRITIC_PACKET_RELEASE_AUDIT_SCHEMA = "pipeline.critic-packet-release-audit.v1";
++export const CRITIC_PACKET_RELEASE_RESULT_SCHEMA = "pipeline.critic-packet-release.v1";
++const PACKET_ID = /^[a-f0-9]{32}$/u;
++const REASON = /^[^\\/\u0000-\u001f]{3,200}$/u;
++const RELEASABLE = new Set(["prepared", "claimed"]);
++
++export class CriticPacketReleaseError extends Error {
++  constructor(code) { super(code); this.name = "CriticPacketReleaseError"; this.code = code; }
++}
++function fail(code) { throw new CriticPacketReleaseError(code); }
++
++function physicalDir(path, code) {
++  let stat;
++  try { stat = lstatSync(path); } catch { fail(code); }
++  if (stat.isSymbolicLink() || !stat.isDirectory()) fail(code);
++}
++function readJson(path, code) {
++  try { return JSON.parse(readFileSync(path, "utf8")); } catch { fail(code); }
++}
++
++/** Release one prepared or claimed packet. Consumed (and any other) phases are refused typed. */
++export function releaseCriticPacket({ controlRoot, packetId, reason, now = new Date() } = {}) {
++  if (typeof controlRoot !== "string" || controlRoot.length === 0) fail("CPR-CONTROL-ROOT");
++  if (!PACKET_ID.test(packetId ?? "")) fail("CPR-PACKET-ID");
++  if (typeof reason !== "string" || !REASON.test(reason) || reason.includes("..") || /^[a-z]:/iu.test(reason.trim())) fail("CPR-REASON");
++  const root = resolve(controlRoot);
++  physicalDir(root, "CPR-CONTROL-ROOT");
++  if (realpathSync(root) !== root) fail("CPR-CONTROL-ROOT");
++  const releasedDir = join(root, "released");
++  const packetDir = join(root, packetId);
++  const parked = join(releasedDir, packetId);
++  if (!existsSync(packetDir)) {
++    if (existsSync(parked)) return Object.freeze({ schema: CRITIC_PACKET_RELEASE_RESULT_SCHEMA, status: "already-released", packetId });
++    fail("CPR-ABSENT");
++  }
++  physicalDir(packetDir, "CPR-PACKET-DIR");
++  const state = readJson(join(packetDir, "state.json"), "CPR-STATE");
++  if (typeof state?.phase !== "string") fail("CPR-STATE");
++  if (!RELEASABLE.has(state.phase)) fail("CPR-PHASE");
++  if (existsSync(releasedDir)) physicalDir(releasedDir, "CPR-RELEASED-DIR"); else mkdirSync(releasedDir, { mode: 0o700 });
++  if (existsSync(parked)) fail("CPR-ALREADY-PARKED");
++  // The audit record is durable before the packet moves; a crash in between leaves a retryable, never a silent, state.
++  const record = {
++    schema: CRITIC_PACKET_RELEASE_AUDIT_SCHEMA,
++    packetId,
++    phaseBefore: state.phase,
++    reason,
++    releasedAt: new Date(now).toISOString(),
++    actor: "session-critic-finalizer release",
++  };
++  appendFileSync(join(releasedDir, "audit.jsonl"), `${JSON.stringify(record)}\n`, { flag: "a", mode: 0o600 });
++  // Free the review-unit reservation held by this packet in the same step.
++  const batches = join(root, "generic-batches");
++  let freed = 0;
++  if (existsSync(batches)) {
++    physicalDir(batches, "CPR-BATCH-DIR");
++    for (const batch of readdirSync(batches)) {
++      const dir = join(batches, batch);
++      if (lstatSync(dir).isSymbolicLink() || !lstatSync(dir).isDirectory()) continue;
++      for (const name of readdirSync(dir).filter((n) => /-admission\.json$/u.test(n))) {
++        const file = join(dir, name);
++        let value; try { value = JSON.parse(readFileSync(file, "utf8")); } catch { continue; }
++        if (value?.packetId !== packetId) continue;
++        renameSync(file, join(dir, `released-${packetId}-${name}`));
++        freed += 1;
++      }
++    }
++  }
++  renameSync(packetDir, parked);
++  return Object.freeze({ schema: CRITIC_PACKET_RELEASE_RESULT_SCHEMA, status: "released", packetId, phaseBefore: state.phase, reservationsFreed: freed });
++}
+diff --git a/plugins/pipeline-core/lib/critic-packet-release.test.mjs b/plugins/pipeline-core/lib/critic-packet-release.test.mjs
+new file mode 100644
+index 000000000..115dbe754
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-packet-release.test.mjs
+@@ -0,0 +1,74 @@
++// SPDX-License-Identifier: SUL-1.0
++import assert from "node:assert/strict";
++import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { releaseCriticPacket } from "./critic-packet-release.mjs";
++
++const ID = "a".repeat(32);
++function fixture(phase = "claimed") {
++  const root = realpathSync(mkdtempSync(join(tmpdir(), "critic-release-")));
++  mkdirSync(join(root, ID));
++  writeFileSync(join(root, ID, "packet.json"), "{}");
++  writeFileSync(join(root, ID, "state.json"), JSON.stringify({ phase }));
++  mkdirSync(join(root, "generic-batches", "b".repeat(32)), { recursive: true });
++  writeFileSync(join(root, "generic-batches", "b".repeat(32), "full-admission.json"), JSON.stringify({ packetId: ID }));
++  return root;
++}
++
++test("D60 (c) release of a claimed packet frees the reservation and writes one audit record", () => {
++  const root = fixture();
++  try {
++    const out = releaseCriticPacket({ controlRoot: root, packetId: ID, reason: "failed earlier admit" });
++    assert.equal(out.status, "released");
++    assert.equal(out.phaseBefore, "claimed");
++    assert.equal(existsSync(join(root, ID)), false);
++    assert.equal(existsSync(join(root, "generic-batches", "b".repeat(32), "full-admission.json")), false);
++    const lines = readFileSync(join(root, "released", "audit.jsonl"), "utf8").trim().split("\n");
++    assert.equal(lines.length, 1);
++    const record = JSON.parse(lines[0]);
++    assert.equal(record.packetId, ID);
++    assert.equal(record.phaseBefore, "claimed");
++    assert.equal(record.reason, "failed earlier admit");
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("D60 (d) a second release is idempotent and writes no second record", () => {
++  const root = fixture();
++  try {
++    releaseCriticPacket({ controlRoot: root, packetId: ID, reason: "failed earlier admit" });
++    const again = releaseCriticPacket({ controlRoot: root, packetId: ID, reason: "failed earlier admit" });
++    assert.equal(again.status, "already-released");
++    assert.equal(readFileSync(join(root, "released", "audit.jsonl"), "utf8").trim().split("\n").length, 1);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("D60 (e) a consumed packet is refused typed and stays in place", () => {
++  const root = fixture("consumed");
++  try {
++    assert.throws(() => releaseCriticPacket({ controlRoot: root, packetId: ID, reason: "cleanup attempt" }), (e) => e.code === "CPR-PHASE");
++    assert.equal(existsSync(join(root, ID)), true);
++    assert.equal(existsSync(join(root, "released", "audit.jsonl")), false);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("D60 (f) a missing, empty or path-bearing reason is refused", () => {
++  const root = fixture();
++  try {
++    for (const reason of [undefined, "", "  ", "see /home/user/x"]) {
++      assert.throws(() => releaseCriticPacket({ controlRoot: root, packetId: ID, reason }), (e) => e.code === "CPR-REASON");
++    }
++    assert.equal(existsSync(join(root, ID)), true);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("D60 (g) the audit record carries no absolute path", () => {
++  const root = fixture();
++  try {
++    releaseCriticPacket({ controlRoot: root, packetId: ID, reason: "failed earlier admit" });
++    const text = readFileSync(join(root, "released", "audit.jsonl"), "utf8");
++    assert.equal(text.includes(root), false);
++    assert.doesNotMatch(text, /["':]\/[a-z]|[A-Za-z]:\\/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+index 8e123c1bd..b48f02484 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-finalizer.test.mjs
+@@ -2,7 +2,8 @@
+ import assert from "node:assert/strict";
+ import { prepareApprovedItemCourseFixture, nativeContractFixtureParent, nativeContractFixtureRepositoryRoot } from "./test-item-approved-course-fixture.mjs";
+ import { createGovernanceScopeController } from "./governance-scope.mjs";
+-import { execFileSync } from "node:child_process";
++import { execFileSync, spawnSync } from "node:child_process";
++import { appendGrant } from "./dispatch-budget-core.mjs";
+ import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir, devNull } from "node:os";
+ import { join } from "node:path";
+@@ -71,6 +72,30 @@ const readReceipt = (commonDir) => { const names = privateEntries(commonDir, "ob
+ const diagDir = (commonDir) => join(commonDir, "agent-pipeline", "run", "native-goldfish-host-diagnostics");
+ const diagEntries = (commonDir) => (existsSync(diagDir(commonDir)) ? readdirSync(diagDir(commonDir)).sort() : []);
+ const plantDiagnostic = (commonDir, name, content) => { mkdirSync(diagDir(commonDir), { recursive: true, mode: 0o700 }); writeFileSync(join(diagDir(commonDir), name), content); };
++// D31/D32 hook-level helper: write a handback transcript with the given outcome, record `grants` budget grants for agent-bg,
++// then spawn the real SubagentStop hook script with the stop input on stdin.
++const hookScript = join(fileURLToPath(new URL(".", import.meta.url)), "..", "hooks", "native-goldfish-host.mjs");
++function spawnStopHook({ root, commonDir, binding, writeMeta, stopInput }, { outcome = "checkpoint", grants = 0, runner = "claude", over = {}, plant = true } = {}) {
++  if (plant) {
++    writeMeta("agent-bg", { spawnDepth: 1, agentType: "goldfish-implementor", toolUseId: "tool-claude" });
++    const transcript = stopInput(binding, "x").transcript_path;
++    writeFileSync(join(transcript.slice(0, -".jsonl".length), "subagents", "agent-agent-bg.jsonl"), `${JSON.stringify({ type: "assistant",
++      message: { role: "assistant", content: [{ type: "tool_use", name: "SubagentHandback", input: { message: finalText(binding, { outcome, report: "Budget reached; continuation card follows." }) } }] } })}\n`);
++  }
++  const grantFile = join(commonDir, "agent-pipeline", "dispatch-budget", "grants", "agent-bg.json");
++  if (grants > 0 && !existsSync(grantFile)) {
++    let record = null;
++    for (let i = 0; i < grants; i += 1) {
++      const appended = appendGrant({ record, agentId: "agent-bg", extra: 20, reason: "unit grant", grantedAt: "2026-10-28T10:00:00Z" });
++      assert.equal(appended.ok, true, JSON.stringify(appended)); record = appended.record;
++    }
++    mkdirSync(join(commonDir, "agent-pipeline", "dispatch-budget", "grants"), { recursive: true });
++    writeFileSync(grantFile, JSON.stringify(record));
++  }
++  const run = spawnSync(process.execPath, [hookScript, "--runner", runner], { input: JSON.stringify(stopInput(binding, undefined, over)),
++    env: { ...process.env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
++  return { status: run.status, stdout: run.stdout, stderr: run.stderr };
++}
+ const diagRecord = (dispatchId, toolUseId) => `${JSON.stringify({ schema: "pipeline.native-goldfish-host-stop-failure.v1", dispatchId, toolUseId,
+   status: "not-finalized", code: "NGHR-FINAL-JSON", commit: null, observedAt: "2026-10-27T00:00:00.000Z" })}\n`;
+ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfish-implementor", options = {}) {
+@@ -499,6 +524,43 @@ const cases = [
+     assert.equal(diagEntries(commonDir).length, 1, JSON.stringify(failed));
+     assert.equal(facts.commits, 0);
+   }, "claude", 1, "goldfish-implementor", { background: true }) },
++  // NGHF20-NGHF25 -- D31/D32 (PO design 2026-10-28): a checkpoint does not stop the Goldfish while a grant remains.
++  { id: "NGHF20", name: "A checkpoint stop with a remaining grant makes the SubagentStop hook block the stop (exit 0, block JSON), once per grant", run: () => fixture((ctx) => {
++    const first = spawnStopHook(ctx, { grants: 1 });
++    assert.equal(first.status, 0, first.stderr);
++    const decision = JSON.parse(first.stdout);
++    assert.equal(decision.decision, "block");
++    assert.equal(typeof decision.reason, "string");
++    assert.match(decision.reason, /continue/iu); assert.match(decision.reason, /cancel/iu);
++    const second = spawnStopHook(ctx, { grants: 1, plant: false });
++    assert.equal(second.status, 0, second.stderr);
++    assert.equal(second.stdout, "", "the one recorded grant is spent: the next checkpoint stop is allowed");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF21", name: "A stop with stop_hook_active true is never blocked, even with a remaining grant", run: () => fixture((ctx) => {
++    const run = spawnStopHook(ctx, { grants: 1, over: { stop_hook_active: true } });
++    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF22", name: "A checkpoint stop with no remaining grant is not blocked and keeps the checkpoint-recorded message", run: () => fixture((ctx) => {
++    const run = spawnStopHook(ctx, { grants: 0 });
++    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
++    assert.match(run.stderr, /NGHF-CHECKPOINT-RESERVATION-LIVE/u);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF23", name: "A non-checkpoint outcome never makes the hook block", run: () => fixture((ctx) => {
++    const run = spawnStopHook(ctx, { outcome: "failed", grants: 1 });
++    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF24", name: "The Codex runner never makes the hook block", run: () => fixture((ctx) => {
++    const run = spawnStopHook(ctx, { grants: 1, runner: "codex" });
++    assert.equal(run.status, 0, run.stderr); assert.equal(run.stdout, "");
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
++  { id: "NGHF25", name: "A blocked checkpoint changes no pending state (slice stays started) and the reason carries no absolute path", run: () => fixture((ctx) => {
++    const before = snapshot(ctx.commonDir);
++    const run = spawnStopHook(ctx, { grants: 1 });
++    const decision = JSON.parse(run.stdout);
++    assert.equal(snapshot(ctx.commonDir), before, "the reservation and every pending state file are untouched");
++    assert.doesNotMatch(decision.reason, /(?:^|[\s"'(=])(?:\/[A-Za-z0-9_.-]+){2,}|[A-Za-z]:\\/u);
++    assert.equal(decision.reason.includes(ctx.root), false);
++  }, "claude", 1, "goldfish-implementor", { background: true }) },
+ 
+ ];
+ 
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 154b89208..0f7831555 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -421,7 +421,7 @@ export function inspectCandidatePacket({ controlRoot, packetId }, { now = new Da
+ 
+ /** Persist exactly one recomputable, redacted pre-export authorization per assurance class. */
+ export function recordCandidateExport({ controlRoot, packetId, receipt, exportView, policy }, options = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   if (currentState(packetDir, packet).phase !== "claimed") fail("CPP-EXPORT", "Packet is not claimed for export authorization.");
+   if (!validateCriticExportAuthorization({ receipt, packet, exportView, policy }, options)) {
+     fail("CPP-EXPORT", "Critic export authorization receipt is invalid or not authorized.");
+@@ -433,7 +433,7 @@ export function recordCandidateExport({ controlRoot, packetId, receipt, exportVi
+ 
+ /** Re-read and revalidate the immutable authorization used by a final receipt. */
+ export function readCandidateExport({ controlRoot, packetId, assuranceClass, policy }, options = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   if (options.requireLiveCandidate === true) {
+     assertLive(packet, options.now ?? new Date());
+     revalidateCandidate(packet);
+@@ -778,7 +778,8 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
+ }
+ 
+ function readConsumedCandidateSnapshot({ controlRoot, packetId }) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  // A packet claimed in the pre-assurance form is consumed by the finalizer through the explicit legacy read; read it back the same way.
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   const state = currentState(packetDir, packet);
+   if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
+   const receiptRecord = readJson(join(packetDir, "receipt.json"), "CPP-RECEIPT");
+@@ -847,7 +848,7 @@ export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapabilit
+ }
+ 
+ export function blockCandidatePacket({ controlRoot, packetId, code, detail = null }, { now = new Date() } = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   if (typeof code !== "string" || !code.startsWith("CPP-")) fail("CPP-BLOCK", "Invalid block code.");
+   const state = currentState(packetDir, packet);
+   if (["consumed", "blocked"].includes(state.phase)) fail("CPP-BLOCK", "Terminal packet cannot be blocked again.");
+@@ -860,7 +861,7 @@ export const __test = Object.freeze({ bindingsFor, observeCheckout, candidateInv
+ /** Read the immutable prelaunch admission only after genuine journal consumption. */
+ export function readConsumedSessionAdmission({ controlRoot, packetId }) {
+   const consumed = readConsumedCandidateResult({ controlRoot, packetId });
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   const admissionPath = join(packetDir, "session-admission.json");
+   if (!existsSync(admissionPath) || packet.request.sessionBinding === undefined) {
+     fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Consumed session admission is unavailable.");
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index fabd0ad9f..ccb499d8b 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -15,6 +15,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { reserveFeatureCriticReviewUnitOwnership } from "../lib/critic-generic-batch.mjs";
++import { releaseCriticPacket } from "../lib/critic-packet-release.mjs";
+ import {
+   GOVERNANCE_REVIEW_SOURCE_SCHEMA,
+   buildGovernanceReviewAction,
+@@ -24,6 +25,7 @@ import {
+ } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
++import { republishGenericCriticBatchIndex } from "../lib/critic-generic-batch.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import {
+   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
+@@ -33,6 +35,8 @@ import {
+   cleanupCandidatePacket,
+   consumeCandidatePacket,
+   inspectClaimedSessionAdmission,
++  inspectClaimedCandidatePacket,
++  inspectCandidatePacket,
+   prepareCandidatePacket,
+   publishClaimedSessionAdmission,
+   readConsumedCandidateReceipt,
+@@ -51,6 +55,7 @@ export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finaliza
+ export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
+ export const GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-registration-request.v2";
+ export const GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-correction-request.v2";
++export const SESSION_CRITIC_RELEASE_REQUEST_SCHEMA = "pipeline.session-critic-release-request.v1";
+ export const SESSION_CRITIC_EXPORT_REQUEST_SCHEMA = "pipeline.session-critic-export-request.v1";
+ export const SESSION_CRITIC_EXPORT_RESULT_SCHEMA = "pipeline.session-critic-export.v1";
+ export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
+@@ -331,9 +336,71 @@ function admittedRouteFor(packet, requestedRoute, trigger, preflightSha256) {
+   return routeFor({ ...requestedRoute, modelTier: role.modelId }, preflightSha256);
+ }
+ 
++/**
++ * D60: a packet of this exact task and candidate that an earlier failed admit left behind is resumed BEFORE the
++ * preflight, because the preflight would refuse the held packet itself. Generic-batch requests only (a feature
++ * request needs the preflight to know its course); anything that does not match falls through to the normal path,
++ * where a different task or candidate stays refused.
++ */
++function resumeHeldGenericPacket(options, deps) {
++  if (options?.genericBatchRef === undefined || !PACKET_ID.test(options.packetId ?? "")) return null;
++  const root = realpathSync(resolve(options.preflightInput.root));
++  const controlRoot = controlRootFor(root);
++  if (!existsSync(join(controlRoot, options.packetId))) return null;
++  const packetId = options.packetId;
++  let packet;
++  try { ({ packet } = inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); }
++  catch {
++    try { ({ packet } = inspectCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); } catch { return null; }
++  }
++  const head = spawnSync("git", ["rev-parse", "--verify", `${options.preflightInput.candidate}^{commit}`], { cwd: root, encoding: "utf8", shell: false });
++  if (!isSuccessfulSpawn(head) || head.stdout.trim() !== packet.candidate?.commit || packet.request?.taskId !== options.taskId) return null;
++  const preflightSha256 = packet.request?.sessionBinding?.preflightSha256;
++  if (!SHA256.test(preflightSha256 ?? "")) return null;
++  const reference = options.genericBatchRef;
++  if (!exact(reference, ["batchId", "registrationSha256", "memberSha256"])) return null;
++  const genericBatch = { batchRef: { batchId: reference.batchId, registrationSha256: reference.registrationSha256 }, memberSha256: reference.memberSha256 };
++  // D60 c3: the same-task, same-candidate packet was found by its directory above; its batch index may have been lost.
++  try { republishGenericCriticBatchIndex({ controlRoot, batchRef: genericBatch.batchRef }); }
++  catch (error) {
++    // D60 c4: another batch owns a logical or origins entry; surface it typed instead of falling to the preflight.
++    if (error?.code === "CGB-CONFLICT") throw error;
++    return null;
++  }
++  try {
++    const current = inspectClaimedSessionAdmission({ controlRoot, packetId }, deps.packetDependencies);
++    const retained = readReservedGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
++    const course = genericCourseFor(retained.reservation);
++    if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256) fail("SCF-PRELAUNCH-BINDING");
++    return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "already-admitted", packetId,
++      packetDigest: current.admission.packetDigest, admissionSha256: sha256(canonicalJson(current.admission)), replay: true });
++  } catch (error) {
++    if (error instanceof SessionCriticFinalizerError) throw error;
++  }
++  // Half-finished: finish what the failed attempt left (claim, reservation, admission), in the same order admit uses.
++  try {
++    try { inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies); }
++    catch {
++      claimCandidatePacket({ controlRoot, packetId, adapter: packet.route.adapter,
++        claimantNonce: (deps.randomBytesFn ?? randomBytes)(32).toString("hex") }, deps.packetDependencies);
++    }
++    const reservation = reserveGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
++    const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({
++      controlRoot, packetId, preflightSha256, ...genericCourseFor(reservation.reservation),
++    }, deps.packetDependencies);
++    return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "admitted", packetId,
++      packetDigest: sha256(canonicalJson(packet)), admissionSha256: sha256(canonicalJson(admission.admission)), resumed: true });
++  } catch (error) {
++    if (error instanceof SessionCriticFinalizerError) throw error;
++    return null;
++  }
++}
++
+ /** Prepare and claim the exact session packet before any fresh Critic spawn. */
+ export function admitSessionCriticReview(options, deps = {}) {
+-  const preflight = (deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
++  const resumed = resumeHeldGenericPacket(options, deps);
++  if (resumed !== null) return resumed;
++  const preflight =(deps.preflightCriticDispatchFn ?? preflightCriticDispatch)(options.preflightInput);
+   if (preflight?.status !== "packet-ready" || preflight.dispatch?.requiredNextGate !== "session-critic-dispatch") fail("SCF-PREFLIGHT");
+   const root = realpathSync(resolve(options.preflightInput.root));
+   const id = sessionId(options.sessionId);
+@@ -411,10 +478,10 @@ function buildResult({ packet, packetDigest, session, verdict }) {
+     verdict: assertVerdict(verdict),
+   });
+ }
+-function validateResult(result, packet) {
++function validateResult(result, packet, packetDigest = sha256(canonicalJson(packet))) {
+   const sessionBinding = packet.request.sessionBinding;
+   if (!exact(result, RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
+-    || result.packetId !== packet.packetId || result.packetDigest !== sha256(canonicalJson(packet))
++    || result.packetId !== packet.packetId || result.packetDigest !== packetDigest
+     || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
+       ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
+       : ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
+@@ -542,11 +609,13 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+     || canonicalJson(packet.route) !== canonicalJson(admittedRouteFor(packet, options.route,
+       options.trigger ?? "T1", preflightSha256))
+     || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
+-  const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
++  // The packet view may carry a normalized legacy binding; the receipt binds the digest of the packet as it lies on disk
++  // (the admission digest, already verified against the raw packet), which is what every consumed-packet reader recomputes.
++  const prepared = { packet, packetDigest: admitted.admission?.packetDigest ?? sha256(canonicalJson(packet)) };
+ 
+   let event = null;
+   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
+-  validateResult(result, prepared.packet);
++  validateResult(result, prepared.packet, prepared.packetDigest);
+   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
+   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
+     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
+@@ -739,6 +808,13 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+     const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";
+     if (Array.isArray(argv) && argv.includes("--allow-caller-authored-fallback") && !optIn) fail("SCF-USAGE");
+     if (Array.isArray(argv) && argv[0] === "export") return runSessionCriticExportCli(argv, deps);
++    if (Array.isArray(argv) && argv[0] === "release") {
++      if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
++      const releaseRoot = realpathSync(resolve(argv[2]));
++      const rawRelease = readPhysicalRequest(releaseRoot, argv[4]);
++      if (!exact(rawRelease, ["schema", "packetId", "reason"]) || rawRelease.schema !== SESSION_CRITIC_RELEASE_REQUEST_SCHEMA) fail("SCF-RELEASE-REQUEST");
++      return Object.freeze({ exitCode: 0, output: releaseCriticPacket({ controlRoot: controlRootFor(releaseRoot), packetId: rawRelease.packetId, reason: rawRelease.reason }) });
++    }
+     if (!Array.isArray(argv) || (argv.length !== 5 && !optIn) || !["admit", "finalize", "register-batch", "append-correction"].includes(argv[0]) || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+     const root = realpathSync(resolve(argv[2]));
+     const raw = readPhysicalRequest(root, argv[4]);
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 8cb31af1a..3739ec141 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -11,7 +11,9 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test from "node:test";
+-import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
++import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission,
++  readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission,
++  recordCandidateExport, blockCandidatePacket } from "./critic-packet-preflight.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+@@ -299,6 +301,190 @@ test("prelaunch admission creates one claimed, digest-bound packet before the ve
+   } finally { cleanup(fx); }
+ });
+ 
++test("D60 (a) a first admit that fails after the claim is completed by the second admit without manual deletion", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "8".repeat(32) });
++    assert.throws(() => admitSessionCriticReview(request, {
++      publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); },
++    }));
++    const second = admitSessionCriticReview(request);
++    assert.ok(["admitted", "already-admitted"].includes(second.status));
++    assert.equal(second.packetId, request.packetId);
++    assert.equal(admitSessionCriticReview(request).status, "already-admitted");
++  } finally { cleanup(fx); }
++});
++
++test("D60 (b) a registration blocked by a held packet is refused with CGB-HELD naming the packet and the release verb", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "7".repeat(32) });
++    admitSessionCriticReview(request);
++    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++    rmSync(join(controlRoot, "generic-batches"), { recursive: true, force: true });
++    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: {
++      taskId: fx.taskId, baseCommit: fx.base, candidateCommit: fx.candidate,
++      logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
++      signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json",
++    } }), (error) => error.code === "CGB-HELD" && error.message.includes("7".repeat(32)) && error.message.includes("release"));
++  } finally { cleanup(fx); }
++});
++
++function lostIndexDeclaration(fx) {
++  return { taskId: fx.taskId, baseCommit: fx.base, candidateCommit: fx.candidate,
++    logicalWorkIds: ["AC-1", "AC-2"], specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"],
++    signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" };
++}
++
++test("D60 c3 (a) the exact reported state: a claimed packet of task T and candidate C with no batch index hit is refused CGB-HELD at registration and is resumed by the second admit", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "6".repeat(32) });
++    assert.throws(() => admitSessionCriticReview(request, {
++      publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); },
++    }));
++    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++    // The state the Toolbox reported: the claimed packet exists, the logical and origins index entries do not.
++    rmSync(join(controlRoot, "generic-batches", "logical"), { recursive: true, force: true });
++    rmSync(join(controlRoot, "generic-batches", "origins"), { recursive: true, force: true });
++    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: lostIndexDeclaration(fx) }),
++      (error) => error.code === "CGB-HELD" && error.message.includes("6".repeat(32)));
++    const second = admitSessionCriticReview(request);
++    assert.ok(["admitted", "already-admitted"].includes(second.status), `second admit status ${second.status}`);
++    assert.equal(second.packetId, request.packetId);
++  } finally { cleanup(fx); }
++});
++
++test("D60 c3 (b) the release verb end to end through its real CLI entry frees a held review unit and is idempotent", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "5".repeat(32) });
++    admitSessionCriticReview(request);
++    const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++    rmSync(join(controlRoot, "generic-batches"), { recursive: true, force: true });
++    const declaration = lostIndexDeclaration(fx);
++    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration }), (error) => error.code === "CGB-HELD");
++    const requestPath = writeScratchRequest(fx, "release-request.json", {
++      schema: "pipeline.session-critic-release-request.v1", packetId: request.packetId, reason: "toolbox held packet closure" });
++    const script = fileURLToPath(new URL("./session-critic-finalizer.mjs", import.meta.url));
++    const run = () => spawnSync(process.execPath, [script, "release", "--root", fx.root, "--request", requestPath], { encoding: "utf8" });
++    const first = run();
++    assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
++    const receipt = JSON.parse(first.stdout);
++    assert.equal(receipt.status, "released");
++    assert.equal(receipt.packetId, request.packetId);
++    const audit = readFileSync(join(controlRoot, "released", "audit.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
++    assert.equal(audit.length, 1);
++    assert.equal(audit[0].packetId, request.packetId);
++    assert.equal(audit[0].reason, "toolbox held packet closure");
++    assert.equal(existsSync(join(controlRoot, request.packetId)), false);
++    // The same candidate no longer meets CGB-HELD.
++    const again = registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration });
++    assert.match(again.memberSha256, /^[a-f0-9]{64}$/u);
++    const second = run();
++    assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
++    assert.equal(JSON.parse(second.stdout).status, "already-released");
++    assert.equal(readFileSync(join(controlRoot, "released", "audit.jsonl"), "utf8").trim().split("\n").length, 1);
++  } finally { cleanup(fx); }
++});
++
++function failedAdmitWithLostIndex(fx, packetId) {
++  const request = registered(fx, { packetId });
++  assert.throws(() => admitSessionCriticReview(request, {
++    publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); },
++  }));
++  const controlRoot = join(fx.root, ".git", "agent-pipeline", "critic-packets");
++  rmSync(join(controlRoot, "generic-batches", "logical"), { recursive: true, force: true });
++  rmSync(join(controlRoot, "generic-batches", "origins"), { recursive: true, force: true });
++  return { request, controlRoot };
++}
++
++test("D60 c4 (a) a held packet of a DIFFERENT candidate is refused CGB-HELD naming the packet and the release verb", () => {
++  const fx = fixture();
++  try {
++    const { request, controlRoot } = failedAdmitWithLostIndex(fx, "4".repeat(32));
++    writeFileSync(join(fx.root, "specs", "spec.md"), "# Spec\n\nOther candidate.\n");
++    const other = commit(fx.root, "other candidate");
++    assert.notEqual(other, fx.candidate);
++    assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: { ...lostIndexDeclaration(fx), candidateCommit: other } }),
++      (error) => error.code === "CGB-HELD" && error.message.includes("4".repeat(32)) && error.message.includes("release"),
++      "D60 c4 (a): registration of another candidate must name the held packet and the release verb");
++    assert.throws(() => admitSessionCriticReview({ ...request, preflightInput: { ...request.preflightInput, candidate: other } }),
++      undefined, "D60 c4 (a): admit of another candidate must not resume the held packet");
++  } finally { cleanup(fx); }
++});
++
++test("D60 c4 (c) a republished index that conflicts with another batch fails closed with CGB-CONFLICT and keeps the foreign entry", () => {
++  const fx = fixture();
++  try {
++    const { request, controlRoot } = failedAdmitWithLostIndex(fx, "3".repeat(32));
++    const logicalDir = join(controlRoot, "generic-batches", "logical");
++    mkdirSync(logicalDir, { recursive: true, mode: 0o700 });
++    const foreignPath = join(logicalDir, `${sha256Canonical("AC-1")}.json`);
++    const foreign = { schema: "pipeline.critic-generic-index.v1", kind: "logical", identity: "AC-1",
++      batchRef: { batchId: "f".repeat(32), registrationSha256: "e".repeat(64) } };
++    writeFileSync(foreignPath, canonicalJson(foreign), { mode: 0o600 });
++    const before = readFileSync(foreignPath, "utf8");
++    assert.throws(() => admitSessionCriticReview(request), (error) => error.code === "CGB-CONFLICT",
++      "D60 c4 (c): the second admit must surface CGB-CONFLICT");
++    assert.equal(readFileSync(foreignPath, "utf8"), before, "D60 c4 (c): the foreign entry is not overwritten");
++  } finally { cleanup(fx); }
++});
++
++test("D60 path: failed admit after the claim, lost index, resume, finalize, export write and read, consumed reads", () => {
++  const fx = fixture();
++  try {
++    const packetId = "2".repeat(32);
++    const controlRoot = controlRootOf(fx);
++    const { request } = e2eStep("first admit fails after the claim; batch index lost", () => failedAdmitWithLostIndex(fx, packetId));
++    e2eStep("second admit resumes the same candidate", () => {
++      const second = admitSessionCriticReview(request);
++      assert.ok(["admitted", "already-admitted"].includes(second.status), `status ${second.status}`);
++    });
++    e2eStep("finalize", () => { assert.equal(finalizeSessionCriticReview(request).status, "completed"); });
++    e2eStep("consumed receipt read", () => { assert.equal(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt.packetId, packetId); });
++    e2eStep("consumed session admission read (the review lineage input)", () => {
++      assert.equal(readConsumedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
++    });
++    e2eStep("export write", () => {
++      criticNotes(fx);
++      assert.equal(exportSessionCriticEvidence(exportOptions(fx, packetId)).status, "exported");
++    });
++    e2eStep("export read back", () => {
++      const dir = join(fx.root, `specs/alpha/evidence/critic/${packetId}`);
++      assert.deepEqual(readdirSync(dir).sort(), [...EXPORT_FILES].sort());
++      assert.equal(JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).packetId, packetId);
++    });
++  } finally { cleanup(fx); }
++});
++
++test("D60 path release: a held packet blocking another candidate is released through the real CLI and the admitted candidate then succeeds", () => {
++  const fx = fixture();
++  try {
++    const heldId = "1a".repeat(16);
++    const { controlRoot } = e2eStep("held packet", () => failedAdmitWithLostIndex(fx, heldId));
++    e2eStep("other candidate blocked", () => {
++      writeFileSync(join(fx.root, "specs", "spec.md"), "# Spec\n\nOther candidate.\n");
++      const other = commit(fx.root, "other candidate");
++      assert.throws(() => registerGenericCriticBatch({ repoRoot: fx.root, controlRoot, declaration: { ...lostIndexDeclaration(fx), candidateCommit: other } }),
++        (error) => error.code === "CGB-HELD");
++    });
++    e2eStep("release through the CLI", () => {
++      const requestPath = writeScratchRequest(fx, "release-request.json", {
++        schema: "pipeline.session-critic-release-request.v1", packetId: heldId, reason: "path verification" });
++      const script = fileURLToPath(new URL("./session-critic-finalizer.mjs", import.meta.url));
++      const run = spawnSync(process.execPath, [script, "release", "--root", fx.root, "--request", requestPath], { encoding: "utf8" });
++      assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
++      assert.equal(JSON.parse(run.stdout).status, "released");
++    });
++    e2eStep("next admit of the admitted candidate", () => {
++      rmSync(join(controlRoot, "generic-batches"), { recursive: true, force: true });
++      delete fx.batch;
++      assert.equal(admitSessionCriticReview(registered(fx, { packetId: "1b".repeat(16) })).status, "admitted");
++    });
++  } finally { cleanup(fx); }
++});
++
+ test("invalid optional Critic selection retains V3, while valid selection binds before packet creation", () => {
+   const fx = fixture();
+   // A second admission on one batch needs the first packet consumed; the valid selection gets its own fixture.
+@@ -635,8 +821,12 @@ function rewriteAsLegacyPacket(fx, packetId, kind) {
+   packet.coordinatorOnly = { localDispatchEvidence: legacyBindingVariant(kind, body) };
+   packet.bindings.coordinatorOnlySha256 = sha(canonicalJson(packet.coordinatorOnly));
+   const digest = sha(canonicalJson(packet));
++  // The old creator sealed the claim over the prepared state of ITS packet digest: re-chain claim.priorStateDigest to the
++  // prepared record of the rewritten packet (readConsumedSessionAdmission recomputes exactly this record).
++  const preparedState = { ...read("state.json"), packetDigest: digest, revision: 1, priorStateDigest: null, phase: "prepared", body: { code: "CPP-PREPARED" }, timestamp: packet.createdAt };
+   const state = read("state.json"); state.packetDigest = digest;
+   const claim = read("claim.json"); claim.packetDigest = digest;
++  claim.priorStateDigest = sha(canonicalJson(preparedState)); state.priorStateDigest = claim.priorStateDigest;
+   const admission = read("session-admission.json"); admission.packetDigest = digest; admission.claimSha256 = sha(canonicalJson(claim));
+   write("packet.json", packet); write("state.json", state); write("claim.json", claim); write("session-admission.json", admission);
+   return { dir, body };
+@@ -701,6 +891,143 @@ test("PF-93 (2)+(7) a packet claimed in the pre-assurance form finalizes through
+   } finally { cleanup(fx); }
+ });
+ 
++// PF-93 follow-up: a legacy-form packet that finalization consumed must stay readable by every read-back path.
++function finalizedLegacyPacket(fx, packetId) {
++  const request = registered(fx, { packetId });
++  admitSessionCriticReview(request);
++  rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++  resealReservationForLegacyPacket(fx, request);
++  assert.equal(finalizeSessionCriticReview(request).status, "completed");
++  const stored = JSON.parse(readFileSync(join(controlRootOf(fx), packetId, "packet.json"), "utf8"));
++  assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
++  return request;
++}
++
++test("PF-93 follow-up (a) export publishes a finalized pre-assurance packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a3".repeat(16);
++    finalizedLegacyPacket(fx, packetId);
++    criticNotes(fx);
++    const result = exportSessionCriticEvidence(exportOptions(fx, packetId));
++    assert.equal(result.status, "exported");
++    assert.deepEqual(readdirSync(join(fx.root, `specs/alpha/evidence/critic/${packetId}`)).sort(), [...EXPORT_FILES].sort());
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (b) receipt and result reads (delta round and Verify binding) accept a consumed pre-assurance packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a4".repeat(16);
++    finalizedLegacyPacket(fx, packetId);
++    const input = { controlRoot: controlRootOf(fx), packetId };
++    const read = readConsumedCandidateReceipt(input);
++    assert.equal(read.packet.packetId, packetId);
++    assert.equal(read.receipt.packetId, packetId);
++    const result = readConsumedCandidateResult(input);
++    assert.equal(result.packet.packetId, packetId);
++    assert.deepEqual(result.receipt, read.receipt);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (c) the consumed session admission read accepts a consumed pre-assurance packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a5".repeat(16);
++    finalizedLegacyPacket(fx, packetId);
++    const read = readConsumedSessionAdmission({ controlRoot: controlRootOf(fx), packetId });
++    assert.equal(read.packet.packetId, packetId);
++    assert.equal(read.admission.packetId, packetId);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (d) a claimed pre-assurance packet can be blocked", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "a6".repeat(16) });
++    admitSessionCriticReview(request);
++    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    const blocked = blockCandidatePacket({ controlRoot: controlRootOf(fx), packetId: request.packetId, code: "CPP-TEST-BLOCK" });
++    assert.equal(blocked.code, "CPP-TEST-BLOCK");
++    assert.equal(blocked.state.phase, "blocked");
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (e) the export write on a claimed pre-assurance packet reaches the authorization check, not the binding refusal", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "a7".repeat(16) });
++    admitSessionCriticReview(request);
++    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    assert.throws(() => recordCandidateExport({ controlRoot: controlRootOf(fx), packetId: request.packetId, receipt: {}, exportView: {}, policy: {} }),
++      (error) => error.code === "CPP-EXPORT");
++  } finally { cleanup(fx); }
++});
++
++// One lifecycle walk of a legacy packet; a failing step names itself in the error message.
++function e2eStep(name, fn) {
++  try { return fn(); } catch (error) {
++    error.message = `PF-93 e2e step "${name}" failed: ${error.message}`;
++    throw error;
++  }
++}
++
++test("PF-93 e2e a pre-assurance packet survives the whole lifecycle, and a blocked one reads back", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a8".repeat(16);
++    const controlRoot = controlRootOf(fx);
++    const request = e2eStep("claimed in the pre-assurance form", () => {
++      const r = registered(fx, { packetId });
++      admitSessionCriticReview(r);
++      rewriteAsLegacyPacket(fx, packetId, "legacy");
++      resealReservationForLegacyPacket(fx, r);
++      const stored = JSON.parse(readFileSync(join(controlRoot, packetId, "packet.json"), "utf8"));
++      assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
++      assert.equal(inspectClaimedCandidatePacket({ controlRoot, packetId }, { allowLegacyPreAssurance: true }).ok, true);
++      return r;
++    });
++    e2eStep("session admission read (claimed)", () => {
++      assert.equal(inspectClaimedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
++    });
++    e2eStep("finalize", () => { assert.equal(finalizeSessionCriticReview(request).status, "completed"); });
++    e2eStep("consumed receipt read", () => { assert.equal(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt.packetId, packetId); });
++    e2eStep("consumed result read (also the only preflight read the review lineage and Verify lifecycle call)", () => {
++      assert.equal(readConsumedCandidateResult({ controlRoot, packetId }).packet.packetId, packetId);
++    });
++    e2eStep("consumed session admission read", () => {
++      assert.equal(readConsumedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
++    });
++    e2eStep("export write", () => {
++      criticNotes(fx);
++      assert.equal(exportSessionCriticEvidence(exportOptions(fx, packetId)).status, "exported");
++    });
++    e2eStep("export read back", () => {
++      const dir = join(fx.root, `specs/alpha/evidence/critic/${packetId}`);
++      assert.deepEqual(readdirSync(dir).sort(), [...EXPORT_FILES].sort());
++      assert.equal(JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).packetId, packetId);
++    });
++    // Second leg: a claimed legacy packet that is blocked, then read back from the durable state.
++    // A registered generic batch stops after its first pass, so the second leg runs in its own fixture.
++    const fx2 = fixture();
++    try {
++      const blockedId = "a9".repeat(16);
++      const controlRoot2 = controlRootOf(fx2);
++      e2eStep("blocked leg: claim legacy and block", () => {
++        const r = registered(fx2, { packetId: blockedId });
++        admitSessionCriticReview(r);
++        rewriteAsLegacyPacket(fx2, blockedId, "legacy");
++        assert.equal(blockCandidatePacket({ controlRoot: controlRoot2, packetId: blockedId, code: "CPP-TEST-BLOCK" }).state.phase, "blocked");
++      });
++      e2eStep("blocked leg: read back", () => {
++        const state = JSON.parse(readFileSync(join(controlRoot2, blockedId, "state.json"), "utf8"));
++        assert.equal(state.phase, "blocked");
++        assert.equal(state.body.code, "CPP-TEST-BLOCK");
++      });
++    } finally { cleanup(fx2); }
++  } finally { cleanup(fx); }
++});
++
+ test("PF-93 (6) skip coverage accepts the pre-assurance binding exactly and refuses a tampered one", () => {
+   const taskId = "HISTORICAL-AUTHORED";
+   const root = mkdtempSync(join(tmpdir(), "pf93-skip-"));
