@@ -13,7 +13,11 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **233 items:232 at75,1 at50,0 at25;1 below75;index74.89%** (round-3 bundle v1,
+contains **234 items:231 at75,2 at50,1 at25;3 below75;index74.57%** (PF-93 reopened to50 and
+Toolbox D60 joined at25 on 2026-10-28 after the Glossover and Toolbox sessions tested the installed build:
+export of a finalized legacy packet and admit on a held packet still fail; D31/D32 follows a changed PO
+design, a budget checkpoint does not stop the Goldfish and the slice stays started; the next candidate
+carries all three fixes; round-3 bundle v1,
 2026-10-28: PF-85, D52, PF-93 and D58/D59 moved to75 on operator commit `692301fd9`, installed in
 the stamp `59b3a7b65`; D31/D32 is the one row below75; the PO holds Full Verify and the batch Critic until
 the happy-path and brownfield tests are green; before it 228/3/2, 74.25%; Toolbox D58/D59
