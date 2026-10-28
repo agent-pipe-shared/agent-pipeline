@@ -368,6 +368,7 @@
         "verify-phase:harness/scripts/verify.mjs:critic-lifecycle-admission-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-notes-write-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-packet-release-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-review-scope-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-route-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-route-v3-tests",
