@@ -1,0 +1,96 @@
+diff --git a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+index 594be6f6a..59a05a10d 100644
+--- a/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-dispatch.test.mjs
+@@ -229,21 +229,29 @@ manualCheck("GD2h a private denial audit is content-free and digest-bound", () =
+ });
+ 
+ // Host built-in agent types (Explore/Plan/general-purpose) must not be refused by the Advisor binding.
++// QG-04 justification: writeCapableCarrierAdmission (guard-dispatch.mjs) deliberately admits only the shipped pipeline-core
++// read-only roles, Codex explorer, a DIRECT-transport Explore and the pipeline-core goldfish roles; GD72/GD73 (W7 B-i/B-ii)
++// pin that a Plan dispatch is refused with DISPATCH-WRITE-CARRIER-REQUIRED. Plan and general-purpose can write, so the old
++// allow expectation was stale: they now expect the refusal; Explore (direct call) stays ALLOW, the property this case proves.
+ for (const builtIn of ["Explore", "Plan", "general-purpose"]) {
+-  check(`GD2i allow a ${builtIn} dispatch without a prohibition line (exact live tool_input shape)`, {
++  const admitted = builtIn === "Explore";
++  check(`GD2i ${admitted ? "allow" : "block"} a ${builtIn} dispatch without a prohibition line (exact live tool_input shape)`, {
+     tool_use_id: `gd2i-${builtIn}`,
+     tool_name: "Agent",
+     tool_input: { subagent_type: builtIn, model: "sonnet", description: "read-only research", prompt: "Read the repository and report where X is defined." },
+-  }, ALLOW);
++  }, admitted ? ALLOW : BLOCK, admitted ? {} : { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
+ }
+-check("GD2j allow a batch of two Explore dispatches without a prohibition line", {
++// QG-04 justification: a Workflow agent() Explore has transport `workflow`, and the carrier policy admits Explore only over a
++// direct call (guard-dispatch.mjs writeCapableCarrierAdmission); the direct-call Explore stays ALLOW in GD2i above.
++check("GD2j block a batch of two Explore dispatches through a Workflow script (carrier policy: direct transport only)", {
+   tool_use_id: "gd2j",
+   tool_name: "Workflow",
+   tool_input: { script: `
+     agent({ agentType: 'Explore', prompt: 'Read a and report.' })
+     agent({ agentType: 'Explore', prompt: 'Read b and report.' })
+   ` },
+-}, ALLOW);
++  // QG-04: c1 renamed this case to "block" but left the expectation at ALLOW, so the check contradicted its own name.
++}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
+ 
+ manualCheck("GD2k built-in role spellings bind case-preservingly when the prohibition line is present", () => {
+   const root = mkdtempSync(join(tmpdir(), "advisor-prohibition-builtin-"));
+@@ -354,9 +362,12 @@ check("GD4 block  an incomplete Goldfish briefing", {
+ }, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING", "GOAL"] });
+ 
+ // GD5 -- roles with no template contract are not this hook's business.
++// QG-04 justification: general-purpose can write and is refused by the carrier policy (GD72/GD73 pin it for Plan). This case
++// proves "a role with no template contract is not this hook's business", so its fixture swaps to a carrier-admitted
++// read-only type (a direct Explore) instead of flipping the expectation; the refusal of general-purpose is pinned in GD2i.
+ check("GD5 allow  an unrelated subagent type", {
+   tool_name: "Task",
+-  tool_input: { subagent_type: "general-purpose", model: "sonnet", prompt: "find where X is defined" },
++  tool_input: { subagent_type: "Explore", model: "sonnet", prompt: "find where X is defined" },
+ }, ALLOW);
+ 
+ // GD6/GD7 -- fail-open. A guard that cannot read its input has no opinion, and a broken
+@@ -436,10 +447,11 @@ check("GD14 block  a freehand prose Antigravity Critic dispatch (the reproduced
+   },
+ }, BLOCK, { stderrIncludes: ["DISPATCH-NO-RULESET-SHA"] });
+ 
+-check("GD15 allow  an Antigravity dispatch of an unrelated subagent type", {
++// QG-04 justification: carrier policy refuses a general-purpose (write-capable) type on every runner (see GD2i, GD72/GD73).
++check("GD15 block  an Antigravity dispatch of a write-capable general-purpose subagent type", {
+   tool_name: "invoke_subagent",
+   tool_input: { Subagents: [{ TypeName: "general-purpose", Prompt: "find where X is defined" }] },
+-}, ALLOW);
++}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
+ 
+ check("GD15a block a direct Agent packet with no role before launch", {
+   tool_name: "Agent",
+@@ -476,14 +488,16 @@ check("GD15g block a Codex critic packet carrying a claims list", {
+   tool_input: { agent_type: "critic", message: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x`, task_name: "review" },
+ }, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", '"modelCalls":0'] });
+ 
+-check("GD15h allow an ordinary Codex worker packet", {
++// QG-04 justification: writeCapableCarrierAdmission admits only Codex `explorer` (not `worker`, not an omitted type).
++// NEEDS POLICY OWNER: whether refusing Codex worker / omitted agent_type is intended; read here by the same policy as GD72/GD73.
++check("GD15h block an ordinary Codex worker packet (write-capable carrier)", {
+   tool_name: "spawn_agent",
+   tool_input: { agent_type: "worker", message: "Implement the bounded task.", task_name: "implementation" },
+-}, ALLOW);
+-check("GD15i allow Codex to use its valid default role when agent_type is omitted", {
++}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
++check("GD15i block Codex default role when agent_type is omitted (write-capable carrier)", {
+   tool_name: "spawn_agent",
+   tool_input: { message: "Inspect the bounded question.", task_name: "inspection" },
+-}, ALLOW);
++}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
+ 
+ check("GD15j block a Codex packet with no message before launch", {
+   tool_name: "spawn_agent",
+@@ -913,6 +927,8 @@ function guardCopyWithHooks(label, hooksJsonText) {
+   copyFileSync(GUARD, join(dir, "hooks", "guard-dispatch.mjs"));
+   symlinkSync(join(dirname(GUARD), "guard-dispatch-budget.mjs"), join(dir, "hooks", "guard-dispatch-budget.mjs"));
+   symlinkSync(join(dirname(GUARD), "..", "lib"), join(dir, "lib"));
++  // The guard resolves ../scripts/{slice-queue,dispatch-record-liveness,dispatch-briefing}.mjs relative to its own location.
++  symlinkSync(join(dirname(GUARD), "..", "scripts"), join(dir, "scripts"));
+   if (hooksJsonText !== null) writeFileSync(join(dir, "hooks", "hooks.json"), hooksJsonText);
+   const guard = join(dir, "hooks", "guard-dispatch.mjs");
+   guardCopies.set(label, guard);
