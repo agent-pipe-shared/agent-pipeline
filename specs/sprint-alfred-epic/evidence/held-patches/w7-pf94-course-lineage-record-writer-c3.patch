@@ -1,0 +1,83 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 766aa4fa2..daa39280c 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -723,6 +723,7 @@ test("D51-CARRY (e) exact-commit evidence behaves as before and records no carry
+ });
+ // PF-94 c16: a REAL consumed course round (claim, session finalization in the owner store), reused by the delta-request slice.
+ import { admitSessionCriticReview, finalizeSessionCriticReview } from "../scripts/session-critic-finalizer.mjs";
++import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mjs";
+ import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
+ import { addCriticReviewLineage } from "./feature-package-registration.mjs";
+ import { chmodSync, existsSync } from "node:fs";
+@@ -731,7 +732,8 @@ const pf94Guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.m
+ const pf94Verdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
+ const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
+ /** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
+-export function consumedCourseRoundFixture({ course = true, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task" } = {}) {
++// Options: course (true: course path with claim; false: generic batch + caller-authored fallback, no claim), failing (true: the round did NOT pass and carries one open major finding), featureId, logicalWorkIds, taskId.
++export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task" } = {}) {
+   const root = mkdtempSync(join(tmpdir(), "pf94-course-round-"));
+   git(root, ["init", "-q", "-b", "main"]);
+   mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
+@@ -773,16 +775,23 @@ export function consumedCourseRoundFixture({ course = true, featureId = "held-fe
+   const preflightInput = { root, base, candidate, specPath, guardrailPaths: course ? [] : pf94Guardrails, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
+   if (course) preflightInput.courseContext = { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
+   const packetId = "9a".repeat(16);
+-  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: failing ? { ...pf94Verdict, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: `${specPath}:1`, spec_ref: "AC-1" }] } : pf94Verdict };
++  let preflightBeforeBatch = null;
+   if (!course) {
++    preflightBeforeBatch = preflightCriticDispatch({ ...preflightInput, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
++    assert.equal(preflightBeforeBatch.status, "packet-ready", JSON.stringify(preflightBeforeBatch));
++    // The pre-rule preflight carried no course admission (generic path); strip it so the finalizer takes the generic-batch branch.
++    preflightBeforeBatch = { ...preflightBeforeBatch, coordinatorOnly: { ...preflightBeforeBatch.coordinatorOnly, courseAdmission: null } };
+     const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
+     mkdirSync(controlRoot, { recursive: true, mode: 0o700 }); chmodSync(join(root, ".git", "agent-pipeline"), 0o700); chmodSync(controlRoot, 0o700);
+     const reg = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId, baseCommit: base, candidateCommit: candidate, logicalWorkIds, specPath, guardrailPaths: pf94Guardrails, signedQualityImportAnchor: null, reviewUnitPath: unitPath } });
+     request.genericBatchRef = { ...reg.batchRef, memberSha256: reg.memberSha256 };
+     request.allowCallerAuthoredFallback = true;
+   }
+-  admitSessionCriticReview(request);
+-  const finalized = finalizeSessionCriticReview(request, course ? { readOriginalSourceReturnFn: pf94Origin } : {});
++  // Upgrade state: the round was admitted BEFORE the course rule existed, so its preflight ran with no generic batch registered. Today's preflight refuses a feature unit whose work ids a generic batch owns (CGB-CONFLICT), so the packet-ready result computed beforehand is replayed through the dependency seam.
++  const deps = course ? { readOriginalSourceReturnFn: pf94Origin } : { readOriginalSourceReturnFn: pf94Origin, preflightCriticDispatchFn: () => preflightBeforeBatch };
++  admitSessionCriticReview(request, course ? {} : { preflightCriticDispatchFn: deps.preflightCriticDispatchFn });
++  const finalized = finalizeSessionCriticReview(request, deps);
+   assert.equal(finalized.status, "completed");
+   const courseRequest = { repoRoot: root, featureId, baseCommit: base, candidateCommit: candidate, registrationCommit, requestedMode: "full", acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
+   return { root, featureId, base, candidate, registrationCommit, packetId, manifestPath, courseRequest, decisionBefore: readCriticCourseAdmission(courseRequest).decision, deltaBefore: readCriticCourseAdmission({ ...courseRequest, requestedMode: "delta" }).decision };
+@@ -830,6 +839,20 @@ test("PF94 LINEAGE (d) upgrade state: a round finalized outside the course (call
+   for (const word of ["inspect-course-takeover", "supersede-course-takeover", "round 1"]) assert.ok(actual.reason.includes(word), actual.reason);
+   assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
+ });
++test("PF94 LINEAGE (g) a failing round with an open finding: after the lineage is registered the delta admission asks for the delta request", () => {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const registration = pf94Commit(fx.root, "register the lineage");
++  mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
++  const correction = pf94Commit(fx.root, "correction after the failing round");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: correction, registrationCommit: correction, requestedMode: "delta" });
++  console.log("PF94 (g) registration:", registration, "admission after:", JSON.stringify(after.decision));
++  assert.equal(after.decision.code, "CCA-DELTA-REQUIRED", JSON.stringify(after.decision));
++  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  console.log("PF94 (g) record findings:", JSON.stringify(record.findings), JSON.stringify(record.verdict));
++  assert.ok(record.findings.some((f) => f.status === "open"), JSON.stringify(record.findings));
++});
+ test("PF94 LINEAGE (e) HEAD behind a correction commit is refused FPR-LINEAGE-TRANSPORT and says to register before the next correction", () => {
+   const fx = consumedCourseRoundFixture();
+   mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index be0296da2..e198663f7 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -541,6 +541,8 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+     correction: round === 1 ? null : { commit: packet.candidate.commit, deltaSha256: packet.diff.sha256, impactSha256: sha256Canonical(edges) },
+     invalidation: { kind: "none", reason: null, evidenceSha256: null },
+   });
++  // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
++  if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
+   if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}`, { compileCode: compiled.code, packetId });
+   const artifact = compiled.value.artifact;
+   const target = join(root, artifact.path), created = !existsSync(target);
