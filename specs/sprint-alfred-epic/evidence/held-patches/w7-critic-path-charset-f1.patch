@@ -1,0 +1,215 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index e156b4d86..f548ccde2 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -362,7 +362,7 @@ const V2_REQUEST_KEYS=['repoRoot','featureId','baseCommit','candidateCommit','re
+ const V2_DELTA_KEYS=['schema','featureId','manifestPath','courseKey','acceptedEnvelopeSha256','genesisRecordSha256','historySha256','parent','candidate','changedPaths','changedBehaviorClaims','pathInvariantMap','pathInvariantMapSha256','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidence'];
+ const lineageSchema=v=>['pipeline.critic-review-lineage.v1','pipeline.critic-review-lineage.v2'].includes(v?.schema);
+ const equal=(a,b)=>canonicalJson(a)===canonicalJson(b);
+-const safe=v=>typeof v==='string' && v.length<=512 && !/[\\\0\r\n:]/u.test(v) && !v.startsWith('/') && v.split('/').every(p=>p && p!=='.' && p!=='..');
++const safe=v=>typeof v==='string' && v.length<=512 && !/[\\\0\r\n]/u.test(v) && !v.startsWith('/') && v.split('/').every(p=>p && p!=='.' && p!=='..');
+ const goodEvidence=e=>object(e) && e.class==='candidate-evidence' && e.authority===false && e.mutability==='immutable' && e.retention==='retain' && safe(e.path) && SHA256.test(e.sha256??'');
+ const ok=value=>({ok:true,value});
+ const refused=(error)=>({ok:false,status:error?.status??'refused',code:error?.code??'CCA-RUNTIME-READBACK'});
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+index 92a64e227..90b807165 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.mjs
+@@ -12,7 +12,7 @@ const exact = (value, keys) => value && typeof value === "object" && !Array.isAr
+ export const diagnosticDigest = bytes => createHash("sha256").update(bytes).digest("hex");
+ function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
+ export function diagnosticPath(path) {
+-  if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f:]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
++  if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
+   return path;
+ }
+ export function readDiagnosticArtifact(root, path) {
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index c79517d95..404887ffc 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -136,6 +136,10 @@ for (const script of ["critic-diagnostic-evidence.mjs", "register-feature-packag
+     assertRouteInOrder(result.stdout);
+   });
+ }
++test("PF97-F1 diagnosticPath accepts a colon and still refuses backslash, controls, absolute and bad segments", () => {
++  for (const ok of ["evidence/a:b.log", "src/app/(app)/[slug]/page.tsx", "evidence/x y.json"]) assert.equal(shared.diagnosticPath(ok), ok, ok);
++  for (const bad of ["evidence\\x.log", "evidence/a\nb.log", "evidence/a\u0000b.log", "/evidence/x.log", "evidence//x.log", "evidence/../x.log"]) assert.throws(() => shared.diagnosticPath(bad), /CDI-PATH/u, JSON.stringify(bad));
++});
+ test("D41 malformed argv keeps its refusal codes and exit status", () => {
+   const producer = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs"), "--help", "--root", "x"], { encoding: "utf8" });
+   assert.equal(producer.status, 1);
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+index 2205ac854..5a12cb8d7 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+@@ -42,7 +42,9 @@ export const CRITIC_INVALIDATION_REASONS = Object.freeze([
+ const SHA = /^[a-f0-9]{64}$/u;
+ export const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+-const PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,512}$/u;
++// Any legitimate file name character; refuses C0/DEL/C1 controls (line breaks and NUL included) and the backslash anywhere.
++// The negated empty class matches line breaks too, unlike a dot.
++const PATH = /^(?!\/)(?![^]*[\u0000-\u001f\u007f-\u009f\\])[^]{1,512}$/u;
+ const PACKET_ID = /^[a-f0-9]{32}$/u;
+ const VERDICTS = new Set(["pending", "no-findings", "findings", "failed"]);
+ const FAILURES = new Set(CRITIC_REVIEW_FAILURES);
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index 1cbb73ed5..5d264e06f 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -12,6 +12,7 @@ import {
+   validateReleaseCriticScopeAdmission,
+ } from "./critic-review-lineage.mjs";
+ import { sha256Canonical } from "./review-economy.mjs";
++import { safePath } from "./critic-review-lineage-core.mjs";
+ 
+ const H = (character) => character.repeat(64);
+ const O = (character) => character.repeat(40);
+@@ -723,5 +724,60 @@ check("release corrections bind the previous reviewed candidate, impact closure
+   assert.equal(validateReleaseCriticScopeAdmission(broad, packet2, broadScope).ok, true);
+ });
+ 
+-assert.equal(passed, 14);
+-console.log(`${passed}/14 checks passed.`);
++// PF-97 F1 (PO decision 2026-10-28): every legitimate file name character is allowed in a repository path.
++const LEGITIMATE_PATHS = [
++  "src/app/(app)/(auth)/anmelden/page.tsx",
++  "src/app/[slug]/page.tsx",
++  "src/app/@modal/(.)photo/page.tsx",
++  "routes/$id.tsx",
++  "src/with space/file name.ts",
++  "src/über/ü.ts",
++  "src/a+b=c,d~e.ts",
++  "src/a:b.ts",
++  "src/trail .ts",
++  "src/-lead.ts",
++  "src/50%#done.ts",
++];
++const REFUSED_PATHS = [
++  "src/a\nb.ts",
++  "src/a.ts\n",
++  "src/a\rb.ts",
++  "src/a\u0000b.ts",
++  "src/a\u0085b.ts",
++  "src/a\u007fb.ts",
++  "src/a\u009fb.ts",
++  "src/a\u0001b.ts",
++  "src/a\\b.ts",
++  "/src/a.ts",
++  "src//a.ts",
++  "src/./a.ts",
++  "src/../a.ts",
++  "src/",
++  "",
++  ".",
++  "..",
++];
++check("allows every legitimate file name character in a repository path and refuses controls, backslash and bad segments", () => {
++  for (const path of LEGITIMATE_PATHS) assert.equal(safePath(path), true, JSON.stringify(path));
++  for (const path of REFUSED_PATHS) assert.equal(safePath(path), false, JSON.stringify(path));
++  assert.equal(safePath(`${"a/".repeat(255)}a`), true);
++  assert.equal(safePath("a".repeat(513)), false);
++  assert.equal(safePath("ü".repeat(257)), false);
++  assert.equal(safePath(null), false);
++});
++check("compiles and validates a lineage record whose packet diff path carries brackets, parentheses and an at sign", () => {
++  const paths = [
++    "src/app/(app)/(auth)/anmelden/page.tsx",
++    "src/app/@modal/(.)photo/page.tsx",
++    "src/app/[slug]/page.tsx",
++  ];
++  const packet = Object.freeze({ ...packet1, diffPaths: paths });
++  const record = compile({ packet });
++  assert.deepEqual(record.diff.changedPaths, paths);
++  assert.equal(validateCriticReviewLineage(record).ok, true);
++  assert.equal(validateCriticLineagePacketAdmission(record, packet).ok, true);
++  assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: ["src/a\nb.ts"] }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
++});
++
++assert.equal(passed, 16);
++console.log(`${passed}/16 checks passed.`);
+diff --git a/plugins/pipeline-core/lib/review-economy.mjs b/plugins/pipeline-core/lib/review-economy.mjs
+index 31016a832..f43a2f7f7 100644
+--- a/plugins/pipeline-core/lib/review-economy.mjs
++++ b/plugins/pipeline-core/lib/review-economy.mjs
+@@ -62,7 +62,9 @@ export const PROGRESS_COMPONENTS = Object.freeze([
+ const SHA256 = /^[a-f0-9]{64}$/;
+ const SHA40 = /^[a-f0-9]{40}$/;
+ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+-const SAFE_PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,240}$/;
++// Any legitimate file name character; refuses C0/DEL/C1 controls (line breaks and NUL included) and the backslash anywhere.
++const PATH_FORBIDDEN_ANYWHERE = "(?![^]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])";
++const SAFE_PATH = new RegExp(`^(?!/)${PATH_FORBIDDEN_ANYWHERE}[^]{1,240}$`);
+ const FAULT_DOMAINS = new Set(["product", "execution-environment", "unknown"]);
+ const SIGNALS = new Set(["SIGABRT", "SIGBUS", "SIGFPE", "SIGHUP", "SIGILL", "SIGINT", "SIGKILL", "SIGPIPE", "SIGQUIT", "SIGSEGV", "SIGTERM", "SIGTRAP"]);
+ 
+@@ -250,7 +252,7 @@ const CRITIC_VERDICT_STATUSES = Object.freeze(["pending", "no-findings", "findin
+ const CRITIC_FINDING_SEVERITIES = Object.freeze(["critical", "high", "medium", "low"]);
+ const CRITIC_FINDING_DISPOSITIONS = Object.freeze(["open", "fixed", "withdrawn", "superseded"]);
+ const CRITIC_SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+-const CRITIC_SAFE_PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,512}$/;
++const CRITIC_SAFE_PATH = new RegExp(`^(?!/)${PATH_FORBIDDEN_ANYWHERE}[^]{1,512}$`);
+ const CRITIC_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+ const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/;
+ const CRITIC_INVALIDATION_REASONS = new Set([
+diff --git a/plugins/pipeline-core/lib/review-economy.test.mjs b/plugins/pipeline-core/lib/review-economy.test.mjs
+index 56ae10032..6678afc11 100644
+--- a/plugins/pipeline-core/lib/review-economy.test.mjs
++++ b/plugins/pipeline-core/lib/review-economy.test.mjs
+@@ -532,6 +532,55 @@ ok("RE64 docs state write path fails", validateWorkflowFallbackReceipt({ ...fall
+ ok("RE65 dot-segment alias fails before authority comparison", validateWorkflowFallbackReceipt({ ...fallbackReceipt, permissions: { ...fallbackReceipt.permissions, writePaths: ["specs/./result.md"] } }).ok === false);
+ ok("RE66 dot-segment authority path itself fails", validateWorkflowFallbackReceipt({ ...fallbackReceipt, bindings: { ...fallbackReceipt.bindings, authorityPaths: { ...fallbackReceipt.bindings.authorityPaths, result: "specs/./result.md" } } }).ok === false);
+ 
++// PF-97 F1 (PO decision 2026-10-28): every legitimate file name character is allowed in a repository path.
++const legitimateEconomyPaths = [
++  "src/app/(app)/(auth)/anmelden/page.tsx",
++  "src/app/[slug]/page.tsx",
++  "src/app/@modal/(.)photo/page.tsx",
++  "routes/$id.tsx",
++  "src/with space/file name.ts",
++  "src/über/ü.ts",
++  "src/a+b=c,d~e.ts",
++  "src/a:b.ts",
++  "src/trail .ts",
++  "src/-lead.ts",
++];
++const refusedEconomyPaths = [
++  "src/a\nb.ts", "src/a.ts\n", "src/a\u0000b.ts", "src/a\u0085b.ts", "src/a\u007fb.ts",
++  "src/a\\b.ts", "/src/a.ts", "src//a.ts", "src/./a.ts", "src/../a.ts",
++];
++const economyDelta = (path) => {
++  const map = { [path]: ["INV-01"] };
++  return { ...delta, changedPaths: [path], pathInvariantMap: map, pathInvariantMapSha256: sha256Canonical(map) };
++};
++ok("RE70a validRepoPath (delta admission) accepts every legitimate file name character",
++  legitimateEconomyPaths.every((path) => admitReviewAttempt(economyDelta(path)).mode === "delta"));
++ok("RE70b validRepoPath (delta admission) refuses controls, backslash, leading slash and bad segments",
++  refusedEconomyPaths.every((path) => admitReviewAttempt(economyDelta(path)).mode === null));
++const compiledCriticRecord = (path) => compileCriticReviewLineage({
++  packet: { ...criticPacket1, diffPaths: [path] },
++  reviewId: "private:review:path",
++  parent: null,
++  packages: [{ id: "nova-a5", subjectSha256: A, changedPaths: [path], integrationEdges: [criticEdge] }],
++  coverage: { changedPaths: [path], acceptanceIds: ["NVA-A54-9"], integrationEdges: [criticEdge], complete: true, receiptSha256: B },
++  lane: { laneId: "private-lane-id", contextSha256: A, evidenceSha256: B },
++  verdict: { status: "findings", schemaValid: true, resultSha256: D, failure: null },
++  findings: [criticFinding],
++  correction: null,
++  invalidation: { kind: "none", reason: null, evidenceSha256: null },
++  reviewAttempt: { round: 1, correctionCommits: 0, requestedMode: "full" },
++});
++const economyCriticRecord = (path) => rehashCriticRecord(compiledCriticRecord("src/ok.ts"), (record) => {
++  record.diff.changedPaths = [path];
++  record.coverage.changedPaths = [path];
++  record.packages[0].changedPaths = [path];
++});
++ok("RE70c criticPath (critic projection) accepts every legitimate file name character, control record is valid",
++  projectCriticReviewEconomy([compiledCriticRecord("src/ok.ts")]).ok === true
++  && legitimateEconomyPaths.every((path) => projectCriticReviewEconomy([economyCriticRecord(path)]).ok === true));
++ok("RE70d criticPath (critic projection) refuses controls, backslash, leading slash and bad segments",
++  refusedEconomyPaths.every((path) => projectCriticReviewEconomy([economyCriticRecord(path)]).ok === false));
++
+ const reviewSchema = JSON.parse(readFileSync(join(scriptsDir, "review-attempt.schema.json"), "utf8"));
+ const fallbackSchema = JSON.parse(readFileSync(join(scriptsDir, "workflow-fallback-receipt.schema.json"), "utf8"));
+ const courseSchema = JSON.parse(readFileSync(join(scriptsDir, "course-decision.schema.json"), "utf8"));
