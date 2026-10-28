@@ -1,5 +1,5 @@
 diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
-index c03e34c50..37cdb9678 100644
+index c03e34c50..ffd02755a 100644
 --- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
 +++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
 @@ -37,9 +37,9 @@ const exact = (v, keys) => v !== null && typeof v === "object" && !Array.isArray
@@ -36,6 +36,42 @@ index c03e34c50..37cdb9678 100644
      ensureStore(c);
      const batchId = randomBytes(16).toString("hex");
      const subject = { schema: GENERIC_CRITIC_BATCH_V2_SCHEMA, batchId, repositoryFingerprint: c.fingerprint, declaredScope: s.scope, originTargets: [s.target] };
+@@ -625,6 +626,27 @@ function reserveAdmission(input) {
+     return { reservation: r, replay: false };
+   });
+ }
++// D60 c3: a retained, complete registration whose logical/origins index entries were lost is re-bound to the same batch.
++// publishIndex refuses (CGB-CONFLICT) when another batch already owns an entry, so this never steals a review unit.
++function republishIndex(input) {
++  shape(input, ["controlRoot", "batchRef"]);
++  const c = readContext(input.controlRoot);
++  return transaction(c, () => {
++    const batchRef = ref(input.batchRef);
++    const p = join(c.root, batchRef.batchId);
++    directory(p);
++    const value = stableJson(join(p, "registration.json"));
++    shape(value, REGISTRATION);
++    const { registrationSha256, ...subject } = value;
++    if (![GENERIC_CRITIC_BATCH_SCHEMA, GENERIC_CRITIC_BATCH_V2_SCHEMA].includes(value.schema) || !eq(batchRef, { batchId: value.batchId, registrationSha256 })
++      || sha256Canonical(subject) !== registrationSha256 || value.repositoryFingerprint !== c.fingerprint || value.originTargets.length !== 1) fail("CGB-STALE");
++    if (!eq(stableJson(join(p, "registration-complete.json")), { schema: "pipeline.critic-generic-registration-complete.v1", batchRef })) fail("CGB-HELD");
++    ensureStore(c);
++    for (const identity of logical(value.declaredScope.logicalWorkIds)) publishIndex(c, "logical", identity, batchRef);
++    for (const target of value.originTargets) publishIndex(c, "origins", target, batchRef);
++    return { batchRef, republished: true };
++  });
++}
+ function invoke(action) {
+   try { return action(); }
+   catch (error) {
+@@ -639,6 +661,7 @@ function invoke(action) {
+ export function registerGenericCriticBatch(input) { return invoke(() => registerBatch(input)); }
+ export function appendGenericCriticBatchCorrection(input) { return invoke(() => appendCorrection(input)); }
+ export function readGenericCriticBatchAdmission(input) { return invoke(() => readAdmission(input)); }
++export function republishGenericCriticBatchIndex(input) { return invoke(() => republishIndex(input)); }
+ export function reserveGenericCriticBatchAdmission(input) { return invoke(() => reserveAdmission(input)); }
+ export function readReservedGenericCriticBatchAdmission(input) { return invoke(() => readReservedAdmission(input)); }
+ /** Diagnose a held transaction without treating a partial publication as a disposable lock. */
 diff --git a/plugins/pipeline-core/lib/critic-packet-release.mjs b/plugins/pipeline-core/lib/critic-packet-release.mjs
 new file mode 100644
 index 000000000..67f4f24ba
@@ -258,7 +294,7 @@ index 154b89208..0f7831555 100644
    if (!existsSync(admissionPath) || packet.request.sessionBinding === undefined) {
      fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Consumed session admission is unavailable.");
 diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
-index fabd0ad9f..d8f89d91f 100644
+index fabd0ad9f..ab126af37 100644
 --- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
 +++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
 @@ -15,6 +15,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -269,7 +305,15 @@ index fabd0ad9f..d8f89d91f 100644
  import {
    GOVERNANCE_REVIEW_SOURCE_SCHEMA,
    buildGovernanceReviewAction,
-@@ -33,6 +34,8 @@ import {
+@@ -24,6 +25,7 @@ import {
+ } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
++import { republishGenericCriticBatchIndex } from "../lib/critic-generic-batch.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import {
+   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
+@@ -33,6 +35,8 @@ import {
    cleanupCandidatePacket,
    consumeCandidatePacket,
    inspectClaimedSessionAdmission,
@@ -278,7 +322,7 @@ index fabd0ad9f..d8f89d91f 100644
    prepareCandidatePacket,
    publishClaimedSessionAdmission,
    readConsumedCandidateReceipt,
-@@ -51,6 +54,7 @@ export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finaliza
+@@ -51,6 +55,7 @@ export const SESSION_CRITIC_CLI_ERROR_SCHEMA = "pipeline.session-critic-finaliza
  export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-import-review-anchor.v1";
  export const GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-registration-request.v2";
  export const GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-correction-request.v2";
@@ -286,7 +330,7 @@ index fabd0ad9f..d8f89d91f 100644
  export const SESSION_CRITIC_EXPORT_REQUEST_SCHEMA = "pipeline.session-critic-export-request.v1";
  export const SESSION_CRITIC_EXPORT_RESULT_SCHEMA = "pipeline.session-critic-export.v1";
  export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
-@@ -331,9 +335,64 @@ function admittedRouteFor(packet, requestedRoute, trigger, preflightSha256) {
+@@ -331,9 +336,66 @@ function admittedRouteFor(packet, requestedRoute, trigger, preflightSha256) {
    return routeFor({ ...requestedRoute, modelTier: role.modelId }, preflightSha256);
  }
  
@@ -314,6 +358,8 @@ index fabd0ad9f..d8f89d91f 100644
 +  const reference = options.genericBatchRef;
 +  if (!exact(reference, ["batchId", "registrationSha256", "memberSha256"])) return null;
 +  const genericBatch = { batchRef: { batchId: reference.batchId, registrationSha256: reference.registrationSha256 }, memberSha256: reference.memberSha256 };
++  // D60 c3: the same-task, same-candidate packet was found by its directory above; its batch index may have been lost.
++  try { republishGenericCriticBatchIndex({ controlRoot, batchRef: genericBatch.batchRef }); } catch { return null; }
 +  try {
 +    const current = inspectClaimedSessionAdmission({ controlRoot, packetId }, deps.packetDependencies);
 +    const retained = readReservedGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
@@ -352,7 +398,7 @@ index fabd0ad9f..d8f89d91f 100644
    if (preflight?.status !== "packet-ready" || preflight.dispatch?.requiredNextGate !== "session-critic-dispatch") fail("SCF-PREFLIGHT");
    const root = realpathSync(resolve(options.preflightInput.root));
    const id = sessionId(options.sessionId);
-@@ -411,10 +470,10 @@ function buildResult({ packet, packetDigest, session, verdict }) {
+@@ -411,10 +473,10 @@ function buildResult({ packet, packetDigest, session, verdict }) {
      verdict: assertVerdict(verdict),
    });
  }
@@ -365,7 +411,7 @@ index fabd0ad9f..d8f89d91f 100644
      || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
        ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
        : ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
-@@ -542,11 +601,13 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+@@ -542,11 +604,13 @@ export function finalizeSessionCriticReview(options, deps = {}) {
      || canonicalJson(packet.route) !== canonicalJson(admittedRouteFor(packet, options.route,
        options.trigger ?? "T1", preflightSha256))
      || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
@@ -381,7 +427,7 @@ index fabd0ad9f..d8f89d91f 100644
    const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
    const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
      claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
-@@ -739,6 +800,13 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+@@ -739,6 +803,13 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
      const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";
      if (Array.isArray(argv) && argv.includes("--allow-caller-authored-fallback") && !optIn) fail("SCF-USAGE");
      if (Array.isArray(argv) && argv[0] === "export") return runSessionCriticExportCli(argv, deps);

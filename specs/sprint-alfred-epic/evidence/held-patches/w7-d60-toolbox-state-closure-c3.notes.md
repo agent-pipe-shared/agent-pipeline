@@ -1,34 +1,33 @@
-# D60 c3: Toolbox state closure (CHECKPOINT: one case RED, a production fix is still needed)
+# D60 c3: Toolbox state closure (case (a) and release CLI case green; reader audit and several full runs open)
 
-Candidate 7f1451ef815990bcb228a9e42a4d0617d9302bf0. Patch: `w7-d60-toolbox-state-closure-c3.patch` (git diff --binary against the candidate, 6 files, +475/-16). It contains the D60 c2 patch (which contains the PF-93 c2 changes) plus two new cases in `session-critic-finalizer.test.mjs`. Nothing under plugins/ was edited in the repository. No production edit was made in this slice.
+Candidate 7f1451ef815990bcb228a9e42a4d0617d9302bf0. Patch: `w7-d60-toolbox-state-closure-c3.patch` (git diff --binary against the candidate, 6 files, +500/-16; contains D60 c2, PF-93 c2, the two c3 cases and the c3 production fix). Nothing under plugins/ was edited in the repository.
 
-## Re-verified recon claims
-- `resumeHeldGenericPacket` (finalizer ~344) is called first in admit; it finds the packet by `options.packetId` (directory exists check), not by scanning the control root.
-- CGB-HELD is raised in `registerBatch` (generic-batch ~414) only when no logical/origins index hit exists and `retainedUnadoptedPacket` (~373) finds a 32-hex packet with the same taskId or the same target.
-- Registration is a SEPARATE step (`register-batch` CLI) before admit. A packet can only exist for a batch that was fully registered, so the no-index-hit state cannot come from a crash inside one registerBatch run (order: registration.json, logical index, origins index via writeMember, registration-complete). It needs the index entries to be lost afterwards (store repair or removal) or a second registration with a different target and different logical ids for the same task. I reproduced it by removing `generic-batches/logical` and `generic-batches/origins` after a first admit failed after the claim.
+## Reproduced state and cause
+- Registration (`register-batch`) is a separate step before admit, so the no-index-hit state cannot come from a crash inside one registerBatch run (order: registration.json, logical index, origins index via writeMember, registration-complete; generic-batch ~398-428). It needs the index entries lost afterwards, which the case reproduces by removing `generic-batches/logical` and `generic-batches/origins` after a first admit failed after the claim. Registration then raises CGB-HELD (generic-batch ~414, `retainedUnadoptedPacket` ~373 scans the control root).
+- The c2 resume found the packet by directory but read the reservation through `readReservedGenericCriticBatchAdmission` -> `member` -> `registration` -> `boundIndex` (~336, ~356, ~362, ~568), which needs the index: second admit failed `CGB-MEMBER`. So c2 did not fix the reproduced state.
 
-## Cases added (finalizer test file)
-- `D60 c3 (a)`: claimed packet of T/C (first admit failed after the claim), index entries removed. Asserts registration is refused CGB-HELD naming the packet, then that the second admit of the same request resumes.
-- `D60 c3 (b)`: release verb through the real CLI (spawned script): receipt `released`, one audit record, packet directory moved, a following registration of the same candidate no longer meets CGB-HELD, second release is `already-released` with no second audit record.
+## Fix (STEP 2)
+Chosen: re-publish the index from the retained registration (not "read without boundIndex"), because every later reader (member, retainedReservation, consumedParent paths) goes through `boundIndex`; one repair heals them all and leaves the readers strict.
+- `critic-generic-batch.mjs`: new exported `republishGenericCriticBatchIndex({controlRoot, batchRef})` (inside the store transaction: reads registration.json, checks shape, registrationSha256, fingerprint, registration-complete, `ensureStore`, then `publishIndex` for each logical id and the origins target). `publishIndex` raises CGB-CONFLICT if another batch owns an entry, so a review unit is never taken from another batch.
+- `session-critic-finalizer.mjs`: imports it from `../lib/critic-generic-batch.mjs` (the preflight module does not re-export it; the first attempt failed to load for that reason) and calls it in `resumeHeldGenericPacket` after the same-task, same-candidate checks; any failure returns null so the normal path (and CGB-HELD for a different task or candidate) is unchanged.
+- Different-task/candidate refusal: unchanged code path (the resume returns null before the new call); no new case pins it beyond the c2 case D60 (b).
 
-## Results
-- RED (clone2 = candidate with only the new test file, name pattern `D60 c3`): 2 fail. (a) fails at the CGB-HELD message assertion (unpatched message does not name the packet: GenericCriticBatchError thrown at registerBatch, code CGB-HELD; the second admit was not reached). (b) fails with `SCF-USAGE` (no release verb). Log: scratch/agent-out/w7ce/red.log (deleted at cleanup).
-- GREEN in the patched clone, whole finalizer file: failing set = {`private task snapshot binds uppercase delivered-v3 bytes without exporting record prose` (pre-existing), `D60 c3 (a)`}. `D60 c3 (b)` is GREEN. Counts line not captured in the printed tail; the failing-name set above is machine-extracted from the log (scratch/agent-out/w7ce/green.session-critic-finalizer.test.mjs.log).
-- **D60 c3 (a) is RED in the patched clone with `CGB-MEMBER`**: the c2 resume path reaches `readReservedGenericCriticBatchAdmission` -> `retainedReservation` -> `member` -> `registration` -> `boundIndex` (generic-batch ~336, ~356, ~362, ~568, ~601), which requires the index entries. So the c2 pre-preflight resume does NOT resume a packet whose index is gone: the reproduced state is not fixed by c2. This is the STEP 2 finding.
-- Baseline clone2 whole-file run and the other three focused suites (generic-batch, preflight, release) were NOT run in this slice (budget). Prior c2 numbers: release 5/5, generic-batch 33/33, preflight 17/17.
+## Cases and results
+- RED (clone2 = candidate plus only the new test file, pattern `D60 c3`): 2 fail. (a) failed at the CGB-HELD message assertion (unpatched message does not name the packet); (b) failed `SCF-USAGE` (no release verb).
+- RED of (a) at the c3-draft base (before the fix): `CGB-MEMBER` from admit.
+- GREEN, patched clone, whole `session-critic-finalizer.test.mjs`: failing set = {`private task snapshot binds uppercase delivered-v3 bytes without exporting record prose`} only. D60 c3 (a) and (b) green. Counts line not captured in the printed tail.
+- Baseline clone2 whole finalizer file at the candidate: failing set = {`private task snapshot binds uppercase delivered-v3 bytes without exporting record prose`} (identical; pre-existing).
+- Other suites in the patched clone, before the final `ensureStore` line was added to the new function (that line only runs inside the new function): generic-batch tests 33 pass 33 fail 0; preflight tests 17 pass 17 fail 0; release tests 5 pass 5 fail 0. NOT re-run after the last edit.
 - Apply check: `git apply --check` in clone2 at the candidate, exit 0.
 
-## Step 4 reader audit
-NOT done (budget). Open: `plugins/pipeline-core/lib/capability-inventory` consumed-packet reader (~136) and `critic-generic-batch.mjs` `consumedParent` (455: `readConsumedSessionAdmission` inside try/catch mapping any failure to CGB-HELD, then packetDigest/claim/preflight bindings compared against the reservation; whether it re-validates the packet form itself was not examined).
-
-## Next step (STEP 2 fix, needs production edit in the six files)
-Make the resume independent of the index: in `resumeHeldGenericPacket` for a same-task, same-candidate packet whose index is missing, rebuild the reservation context by reading the registration directory named by `options.genericBatchRef` without `boundIndex`, or re-publish the logical/origins index entries from the retained registration (generic-batch `publishIndex`) before reading the reservation. Keep the different-task/candidate refusal with CGB-HELD naming packet and release verb. Case (a) is the acceptance test.
+## STEP 4 reader audit
+NOT done (budget). Open: `plugins/pipeline-core/lib/capability-inventory` consumed-packet reader (~136) and `consumedParent` in generic-batch (~455-463: `readConsumedSessionAdmission` in a try/catch mapping any failure to CGB-HELD, then packet digest, claim, preflight and course bindings compared to the reservation; whether it re-validates the packet form itself was not examined).
 
 ## Not done
-Native Windows, Full Verify, independent Critic (parent-owned batch gate), PO acceptance, Verify-suite registration of `critic-packet-release.test.mjs` (`harness/verify-suites.json`, case-completion configs are not mine).
+Native Windows, Full Verify, independent Critic (parent-owned batch gate), PO acceptance, Verify-suite registration of `critic-packet-release.test.mjs` (`harness/verify-suites.json` and case-completion configs are not mine). No dedicated case for the different-candidate CGB-HELD refusal after the fix.
 
-## Proposed commit message (only once (a) is green)
+## Proposed commit message
 `fix(critic): reproduce the exact CGB-HELD state of a held packet and test the release verb end to end (Toolbox D60)`
 
 ## Operator flow
-`git apply` the patch (instead of the c2 patch, it includes it); `git add -u` limited to the six paths plus `git add` of the two new release files; commit with `--no-verify`; stamp; install. Protected-path classification: none of the six files matches TP-1 to TP-13.
+`git apply` the patch (it replaces the c2 patch); `git add -u` limited to the six paths plus `git add` of the two new release files; commit with `--no-verify`; stamp; install. Protected-path classification: none of the six files matches TP-1 to TP-13. Independent Critic review stays a parent-owned batch gate.
