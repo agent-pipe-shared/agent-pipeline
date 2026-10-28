@@ -1,0 +1,291 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 84afcb82f..158503799 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -167,7 +167,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",213],
++    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",232],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",169],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",74],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 66ee99b40..73ec23c2e 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -1016,4 +1016,47 @@ test("PF94 DELTA (h) the CLI accepts exactly the delta shape", () => {
+   assert.equal(runRegisterFeaturePackage(["--root", bare, "--add-delta-request", "delta-input.json"], (text) => seen.push(text)), 2);
+   assert.equal(JSON.parse(seen[0]).code, "FPR-NO-APPROVED-PLAN", seen[0]);
+ });
++// PF-94 operator documentation pins (text only; each pin reads the text an operator sees).
++const pf94Read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
++test("PF94 DOCS (a) the register-feature-package help lists every flag, the delta request route and the late lineage block", () => {
++  const lines = [];
++  assert.equal(runRegisterFeaturePackage(["--help"], (text) => lines.push(text)), 0);
++  const help = lines.join("");
++  const usage = help.split("\n")[0];
++  for (const flag of ["--add-review-unit", "--add-diagnostic-evidence <path>", "--add-review-lineage --packet <packetId>", "--add-delta-request <input.json>"]) assert.ok(usage.includes(flag), `usage line names ${flag}`);
++  assert.ok(help.includes("Critic delta request route (PF-94)"));
++  for (const key of ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) assert.ok(help.includes(key), `help names input key ${key}`);
++  assert.ok(help.includes("pathInvariantMap must have exactly the changed paths"));
++  assert.ok(help.includes("--add-delta-request <input.json>") && help.includes("critic-dispatch-preflight"));
++  assert.ok(help.includes("Late lineage") && help.includes("CCA-TRANSPORT-SOURCE-DRIFT"));
++  assert.ok(help.includes("inspect-course-takeover") && help.includes("supersede-course-takeover"));
++});
++test("PF94 DOCS (b) the lineage refusals name the late-lineage repair and keep their old text", () => {
++  const source = pf94Read("./feature-package-registration.mjs");
++  const sentence = "if correction commits already follow this round the lineage cannot be registered any more; retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path";
++  assert.equal(source.split(sentence).length - 1, 2, "both FPR-LINEAGE-TRANSPORT/COMPILE reason texts carry the sentence");
++  assert.ok(source.includes("so the lineage of round N must be registered BEFORE the next correction commit"));
++  assert.ok(source.includes("the lineage of round N must be registered before the next correction commit"));
++});
++test("PF94 DOCS (c) SCF-TAKEOVER-REQUEST names the expected request shape and the finalizer help lists the takeover verbs", () => {
++  const source = pf94Read("../scripts/session-critic-finalizer.mjs");
++  assert.ok(source.includes("expected request"), "repair text names the expected request");
++  assert.ok(source.includes("regular .json file"), "repair text names the file requirement");
++  const help = execFileSync(process.execPath, [new URL("../scripts/session-critic-finalizer.mjs", import.meta.url).pathname, "--help"], { encoding: "utf8" });
++  assert.ok(help.includes("inspect-course-takeover --root <repository-root> --request"));
++  assert.ok(help.includes("supersede-course-takeover --root <repository-root> --request"));
++});
++test("PF94 DOCS (d) the Critic skill documents continuing a course and the continuation reference points to it", () => {
++  const skill = pf94Read("../skills/critic-review/SKILL.md");
++  const heading = "## Continuing a Critic course after the first round (PF-94)";
++  const start = skill.indexOf(heading);
++  assert.ok(start >= 0, "section heading");
++  const rest = skill.slice(start + heading.length);
++  const next = rest.search(/\n## /u);
++  const section = heading + (next < 0 ? rest : rest.slice(0, next));
++  assert.ok(section.split("\n").length <= 46, "section stays within 45 lines plus heading");
++  for (const needle of ["inspect-course-takeover", "supersede-course-takeover", "--add-review-lineage --packet", "--add-diagnostic-evidence", "--add-delta-request", "CGB-CONFLICT", "CGB-TAKEOVER-COURSE", "CGB-TAKEOVER-HISTORY", "CGB-TAKEOVER-OPEN", "FPR-LINEAGE-TRANSPORT", "CCA-TRANSPORT-SOURCE-DRIFT", "CCA-DELTA-REQUIRED", "CCA-REQUESTED-MODE"]) assert.ok(section.includes(needle), `skill section names ${needle}`);
++  const cont = pf94Read("../skills/pipeline-start/references/implementation-continuation.md");
++  assert.ok(cont.includes("Continuing a Critic course after the first round (PF-94)"));
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 5c6a380f3..d16f97d8c 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -525,7 +525,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   }
+   const identityInput = { repoRoot: root, featureId, baseCommit: packet.candidate.base, candidateCommit: packet.candidate.commit, registrationCommit: head, acceptedReference: null };
+   const resolved = resolveRegisteredCriticCourseIdentity(identityInput);
+-  if (!resolved.ok) return refused(String(resolved.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the course identity does not resolve (${resolved.code}); HEAD must be reachable from the round candidate through evidence-only commits only, so the lineage of round N must be registered BEFORE the next correction commit`, { compileCode: resolved.code, packetId });
++  if (!resolved.ok) return refused(String(resolved.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the course identity does not resolve (${resolved.code}); HEAD must be reachable from the round candidate through evidence-only commits only, so the lineage of round N must be registered BEFORE the next correction commit; if correction commits already follow this round the lineage cannot be registered any more; retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path`,{ compileCode: resolved.code, packetId });
+   const claim = readConsumedCourseClaimBinding({ resolvedRepository: resolved.value.resolvedRepository, packetId, expectedCandidate: { commit: packet.candidate.commit, tree: packet.candidate.tree } });
+   if (!claim.ok) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, readerCode: claim.code ?? null });
+   const history = resolved.value.registeredHistory;
+@@ -546,7 +546,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   });
+   // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
+   if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
+-  if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}`, { compileCode: compiled.code, packetId });
++  if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}; if correction commits already follow this round the lineage cannot be registered any more; retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path`,{ compileCode: compiled.code, packetId });
+   const artifact = compiled.value.artifact;
+   const target = join(root, artifact.path), created = !existsSync(target);
+   const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 9b47f850b..2283872a4 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -51,7 +51,7 @@ function commitPlan(root, result) {
+ }
+ 
+ export const REGISTER_FEATURE_PACKAGE_HELP = [
+-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]",
++  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
+   "",
+   "Critic diagnostic evidence route (run in this order):",
+   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs.",
+@@ -65,6 +65,24 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  2. Register it: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>",
+   "  3. Commit the manifest and the critic-lineage file the registration names, in one evidence-only commit.",
+   "",
++  "Critic delta request route (PF-94) for round 2 and later (run in this order):",
++  "  1. The lineage of the last round is registered and committed (route above).",
++  "  2. Make the correction commit.",
++  "  3. Produce and commit the diagnostic for it, then register it (--add-diagnostic-evidence, route above) and commit the manifest.",
++  "  4. Write the input JSON with exactly these keys and nothing else:",
++  "     changedBehaviorClaims   list of claim ids the correction changes",
++  "     pathInvariantMap        object: every changed path maps to its list of invariant ids",
++  "     coordinatorImpactConfirmed  true when the Coordinator confirmed the impact",
++  "     trustBoundaryChanged    true when the correction moves a trust boundary",
++  "     impactAmbiguous         true when the impact cannot be told",
++  "     pathInvariantMap must have exactly the changed paths as keys; a wrong map is refused (FPR-DELTA-MAP) with the changed paths printed.",
++  "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
++  "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
++  "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
++  "",
++  "Late lineage: if correction commits already follow a consumed round, its lineage can no longer be registered (CCA-TRANSPORT-SOURCE-DRIFT).",
++  "  Retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover, then rerun round 1 on the course path.",
++  "",
+ ].join("\n");
+ 
+ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index 255bf070e..340b61e29 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -32,8 +32,14 @@ import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admi
+ export const SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
+ export const SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
+ // PF-94: the operator types only the feature id; the course key and the review unit are derived, never typed.
+-function takeoverTarget(root, featureId) {
+-  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST");
++const TAKEOVER_REQUEST_FILE_TEXT = "the file must be a regular .json file in the repository scratch";
++function takeoverRequestRepair(supersede) {
++  return supersede
++    ? `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA}, featureId, digestSha256, reason; ${TAKEOVER_REQUEST_FILE_TEXT}`
++    : `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA}, featureId; ${TAKEOVER_REQUEST_FILE_TEXT}`;
++}
++function takeoverTarget(root, featureId, supersede = false) {
++  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
+   const run = (args) => {
+     const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
+     if (!isSuccessfulSpawn(r)) fail("SCF-TAKEOVER-REPOSITORY");
+@@ -94,6 +100,10 @@ const CLI_HELP = [
+   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
+   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
+   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
++  "Usage: session-critic-finalizer.mjs inspect-course-takeover --root <repository-root> --request <repo-relative scratch request.json>",
++  "       request: {\"schema\":\"pipeline.session-critic-course-takeover-inspect-request.v1\",\"featureId\":\"<feature>\"}",
++  "Usage: session-critic-finalizer.mjs supersede-course-takeover --root <repository-root> --request <repo-relative scratch request.json>",
++  "       request: {\"schema\":\"pipeline.session-critic-course-takeover-supersede-request.v1\",\"featureId\":\"<feature>\",\"digestSha256\":\"<digest printed by inspect>\",\"reason\":\"<short reason>\"}",
+   "       session-critic-finalizer.mjs --help",
+   "",
+   "Admit and claim before the fresh Critic starts; finalize only the same preclaimed packet after return.",
+@@ -113,14 +123,14 @@ const REVIEW_KEYS = Object.freeze(["base", "candidate", "specPath", "guardrailPa
+ const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
+ 
+ export class SessionCriticFinalizerError extends Error {
+-  constructor(code) {
+-    super("Session Critic finalization is invalid.");
++  constructor(code, message = "Session Critic finalization is invalid.") {
++    super(message);
+     this.name = "SessionCriticFinalizerError";
+     this.code = code;
+   }
+ }
+ 
+-function fail(code) { throw new SessionCriticFinalizerError(code); }
++function fail(code, message) { throw new SessionCriticFinalizerError(code, message); }
+ 
+ // Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
+ // No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
+@@ -828,6 +838,7 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
+     receiptSha256: index.receiptSha256,
+     reportSha256: index.reportSha256,
+     indexSha256: sha256(indexBytes),
++    next: `If more review rounds follow, register the lineage of this round NOW, before the next correction commit: register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId}; then commit the manifest and the lineage file it names. If correction commits already follow this round, the lineage can no longer be registered: continue with session-critic-finalizer.mjs inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path (section "Continuing a Critic course" of the critic-review skill gives the full order).`,
+   });
+ }
+ 
+@@ -870,8 +881,8 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+       const rawTakeover = readPhysicalRequest(takeoverRoot, argv[4]);
+       const supersede = argv[0] === "supersede-course-takeover";
+       if (!exact(rawTakeover, supersede ? ["schema", "featureId", "digestSha256", "reason"] : ["schema", "featureId"])
+-        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST");
+-      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId);
++        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
++      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId, supersede);
+       const common = { repoRoot: takeoverRoot, controlRoot: controlRootFor(takeoverRoot), ...target };
+       return Object.freeze({ exitCode: 0, output: supersede
+         ? supersedeFeatureCourseTakeover({ ...common, digestSha256: rawTakeover.digestSha256, reason: rawTakeover.reason })
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 296a7264e..36e89e0a2 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1867,6 +1867,25 @@ test("export publishes a consumed review as receipt, report and index with match
+   } finally { cleanup(fx); }
+ });
+ 
++test("PF94 export (1) the export result names the lineage registration before the next correction commit", () => {
++  const fx = fixture();
++  try {
++    const packetId = "7".repeat(32);
++    assert.equal(finalizeSessionCriticReview(preadmitted(fx, { packetId })).status, "completed");
++    criticNotes(fx, "# Critic notes\n\nNo findings.\n");
++    const result = exportSessionCriticEvidence(exportOptions(fx, packetId));
++    assert.equal(typeof result.next, "string");
++    assert.ok(result.next.includes(packetId), "next names the literal packet id");
++    assert.ok(result.next.includes("--add-review-lineage --packet"));
++    assert.ok(result.next.includes("before the next correction commit"));
++    assert.ok(result.next.includes("supersede-course-takeover"));
++    assert.ok(!result.next.includes("\n"), "next is one line");
++    assert.ok(!result.next.includes("/home/"), "next carries no absolute path");
++    assert.deepEqual(Object.keys(result).sort(),
++      ["indexSha256", "next", "outDir", "packetId", "paths", "receiptSha256", "reportSha256", "schema", "status"]);
++  } finally { cleanup(fx); }
++});
++
+ test("a failing review exports too, with reviewPass false and its finding count", () => {
+   const fx = fixture();
+   try {
+@@ -1944,6 +1963,7 @@ test("the export verb runs from a scratch request with no git on PATH and closes
+     assert.equal(output.schema, SESSION_CRITIC_EXPORT_RESULT_SCHEMA);
+     assert.equal(output.status, "exported");
+     assert.equal(output.packetId, packetId);
++    assert.ok(typeof output.next === "string" && output.next.includes(`--add-review-lineage --packet ${packetId}`));
+     assert.deepEqual(readdirSync(join(fx.root, outDir)).sort(), [...EXPORT_FILES].sort());
+     assert.equal(readFileSync(join(fx.root, outDir, "receipt.json"), "utf8"), canonicalJson(journalReceiptBody(fx, packetId)));
+     const unwritten = `specs/beta/evidence/critic/${"6".repeat(32)}`;
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index 772cc2901..de1c1c490 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -139,6 +139,39 @@ the Elephant default. Validate the preflight identity but never execute its
+ onboarding `nextAction`, inspect State/handover/history, or perform an Elephant
+ bootstrap. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
+ 
++## Continuing a Critic course after the first round (PF-94)
++
++Script paths resolve under the plugin root the bootstrap prints. Order:
++
++1. `session-critic-finalizer.mjs inspect-course-takeover --root <root> --request <scratch request.json>`,
++   then `supersede-course-takeover` with the printed digest and a reason. Only when the old batch
++   belongs to an earlier course key or to no course; never for the same course key.
++2. Rerun round 1 on the course path.
++3. `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` BEFORE
++   the next correction commit; commit the manifest and the lineage file it names.
++4. Make the correction commit.
++5. Produce the diagnostic (`critic-diagnostic-evidence.mjs`), commit it, register it with
++   `--add-diagnostic-evidence <path>`, commit the manifest.
++6. Write the input JSON and run `register-feature-package.mjs --root <root> --add-delta-request <input.json>`
++   (keys: `changedBehaviorClaims`, `pathInvariantMap` with exactly the changed paths,
++   `coordinatorImpactConfirmed`, `trustBoundaryChanged`, `impactAmbiguous`).
++7. Commit the manifest and the request file the verb names.
++8. Rerun `critic-dispatch-preflight.mjs` for round 2 with the arguments the verb prints.
++
++Request files for the takeover verbs are regular `.json` files in the repository scratch:
++inspect `{"schema":"pipeline.session-critic-course-takeover-inspect-request.v1","featureId":"<feature>"}`;
++supersede adds `"digestSha256"` and `"reason"` and uses the `...-supersede-request.v1` schema.
++
++| Code | Meaning and what to do |
++|---|---|
++| `CGB-CONFLICT` | An earlier batch owns the work ids; it may belong to an earlier course key: use the takeover verbs. |
++| `CGB-TAKEOVER-COURSE` | The owner is the SAME course key: do not take over; register its lineage with `--add-review-lineage`, or continue in delta mode. |
++| `CGB-TAKEOVER-HISTORY` | The feature already has registered history: continue in delta mode. |
++| `CGB-TAKEOVER-OPEN` | The old batch has no reserved packet or an unconsumed one: finish or release it first. |
++| `FPR-LINEAGE-TRANSPORT` | The lineage does not resolve; with `CCA-TRANSPORT-SOURCE-DRIFT` (a non-evidence-only commit follows the round) it can no longer be registered: use the takeover verbs, rerun round 1. |
++| `CCA-DELTA-REQUIRED` | A retained review exists: register a delta request, rerun preflight with its path. |
++| `CCA-REQUESTED-MODE` | First review is full, every later one delta: rerun preflight with the required mode. |
++
+ ## 0. Parse the dispatch (paths only — strict)
+ 
+ Arguments received: `$ARGUMENTS`
+diff --git a/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md b/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
+index a1fbe6196..0521c4ada 100644
+--- a/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
++++ b/plugins/pipeline-core/skills/pipeline-start/references/implementation-continuation.md
+@@ -97,6 +97,10 @@ After registration, do not edit any file the manifest registers (PRD, Spec,
+ digests, so an edit makes the next one `CAC-REGISTRATION-INVALID` again; an
+ edited PRD or Spec also fails the approval binding (`CAC-SOURCE-BINDING-MISMATCH`).
+ 
++To continue a course after its first Critic round (takeover of an old batch, lineage,
++delta request, refusal codes), follow the section
++"Continuing a Critic course after the first round (PF-94)" in `skills/critic-review/SKILL.md`.
++
+ The guard creates `slice-queue.json` itself from the first productive dispatch
+ whose prompt opens with a generated binding carrying `itemDelivery`; without
+ one it refuses `SQ-DELIVERY-COURSE-ABSENT`. Generate it, never hand-write it:
