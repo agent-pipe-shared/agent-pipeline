@@ -14,10 +14,10 @@ import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket
 import {readCriticCourseAdmission} from "./critic-course-admission.mjs";
 import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
-import {readdirSync,readlinkSync,fsyncSync} from "node:fs";
+import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -600,6 +600,22 @@ test("PF94 c19 takeover refuses only the SAME course key; another key keeps the 
     const conflict=thrown(()=>assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}));
     assert.equal(conflict?.code,"CGB-CONFLICT");
     assert.ok(conflict.message.includes("earlier course key of this feature")&&conflict.message.includes("no registered lineage"),conflict.message);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("PF95 CGB035 inspect lists every origins entry of the old batch (feature-course and delivery target) and they enter the digest",()=>{
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx),other="9".repeat(64);
+    const origins=join(fx.root,".git/agent-pipeline/critic-packets/generic-batches/origins");
+    const inspect=()=>CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:true});
+    const full=inspect();
+    assert.deepEqual(full.originEntries.map(e=>e.kind).sort(),["authored-delivery","feature-course"]);
+    assert.deepEqual(full.originEntries.map(e=>e.file),[...full.originEntries.map(e=>e.file)].sort());
+    assert.ok(full.originEntries.every(e=>e.file===`${e.file.slice(0,64)}.json`&&readdirSync(origins).includes(e.file)));
+    const delivery=full.originEntries.find(e=>e.kind==="authored-delivery").file;
+    renameSync(join(origins,delivery),join(fx.root,"moved-delivery.json"));
+    const without=inspect();
+    assert.deepEqual(without.originEntries.map(e=>e.kind),["feature-course"]);
+    assert.notEqual(without.digestSha256,full.digestSha256);
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

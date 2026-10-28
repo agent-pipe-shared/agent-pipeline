@@ -753,14 +753,24 @@ function featureOwnership(c, courseKey, work) {
     || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
   return { ...registered, batchRef };
 }
+// PF-95: every origins index entry that belongs to a batch (feature-course origin and the delivery target of each member), read-only.
+function originEntriesOf(c, batchRef) {
+  const dir = join(c.root, "origins");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter(f => f.endsWith(".json")).sort()
+    .map(file => ({ file, value: stableJson(join(dir, file)) }))
+    .filter(e => eq(e.value.batchRef, batchRef))
+    .map(e => ({ kind: e.value.identity.kind, file: e.file }));
+}
 function takeoverState(c, courseKey, work, courseHistoryRegistered) {
   const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
   const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
-    originTargets: null, packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true };
+    originTargets: null, originEntries: [], packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true };
   const done = refusalCode => ({ facts, refusalCode });
   if (!hits.length) return done("CGB-TAKEOVER-NONE");
   const batchRef = ref(hits[0].value.batchRef);
   facts.batchRef = batchRef;
+  facts.originEntries = originEntriesOf(c, batchRef);
   if (hits.length !== work.length || !hits.every(h => eq(h.value.batchRef, batchRef))) return done("CGB-TAKEOVER-PARTIAL");
   const r = registration(c, batchRef);
   facts.registrationSchema = r.value.schema; facts.originTargets = r.value.originTargets; facts.originKind = r.value.originTargets[0].kind;
@@ -812,7 +822,7 @@ export function supersedeFeatureCourseTakeover(input) {
         if (sha256Canonical(state) !== input.digestSha256) fail("CGB-TAKEOVER-STALE");
         if (state.refusalCode !== null) fail(state.refusalCode, TAKEOVER_REPAIR[state.refusalCode]);
         createDirectory(join(c.root, "superseded")); createDirectory(dir);
-        const moves = [...work.map(id => ["logical", id]), ["origins", state.facts.originTargets[0]]].map(([kind, identity]) => ({ kind, file: `${sha256Canonical(identity)}.json` }));
+        const moves = [...work.map(id => ({ kind: "logical", file: `${sha256Canonical(id)}.json` })), ...state.facts.originEntries.map(e => ({ kind: "origins", file: e.file }))];
         audit = { schema: "pipeline.critic-feature-course-takeover-audit.v1", digestSha256: input.digestSha256, courseKey: input.courseKey, reason: input.reason,
           batchRef: state.facts.batchRef, registrationSchema: state.facts.registrationSchema, originKind: state.facts.originKind, logicalWorkIds: work, moves,
           at: new Date().toISOString() };
@@ -867,7 +877,10 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       const courseKey = identity.courseKey, target = {kind:"feature-course",courseKey};
       let owned = featureOwnership(c,courseKey,work);
       const deliveryIndex=indexPath(c,"origins",targetForPacket(packet));
-      if(existsSync(deliveryIndex) && (!owned || !eq(stableJson(deliveryIndex).batchRef,owned.batchRef)))fail("CGB-CONFLICT");
+      if(existsSync(deliveryIndex)){
+        const entry=stableJson(deliveryIndex);
+        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
+      }
       if (!owned) {
         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
         const declaredScope={logicalWorkIds:work,specification:reference(input.repoRoot,packet.candidate.commit,unitRef.specPath),
