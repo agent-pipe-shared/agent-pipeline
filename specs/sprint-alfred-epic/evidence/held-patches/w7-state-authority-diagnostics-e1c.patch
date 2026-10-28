@@ -1,0 +1,190 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 8f31ffb6b..c1738127c 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -235,7 +235,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["runtime-handover-writer-tests","plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs","top-level-assertions",14],
+     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
+     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",229],
++    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",251],
+     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
+     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
+     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
+diff --git a/harness/scripts/pipeline-state.test.mjs b/harness/scripts/pipeline-state.test.mjs
+index 9b4513040..642c24b0a 100644
+--- a/harness/scripts/pipeline-state.test.mjs
++++ b/harness/scripts/pipeline-state.test.mjs
+@@ -5233,64 +5233,6 @@ runFeaturePackageReconcileTests();
+   );
+ }
+ 
+-// ---- SAD diag: the state authority refusal names an untyped failure, its elapsed time, and an opt-in trace ----
+-{
+-  const mod = await import("./pipeline-state.mjs");
+-  const describe = typeof mod.describeStateAuthorityRefusal === "function" ? mod.describeStateAuthorityRefusal : null;
+-  const safe = (fn) => { try { return String(fn()); } catch (e) { return "THREW " + e?.message; } };
+-  const typed = describe ? safe(() => describe({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 })) : "";
+-  ok("SAD diag (1) a typed refusal keeps its text and ends with the elapsed time",
+-    typed.includes("State authority route unavailable (SDC-AUTHORITY-HELD: state-operation-in-flight); no success is reported.") && typed.endsWith(" Elapsed: 12 ms."), typed);
+-
+-  const untyped = describe ? safe(() => describe(new TypeError("boom"), { elapsedMs: 5 })) : "";
+-  const framesText = untyped.includes("; at ") ? untyped.slice(untyped.indexOf("; at "), untyped.indexOf(")", untyped.indexOf("; at ") + 4 + 0) ) : "";
+-  const afterAt = untyped.split("; at ")[1] ?? "";
+-  const framesPart = afterAt.slice(0, afterAt.indexOf("); no success"));
+-  const frameCount = framesPart.length === 0 ? 0 : framesPart.split(", ").length;
+-  ok("SAD diag (2) an error without code and reason names its class, message and at most two bare frames",
+-    untyped.includes("(SDC-AUTHORITY-UNAVAILABLE: untyped TypeError: boom;") && untyped.includes("at ")
+-      && frameCount >= 1 && frameCount <= 2 && !/[\\/]/.test(framesPart), untyped + " | frames=" + framesPart + " | " + framesText);
+-
+-  const coded = describe ? safe(() => describe(Object.assign(new Error("a\nb\r\nc"), { code: "WT-PATH-TYPE" }), { elapsedMs: 1 })) : "";
+-  const longText = describe ? safe(() => describe(new Error("x".repeat(1000)), { elapsedMs: 1 })) : "";
+-  const xs = /x+/.exec(longText)?.[0] ?? "";
+-  ok("SAD diag (3) an error with a code keeps it, a long message is cut to 240 and a multi-line one is one line",
+-    coded.includes("(WT-PATH-TYPE: untyped Error: a b c;") && xs.length === 240, coded + " | xlen=" + xs.length);
+-
+-  const stringThrow = describe ? safe(() => describe("plain text", { elapsedMs: 3 })) : "";
+-  ok("SAD diag (4) a non-Error throw prints its type", stringThrow.includes("untyped string") && stringThrow.endsWith(" Elapsed: 3 ms."), stringThrow);
+-
+-  const traceDir = freshDir("authority-trace");
+-  const traceGit = (...args) => spawnSync("git", args, { cwd: traceDir, encoding: "utf8" });
+-  traceGit("init", "-q");
+-  traceGit("config", "user.email", "goldfish@example.invalid");
+-  traceGit("config", "user.name", "Goldfish");
+-  writeFileSync(join(traceDir, "README.md"), "fixture\n");
+-  traceGit("add", "README.md");
+-  traceGit("commit", "-q", "-m", "init");
+-  const traceArgs = [CLI, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"];
+-  const traced = spawnSync(process.execPath, traceArgs, { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: traceDir, PIPELINE_AUTHORITY_TRACE: "1" } });
+-  const traceLines = String(traced.stderr).split("\n").filter(line => line.startsWith("AUTHORITY-TRACE "));
+-  let traceJson = null;
+-  try { traceJson = JSON.parse(traceLines[0].slice("AUTHORITY-TRACE ".length)); } catch { /* reported below */ }
+-  ok("SAD diag (5) PIPELINE_AUTHORITY_TRACE=1 prints exactly one parseable trace line on stderr",
+-    traceLines.length === 1 && traceJson?.schema === "pipeline.authority-trace.v1" && traceJson.custodyInspections.count >= 1
+-      && typeof traceJson.elapsedMs === "number" && ["ok", "refused"].includes(traceJson.outcome), String(traced.stderr).slice(-600));
+-
+-  const quiet = spawnSync(process.execPath, traceArgs, { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: traceDir, PIPELINE_AUTHORITY_TRACE: "" } });
+-  ok("SAD diag (6) without the variable no trace text appears", !String(quiet.stderr).includes("AUTHORITY-TRACE") && !String(quiet.stdout).includes("AUTHORITY-TRACE"), String(quiet.stderr).slice(-300));
+-
+-  const backend = await import("../../plugins/pipeline-core/lib/windows-owned-authority-backend.mjs");
+-  const hasStats = typeof backend.nativeAuthorityStats === "function" && typeof backend.recordNativeAuthoritySpawn === "function";
+-  const fresh = hasStats ? backend.nativeAuthorityStats() : null;
+-  let after = null;
+-  if (hasStats) { backend.recordNativeAuthoritySpawn("inspect", 10, true); backend.recordNativeAuthoritySpawn("read", 30, false); after = backend.nativeAuthorityStats(); }
+-  ok("SAD diag (7) the backend spawn counters start at zero and report count, ms, maxMs, failed and byOperation",
+-    fresh !== null && fresh.count === 0 && fresh.ms === 0 && fresh.maxMs === 0 && fresh.failed === 0 && Object.keys(fresh.byOperation).length === 0
+-      && after.count === 2 && after.ms === 40 && after.maxMs === 30 && after.failed === 1
+-      && JSON.stringify(after.byOperation) === JSON.stringify({ inspect: 1, read: 1 }), JSON.stringify([fresh, after]));
+-}
+-
+ // ---- Cleanup ------------------------------------------------------------------------------
+ for (const dir of ALL_DIRS) {
+   try {
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 730692ab9..2c60db988 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13581,13 +13581,14 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+   const repairInspect = `node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir}`;
+   const code = typeof error?.code === "string" ? error.code : "SDC-AUTHORITY-UNAVAILABLE";
+   const elapsedText = ` Elapsed: ${Math.max(0, Math.trunc(Number(elapsedMs) || 0))} ms.`;
+-  let reasonText;
++  let reasonText = "";
++  let causeText = "";
+   if (typeof error?.reason === "string") reasonText = `: ${error.reason.slice(0, 240)}`;
+   else if (error instanceof Error) {
+     const message = String(error.message ?? "").replace(/\r\n|\r|\n/gu, " ").slice(0, 240);
+     const frames = authorityRefusalFrames(error);
+-    reasonText = `: untyped ${String(error.name ?? "Error")}: ${message}${frames.length > 0 ? `; at ${frames.join(", ")}` : ""}`;
+-  } else reasonText = `: untyped ${typeof error}`;
++    causeText = `; cause: untyped ${String(error.name ?? "Error")}: ${message}${frames.length > 0 ? `; at ${frames.join(", ")}` : ""}`;
++  } else causeText = `; cause: untyped ${typeof error}`;
+   if (sub === "approve-push" && error?.reason === "state-push-source-requester") {
+     // K103 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74): `inspect` reports a healthy registry for this cause, so the
+     // general sentence below would point at a command that clears nothing. Name the cause and the step that can be run.
+@@ -13597,7 +13598,7 @@ export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".",
+       "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
+       `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}${elapsedText}`;
+   }
+-  return `Error: State authority route unavailable (${code}${reasonText}); no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
++  return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
+ }
+ 
+ export function run(argv = process.argv.slice(2), deps = {}) {
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 86bf44385..01e8fe07f 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -12,7 +12,9 @@ import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
+ import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
+ import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
+-import { run as runState } from "./pipeline-state.mjs";
++import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
++import { fileURLToPath } from "node:url";
++import { nativeAuthorityStats, recordNativeAuthoritySpawn } from "../lib/windows-owned-authority-backend.mjs";
+ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+ import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
+ import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
+@@ -572,6 +574,61 @@ const cases = [
+     assert.ok(aside, JSON.stringify(found.next));
+     assert.match(aside.why, /does not clear a finalizer stop-failure record/u, aside.why);
+   }) },
++  // ---- SAD diag: the state authority refusal names an untyped cause after the code parenthesis, its elapsed time, and an opt-in trace ----
++  { id: "SAS01", name: "SAD diag (1) a typed refusal keeps its text and ends with the elapsed time", run: () => {
++    const typed = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 });
++    assert.ok(typed.includes("State authority route unavailable (SDC-AUTHORITY-HELD: state-operation-in-flight); no success is reported."), typed);
++    assert.ok(typed.endsWith(" Elapsed: 12 ms."), typed);
++  } },
++  { id: "SAS02", name: "SAD diag (2) an error without code and reason keeps the default code alone in the parenthesis and names its class, message and at most two bare frames after it", run: () => {
++    const untyped = describeStateAuthorityRefusal(new TypeError("boom"), { elapsedMs: 5 });
++    assert.ok(untyped.includes("(SDC-AUTHORITY-UNAVAILABLE); cause: untyped TypeError: boom; at "), untyped);
++    const afterAt = untyped.split("; at ")[1] ?? "";
++    const framesPart = afterAt.slice(0, afterAt.indexOf("; no success"));
++    const frameCount = framesPart.length === 0 ? 0 : framesPart.split(", ").length;
++    assert.ok(frameCount >= 1 && frameCount <= 2, untyped);
++    assert.doesNotMatch(framesPart, /[\\/]/u, framesPart);
++  } },
++  { id: "SAS03", name: "SAD diag (3) an error with a code but no reason keeps the code alone in the parenthesis, a long message is cut to 240 and a multi-line one is one line", run: () => {
++    const coded = describeStateAuthorityRefusal(Object.assign(new Error("a\nb\r\nc"), { code: "WT-PATH-TYPE" }), { elapsedMs: 1 });
++    assert.ok(coded.includes("(WT-PATH-TYPE); cause: untyped Error: a b c;"), coded);
++    const longText = describeStateAuthorityRefusal(new Error("x".repeat(1000)), { elapsedMs: 1 });
++    assert.equal((/x+/u.exec(longText)?.[0] ?? "").length, 240);
++  } },
++  { id: "SAS04", name: "SAD diag (4) a non-Error throw prints its type as the cause", run: () => {
++    const stringThrow = describeStateAuthorityRefusal("plain text", { elapsedMs: 3 });
++    assert.ok(stringThrow.includes("(SDC-AUTHORITY-UNAVAILABLE); cause: untyped string;"), stringThrow);
++    assert.ok(stringThrow.endsWith(" Elapsed: 3 ms."), stringThrow);
++  } },
++  { id: "SAS05", name: "SAD diag (5) PIPELINE_AUTHORITY_TRACE=1 prints exactly one parseable trace line on stderr for a spawned state verb", run: () => fixture(({ root }) => {
++    const cli = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
++    const traced = spawnSync(process.execPath, [cli, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root, PIPELINE_AUTHORITY_TRACE: "1" } });
++    const traceLines = String(traced.stderr).split("\n").filter((line) => line.startsWith("AUTHORITY-TRACE "));
++    assert.equal(traceLines.length, 1, String(traced.stderr).slice(-600));
++    const traceJson = JSON.parse(traceLines[0].slice("AUTHORITY-TRACE ".length));
++    assert.equal(traceJson.schema, "pipeline.authority-trace.v1");
++    assert.ok(traceJson.custodyInspections.count >= 1, JSON.stringify(traceJson));
++    assert.equal(typeof traceJson.elapsedMs, "number");
++    assert.ok(["ok", "refused"].includes(traceJson.outcome), JSON.stringify(traceJson));
++  }) },
++  { id: "SAS06", name: "SAD diag (6) without the variable no trace text appears", run: () => fixture(({ root }) => {
++    const cli = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
++    const quiet = spawnSync(process.execPath, [cli, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root, PIPELINE_AUTHORITY_TRACE: "" } });
++    assert.ok(!String(quiet.stderr).includes("AUTHORITY-TRACE") && !String(quiet.stdout).includes("AUTHORITY-TRACE"), String(quiet.stderr).slice(-300));
++  }) },
++  { id: "SAS07", name: "SAD diag (7) the backend spawn counters report count, ms, maxMs, failed and byOperation", run: () => {
++    const before = nativeAuthorityStats();
++    recordNativeAuthoritySpawn("inspect", 10, true); recordNativeAuthoritySpawn("read", 30, false);
++    const after = nativeAuthorityStats();
++    assert.equal(after.count - before.count, 2); assert.equal(after.ms - before.ms, 40); assert.equal(after.failed - before.failed, 1);
++    assert.ok(after.maxMs >= 30, JSON.stringify(after));
++    assert.equal((after.byOperation.inspect ?? 0) - (before.byOperation.inspect ?? 0), 1);
++    assert.equal((after.byOperation.read ?? 0) - (before.byOperation.read ?? 0), 1);
++  } },
++  { id: "SAS08", name: "SAD diag (8) the line for an error coded WT-GIT-FAILED without a reason matches the PSXL05 pin", run: () => {
++    const text = describeStateAuthorityRefusal(Object.assign(new Error("git failed"), { code: "WT-GIT-FAILED" }), { elapsedMs: 1 });
++    assert.match(text, /State authority route unavailable \(WT-GIT-FAILED\)/u, text);
++  } },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
