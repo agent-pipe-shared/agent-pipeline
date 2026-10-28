@@ -1,0 +1,95 @@
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 9ca535848..2f763feef 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -540,9 +540,13 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+     }
+     const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
+     if (localDispatchEvidence !== undefined) {
++      // A packet claimed before the assurance field carries the exact old key set and the old digest; it reads as assurance null.
++      const legacyForm = !Object.hasOwn(localDispatchEvidence ?? {}, "assurance");
+       try {
+-        exactObject(localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256",
+-          "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
++        exactObject(localDispatchEvidence, legacyForm
++          ? ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"]
++          : ["schema", "taskId", "recordPath", "recordSha256",
++            "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
+       } catch {
+         return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
+       }
+@@ -553,7 +557,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+         recordSha256: localDispatchEvidence.recordSha256,
+         sourceCandidateCommit: localDispatchEvidence.sourceCandidateCommit,
+         reviewCandidateCommit: localDispatchEvidence.reviewCandidateCommit,
+-        assurance: localDispatchEvidence.assurance,
++        ...(legacyForm ? {} : { assurance: localDispatchEvidence.assurance }),
+       };
+       const packetCandidate = bound.packet.candidate?.commit;
+       const expectedPath = `evidence/dispatch-record-${addendum.taskId}.json`;
+@@ -569,7 +573,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+         || localDispatchEvidence.sourceCandidateCommit !== sourceRecord?.candidateCommit
+         || localDispatchEvidence.reviewCandidateCommit !== addendum.reviewCandidateCommit
+         || localDispatchEvidence.reviewCandidateCommit !== packetCandidate
+-        || (localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
++        || (!legacyForm && localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
+         || localDispatchEvidence.snapshotId !== sha256Canonical(binding)
+         || bound.packet.request?.taskId !== addendum.taskId
+         || !Array.isArray(bound.packet.references)
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 2fc83ce58..b1a038977 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -361,6 +361,21 @@ function normalizeCoordinatorOnly(value, candidate) {
+     }
+     return Object.freeze({ signedQualityImportAnchor: Object.freeze({ ...anchor }) });
+   }
++  if (exactKeys(value, ["localDispatchEvidence"])
++    && exactKeys(value.localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])) {
++    // Pre-assurance form (claimed before the binding carried an assurance field): closed, exact old digest, read as assurance null.
++    const legacy = value.localDispatchEvidence;
++    const { snapshotId: legacySnapshotId, ...legacyBody } = legacy;
++    if (legacy.schema !== "pipeline.local-dispatch-evidence.v1"
++      || !isSafeTaskId(legacy.taskId) || legacy.recordPath !== `evidence/dispatch-record-${legacy.taskId}.json`
++      || !SHA256.test(legacy.recordSha256 ?? "") || !OID.test(legacy.sourceCandidateCommit ?? "")
++      || legacy.sourceCandidateCommit.length !== candidate.commit.length || legacy.reviewCandidateCommit !== candidate.commit
++      || legacySnapshotId !== sha256Canonical(legacyBody)) {
++      fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
++    }
++    const view = { ...legacyBody, assurance: null };
++    return Object.freeze({ localDispatchEvidence: Object.freeze({ ...view, snapshotId: sha256Canonical(view) }) });
++  }
+   if (exactKeys(value, ["localDispatchEvidence"])) {
+     const binding = value.localDispatchEvidence;
+     if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"])
+@@ -717,7 +732,11 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now
+     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
+     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
+   }
+-  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet, claim, admission };
++  // Digest checks above use the raw packet; the returned view carries the normalized coordinator binding.
++  const view = packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
++    ? packet
++    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate).localDispatchEvidence } };
++  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet: view, claim, admission };
+ }
+ 
+ export function recordCandidateResult({ controlRoot, packetId, result }, { now = new Date() } = {}) {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index ee0bbfad2..fabd0ad9f 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -495,7 +495,12 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+   let admitted;
+   try {
+     admitted = (deps.inspectClaimedSessionAdmissionFn ?? inspectClaimedSessionAdmission)({ controlRoot, packetId }, deps.packetDependencies);
+-  } catch { fail("SCF-PRELAUNCH-ADMISSION"); }
++  } catch (error) {
++    const cause = typeof error?.code === "string" && /^[A-Z0-9-]+$/u.test(error.code) ? error.code : undefined;
++    const failure = new SessionCriticFinalizerError("SCF-PRELAUNCH-ADMISSION");
++    if (cause !== undefined) { failure.cause = cause; failure.message = `Session Critic finalization is invalid (admission cause: ${cause}).`; }
++    throw failure;
++  }
+   const packet = admitted.packet;
+   const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
+   if (packet.candidate.base !== candidateFor(preflight).base
