@@ -1,0 +1,178 @@
+diff --git a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+index 2c5eaee05..7bfec1672 100644
+--- a/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
++++ b/plugins/pipeline-core/scripts/design-approval-route.e2e.test.mjs
+@@ -128,6 +128,22 @@ const originalDesignCases = [
+   {
+     "id": "DABX008",
+     "name": "retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)"
++  },
++  {
++    "id": "DABX009",
++    "name": "rebind 1: present-plan after a byte-identical feature-folder move builds a pathRebind binding and needs no new review round"
++  },
++  {
++    "id": "DABX010",
++    "name": "rebind 2: the same move plus one changed PRD byte still refuses with the existing typed review-chain code"
++  },
++  {
++    "id": "DABX011",
++    "name": "rebind 3: a request signed before the move is refused after the move with DAB-BINDING-DRIFT, so a fresh signature is needed"
++  },
++  {
++    "id": "DABX012",
++    "name": "rebind 4: a request created after the move is signed and approved by the real route"
+   }
+ ];
+ const designCompletionCases = [];
+@@ -410,7 +426,8 @@ function continuityRequest(authority) {
+ }
+ 
+ /** A git repo in the state "feature plan submitted, awaiting approval", with a finished source set and one passing review receipt. */
+-async function buildSubmittedFeature(prefix, { fallback } = {}) {
++const MOVED_DIR = "specs/e2e-moved";
++async function buildSubmittedFeature(prefix, { fallback, move = false, changeByte = false } = {}) {
+   stateModule ??= await import(pathToFileURL(CLI).href);
+   const governance = await loadLib("governance-scope.mjs");
+   const poGate = await loadLib("po-gate-authority.mjs");
+@@ -513,17 +530,33 @@ async function buildSubmittedFeature(prefix, { fallback } = {}) {
+ 
+   git(dir, "add", "--", PLAN_PATH, SPEC_PATH, ...COMPANION_PATHS, REPORT_PATH, RECEIPT_PATH, "project/critical-human-proof.json", "specs/e2e/acceptance.md", "specs/e2e/result.md");
+   git(dir, "commit", "-q", "-m", "fixture: finished design sources and review receipt");
++  // Folder rebind (Phoenix Wanted 4, slice 3): the reviewed sources move to another registrar-valid feature folder; the review
++  // receipt and report stay where they are (default pending PO). `changeByte` appends one byte to the PRD after the move.
++  let planPath = PLAN_PATH, specPath = SPEC_PATH;
++  if (move) {
++    planPath = `${MOVED_DIR}/prd_e2e.md`; specPath = `${MOVED_DIR}/spec.md`;
++    mkdirSync(join(dir, ...MOVED_DIR.split("/")), { recursive: true });
++    git(dir, "mv", PLAN_PATH, planPath);
++    git(dir, "mv", SPEC_PATH, specPath);
++    for (const companion of COMPANION_PATHS) git(dir, "mv", companion, `${MOVED_DIR}/${basename(companion)}`);
++    // The review report lives under the old feature directory, so a byte-identical rebind observes it under the new one.
++    mkdirSync(join(dir, ...MOVED_DIR.split("/"), "review"), { recursive: true });
++    git(dir, "mv", REPORT_PATH, `${MOVED_DIR}/review/${basename(REPORT_PATH)}`);
++    if (changeByte) writeFileSync(join(dir, ...planPath.split("/")), `${readFileSync(join(dir, ...planPath.split("/")), "utf8")}x`);
++    git(dir, "add", "-A");
++    git(dir, "commit", "-q", "-m", "fixture: the feature folder moved");
++  }
+   // The real submit-plan refuses a governed root whose architecture is not ready (D165-S4): materialize the sanctioned design package.
+-  materializeArchitectureDesignFixture({ rootDir: dir, planPath: PLAN_PATH, sourcePath: "src/index.mjs", decisionRef: "TEST-DAR-ROUTE", by: "Design route fixture PO" });
++  materializeArchitectureDesignFixture({ rootDir: dir, planPath, sourcePath: "src/index.mjs", decisionRef: "TEST-DAR-ROUTE", by: "Design route fixture PO" });
+   git(dir, "add", "-A");
+   git(dir, "commit", "-q", "-m", "fixture: architecture design package");
+ 
+-  const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", PLAN_PATH]);
++  const featureSet = cli(fx, ["set-feature", "--id", FEATURE_ID, "--plan-path", planPath]);
+   if (featureSet.status !== 0) throw new Error(`fixture set-feature failed: ${featureSet.stderr}`);
+   const requestRel = "continuity-init-request.json";
+   writeFileIn(dir, requestRel, `${JSON.stringify(continuityRequest({
+-    humanFacing: "de", planPath: PLAN_PATH, planSha256: sha256(readFileSync(join(dir, PLAN_PATH))),
+-    specPath: SPEC_PATH, specSha256: sha256(readFileSync(join(dir, SPEC_PATH))),
++    humanFacing: "de", planPath, planSha256: sha256(readFileSync(join(dir, planPath))),
++    specPath, specSha256: sha256(readFileSync(join(dir, specPath))),
+   }), null, 2)}\n`);
+   const initialized = cli(fx, ["continuity-init", "--expected-revision", "absent", "--request-file", requestRel, "--lock-token", randomBytes(24).toString("hex")]);
+   if (initialized.status !== 0) throw new Error(`fixture continuity-init failed: ${initialized.stderr}`);
+@@ -796,6 +829,79 @@ test("retired: lib/retired-design-codes.mjs holds the four retirement codes (A4)
+   }
+ });
+ 
++// Phoenix Wanted 4, slice 3: the present-plan route after the reviewed feature folder moved byte-identically.
++async function presentOwned(fx) {
++  await bindRouteOwner(fx);
++  const present = await ownedCli(fx, ["present-plan", "--by", "coordinator", "--review-receipt", fx.receiptPath]);
++  const line = present.stdout.split(/\r?\n/u).find((entry) => /sign-intent/u.test(entry)) ?? "";
++  const match = /--request\s+(?:"([^"]+)"|'([^']+)'|(\S+))/u.exec(line);
++  const requestAbs = match ? (match[1] ?? match[2] ?? match[3]) : null;
++  return { present, requestAbs, request: requestAbs !== null && existsSync(requestAbs) ? JSON.parse(readFileSync(requestAbs, "utf8")) : null };
++}
++function signRequest(fx, requestAbs, request) {
++  const proof = {
++    schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: fx.signer.keyReference,
++    publicKey: fx.signer.publicKeyPem, signatureBase64: sign(null, Buffer.from(String(request.approvalIntent.sha256)), fx.signer.privateKey).toString("base64"),
++  };
++  writeFileSync(join(dirname(requestAbs), basename(requestAbs).replace("request", "proof")), `${JSON.stringify(proof, null, 2)}\n`);
++  return relative(realpathSync(fx.dir), realpathSync(requestAbs)).split(sep).join("/");
++}
++
++test("rebind 1: present-plan after a byte-identical feature-folder move builds a pathRebind binding and needs no new review round", async (t) => {
++  const fx = await buildSubmittedFeature("rebind-move", { move: true });
++  let out;
++  try { out = await presentOwned(fx); } catch (error) { const limitation = hostLimitationOf(error); if (limitation === null) throw error; t.skip(`HOST-LIMITATION ${limitation.reason}`); return; }
++  assert.equal(out.present.status, 0, `present-plan over the moved folder must exit 0 with the one existing receipt; stderr: ${out.present.stderr}`);
++  assert.ok(out.request, "the sign command names an existing request");
++  const binding = out.request.binding;
++  assert.deepEqual(binding.pathRebind, { fromDir: "specs/e2e", toDir: MOVED_DIR });
++  assert.equal(binding.reviewReceipts.length, 1, "no new review round: still exactly the one existing receipt");
++  assert.equal(binding.reviewReceipts[0].path, RECEIPT_PATH, "the receipt file stays where it is");
++  assert.equal(binding.sources.prd.path, `${MOVED_DIR}/prd_e2e.md`);
++  assert.equal(binding.sources.spec.path, `${MOVED_DIR}/spec.md`);
++  assert.equal("unreviewedSourceDelta" in binding, false, "a byte-identical move is not a source delta");
++  assert.equal(readState(fx.dir).planPresentation.designApprovalBinding.pathRebind.toDir, MOVED_DIR);
++});
++
++test("rebind 2: the same move plus one changed PRD byte still refuses with the existing typed review-chain code", async (t) => {
++  const fx = await buildSubmittedFeature("rebind-changed", { move: true, changeByte: true });
++  let out;
++  try { out = await presentOwned(fx); } catch (error) { const limitation = hostLimitationOf(error); if (limitation === null) throw error; t.skip(`HOST-LIMITATION ${limitation.reason}`); return; }
++  assert.notEqual(out.present.status, 0, "a moved folder with a changed byte is refused");
++  assert.match(out.present.stderr, /DCC-REVIEW-RECEIPT-BINDING|DAB-REVIEW-CHAIN/u, `the existing typed code; stderr: ${out.present.stderr}`);
++  assert.equal(out.request, null, "no request is produced");
++  assert.equal(readState(fx.dir).planPresentation, undefined, "no presentation was recorded");
++});
++
++test("rebind 3: a request signed before the move is refused after the move with DAB-BINDING-DRIFT, so a fresh signature is needed", async (t) => {
++  const before = await buildSubmittedFeature("rebind-pre");
++  const fx = await buildSubmittedFeature("rebind-post", { move: true });
++  let pre, post;
++  try { pre = await presentOwned(before); post = await presentOwned(fx); } catch (error) { const limitation = hostLimitationOf(error); if (limitation === null) throw error; t.skip(`HOST-LIMITATION ${limitation.reason}`); return; }
++  assert.equal(pre.present.status, 0, `pre-move present-plan; stderr: ${pre.present.stderr}`);
++  assert.equal(post.present.status, 0, `post-move present-plan; stderr: ${post.present.stderr}`);
++  // Substitute the pre-move request (already signed in the pre-move repository) for the post-move one and try to approve.
++  writeFileSync(post.requestAbs, readFileSync(pre.requestAbs));
++  const requestRel = signRequest(fx, post.requestAbs, pre.request);
++  const approved = await ownedCli(fx, ["approve-plan", "--by", "po-test", "--design-approval-request", requestRel]);
++  assert.notEqual(approved.status, 0, "the pre-move request does not approve the moved folder");
++  assert.match(`${approved.stdout}\n${approved.stderr}`, /DAB-BINDING-DRIFT/u);
++  assert.notEqual(readState(fx.dir).planApproved, true, "no approval was written");
++});
++
++test("rebind 4: a request created after the move is signed and approved by the real route", async (t) => {
++  const fx = await buildSubmittedFeature("rebind-approve", { move: true });
++  let out;
++  try { out = await presentOwned(fx); } catch (error) { const limitation = hostLimitationOf(error); if (limitation === null) throw error; t.skip(`HOST-LIMITATION ${limitation.reason}`); return; }
++  assert.equal(out.present.status, 0, `present-plan; stderr: ${out.present.stderr}`);
++  const requestRel = signRequest(fx, out.requestAbs, out.request);
++  const approved = await ownedCli(fx, ["approve-plan", "--by", "po-test", "--design-approval-request", requestRel]);
++  assert.equal(approved.status, 0, `approve-plan over the post-move request; stderr: ${approved.stderr}`);
++  const state = readState(fx.dir);
++  assert.equal(state.planApproved, true);
++  assert.deepEqual(state.planApproval.designApprovalBinding.pathRebind, { fromDir: "specs/e2e", toDir: MOVED_DIR });
++});
++
+ // Every original callback registers exactly once with the official FD3 protocol.
+ assert.equal(designCompletionCases.length, originalDesignCases.length);
+ const sortedDesignCases = designCompletionCases.sort((a, b) => a.id.localeCompare(b.id));
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2095024a9..f23391e7a 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -9450,8 +9450,16 @@ function readDesignApprovalInputs(dir, submission, paths) {
+     const refused = summaries.find(entry => !entry.ok);
+     if (refused) return refused;
+     const latest = summaries.at(-1).summary;
+-    const companions = latest.sources.companions.map(entry => entry.path);
+-    const bound = [...new Set([submission.planPath, submission.specPath, ...companions, ...paths, ...summaries.map(entry => entry.summary.report.path)])];
++    // Folder rebind: when the submission's feature directory differs from the latest receipt's, a path under the old directory is
++    // observed at the same relative position under the new one if it exists there; otherwise the receipt's own path is kept.
++    const fromDir = dirname(latest.sources.prd.path).replaceAll("\\", "/"), toDir = dirname(submission.planPath).replaceAll("\\", "/");
++    const moved = path => {
++      if (fromDir === toDir || !path.startsWith(`${fromDir}/`)) return path;
++      const candidate = `${toDir}/${path.slice(fromDir.length + 1)}`;
++      return physicalRebindFile(dir, candidate) !== null ? candidate : path;
++    };
++    const companions = latest.sources.companions.map(entry => moved(entry.path));
++    const bound = [...new Set([submission.planPath, submission.specPath, ...companions, ...paths, ...summaries.map(entry => moved(entry.summary.report.path))])];
+     const git = (...args) => { const out = spawnSync("git", args, { cwd: dir, encoding: "utf8" }); if (out.status !== 0 && out.status !== 1) throw Error("git observation unavailable"); return out; };
+     const pathStates = bound.map(path => {
+       const file = physicalRebindFile(dir, path);
