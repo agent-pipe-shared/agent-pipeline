@@ -1,0 +1,70 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 78cf3d855..766aa4fa2 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -727,6 +727,7 @@ import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
+ import { addCriticReviewLineage } from "./feature-package-registration.mjs";
+ import { chmodSync, existsSync } from "node:fs";
+ const pf94Commit = (root, message) => { git(root, ["add", "."]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++const pf94Guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
+ const pf94Verdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
+ const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
+ /** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
+@@ -769,14 +770,14 @@ export function consumedCourseRoundFixture({ course = true, featureId = "held-fe
+   for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
+   writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
+   const registrationCommit = pf94Commit(root, "register captured feature diagnostics");
+-  const preflightInput = { root, base, candidate, specPath, guardrailPaths: course ? [] : [".claude/pipeline.yaml"], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
++  const preflightInput = { root, base, candidate, specPath, guardrailPaths: course ? [] : pf94Guardrails, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
+   if (course) preflightInput.courseContext = { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
+   const packetId = "9a".repeat(16);
+   const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
+   if (!course) {
+     const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
+     mkdirSync(controlRoot, { recursive: true, mode: 0o700 }); chmodSync(join(root, ".git", "agent-pipeline"), 0o700); chmodSync(controlRoot, 0o700);
+-    const reg = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId, baseCommit: base, candidateCommit: candidate, logicalWorkIds, specPath, guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: unitPath } });
++    const reg = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId, baseCommit: base, candidateCommit: candidate, logicalWorkIds, specPath, guardrailPaths: pf94Guardrails, signedQualityImportAnchor: null, reviewUnitPath: unitPath } });
+     request.genericBatchRef = { ...reg.batchRef, memberSha256: reg.memberSha256 };
+     request.allowCallerAuthoredFallback = true;
+   }
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index a7d0fded2..4749a1d5e 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -208,6 +208,8 @@ function sanctionedRegisterFeaturePackageArgs(args, root) {
+   if (!exactRoot(args, root, 0)) return false;
+   if (args.length === 2) return true;
+   if (args.length === 3) return args[2] === "--add-review-unit";
++  // PF-94: the lineage form names one 32-character lowercase hex packet id (never a path, never a dash-start value).
++  if (args.length === 5) return args[2] === "--add-review-lineage" && args[3] === "--packet" && /^[a-f0-9]{32}$/u.test(args[4]);
+   // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
+   return args.length === 4 && args[2] === "--add-diagnostic-evidence" && typeof args[3] === "string" && args[3] !== ""
+     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 17c4caf5c..31f2910b4 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -478,6 +478,23 @@ test("D64 feature-package registration: exactly the documented forms are admitte
+   });
+ });
+ 
++test("PF-94 feature-package registration: --add-review-lineage --packet <32 lowercase hex> is admitted, malformed shapes are not", () => {
++  withFixture("feature", f => {
++    const hex = "0123456789abcdef0123456789abcdef";
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-lineage", "--packet", hex), f, "add review lineage");
++    for (const [label, argv] of [["lineage without packet flag", ["--root", f.root, "--add-review-lineage"]],
++      ["lineage packet without id", ["--root", f.root, "--add-review-lineage", "--packet"]],
++      ["lineage dash id", ["--root", f.root, "--add-review-lineage", "--packet", "--force"]],
++      ["lineage short id", ["--root", f.root, "--add-review-lineage", "--packet", "0123abcd"]],
++      ["lineage uppercase id", ["--root", f.root, "--add-review-lineage", "--packet", hex.toUpperCase()]],
++      ["lineage extra argument", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--force"]],
++      ["lineage wrong second flag", ["--root", f.root, "--add-review-lineage", "--other", hex]],
++      ["lineage before root", ["--add-review-lineage", "--packet", hex, "--root", f.root]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
++  });
++});
++
+ test("D64 architecture baseline diagnosis: the read-only assessment forms and --help are admitted; the writing and file-reading forms are not", () => {
+   withFixture("feature", f => {
+     const base = (...rest) => scriptAction(baselineScript, "--root", f.root, ...rest);
