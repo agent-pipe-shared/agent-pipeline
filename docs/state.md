@@ -60,6 +60,18 @@ added; no earlier identity disappeared. [Finding ledger](../specs/sprint-alfred-
 75 means focused Source readiness, not native acceptance or release.
 All-at75 remains the continuation objective after transfer.
 
+**Status 2026-10-28 night (round-2 bundle held; apply, install, Full Verify, Critic, native runs and PO acceptance pending):**
+after the 2026-10-27 install the remaining complete held patches are composed in
+`specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-2026-10-28.patch` (13 patches, 32 files,
+chain-checked on a fresh clone of HEAD; apply blocks, test counts and the kernel parts for the batch Critic
+in `COMPOSED-STACK-VERIFY-2026-10-28.md`). It carries D56 slices 2-5 (attested record admission, binding
+assurance, writer CLI, guard admission, end-to-end chain test and refusal text), D52 checkpoint-commit route,
+PF-86 read API c6, D31 briefing and budget-notice checkpoint return, Phoenix feature directory and reopen
+dry run, and the preflight scanner and no-sudo slices. Only failing composed-tree test file is
+`critic-generic-batch.test.mjs` CGB002/CGB003, identical on the clean tree. Not built: PF-85 slice 1a
+(needs a package schema field, PO decision), Phoenix receipt binding, PowerShell parity of the half-moved lane,
+the remaining baseline-red test files. No matrix row is lifted before the PO has applied, stamped and installed.
+
 **Status 2026-10-27 evening (composed stack verified; apply, Full Verify, Critic, native runs and PO acceptance pending):**
 the complete held patches are composed in
 `specs/sprint-alfred-epic/evidence/held-patches/w7-final-bundle-2026-10-27.patch`
