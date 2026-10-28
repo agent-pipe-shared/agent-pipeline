@@ -170,7 +170,9 @@ export function observeCodexGoldfishReturn(input, pending) {
  * independently by the authenticated continuation writer. */
 export function validateItemDeliveryBriefing(value) {
   const locator=value?.criterionLocator;
-  if(!exact(value,['schema','sliceId','itemId','criterionLocator','checks'])||value.schema!=='pipeline.item-delivery-briefing.v1'
+  const hasContinuation=value!==null&&typeof value==='object'&&Object.hasOwn(value,'continuationOf');
+  if(!exact(value,hasContinuation?['schema','sliceId','itemId','criterionLocator','checks','continuationOf']:['schema','sliceId','itemId','criterionLocator','checks'])
+    ||(hasContinuation&&(typeof value.continuationOf!=='string'||!ID.test(value.continuationOf)))||value.schema!=='pipeline.item-delivery-briefing.v1'
     ||!ID.test(value.sliceId??'')||!ID.test(value.itemId??'')
     ||!exact(locator,['schema','sourcePath','sourceSha256','criterionId','startByte','endByte','excerptSha256'])
     ||locator.schema!=='pipeline.critic-criterion-locator.v1'||!normalizedPath(locator.sourcePath)

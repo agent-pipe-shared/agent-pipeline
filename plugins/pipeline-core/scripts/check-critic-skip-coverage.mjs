@@ -540,9 +540,13 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
     }
     const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
     if (localDispatchEvidence !== undefined) {
+      // A packet claimed before the assurance field carries the exact old key set and the old digest; it reads as assurance null.
+      const legacyForm = !Object.hasOwn(localDispatchEvidence ?? {}, "assurance");
       try {
-        exactObject(localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256",
-          "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
+        exactObject(localDispatchEvidence, legacyForm
+          ? ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"]
+          : ["schema", "taskId", "recordPath", "recordSha256",
+            "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
       } catch {
         return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
       }
@@ -553,7 +557,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
         recordSha256: localDispatchEvidence.recordSha256,
         sourceCandidateCommit: localDispatchEvidence.sourceCandidateCommit,
         reviewCandidateCommit: localDispatchEvidence.reviewCandidateCommit,
-        assurance: localDispatchEvidence.assurance,
+        ...(legacyForm ? {} : { assurance: localDispatchEvidence.assurance }),
       };
       const packetCandidate = bound.packet.candidate?.commit;
       const expectedPath = `evidence/dispatch-record-${addendum.taskId}.json`;
@@ -569,7 +573,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
         || localDispatchEvidence.sourceCandidateCommit !== sourceRecord?.candidateCommit
         || localDispatchEvidence.reviewCandidateCommit !== addendum.reviewCandidateCommit
         || localDispatchEvidence.reviewCandidateCommit !== packetCandidate
-        || (localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
+        || (!legacyForm && localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
         || localDispatchEvidence.snapshotId !== sha256Canonical(binding)
         || bound.packet.request?.taskId !== addendum.taskId
         || !Array.isArray(bound.packet.references)

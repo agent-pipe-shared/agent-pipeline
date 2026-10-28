@@ -93,12 +93,28 @@ function durable(p, value) {
   directory(dirname(p));
   const fd = openSync(p, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
   if (activeTransaction) activeTransaction.dirty = true;
-  try { writeFileSync(fd, canonicalJson(value)); fsyncSync(fd); } finally { closeSync(fd); }
+  try {
+    writeFileSync(fd, canonicalJson(value));
+    try { genericCriticBatchIo.fsyncFileFn(fd); } catch (error) { physicalStep("file-fsync", error); }
+  } finally { closeSync(fd); }
   if (!eq(stableJson(p), value)) fail("CGB-STALE");
   let parent;
-  try { parent = openSync(dirname(p), constants.O_RDONLY); fsyncSync(parent); }
-  catch { fail("CGB-PHYSICAL"); }
-  finally { if (parent !== undefined) closeSync(parent); }
+  try {
+    parent = openSync(dirname(p), constants.O_RDONLY);
+    genericCriticBatchIo.fsyncDirFn(parent);
+  } catch (error) {
+    // Windows cannot fsync a directory handle (EPERM); the file fsync above stays strict and every other
+    // directory error, and EPERM on any other platform, still fails.
+    if (!(genericCriticBatchIo.platform === "win32" && error?.code === "EPERM")) physicalStep("directory-fsync", error);
+  } finally { if (parent !== undefined) closeSync(parent); }
+}
+/** Test seam (mutable, restored by tests): the public functions take exact-shape inputs, so deps cannot ride on them. */
+export const genericCriticBatchIo = { platform: process.platform, fsyncFileFn: fsyncSync, fsyncDirFn: fsyncSync };
+function physicalStep(step, error) {
+  const refusal = new GenericCriticBatchError("CGB-PHYSICAL");
+  refusal.cause = typeof error?.code === "string" ? error.code : typeof error?.name === "string" ? error.name : "unknown";
+  refusal.step = step;
+  throw refusal;
 }
 function git(root, args) {
   const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000, maxBuffer: 32 * 1024 * 1024 });
@@ -497,7 +513,8 @@ function appendCorrection(input) {
 }
 function actualPacket(c, packetId, claimed = false) {
   try {
-    if (claimed) return inspectClaimedCandidatePacket({ controlRoot: c.controlRoot, packetId });
+    // PF-93: a packet claimed before the binding carried an assurance field is read back in its stored pre-assurance form.
+    if (claimed) return inspectClaimedCandidatePacket({ controlRoot: c.controlRoot, packetId }, { allowLegacyPreAssurance: true });
     try { return inspectClaimedCandidatePacket({ controlRoot: c.controlRoot, packetId }); }
     catch { return inspectCandidatePacket({ controlRoot: c.controlRoot, packetId }); }
   } catch { fail("CGB-PHYSICAL"); }

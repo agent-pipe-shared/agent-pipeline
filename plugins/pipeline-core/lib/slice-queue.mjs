@@ -116,7 +116,7 @@ const TEST_LOOKING = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[a-z0-9]+$/iu;
 const TOP_KEYS = new Set(["schema", "feature", "defaults", "limits", "monoliths", "slices"]);
 const DEFAULT_KEYS = new Set(["commitMode", "tier", "loadClass"]);
 const LIMIT_KEYS = new Set(["deadline", "maxAttemptsPerSlice"]);
-const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls", "cancelClass"]);
+const SLICE_KEYS = new Set(["id", "title", "state", "holdReason", "dependsOn", "writeScope", "readScope", "tier", "tierReason", "commitMode", "loadClass", "briefing", "estimatedToolCalls", "cancelClass", "continuationOf"]);
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const isSliceId = (value) => isSafeTaskId(value) && value.length <= 128 && !value.includes("..");
@@ -611,6 +611,13 @@ export function validateSliceQueue(input, options = {}) {
       else cancelClass = verdict.cancelClass;
     } else if (state === "cancelled") cancelClass = UNCLASSIFIED_CANCEL;
 
+    // PF-85 1a: a package may name the stopped slice it continues; a record only, never a dependency.
+    let continuationOf;
+    if (raw.continuationOf !== undefined) {
+      if (isSliceId(raw.continuationOf) && raw.continuationOf !== id) continuationOf = raw.continuationOf;
+      else err("SQ-SCHEMA", `slice ${id}: continuationOf must be the id of another slice`, { sliceId: id });
+    }
+
     let dependsOn = [];
     if (raw.dependsOn !== undefined) {
       if (Array.isArray(raw.dependsOn) && raw.dependsOn.every((dep) => typeof dep === "string")) dependsOn = [...new Set(raw.dependsOn)];
@@ -680,6 +687,7 @@ export function validateSliceQueue(input, options = {}) {
       state,
       holdReason,
       cancelClass,
+      ...(continuationOf !== undefined ? { continuationOf } : {}),
       dependsOn,
       writeScope: writeScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),
       readScope: readScope.filter((scope) => typeof scope === "string").map((scope) => scope.trim()),

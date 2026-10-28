@@ -14,9 +14,10 @@ import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket
 import {readCriticCourseAdmission} from "./critic-course-admission.mjs";
 import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
-import {readdirSync,readlinkSync} from "node:fs";
+import {readdirSync,readlinkSync,fsyncSync} from "node:fs";
+import * as CGB from "./critic-generic-batch.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -523,5 +524,39 @@ test("D56 an orchestrator-attested local dispatch binding yields the orchestrato
     const result=registeredTargets(fx,register(fx));
     assert.equal(result.originTargets[0].kind,"orchestrator-attested-delivery");
   }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+// D58: a Windows directory fsync answers EPERM for every directory; the write itself is already durable.
+function withIo(patch,run){
+  const io=CGB.genericCriticBatchIo;const saved={...io};
+  try{Object.assign(io,patch);return run();}finally{Object.assign(io,saved);}
+}
+function eperm(code="EPERM"){return ()=>{const e=new Error(`${code} simulated`);e.code=code;throw e;};}
+const realFsync=fsyncSync;
+test("D58 directory fsync EPERM on win32 completes the write and register succeeds",()=>{
+  const fx=fixture();try{
+    const result=withIo({platform:"win32",fsyncDirFn:eperm("EPERM")},()=>register(fx));
+    assert.ok(result.batchRef);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D58 the same directory fsync EPERM on linux still fails CGB-PHYSICAL and names EPERM and the step",()=>{
+  const fx=fixture();try{
+    assert.throws(()=>withIo({platform:"linux",fsyncDirFn:eperm("EPERM")},()=>register(fx)),e=>e.code==="CGB-PHYSICAL"&&e.cause==="EPERM"&&e.step==="directory-fsync"&&!/\//u.test(`${e.cause}${e.step}`));
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D58 a non-EPERM directory fsync error still fails even on win32",()=>{
+  const fx=fixture();try{
+    assert.throws(()=>withIo({platform:"win32",fsyncDirFn:eperm("EIO")},()=>register(fx)),e=>e.code==="CGB-PHYSICAL"&&e.cause==="EIO"&&e.step==="directory-fsync");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D58 a file fsync EPERM stays strict on win32",()=>{
+  const fx=fixture();try{
+    assert.throws(()=>withIo({platform:"win32",fsyncFileFn:eperm("EPERM"),fsyncDirFn:realFsync},()=>register(fx)),e=>e.code==="CGB-PHYSICAL"&&e.cause==="EPERM"&&e.step==="file-fsync");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D58 default seams equal today's behaviour: real platform and real fsync",()=>{
+  const io=CGB.genericCriticBatchIo;
+  assert.equal(io.platform,process.platform);
+  assert.equal(io.fsyncDirFn,fsyncSync);
+  assert.equal(io.fsyncFileFn,fsyncSync);
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

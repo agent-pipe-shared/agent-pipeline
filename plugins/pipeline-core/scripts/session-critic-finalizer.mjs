@@ -495,7 +495,12 @@ export function finalizeSessionCriticReview(options, deps = {}) {
   let admitted;
   try {
     admitted = (deps.inspectClaimedSessionAdmissionFn ?? inspectClaimedSessionAdmission)({ controlRoot, packetId }, deps.packetDependencies);
-  } catch { fail("SCF-PRELAUNCH-ADMISSION"); }
+  } catch (error) {
+    const cause = typeof error?.code === "string" && /^[A-Z0-9-]+$/u.test(error.code) ? error.code : undefined;
+    const failure = new SessionCriticFinalizerError("SCF-PRELAUNCH-ADMISSION");
+    if (cause !== undefined) { failure.cause = cause; failure.message = `Session Critic finalization is invalid (admission cause: ${cause}).`; }
+    throw failure;
+  }
   const packet = admitted.packet;
   const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
   if (packet.candidate.base !== candidateFor(preflight).base

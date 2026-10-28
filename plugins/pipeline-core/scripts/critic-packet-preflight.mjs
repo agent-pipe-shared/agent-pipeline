@@ -324,7 +324,7 @@ function bindingsFor(packet) {
 function recordBody(packet, revision, priorStateDigest, phase, body, timestamp) {
   return { schema: STATE_SCHEMA, packetId: packet.packetId, packetDigest: sha256(canonicalJson(packet)), revision, priorStateDigest, timestamp, phase, body };
 }
-function validatePacketShape(packet) {
+function validatePacketShape(packet, shapeOptions = {}) {
   if (!isObject(packet) || packet.schema !== PACKET_SCHEMA || !PACKET_ID.test(packet.packetId)
     || !SHA256.test(packet.bindings?.requestSha256) || !SHA256.test(packet.bindings?.diffPathsSha256)
     || !SHA256.test(packet.bindings?.governanceSha256)) fail("CPP-DIGEST", "Packet shape is invalid.");
@@ -332,17 +332,17 @@ function validatePacketShape(packet) {
   if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
   if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding, packet.route);
   if (packet.coordinatorOnly !== undefined) {
-    const coordinator = normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate);
+    const coordinator = normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, shapeOptions);
     const taskId = coordinator.localDispatchEvidence?.taskId ?? coordinator.signedQualityImportAnchor?.taskId;
     if (taskId !== packet.request?.taskId) fail("CPP-COORDINATOR-BINDING", "Coordinator-only binding does not name the packet task.");
   }
   if (packet.diagnostics !== undefined && !validateDiagnosticBundleShape(packet.diagnostics)) fail("CPP-DIAGNOSTIC", "Invalid diagnostic bundle.");
 }
 
-function normalizeCoordinatorOnly(value, candidate) {
+function normalizeCoordinatorOnly(value, candidate, { allowLegacyPreAssurance = false } = {}) {
   if (isObject(value) && Object.hasOwn(value,"historicalFreshReview")) {
     const {historicalFreshReview,...ordinary}=value;
-    const normalized=normalizeCoordinatorOnly(ordinary,candidate);
+    const normalized=normalizeCoordinatorOnly(ordinary,candidate,{allowLegacyPreAssurance});
     if(historicalFreshReview?.target?.baseCommit!==candidate.base
       || historicalFreshReview?.target?.candidateCommit!==candidate.commit
       || !revalidateHistoricalFreshReviewPacketBinding(historicalFreshReview)) fail("CPP-HISTORICAL-ADMISSION","Historical fresh-review binding is unavailable or drifted.");
@@ -360,6 +360,22 @@ function normalizeCoordinatorOnly(value, candidate) {
       fail("CPP-COORDINATOR-BINDING", "Signed import anchor is not closed or does not bind this candidate range.");
     }
     return Object.freeze({ signedQualityImportAnchor: Object.freeze({ ...anchor }) });
+  }
+  // Only a packet ALREADY CLAIMED under the older version may be read in this form; a new claim or admission stays strict.
+  if (allowLegacyPreAssurance === true && exactKeys(value, ["localDispatchEvidence"])
+    && exactKeys(value.localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])) {
+    // Pre-assurance form (claimed before the binding carried an assurance field): closed, exact old digest, read as assurance null.
+    const legacy = value.localDispatchEvidence;
+    const { snapshotId: legacySnapshotId, ...legacyBody } = legacy;
+    if (legacy.schema !== "pipeline.local-dispatch-evidence.v1"
+      || !isSafeTaskId(legacy.taskId) || legacy.recordPath !== `evidence/dispatch-record-${legacy.taskId}.json`
+      || !SHA256.test(legacy.recordSha256 ?? "") || !OID.test(legacy.sourceCandidateCommit ?? "")
+      || legacy.sourceCandidateCommit.length !== candidate.commit.length || legacy.reviewCandidateCommit !== candidate.commit
+      || legacySnapshotId !== sha256Canonical(legacyBody)) {
+      fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
+    }
+    const view = { ...legacyBody, assurance: null };
+    return Object.freeze({ localDispatchEvidence: Object.freeze({ ...view, snapshotId: sha256Canonical(view) }) });
   }
   if (exactKeys(value, ["localDispatchEvidence"])) {
     const binding = value.localDispatchEvidence;
@@ -379,13 +395,13 @@ function normalizeCoordinatorOnly(value, candidate) {
   }
   fail("CPP-COORDINATOR-BINDING", "Coordinator-only packet binding is invalid.");
 }
-function packetContext(controlRoot, packetId) {
+function packetContext(controlRoot, packetId, shapeOptions = {}) {
   if (!PACKET_ID.test(packetId)) fail("CPP-ARGUMENT", "packetId must be 32 lowercase hex characters.");
   const root = assertRealPrivateDir(resolve(controlRoot), "control root");
   const packetDir = assertNoSymlinkPath(join(root, packetId), root, "packet directory");
   if (!existsSync(packetDir)) fail("CPP-ABSENT", "Packet does not exist.");
   const packet = readJson(join(packetDir, "packet.json"));
-  validatePacketShape(packet);
+  validatePacketShape(packet, shapeOptions);
   if (packet.packetId !== packetId) fail("CPP-DIGEST", "Packet ID mismatch.");
   return { root, packetDir, packet };
 }
@@ -649,8 +665,8 @@ export function claimCandidatePacket({ controlRoot, packetId, adapter, claimantN
 }
 
 /** Read back the exact durable claim without issuing a new one. */
-export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now = new Date() } = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now = new Date(), allowLegacyPreAssurance = false } = {}) {
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance });
   revalidateCandidate(packet);
   const state = currentState(packetDir, packet);
   if (state.phase !== "claimed" || state.revision !== 2) fail("CPP-CLAIM-READ", "Packet is not in its claimed phase.");
@@ -700,8 +716,8 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
 
 /** Re-read the exact admission while the packet is still claimed. */
 export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now = new Date() } = {}) {
-  const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now });
-  const { packetDir } = packetContext(controlRoot, packetId);
+  const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now, allowLegacyPreAssurance: true });
+  const { packetDir } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   const admissionPath = join(packetDir, "session-admission.json");
   if (!existsSync(admissionPath)) fail("CPP-SESSION-ADMISSION", "Session admission is absent.");
   const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
@@ -717,11 +733,15 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now 
     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
   }
-  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet, claim, admission };
+  // Digest checks above use the raw packet; the returned view carries the normalized coordinator binding.
+  const view = packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
+    ? packet
+    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
+  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet: view, claim, admission };
 }
 
 export function recordCandidateResult({ controlRoot, packetId, result }, { now = new Date() } = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   revalidateCandidate(packet);
   if (!isObject(result)) fail("CPP-RESULT", "Result must be an object.");
   const state = currentState(packetDir, packet);
@@ -741,7 +761,7 @@ export function recordCandidateResult({ controlRoot, packetId, result }, { now =
 }
 
 export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now = new Date() } = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   revalidateCandidate(packet);
   const state = currentState(packetDir, packet);
   if (state.phase === "consumed") {
@@ -812,7 +832,8 @@ export function readConsumedCandidateResult({ controlRoot, packetId }) {
 
 
 export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapability }, { now = new Date() } = {}) {
-  const { packetDir, packet } = packetContext(controlRoot, packetId);
+  // Cleanup acts on the packet the finalizer just consumed through the explicit legacy read, so it reads it the same way.
+  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
   const state = currentState(packetDir, packet);
   if (state.phase !== "consumed" || cleanupCapability !== packet.cleanupCapability) fail("CPP-CLEANUP", "Cleanup is not authorized.");
   revalidateCandidate(packet);

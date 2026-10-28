@@ -633,7 +633,11 @@ export function verifyCommit(sha, deps) {
     const attestedDeclared = declaredPaths(record);
     const attestedUncovered = attestedDeclared === null ? attestedChanged : attestedChanged.filter((path) => coveringPath(path, attestedDeclared) === null);
     if (attestedUncovered.length > 0) {
-      return result(sha, VERDICT.fail, "record-paths-do-not-cover", `record does not declare ${attestedUncovered.length} changed path(s): ${attestedUncovered.join(", ")}`, { taskId, uncovered: attestedUncovered });
+      const queueOrStatePaths = attestedUncovered.filter((path) => /(^|\/)[^/]*(queue|state)[^/]*$/iu.test(path));
+      const hint = queueOrStatePaths.length > 0
+        ? `; path class queue or state file(s) (${queueOrStatePaths.join(", ")}) in this commit are outside the briefing: an orchestrator-attested record covers only the briefed paths (the rule is not relaxed); repair: commit the queue or state file in its own commit, then the briefed paths`
+        : "; path class other: an orchestrator-attested record covers only the briefed paths; repair: commit only the briefed paths";
+      return result(sha, VERDICT.fail, "record-paths-do-not-cover", `record does not declare ${attestedUncovered.length} changed path(s): ${attestedUncovered.join(", ")}${hint}`, { taskId, uncovered: attestedUncovered, queueOrStatePaths });
     }
     return result(sha, VERDICT.unverifiable, "orchestrator-attested-delivery",
       `record for \`${taskId}\` is an orchestrator-attested delivery of commit \`${sha}\`: the orchestrator vouches for it, no host observation backs it, so it is weaker than a host-observed authored commit`,

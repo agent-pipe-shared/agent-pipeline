@@ -1149,6 +1149,22 @@ test("D56-3b an attested record for a different commit, or one whose diff the re
   assert.deepEqual(uncovered.uncovered, ["src/other.mjs"]);
 });
 
+test("D59 an attested record refusal names the queue/state path class, the rule and the repair; the code is unchanged", () => {
+  const sha = "9".repeat(40);
+  writeRecord("DOD-ATT-4", attestedAuthored("DOD-ATT-4", sha));
+  const queue = "specs/sprint-alfred-epic/slice-queue.json";
+  const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-4 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs", queue] }));
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "record-paths-do-not-cover");
+  assert.deepEqual(verdict.uncovered, [queue]);
+  assert.deepEqual(verdict.queueOrStatePaths, [queue]);
+  assert.match(verdict.reason ?? verdict.message ?? JSON.stringify(verdict), /queue or state file/u);
+  assert.match(JSON.stringify(verdict), /own commit/u);
+  const other = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-4 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs", "src/other.mjs"] }));
+  assert.deepEqual(other.queueOrStatePaths, []);
+  assert.doesNotMatch(JSON.stringify(other), /queue or state file/u);
+});
+
 test("D56-3c the other non-authoring kinds keep their FAIL, so only the attested kind gets the weaker verdict", () => {
   const sha = "8".repeat(40);
   const readOnly = { ...attestedAuthored("DOD-ATT-3", sha), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], criticSkip: skip() };

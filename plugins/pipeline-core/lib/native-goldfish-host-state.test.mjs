@@ -1406,6 +1406,49 @@ const cases = [
     assert.equal(mod.memoPerAdmission.length,3);
   }},
 
+  { id: "NGHS52", name: "PF-85 1a: continuationOf is admitted only for a budget or wrong-premise cancelled predecessor; any other predecessor is refused with the sanctioned repair", run: () => fixture(({ root }) => {
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,'fixture-host')});const plan=controller.planDecision({rootDir:root,decision:'enroll',by:'fixture explicit course'});assert.equal(controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256}).state,'active');
+    const original=prepareApprovedItemCourseFixture({root});
+    const repository=inspectSignedDescriptorCustodyRepository(root),runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,'agent-pipeline/controlled-method-fixtures/original-course'),sessionId:'original-course-owner'});
+    const delivery=(sliceId,extra={})=>({schema:'pipeline.item-delivery-briefing.v1',sliceId,itemId:'AC-1',criterionLocator:original.criterionLocator,checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}],...extra});
+    const prepare=(sliceId,extra)=>runtime.run(()=>prepareGovernedItemQueue({root,itemDelivery:delivery(sliceId,extra),candidate:original.candidate,writeScope:['src/change.mjs']}));
+    const cancel=(sliceId,cancelClass)=>runtime.run(()=>cancelUnstartedGovernedItemSlice({root,sliceId,reason:'stopped',cancelClass}));
+    const queuePath=join(root,'specs/unit/slice-queue.json'),rowOf=id=>JSON.parse(readFileSync(queuePath,'utf8')).slices.find(entry=>entry.id===id);
+    const refusedWith=(label,sliceId,predecessor,reason)=>{
+      const before=readFileSync(queuePath,'utf8'),refused=prepare(sliceId,{continuationOf:predecessor});
+      assert.equal(refused.status,'refused',`${label}: ${JSON.stringify(refused)}`);assert.equal(refused.code,'NGHS-ITEM-CONTINUATION-PREDECESSOR-INVALID',`${label}: ${JSON.stringify(refused)}`);
+      assert.match(refused.reason,reason,label);assert.match(refused.repair,/slice-queue\.mjs cancel <slice id> --class budget/u,label);assert.match(refused.repair,/regenerate the binding/u,label);
+      assert.equal(readFileSync(queuePath,'utf8'),before,`${label}: a refused continuation leaves the queue untouched`);
+    };
+    assert.equal(prepare('ITEM-AC-1').status,'required');
+    refusedWith('ready predecessor','ITEM-AC-2','ITEM-AC-1',/ready/u);
+    refusedWith('unknown predecessor','ITEM-AC-2','ITEM-NOPE',/ITEM-NOPE/u);
+    assert.equal(cancel('ITEM-AC-1','budget').status,'cancelled');
+    const budget=prepare('ITEM-AC-2',{continuationOf:'ITEM-AC-1'});
+    assert.equal(budget.status,'required',JSON.stringify(budget));
+    assert.equal(rowOf('ITEM-AC-2').continuationOf,'ITEM-AC-1');assert.deepEqual(rowOf('ITEM-AC-2').dependsOn,[]);
+    const stored=JSON.parse(readFileSync(queuePath,'utf8')),validated=validateSliceQueue(stored);
+    assert.equal(validated.ok,true,JSON.stringify(validated.errors));assert.equal(validated.queue.slices.find(entry=>entry.id==='ITEM-AC-2').continuationOf,'ITEM-AC-1');
+    assert.equal(cancel('ITEM-AC-2','wrong-premise').status,'cancelled');
+    const premise=prepare('ITEM-AC-3',{continuationOf:'ITEM-AC-2'});
+    assert.equal(premise.status,'required',JSON.stringify(premise));assert.equal(rowOf('ITEM-AC-3').continuationOf,'ITEM-AC-2');
+    assert.equal(cancel('ITEM-AC-3','review-defect').status,'cancelled');
+    refusedWith('other-class predecessor','ITEM-AC-4','ITEM-AC-3',/review-defect/u);
+    const plain=prepare('ITEM-AC-5');
+    assert.equal(plain.status,'required',JSON.stringify(plain));assert.equal('continuationOf' in rowOf('ITEM-AC-5'),false,'a briefing without the field leaves the row without it');
+  })},
+
+  { id: "NGHS53", name: "PF-85 1a: validateItemDeliveryBriefing accepts an absent or safe-id continuationOf and refuses any other type or shape", run: async () => {
+    const { validateItemDeliveryBriefing } = await import("./native-goldfish-host-return.mjs");
+    const base={schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-AC-2',itemId:'AC-1',criterionLocator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:'a'.repeat(64),criterionId:'AC-1',startByte:0,endByte:10,excerptSha256:'b'.repeat(64)},checks:[{id:'criterion-one',path:'src/change.test.mjs',dependencies:['src/change.mjs','src/change.test.mjs']}]};
+    assert.equal(validateItemDeliveryBriefing(base).ok,true,'no field validates as before');
+    assert.equal(validateItemDeliveryBriefing({...base,continuationOf:'ITEM-AC-1'}).ok,true,'a safe task id validates');
+    for(const bad of [7,'',null,['ITEM-AC-1'],{},'has space','../x','x'.repeat(200),true]){
+      const verdict=validateItemDeliveryBriefing({...base,continuationOf:bad});
+      assert.equal(verdict.ok,false,JSON.stringify(bad));assert.equal(verdict.code,'NGHR-ITEM-DELIVERY-SHAPE',JSON.stringify(bad));
+    }
+  }},
+
 ];
 
 function governedRegistryFixture({root,commit}){

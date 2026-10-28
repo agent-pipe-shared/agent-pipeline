@@ -18,6 +18,7 @@ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feat
 import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
 import { requiresPublicationReview } from "../lib/publication-review-requirement.mjs";
 import { SLICE_QUEUE_MAX_BYTES, validateSliceQueue } from "../lib/slice-queue.mjs";
+import { isTerminalOutcome } from "../lib/dispatch-record.mjs";
 import { evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
 import { classifyCourseAuthorship } from "../lib/close-authorship-record.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
@@ -402,6 +403,12 @@ function continuityCloseRequest(root, snapshot, path) {
  * authored, but only on the audit route, whose candidate-bound Verify and Critic receipt stand in for
  * the record's Critic decision (lib/close-authorship-record.mjs).
  */
+function hasTerminalRecord(root, taskId) {
+  let value;
+  try { value = readJsonFile(root, `evidence/dispatch-record-${taskId}.json`, "dispatch record").value; }
+  catch { return false; }
+  return isTerminalOutcome(value.outcome);
+}
 function assertCourseCriticEvidence(root, feature, { audited }) {
   const directory = dirname(feature.planPath);
   const coursePath = directory === "." ? "slice-queue.json" : `${directory}/slice-queue.json`;
@@ -411,12 +418,13 @@ function assertCourseCriticEvidence(root, feature, { audited }) {
     if (error?.code === "ENOENT") return;
     fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is unreadable; the Critic evidence gate fails closed");
   }
-  let ids, slices;
+  let ids, slices, legacyCourse = false;
   try {
     if (size > SLICE_QUEUE_MAX_BYTES) throw new Error("delivery course exceeds the slice-queue size bound");
     const course = readJsonFile(root, coursePath, "delivery course").value;
     if (!validateSliceQueue(course).ok || course.feature !== feature.id) throw new Error("delivery course is invalid or belongs to another feature");
     slices = course.slices;
+    legacyCourse = course.schema === "pipeline.slice-queue.v1";
     ids = slices.map((slice) => slice.id);
   } catch {
     fail("CLOSE-DELIVERY-COURSE-INVALID", "the feature's delivery course is invalid, oversized or belongs to another feature; the Critic evidence gate fails closed");
@@ -426,6 +434,15 @@ function assertCourseCriticEvidence(root, feature, { audited }) {
   catch { fail("CLOSE-CRITIC-EVIDENCE-UNAVAILABLE", "Critic evidence coverage for the feature's delivery course could not be evaluated"); }
   if (coverage.requiredTaskIds.length > 0) {
     fail("CLOSE-CRITIC-EVIDENCE-MISSING", `feature close preparation is blocked: ${coverage.requiredTaskIds.join(", ")} require a Critic and carry no matching Critic evidence; repair: run the Critic dispatch for each of them, bind its evidence to the dispatch record, then plan the transition again; follow-up = correction-diff Critic only, over the previously reviewed commit to the new candidate; one full review plus at most three correction-diff reviews per declared batch; once spent, Elephant self-verification or an explicit PO decision, never another Critic`);
+  }
+  // D52: a Critic slice of THIS course that is still scheduled (ready, no terminal dispatch record) means the
+  // independent review has not happened; the close must not reach feature-close-prepared past it. Legacy v1
+  // courses only: an item-owned course takes its done state from integration readiness, not from records.
+  if (legacyCourse) {
+    const scheduled = slices.filter((slice) => slice.tier === "critic" && slice.state === "ready" && !hasTerminalRecord(root, slice.id)).map((slice) => slice.id);
+    if (scheduled.length > 0) {
+      fail("CLOSE-CRITIC-SLICE-SCHEDULED", `feature close preparation is blocked: Critic slice ${scheduled.join(", ")} of the delivery course is still scheduled (no terminal dispatch record); repair: run the Critic review and record its evidence in the slice's dispatch record, or cancel the Critic slice through the sanctioned slice-queue route, then plan the transition again`);
+    }
   }
   let authorship;
   try { authorship = classifyCourseAuthorship({ root, slices, candidateCommit: git(root, ["rev-parse", "HEAD"]) }); }

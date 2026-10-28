@@ -54,6 +54,19 @@ function fail(code) { return { ok: false, code }; }
 export function heldDependencyRepair() {
   return `a never-started dependency is released with: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --reason "<why>" ${cancelClassArg()}. ${cancelClassTeaching()}. A started one needs its "Dispatch: <slice id> (goldfish)" commit`;
 }
+// PF-85 1a: a package may name the stopped slice it continues. Only a slice cancelled for a budget stop or a
+// wrong premise can be continued; anything else is refused before the queue is written.
+export function continuationPredecessorRefusal(continuationOf, sliceId, slices) {
+  const predecessor = continuationOf === sliceId ? undefined : (slices ?? []).find(row => row.id === continuationOf);
+  const cancelClass = predecessor?.cancelClass ?? predecessor?.cancelled?.class;
+  if (predecessor && predecessor.state === 'cancelled' && (cancelClass === 'budget' || cancelClass === 'wrong-premise')) return null;
+  const reason = continuationOf === sliceId ? `${continuationOf} cannot continue itself`
+    : !predecessor ? `${continuationOf} is absent from the slice queue`
+    : predecessor.state !== 'cancelled' ? `${continuationOf} is still ${predecessor.state}, not cancelled`
+    : `${continuationOf} was cancelled with class ${cancelClass}, not budget or wrong-premise`;
+  return { status: 'refused', code: 'NGHS-ITEM-CONTINUATION-PREDECESSOR-INVALID', reason: `${reason}; the queue was not written`,
+    repair: `cancel the predecessor first: node ${SLICE_QUEUE_SCRIPT} cancel <slice id> --class budget (or --class wrong-premise), then regenerate the binding naming it as continuationOf` };
+}
 export function heldDependencyReason(held, slices) {
   const why = id => {
     const row = slices.find(entry => entry.id === id);
@@ -1078,6 +1091,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
         raw.slices=raw.slices.map(row=>({...row,state:'deferred',holdReason:'Original item binding is required; legacy completion is retained evidence only.',delivery:{status:'unbound-legacy',itemId:row.id,legacyQueueSha256:legacyHash}}));
       }
       const existing=raw.slices.find(row=>row.id===itemDelivery.sliceId);
+      if(itemDelivery.continuationOf!==undefined){const refusal=continuationPredecessorRefusal(itemDelivery.continuationOf,itemDelivery.sliceId,raw.slices);if(refusal)return refusal;}
       const delivery={itemId:itemDelivery.itemId,criteria:[locator.criterionId],baseCommit:candidate.commit,
         criterionLocator:locator,checks:itemDelivery.checks,approvalSha256:approval.approvalSha256};
       const canRebindLegacy=existing&&existing.delivery?.status!=='unbound-legacy'&&!existing.delivery?.criterionLocator
@@ -1098,8 +1112,8 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
         }
         return resolveGovernedItemQueue({root:physical});
       }
-      if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];}
-      else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
+      if(existing){existing.delivery=delivery;existing.state='ready';delete existing.holdReason;existing.writeScope=[...writeScope];if(itemDelivery.continuationOf!==undefined)existing.continuationOf=itemDelivery.continuationOf;}
+      else raw.slices.push({id:itemDelivery.sliceId,title:locator.criterionId,state:'ready',...(itemDelivery.continuationOf!==undefined?{continuationOf:itemDelivery.continuationOf}:{}),dependsOn:[],writeScope:[...writeScope],readScope:[source.path],tier:'implementor',commitMode:'host-commit',loadClass:'light',delivery});
       orderAndCoverAdmittedSlice(raw,itemDelivery.sliceId,candidate.commit);
       if(!validateSliceQueue(raw).ok)throw nativeManagedFault('item-course-prepared-queue-invalid');
       // A held dependency refuses before the queue is written, so a refused dispatch leaves the tree as it was.
