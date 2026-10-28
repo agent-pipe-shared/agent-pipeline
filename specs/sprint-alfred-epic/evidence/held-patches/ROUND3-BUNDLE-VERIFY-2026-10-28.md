@@ -12,8 +12,11 @@ applied, stamped, installed, reviewed or accepted until the PO has done so. No c
    (the native Goldfish host state/return and slice-queue files in the bundle; see its notes file
    `w7-pf85-continuation-of-c3.notes.md` for the exact change).
 2. `w7-d52-close-gate-and-commit-route-check-c2` — D52 clause B: the close coordinator refuses a scheduled Critic slice
-   (`CLOSE-CRITIC-SLICE-SCHEDULED`) and the commit route check, with a pin test. Clause A of D52 (an intermediate state the
-   Elephant cannot commit) is NOT in this patch.
+   (`CLOSE-CRITIC-SLICE-SCHEDULED`) and the commit route check, with a pin test. Clause A of D52 (onboarding checks the commit route
+   early) needs no patch: the parent re-checked after the recon note and found production code in `pipeline-start-preflight.mjs`
+   (typed `HOOK-SNAPSHOT-STALE` for every stale mandatory hook, status `hook-refresh-required`, AC-179) and existing pins
+   (`pipeline-start-preflight.test.mjs` "P2 (preflight, behavioural)", `lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs`).
+   The recon note's "no pin found" only looked at the pre-push hook cases.
 3. `w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2` — D58: a refused directory fsync no longer aborts the generic
    Critic batch admit with `CGB-PHYSICAL` (Windows); D59: the attested dispatch-record scope refusal names its repair.
    Verified on Linux only; the Windows behaviour needs the native run.
@@ -58,9 +61,9 @@ Block 3, synchronize the installed plugin copy and install per `docs/push-releas
 - PF-93 option (B): a release command for an already finalized legacy packet (export, read-back). Without it those paths stay strict.
 - D31 resume without manual cancel: option A (own finalizer slice that ends in-place SendMessage resume) or option C. Not in this bundle.
 - Deep tier or a larger tool budget for kernel slices (the Sonnet/medium 40-call budget needed three to four passes per kernel slice).
-- D52 clause A (intermediate-state commit) is still unbuilt; D58/D59 needs the native Windows run.
+- D58/D59 needs the native Windows run (the D52 clause A gap named earlier is closed by existing code and pins, see patch 2).
 
 ## Not in this bundle
 
-D31/D32, D52 clause A, PF-93 option B. Critic, Full Verify, native Windows run and PO acceptance stay open. After install the matrix rows
-of PF-85, D52 (clause B only), D58/D59 and PF-93 may be lifted to 75; D52 clause A and the Windows proof are named gaps.
+D31/D32, PF-93 option B. Critic, Full Verify, native Windows run and PO acceptance stay open. After install the matrix rows
+of PF-85, D52, D58/D59 and PF-93 may be lifted to 75; the Windows proof of D58/D59 stays a named gate.
