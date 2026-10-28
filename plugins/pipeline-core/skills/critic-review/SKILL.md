@@ -139,6 +139,39 @@ the Elephant default. Validate the preflight identity but never execute its
 onboarding `nextAction`, inspect State/handover/history, or perform an Elephant
 bootstrap. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
+## Continuing a Critic course after the first round (PF-94)
+
+Script paths resolve under the plugin root the bootstrap prints. Order:
+
+1. `session-critic-finalizer.mjs inspect-course-takeover --root <root> --request <scratch request.json>`,
+   then `supersede-course-takeover` with the printed digest and a reason. Only when the old batch
+   belongs to an earlier course key or to no course; never for the same course key.
+2. Rerun round 1 on the course path.
+3. `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` BEFORE
+   the next correction commit; commit the manifest and the lineage file it names.
+4. Make the correction commit.
+5. Produce the diagnostic (`critic-diagnostic-evidence.mjs`), commit it, register it with
+   `--add-diagnostic-evidence <path>`, commit the manifest.
+6. Write the input JSON and run `register-feature-package.mjs --root <root> --add-delta-request <input.json>`
+   (keys: `changedBehaviorClaims`, `pathInvariantMap` with exactly the changed paths,
+   `coordinatorImpactConfirmed`, `trustBoundaryChanged`, `impactAmbiguous`).
+7. Commit the manifest and the request file the verb names.
+8. Rerun `critic-dispatch-preflight.mjs` for round 2 with the arguments the verb prints.
+
+Request files for the takeover verbs are regular `.json` files in the repository scratch:
+inspect `{"schema":"pipeline.session-critic-course-takeover-inspect-request.v1","featureId":"<feature>"}`;
+supersede adds `"digestSha256"` and `"reason"` and uses the `...-supersede-request.v1` schema.
+
+| Code | Meaning and what to do |
+|---|---|
+| `CGB-CONFLICT` | An earlier batch owns the work ids; it may belong to an earlier course key: use the takeover verbs. |
+| `CGB-TAKEOVER-COURSE` | The owner is the SAME course key: do not take over; register its lineage with `--add-review-lineage`, or continue in delta mode. |
+| `CGB-TAKEOVER-HISTORY` | The feature already has registered history: continue in delta mode. |
+| `CGB-TAKEOVER-OPEN` | The old batch has no reserved packet or an unconsumed one: finish or release it first. |
+| `FPR-LINEAGE-TRANSPORT` | The lineage does not resolve; with `CCA-TRANSPORT-SOURCE-DRIFT` (a non-evidence-only commit follows the round) it can no longer be registered: use the takeover verbs, rerun round 1. |
+| `CCA-DELTA-REQUIRED` | A retained review exists: register a delta request, rerun preflight with its path. |
+| `CCA-REQUESTED-MODE` | First review is full, every later one delta: rerun preflight with the required mode. |
+
 ## 0. Parse the dispatch (paths only — strict)
 
 Arguments received: `$ARGUMENTS`

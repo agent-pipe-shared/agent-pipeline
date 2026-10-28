@@ -32,8 +32,14 @@ import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admi
 export const SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
 export const SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
 // PF-94: the operator types only the feature id; the course key and the review unit are derived, never typed.
-function takeoverTarget(root, featureId) {
-  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST");
+const TAKEOVER_REQUEST_FILE_TEXT = "the file must be a regular .json file in the repository scratch";
+function takeoverRequestRepair(supersede) {
+  return supersede
+    ? `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA}, featureId, digestSha256, reason; ${TAKEOVER_REQUEST_FILE_TEXT}`
+    : `expected request keys: schema=${SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA}, featureId; ${TAKEOVER_REQUEST_FILE_TEXT}`;
+}
+function takeoverTarget(root, featureId, supersede = false) {
+  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
   const run = (args) => {
     const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
     if (!isSuccessfulSpawn(r)) fail("SCF-TAKEOVER-REPOSITORY");
@@ -94,6 +100,10 @@ const CLI_HELP = [
   "Usage: session-critic-finalizer.mjs register-batch --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs append-correction --root <repository-root> --request <repo-relative scratch request.json>",
   "Usage: session-critic-finalizer.mjs export --root <repository-root> --request <repo-relative scratch request.json>",
+  "Usage: session-critic-finalizer.mjs inspect-course-takeover --root <repository-root> --request <repo-relative scratch request.json>",
+  "       request: {\"schema\":\"pipeline.session-critic-course-takeover-inspect-request.v1\",\"featureId\":\"<feature>\"}",
+  "Usage: session-critic-finalizer.mjs supersede-course-takeover --root <repository-root> --request <repo-relative scratch request.json>",
+  "       request: {\"schema\":\"pipeline.session-critic-course-takeover-supersede-request.v1\",\"featureId\":\"<feature>\",\"digestSha256\":\"<digest printed by inspect>\",\"reason\":\"<short reason>\"}",
   "       session-critic-finalizer.mjs --help",
   "",
   "Admit and claim before the fresh Critic starts; finalize only the same preclaimed packet after return.",
@@ -113,14 +123,14 @@ const REVIEW_KEYS = Object.freeze(["base", "candidate", "specPath", "guardrailPa
 const EVENT_KEYS = Object.freeze(["eventOutPath", "featureId"]);
 
 export class SessionCriticFinalizerError extends Error {
-  constructor(code) {
-    super("Session Critic finalization is invalid.");
+  constructor(code, message = "Session Critic finalization is invalid.") {
+    super(message);
     this.name = "SessionCriticFinalizerError";
     this.code = code;
   }
 }
 
-function fail(code) { throw new SessionCriticFinalizerError(code); }
+function fail(code, message) { throw new SessionCriticFinalizerError(code, message); }
 
 // Cut A: a finalized verdict must come with a record the Source issued when the fresh session returned.
 // No runner produces one yet, so the default reader is typed-unavailable; only an explicit option in
@@ -828,6 +838,7 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
     receiptSha256: index.receiptSha256,
     reportSha256: index.reportSha256,
     indexSha256: sha256(indexBytes),
+    next: `If more review rounds follow, register the lineage of this round NOW, before the next correction commit: register-feature-package.mjs --root <root> --add-review-lineage --packet ${packetId}; then commit the manifest and the lineage file it names. If correction commits already follow this round, the lineage can no longer be registered: continue with session-critic-finalizer.mjs inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path (section "Continuing a Critic course" of the critic-review skill gives the full order).`,
   });
 }
 
@@ -870,8 +881,8 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       const rawTakeover = readPhysicalRequest(takeoverRoot, argv[4]);
       const supersede = argv[0] === "supersede-course-takeover";
       if (!exact(rawTakeover, supersede ? ["schema", "featureId", "digestSha256", "reason"] : ["schema", "featureId"])
-        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST");
-      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId);
+        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST", takeoverRequestRepair(supersede));
+      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId, supersede);
       const common = { repoRoot: takeoverRoot, controlRoot: controlRootFor(takeoverRoot), ...target };
       return Object.freeze({ exitCode: 0, output: supersede
         ? supersedeFeatureCourseTakeover({ ...common, digestSha256: rawTakeover.digestSha256, reason: rawTakeover.reason })

@@ -51,7 +51,7 @@ function commitPlan(root, result) {
 }
 
 export const REGISTER_FEATURE_PACKAGE_HELP = [
-  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]",
+  "register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path> | --add-review-lineage --packet <packetId> | --add-delta-request <input.json>]",
   "",
   "Critic diagnostic evidence route (run in this order):",
   "  1. Produce the diagnostic with scripts/critic-diagnostic-evidence.mjs.",
@@ -64,6 +64,24 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "  1. Finalize the course round (session-critic-finalizer) so the packet is consumed.",
   "  2. Register it: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>",
   "  3. Commit the manifest and the critic-lineage file the registration names, in one evidence-only commit.",
+  "",
+  "Critic delta request route (PF-94) for round 2 and later (run in this order):",
+  "  1. The lineage of the last round is registered and committed (route above).",
+  "  2. Make the correction commit.",
+  "  3. Produce and commit the diagnostic for it, then register it (--add-diagnostic-evidence, route above) and commit the manifest.",
+  "  4. Write the input JSON with exactly these keys and nothing else:",
+  "     changedBehaviorClaims   list of claim ids the correction changes",
+  "     pathInvariantMap        object: every changed path maps to its list of invariant ids",
+  "     coordinatorImpactConfirmed  true when the Coordinator confirmed the impact",
+  "     trustBoundaryChanged    true when the correction moves a trust boundary",
+  "     impactAmbiguous         true when the impact cannot be told",
+  "     pathInvariantMap must have exactly the changed paths as keys; a wrong map is refused (FPR-DELTA-MAP) with the changed paths printed.",
+  "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
+  "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
+  "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
+  "",
+  "Late lineage: if correction commits already follow a consumed round, its lineage can no longer be registered (CCA-TRANSPORT-SOURCE-DRIFT).",
+  "  Retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover, then rerun round 1 on the course path.",
   "",
 ].join("\n");
 

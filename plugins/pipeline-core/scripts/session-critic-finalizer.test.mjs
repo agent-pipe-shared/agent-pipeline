@@ -1867,6 +1867,25 @@ test("export publishes a consumed review as receipt, report and index with match
   } finally { cleanup(fx); }
 });
 
+test("PF94 export (1) the export result names the lineage registration before the next correction commit", () => {
+  const fx = fixture();
+  try {
+    const packetId = "7".repeat(32);
+    assert.equal(finalizeSessionCriticReview(preadmitted(fx, { packetId })).status, "completed");
+    criticNotes(fx, "# Critic notes\n\nNo findings.\n");
+    const result = exportSessionCriticEvidence(exportOptions(fx, packetId));
+    assert.equal(typeof result.next, "string");
+    assert.ok(result.next.includes(packetId), "next names the literal packet id");
+    assert.ok(result.next.includes("--add-review-lineage --packet"));
+    assert.ok(result.next.includes("before the next correction commit"));
+    assert.ok(result.next.includes("supersede-course-takeover"));
+    assert.ok(!result.next.includes("\n"), "next is one line");
+    assert.ok(!result.next.includes("/home/"), "next carries no absolute path");
+    assert.deepEqual(Object.keys(result).sort(),
+      ["indexSha256", "next", "outDir", "packetId", "paths", "receiptSha256", "reportSha256", "schema", "status"]);
+  } finally { cleanup(fx); }
+});
+
 test("a failing review exports too, with reviewPass false and its finding count", () => {
   const fx = fixture();
   try {
@@ -1944,6 +1963,7 @@ test("the export verb runs from a scratch request with no git on PATH and closes
     assert.equal(output.schema, SESSION_CRITIC_EXPORT_RESULT_SCHEMA);
     assert.equal(output.status, "exported");
     assert.equal(output.packetId, packetId);
+    assert.ok(typeof output.next === "string" && output.next.includes(`--add-review-lineage --packet ${packetId}`));
     assert.deepEqual(readdirSync(join(fx.root, outDir)).sort(), [...EXPORT_FILES].sort());
     assert.equal(readFileSync(join(fx.root, outDir, "receipt.json"), "utf8"), canonicalJson(journalReceiptBody(fx, packetId)));
     const unwritten = `specs/beta/evidence/critic/${"6".repeat(32)}`;

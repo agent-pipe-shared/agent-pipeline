@@ -1016,4 +1016,47 @@ test("PF94 DELTA (h) the CLI accepts exactly the delta shape", () => {
   assert.equal(runRegisterFeaturePackage(["--root", bare, "--add-delta-request", "delta-input.json"], (text) => seen.push(text)), 2);
   assert.equal(JSON.parse(seen[0]).code, "FPR-NO-APPROVED-PLAN", seen[0]);
 });
+// PF-94 operator documentation pins (text only; each pin reads the text an operator sees).
+const pf94Read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
+test("PF94 DOCS (a) the register-feature-package help lists every flag, the delta request route and the late lineage block", () => {
+  const lines = [];
+  assert.equal(runRegisterFeaturePackage(["--help"], (text) => lines.push(text)), 0);
+  const help = lines.join("");
+  const usage = help.split("\n")[0];
+  for (const flag of ["--add-review-unit", "--add-diagnostic-evidence <path>", "--add-review-lineage --packet <packetId>", "--add-delta-request <input.json>"]) assert.ok(usage.includes(flag), `usage line names ${flag}`);
+  assert.ok(help.includes("Critic delta request route (PF-94)"));
+  for (const key of ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) assert.ok(help.includes(key), `help names input key ${key}`);
+  assert.ok(help.includes("pathInvariantMap must have exactly the changed paths"));
+  assert.ok(help.includes("--add-delta-request <input.json>") && help.includes("critic-dispatch-preflight"));
+  assert.ok(help.includes("Late lineage") && help.includes("CCA-TRANSPORT-SOURCE-DRIFT"));
+  assert.ok(help.includes("inspect-course-takeover") && help.includes("supersede-course-takeover"));
+});
+test("PF94 DOCS (b) the lineage refusals name the late-lineage repair and keep their old text", () => {
+  const source = pf94Read("./feature-package-registration.mjs");
+  const sentence = "if correction commits already follow this round the lineage cannot be registered any more; retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover and rerun round 1 on the course path";
+  assert.equal(source.split(sentence).length - 1, 2, "both FPR-LINEAGE-TRANSPORT/COMPILE reason texts carry the sentence");
+  assert.ok(source.includes("so the lineage of round N must be registered BEFORE the next correction commit"));
+  assert.ok(source.includes("the lineage of round N must be registered before the next correction commit"));
+});
+test("PF94 DOCS (c) SCF-TAKEOVER-REQUEST names the expected request shape and the finalizer help lists the takeover verbs", () => {
+  const source = pf94Read("../scripts/session-critic-finalizer.mjs");
+  assert.ok(source.includes("expected request"), "repair text names the expected request");
+  assert.ok(source.includes("regular .json file"), "repair text names the file requirement");
+  const help = execFileSync(process.execPath, [new URL("../scripts/session-critic-finalizer.mjs", import.meta.url).pathname, "--help"], { encoding: "utf8" });
+  assert.ok(help.includes("inspect-course-takeover --root <repository-root> --request"));
+  assert.ok(help.includes("supersede-course-takeover --root <repository-root> --request"));
+});
+test("PF94 DOCS (d) the Critic skill documents continuing a course and the continuation reference points to it", () => {
+  const skill = pf94Read("../skills/critic-review/SKILL.md");
+  const heading = "## Continuing a Critic course after the first round (PF-94)";
+  const start = skill.indexOf(heading);
+  assert.ok(start >= 0, "section heading");
+  const rest = skill.slice(start + heading.length);
+  const next = rest.search(/\n## /u);
+  const section = heading + (next < 0 ? rest : rest.slice(0, next));
+  assert.ok(section.split("\n").length <= 46, "section stays within 45 lines plus heading");
+  for (const needle of ["inspect-course-takeover", "supersede-course-takeover", "--add-review-lineage --packet", "--add-diagnostic-evidence", "--add-delta-request", "CGB-CONFLICT", "CGB-TAKEOVER-COURSE", "CGB-TAKEOVER-HISTORY", "CGB-TAKEOVER-OPEN", "FPR-LINEAGE-TRANSPORT", "CCA-TRANSPORT-SOURCE-DRIFT", "CCA-DELTA-REQUIRED", "CCA-REQUESTED-MODE"]) assert.ok(section.includes(needle), `skill section names ${needle}`);
+  const cont = pf94Read("../skills/pipeline-start/references/implementation-continuation.md");
+  assert.ok(cont.includes("Continuing a Critic course after the first round (PF-94)"));
+});
 registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});

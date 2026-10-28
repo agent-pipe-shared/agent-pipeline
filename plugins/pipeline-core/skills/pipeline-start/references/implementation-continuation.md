@@ -97,6 +97,10 @@ After registration, do not edit any file the manifest registers (PRD, Spec,
 digests, so an edit makes the next one `CAC-REGISTRATION-INVALID` again; an
 edited PRD or Spec also fails the approval binding (`CAC-SOURCE-BINDING-MISMATCH`).
 
+To continue a course after its first Critic round (takeover of an old batch, lineage,
+delta request, refusal codes), follow the section
+"Continuing a Critic course after the first round (PF-94)" in `skills/critic-review/SKILL.md`.
+
 The guard creates `slice-queue.json` itself from the first productive dispatch
 whose prompt opens with a generated binding carrying `itemDelivery`; without
 one it refuses `SQ-DELIVERY-COURSE-ABSENT`. Generate it, never hand-write it:
