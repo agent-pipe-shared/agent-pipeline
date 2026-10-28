@@ -1,0 +1,137 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index c2e2404d0..280569e99 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -93,12 +93,28 @@ function durable(p, value) {
+   directory(dirname(p));
+   const fd = openSync(p, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
+   if (activeTransaction) activeTransaction.dirty = true;
+-  try { writeFileSync(fd, canonicalJson(value)); fsyncSync(fd); } finally { closeSync(fd); }
++  try {
++    writeFileSync(fd, canonicalJson(value));
++    try { genericCriticBatchIo.fsyncFileFn(fd); } catch (error) { physicalStep("file-fsync", error); }
++  } finally { closeSync(fd); }
+   if (!eq(stableJson(p), value)) fail("CGB-STALE");
+   let parent;
+-  try { parent = openSync(dirname(p), constants.O_RDONLY); fsyncSync(parent); }
+-  catch { fail("CGB-PHYSICAL"); }
+-  finally { if (parent !== undefined) closeSync(parent); }
++  try {
++    parent = openSync(dirname(p), constants.O_RDONLY);
++    genericCriticBatchIo.fsyncDirFn(parent);
++  } catch (error) {
++    // Windows cannot fsync a directory handle (EPERM); the file fsync above stays strict and every other
++    // directory error, and EPERM on any other platform, still fails.
++    if (!(genericCriticBatchIo.platform === "win32" && error?.code === "EPERM")) physicalStep("directory-fsync", error);
++  } finally { if (parent !== undefined) closeSync(parent); }
++}
++/** Test seam (mutable, restored by tests): the public functions take exact-shape inputs, so deps cannot ride on them. */
++export const genericCriticBatchIo = { platform: process.platform, fsyncFileFn: fsyncSync, fsyncDirFn: fsyncSync };
++function physicalStep(step, error) {
++  const refusal = new GenericCriticBatchError("CGB-PHYSICAL");
++  refusal.cause = typeof error?.code === "string" ? error.code : typeof error?.name === "string" ? error.name : "unknown";
++  refusal.step = step;
++  throw refusal;
+ }
+ function git(root, args) {
+   const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000, maxBuffer: 32 * 1024 * 1024 });
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index fdf433584..813b04cc9 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -14,9 +14,10 @@ import {readConsumedSessionAdmission,prepareCandidatePacket,claimCandidatePacket
+ import {readCriticCourseAdmission} from "./critic-course-admission.mjs";
+ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
+ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
+-import {readdirSync,readlinkSync} from "node:fs";
++import {readdirSync,readlinkSync,fsyncSync} from "node:fs";
++import * as CGB from "./critic-generic-batch.mjs";
+ 
+-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028"]);
++const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033"]);
+ const completionCases = [];
+ function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
+ function unit(overrides = {}) {
+@@ -524,4 +525,38 @@ test("D56 an orchestrator-attested local dispatch binding yields the orchestrato
+     assert.equal(result.originTargets[0].kind,"orchestrator-attested-delivery");
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
++// D58: a Windows directory fsync answers EPERM for every directory; the write itself is already durable.
++function withIo(patch,run){
++  const io=CGB.genericCriticBatchIo;const saved={...io};
++  try{Object.assign(io,patch);return run();}finally{Object.assign(io,saved);}
++}
++function eperm(code="EPERM"){return ()=>{const e=new Error(`${code} simulated`);e.code=code;throw e;};}
++const realFsync=fsyncSync;
++test("D58 directory fsync EPERM on win32 completes the write and register succeeds",()=>{
++  const fx=fixture();try{
++    const result=withIo({platform:"win32",fsyncDirFn:eperm("EPERM")},()=>register(fx));
++    assert.ok(result.batchRef);
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D58 the same directory fsync EPERM on linux still fails CGB-PHYSICAL and names EPERM and the step",()=>{
++  const fx=fixture();try{
++    assert.throws(()=>withIo({platform:"linux",fsyncDirFn:eperm("EPERM")},()=>register(fx)),e=>e.code==="CGB-PHYSICAL"&&e.cause==="EPERM"&&e.step==="directory-fsync"&&!/\//u.test(`${e.cause}${e.step}`));
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D58 a non-EPERM directory fsync error still fails even on win32",()=>{
++  const fx=fixture();try{
++    assert.throws(()=>withIo({platform:"win32",fsyncDirFn:eperm("EIO")},()=>register(fx)),e=>e.code==="CGB-PHYSICAL"&&e.cause==="EIO"&&e.step==="directory-fsync");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D58 a file fsync EPERM stays strict on win32",()=>{
++  const fx=fixture();try{
++    assert.throws(()=>withIo({platform:"win32",fsyncFileFn:eperm("EPERM"),fsyncDirFn:realFsync},()=>register(fx)),e=>e.code==="CGB-PHYSICAL"&&e.cause==="EPERM"&&e.step==="file-fsync");
++  }finally{rmSync(fx.root,{recursive:true,force:true});}
++});
++test("D58 default seams equal today's behaviour: real platform and real fsync",()=>{
++  const io=CGB.genericCriticBatchIo;
++  assert.equal(io.platform,process.platform);
++  assert.equal(io.fsyncDirFn,fsyncSync);
++  assert.equal(io.fsyncFileFn,fsyncSync);
++});
+ registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+index 900197f4a..c8dd44604 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs
+@@ -633,7 +633,11 @@ export function verifyCommit(sha, deps) {
+     const attestedDeclared = declaredPaths(record);
+     const attestedUncovered = attestedDeclared === null ? attestedChanged : attestedChanged.filter((path) => coveringPath(path, attestedDeclared) === null);
+     if (attestedUncovered.length > 0) {
+-      return result(sha, VERDICT.fail, "record-paths-do-not-cover", `record does not declare ${attestedUncovered.length} changed path(s): ${attestedUncovered.join(", ")}`, { taskId, uncovered: attestedUncovered });
++      const queueOrStatePaths = attestedUncovered.filter((path) => /(^|\/)[^/]*(queue|state)[^/]*$/iu.test(path));
++      const hint = queueOrStatePaths.length > 0
++        ? `; path class queue or state file(s) (${queueOrStatePaths.join(", ")}) in this commit are outside the briefing: an orchestrator-attested record covers only the briefed paths (the rule is not relaxed); repair: commit the queue or state file in its own commit, then the briefed paths`
++        : "; path class other: an orchestrator-attested record covers only the briefed paths; repair: commit only the briefed paths";
++      return result(sha, VERDICT.fail, "record-paths-do-not-cover", `record does not declare ${attestedUncovered.length} changed path(s): ${attestedUncovered.join(", ")}${hint}`, { taskId, uncovered: attestedUncovered, queueOrStatePaths });
+     }
+     return result(sha, VERDICT.unverifiable, "orchestrator-attested-delivery",
+       `record for \`${taskId}\` is an orchestrator-attested delivery of commit \`${sha}\`: the orchestrator vouches for it, no host observation backs it, so it is weaker than a host-observed authored commit`,
+diff --git a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+index 33dc36e78..1d9b0e29d 100644
+--- a/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+@@ -1149,6 +1149,22 @@ test("D56-3b an attested record for a different commit, or one whose diff the re
+   assert.deepEqual(uncovered.uncovered, ["src/other.mjs"]);
+ });
+ 
++test("D59 an attested record refusal names the queue/state path class, the rule and the repair; the code is unchanged", () => {
++  const sha = "9".repeat(40);
++  writeRecord("DOD-ATT-4", attestedAuthored("DOD-ATT-4", sha));
++  const queue = "specs/sprint-alfred-epic/slice-queue.json";
++  const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-4 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs", queue] }));
++  assert.equal(verdict.verdict, VERDICT.fail);
++  assert.equal(verdict.classification, "record-paths-do-not-cover");
++  assert.deepEqual(verdict.uncovered, [queue]);
++  assert.deepEqual(verdict.queueOrStatePaths, [queue]);
++  assert.match(verdict.reason ?? verdict.message ?? JSON.stringify(verdict), /queue or state file/u);
++  assert.match(JSON.stringify(verdict), /own commit/u);
++  const other = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-4 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs", "src/other.mjs"] }));
++  assert.deepEqual(other.queueOrStatePaths, []);
++  assert.doesNotMatch(JSON.stringify(other), /queue or state file/u);
++});
++
+ test("D56-3c the other non-authoring kinds keep their FAIL, so only the attested kind gets the weaker verdict", () => {
+   const sha = "8".repeat(40);
+   const readOnly = { ...attestedAuthored("DOD-ATT-3", sha), outcome: "read-only-completed", outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "read-only" }, commits: [], criticSkip: skip() };
