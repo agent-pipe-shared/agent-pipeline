@@ -18,6 +18,13 @@ inspect` was healthy (no lock, no catalogue drift, twelve producers ok). The com
    So the run saw HEAD move while it was still running. A multi-minute run widens that window; the drift is a consequence of the slowness, not its cause.
 4. Every native DACL observation on Windows spawns a fixed PowerShell (`windows-private-state.mjs`, timeout 7 s, batch 10 s). Its memo lives per process, so each CLI run
    starts cold. Every custody inspection spawns `git rev-parse`. Both counts are unmeasured.
+5. The registry itself does not go through that module. `windows-owned-authority-backend.mjs` `invoke()` runs ONE `spawnSync` of a fixed PowerShell (timeout 15 s, helper
+   source re-read and re-hashed each time) for EVERY operation: `inspect`, `read`, `read-source`, `ancestor`, `ancestor-above-root`, `publish`, `create-directory`, `remove`,
+   `inspect-source-image`. There is no memo and no batching. The registry module calls it for each directory and file of the registry walk (`owned()` in `registryClosure`,
+   up to 4096 entries), for each record read (`readRaw`), for the lock create and remove, and for the private directories on every lock acquisition. Five modules additionally
+   walk every ancestor directory up to the drive root with one spawn each (`session-authority-domain-owner`, `session-requester-bridge`, `windows-requester-runtime`,
+   `owned-continuity-verification`, `codex-host-process-journal`). A consumer measured `reopen-design --dry-run` (boundary entry only, no write) at 3 min 18 s, which is
+   consistent with a few hundred process starts of about half a second to one second each. This is still arithmetic, not a measurement: the trace below measures it.
 
 ## Not verified (hypotheses)
 
@@ -29,8 +36,9 @@ measures this today, and the handler cannot name the failing call.
 - The refusal handler names the real failure for an error without a string `reason`: `(<code>: untyped <ErrorName>: <message, at most 240 characters>; at <up to two stack
   frames as function and file name only>)`. A typed error prints exactly as before (existing pins in `session-authority-repair.test.mjs` and `pipeline-state.test.mjs`).
 - The refusal ends with ` Elapsed: <n> ms.` after the existing `Repair:` sentence.
-- Opt-in `PIPELINE_AUTHORITY_TRACE=1` prints one JSON line to stderr when the command ends (success or refusal): counts and cumulative milliseconds of custody inspections
-  (git reads) and of native Windows observations (PowerShell starts), plus total elapsed. Off by default, no output and no cost when unset.
+- Opt-in `PIPELINE_AUTHORITY_TRACE=1` prints one JSON line to stderr when the command ends (success or refusal): count, cumulative and longest milliseconds of custody
+  inspections (git reads) and of native Windows spawns (both modules above; the owned-authority backend also reports a per-operation count map), plus failed spawns and
+  total elapsed. Off by default, no output and no cost when unset.
 
 ## Out of scope (next slice, after the consumer's measurement)
 
