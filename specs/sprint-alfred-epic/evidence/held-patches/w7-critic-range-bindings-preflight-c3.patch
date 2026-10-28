@@ -1,0 +1,240 @@
+diff --git a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+index 370c3a601..a66de9ce1 100644
+--- a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
++++ b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+@@ -52,8 +52,8 @@ function readHandover(repoRoot, head) {
+ }
+ 
+ function classify(path, handover) {
+-  if (path === handover) return ROLE_PROJECT_STATE_RECORD;
+-  if (posix.dirname(path) === posix.dirname(handover) && /^pipeline-handover[^/]*\.md$/u.test(posix.basename(path))) return ROLE_PROJECT_STATE_RECORD;
++  if (handover !== null && path === handover) return ROLE_PROJECT_STATE_RECORD;
++  if (handover !== null && posix.dirname(path) === posix.dirname(handover) && /^pipeline-handover[^/]*\.md$/u.test(posix.basename(path))) return ROLE_PROJECT_STATE_RECORD;
+   if (RETAINED_PATTERN.test(path)) return ROLE_RETAINED_PRIOR_RESULT;
+   return "source";
+ }
+@@ -81,14 +81,20 @@ function sha256OfBlob(repoRoot, blob) {
+   return createHash("sha256").update(object.stdout).digest("hex");
+ }
+ 
+-export function deriveCriticCorrectionInputBindings({ repoRoot, base, head } = {}) {
++// projectStateOptional: an unreadable calibration then means "no project-state paths" (the default stays refusing).
++export function deriveCriticCorrectionInputBindings({ repoRoot, base, head, projectStateOptional = false } = {}) {
+   try {
+     if (typeof repoRoot !== "string" || typeof base !== "string" || typeof head !== "string" || base === "" || head === "") fail("CCI-RANGE", "repoRoot, base and head are required");
+     const resolve = (ref) => gitOrRange(repoRoot, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`], "resolve commit").trim();
+     const baseCommit = resolve(base), headCommit = resolve(head);
+     if (!git(repoRoot, ["merge-base", "--is-ancestor", baseCommit, headCommit]).ok) fail("CCI-RANGE", "base is not an ancestor of head");
+     const treeOf = (commit) => gitOrRange(repoRoot, ["rev-parse", `${commit}^{tree}`], "resolve tree").trim();
+-    const handover = readHandover(repoRoot, headCommit);
++    let handover;
++    if (projectStateOptional === true) {
++      try { handover = readHandover(repoRoot, headCommit); } catch (error) {
++        if (error instanceof CriticCorrectionInputBindingsError && error.code === "CCI-CALIBRATION") handover = null; else throw error;
++      }
++    } else handover = readHandover(repoRoot, headCommit);
+     const listed = gitOrRange(repoRoot, ["rev-list", "--reverse", "--parents", `${baseCommit}..${headCommit}`], "list range").split("\n").filter(Boolean);
+     const commits = listed.map((line) => { const [commit, ...parents] = line.split(" "); return { commit, parents, tree: treeOf(commit) }; });
+     const excluded = new Map();
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 946ac7b5f..60b0ad58a 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -2,6 +2,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import { readDispatchBudgetLaunchObservation } from "../lib/dispatch-budget-launch-observation.mjs";
+ 
++import { CriticCorrectionInputBindingsError, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
++
+ /**
+  * Read-only admission for a path-only Critic dispatch.
+  *
+@@ -188,6 +190,35 @@ function candidateBytes(root, candidate, path) {
+   return result.stdout;
+ }
+ 
++const CCI_COMMAND_HINT = "Run critic-correction-input-bindings.mjs derive --base <base> --head <candidate> and pass its file as correctionInputBindings";
++function checkCorrectionInputBindings(root, baseCommit, candidateCommit, reference) {
++  let derived;
++  try {
++    try { derived = deriveCriticCorrectionInputBindings({ repoRoot: root, base: baseCommit, head: candidateCommit }); }
++    catch (error) {
++      // A repository without a readable project calibration has no project-state class; retained results still count.
++      if (error instanceof CriticCorrectionInputBindingsError && error.code === "CCI-CALIBRATION") {
++        derived = deriveCriticCorrectionInputBindings({ repoRoot: root, base: baseCommit, head: candidateCommit, projectStateOptional: true });
++      } else throw error;
++    }
++  } catch (error) {
++    const code = error instanceof CriticCorrectionInputBindingsError ? error.code : "CCI-UNEXPECTED";
++    fail("CDP-CORRECTION-INPUT-REFUSED", `Fix the range and rerun the preflight; the bindings derivation refused it with ${code}.`);
++  }
++  if (reference === null || reference === undefined) {
++    if (derived.exclusions.length === 0) return null;
++    fail("CDP-CORRECTION-INPUT-REQUIRED", `${CCI_COMMAND_HINT}; the range contains project-state or retained-result paths.`);
++  }
++  const path = normalizePath(reference, "correction input bindings path");
++  if (!path.startsWith("scratch/")) fail("CDP-PATH", "correction input bindings path must be under scratch/.");
++  let given;
++  try { given = JSON.parse(localEvidence(root, path)); } catch { given = null; }
++  if (!isObject(given) || given.digestSha256 !== derived.digestSha256 || sha256Canonical(given) !== sha256Canonical(derived)) {
++    fail("CDP-CORRECTION-INPUT-STALE", `${CCI_COMMAND_HINT}; the given bindings file is unreadable or does not match this range.`);
++  }
++  return { path, digestSha256: derived.digestSha256 };
++}
++
+ function currentArtifactCoverage(root, candidate, byPath, scope) {
+   return scope.paths.map((path) => {
+     const file = byPath.get(path);
+@@ -257,7 +288,7 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
+  * state. Evidence is a local, bounded JSON observation that binds the frozen
+  * candidate; Spec and guardrails are always read from that candidate tree.
+  */
+-export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null }, observer = null) {
++export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, correctionInputBindings = null }, observer = null) {
+   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
+   try {
+   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
+@@ -278,6 +309,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+   if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
+   sourceCandidate = { commit: candidateCommit, tree: candidateTree };
+   if (scope === null && baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
++  const correctionInputEcho = scope === null && baseCommit !== null ? checkCorrectionInputBindings(realRoot, baseCommit, candidateCommit, correctionInputBindings) : null;
+ 
+   stage = "paths";
+   const spec = normalizePath(specPath, "spec path");
+@@ -402,6 +434,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     status: "packet-ready",
+     ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
+     candidate: { commit: candidateCommit, tree: candidateTree },
++    ...(correctionInputEcho === null ? {} : { correctionInputBindings: correctionInputEcho }),
+     spec: specReadback,
+     guardrails: guardrailReadback,
+     governance,
+@@ -487,8 +520,9 @@ export function parseCriticDispatchPreflightArgs(argv) {
+   for (let index = 0; index < argv.length; index += 1) {
+     const flag = argv[index];
+     const value = argv[index + 1];
+-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+-    if (flag === "--root") values.root = value;
++    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
++    if (flag === "--correction-input-bindings") values.correctionInputBindings = value;
++    else if (flag === "--root") values.root = value;
+     else if (flag === "--base") values.base = value;
+     else if (flag === "--candidate") values.candidate = value;
+     else if (flag === "--spec") values.specPath = value;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index a13a3f275..c494c5abe 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -1200,4 +1200,111 @@ test("CCI (8) an unreadable calibration is refused CCI-CALIBRATION, and the CLI
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// ---- CCI preflight: a range with project-state or retained-result paths needs the bindings file (AC-160; slice C3) ----
++function cciPreflightFixture(candidateFiles, { calibration = true } = {}) {
++  const root = mkdtempSync(join(tmpdir(), "cci-preflight-"));
++  git(root, ["init", "-q"]);
++  cciWrite(root, ".claude/pipeline.yaml", "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++  cciWrite(root, "governance/guidelines/review.md", "Review changed code.\n");
++  cciWrite(root, "governance/policies/checklist.md", "- verify\n");
++  cciWrite(root, "specs/spec.md", "# Spec\n");
++  cciWrite(root, "docs/state.md", "state v0\n");
++  cciWrite(root, "src/a.txt", "alpha content that is long enough for rename detection\nsecond line\nthird line\n");
++  if (calibration) cciWrite(root, "project/pipeline.json", `${JSON.stringify({ project: "fixture", handover: "docs/state.md" })}\n`);
++  const base = commit(root, "base");
++  cciWrite(root, "specs/spec.md", "# Spec\n\nchanged\n");
++  for (const [rel, content] of Object.entries(candidateFiles)) cciWrite(root, rel, content);
++  const candidate = commit(root, "candidate");
++  const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
++  cciWrite(root, "evidence/verify.json", `${JSON.stringify(verifyValue(candidate, tree))}\n`);
++  cciWrite(root, "evidence/prior-critic.json", `${JSON.stringify({ candidate: { commit: base, tree: git(root, ["rev-parse", `${base}^{tree}`]) } })}\n`);
++  return { root, base, candidate, tree };
++}
++function cdpRefusal(run, code) {
++  let caught = null;
++  assert.throws(run, (error) => { caught = error; return error instanceof CriticDispatchPreflightError && error.code === code; });
++  return caught;
++}
++function cciWriteBindings(fx, head, rel = "scratch/bindings.json") {
++  const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++  cciWrite(fx.root, rel, `${JSON.stringify(doc)}\n`);
++  return doc;
++}
++
++test("CCI preflight (1) a range without state or retained-result paths admits as before and echoes no bindings", () => {
++  const fx = cciPreflightFixture({ "src/a.txt": "changed\n" });
++  try {
++    const result = preflightCriticDispatch(input(fx));
++    assert.equal(result.status, "packet-ready");
++    assert.equal(Object.hasOwn(result, "correctionInputBindings"), false);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI preflight (2) a range with the handover file changed and no bindings field is refused CDP-CORRECTION-INPUT-REQUIRED with a verb-first message", () => {
++  const fx = cciPreflightFixture({ "docs/state.md": "state v1\n" });
++  try {
++    const error = cdpRefusal(() => preflightCriticDispatch(input(fx)), "CDP-CORRECTION-INPUT-REQUIRED");
++    assert.ok(error.message.startsWith("Run "));
++    assert.ok(error.message.includes("critic-correction-input-bindings.mjs derive"));
++    assert.equal(error.message.includes("\n"), false);
++    assert.ok(error.message.length <= 220);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI preflight (3) the same range with a correct bindings file admits and echoes its path and digest", () => {
++  const fx = cciPreflightFixture({ "docs/state.md": "state v1\n", "src/a.txt": "changed\n" });
++  try {
++    const doc = cciWriteBindings(fx, fx.candidate);
++    const result = preflightCriticDispatch(input(fx, { correctionInputBindings: "scratch/bindings.json" }));
++    assert.equal(result.status, "packet-ready");
++    assert.deepEqual(result.correctionInputBindings, { path: "scratch/bindings.json", digestSha256: doc.digestSha256 });
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI preflight (4) a bindings file written for another head, or an unreadable one, is CDP-CORRECTION-INPUT-STALE", () => {
++  const fx = cciPreflightFixture({ "docs/state.md": "state v1\n" });
++  try {
++    cciWrite(fx.root, "docs/state.md", "state v2\n");
++    const later = commit(fx.root, "later head");
++    cciWriteBindings(fx, later);
++    const error = cdpRefusal(() => preflightCriticDispatch(input(fx, { correctionInputBindings: "scratch/bindings.json" })), "CDP-CORRECTION-INPUT-STALE");
++    assert.ok(error.message.startsWith("Run "));
++    assert.ok(error.message.includes("critic-correction-input-bindings.mjs derive"));
++    assert.ok(error.message.length <= 220 && !error.message.includes("\n"));
++    cdpRefusal(() => preflightCriticDispatch(input(fx, { correctionInputBindings: "scratch/absent.json" })), "CDP-CORRECTION-INPUT-STALE");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI preflight (5) a retained prior result under the Critic results location triggers the requirement", () => {
++  const fx = cciPreflightFixture({ "specs/feat-x/evidence/critic/p1/result.md": "retained\n" });
++  try {
++    cdpRefusal(() => preflightCriticDispatch(input(fx)), "CDP-CORRECTION-INPUT-REQUIRED");
++    cciWriteBindings(fx, fx.candidate);
++    assert.equal(preflightCriticDispatch(input(fx, { correctionInputBindings: "scratch/bindings.json" })).status, "packet-ready");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI preflight (6) a rename across classes is CDP-CORRECTION-INPUT-REFUSED carrying the CCI code", () => {
++  const fx = cciPreflightFixture({});
++  try {
++    mkdirSync(join(fx.root, "evidence", "critic", "p1"), { recursive: true });
++    git(fx.root, ["mv", "src/a.txt", "evidence/critic/p1/a.txt"]);
++    const candidate = commit(fx.root, "rename across classes");
++    const tree = git(fx.root, ["rev-parse", "HEAD^{tree}"]);
++    writeFileSync(join(fx.root, "evidence", "verify.json"), `${JSON.stringify(verifyValue(candidate, tree))}\n`);
++    const error = cdpRefusal(() => preflightCriticDispatch(input({ ...fx, candidate })), "CDP-CORRECTION-INPUT-REFUSED");
++    assert.ok(error.message.includes("CCI-MIXED"));
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI preflight (7) projectStateOptional lets an unreadable calibration mean no project-state paths, while the default still refuses", () => {
++  const fx = cciPreflightFixture({ "docs/state.md": "state v1\n", "evidence/critic/p1/r.md": "retained\n" }, { calibration: false });
++  try {
++    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: fx.candidate }), "CCI-CALIBRATION");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: fx.candidate, projectStateOptional: true });
++    assert.deepEqual(doc.exclusions.map((entry) => entry.path), ["evidence/critic/p1/r.md"]);
++    assert.ok(doc.sourcePaths.includes("docs/state.md"));
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
