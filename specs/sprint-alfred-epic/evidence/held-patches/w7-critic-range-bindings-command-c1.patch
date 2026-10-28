@@ -1,0 +1,424 @@
+diff --git a/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+new file mode 100644
+index 000000000..370c3a601
+--- /dev/null
++++ b/plugins/pipeline-core/lib/critic-correction-input-bindings.mjs
+@@ -0,0 +1,140 @@
++// SPDX-License-Identifier: SUL-1.0
++// Derives the correction-input bindings of a Critic range: for every path a commit range changed it records either
++// "source" (listed by exact path) or an exclusion (role + every touched version's blob identity, SHA-256 and mode).
++// Metadata-only git observations; an excluded file's bytes are hashed in memory and never stored or printed.
++import { createHash } from "node:crypto";
++import { spawnSync } from "node:child_process";
++import { posix } from "node:path";
++import { sha256Canonical } from "./review-economy.mjs";
++
++export const CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA = "pipeline.critic-correction-input-bindings.v1";
++export const ROLE_RETAINED_PRIOR_RESULT = "retained prior result";
++export const ROLE_PROJECT_STATE_RECORD = "project-state record";
++const ABSENT = "absent";
++const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
++const ZERO_ID = /^0+$/u;
++const CHANGE_NAMES = { A: "added", M: "modified", D: "deleted", T: "type-changed", R: "renamed", C: "copied" };
++// The layout session-critic-finalizer.mjs writes: specs/<segment>/evidence/critic/<packetId>/..., and the root form evidence/critic/....
++const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/critic\/[^/]+(?:\/[^/]+)*$/u;
++
++export class CriticCorrectionInputBindingsError extends Error {
++  constructor(code, detail) {
++    super(`${code}: ${detail}`);
++    this.name = "CriticCorrectionInputBindingsError";
++    this.code = code;
++    this.detail = detail;
++  }
++}
++const fail = (code, detail) => { throw new CriticCorrectionInputBindingsError(code, detail); };
++
++function git(repoRoot, args, { buffer = false } = {}) {
++  const result = spawnSync("git", ["-C", repoRoot, ...args], { encoding: buffer ? null : "utf8", maxBuffer: 256 * 1024 * 1024 });
++  if (result.error || result.status !== 0) return { ok: false, stdout: null };
++  return { ok: true, stdout: result.stdout };
++}
++function gitOrRange(repoRoot, args, what) {
++  const result = git(repoRoot, args);
++  if (!result.ok) fail("CCI-RANGE", `git observation failed: ${what}`);
++  return result.stdout;
++}
++
++function readHandover(repoRoot, head) {
++  const shown = git(repoRoot, ["show", `${head}:project/pipeline.json`]);
++  if (!shown.ok) fail("CCI-CALIBRATION", "project/pipeline.json is not readable at the head commit");
++  let parsed;
++  try { parsed = JSON.parse(shown.stdout); } catch { fail("CCI-CALIBRATION", "project/pipeline.json is not valid JSON"); }
++  const handover = parsed?.handover;
++  if (typeof handover !== "string" || handover === "" || handover.startsWith("/") || handover.includes("\\")
++    || handover.split("/").some((part) => part === "" || part === "." || part === "..")) {
++    fail("CCI-CALIBRATION", "the calibration handover field is missing or not a repository-relative path");
++  }
++  return handover;
++}
++
++function classify(path, handover) {
++  if (path === handover) return ROLE_PROJECT_STATE_RECORD;
++  if (posix.dirname(path) === posix.dirname(handover) && /^pipeline-handover[^/]*\.md$/u.test(posix.basename(path))) return ROLE_PROJECT_STATE_RECORD;
++  if (RETAINED_PATTERN.test(path)) return ROLE_RETAINED_PRIOR_RESULT;
++  return "source";
++}
++
++function parseRaw(output) {
++  const parts = output.split("\0");
++  const entries = [];
++  let i = 0;
++  while (i < parts.length && parts[i] !== "") {
++    const header = /^:(\d{6}) (\d{6}) ([0-9a-f]+) ([0-9a-f]+) ([A-Z])\d*$/u.exec(parts[i]);
++    if (header === null) fail("CCI-UNEXPECTED", "unrecognized raw diff record");
++    const [, modeBefore, modeAfter, blobBefore, blobAfter, status] = header;
++    const paths = (status === "R" || status === "C") ? [parts[i + 1], parts[i + 2]] : [parts[i + 1]];
++    i += 1 + paths.length;
++    entries.push({ modeBefore, modeAfter, blobBefore, blobAfter, status, paths });
++  }
++  return entries;
++}
++const side = (value) => (ZERO_ID.test(value) ? ABSENT : value);
++
++function sha256OfBlob(repoRoot, blob) {
++  if (blob === ABSENT) return ABSENT;
++  const object = git(repoRoot, ["cat-file", "blob", blob], { buffer: true });
++  if (!object.ok) fail("CCI-RANGE", "an excluded blob could not be read");
++  return createHash("sha256").update(object.stdout).digest("hex");
++}
++
++export function deriveCriticCorrectionInputBindings({ repoRoot, base, head } = {}) {
++  try {
++    if (typeof repoRoot !== "string" || typeof base !== "string" || typeof head !== "string" || base === "" || head === "") fail("CCI-RANGE", "repoRoot, base and head are required");
++    const resolve = (ref) => gitOrRange(repoRoot, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`], "resolve commit").trim();
++    const baseCommit = resolve(base), headCommit = resolve(head);
++    if (!git(repoRoot, ["merge-base", "--is-ancestor", baseCommit, headCommit]).ok) fail("CCI-RANGE", "base is not an ancestor of head");
++    const treeOf = (commit) => gitOrRange(repoRoot, ["rev-parse", `${commit}^{tree}`], "resolve tree").trim();
++    const handover = readHandover(repoRoot, headCommit);
++    const listed = gitOrRange(repoRoot, ["rev-list", "--reverse", "--parents", `${baseCommit}..${headCommit}`], "list range").split("\n").filter(Boolean);
++    const commits = listed.map((line) => { const [commit, ...parents] = line.split(" "); return { commit, parents, tree: treeOf(commit) }; });
++    const excluded = new Map();
++    const sources = new Set();
++    for (const { commit, parents } of commits) {
++      const from = parents[0] ?? EMPTY_TREE;
++      const raw = gitOrRange(repoRoot, ["diff-tree", "-r", "-z", "-M", "--raw", "--no-textconv", "--no-ext-diff", from, commit], "diff-tree");
++      for (const entry of parseRaw(raw)) {
++        const roles = entry.paths.map((p) => classify(p, handover));
++        if (new Set(roles).size > 1) fail("CCI-MIXED", `a ${CHANGE_NAMES[entry.status] ?? "change"} crosses classes (${roles.join(" / ")})`);
++        entry.paths.forEach((path, index) => {
++          if (roles[index] === "source") { sources.add(path); return; }
++          const pair = entry.paths.length === 2;
++          const isFrom = pair && index === 0;
++          const version = {
++            commit,
++            change: pair ? (isFrom ? `${CHANGE_NAMES[entry.status]}-from` : `${CHANGE_NAMES[entry.status]}-to`) : (CHANGE_NAMES[entry.status] ?? entry.status),
++            blobBefore: pair && !isFrom ? ABSENT : side(entry.blobBefore),
++            blobAfter: isFrom && entry.status === "R" ? ABSENT : side(entry.blobAfter),
++            modeBefore: pair && !isFrom ? ABSENT : (ZERO_ID.test(entry.modeBefore) ? ABSENT : entry.modeBefore),
++            modeAfter: isFrom && entry.status === "R" ? ABSENT : (ZERO_ID.test(entry.modeAfter) ? ABSENT : entry.modeAfter),
++          };
++          version.sha256After = sha256OfBlob(repoRoot, version.blobAfter);
++          const known = excluded.get(path) ?? { path, role: roles[index], versions: [] };
++          known.versions.push(version);
++          excluded.set(path, known);
++        });
++      }
++    }
++    const document = {
++      schema: CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA,
++      base: { commit: baseCommit, tree: treeOf(baseCommit) },
++      head: { commit: headCommit, tree: treeOf(headCommit) },
++      commits,
++      exclusions: [...excluded.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
++      sourcePaths: [...sources].sort(),
++    };
++    return { ...document, digestSha256: sha256Canonical(document) };
++  } catch (error) {
++    if (error instanceof CriticCorrectionInputBindingsError) throw error;
++    throw new CriticCorrectionInputBindingsError("CCI-UNEXPECTED", "unexpected failure while deriving the bindings");
++  }
++}
++
++export function bindingsRoleCounts(document) {
++  const counts = { [ROLE_RETAINED_PRIOR_RESULT]: 0, [ROLE_PROJECT_STATE_RECORD]: 0, source: document.sourcePaths.length };
++  for (const entry of document.exclusions) counts[entry.role] += 1;
++  return counts;
++}
+diff --git a/plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs b/plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs
+new file mode 100644
+index 000000000..c76c1b426
+--- /dev/null
++++ b/plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs
+@@ -0,0 +1,67 @@
++#!/usr/bin/env node
++// SPDX-License-Identifier: SUL-1.0
++// critic-correction-input-bindings.mjs derive --root ROOT --base COMMIT --head COMMIT --out scratch/FILE
++// Writes the correction-input bindings document of a Critic range once (no overwrite) and prints a one-line JSON result.
++// Exit 0 on success; a typed refusal prints {schema, code, detail} on one line and exits 2.
++import { lstatSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, join, resolve, sep } from "node:path";
++import { isDirectInvocation } from "../lib/entrypoint.mjs";
++import {
++  CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA,
++  CriticCorrectionInputBindingsError,
++  bindingsRoleCounts,
++  deriveCriticCorrectionInputBindings,
++} from "../lib/critic-correction-input-bindings.mjs";
++
++export const CRITIC_CORRECTION_INPUT_BINDINGS_REFUSAL_SCHEMA = "pipeline.critic-correction-input-bindings-refusal.v1";
++const USAGE = "Usage: critic-correction-input-bindings.mjs derive --root ROOT --base COMMIT --head COMMIT --out scratch/FILE";
++const refuse = (code, detail) => { throw new CriticCorrectionInputBindingsError(code, detail); };
++
++function parseArgs(argv) {
++  if (argv[0] !== "derive") refuse("CCI-USAGE", USAGE);
++  const options = {};
++  const keys = { "--root": "root", "--base": "base", "--head": "head", "--out": "out" };
++  for (let i = 1; i < argv.length; i += 2) {
++    const key = keys[argv[i]];
++    if (key === undefined || argv[i + 1] === undefined || Object.hasOwn(options, key)) refuse("CCI-USAGE", USAGE);
++    options[key] = argv[i + 1];
++  }
++  for (const key of Object.values(keys)) if (typeof options[key] !== "string" || options[key] === "") refuse("CCI-USAGE", USAGE);
++  return options;
++}
++
++function outTarget(root, out) {
++  const parts = out.split("/");
++  if (isAbsolute(out) || out.includes("\\") || out.includes("\0") || parts.length < 2 || parts[0] !== "scratch"
++    || parts.some((part) => part === "" || part === "." || part === "..")) refuse("CCI-OUT", "the out path must be a repository-relative path under scratch/");
++  const rootReal = realpathSync(root);
++  let cursor = rootReal;
++  for (const part of parts.slice(0, -1)) {
++    cursor = join(cursor, part);
++    let info = null;
++    try { info = lstatSync(cursor); } catch (error) { if (error?.code !== "ENOENT") refuse("CCI-OUT", "the out directory is not readable"); break; }
++    if (info.isSymbolicLink() || !info.isDirectory()) refuse("CCI-OUT", "the out path crosses a symlink or a non-directory");
++  }
++  const target = resolve(rootReal, out);
++  if (!target.startsWith(rootReal + sep)) refuse("CCI-OUT", "the out path leaves the repository root");
++  return target;
++}
++
++export function runCriticCorrectionInputBindingsCli(argv) {
++  const options = parseArgs(argv);
++  const target = outTarget(options.root, options.out);
++  const document = deriveCriticCorrectionInputBindings({ repoRoot: options.root, base: options.base, head: options.head });
++  mkdirSync(dirname(target), { recursive: true });
++  try { writeFileSync(target, `${JSON.stringify(document, null, 2)}\n`, { flag: "wx" }); }
++  catch (error) { if (error?.code === "EEXIST") refuse("CCI-OUT", "the out file already exists and is never overwritten"); throw error; }
++  return { schema: CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, digestSha256: document.digestSha256, counts: bindingsRoleCounts(document), path: options.out };
++}
++
++if (isDirectInvocation(import.meta.url)) {
++  try { console.log(JSON.stringify(runCriticCorrectionInputBindingsCli(process.argv.slice(2)))); }
++  catch (error) {
++    const typed = error instanceof CriticCorrectionInputBindingsError ? error : new CriticCorrectionInputBindingsError("CCI-UNEXPECTED", "unexpected failure");
++    console.log(JSON.stringify({ schema: CRITIC_CORRECTION_INPUT_BINDINGS_REFUSAL_SCHEMA, code: typed.code, detail: typed.detail }));
++    process.exitCode = 2;
++  }
++}
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index b88d5e109..a13a3f275 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -22,6 +22,7 @@ import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
+ import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
+ import { admitSessionCriticReview } from "./session-critic-finalizer.mjs";
+ import { sha256Canonical } from "../lib/review-economy.mjs";
++import { CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, CriticCorrectionInputBindingsError, deriveCriticCorrectionInputBindings } from "../lib/critic-correction-input-bindings.mjs";
+ 
+ function verifyValue(commit, tree, exitCode = 0) {
+   return { schema: "pipeline.verify-evidence.v0", commit, tree, exitCode, steps: [{ name: "fixture-check", exitCode }], selection: planVerifySelection({ mode: "critic", candidateCommit: commit, registeredSuiteIds: ["fixture-check"], policy: { schema: "pipeline.verify-selection.v1", baseline: ["fixture-check"], areas: [{ id: "all", paths: ["**"], suites: ["fixture-check"] }] } }) };
+@@ -1011,4 +1012,192 @@ test("a diagnostic lacking required guardrails fails CDI-GUARDRAILS and the fail
+   } finally { rmSync(fx.root, { recursive: true, force: true }); }
+ });
+ 
++// ---- CCI: correction-input bindings of a Critic range (AC-160; recon CRITIC-RANGE-BINDINGS-RECON-2026-10-28) ----
++const CCI_SCRIPT = join(path.dirname(fileURLToPath(import.meta.url)), "critic-correction-input-bindings.mjs");
++const CCI_MARKER = "MARKER-7d41c9e2-excluded-body-bytes";
++function cciFixture() {
++  const root = mkdtempSync(join(tmpdir(), "cci-bindings-"));
++  git(root, ["init", "-q"]);
++  mkdirSync(join(root, "project"), { recursive: true });
++  mkdirSync(join(root, "docs"), { recursive: true });
++  mkdirSync(join(root, "src"), { recursive: true });
++  writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify({ project: "fixture", handover: "docs/state.md" })}\n`);
++  writeFileSync(join(root, "docs", "state.md"), "state v0\n");
++  writeFileSync(join(root, "src", "a.txt"), "alpha content that is long enough for rename detection\nsecond line\nthird line\n");
++  return { root, base: commit(root, "base") };
++}
++function cciWrite(root, rel, content) {
++  mkdirSync(join(root, ...rel.split("/").slice(0, -1)), { recursive: true });
++  writeFileSync(join(root, ...rel.split("/")), content);
++}
++function cciRefusal(run, code) {
++  assert.throws(run, (error) => { assert.ok(error instanceof CriticCorrectionInputBindingsError); assert.equal(error.code, code); return true; });
++}
++function cciCli(root, base, head, out) {
++  return spawnSync(process.execPath, [CCI_SCRIPT, "derive", "--root", root, "--base", base, "--head", head, "--out", out], { encoding: "utf8" });
++}
++
++test("CCI (1) a source-only range has no exclusions and lists every changed path as a source path", () => {
++  const fx = cciFixture();
++  try {
++    cciWrite(fx.root, "src/a.txt", "changed\n");
++    cciWrite(fx.root, "src/b.txt", "new\n");
++    const head = commit(fx.root, "source only");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    assert.equal(doc.schema, CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA);
++    assert.equal(CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA, "pipeline.critic-correction-input-bindings.v1");
++    assert.deepEqual(doc.exclusions, []);
++    assert.deepEqual(doc.sourcePaths, ["src/a.txt", "src/b.txt"]);
++    assert.equal(doc.base.commit, fx.base);
++    assert.equal(doc.head.commit, head);
++    assert.equal(doc.head.tree, git(fx.root, ["rev-parse", `${head}^{tree}`]));
++    assert.deepEqual(doc.commits.map((c) => c.commit), [head]);
++    assert.deepEqual(doc.commits[0].parents, [fx.base]);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (2) a retained prior result under the evidence/critic layout is excluded by exact path with its version list", () => {
++  const fx = cciFixture();
++  try {
++    cciWrite(fx.root, "specs/feat-x/evidence/critic/p1/report.md", "report one\n");
++    cciWrite(fx.root, "evidence/critic/p2/report.md", "report two\n");
++    cciWrite(fx.root, "evidence/other/notes.md", "not a critic result\n");
++    cciWrite(fx.root, "src/a.txt", "changed\n");
++    const head = commit(fx.root, "with retained results");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    assert.deepEqual(doc.exclusions.map((e) => e.path), ["evidence/critic/p2/report.md", "specs/feat-x/evidence/critic/p1/report.md"]);
++    for (const entry of doc.exclusions) {
++      assert.equal(entry.role, "retained prior result");
++      assert.equal(entry.versions.length, 1);
++      assert.equal(entry.versions[0].commit, head);
++      assert.equal(entry.versions[0].change, "added");
++      assert.equal(entry.versions[0].blobBefore, "absent");
++      assert.equal(entry.versions[0].modeBefore, "absent");
++      assert.equal(entry.versions[0].modeAfter, "100644");
++    }
++    assert.equal(doc.exclusions[0].versions[0].blobAfter, git(fx.root, ["rev-parse", `${head}:evidence/critic/p2/report.md`]));
++    assert.equal(doc.exclusions[0].versions[0].sha256After, sha256("report two\n"));
++    assert.deepEqual(doc.sourcePaths, ["evidence/other/notes.md", "src/a.txt"]);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (3) a state file changed in three commits gives three versions with chained blob and mode transitions", () => {
++  const fx = cciFixture();
++  try {
++    const blob0 = git(fx.root, ["rev-parse", `${fx.base}:docs/state.md`]);
++    cciWrite(fx.root, "docs/state.md", "state v1\n");
++    const c1 = commit(fx.root, "state 1");
++    cciWrite(fx.root, "docs/state.md", "state v2\n");
++    cciWrite(fx.root, "src/a.txt", "touched\n");
++    const c2 = commit(fx.root, "state 2");
++    cciWrite(fx.root, "docs/state.md", "state v3\n");
++    fs.chmodSync(join(fx.root, "docs", "state.md"), 0o755);
++    const c3 = commit(fx.root, "state 3");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: c3 });
++    assert.equal(doc.exclusions.length, 1);
++    const entry = doc.exclusions[0];
++    assert.equal(entry.path, "docs/state.md");
++    assert.equal(entry.role, "project-state record");
++    assert.deepEqual(entry.versions.map((v) => v.commit), [c1, c2, c3]);
++    assert.equal(entry.versions[0].blobBefore, blob0);
++    assert.equal(entry.versions[1].blobBefore, entry.versions[0].blobAfter);
++    assert.equal(entry.versions[2].blobBefore, entry.versions[1].blobAfter);
++    assert.equal(entry.versions[2].blobAfter, git(fx.root, ["rev-parse", `${c3}:docs/state.md`]));
++    assert.deepEqual(entry.versions.map((v) => [v.modeBefore, v.modeAfter]), [["100644", "100644"], ["100644", "100644"], ["100644", "100755"]]);
++    assert.deepEqual(entry.versions.map((v) => v.sha256After), [sha256("state v1\n"), sha256("state v2\n"), sha256("state v3\n")]);
++    assert.deepEqual(doc.commits.map((c) => c.commit), [c1, c2, c3]);
++    assert.deepEqual(doc.sourcePaths, ["src/a.txt"]);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (4) a deleted state file records explicit absence on the after side", () => {
++  const fx = cciFixture();
++  try {
++    git(fx.root, ["rm", "-q", "docs/state.md"]);
++    const head = commit(fx.root, "delete state");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    assert.equal(doc.exclusions.length, 1);
++    const version = doc.exclusions[0].versions[0];
++    assert.equal(version.change, "deleted");
++    assert.equal(version.blobAfter, "absent");
++    assert.equal(version.modeAfter, "absent");
++    assert.equal(version.sha256After, "absent");
++    assert.equal(version.blobBefore, git(fx.root, ["rev-parse", `${fx.base}:docs/state.md`]));
++    assert.equal(version.modeBefore, "100644");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (5) a rename across classes is refused CCI-MIXED", () => {
++  const fx = cciFixture();
++  try {
++    mkdirSync(join(fx.root, "evidence", "critic", "p1"), { recursive: true });
++    git(fx.root, ["mv", "src/a.txt", "evidence/critic/p1/a.txt"]);
++    const head = commit(fx.root, "rename across classes");
++    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head }), "CCI-MIXED");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (6) the document, the written file and the CLI stdout carry no byte of an excluded file", () => {
++  const fx = cciFixture();
++  try {
++    cciWrite(fx.root, "evidence/critic/p1/report.md", `${CCI_MARKER}\n`);
++    cciWrite(fx.root, "docs/state.md", `state with ${CCI_MARKER}\n`);
++    cciWrite(fx.root, "src/a.txt", "changed\n");
++    const head = commit(fx.root, "excluded bodies");
++    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    assert.equal(doc.exclusions.length, 2);
++    assert.equal(JSON.stringify(doc).includes(CCI_MARKER), false);
++    const result = cciCli(fx.root, fx.base, head, "scratch/bindings.json");
++    assert.equal(result.status, 0, String(result.stderr));
++    assert.equal(result.stdout.includes(CCI_MARKER), false);
++    const line = JSON.parse(result.stdout.trim());
++    assert.equal(line.schema, CRITIC_CORRECTION_INPUT_BINDINGS_SCHEMA);
++    assert.equal(line.digestSha256, doc.digestSha256);
++    const written = readFileSync(join(fx.root, "scratch", "bindings.json"), "utf8");
++    assert.equal(written.includes(CCI_MARKER), false);
++    assert.equal(JSON.parse(written).digestSha256, doc.digestSha256);
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (7) the same range twice gives the same digest, and the digest covers the document without its own field", () => {
++  const fx = cciFixture();
++  try {
++    cciWrite(fx.root, "docs/state.md", "state v1\n");
++    cciWrite(fx.root, "src/a.txt", "changed\n");
++    const head = commit(fx.root, "change");
++    const one = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    const two = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
++    assert.equal(one.digestSha256, two.digestSha256);
++    assert.deepEqual(one, two);
++    const { digestSha256, ...rest } = one;
++    assert.equal(digestSha256, sha256Canonical(rest));
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
++test("CCI (8) an unreadable calibration is refused CCI-CALIBRATION, and the CLI writes only under scratch/ and never overwrites", () => {
++  const fx = cciFixture();
++  try {
++    cciWrite(fx.root, "src/a.txt", "changed\n");
++    const head = commit(fx.root, "source");
++    const okOut = cciCli(fx.root, fx.base, head, "scratch/out.json");
++    assert.equal(okOut.status, 0, String(okOut.stderr));
++    const again = cciCli(fx.root, fx.base, head, "scratch/out.json");
++    assert.equal(again.status, 2);
++    assert.equal(JSON.parse(again.stdout.trim()).code, "CCI-OUT");
++    const outside = cciCli(fx.root, fx.base, head, "evidence/out.json");
++    assert.equal(outside.status, 2);
++    assert.equal(JSON.parse(outside.stdout.trim()).code, "CCI-OUT");
++    assert.equal(spawnSync("test", ["-e", join(fx.root, "evidence", "out.json")]).status, 1);
++    writeFileSync(join(fx.root, "project", "pipeline.json"), "{ not json");
++    const broken = commit(fx.root, "break calibration");
++    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: broken }), "CCI-CALIBRATION");
++    git(fx.root, ["rm", "-q", "project/pipeline.json"]);
++    const missing = commit(fx.root, "remove calibration");
++    cciRefusal(() => deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head: missing }), "CCI-CALIBRATION");
++    const cli = cciCli(fx.root, fx.base, missing, "scratch/other.json");
++    assert.equal(cli.status, 2);
++    assert.equal(JSON.parse(cli.stdout.trim()).code, "CCI-CALIBRATION");
++  } finally { rmSync(fx.root, { recursive: true, force: true }); }
++});
++
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 32768});
