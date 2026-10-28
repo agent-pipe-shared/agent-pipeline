@@ -18,6 +18,26 @@ Pipeline; the Glossover session rightly refused to do that and did not start the
 Consequence: no consumer can ever start Critic round 2 or later through a sanctioned route. Round 1 works, the course
 cannot continue.
 
+## Consumer facts (read-only answers of the Glossover session, 2026-10-28; model output, not yet re-verified here)
+
+- Round 1: candidate `20efd3ed…`, base `05e3ebc8…`, packet `c3a2e1df…`, packetDigest `37f56e92…`; finalized with the
+  caller-authored fallback under build `…091024.692301f` (the course path was not used); exported and committed in `83e36de`
+  under `specs/<feature>/evidence/critic/c3a2…/` (receipt, report, index), none of them registered in `lifecycle.json`.
+- 25 commits since round 1 (corrections plus documentation). The manifest holds diagnostic evidence for later candidates
+  (`critic-diag-c2`, `c3`) but no lineage record and no delta request anywhere in the repository.
+- Preflight on candidate `65eb2a14…` with the evidence: mode full ends in `CGB-CONFLICT`; with a (placeholder) delta request
+  path it ends in `CCA-REQUESTED-MODE` ("the first review is full, every later review is a delta"). `CCA-DELTA-REQUIRED` never
+  appeared, so the course does not see round 1 as consumed history.
+
+## Finding of the Elephant (2026-10-28, checked in this repository)
+
+The course history is read from manifest-registered `candidate-evidence` artifacts whose content is a
+`pipeline.critic-review-lineage.v1|v2` record (`retainedV2`, `critic-course-admission.mjs` line 378). `compileCriticReviewLineage`
+and `compileRegisteredCriticReviewLineage` (`critic-review-lineage.mjs` lines 293 and 418) have no production caller, only tests.
+So the gap is wider than the delta request: no sanctioned route turns a consumed round into a lineage record and registers it,
+and none builds and registers the delta request. Round 2 needs both, in a registration order not yet analysed. Whether a round
+finalized with the caller-authored fallback may seed a course is an open question (possibly a PO decision).
+
 ## Wanted
 
 - A sanctioned command, for example `register-feature-package.mjs --root <root> --add-delta-request <input.json>`, that takes
