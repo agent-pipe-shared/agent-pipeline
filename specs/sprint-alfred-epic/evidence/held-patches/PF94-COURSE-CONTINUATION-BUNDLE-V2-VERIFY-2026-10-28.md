@@ -11,7 +11,7 @@ and its pin test are guard files: the PO applies this patch as operator.
 
 ## Why this bundle
 
-Glossover (PF-94) could not run Critic round 2 of its course by any sanctioned route. Round 1 had run as a generic batch, so the course had no
+Consumer A (PF-94) could not run Critic round 2 of its course by any sanctioned route. Round 1 had run as a generic batch, so the course had no
 history; no sanctioned command wrote the lineage record of a consumed round or the delta request of the next one. PO decisions: a rerun of round 1
 is acceptable, and the takeover is a narrow audited command.
 
@@ -41,7 +41,7 @@ Full Verify is not run for this bundle.
 
 ## Named gaps and gates (not done)
 
-- **No real Glossover retest yet.** The cases run on fixtures; the next Glossover run is the real test.
+- **No real consumer retest yet.** The cases run on fixtures; the next consumer run is the real test.
 - **Path after the admitted delta is not walked:** preflight of round 2, claim, finalize, export and the lineage of round 2 are not exercised end to end.
 - **Untested refusals:** `FPR-LINEAGE-COVERAGE-CLAIM`, `CGB-TAKEOVER-COURSE`; the c15 upgrade-state reproduction on the previous build is covered only through the bundle run.
 - **Operator docs:** SKILL.md / implementation-continuation.md and the `--help` text for the new verbs are not written.
@@ -61,7 +61,7 @@ Block 2, stage with a path limit and commit ONCE with your own ceremony:
 Block 3, tell the Elephant. It stamps (`scripts/stamp-candidate.mjs`), then you synchronize the installed plugin copy per
 `docs/push-release-flow.md` and run `refresh-mandatory-hooks.mjs`.
 
-## Order for Glossover after the install
+## Order for a consumer after the install
 
 1. `inspect-course-takeover`, then `supersede-course-takeover` (digest and reason).
 2. Rerun round 1 on the course path.

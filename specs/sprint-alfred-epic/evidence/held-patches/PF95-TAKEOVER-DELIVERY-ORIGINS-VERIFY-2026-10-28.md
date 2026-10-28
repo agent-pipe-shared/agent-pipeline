@@ -5,7 +5,7 @@ One patch, applied and committed as ONE commit on the installed candidate (`0.7.
 `w7-pf94-takeover-moves-delivery-origins-c22.patch` (4 files). This is a HELD PATCH: nothing in it is applied, stamped, installed, reviewed or accepted
 until the PO has done so.
 
-## The defect (my fault, found by the real Glossover run)
+## The defect (my fault, found by a real consumer run)
 
 After `inspect-course-takeover` (`refusalCode: null`) and `supersede-course-takeover` (`superseded`), the next `admit` on the course path ended in
 `CGB-CONFLICT`. The old batch owns TWO kinds of origins index entry: the feature-course origin and, from `writeMember`, the delivery target of every member
@@ -45,7 +45,7 @@ bytes without exporting record prose`; it is the only failing name and fails ide
 - **The refusal text does not reach the operator.** The detail of `CGB-CONFLICT` is set in the library, but the `admit` layer of the finalizer still prints
   only the generic `Generic Critic batch is unavailable or refused.` The case that asserted the text at the finalizer layer was removed by the Goldfish
   (deviation, written down). Surfacing the detail in `admit` is a separate small slice.
-- **Glossover's already-superseded state is not repaired by this patch.** There the logical entries are gone, so a corrected `supersede` finds nothing to
+- **An already-superseded consumer state is not repaired by this patch.** There the logical entries are gone, so a corrected `supersede` finds nothing to
   take over. The one leftover file `origins/<sha>.json` of the old batch must be moved by hand into `superseded/<digest>/origins/` (same store). Nothing is deleted.
 - Full Verify, batch Critic, native Windows, D31 native qualification, the real retests and PO acceptance stay open.
 

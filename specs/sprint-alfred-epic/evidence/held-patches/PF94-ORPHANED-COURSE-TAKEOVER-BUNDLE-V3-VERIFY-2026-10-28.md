@@ -7,11 +7,11 @@ installed PF-94 candidate (`0.7.0+claude.20261028151938.d2a0f0f`, stamp `dd16c69
 stamped, installed, reviewed or accepted until the PO has done so.
 
 PO decision (2026-10-28, question tiles): the takeover may also retire a consumed feature-course batch of ANOTHER course key that has no registered
-lineage (narrow extension of the earlier decision), and Glossover may rerun round 1 on the course path after the install.
+lineage (narrow extension of the earlier decision), and a consumer may rerun round 1 on the course path after the install.
 
 ## Why this bundle
 
-The first real run of the installed PF-94 build on the Glossover repository ended in a dead end:
+The first real run of the installed PF-94 build on a consumer repository ended in a dead end:
 
 - `inspect-course-takeover` printed `originKind: feature-course`, an owner course key (`75b29a71…`) different from the requested one (`0e48762b…`),
   all packets consumed, `courseHistoryRegistered: false`, `refusalCode: CGB-TAKEOVER-COURSE`.
@@ -56,11 +56,11 @@ not run for this bundle.
 
 ## Named gaps and gates (not done)
 
-- **Not tested on the Glossover repository.** The case builds the old batch through the real course path of the fixture, not from the consumer's disk. The
-  next Glossover run is the real test.
+- **Not tested on a consumer repository.** The case builds the old batch through the real course path of the fixture, not from the consumer's disk. The
+  next consumer run is the real test.
 - **Untested refusal:** `FPR-LINEAGE-COVERAGE-CLAIM`. The path after the admitted delta (preflight of round 2, claim, finalize, export, lineage of round 2)
   is not walked end to end.
-- **Operator documentation of the four verbs is still missing** (skill text, `--help`), and it is the reason Glossover did not find the order. A separate
+- **Operator documentation of the four verbs is still missing** (skill text, `--help`), and it is the reason the consumer did not find the order. A separate
   slice is next.
 - Full Verify, batch Critic, native Windows (D58 to D61), D31 native qualification and PO acceptance stay open.
 
@@ -77,7 +77,7 @@ Block 2, stage with a path limit and commit ONCE with your own ceremony:
 Block 3, tell the Elephant. It stamps (`scripts/stamp-candidate.mjs`), then you synchronize the installed plugin copy per `docs/push-release-flow.md` and
 run `refresh-mandatory-hooks.mjs`.
 
-## Order for Glossover after the install
+## Order for a consumer after the install
 
 1. `inspect-course-takeover` (expect `refusalCode: null`, a different owner key), then `supersede-course-takeover` with the digest and a short reason.
 2. Rerun round 1 on the course path (PO approved the Opus run, budget limit PF-92).

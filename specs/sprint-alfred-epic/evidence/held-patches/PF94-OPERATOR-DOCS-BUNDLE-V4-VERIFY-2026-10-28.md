@@ -43,7 +43,7 @@ not run for this bundle. The c20 patch alone left case-completion at 31 of 32 (V
 
 ## Named gaps and gates (not done)
 
-- **Not tested on the Glossover repository.** The next Glossover run is the real test.
+- **Not tested on a consumer repository.** The next consumer run is the real test.
 - **Untested refusal:** `FPR-LINEAGE-COVERAGE-CLAIM`. The path after the admitted delta (preflight of round 2, claim, finalize, export, lineage of
   round 2) is not walked end to end.
 - Full Verify, batch Critic, native Windows (D58 to D61), D31 native qualification and PO acceptance stay open.
@@ -62,7 +62,7 @@ Block 3, tell the Elephant. It stamps once (`scripts/stamp-candidate.mjs`), cove
 synchronize the installed plugin copy per `docs/push-release-flow.md` and run `refresh-mandatory-hooks.mjs`. The stamp `a0957c150` is superseded and
 is not installed.
 
-## Order for Glossover after the install
+## Order for a consumer after the install
 
 1. `inspect-course-takeover` (expect `refusalCode: null`, a different owner key), then `supersede-course-takeover` with the digest and a short reason.
 2. Rerun round 1 on the course path (PO approved the Opus run, budget limit PF-92).

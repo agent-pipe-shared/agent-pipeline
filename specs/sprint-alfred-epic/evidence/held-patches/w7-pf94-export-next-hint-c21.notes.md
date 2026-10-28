@@ -7,7 +7,7 @@ Patch: `w7-pf94-export-next-hint-c21.patch` (2 files, 3480 bytes). It is an INCR
 
 After `session-critic-finalizer.mjs export` an operator makes correction commits; only `register-feature-package.mjs --help` said the lineage of round N
 must be registered before the next correction commit. By then `--add-review-lineage --packet <id>` can no longer succeed (FPR-LINEAGE-TRANSPORT /
-CCA-TRANSPORT-SOURCE-DRIFT). The export result, the last thing read before those commits, carried no hint (Toolbox report D69).
+CCA-TRANSPORT-SOURCE-DRIFT). The export result, the last thing read before those commits, carried no hint (consumer report D69).
 
 ## Changed lines
 

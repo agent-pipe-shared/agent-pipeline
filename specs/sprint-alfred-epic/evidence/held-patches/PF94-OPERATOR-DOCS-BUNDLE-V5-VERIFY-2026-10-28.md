@@ -11,7 +11,7 @@ reviewed or accepted until the PO has done so.
 
 The four verbs that continue a Critic course past a consumed first round (`inspect-course-takeover`, `supersede-course-takeover`,
 `register-feature-package --add-review-lineage`, `register-feature-package --add-delta-request`) existed without operator documentation, and the
-`export` result did not say that the lineage of round N must be registered BEFORE the next correction commit (Toolbox report D69, Glossover PF-94). Both
+`export` result did not say that the lineage of round N must be registered BEFORE the next correction commit (consumer B report D69, consumer A PF-94). Both
 repositories read the same skill and the same CLI texts from the installed plugin, so the documentation travels with the install.
 
 ## What changes
@@ -47,7 +47,7 @@ unchanged baseline. Full Verify is not run for this bundle.
 
 ## Named gaps and gates (not done)
 
-- **Not tested on the Toolbox or Glossover repository.** The next run there is the real test.
+- **Not tested on a consumer repository.** The next run there is the real test.
 - **Untested refusal:** `FPR-LINEAGE-COVERAGE-CLAIM`. The path after the admitted delta (preflight of round 2, claim, finalize, export, lineage of
   round 2) is not walked end to end.
 - Full Verify, batch Critic, native Windows (D58 to D61), D31 native qualification and PO acceptance stay open.
@@ -66,7 +66,7 @@ Block 2, stage with a path limit and commit ONCE with your own ceremony:
 Block 3, tell the Elephant. It stamps once (`scripts/stamp-candidate.mjs`), covering the v3 takeover bundle and this bundle; then you synchronize the
 installed plugin copy per `docs/push-release-flow.md` and run `refresh-mandatory-hooks.mjs`. The stamp `a0957c150` is superseded and is not installed.
 
-## Order for Toolbox and Glossover after the install
+## Order for a consumer after the install
 
 1. `inspect-course-takeover` (expect `refusalCode: null`, a different owner key), then `supersede-course-takeover` with the digest and a short reason.
 2. Rerun round 1 on the course path (PO approved the run, budget limit PF-92).

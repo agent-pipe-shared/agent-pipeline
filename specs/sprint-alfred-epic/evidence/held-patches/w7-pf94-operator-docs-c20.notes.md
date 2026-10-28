@@ -15,7 +15,7 @@ State: all five text edits are made in the scratch clone and the patch `w7-pf94-
 1. Read counts of `scratch/agent-out/w7cn/logs/green1.log` (clone, started) and `base1.log` (clone2 baseline, started): expect 65 cases (61 + 4) all passing in clone, 61 in clone2; compare failing-name sets.
 2. Run and read counts: `session-critic-finalizer.test.mjs` (expect 79, 78 pass, 1 known fail; CLI_HELP or message pins may break), `critic-generic-batch.test.mjs` (34), `harness/scripts/check-verify-case-completion.test.mjs` (32; VCR01 pinned number of row `critic-course-admission-tests` MUST change to the printed actual, +assertions of the four new cases; NOT yet changed, so the patch leaves that test red until fixed), `lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs` (24). Driver: `node scratch/agent-out/w7cn/driver.mjs run LABEL <file>`.
 3. If VCR01 changes: edit it in the clone, rerun `driver.mjs patch` and `check`, then `driver.mjs cleanup` (clones are still in place, w7cl/w7cm untouched).
-4. Not done: Verify run, batch Critic (parent-owned), native Windows, real Glossover retest, PO acceptance.
+4. Not done: Verify run, batch Critic (parent-owned), native Windows, real consumer retest, PO acceptance.
 
 ## Proposed commit message
 `docs(critic): document how to continue a Critic course (takeover, lineage, delta request) and name the late-lineage repair in the refusal texts (PF-94)`
