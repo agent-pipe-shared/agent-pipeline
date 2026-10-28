@@ -13,7 +13,10 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **233 items:228 at75,3 at50,2 at25;5 below75;index74.25%** (Toolbox D58/D59
+contains **233 items:232 at75,1 at50,0 at25;1 below75;index74.89%** (round-3 bundle v1,
+2026-10-28: PF-85, D52, PF-93 and D58/D59 moved to75 on operator commit `692301fd9`, installed in
+the stamp `59b3a7b65`; D31/D32 is the one row below75; the PO holds Full Verify and the batch Critic until
+the happy-path and brownfield tests are green; before it 228/3/2, 74.25%; Toolbox D58/D59
 intake, 2026-10-28: one P0 row joined at25, the Windows directory fsync refusal that
 aborts the Critic batch admit with CGB-PHYSICAL, held patch delivered and verified on
 Linux; PF-93 intake,

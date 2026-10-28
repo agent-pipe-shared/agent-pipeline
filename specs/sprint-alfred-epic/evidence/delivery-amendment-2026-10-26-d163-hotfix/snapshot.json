@@ -6,7 +6,7 @@
     "path": "specs/sprint-alfred-epic/evidence/delivery-amendment-2026-10-25-portable-closure/snapshot.json",
     "sha256": "db7af02c0654ab2f86e2ff37af08e012ca5db4bab6a9060820ee43ae19a41d63"
   },
-  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75). Green-in-code amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): five rows whose committed code and pins are green move 50 to 75 with their open entries kept: bounded reader terminal binding, design phase one review, G20 publication and close, G22 isolated dependencies, R2 branch and checkout runtime continuity. Sitting amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): seven rows whose held patches were applied in the 17-patch sitting and installed move to 75 with their open entries kept: G8 design receipt, critic finalizer original independence, Verify pnpm lockfile, late review unit push block, brownfield architecture gate, missing docs/adr, draft guard Phoenix plan. Rows with a partial delivery stay at 50: preflight prerequisites (node probe only), D7 (Wanted 2 to 4), fitness class 6 (patch pending), half-moved feature directory (PowerShell parity open), PF-79 (refusal text only, honest route open). P0/P1 intake round 3 (2026-10-27, PO message): ten P1 rows from the Toolbox hand-over (D50, D47, D41, D43/D45/D52, D51, D31/D32) and Glossover feedback 06 (PF-82, PF-83, PF-85, PF-86) join; no P0 is open. D50 sits at 50 (fix delivered, cause unconfirmed), the rest at 25 until analysed. P2/P3 and low items stay in the backlog list only. Evening sitting amendment (2026-10-27, PO rule \"everything green in the code gets 75\" and the D50 decision): the bundle and increment of the 2026-10-27 evening were applied in operator commit 4ea7a86b7 and installed in the stamp 4df491eb2 (0.7.0+claude.20261027214535.4ea7a86). Eleven rows move to 75 with their open entries kept (the agent entry dropped where the patch is exactly that entry): elephant main context, signature ceremony slice A, G9b, G18, G23 forensics, fitness class 6, D50 (native-host confirmation open), D41, D51, D47, PF-83. Five rows move 25 to 50 on partial delivery with committed notes: D52, D31/D32, PF-82, PF-85 (1b only), PF-86. Four rows stay at 50: preflight prerequisites, design course versus registrar, half-moved feature directory, Critic admission without a dispatch record (D56 slices 4, 4b, 5 open). No Full Verify, Critic, native or acceptance claim. Round-2 bundle v5 amendment (2026-10-28, PO rule \"everything green in the code gets 75\"): the twenty-four held patches of w7-round2-bundle-v5-2026-10-28.patch were applied in operator commit c0b837599 and installed in the stamp 638aef7bf (0.7.0+claude.20261028061638.c0b8375). Six rows move 50 to 75 with their open entries kept (the agent entry dropped where the patches are exactly that entry): preflight prerequisites, design course versus registrar, half-moved feature directory, Critic admission without a dispatch record, PF-82 and PF-86. Three rows stay at 50: D52 (onboarding check and close-block refusal open), D31/D32 (resume without a manual cancel and the grant headroom open), PF-85 (slice 1a open). No Full Verify, Critic, native or acceptance claim. PF-93 intake (2026-10-28, PO message from the Glossover session): one P0 row joins at 25, pipeline.glossover.pf93-critic-packet-claimed-under-an-older-version-cannot-finalize. Toolbox D58/D59 intake (2026-10-28, PO message from the Toolbox session): one P0 row joins at 25, pipeline.toolbox.d58-d59-windows-directory-fsync-blocks-critic-admit.",
+  "method": "D163 hotfix amendment: same 207 identities. Six rows move to 75 on the operator commit 9ce6c2361 that applies the nineteen held patches (five rows) and on the direct commit 45612a7bd (one row). Evidence is each patch's notes and the Coordinator bundle run; no Full Verify, Critic, native or acceptance claim. D164 adds one P1 row at 25: pipeline.preflight-establishes-runner-prerequisites. D165 adds two P0 consumer blocker rows at 25 for an interim candidate. D166 adds seven Toolbox rows for the next candidate: P0 D25, D6 (at 50, held patch D165-S7a applied) and D7 with D15/D16/D17/D24, P1 D8, D9, D14/D18 and D21 with the rest of D3. D167 adds the P0 row pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location (PF-78). D172 (2026-10-27, PO rule \"75 counts when technically delivered in the candidate\"): D25 (dispatch authority store on Windows) and PF-78 move 25 to 75 and S7b (Windows preflight private-root finding) 50 to 75, each dropping only its agent entry, on held patches D166/D169, D167 and D168 applied in operator commit 304365b68 and installed; the D7 row moves 25 to 50 on D170 (17e002a67) and D171 (bff5c444e, in source), Wanted 2 to 4 open. The Glossover findings PF-79 (P0), PF-80 and PF-81 (P1) join as three rows at 25. D173 (2026-10-27, same PO rule): PF-80 moves 25 to 75, dropping only its agent entry, on held patch D173 applied in operator commit e3f0d7d03 and installed in the stamp e562ae955. Analysis amendment (2026-10-27, PO rule: analysed rows need evidence to reach 50): eight analysed rows move 25 to 50 on read-only recon notes committed under specs/sprint-alfred-epic/evidence/recon-2026-10-27 and, where a part is delivered, on held patches that are committed but not applied: preflight prerequisites, late review unit, brownfield architecture gate, missing docs/adr (D8), fitness class 6 (D9), half-moved feature directory (D14/D18), draft guard recovery wrappers (D21) and PF-79. Their agent entries stay open; held patches count for 75 only once applied and installed. Row amendment (2026-10-27, PO tile decision): three rows whose only open entries are a counted Verify run, the Critic and PO acceptance move 50 to 75 as technically delivered: nongit retirement reader controller helper, onboarding greenfield matrix speed, onboarding test runner async settlement. Second row amendment (2026-10-27, PO tile decision): two rows with no agent entry left move 50 to 75 as technically delivered: retirement reader unsafe-layout inspection, three-runner happy path with two PO approvals (native runner runs stay a gate after 75). Green-in-code amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): five rows whose committed code and pins are green move 50 to 75 with their open entries kept: bounded reader terminal binding, design phase one review, G20 publication and close, G22 isolated dependencies, R2 branch and checkout runtime continuity. Sitting amendment (2026-10-27, PO rule \"everything green in the code gets 75\"): seven rows whose held patches were applied in the 17-patch sitting and installed move to 75 with their open entries kept: G8 design receipt, critic finalizer original independence, Verify pnpm lockfile, late review unit push block, brownfield architecture gate, missing docs/adr, draft guard Phoenix plan. Rows with a partial delivery stay at 50: preflight prerequisites (node probe only), D7 (Wanted 2 to 4), fitness class 6 (patch pending), half-moved feature directory (PowerShell parity open), PF-79 (refusal text only, honest route open). P0/P1 intake round 3 (2026-10-27, PO message): ten P1 rows from the Toolbox hand-over (D50, D47, D41, D43/D45/D52, D51, D31/D32) and Glossover feedback 06 (PF-82, PF-83, PF-85, PF-86) join; no P0 is open. D50 sits at 50 (fix delivered, cause unconfirmed), the rest at 25 until analysed. P2/P3 and low items stay in the backlog list only. Evening sitting amendment (2026-10-27, PO rule \"everything green in the code gets 75\" and the D50 decision): the bundle and increment of the 2026-10-27 evening were applied in operator commit 4ea7a86b7 and installed in the stamp 4df491eb2 (0.7.0+claude.20261027214535.4ea7a86). Eleven rows move to 75 with their open entries kept (the agent entry dropped where the patch is exactly that entry): elephant main context, signature ceremony slice A, G9b, G18, G23 forensics, fitness class 6, D50 (native-host confirmation open), D41, D51, D47, PF-83. Five rows move 25 to 50 on partial delivery with committed notes: D52, D31/D32, PF-82, PF-85 (1b only), PF-86. Four rows stay at 50: preflight prerequisites, design course versus registrar, half-moved feature directory, Critic admission without a dispatch record (D56 slices 4, 4b, 5 open). No Full Verify, Critic, native or acceptance claim. Round-2 bundle v5 amendment (2026-10-28, PO rule \"everything green in the code gets 75\"): the twenty-four held patches of w7-round2-bundle-v5-2026-10-28.patch were applied in operator commit c0b837599 and installed in the stamp 638aef7bf (0.7.0+claude.20261028061638.c0b8375). Six rows move 50 to 75 with their open entries kept (the agent entry dropped where the patches are exactly that entry): preflight prerequisites, design course versus registrar, half-moved feature directory, Critic admission without a dispatch record, PF-82 and PF-86. Three rows stay at 50: D52 (onboarding check and close-block refusal open), D31/D32 (resume without a manual cancel and the grant headroom open), PF-85 (slice 1a open). No Full Verify, Critic, native or acceptance claim. PF-93 intake (2026-10-28, PO message from the Glossover session): one P0 row joins at 25, pipeline.glossover.pf93-critic-packet-claimed-under-an-older-version-cannot-finalize. Toolbox D58/D59 intake (2026-10-28, PO message from the Toolbox session): one P0 row joins at 25, pipeline.toolbox.d58-d59-windows-directory-fsync-blocks-critic-admit. Round-3 bundle v1 amendment (2026-10-28, PO rule \"everything green in the code gets 75\"): the four held patches of w7-round3-bundle-v1-2026-10-28.patch were applied in operator commit 692301fd9 and installed in the stamp 59b3a7b65 (0.7.0+claude.20261028091024.692301f). Four rows move to 75 with their open entries kept (the agent entry dropped where the patch is exactly that entry): PF-85 (50), D52 (50), PF-93 (25) and Toolbox D58/D59 (25). D31/D32 stays at 50 (resume without a manual cancel: option A or C is a PO decision; the grant headroom rule is open). PF-93 option B (release command), the native Windows run of D58/D59, Full Verify, the batch Critic and PO acceptance stay open; no Full Verify, Critic, native or acceptance claim.",
   "total": 233,
   "baseline": {
     "counts": {
@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 2,
-      "50": 3,
-      "75": 228,
+      "25": 0,
+      "50": 1,
+      "75": 232,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 74.25
+    "index": 74.89
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -355,7 +355,7 @@
     "critic": 234,
     "po-acceptance": 233,
     "native-host": 133,
-    "agent": 39,
+    "agent": 35,
     "po-decision": 3,
     "verify-wsl": 92,
     "historical-evidence": 1
@@ -8146,20 +8146,17 @@
     {
       "itemId": "pipeline.toolbox.d52-elephant-cannot-commit-intermediate-states",
       "title": "The Elephant has a sanctioned commit route for state.md, pipeline files and intermediate states, and close-block cannot end the feature before the Critic (Toolbox D43, D45, D52)",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Toolbox relayed 2026-10-27: no commit route for docs/state.md and pipeline files (D43, D45; D45 solved in 757cc2f, onboarding should check it earlier); intermediate states needed --no-verify (D52) and the pipeline close-block would end the feature before the Critic. Not analysed yet. Partial delivery: w7-d52-stale-snapshot-refusal-text (the refusal names the cause and the sanctioned route); the sanctioned intermediate-commit route, the early onboarding check and the close-block refusal while a Critic is scheduled are not built, applied in operator commit 4ea7a86b7 and installed in the stamp 4df491eb2 (0.7.0+claude.20261027214535.4ea7a86); the rest stays open, so the row stays below 75. Counts only as 50 on committed notes and applied code. Round-2 bundle v5 (2026-10-28, operator commit c0b837599, stamp 638aef7bf (0.7.0+claude.20261028061638.c0b8375)): patch 9 delivers the sanctioned checkpoint-commit route (checkpoint-commit.mjs and the Checkpoint-Act trailer admission); the early onboarding check of the commit route and the close-block refusal while a Critic is scheduled are not built. The row stays below 75.",
+      "reason": "Toolbox relayed 2026-10-27: no commit route for docs/state.md and pipeline files (D43, D45; D45 solved in 757cc2f, onboarding should check it earlier); intermediate states needed --no-verify (D52) and the pipeline close-block would end the feature before the Critic. Not analysed yet. Partial delivery: w7-d52-stale-snapshot-refusal-text (the refusal names the cause and the sanctioned route); the sanctioned intermediate-commit route, the early onboarding check and the close-block refusal while a Critic is scheduled are not built, applied in operator commit 4ea7a86b7 and installed in the stamp 4df491eb2 (0.7.0+claude.20261027214535.4ea7a86); the rest stays open, so the row stays below 75. Counts only as 50 on committed notes and applied code. Round-2 bundle v5 (2026-10-28, operator commit c0b837599, stamp 638aef7bf (0.7.0+claude.20261028061638.c0b8375)): patch 9 delivers the sanctioned checkpoint-commit route (checkpoint-commit.mjs and the Checkpoint-Act trailer admission); the early onboarding check of the commit route and the close-block refusal while a Critic is scheduled are not built. The row stays below 75. Delivered 2026-10-28: patch w7-d52-close-gate-and-commit-route-check-c2 (the close coordinator refuses with CLOSE-CRITIC-SLICE-SCHEDULED while a Critic slice of the feature course is scheduled or in progress, with a pin), on top of the refusal text (4ea7a86b7) and the checkpoint-commit route (c0b837599); the early onboarding check of the commit route needs no patch: the start preflight already emits the typed HOOK-SNAPSHOT-STALE code and the status hook-refresh-required for every stale mandatory hook (AC-179), pinned in pipeline-start-preflight.test.mjs and lib/pins/git-hook-runtime-snapshots-go-stale-after-plugin-changes.test.mjs. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the round-3 held-patch bundle v1 was applied in operator commit 692301fd9 and installed in the stamp 59b3a7b65 (0.7.0+claude.20261028091024.692301f); the installed manifest version was read back and equals the stamped version. The open entries stay as the list of what tests and acceptance still miss; no Full Verify, Critic, native or acceptance claim.",
       "evidence": [
         "backlog/items/2026-10-27-p0-p1-findings-round-3-toolbox-and-glossover.md",
-        "specs/sprint-alfred-epic/evidence/held-patches/COMPOSED-STACK-VERIFY-2026-10-28.md"
+        "specs/sprint-alfred-epic/evidence/held-patches/COMPOSED-STACK-VERIFY-2026-10-28.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/ROUND3-BUNDLE-VERIFY-2026-10-28.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Recon the commit gates the Elephant meets (pre-commit snapshot, GIT-03 trailers, GG-17 --no-verify) and give intermediate commits a sanctioned route; make onboarding check the commit route early; make close-block refuse while a Critic is still scheduled."
-        },
         {
           "owner": "verify-wsl",
           "what": "Candidate-bound integrated Verify/Security remains pending."
@@ -8174,7 +8171,9 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "previousSnapshotStage": "50",
+      "evidenceHead": "692301fd9"
     },
     {
       "itemId": "pipeline.toolbox.d51-critic-diagnostic-evidence-demands-head-equals-candidate",
@@ -8319,20 +8318,17 @@
     {
       "itemId": "pipeline.glossover.pf85-follow-up-package-on-the-same-item-is-refused",
       "title": "A follow-up package on the same item is accepted with an explicit continuation reference without committing a red predecessor (Glossover PF-85)",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Glossover relayed 2026-10-27: after a partial blocked delivery the follow-up on the same item is refused (NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD) until the incomplete predecessor is committed, forcing red intermediate commits; an item id outside the spec catalogue fails with catalogue-source-closure and no hint. The same refusal class (item-delivery-owner-collision) was met in this session. Not analysed yet. Partial delivery: w7-pf85-repair-hints-c2 (every item-delivery refusal names the sanctioned repair, 1b); --continuation-of (1a) follows the cancel class by PO decision and is not built, applied in operator commit 4ea7a86b7 and installed in the stamp 4df491eb2 (0.7.0+claude.20261027214535.4ea7a86); the rest stays open, so the row stays below 75. Counts only as 50 on committed notes and applied code. Round-2 bundle v5 (2026-10-28, operator commit c0b837599, stamp 638aef7bf (0.7.0+claude.20261028061638.c0b8375)): no patch of the bundle touches it; slice 1a (--continuation-of) follows after the install by the PO decision. The row stays below 75.",
+      "reason": "Glossover relayed 2026-10-27: after a partial blocked delivery the follow-up on the same item is refused (NGHS-ITEM-INTEGRATION-DEPENDENCY-HELD) until the incomplete predecessor is committed, forcing red intermediate commits; an item id outside the spec catalogue fails with catalogue-source-closure and no hint. The same refusal class (item-delivery-owner-collision) was met in this session. Not analysed yet. Partial delivery: w7-pf85-repair-hints-c2 (every item-delivery refusal names the sanctioned repair, 1b); --continuation-of (1a) follows the cancel class by PO decision and is not built, applied in operator commit 4ea7a86b7 and installed in the stamp 4df491eb2 (0.7.0+claude.20261027214535.4ea7a86); the rest stays open, so the row stays below 75. Counts only as 50 on committed notes and applied code. Round-2 bundle v5 (2026-10-28, operator commit c0b837599, stamp 638aef7bf (0.7.0+claude.20261028061638.c0b8375)): no patch of the bundle touches it; slice 1a (--continuation-of) follows after the install by the PO decision. The row stays below 75. Delivered 2026-10-28: patch w7-pf85-continuation-of-c3 (slice 1a: --continuation-of admits a follow-up package for a cancelled predecessor of class budget or wrong-premise; 1b was applied earlier). PO rule 2026-10-27 (\"everything green in the code gets 75\"): the round-3 held-patch bundle v1 was applied in operator commit 692301fd9 and installed in the stamp 59b3a7b65 (0.7.0+claude.20261028091024.692301f); the installed manifest version was read back and equals the stamped version. The open entries stay as the list of what tests and acceptance still miss; no Full Verify, Critic, native or acceptance claim.",
       "evidence": [
         "backlog/items/2026-10-27-p0-p1-findings-round-3-toolbox-and-glossover.md",
-        "specs/sprint-alfred-epic/evidence/held-patches/COMPOSED-STACK-VERIFY-2026-10-28.md"
+        "specs/sprint-alfred-epic/evidence/held-patches/COMPOSED-STACK-VERIFY-2026-10-28.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/ROUND3-BUNDLE-VERIFY-2026-10-28.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Recon the item reservation and integration-dependency checks; add --continuation-of <id> for a package that continues a stopped slice, and name the catalogue rule in the catalogue-source-closure refusal; RED cases for both."
-        },
         {
           "owner": "verify-wsl",
           "what": "Candidate-bound integrated Verify/Security remains pending."
@@ -8347,7 +8343,9 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "previousSnapshotStage": "50",
+      "evidenceHead": "692301fd9"
     },
     {
       "itemId": "pipeline.glossover.pf86-registry-lock-is-busy-while-agents-run",
@@ -8389,19 +8387,16 @@
     {
       "itemId": "pipeline.glossover.pf93-critic-packet-claimed-under-an-older-version-cannot-finalize",
       "title": "A Critic packet claimed under an older plugin version is finalized under the new version and the hidden admission cause is named (Glossover PF-93)",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Glossover blocker relayed 2026-10-28 (PO message, handover docs/pipeline-handover-pf93.md in the Glossover repository): a packet claimed under version A can neither be finalized nor released under version B, keeps the reservation for the old packet and loses the independent verdict. Cause chain re-read in this repository: normalizeCoordinatorOnly in critic-packet-preflight.mjs requires the assurance key and a snapshotId over it since the D56 binding assurance patch (round-2 bundle v5, installed 2026-10-28), and the catch in finalizeSessionCriticReview reports SCF-PRELAUNCH-ADMISSION without the cause. Not analysed further and not fixed; slice w7-pf93-critic-packet-version-skew is in preparation.",
+      "reason": "Glossover blocker relayed 2026-10-28 (PO message, handover docs/pipeline-handover-pf93.md in the Glossover repository): a packet claimed under version A can neither be finalized nor released under version B, keeps the reservation for the old packet and loses the independent verdict. Cause chain re-read in this repository: normalizeCoordinatorOnly in critic-packet-preflight.mjs requires the assurance key and a snapshotId over it since the D56 binding assurance patch (round-2 bundle v5, installed 2026-10-28), and the catch in finalizeSessionCriticReview reports SCF-PRELAUNCH-ADMISSION without the cause. Not analysed further and not fixed; slice w7-pf93-critic-packet-version-skew is in preparation. Delivered 2026-10-28: patch w7-pf93-critic-packet-version-skew-c11 (the pre-assurance packet form is accepted as assurance null only through the explicit allowLegacyPreAssurance option, passed by the claimed-packet reads, record, consume and cleanup; prepare, claim and publish stay strict; the hidden admission cause is named; skip coverage accepts the exact legacy binding; the end-to-end legacy finalization is a green case). Export, consumed-snapshot readers and block stay strict for a legacy packet; the release command (option B) stays a PO decision. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the round-3 held-patch bundle v1 was applied in operator commit 692301fd9 and installed in the stamp 59b3a7b65 (0.7.0+claude.20261028091024.692301f); the installed manifest version was read back and equals the stamped version. The open entries stay as the list of what tests and acceptance still miss; no Full Verify, Critic, native or acceptance claim.",
       "evidence": [
-        "backlog/items/2026-10-28-critic-packet-claimed-under-an-older-version-cannot-finalize.md"
+        "backlog/items/2026-10-28-critic-packet-claimed-under-an-older-version-cannot-finalize.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/ROUND3-BUNDLE-VERIFY-2026-10-28.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Accept the pre-assurance packet form as assurance null (exact old key set and digest only), pass the underlying cause through SCF-PRELAUNCH-ADMISSION, add a regression over two version states, and report the CGB-PHYSICAL refusal at admit with the old packet."
-        },
         {
           "owner": "po-decision",
           "what": "Decide whether a release command for a claimed Critic packet with an audit trail is wanted (the reservation has no expiry and no release route today)."
@@ -8424,25 +8419,24 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "previousSnapshotStage": "25",
+      "evidenceHead": "692301fd9"
     },
     {
       "itemId": "pipeline.toolbox.d58-d59-windows-directory-fsync-blocks-critic-admit",
       "title": "The generic Critic batch admit tolerates the Windows directory fsync refusal, and the attested dispatch record scope refusal names its repair (Toolbox D58, D59)",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Toolbox blocker relayed 2026-10-28 (PO message from the Toolbox session): on Windows admit aborts with CGB-PHYSICAL because critic-generic-batch.mjs durable() fsyncs the parent directory and Windows refuses that with EPERM (every Windows project is affected, a retry never helps, the tool names no cause); D59: an orchestrator-attested record refuses a commit with paths outside the briefing without saying how to repair it (the property stays). The held patch w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2 is delivered and verified on Linux (33/33 and 74/74, identical failing sets, apply check); not applied, not stamped, not verified on native Windows.",
+      "reason": "Toolbox blocker relayed 2026-10-28 (PO message from the Toolbox session): on Windows admit aborts with CGB-PHYSICAL because critic-generic-batch.mjs durable() fsyncs the parent directory and Windows refuses that with EPERM (every Windows project is affected, a retry never helps, the tool names no cause); D59: an orchestrator-attested record refuses a commit with paths outside the briefing without saying how to repair it (the property stays). The held patch w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2 is delivered and verified on Linux (33/33 and 74/74, identical failing sets, apply check); not applied, not stamped, not verified on native Windows. Delivered 2026-10-28: patch w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2 (a refused directory fsync no longer aborts the generic Critic batch admit with CGB-PHYSICAL; the attested scope refusal names its repair); verified on Linux only, the native Windows run stays open. PO rule 2026-10-27 (\"everything green in the code gets 75\"): the round-3 held-patch bundle v1 was applied in operator commit 692301fd9 and installed in the stamp 59b3a7b65 (0.7.0+claude.20261028091024.692301f); the installed manifest version was read back and equals the stamped version. The open entries stay as the list of what tests and acceptance still miss; no Full Verify, Critic, native or acceptance claim.",
       "evidence": [
         "backlog/items/2026-10-28-windows-directory-fsync-eperm-blocks-critic-admit.md",
-        "specs/sprint-alfred-epic/evidence/held-patches/w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2.notes.md"
+        "specs/sprint-alfred-epic/evidence/held-patches/w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2.notes.md",
+        "specs/sprint-alfred-epic/evidence/held-patches/ROUND3-BUNDLE-VERIFY-2026-10-28.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Apply, stamp and install the held patch w7-d58-d59-windows-dir-fsync-and-attested-scope-hint-c2 (the PO installs), then lift this row to 75; the other directory fsync sites listed in the patch notes stay a follow-up."
-        },
         {
           "owner": "native-host",
           "what": "Qualify on a native Windows runner: admit must complete (CGB-PHYSICAL is also caused by the PF-93 version skew, a separate row)."
@@ -8461,7 +8455,9 @@
         }
       ],
       "relatedACs": [],
-      "reportingIdentityOnly": true
+      "reportingIdentityOnly": true,
+      "previousSnapshotStage": "25",
+      "evidenceHead": "692301fd9"
     }
   ]
 }
