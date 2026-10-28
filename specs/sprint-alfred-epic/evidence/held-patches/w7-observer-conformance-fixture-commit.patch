@@ -1,0 +1,20 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs b/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs
+index 75752c127..f88e0e9b5 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state-observer-conformance.test.mjs
+@@ -56,6 +56,15 @@ function tempRoot(name, { withStateMd = true } = {}) {
+     constraints: [],
+   };
+   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
++  // submit-plan now requires a resolvable HEAD; give the fixture repository one initial commit (fixed identity, no hooks).
++  const addAll = spawnSync("git", ["add", "-A"], { cwd: root, encoding: "utf8", shell: false });
++  assert.equal(addAll.status, 0, addAll.stderr);
++  const initialCommit = spawnSync(
++    "git",
++    ["-c", "user.name=PO", "-c", "user.email=po@test.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "commit", "-q", "--no-verify", "-m", "fixture: initial commit"],
++    { cwd: root, encoding: "utf8", shell: false }
++  );
++  assert.equal(initialCommit.status, 0, initialCommit.stderr);
+   return root;
+ }
+ 
