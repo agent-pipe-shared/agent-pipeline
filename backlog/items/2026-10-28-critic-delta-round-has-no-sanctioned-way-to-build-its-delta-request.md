@@ -38,6 +38,22 @@ So the gap is wider than the delta request: no sanctioned route turns a consumed
 and none builds and registers the delta request. Round 2 needs both, in a registration order not yet analysed. Whether a round
 finalized with the caller-authored fallback may seed a course is an open question (possibly a PO decision).
 
+## Recon result and PO decisions (2026-10-28)
+
+Recon notes: `specs/sprint-alfred-epic/evidence/held-patches/w7-recon-pf94-course-continuation.notes.md` (committed `63360e652`).
+No production caller exists for the lineage compilers or the delta request builder; the lineage registration of round N must
+happen before the next correction commit (evidence-only transport); a fallback-finalized round has no course claim and cannot
+become a lineage record; mode full ends in `CGB-CONFLICT` because the old batch owns the review unit work ids under another
+origin (`featureOwnership`, `critic-generic-batch.mjs` about line 735).
+
+PO decisions: (1) rerunning a Critic round is acceptable, cost is no objection; (2) tile answer "narrow takeover by command":
+a feature course may take over the logical work ids of a consumed batch with a non-course origin, only while the course has no
+registered history, with a reason, an append-only audit record and the old evidence preserved. A legacy seed and new work ids
+were not chosen.
+
+Slices: c15 takeover verbs (inspect and supersede, unblocks the rerun of round 1), c16 lineage record writer
+(`--add-review-lineage`), c17 delta request writer (`--add-delta-request`), then the end-to-end pin and the operator docs.
+
 ## Wanted
 
 - A sanctioned command, for example `register-feature-package.mjs --root <root> --add-delta-request <input.json>`, that takes
