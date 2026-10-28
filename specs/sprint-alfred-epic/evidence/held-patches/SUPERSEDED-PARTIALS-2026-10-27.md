@@ -36,5 +36,7 @@ and must NOT be applied. Apply only the replacement.
 | `w7-pipeline-state-neutral-only-fixture-c2.patch` | `w7-pipeline-state-neutral-only-fixture-c3.patch` | fixed the partial calibration block too; the file then aborted in the verify deadlock block |
 | `w7-guard-dispatch-test-fixtures.patch` | `w7-guard-dispatch-test-fixtures-c2.patch` | c1 took the file from 53 to 59 of 75; c2 includes it and completes the Workflow Explore check (60 of 75). 15 reds remain in both: generated-briefing fixtures (10) and the group B order question (5) |
 | `w7-round2-bundle-v3-2026-10-28.patch` | `w7-round2-bundle-v4-2026-10-28.patch` | v3 holds 17 patches; v4 is the same plus five test-only baseline-red repairs (critic-generic-batch, pipeline-state, codex-pretool-guard, catalogue-admit D64, guard-dispatch). Apply only one. |
+| `w7-round2-bundle-v4-2026-10-28.patch` | `w7-round2-bundle-v5-2026-10-28.patch` | v4 holds 22 patches; v5 adds the push-init fixture repair and the doc reconciliation buffer fix. Apply only one. |
+| `w7-observer-conformance-fixture-commit.patch` | `w7-round2-bundle-v5-2026-10-28.patch` | stand-alone patch, redundant inside the bundle: `w7-phoenix-reopen-design-dry-run-c4` adds the same initial commit to the same helper, so applying both conflicts. Use it only without the Phoenix patch. |
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.

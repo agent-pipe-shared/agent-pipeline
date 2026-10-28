@@ -1,16 +1,18 @@
-# Round-2 held-patch bundle v4, verification and PO apply blocks (2026-10-28)
+# Round-2 held-patch bundle v5, verification and PO apply blocks (2026-10-28)
 
-Bundle: `w7-round2-bundle-v4-2026-10-28.patch` (44 files, +2294/-146). It stacks on the tree that already
+Bundle: `w7-round2-bundle-v5-2026-10-28.patch` (47 files, +2333/-147, 24 patches). It stacks on the tree that already
 contains the earlier bundle and increment (installed at 4ea7a86b7). It applies cleanly with `git apply`
-on a fresh clone of the repository HEAD (chain check, base 60477ef80). It is a HELD PATCH: nothing in it is applied,
+on a fresh clone of the repository HEAD (chain check, base 80cc913cb). It is a HELD PATCH: nothing in it is applied,
 stamped, installed, reviewed or accepted until the PO has done so.
 
 Apply only ONE round-2 bundle. v1 (`w7-round2-bundle-2026-10-28.patch`, 13 patches), v2
-(`w7-round2-bundle-v2-2026-10-28.patch`, 15) and v3 (`w7-round2-bundle-v3-2026-10-28.patch`, 17) are superseded by v4
-(the same plus five test-only repairs). Superseded partials are listed in `SUPERSEDED-PARTIALS-2026-10-27.md`;
-never apply those.
+(`w7-round2-bundle-v2-2026-10-28.patch`, 15), v3 (`w7-round2-bundle-v3-2026-10-28.patch`, 17) and v4
+(`w7-round2-bundle-v4-2026-10-28.patch`, 22) are superseded by v5 (v4 plus one fixture repair and one production fix).
+Superseded partials are listed in `SUPERSEDED-PARTIALS-2026-10-27.md`; never apply those.
+Do NOT additionally apply `w7-observer-conformance-fixture-commit.patch`: patch 7 of this bundle already adds the same
+initial commit to the same helper (applying both conflicts), and the seven observer-conformance reds are fixed by the bundle.
 
-## Contents, in apply order (22 patches)
+## Contents, in apply order (24 patches)
 
 1. `w7-d56-admit-attested-record-c2`: admission of the orchestrator-attested record kind (Critic skip coverage).
 2. `w7-d56-binding-assurance-c3`: assurance in the binding, generic batch kind cases.
@@ -51,7 +53,19 @@ measured against the clean tree, details in the notes next to each patch):
     expectations follow the deliberate carrier policy. 53 of 75 before, 60 of 75 after; the 15 remaining reds are a
     subset of the 22 baseline reds (none new).
 
-## Test evidence (composed clone, 23 touched test files, `node --test <file>`)
+New in v5 (found by the recon of the remaining baseline reds, `w7-recon-baseline-reds-c.notes.md`):
+
+23. `w7-push-init-fixture-publication-review` (+3, test only): the all-green prepare dependencies neutralise the
+    publication review gate (`critic-bound-verify`, CBV-ROOT) through its two existing seams. push-init: 23 of 32
+    before, 32 of 32 in the composed clone. The first recon blamed the architecture gate wrongly; the stop report and the
+    correction are in `w7-push-init-fixture-architecture-readiness.notes.md`.
+24. `w7-doc-reconciliation-ls-files-buffer` (+36/-1, PRODUCTION): `harness/scripts/check-doc-reconciliation.mjs` listed
+    tracked files with Node's default 1 MiB `spawnSync` buffer; this repository now lists 1199748 bytes, so the call
+    failed (`GIT-LS-FILES-ERROR`, git exited null, exit 2). That makes layer 1b of a real push on this repository fail,
+    not only a test. The patch sets `maxBuffer: 1 << 28` on that call and adds one case with an index-only fixture above
+    1 MiB (RED before, 23 of 23 after). The range diff listing in the same file could overflow in theory; follow-up.
+
+## Test evidence (composed clone, 25 touched test files, `node --test <file>`)
 
 Everything passes except two files:
 - `hooks/guard-dispatch.test.mjs`: 75 tests, 60 pass, 15 fail. All 15 are baseline reds, see below.
@@ -66,18 +80,21 @@ commit-message-policy 42/42, critic-generic-batch 28/28, design-approval-binding
 host-commit pin file 17/17, po-gate-authority 1/1, check-critic-skip-coverage 48/48, checkpoint-commit 6/6,
 critic-packet-preflight 17/17, design-approval-route e2e 18/18, dispatch-authorship-verify 73/73,
 dispatch-record-write 31/31, pipeline-state-observer-conformance 18/18, pipeline-state (plugin) passes,
-toolchain-preflight 53/53.
+toolchain-preflight 53/53, push-init 32/32, check-doc-reconciliation passes (23 cases).
 
-Baseline reds still open after v4 (all pre-existing on the clean tree):
+Baseline reds still open after v5 (all pre-existing on the clean tree):
 - `guard-dispatch.test.mjs`, 15 names (positional ids): group C, ten checks (GD22, GD27, GD58 to GD65) fail on
   `DBG-GENERATED-BRIEFING-REQUIRED` and need generator-built briefings; two of them (incomplete briefing, filled template)
   cannot keep their property without forging the sha256 marker. Group B, five checks (GD34, GD36, GD38, GD39, GD43): the
   write-carrier check runs before the typed ROLE-REQUIRED / ROLE-UNKNOWN / PROMPT-REQUIRED findings.
 - `harness/scripts/pipeline-state.test.mjs` (protected TP-5, not touched, not run), Q9 D55 library suite,
   `lib/guard/sanctioned-args-scripts` consumers (only the D64 case was red; now fixed), and the other files of the
-  2026-10-27 list that were not re-examined (parallel-work PARWORK, project-onboarding, onboarding-continuity OBC264,
-  approve-announce, plan-authority-staging-guard, measure-tofu, observer-conformance, push-init, configure-verify-names,
-  consumer-approved-plan). They were never in the set of files this bundle touches.
+  2026-10-27 list. Fixed by v5: observer-conformance (through patch 7) and push-init (patches 23, 24). Measured and
+  classified but not fixed (see `w7-recon-baseline-reds-c.notes.md`): parallel-work PARWORK-M6a/c/d/e/f (fixture needs a
+  generator-built briefing, same family as guard-dispatch group C) and configure-verify-names (3 cases expect a
+  `repair` clause the refusal never carries; production or pin ahead of its fix, undecided). Never classified:
+  project-onboarding-v3, onboarding-continuity OBC264, approve-announce, project-onboarding-e2e,
+  plan-authority-staging-guard, measure-tofu, consumer-approved-plan (g); the Q9 D55 suite name does not resolve.
 Not run: Antigravity pretool guard test file, any dedicated PowerShell dialect test, Full Verify.
 
 ## For the batch Critic (kernel and custody parts)
@@ -108,7 +125,7 @@ Read first, in this order:
 
 ## PO apply blocks (from the repository root, in this order)
 
-Block 1, apply and look: `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v4-2026-10-28.patch`
+Block 1, apply and look: `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v5-2026-10-28.patch`
 then `git status --short`.
 
 Block 2, stage with a path limit and commit with your own ceremony: `git add -A -- plugins/pipeline-core`.

@@ -62,9 +62,14 @@ All-at75 remains the continuation objective after transfer.
 
 **Status 2026-10-28 night (round-2 bundle held; apply, install, Full Verify, Critic, native runs and PO acceptance pending):**
 after the 2026-10-27 install the remaining complete held patches are composed in
-`specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v4-2026-10-28.patch` (22 patches, 44 files,
-chain-checked on a fresh clone of HEAD; supersedes the 13-, 15- and 17-patch round-2 bundles, apply only one;
+`specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v5-2026-10-28.patch` (24 patches, 47 files,
+chain-checked on a fresh clone of HEAD; supersedes the 13-, 15-, 17- and 22-patch round-2 bundles, apply only one;
 apply blocks, test counts and the kernel parts for the batch Critic in `COMPOSED-STACK-VERIFY-2026-10-28.md`).
+v5 adds to v4 a push-init fixture repair (publication review gate, 23 to 32 of 32) and a PRODUCTION fix: the doc
+reconciliation tool listed tracked files with the 1 MiB spawn buffer, which fails on this repository
+(`GIT-LS-FILES-ERROR`) and would block layer 1b of a real push here; observer-conformance is fixed through the
+Phoenix patch, so its standalone patch is not applied. The recon of the remaining baseline reds is
+`w7-recon-baseline-reds-c.notes.md` (parallel-work and configure-verify-names classified, seven files unclassified).
 v4 = the 17 production and test patches below plus five TEST-ONLY baseline-red repairs (critic-generic-batch origin
 fixture, pipeline-state calibration fixtures c3, codex-pretool-guard ready fixture, catalogue-admit D64 pin,
 guard-dispatch fixtures c2): no production line, each with a QG-04 comment; guard-dispatch is 60 of 75 (15 baseline
