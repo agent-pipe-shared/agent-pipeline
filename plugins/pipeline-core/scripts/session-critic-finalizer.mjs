@@ -285,7 +285,8 @@ function validateCliRequest(value) {
     || !isSafeTaskId(value.taskId) || !SAFE_ID.test(value.projectId ?? "")
     || !SAFE_ID.test(value.sessionId ?? "") || !PACKET_ID.test(value.packetId ?? "")
     || !["T0", "T1", "T2", "T3"].includes(value.trigger)
-    || !exact(value.route, ROUTE_KEYS) || !exact(value.review, version2 ? [...REVIEW_KEYS, "courseContext"] : version3 ? [...REVIEW_KEYS, "genericBatchRef"] : REVIEW_KEYS)
+    || !exact(value.route, ROUTE_KEYS) || !exact(value.review, [...(version2 ? [...REVIEW_KEYS, "courseContext"] : version3 ? [...REVIEW_KEYS, "genericBatchRef"] : REVIEW_KEYS), ...(record(value.review) && Object.hasOwn(value.review, "correctionInputBindings") ? ["correctionInputBindings"] : [])])
+    || (Object.hasOwn(value.review, "correctionInputBindings") && (typeof value.review.correctionInputBindings !== "string" || value.review.correctionInputBindings === ""))
     || typeof value.review.base !== "string" || typeof value.review.candidate !== "string"
     || typeof value.review.specPath !== "string" || !Array.isArray(value.review.guardrailPaths)
     || !Array.isArray(value.review.evidencePaths)
@@ -917,6 +918,7 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
         evidencePaths: request.review.evidencePaths,
         priorCriticEvidencePath: request.review.priorCriticEvidencePath,
         ...(request.schema === SESSION_CRITIC_FINALIZE_REQUEST_V2_SCHEMA ? { courseContext: request.review.courseContext } : {}),
+        ...(request.review.correctionInputBindings === undefined ? {} : { correctionInputBindings: request.review.correctionInputBindings }),
       },
       ...(request.schema === SESSION_CRITIC_FINALIZE_REQUEST_V3_SCHEMA ? { genericBatchRef: request.review.genericBatchRef } : {}),
       taskId: request.taskId,
