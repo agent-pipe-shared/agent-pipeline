@@ -13,7 +13,20 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **234 items:234 at75,0 at50,0 at25;0 below75;index75.00%** (round-3 follow-up bundle v1,
+contains **235 items:235 at75,0 at50,0 at25;0 below75;index75.00%** (round-3 follow-up bundle v2,
+2026-10-28: the first tests of the installed v1 build showed the v1 lift of PF-93 and D60 was too early
+(fixes tested against states built by the new code, not against the previous build's state on disk): PF-93
+export of a legacy packet finalized by the previous build still failed, D60 feature-request admit threw
+after a half-finished claim, and Toolbox D61 (dead `transaction.lock` owner over an empty generic-batch
+store, no sanctioned command) joined as a new P0 row; at intake 232/2/1, 74.57%; bundle v2 plus the c14
+increment applied as one operator commit `de73effdd`, installed in the stamp `3dd733330`
+(`0.7.0+claude.20261028130003.de73eff`, installed version read back and equal, git hooks refreshed); all
+three rows at75 again; the Verify registration of `critic-packet-release.test.mjs` and the inventory suite
+(30 of 30) are delivered; still open after75: the real Glossover retest of PF-93 (green cases use a chain
+built with the real previous build), the D31 native qualification, the native Windows run of
+D58/D59/D60/D61, Full Verify, the batch Critic and PO acceptance, all held by the PO until the happy-path
+and brownfield tests are green; two unpinned D60 cases and the PO decision on different-task-same-target
+semantics are recorded on the D60 row; before it 234/0/0, 75.00%; round-3 follow-up bundle v1,
 2026-10-28: PF-93, Toolbox D60 and D31/D32 moved to75 on operator commit `e8834589d`, installed in the
 stamp `c896f9444` (`0.7.0+claude.20261028105149.e883458`, installed version read back and equal);
 open after75: the D31 native qualification, the Verify-suite registration of
