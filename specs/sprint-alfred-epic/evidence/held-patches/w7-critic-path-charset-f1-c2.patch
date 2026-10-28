@@ -1,0 +1,26 @@
+diff --git a/plugins/pipeline-core/lib/review-economy.test.mjs b/plugins/pipeline-core/lib/review-economy.test.mjs
+index 6678afc11..61752e633 100644
+--- a/plugins/pipeline-core/lib/review-economy.test.mjs
++++ b/plugins/pipeline-core/lib/review-economy.test.mjs
+@@ -574,6 +574,21 @@ const economyCriticRecord = (path) => rehashCriticRecord(compiledCriticRecord("s
+   record.diff.changedPaths = [path];
+   record.coverage.changedPaths = [path];
+   record.packages[0].changedPaths = [path];
++  // The projection also binds request.compiledSha256 to diff, packages and coverage: refresh it so only the path rule can decide.
++  record.request.compiledSha256 = sha256Canonical({
++    packetId: record.request.packetId,
++    candidate: record.candidate,
++    diff: record.diff,
++    references: record.references,
++    packages: record.packages,
++    coverage: {
++      changedPaths: record.coverage.changedPaths,
++      acceptanceIds: record.coverage.acceptanceIds,
++      integrationEdges: record.coverage.integrationEdges,
++    },
++    mode: record.request.mode,
++    admissionCode: record.request.admissionCode,
++  });
+ });
+ ok("RE70c criticPath (critic projection) accepts every legitimate file name character, control record is valid",
+   projectCriticReviewEconomy([compiledCriticRecord("src/ok.ts")]).ok === true
