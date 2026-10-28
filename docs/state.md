@@ -13,18 +13,15 @@ Keep `feat/sprint-alfred` and push its existing tracking branch after genuine
 candidate-bound authorization. [Transfer plan](../specs/sprint-alfred-epic/plans/pc-runner-transfer-2026-10-25.md).
 
 The [current matrix](../specs/sprint-alfred-epic/evidence/delivery-status-current.md)
-contains **236 items:236 at75,0 at50,0 at25;0 below75;index75.00%** (PF-94 follow-up, 2026-10-28
-evening: the v2 build ended in a dead end on Glossover (old batch of an earlier course key without lineage)
-and Toolbox reported the same cause as D69; bundle v3 (operator commit `35fb9c3a6`, takeover also retires a
-consumed feature-course batch of another course key) and bundle v5 (operator commit `fa30ba28a`, operator
-documentation of the four verbs in help, refusal texts, skill and continuation reference, the export result
-field `next` naming the lineage registration before the next correction commit) installed in the stamp
-`44356a575` (`0.7.0+claude.20261028185243.fa30ba2`, installed version read back and equal, git hooks
-refreshed); the row stays at75; open: the path after the admitted delta, `FPR-LINEAGE-COVERAGE-CLAIM`
-unpinned, the real Glossover and Toolbox retests; order: `inspect-course-takeover`,
-`supersede-course-takeover`, rerun round 1, `--add-review-lineage` before the next correction commit,
-`--add-delta-request`, round 2; evidence `PF94-OPERATOR-DOCS-BUNDLE-V5-VERIFY-2026-10-28.md`; PF-94,
-2026-10-28: Glossover could
+contains **236 items:236 at75,0 at50,0 at25;0 below75;index75.00%** (PF-95/PF-94 follow-up, 2026-10-28
+night: Glossover dead end (old batch, earlier course key) and Toolbox D69; bundle v3 (`35fb9c3a6`), v5
+(`fa30ba28a`: docs of the four verbs, export field `next`) and patch c22 (`6d0946341`: the takeover also moves
+the delivery-target origins entries, else `admit` ended in `CGB-CONFLICT`) installed in the stamp `20c50d267`
+(`0.7.0+claude.20261028194700.6d09463`, version read back and equal, hooks refreshed); row stays at75, agent
+38: refusal detail not surfaced by `admit`, superseded Glossover state needs one manual file move, path after
+the delta, `FPR-LINEAGE-COVERAGE-CLAIM` unpinned, real retests; order: inspect, supersede, rerun round 1,
+`--add-review-lineage` before the next correction commit, `--add-delta-request`, round 2; evidence
+`PF95-TAKEOVER-DELIVERY-ORIGINS-VERIFY-2026-10-28.md`; PF-94, 2026-10-28: Glossover could
 not run round 2 of its Critic course (no sanctioned takeover of a consumed non-course batch, no lineage
 record writer, no delta request writer); the PF-94 bundle v2 was applied as one operator commit
 `d2a0f0ffb`, installed in the stamp `dd16c6935` (`0.7.0+claude.20261028151938.d2a0f0f`, installed version
