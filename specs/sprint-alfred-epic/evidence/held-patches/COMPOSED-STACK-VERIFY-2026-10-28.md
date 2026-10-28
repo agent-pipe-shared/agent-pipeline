@@ -99,8 +99,9 @@ Baseline reds still open after v5 (all pre-existing on the clean tree):
   and measure-tofu (the driver ends `unsupported-next-action` where the pin expects an error code; needs a decision
   which outcome is intended), consumer-approved-plan (g) (refusal wording changed, pin stale), project-onboarding-v3
   (five cases, three causes: no Critic binding in the push-gate fixtures, calibration not committed before
-  `set-phase implementation`, `configure verify` exit 2 for codex and antigravity). The Q9 D55 suite name does not
-  resolve.
+  `set-phase implementation`, `configure verify` exit 2 for codex and antigravity). The Q9 D55 case is in
+  `lib/human-guard-override.test.mjs`: red under the real HOME/TMPDIR (`domain-ancestor-unsafe`), green under the
+  isolated runner (177 pass), so environmental; run that file only through `scripts/run-parallel.mjs`.
 Not run: Antigravity pretool guard test file, any dedicated PowerShell dialect test, Full Verify.
 
 ## For the batch Critic (kernel and custody parts)
