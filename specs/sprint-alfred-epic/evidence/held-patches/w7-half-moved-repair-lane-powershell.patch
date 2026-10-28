@@ -1,0 +1,200 @@
+diff --git a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+index d2a1ed162..3a30a07aa 100644
+--- a/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
++++ b/plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
+@@ -11745,6 +11745,96 @@ test("HM-6 without a readable bound feature directory in the state the repair la
+   }
+ });
+ 
++// W7 Slice B parity (item half-moved-feature-directory-locks-every-shell-and-source-write): the same two repair commands under the
++// PowerShell tool. NOTE: for PowerShell the lifecycle gate is never reached (evaluate.mjs returns powerShellScopeVerdict first), so the
++// dialect itself observes readiness and admits only on a session-intent PORG-INVALID-OBSERVATION.
++import * as hmpsWs from "../lib/guard/write-scope.mjs";
++import { win32 as hmpsWin32 } from "node:path";
++function hmPs(path, commandLine, outcome = "invalid") { return qw04Run(path, "PowerShell", { CommandLine: commandLine }, outcome); }
++
++test("HMPS-1 an invalid session observation admits git mv and git restore under PowerShell inside the bound feature directory", () => {
++  const path = hmRoot();
++  for (const command of [
++    "git mv specs/f/a.md specs/f/b.md", "git mv specs/f/a.md specs/f/sub/a.md", "git restore specs/f/a.md",
++    "git restore specs/f/not-yet.md", "git.exe mv specs/f/a.md specs/f/b.md", "git mv 'specs/f/a.md' \"specs/f/b.md\"",
++  ]) {
++    const result = hmPs(path, command);
++    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
++  }
++});
++
++test("HMPS-2 backslash separated relative spellings are admitted", () => {
++  const path = hmRoot();
++  for (const command of [
++    `git mv ${hmpsWin32.join("specs", "f", "a.md")} ${hmpsWin32.join("specs", "f", "b.md")}`,
++    `git restore ${hmpsWin32.join("specs", "f", "a.md")}`,
++  ]) {
++    const result = hmPs(path, command);
++    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
++  }
++});
++
++test("HMPS-3 a drive-absolute path is admitted only when it normalises strictly under the root", () => {
++  const winRoot = "C:\\work\\proj";
++  const rel = (word) => hmpsWs.halfMovedWindowsOperandRelative(word, winRoot);
++  assert.equal(rel(hmpsWin32.join(winRoot, "specs", "f", "a.md")), "specs/f/a.md");
++  assert.equal(rel("c:\\WORK\\Proj\\specs\\f\\a.md"), "specs/f/a.md", "prefix compared case-insensitively");
++  assert.equal(rel("C:/work/proj/specs/f/a.md"), "specs/f/a.md");
++  for (const word of [
++    "C:\\work\\proj", "C:\\work\\proj\\", "C:\\work\\project\\specs\\f\\a.md", "D:\\work\\proj\\specs\\f\\a.md",
++    "C:\\work\\proj\\specs\\..\\..\\x.md", "C:\\work\\other\\specs\\f\\a.md", "\\specs\\f\\a.md", "/specs/f/a.md",
++  ]) assert.equal(rel(word), null, word);
++  assert.equal(hmpsWs.halfMovedWindowsOperandRelative("C:\\work\\proj\\specs\\f\\a.md", null), null, "no Windows root: fail closed");
++  const path = hmRoot();
++  const result = evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { CommandLine: "git mv C:\\work\\proj\\specs\\f\\a.md C:\\work\\proj\\specs\\f\\b.md" } }, {
++    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: QW04_OUTCOMES.invalid, halfMovedWindowsRoot: winRoot,
++  });
++  assert.equal(result.exitCode, 0, result.stderr);
++  assert.equal(hmPs(path, "git mv C:\\work\\proj\\specs\\f\\a.md C:\\work\\proj\\specs\\f\\b.md").exitCode, 2, "POSIX host without a Windows root refuses drive paths");
++});
++
++test("HMPS-4 traversal, UNC, other volume, extended-length prefix, ADS, 8.3, trailing dot, link escape, options, aliases, chaining and expansion are refused", () => {
++  const path = hmRoot();
++  symlinkSync(join(path, "src"), join(path, "specs", "f", "escape"), "dir");
++  for (const command of [
++    "git mv specs\\f\\..\\..\\src\\a.md specs\\f\\b.md", "git mv specs/f/a.md ..\\outside.md",
++    "git mv \\\\server\\share\\specs\\f\\a.md specs\\f\\b.md", "git mv D:\\other\\specs\\f\\a.md specs\\f\\b.md",
++    "git mv \\\\?\\C:\\proj\\specs\\f\\a.md specs\\f\\b.md", "git mv specs/f/a.md:stream specs/f/b.md",
++    "git mv specs/f/SPECS~1.md specs/f/b.md", "git mv specs/f/a.md. specs/f/b.md", "git mv specs/f./a.md specs/f/b.md",
++    "git mv specs\\f\\escape\\a.md specs\\f\\b.md", "git mv -f specs/f/a.md specs/f/b.md", "git restore --staged specs/f/a.md",
++    "git restore src/prod.mjs", "git rm specs/f/a.md", "git checkout -- specs/f/a.md",
++    "Move-Item specs/f/a.md specs/f/b.md", "mv specs/f/a.md specs/f/b.md", "move specs\\f\\a.md specs\\f\\b.md", "mi specs/f/a.md specs/f/b.md",
++    "git mv specs/f/a.md specs/f/b.md ; git mv specs/f/b.md specs/f/c.md", "git mv specs/f/a.md specs/f/b.md && git restore specs/f/a.md",
++    "git mv $env:TEMP\\a.md specs/f/b.md", "git mv specs/f/a`.md specs/f/b.md", "git mv specs/f/a.md specs/f/b.md | cat",
++    "C:\\tools\\git.exe mv specs/f/a.md specs/f/b.md",
++  ]) {
++    const result = hmPs(path, command);
++    assert.equal(result.exitCode, 2, `admitted: ${command}`);
++    assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, command);
++  }
++});
++
++test("HMPS-5 session intent PORG-INVALID-OBSERVATION only: bootstrap intent, partial, drift and a ready lifecycle stay refused", () => {
++  const path = hmRoot();
++  for (const outcome of ["invalidBootstrapIntent", "partial", "drift"]) {
++    for (const command of ["git mv specs/f/a.md specs/f/b.md", "git restore specs/f/a.md"]) {
++      assert.equal(hmPs(path, command, outcome).exitCode, 2, `${outcome}: ${command}`);
++    }
++  }
++  const ready = evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { CommandLine: "git mv specs/f/a.md specs/f/b.md" } }, {
++    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn() { return {}; },
++  });
++  assert.equal(ready.exitCode, 2, "a ready lifecycle gets no git through the PowerShell dialect");
++});
++
++test("HMPS-6 without a readable bound feature directory the PowerShell repair lane admits nothing", () => {
++  for (const state of [null, "{ not json", { schema: "pipeline.state.v0", activeFeature: { id: "f", planPath: "docs/prd-bound.md" }, planApproved: true }]) {
++    const path = hmRoot(state);
++    assert.equal(hmPs(path, "git mv specs/f/a.md specs/f/b.md").exitCode, 2, `state ${JSON.stringify(state)}`);
++    assert.equal(hmPs(path, "git restore specs/f/a.md").exitCode, 2, `state ${JSON.stringify(state)} restore`);
++  }
++});
++
+ // ALFRED-QP4-BUILD2: tests for the fourth signed quality package (appended to the HEAD test file); re-scoped to the guard-side changes only.
+ // Contract: scratch/qp4/false-positives.md. The refusal label GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY non-admitted single read-family
+ // command (isRejectedReadFamilyCommand), so R1-R3/R6 were never outside-root reads: they are refused for rg flags the closed grammar does not know
+diff --git a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+index e6799c4b7..d6c8a58c0 100644
+--- a/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
++++ b/plugins/pipeline-core/lib/guard/powershell-dialect.mjs
+@@ -5,7 +5,20 @@ import { basename, win32 } from "node:path";
+ import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
+ import { isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
+ import { verdict } from "./verdict.mjs";
+-import { isPhysicalIntakeScratchPath } from "./write-scope.mjs";
++import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
++import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
++
++// W7 Slice B parity: the lifecycle gate is never reached for PowerShell (evaluate.mjs returns powerShellScopeVerdict first), so the
++// dialect observes readiness itself, and only after the argv already passed the operand validator. Admitted solely for a
++// session-intent PORG-INVALID-OBSERVATION; a ready, partial, drifted or bootstrap-intent observation admits nothing.
++function invalidSessionObservation(root, dependencies) {
++  try {
++    (dependencies?.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({ rootDir: root, intent: "session", runner: dependencies?.runner });
++    return false;
++  } catch (error) {
++    return error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION" && error.intent === "session";
++  }
++}
+ import { containedLiteralReadPath, sessionReadScopeRoots } from "./read-scope.mjs";
+ import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
+ 
+@@ -99,5 +112,9 @@ export function powerShellScopeVerdict(input, root, dependencies) {
+       : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
+   }
+   if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
++  // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
++  if (["git", "git.exe"].includes(executable.toLowerCase())
++    && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
++    && invalidSessionObservation(root, dependencies)) return verdict(0);
+   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
+ }
+diff --git a/plugins/pipeline-core/lib/guard/write-scope.mjs b/plugins/pipeline-core/lib/guard/write-scope.mjs
+index 78d881003..0ed75c8af 100644
+--- a/plugins/pipeline-core/lib/guard/write-scope.mjs
++++ b/plugins/pipeline-core/lib/guard/write-scope.mjs
+@@ -125,9 +125,40 @@ export function isHalfMovedRepairCommand(command, root, dependencies = {}) {
+   try {
+     const words = simpleWords(command, root);
+     if (!words || words[0] !== "git") return false;
++    return isHalfMovedRepairArgv(words.slice(1), root, dependencies);
++  } catch { return false; }
++}
++
++/**
++ * W7 Slice B parity (PowerShell): the pure Windows spelling step. Returns the root-relative POSIX spelling of one operand, or
++ * null. Accepts both separators; a drive-absolute spelling only when it is strictly under `windowsRoot` (prefix compared
++ * case-insensitively, the returned remainder keeps its case for the physical check). Refuses UNC / extended-length / rooted
++ * spellings, any colon beyond the drive, tilde (8.3 short names), and empty, dot, parent or trailing-dot/space segments.
++ */
++export function halfMovedWindowsOperandRelative(word, windowsRoot) {
++  if (typeof word !== "string" || word === "" || /[\0*?[\]{}~$`!#&|;<>"'\s@]/u.test(word)) return null;
++  const drive = /^[A-Za-z]:[\\/]/u.test(word);
++  if ((drive ? word.slice(3) : word).includes(":")) return null;
++  if (!drive && /^[\\/]/u.test(word)) return null;
++  const segments = word.replaceAll("\\", "/").split("/");
++  if (segments.slice(drive ? 1 : 0).some((segment) => segment === "" || segment === "." || segment === ".." || /[. ]$/u.test(segment))) return null;
++  if (!drive) return segments.join("/");
++  if (typeof windowsRoot !== "string" || !/^[A-Za-z]:[\\/]/u.test(windowsRoot)) return null;
++  const rootSegments = windowsRoot.replaceAll("\\", "/").replace(/\/+$/u, "").split("/");
++  if (segments.length <= rootSegments.length
++    || !rootSegments.every((segment, index) => segment.toLowerCase() === segments[index].toLowerCase())) return null;
++  return segments.slice(rootSegments.length).join("/");
++}
++
++/**
++ * The operand validator, split out of the POSIX tokenizer: `argv` is the dequoted argument vector after `git`, exactly
++ * `["mv", A, B]` or `["restore", P]`. `options.windows` first maps each operand through halfMovedWindowsOperandRelative.
++ */
++export function isHalfMovedRepairArgv(argv, root, dependencies = {}, options = {}) {
++  try {
+     let operands;
+-    if (words[1] === "mv" && words.length === 4) operands = [words[2], words[3]];
+-    else if (words[1] === "restore" && words.length === 3) operands = [words[2]];
++    if (argv[0] === "mv" && argv.length === 3) operands = [argv[1], argv[2]];
++    else if (argv[0] === "restore" && argv.length === 2) operands = [argv[1]];
+     else return false;
+     const dirs = w04BoundFeatureDirectories(root);
+     const bound = w04BoundAuthorityPaths(root);
+@@ -136,8 +167,13 @@ export function isHalfMovedRepairCommand(command, root, dependencies = {}) {
+     const lstat = dependencies.lstatSyncFn ?? lstatSync;
+     const realRoot = realpath(root);
+     const resolved = [];
+-    for (const word of operands) {
+-      if (word === "" || word.startsWith("-") || /[\0\\*?[\]{}~$`!#&|;<>"'\s]/u.test(word)) return false;
++    for (const operand of operands) {
++      let word = operand;
++      if (options.windows === true) {
++        word = halfMovedWindowsOperandRelative(operand, dependencies.halfMovedWindowsRoot ?? (process.platform === "win32" ? root : null));
++        if (word === null) return false;
++      }
++      if (typeof word !== "string" || word === "" || word.startsWith("-") || /[\0\\*?[\]{}~$`!#&|;<>"'\s]/u.test(word)) return false;
+       if (word.split("/").includes("..")) return false;
+       const absolute = resolve(root, word);
+       const rel = relative(root, absolute).split(sep).join("/");
