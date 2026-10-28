@@ -1,0 +1,17 @@
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2922eb40c..e5b4995d7 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -2215,8 +2215,10 @@ function awaitingApprovalFixture() {
+     assert.ok(decisionLine, `${label} must display task-scoped architecture decisions`);
+     const decisionSummary = JSON.parse(decisionLine.slice("Architecture decisions: ".length));
+     assert.equal(decisionSummary.schema, "pipeline.architecture-planning-decisions.v1");
+-    assert.deepEqual(decisionSummary.areas, [], `${label} must not invent an effective decision for the unowned planned path`);
+-    assert.deepEqual(decisionSummary.unresolvedPaths, ["src/change.mjs"], `${label} must display the actual task-scoped planning path`);
++    // The fixture's module `application` owns src/**, so the planned path is owned: it lands in areas, not unresolvedPaths
++    // (same shape as lib/architecture-entry-readiness.test.mjs, owned versus unowned planned path).
++    assert.deepEqual(decisionSummary.areas, [{ area: "application", status: "ready", decisions: [], findingCount: 0 }], `${label} must display the owned planned path's area without inventing an effective decision`);
++    assert.deepEqual(decisionSummary.unresolvedPaths, [], `${label} must leave no unresolved path for the owned planned path`);
+     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
+   }
+ 
