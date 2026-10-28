@@ -1,0 +1,288 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 8baf62591..7289f736d 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -732,18 +732,102 @@ export function readCriticReviewUnit(input) {
+     return reviewUnitSource(input.repoRoot, input, logical(input.logicalWorkIds));
+   });
+ }
++// PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
++const TAKEOVER_DETAIL = "The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted.";
++const TAKEOVER_REPAIR = {
++  "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
++  "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
++  "CGB-TAKEOVER-COURSE": "The owner is itself a feature course; its lineage cannot be reset.",
++  "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
++  "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first.",
++};
+ function featureOwnership(c, courseKey, work) {
+   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
+   const origin=indexPath(c,"origins",{kind:"feature-course",courseKey});
+   if (!hits.length) { if(existsSync(origin))fail("CGB-CONFLICT");return null; }
+   const batchRef = ref(hits[0].batchRef);
+-  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) fail("CGB-CONFLICT");
++  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
+   const registered = registration(c, batchRef);
+   if (registered.value.schema !== GENERIC_CRITIC_BATCH_V2_SCHEMA
+     || !eq(registered.value.declaredScope.logicalWorkIds, work)
+-    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT");
++    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
+   return { ...registered, batchRef };
+ }
++function takeoverState(c, courseKey, work, courseHistoryRegistered) {
++  const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
++  const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
++    originTargets: null, packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true };
++  const done = refusalCode => ({ facts, refusalCode });
++  if (!hits.length) return done("CGB-TAKEOVER-NONE");
++  const batchRef = ref(hits[0].value.batchRef);
++  facts.batchRef = batchRef;
++  if (hits.length !== work.length || !hits.every(h => eq(h.value.batchRef, batchRef))) return done("CGB-TAKEOVER-PARTIAL");
++  const r = registration(c, batchRef);
++  facts.registrationSchema = r.value.schema; facts.originTargets = r.value.originTargets; facts.originKind = r.value.originTargets[0].kind;
++  if (!eq(r.value.declaredScope.logicalWorkIds, work)) return done("CGB-TAKEOVER-PARTIAL");
++  const rows = reservations(r.dir);
++  facts.packetIds = rows.map(x => x.packetId);
++  facts.allPacketsConsumed = rows.length > 0 && rows.every(x => {
++    try { readConsumedSessionAdmission({ controlRoot: c.controlRoot, packetId: x.packetId }); return true; } catch { return false; }
++  });
++  if (facts.originKind === "feature-course") return done("CGB-TAKEOVER-COURSE");
++  if (facts.courseHistoryRegistered) return done("CGB-TAKEOVER-HISTORY");
++  if (!facts.allPacketsConsumed) return done("CGB-TAKEOVER-OPEN");
++  return done(null);
++}
++const TAKEOVER_KEYS = ["repoRoot", "controlRoot", "courseKey", "logicalWorkIds", "courseHistoryRegistered"];
++/** PF-94: read-only account of who owns a feature review unit's work ids and whether a takeover is admissible. */
++export function inspectFeatureCourseTakeover(input) {
++  return invoke(() => {
++    shape(input, TAKEOVER_KEYS);
++    if (!SHA.test(input.courseKey) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
++    const work = logical(input.logicalWorkIds);
++    const c = context(input.repoRoot, input.controlRoot); unlocked(c);
++    const first = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered);
++    const second = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered); unlocked(c);
++    if (!eq(first, second)) fail("CGB-STALE");
++    return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-inspection.v1", ...first.facts, refusalCode: first.refusalCode,
++      repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode], digestSha256: sha256Canonical(first) });
++  });
++}
++/** PF-94: audited, append-only retirement of the old batch's index entries; nothing is deleted. */
++export function supersedeFeatureCourseTakeover(input) {
++  return invoke(() => {
++    shape(input, [...TAKEOVER_KEYS, "digestSha256", "reason"]);
++    if (!SHA.test(input.courseKey) || !SHA.test(input.digestSha256) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
++    if (typeof input.reason !== "string" || input.reason.trim().length === 0 || input.reason.length > 256 || /[\\/\u0000-\u001f]/u.test(input.reason)) fail("CGB-TAKEOVER-REASON");
++    const work = logical(input.logicalWorkIds);
++    const c = context(input.repoRoot, input.controlRoot);
++    return transaction(c, () => {
++      const dir = join(c.root, "superseded", input.digestSha256);
++      const auditPath = join(dir, "audit.json"), completePath = join(dir, "complete.json");
++      let audit;
++      const replay = existsSync(auditPath);
++      if (replay) {
++        // Replay or resume of the very same takeover: the audit record was written first, so finish what it names.
++        audit = stableJson(auditPath);
++        if (audit.digestSha256 !== input.digestSha256 || audit.courseKey !== input.courseKey || !eq(audit.logicalWorkIds, work)) fail("CGB-TAKEOVER-STALE");
++      } else {
++        const state = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered);
++        if (sha256Canonical(state) !== input.digestSha256) fail("CGB-TAKEOVER-STALE");
++        if (state.refusalCode !== null) fail(state.refusalCode, TAKEOVER_REPAIR[state.refusalCode]);
++        createDirectory(join(c.root, "superseded")); createDirectory(dir);
++        const moves = [...work.map(id => ["logical", id]), ["origins", state.facts.originTargets[0]]].map(([kind, identity]) => ({ kind, file: `${sha256Canonical(identity)}.json` }));
++        audit = { schema: "pipeline.critic-feature-course-takeover-audit.v1", digestSha256: input.digestSha256, courseKey: input.courseKey, reason: input.reason,
++          batchRef: state.facts.batchRef, registrationSchema: state.facts.registrationSchema, originKind: state.facts.originKind, logicalWorkIds: work, moves,
++          at: new Date().toISOString() };
++        durable(auditPath, audit);
++      }
++      for (const kind of ["logical", "origins"]) createDirectory(join(dir, kind));
++      for (const m of audit.moves) {
++        const from = join(c.root, m.kind, m.file);
++        if (existsSync(from)) renameSync(from, join(dir, m.kind, m.file));
++      }
++      if (!existsSync(completePath)) durable(completePath, { schema: "pipeline.critic-feature-course-takeover-complete.v1", digestSha256: input.digestSha256 });
++      return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-result.v1", status: "superseded", replay, digestSha256: input.digestSha256, batchRef: audit.batchRef });
++    });
++  });
++}
+ /** Read-only shared work-identity check; absence grants no packet or child authority. */
+ export function assertFeatureCriticReviewUnitOwnership(input) {
+   return invoke(() => {
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index a597bf583..255bf070e 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -25,7 +25,33 @@ import {
+ } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+-import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore } from "../lib/critic-generic-batch.mjs";
++import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore,
++  inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
++import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
++
++export const SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
++export const SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
++// PF-94: the operator types only the feature id; the course key and the review unit are derived, never typed.
++function takeoverTarget(root, featureId) {
++  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST");
++  const run = (args) => {
++    const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
++    if (!isSuccessfulSpawn(r)) fail("SCF-TAKEOVER-REPOSITORY");
++    return String(r.stdout).trim();
++  };
++  const manifestPath = `specs/${featureId}/lifecycle.json`, unitPath = `specs/${featureId}/design/critic-review-unit.json`;
++  const head = run(["rev-parse", "HEAD"]);
++  const base = run(["rev-list", "--reverse", "HEAD", "--", manifestPath]).split("\n")[0];
++  const introduced = run(["rev-list", "--reverse", "HEAD", "--", unitPath]).split("\n")[0];
++  if (!base || !introduced) fail("SCF-TAKEOVER-REPOSITORY");
++  const declaration = JSON.parse(run(["show", `${introduced}:${unitPath}`]));
++  const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
++    logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
++  const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
++  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY");
++  return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
++    courseHistoryRegistered: resolved.value.registeredHistory.length > 0 };
++}
+ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import {
+   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
+@@ -838,6 +864,19 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+       if (!exact(rawRecover, ["schema", "digestSha256"]) || rawRecover.schema !== SESSION_CRITIC_BATCH_RECOVERY_REQUEST_SCHEMA) fail("SCF-BATCH-RECOVERY-REQUEST");
+       return Object.freeze({ exitCode: 0, output: recoverGenericCriticBatchEmptyStore({ controlRoot: controlRootFor(recoverRoot), digestSha256: rawRecover.digestSha256 }) });
+     }
++    if (Array.isArray(argv) && (argv[0] === "inspect-course-takeover" || argv[0] === "supersede-course-takeover")) {
++      if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
++      const takeoverRoot = realpathSync(resolve(argv[2]));
++      const rawTakeover = readPhysicalRequest(takeoverRoot, argv[4]);
++      const supersede = argv[0] === "supersede-course-takeover";
++      if (!exact(rawTakeover, supersede ? ["schema", "featureId", "digestSha256", "reason"] : ["schema", "featureId"])
++        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST");
++      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId);
++      const common = { repoRoot: takeoverRoot, controlRoot: controlRootFor(takeoverRoot), ...target };
++      return Object.freeze({ exitCode: 0, output: supersede
++        ? supersedeFeatureCourseTakeover({ ...common, digestSha256: rawTakeover.digestSha256, reason: rawTakeover.reason })
++        : inspectFeatureCourseTakeover(common) });
++    }
+     if (Array.isArray(argv) && argv[0] === "release") {
+       if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+       const releaseRoot = realpathSync(resolve(argv[2]));
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 559aedfaf..ae4978ae0 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -20,6 +20,8 @@ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } fro
+ import { execFileSync } from "node:child_process";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
++import * as CGB from "../lib/critic-generic-batch.mjs";
++import * as CCA from "../lib/critic-course-admission.mjs";
+ import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
+ 
+ import {
+@@ -1520,6 +1522,106 @@ test("Cut A (4) a bound Source record completes with the receipt unchanged and s
+   } finally { cleanup(fx); }
+ });
+ 
++// PF-94: the Glossover shape. Round 1 ran OUTSIDE the feature course (generic batch, caller-authored fallback), so the
++// feature course owns no history but the old batch owns the review unit's logical work ids.
++const TAKEOVER_INSPECT_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
++const TAKEOVER_SUPERSEDE_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
++function takeoverFixture({ consume = true } = {}) {
++  const fx = fixture();
++  const id = "held-feature", prefix = `specs/${id}`;
++  mkdirSync(join(fx.root, prefix, "design"), { recursive: true });
++  const specPath = `${prefix}/spec.md`, unitPath = `${prefix}/design/critic-review-unit.json`;
++  writeFileSync(join(fx.root, specPath), "# Feature\nAC-1 AC-2\n");
++  writeFileSync(join(fx.root, unitPath), JSON.stringify({ ...reviewUnit(), specPath }));
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "approved", artifacts: [
++    { class: "spec", path: specPath, sha256: sha(readFileSync(join(fx.root, specPath))), authority: true, mutability: "mutable", retention: "active" },
++    { class: "design", path: unitPath, sha256: sha(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }] };
++  writeFileSync(join(fx.root, `${prefix}/lifecycle.json`), JSON.stringify(manifest));
++  git(fx.root, ["add", prefix]);
++  git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "declare feature review unit"]);
++  fx.featureId = id;
++  if (consume) {
++    fx.packetId = "e1".repeat(16);
++    fx.consumed = finalizeRaw(preadmitted(fx, { packetId: fx.packetId, allowCallerAuthoredFallback: true }));
++  } else batchFor(fx);
++  return fx;
++}
++function takeoverVerb(fx, verb, request) {
++  const run = spawnSync(process.execPath, [FINALIZER_SCRIPT, verb, "--root", fx.root, "--request", writeScratchRequest(fx, `${verb}.json`, request)], { encoding: "utf8" });
++  return { status: run.status, out: JSON.parse(run.stdout) };
++}
++function featureCourseKey(fx) {
++  const manifestPath = `specs/${fx.featureId}/lifecycle.json`;
++  const base = git(fx.root, ["rev-list", "--reverse", "HEAD", "--", manifestPath]).split("\n")[0], head = git(fx.root, ["rev-parse", "HEAD"]);
++  const resolved = CCA.resolveRegisteredCriticCourseIdentity({ repoRoot: fx.root, featureId: fx.featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
++  assert.equal(resolved.ok, true, JSON.stringify(resolved));
++  return resolved.value.courseIdentity.courseKey;
++}
++
++test("PF94 TAKEOVER (1) real state: a consumed non-course batch makes the feature course refuse CGB-CONFLICT, and the text names both verbs", () => {
++  const fx = takeoverFixture();
++  try {
++    assert.equal(fx.consumed.status, "completed");
++    assert.equal(fx.consumed.independence, "caller-authored-fallback");
++    let error = null;
++    try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
++    assert.equal(error?.code, "CGB-CONFLICT");
++    assert.ok(error.message.includes("inspect-course-takeover") && error.message.includes("supersede-course-takeover"), error.message);
++  } finally { cleanup(fx); }
++});
++
++test("PF94 TAKEOVER (2) inspect names the work ids, owner, origin kind, consumption and history, read-only and stable", () => {
++  const fx = takeoverFixture();
++  try {
++    const first = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId });
++    assert.equal(first.status, 0, JSON.stringify(first.out));
++    assert.deepEqual(first.out.logicalWorkIds, ["AC-1", "AC-2"]);
++    assert.equal(first.out.originKind, "authored-delivery");
++    assert.equal(first.out.allPacketsConsumed, true);
++    assert.equal(first.out.courseHistoryRegistered, false);
++    assert.equal(first.out.refusalCode, null);
++    assert.match(first.out.digestSha256, /^[a-f0-9]{64}$/u);
++    assert.ok(first.out.batchRef.batchId);
++    assert.deepEqual(takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId }).out, first.out);
++  } finally { cleanup(fx); }
++});
++
++test("PF94 TAKEOVER (3) supersede audits first, retires only the index entries, keeps the old evidence, is idempotent, and clears the ownership gate", () => {
++  const fx = takeoverFixture();
++  try {
++    const inspected = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId }).out;
++    const request = { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.digestSha256, reason: "round 1 ran outside the course; rerun on the course path" };
++    const done = takeoverVerb(fx, "supersede-course-takeover", request);
++    assert.equal(done.status, 0, JSON.stringify(done.out));
++    assert.equal(done.out.status, "superseded");
++    const store = join(controlRootOf(fx), "generic-batches");
++    assert.ok(existsSync(join(store, inspected.batchRef.batchId, "registration.json")), "old registration stays readable");
++    assert.ok(existsSync(join(controlRootOf(fx), inspected.packetIds[0])), "old packet stays");
++    assert.ok(existsSync(join(store, "superseded", inspected.digestSha256, "audit.json")), "append-only audit record");
++    assert.equal(readdirSync(join(store, "logical")).length, 0);
++    assert.equal(readdirSync(join(store, "origins")).length, 0);
++    assert.deepEqual(CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }), { claimed: false, batchRef: null });
++    const replay = takeoverVerb(fx, "supersede-course-takeover", request);
++    assert.equal(replay.status, 0, JSON.stringify(replay.out));
++    assert.equal(replay.out.replay, true);
++  } finally { cleanup(fx); }
++});
++
++test("PF94 TAKEOVER (4) refusals are typed: stale digest, open batch, registered history, partial work ids, bad reason", () => {
++  const fx = takeoverFixture({ consume: false });
++  try {
++    const base = { repoRoot: fx.root, controlRoot: controlRootOf(fx), courseKey: "c".repeat(64), logicalWorkIds: ["AC-1", "AC-2"], courseHistoryRegistered: false };
++    const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
++    const open = CGB.inspectFeatureCourseTakeover(base);
++    assert.equal(open.refusalCode, "CGB-TAKEOVER-OPEN");
++    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: open.digestSha256, reason: "r" })), "CGB-TAKEOVER-OPEN");
++    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: "a".repeat(64), reason: "r" })), "CGB-TAKEOVER-STALE");
++    assert.equal(CGB.inspectFeatureCourseTakeover({ ...base, courseHistoryRegistered: true }).refusalCode, "CGB-TAKEOVER-HISTORY");
++    assert.equal(CGB.inspectFeatureCourseTakeover({ ...base, logicalWorkIds: ["AC-1", "AC-2", "AC-3"] }).refusalCode, "CGB-TAKEOVER-PARTIAL");
++    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: open.digestSha256, reason: "see /etc/passwd" })), "CGB-TAKEOVER-REASON");
++  } finally { cleanup(fx); }
++});
++
+ test("Cut A (5) the explicit fallback completes with the weaker marker, keeps reviewPass, and never masks a bad binding", () => {
+   const fx = fixture();
+   try {
