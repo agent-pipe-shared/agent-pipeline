@@ -1622,6 +1622,39 @@ test("PF94 TAKEOVER (4) refusals are typed: stale digest, open batch, registered
   } finally { cleanup(fx); }
 });
 
+test("PF94 TAKEOVER (5) a consumed feature-course batch of ANOTHER course key without lineage is retired, nothing is deleted, replay is idempotent, a fresh course may admit", () => {
+  const fx = featureCourseFixture();
+  try {
+    assert.equal(admitSessionCriticReview(fx.request).status, "admitted");
+    const verdictValue = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "controlled fixture inspected", briefing_violations: [], pass: false };
+    assert.equal(finalizeSessionCriticReview({ ...fx.request, verdict: verdictValue, allowCallerAuthoredFallback: true }).status, "completed");
+    fx.featureId = "held-feature";
+    const inspected = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId });
+    assert.equal(inspected.status, 0, JSON.stringify(inspected.out));
+    assert.equal(inspected.out.originKind, "feature-course");
+    assert.equal(inspected.out.allPacketsConsumed, true);
+    assert.equal(inspected.out.courseHistoryRegistered, false);
+    const newKey = featureCourseKey(fx);
+    assert.notEqual(inspected.out.originTargets[0].courseKey, newKey);
+    assert.equal(inspected.out.refusalCode, null);
+    const request = { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round 1 ran under an earlier course key" };
+    const done = takeoverVerb(fx, "supersede-course-takeover", request);
+    assert.equal(done.status, 0, JSON.stringify(done.out));
+    const store = join(controlRootOf(fx), "generic-batches");
+    assert.ok(existsSync(join(store, "superseded", inspected.out.digestSha256, "audit.json")));
+    assert.equal(readdirSync(join(store, "logical")).length, 0);
+    // The reserved packet's DELIVERY-TARGET origins entry (targetForPacket) legitimately stays; it only blocks a reserve with the SAME delivery target, which a fresh course after correction commits does not have. The feature-course origin entry must be the one that moved.
+    const remainingOrigins = readdirSync(join(store, "origins"));
+    assert.equal(remainingOrigins.length, 1);
+    assert.ok(!readdirSync(join(store, "superseded", inspected.out.digestSha256, "origins")).includes(remainingOrigins[0]));
+    assert.equal(readdirSync(join(store, "superseded", inspected.out.digestSha256, "logical")).length, 2);
+    assert.equal(readdirSync(join(store, "superseded", inspected.out.digestSha256, "origins")).length, 1);
+    assert.ok(existsSync(join(store, inspected.out.batchRef.batchId, "registration.json")));
+    assert.equal(CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: newKey, logicalWorkIds: ["scope-one", "scope-two"] }).claimed, false);
+    assert.equal(takeoverVerb(fx, "supersede-course-takeover", request).out.replay, true);
+  } finally { cleanup(fx); }
+});
+
 test("Cut A (5) the explicit fallback completes with the weaker marker, keeps reviewPass, and never masks a bad binding", () => {
   const fx = fixture();
   try {

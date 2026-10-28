@@ -733,11 +733,11 @@ export function readCriticReviewUnit(input) {
   });
 }
 // PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
-const TAKEOVER_DETAIL = "The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted.";
+const TAKEOVER_DETAIL = "The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
 const TAKEOVER_REPAIR = {
   "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
-  "CGB-TAKEOVER-COURSE": "The owner is itself a feature course; its lineage cannot be reset.",
+  "CGB-TAKEOVER-COURSE": "The owner is this very feature course (same course key); its lineage cannot be reset. If its packet is consumed and its lineage is not registered, run register-feature-package.mjs --root <repo> --add-review-lineage --packet <packetId> BEFORE the next correction commit; otherwise continue the course in delta mode.",
   "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
   "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first.",
 };
@@ -770,7 +770,7 @@ function takeoverState(c, courseKey, work, courseHistoryRegistered) {
   facts.allPacketsConsumed = rows.length > 0 && rows.every(x => {
     try { readConsumedSessionAdmission({ controlRoot: c.controlRoot, packetId: x.packetId }); return true; } catch { return false; }
   });
-  if (facts.originKind === "feature-course") return done("CGB-TAKEOVER-COURSE");
+  if (facts.originKind === "feature-course" && facts.originTargets[0].courseKey === courseKey) return done("CGB-TAKEOVER-COURSE");
   if (facts.courseHistoryRegistered) return done("CGB-TAKEOVER-HISTORY");
   if (!facts.allPacketsConsumed) return done("CGB-TAKEOVER-OPEN");
   return done(null);

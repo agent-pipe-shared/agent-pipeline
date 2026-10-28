@@ -17,7 +17,7 @@ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} f
 import {readdirSync,readlinkSync,fsyncSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -558,5 +558,48 @@ test("D58 default seams equal today's behaviour: real platform and real fsync",(
   assert.equal(io.platform,process.platform);
   assert.equal(io.fsyncDirFn,fsyncSync);
   assert.equal(io.fsyncFileFn,fsyncSync);
+});
+// PF-94 c19: a feature-course batch built through the real reserve path (claimed, not consumed).
+function reservedCourse(fx){
+  const logPath="specs/course-feature/evidence/targeted.log",jsonPath="specs/course-feature/evidence/diagnostic.json";
+  const diagnostic=produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/course-feature/spec.md",
+    command:[process.execPath,"-e","console.log('feature fixture pass')"],logPath:"evidence/feature-targeted.log"});
+  const log=readFileSync(join(fx.root,"evidence/feature-targeted.log"));
+  writeFileSync(join(fx.root,logPath),log);diagnostic.targeted.log.path=logPath;
+  const bytes=`${JSON.stringify(diagnostic)}\n`;writeFileSync(join(fx.root,jsonPath),bytes);
+  const manifestPath=join(fx.root,"specs/course-feature/lifecycle.json"),manifest=JSON.parse(readFileSync(manifestPath));
+  for(const [path,content] of [[logPath,log],[jsonPath,bytes]])manifest.artifacts.push({class:"candidate-evidence",path,sha256:sha256(content),authority:false,mutability:"immutable",retention:"retain"});
+  writeFileSync(manifestPath,`${JSON.stringify(manifest)}\n`);
+  git(fx.root,["add","specs/course-feature/lifecycle.json",logPath,jsonPath]);
+  git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","register feature diagnostic"]);
+  const registrationCommit=git(fx.root,["rev-parse","HEAD"]);
+  const courseInput={repoRoot:fx.root,featureId:"course-feature",baseCommit:fx.base,candidateCommit:fx.candidate,registrationCommit,requestedMode:"full",acceptedReference:null,criterionLocator:null,deltaRequestPath:null};
+  const projection=readCriticCourseAdmission(courseInput),{decision,...subject}=projection;
+  const controlRoot=join(fx.root,".git/agent-pipeline/critic-packets");
+  mkdirSync(controlRoot,{recursive:true,mode:0o700});chmodSync(join(fx.root,".git/agent-pipeline"),0o700);chmodSync(controlRoot,0o700);
+  const route={routeId:"feature-fixture",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh",assurance:"functional-equivalent-read-only; OS isolation not asserted",projectionDigest:"a".repeat(64)};
+  const preflightSha256="b".repeat(64),packetId="e".repeat(32);
+  const sessionBinding={schema:"pipeline.session-critic-packet-binding.v1",sessionId:"feature-fixture",preflightSha256,assurance:route.assurance,freshContext:true,historyInherited:false,mayDelegate:false};
+  prepareCandidatePacket({repoRoot:fx.root,controlRoot,packetId,taskId:fx.taskId,projectId:"pipeline",baseCommit:fx.base,candidateCommit:fx.candidate,rulesetOid:fx.base,route,sessionBinding,
+    references:[{kind:"spec",path:"specs/course-feature/spec.md"},{kind:"guardrail",path:".claude/pipeline.json"}]});
+  claimCandidatePacket({controlRoot,packetId,adapter:route.adapter,claimantNonce:"c".repeat(64)});
+  reserveFeatureCriticReviewUnitOwnership({repoRoot:fx.root,controlRoot,packetId,preflightSha256,courseInput,sourceSha256:sha256Canonical(subject),decisionSha256:sha256Canonical(decision)});
+  return {controlRoot,courseKey:projection.courseIdentity.courseKey,base:{repoRoot:fx.root,controlRoot,logicalWorkIds:["AC-1","AC-2"]}};
+}
+test("PF94 c19 takeover refuses only the SAME course key; another key keeps the history/open checks; the conflict text names the earlier key",()=>{
+  const fx=fixture({feature:true});try{
+    const c=reservedCourse(fx),other="9".repeat(64);
+    const thrown=fn=>{try{fn();}catch(e){return e;}return null;};
+    const same=CGB.inspectFeatureCourseTakeover({...c.base,courseKey:c.courseKey,courseHistoryRegistered:false});
+    assert.equal(same.originKind,"feature-course");
+    assert.equal(same.refusalCode,"CGB-TAKEOVER-COURSE");
+    assert.ok(same.repair.includes("--add-review-lineage"),same.repair);
+    assert.equal(thrown(()=>CGB.supersedeFeatureCourseTakeover({...c.base,courseKey:c.courseKey,courseHistoryRegistered:false,digestSha256:same.digestSha256,reason:"r"}))?.code,"CGB-TAKEOVER-COURSE");
+    assert.equal(CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:true}).refusalCode,"CGB-TAKEOVER-HISTORY");
+    assert.equal(CGB.inspectFeatureCourseTakeover({...c.base,courseKey:other,courseHistoryRegistered:false}).refusalCode,"CGB-TAKEOVER-OPEN");
+    const conflict=thrown(()=>assertFeatureCriticReviewUnitOwnership({repoRoot:fx.root,courseKey:other,logicalWorkIds:["AC-1","AC-2"]}));
+    assert.equal(conflict?.code,"CGB-CONFLICT");
+    assert.ok(conflict.message.includes("earlier course key of this feature")&&conflict.message.includes("no registered lineage"),conflict.message);
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});
