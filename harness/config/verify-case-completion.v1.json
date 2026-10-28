@@ -462,6 +462,11 @@
       "reason": "backlog/items/2026-09-04-an-uncaught-assertion-silently-truncates-a-test-file-so-later-cases-never-run.md"
     },
     {
+      "name": "critic-packet-release-tests",
+      "path": "plugins/pipeline-core/lib/critic-packet-release.test.mjs",
+      "disposition": "required"
+    },
+    {
       "name": "critic-route-v3-tests",
       "path": "plugins/pipeline-core/lib/critic-route-v3.test.mjs",
       "disposition": "required"

@@ -18,7 +18,7 @@ import { validateCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
-import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
+import { canonicalJson, sha256, packetDigestMatches } from "../scripts/critic-packet-preflight.mjs";
 import { readConsumedSessionAdmission, readConsumedCandidateResult, readConsumedCandidateReceipt } from "../scripts/critic-packet-preflight.mjs";
 import { validateSessionCriticResult, sessionCriticReceiptForResult, validateSessionCriticReceipt } from "../scripts/session-critic-finalizer.mjs";
 import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission.mjs";
@@ -65,7 +65,7 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
   try { validateSessionCriticReceipt(critic); }
   catch { fail("CVL-CRITIC-INVALID", "Private Critic receipt is malformed."); }
   if (!packet || packet.packetId !== criticPacketId || critic.packetId !== criticPacketId
-    || critic.packetDigest !== sha256(canonicalJson(packet))
+    || !packetDigestMatches(packet, critic.packetDigest)
     || packet.candidate?.base !== critic.candidate.base || packet.candidate?.commit !== critic.candidate.commit
     || packet.candidate?.tree !== critic.candidate.tree || packet.diff?.base !== critic.reviewRange.base
     || packet.diff?.commit !== critic.reviewRange.commit || packet.diff?.sha256 !== critic.reviewRange.diffSha256) {

@@ -2286,6 +2286,12 @@
       "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-generic-batch.test.mjs"
     },
     {
+      "name": "critic-packet-release-tests",
+      "file": "plugins/pipeline-core/lib/critic-packet-release.test.mjs",
+      "invariantPinned": "Regression and invariant coverage for plugins/pipeline-core/lib/critic-packet-release.test.mjs",
+      "nonOverlapNote": "Unique test suite for plugins/pipeline-core/lib/critic-packet-release.test.mjs"
+    },
+    {
       "name": "verify-case-completion-augmentation-policy-tests",
       "file": "harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",
       "invariantPinned": "Regression and invariant coverage for harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs",

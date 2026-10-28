@@ -512,6 +512,21 @@
       }
     },
     {
+      "name": "critic-packet-release-tests",
+      "file": "plugins/pipeline-core/lib/critic-packet-release.test.mjs",
+      "caseCompletion": {
+        "schema": "pipeline.verify-case-completion-policy.v1",
+        "caseIds": [
+          "CPR001",
+          "CPR002",
+          "CPR003",
+          "CPR004",
+          "CPR005"
+        ],
+        "maxBytes": 65536
+      }
+    },
+    {
       "name": "darwin-native-process-observer-tests",
       "file": "plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs",
       "caseCompletion": {

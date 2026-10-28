@@ -714,6 +714,23 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
   return inspectClaimedSessionAdmission({ controlRoot, packetId }, { now });
 }
 
+/** The packet as a claimed-session reader sees it: a stored pre-assurance coordinator binding is shown in its normalized form. */
+export function normalizedPacketView(packet) {
+  return packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
+    ? packet
+    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
+}
+
+/**
+ * True when `digest` is the digest of this exact packet: as it lies on disk (what the finalizer binds today) or as its normalized
+ * view (what the build before bound for a pre-assurance packet). Any other digest, or a changed packet, is false.
+ */
+export function packetDigestMatches(packet, digest) {
+  if (typeof digest !== "string") return false;
+  if (digest === sha256(canonicalJson(packet))) return true;
+  try { return digest === sha256(canonicalJson(normalizedPacketView(packet))); } catch { return false; }
+}
+
 /** Re-read the exact admission while the packet is still claimed. */
 export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now = new Date() } = {}) {
   const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now, allowLegacyPreAssurance: true });
@@ -734,9 +751,7 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now 
     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
   }
   // Digest checks above use the raw packet; the returned view carries the normalized coordinator binding.
-  const view = packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
-    ? packet
-    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
+  const view = normalizedPacketView(packet);
   return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet: view, claim, admission };
 }
 

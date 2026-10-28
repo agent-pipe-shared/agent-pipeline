@@ -245,6 +245,7 @@ verificationEntryPoints:
   - plugins/pipeline-core/lib/project-uninstall.test.mjs
   - plugins/pipeline-core/lib/runtime-projection-removal.test.mjs
   - plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+  - plugins/pipeline-core/lib/critic-packet-release.test.mjs
   - plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs
   - plugins/pipeline-core/lib/native-platform-process-observer.test.mjs
   - plugins/pipeline-core/lib/darwin-requester-integration.test.mjs

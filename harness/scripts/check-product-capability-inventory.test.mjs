@@ -362,7 +362,13 @@ check("HAW-A04c reads a genuinely consumed private Critic receipt across a commi
         trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true },
     };
     assert.equal(admitSessionCriticReview(criticRequest).status, "admitted");
-    const result = finalizeSessionCriticReview(criticRequest);
+    // Cut A: a finalized verdict needs a record the Source issued; build it the way the finalizer's own suite does.
+    const sourceIssuedOrigin = (query) => ({
+      schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: query.packetId,
+      packetDigest: query.packetDigest, claimant: query.claimant, sessionId: query.sessionId,
+      verdictSha256: query.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000,
+    });
+    const result = finalizeSessionCriticReview(criticRequest, { readOriginalSourceReturnFn: sourceIssuedOrigin });
     assert.equal(result.status, "completed");
     const prepared = preparePortableCriticExport({ gitCommonDir: join(root, ".git"),
       criticPacketId: criticRequest.packetId, candidate: { commit: candidate, tree },

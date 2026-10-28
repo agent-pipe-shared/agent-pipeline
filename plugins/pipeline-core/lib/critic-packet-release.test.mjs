@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { registerTestCaseCompletion } from "./test-case-completion.mjs";
 import { releaseCriticPacket } from "./critic-packet-release.mjs";
+
+const completionCaseIds = Object.freeze(["CPR001", "CPR002", "CPR003", "CPR004", "CPR005"]);
+const completionCases = [];
+function test(name, run) { completionCases.push({ id: completionCaseIds[completionCases.length], name, run }); }
 
 const ID = "a".repeat(32);
 function fixture(phase = "claimed") {
@@ -72,3 +76,4 @@ test("D60 (g) the audit record carries no absolute path", () => {
     assert.doesNotMatch(text, /["':]\/[a-z]|[A-Za-z]:\\/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+registerTestCaseCompletion({ cases: completionCases, fd: 3, maxBytes: 8192 });

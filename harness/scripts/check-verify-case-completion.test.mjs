@@ -136,13 +136,25 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   // `sites` of git-null-device-sites-tests 14 -> 17, session-authority-repair-tests 123 -> 144, slice-queue-cli-tests 109 -> 125 and
   // slice-queue-tests 310 -> 330. Only these four numbers change; names, paths, classifications, the identity digests and the counts
   // 266 / 347 / 361 stay as pinned, and no assertion is weakened.
+  // Restated 2026-10-28 (QG-04, own hunk; Toolbox D60 Verify registration): (1) critic-packet-release-tests is a Verify registration with the full
+  // completion protocol and a measured top-level sites count of 17; (2) 18 suites registered after the last restatement (architecture-close-disposition-tests
+  // ... windows-authority-readiness-tests) were never counted here, so each is added with its measured classification and sites (+18, newlyCounted 82 -> 100
+  // incl. the release test) and excluded from the R5 set below; (3) 12 sites counts were outgrown by their suites (the classifier sources are unchanged since
+  // 2026-10-16): audit-pack 33->51, critic-course-admission 60->146, critic-dispatch-preflight 158->169, critic-generic-batch 18->66, design-authoring 12->36,
+  // devplan-shell-sanctioned-recovery 23->40, guard-dispatch-budget-checkpoint 140->143, guard-dispatch-model 9->19,
+  // phoenix-authority-revision-installed-package 10->21, pin-devplan-lane-admits-the-producer-materialize-step 9->16, session-authority-repair 144->229,
+  // stop-fanout 89->94; (4) antigravity-topology-refresh-host-tests no longer classifies vulnerable (it adopted the completion protocol), so it is re-added
+  // to the retained R8 identity set from its registry row as convertedSinceR8, leaving the pinned 266 and its digest unchanged and not weakened.
+  // Arithmetic: 266 retained + 100 newlyCounted - 1 converted = 365 classified; registry 362 -> 386 (361 + 25 rows added since, incl. the release row).
   const newlyCounted = [
     ["administrative-commit-policy-tests","plugins/pipeline-core/lib/administrative-commit-policy.test.mjs","top-level-assertions",45],
     ["agy-item-delivery-tests","plugins/pipeline-core/lib/agy-item-delivery.test.mjs","top-level-assertions",33],
+    ["architecture-close-disposition-tests","plugins/pipeline-core/lib/architecture-close-disposition.test.mjs","top-level-assertions",16],
     ["architecture-entry-required-source-tests","harness/scripts/architecture-entry-required-source.test.mjs","top-level-assertions",13],
     ["architecture-prospective-companion-tests","plugins/pipeline-core/lib/architecture-prospective-companion.test.mjs","top-level-assertions",21],
     ["architecture-prospective-materialization-tests","plugins/pipeline-core/lib/architecture-prospective-materialization.test.mjs","top-level-assertions",60],
-    ["audit-pack-tests","plugins/pipeline-core/scripts/audit-pack.test.mjs","top-level-assertions",33],
+    ["audit-pack-command-admission-tests","plugins/pipeline-core/lib/guard/audit-pack-command-admission.test.mjs","top-level-assertions",30],
+    ["audit-pack-tests","plugins/pipeline-core/scripts/audit-pack.test.mjs","top-level-assertions",51],
     ["bootstrap-acknowledgement-mode-tests","plugins/pipeline-core/scripts/bootstrap-acknowledgement-mode.test.mjs","top-level-assertions",15],
     ["bound-design-line-endings-tests","plugins/pipeline-core/lib/bound-design-line-endings.test.mjs","top-level-assertions",22],
     ["claude-intake-prompt-capture-tests","plugins/pipeline-core/lib/claude-intake-prompt-capture.test.mjs","top-level-assertions",48],
@@ -152,15 +164,20 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["claude-task-output-read-scope-tests","plugins/pipeline-core/lib/claude-task-output-read-scope.test.mjs","top-level-assertions",20],
     ["claude-task-output-scope-posttool-tests","plugins/pipeline-core/hooks/claude-task-output-scope-posttool.test.mjs","top-level-assertions",9],
     ["clone-hook-readiness-rollback-tests","plugins/pipeline-core/scripts/clone-hook-readiness.rollback.test.mjs","top-level-assertions",86],
+    ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+    ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",60],
-    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",158],
-    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",18],
+    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",146],
+    ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",169],
+    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",66],
+    ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+    ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+    ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",17],
     ["darwin-native-process-observer-tests","plugins/pipeline-core/lib/darwin-native-process-observer.test.mjs","top-level-assertions",24],
     ["darwin-requester-integration-tests","plugins/pipeline-core/lib/darwin-requester-integration.test.mjs","top-level-assertions",13],
     ["design-approval-command-admission-tests","plugins/pipeline-core/hooks/design-approval-command-admission.test.mjs","top-level-assertions",5],
     ["design-approval-route-tests","plugins/pipeline-core/lib/design-approval-route.test.mjs","top-level-assertions",66],
-    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",12],
+    ["design-authoring-tests","plugins/pipeline-core/lib/design-authoring.test.mjs","top-level-assertions",36],
     ["design-course-command-admission-tests","plugins/pipeline-core/hooks/design-course-command-admission.test.mjs","top-level-assertions",44],
     ["design-course-coordinator-tests","plugins/pipeline-core/scripts/design-course-coordinator.test.mjs","top-level-assertions",6],
     ["design-course-session-tests","plugins/pipeline-core/scripts/design-course-session.test.mjs","top-level-assertions",66],
@@ -168,10 +185,15 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["design-workflow-candidate-binding-tests","plugins/pipeline-core/lib/design-workflow-candidate-binding.test.mjs","top-level-assertions",13],
     ["design-workflow-package-builder-tests","plugins/pipeline-core/lib/design-workflow-package-builder.test.mjs","top-level-assertions",28],
     ["devplan-shell-lane-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-lane-recovery.test.mjs","top-level-assertions",13],
-    ["devplan-shell-sanctioned-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs","top-level-assertions",23],
+    ["devplan-shell-sanctioned-recovery-tests","plugins/pipeline-core/lib/guard/devplan-shell-sanctioned-recovery.test.mjs","top-level-assertions",40],
     ["doc-reader-course-budget-tests","harness/scripts/doc-reader-course-budget.test.mjs","top-level-assertions",8],
     ["fanout-governor-tests","plugins/pipeline-core/lib/fanout-governor.test.mjs","top-level-assertions",273],
     ["fanout-ledger-tests","plugins/pipeline-core/lib/fanout-ledger.test.mjs","top-level-assertions",62],
+    ["g17-publication-observation-tests","plugins/pipeline-core/lib/g17-publication-observation.test.mjs","top-level-assertions",31],
+    ["g23-quoted-pipeline-reads-tests","plugins/pipeline-core/lib/guard/g23-quoted-pipeline-reads.test.mjs","top-level-assertions",17],
+    ["g23-read-help-tests","plugins/pipeline-core/lib/guard/g23-read-help.test.mjs","top-level-assertions",14],
+    ["g29-public-handover-admission-tests","plugins/pipeline-core/lib/guard/g29-public-handover-admission.test.mjs","top-level-assertions",3],
+    ["g6-aggregate-native-boundaries-tests","plugins/pipeline-core/hooks/g6-aggregate-native-boundaries.test.mjs","top-level-assertions",6],
     ["git-hook-runtime-snapshot-fast-verify-tests","plugins/pipeline-core/lib/git-hook-runtime-snapshot-fast-verify.test.mjs","top-level-assertions",57],
     ["git-null-device-sites-tests","plugins/pipeline-core/lib/git-null-device-sites.test.mjs","top-level-assertions",17],
     ["git-stash-readonly-tests","plugins/pipeline-core/lib/guard/git-stash-readonly.test.mjs","top-level-assertions",7],
@@ -179,35 +201,41 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["gitleaks-scratch-clones-exclusion-tests","plugins/pipeline-core/scripts/security-adapters/gitleaks-scratch-clones-exclusion.test.mjs","node-test-single",5],
     ["governance-scope-win32-acl-tests","plugins/pipeline-core/lib/governance-scope-win32-acl.test.mjs","top-level-assertions",7],
     ["guard-devplan-design-approval-v7-tests","plugins/pipeline-core/hooks/guard-devplan-design-approval-v7.test.mjs","top-level-assertions",18],
-    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",140],
-    ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",9],
+    ["guard-dispatch-budget-checkpoint-tests","plugins/pipeline-core/hooks/guard-dispatch-budget-checkpoint.test.mjs","top-level-assertions",143],
+    ["guard-dispatch-model-tests","plugins/pipeline-core/hooks/guard-dispatch-model.test.mjs","top-level-assertions",19],
     ["hardened-private-directory-install-tests","plugins/pipeline-core/lib/hardened-private-directory.install.test.mjs","top-level-assertions",6],
     ["human-guard-override-disjoint-tests","plugins/pipeline-core/lib/human-guard-override-disjoint.test.mjs","top-level-assertions",57],
     ["install-agy-inline-candidate-tests","plugins/pipeline-core/install-agy.inline-candidate.test.mjs","top-level-assertions",54],
     ["install-snapshot-progress-tests","plugins/pipeline-core/scripts/install-snapshot-progress.test.mjs","top-level-assertions",17],
     ["installed-bootstrap-import-closure-tests","plugins/pipeline-core/scripts/installed-bootstrap-import-closure.test.mjs","top-level-assertions",17],
     ["installed-plugin-attestation-inline-action-tests","plugins/pipeline-core/scripts/installed-plugin-attestation-inline-action.test.mjs","top-level-assertions",28],
+    ["mid-session-hook-refresh-tests","plugins/pipeline-core/scripts/mid-session-hook-refresh.test.mjs","top-level-assertions",21],
     ["model-family-approval-request-tests","plugins/pipeline-core/scripts/model-family-approval-request.test.mjs","top-level-assertions",49],
     ["native-goldfish-host-state-fanout-tests","plugins/pipeline-core/lib/native-goldfish-host-state-fanout.test.mjs","top-level-assertions",52],
     ["native-platform-process-observer-tests","plugins/pipeline-core/lib/native-platform-process-observer.test.mjs","top-level-assertions",20],
     ["onboarding-greenfield-walk-tests","plugins/pipeline-core/lib/onboarding-greenfield-walk.test.mjs","top-level-assertions",16],
     ["onboarding-init-machine-plane-reason-tests","plugins/pipeline-core/scripts/onboarding-init-machine-plane-reason.test.mjs","node-test-single",4],
     ["passive-read-credential-follow-tests","plugins/pipeline-core/lib/passive-read-credential-follow.test.mjs","top-level-assertions",23],
-    ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",10],
+    ["phoenix-authority-revision-installed-package-tests","plugins/pipeline-core/scripts/phoenix-authority-revision-installed-package.test.mjs","top-level-assertions",21],
     ["pin-denial-names-a-diagnosis-it-refuses-tests","plugins/pipeline-core/lib/pins/denial-names-a-diagnosis-it-refuses.test.mjs","top-level-assertions",43],
-    ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",9],
+    ["pin-devplan-lane-admits-the-producer-materialize-step-tests","plugins/pipeline-core/lib/pins/devplan-lane-admits-the-producer-materialize-step.test.mjs","top-level-assertions",16],
     ["pin-installed-design-trailer-example-is-rejected-by-git-guard-tests","plugins/pipeline-core/lib/pins/installed-design-trailer-example-is-rejected-by-git-guard.test.mjs","node-test-single",60],
     ["pipeline-state-approve-push-chat-catalogue-repair-tests","plugins/pipeline-core/scripts/pipeline-state-approve-push-chat-catalogue-repair.test.mjs","node-test-single",13],
+    ["pipeline-state-calibration-recovery-tests","plugins/pipeline-core/scripts/pipeline-state-calibration-recovery.test.mjs","top-level-assertions",69],
     ["plan-reopen-current-action-tests","harness/scripts/plan-reopen-current-action.test.mjs","top-level-assertions",27],
+    ["po-human-approval-signing-handoff-tests","plugins/pipeline-core/scripts/po-human-approval.signing-handoff.test.mjs","top-level-assertions",14],
     ["project-onboarding-foreign-residue-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue.test.mjs","top-level-assertions",13],
     ["project-onboarding-foreign-residue-unit-tests","plugins/pipeline-core/lib/project-onboarding-foreign-residue-unit.test.mjs","top-level-assertions",15],
     ["project-onboarding-temp-root-tests","plugins/pipeline-core/lib/project-onboarding-temp-root.test.mjs","top-level-assertions",20],
+    ["public-handover-duty-tests","plugins/pipeline-core/lib/public-handover-duty.test.mjs","top-level-assertions",72],
+    ["publication-guard-candidate-tests","plugins/pipeline-core/scripts/publication-guard-candidate.test.mjs","top-level-assertions",21],
+    ["publication-review-requirement-tests","plugins/pipeline-core/lib/publication-review-requirement.test.mjs","top-level-assertions",11],
     ["runtime-handover-projection-tests","plugins/pipeline-core/lib/runtime-handover-projection.test.mjs","top-level-assertions",8],
     ["runtime-handover-projection-win-path-tests","plugins/pipeline-core/lib/runtime-handover-projection.win-path.test.mjs","top-level-assertions",2],
     ["runtime-handover-writer-tests","plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs","top-level-assertions",14],
     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",144],
+    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",229],
     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
@@ -215,9 +243,10 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     ["signed-spec-descriptor-tests","plugins/pipeline-core/lib/signed-spec-descriptor.test.mjs","top-level-assertions",26],
     ["slice-queue-cli-tests","plugins/pipeline-core/scripts/slice-queue.test.mjs","top-level-assertions",125],
     ["slice-queue-tests","plugins/pipeline-core/lib/slice-queue.test.mjs","top-level-assertions",330],
-    ["stop-fanout-tests","plugins/pipeline-core/hooks/stop-fanout.test.mjs","top-level-assertions",89],
+    ["stop-fanout-tests","plugins/pipeline-core/hooks/stop-fanout.test.mjs","top-level-assertions",94],
     ["verify-case-completion-augmentation-policy-tests","harness/scripts/check-verify-case-completion-augmentation-policy.test.mjs","top-level-assertions",8],
     ["verify-run-record-tests","plugins/pipeline-core/lib/verify-run-record.test.mjs","top-level-assertions",24],
+    ["windows-authority-readiness-tests","plugins/pipeline-core/lib/windows-authority-readiness.test.mjs","top-level-assertions",69],
   ];
   const registry = JSON.parse(readFileSync(join(REPO_ROOT, DEFAULT_REGISTRY), "utf8"));
   const classified = registry.entries.flatMap((entry) => {
@@ -226,16 +255,19 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
   }).sort((left, right) => left[0].localeCompare(right[0]));
   const addedNames = new Set(newlyCounted.map((entry) => entry[0]));
   assert.deepEqual(classified.filter((entry) => addedNames.has(entry[0])), newlyCounted);
-  const retainedIdentities = classified.filter((entry) => !addedNames.has(entry[0]))
-    .map(([name, path]) => [name, path]);
+  const convertedSinceR8 = ["antigravity-topology-refresh-host-tests"];
+  const retainedIdentities = [
+    ...classified.filter((entry) => !addedNames.has(entry[0])).map(([name, path]) => [name, path]),
+    ...convertedSinceR8.map((name) => [name, registry.entries.find((entry) => entry.name === name).path]),
+  ].sort((left, right) => left[0].localeCompare(right[0]));
   assert.equal(retainedIdentities.length, baselineVulnerableCount);
   assert.equal(createHash("sha256").update(JSON.stringify(retainedIdentities)).digest("hex"),
     "e7fa11eb9b8a508827f777ca5263573bc68c48675817a9f55aac67fd6b3a68d7",
     "the complete R8 classified identity set must remain present");
-  assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length);
+  assert.equal(result.vulnerableCount, baselineVulnerableCount + newlyCounted.length - convertedSinceR8.length);
   assert.equal(classified.length, result.vulnerableCount,
     "all classified Verify registrations must have a completion-registry row");
-  assert.equal(result.registryCount, 361);
+  assert.equal(result.registryCount, 386);
   // Restated 2026-10-22 (QG-04, own commit): the R5 identity set (284, digest below) is unchanged. Suites registered
   // after R5 are excluded by name, and the R5 members that have since adopted the full completion protocol (no longer
   // classified vulnerable; each is asserted `required` below) are re-added from their registry rows, so the digest
@@ -252,6 +284,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "critic-course-admission-tests",
     "critic-dispatch-preflight-tests",
     "critic-generic-batch-tests",
+    "critic-packet-release-tests",
     "darwin-native-process-observer-tests",
     "darwin-requester-integration-tests",
     "design-approval-command-admission-tests",
@@ -304,10 +337,30 @@ check("VCR01", "the repository registry covers all arrays and pins the observed 
     "slice-queue-cli-tests",
     "slice-queue-tests",
     "stop-fanout-tests",
+    "architecture-close-disposition-tests",
+    "audit-pack-command-admission-tests",
+    "codex-critic-actual-baseline-tests",
+    "codex-critic-baseline-tests",
+    "current-session-artifact-cross-runner-tests",
+    "current-session-artifact-export-tests",
+    "g17-publication-observation-tests",
+    "g23-quoted-pipeline-reads-tests",
+    "g23-read-help-tests",
+    "g29-public-handover-admission-tests",
+    "g6-aggregate-native-boundaries-tests",
+    "mid-session-hook-refresh-tests",
+    "pipeline-state-calibration-recovery-tests",
+    "po-human-approval-signing-handoff-tests",
+    "public-handover-duty-tests",
+    "publication-guard-candidate-tests",
+    "publication-review-requirement-tests",
+    "windows-authority-readiness-tests",
     "verify-case-completion-augmentation-policy-tests",
     "verify-run-record-tests"
   ]);
-  const convertedSinceR5 = ["clone-hook-readiness-tests","commit-msg-hook-install-tests"];
+  // Restated 2026-10-28 (QG-04): antigravity-topology-refresh-host-tests adopted the completion protocol and no longer classifies vulnerable;
+  // re-added from its registry row like the two before it, so the R5 set (284) and its digest stay unchanged.
+  const convertedSinceR5 = ["antigravity-topology-refresh-host-tests","clone-hook-readiness-tests","commit-msg-hook-install-tests"];
   const retainedR5Identities = [
     ...classified.filter((entry) => entry[0] !== "design-course-command-admission-tests" && !addedAfterR5.has(entry[0])).map(([suite, path]) => [suite, path]),
     ...convertedSinceR5.map((name) => [name, registry.entries.find((entry) => entry.name === name).path]),

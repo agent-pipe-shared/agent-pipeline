@@ -18,7 +18,9 @@ When its status is `migration-required`, a legacy deferred adoption exists
 and must be migrated before implementation (D162). Run the nested read-only
 `nextAction` and show the PO the proposal's `migration` block: measure when the
 map is missing, prepare the approved-scoped adoption, then confirm and apply it
-through the same route as a fresh adoption. Never run the measure or apply steps
+through the same route as a fresh adoption. The measure step is the
+`scripts/architecture-measure.mjs` entry point (`Usage: node scripts/architecture-measure.mjs --root <dir> [--apply] [--json]`;
+without `--apply` it only reports). Never run the measure or apply steps
 without the PO's go, and never offer a new deferral.
 
 Orientation and proposal are not authority to write a map or make a PO

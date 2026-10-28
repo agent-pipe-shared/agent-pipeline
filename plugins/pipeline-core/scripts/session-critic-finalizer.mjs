@@ -25,7 +25,7 @@ import {
 } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
-import { republishGenericCriticBatchIndex } from "../lib/critic-generic-batch.mjs";
+import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore } from "../lib/critic-generic-batch.mjs";
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
@@ -37,6 +37,7 @@ import {
   inspectClaimedSessionAdmission,
   inspectClaimedCandidatePacket,
   inspectCandidatePacket,
+  packetDigestMatches,
   prepareCandidatePacket,
   publishClaimedSessionAdmission,
   readConsumedCandidateReceipt,
@@ -56,6 +57,7 @@ export const SIGNED_IMPORT_REVIEW_ANCHOR_SCHEMA = "pipeline.signed-quality-impor
 export const GENERIC_BATCH_REGISTRATION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-registration-request.v2";
 export const GENERIC_BATCH_CORRECTION_REQUEST_SCHEMA = "pipeline.critic-generic-batch-correction-request.v2";
 export const SESSION_CRITIC_RELEASE_REQUEST_SCHEMA = "pipeline.session-critic-release-request.v1";
+export const SESSION_CRITIC_BATCH_RECOVERY_REQUEST_SCHEMA = "pipeline.session-critic-batch-recovery-request.v1";
 export const SESSION_CRITIC_EXPORT_REQUEST_SCHEMA = "pipeline.session-critic-export-request.v1";
 export const SESSION_CRITIC_EXPORT_RESULT_SCHEMA = "pipeline.session-critic-export.v1";
 export const SESSION_CRITIC_EVIDENCE_INDEX_SCHEMA = "pipeline.session-critic-evidence-index.v1";
@@ -420,8 +422,21 @@ export function admitSessionCriticReview(options, deps = {}) {
   if (existsSync(join(controlRoot, packetId))) {
     const retained = genericBatch === null ? featureReservationFor(options,preflight,root,controlRoot,packetId,preflightSha256)
       : readReservedGenericCriticBatchAdmission({ controlRoot, packetId, preflightSha256, ...genericBatch });
-    const current = inspectClaimedSessionAdmission({ controlRoot, packetId }, deps.packetDependencies);
     const course = genericCourseFor(retained.reservation);
+    let current;
+    try { current = inspectClaimedSessionAdmission({ controlRoot, packetId }, deps.packetDependencies); }
+    catch (error) {
+      // D60 c7: a feature-request packet left claimed without admission by a failed first admit is completed here, only
+      // for the same task, candidate and preflight; anything else keeps the original refusal.
+      if (genericBatch !== null || error?.code !== "CPP-SESSION-ADMISSION") throw error;
+      let held;
+      try { ({ packet: held } = inspectClaimedCandidatePacket({ controlRoot, packetId }, deps.packetDependencies)); } catch { throw error; }
+      if (held.candidate?.commit !== preflight.candidate.commit || held.request?.taskId !== options.taskId
+        || held.request?.sessionBinding?.preflightSha256 !== preflightSha256) throw error;
+      const admission = (deps.publishClaimedSessionAdmissionFn ?? publishClaimedSessionAdmission)({ controlRoot, packetId, preflightSha256, ...course }, deps.packetDependencies);
+      return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "admitted", packetId,
+        packetDigest: sha256(canonicalJson(held)), admissionSha256: sha256(canonicalJson(admission.admission)), resumed: true });
+    }
     if (current.admission.courseSourceSha256 !== course.courseSourceSha256 || current.admission.courseDecisionSha256 !== course.courseDecisionSha256) fail("SCF-PRELAUNCH-BINDING");
     return Object.freeze({ schema: SESSION_CRITIC_ADMISSION_RESULT_SCHEMA, status: "already-admitted", packetId,
       packetDigest: current.admission.packetDigest, admissionSha256: sha256(canonicalJson(current.admission)), replay: true });
@@ -515,7 +530,9 @@ function receiptFor(result) {
 
 /** Pure validation only; this does not consume a packet or authorize review. */
 export function validateSessionCriticResult(result, packet) {
-  return validateResult(result, packet);
+  // A result of the previous build binds the normalized-view digest of a legacy packet; accept it only for the SAME packet.
+  const stored = packetDigestMatches(packet, result?.packetDigest) ? result.packetDigest : undefined;
+  return validateResult(result, packet, stored);
 }
 
 /** Pure receipt projection only; durable consumed readback remains required. */
@@ -750,7 +767,7 @@ export function exportSessionCriticEvidence({ root: rootInput, packetId, reportP
   try { validateSessionCriticReceipt(receipt); } catch { fail("SCF-EXPORT-UNCONSUMED"); }
   // Same binding the Verify lifecycle demands, minus its pass gate: a review with findings is evidence too.
   if (!record(packet) || packet.packetId !== packetId || receipt.packetId !== packetId
-    || receipt.packetDigest !== sha256(canonicalJson(packet))
+    || !packetDigestMatches(packet, receipt.packetDigest)
     || packet.candidate?.base !== receipt.candidate.base || packet.candidate?.commit !== receipt.candidate.commit
     || packet.candidate?.tree !== receipt.candidate.tree || packet.diff?.base !== receipt.reviewRange.base
     || packet.diff?.commit !== receipt.reviewRange.commit
@@ -808,6 +825,19 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
     const optIn = Array.isArray(argv) && argv.length === 6 && argv[0] === "finalize" && argv[5] === "--allow-caller-authored-fallback";
     if (Array.isArray(argv) && argv.includes("--allow-caller-authored-fallback") && !optIn) fail("SCF-USAGE");
     if (Array.isArray(argv) && argv[0] === "export") return runSessionCriticExportCli(argv, deps);
+    // D61: sanctioned recovery of an abandoned transaction lock over an EMPTY generic batch store. Inspect is read-only;
+    // recover takes the inspected digest and still judges the recorded owner itself. A partial store is never touched.
+    if (Array.isArray(argv) && argv[0] === "inspect-batch-recovery") {
+      if (argv.length !== 3 || argv[1] !== "--root") fail("SCF-USAGE");
+      return Object.freeze({ exitCode: 0, output: inspectGenericCriticBatchRecovery({ controlRoot: controlRootFor(realpathSync(resolve(argv[2]))) }) });
+    }
+    if (Array.isArray(argv) && argv[0] === "recover-batch") {
+      if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+      const recoverRoot = realpathSync(resolve(argv[2]));
+      const rawRecover = readPhysicalRequest(recoverRoot, argv[4]);
+      if (!exact(rawRecover, ["schema", "digestSha256"]) || rawRecover.schema !== SESSION_CRITIC_BATCH_RECOVERY_REQUEST_SCHEMA) fail("SCF-BATCH-RECOVERY-REQUEST");
+      return Object.freeze({ exitCode: 0, output: recoverGenericCriticBatchEmptyStore({ controlRoot: controlRootFor(recoverRoot), digestSha256: rawRecover.digestSha256 }) });
+    }
     if (Array.isArray(argv) && argv[0] === "release") {
       if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
       const releaseRoot = realpathSync(resolve(argv[2]));

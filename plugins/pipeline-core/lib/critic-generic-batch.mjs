@@ -152,9 +152,9 @@ function readContext(controlRoot) {
 }
 function transaction(c, action) {
   const lock = join(c.root, "transaction.lock");
-  try { mkdirSync(lock, { mode: 0o700 }); } catch (error) { if (error.code === "EEXIST") fail("CGB-HELD"); throw error; }
+  try { mkdirSync(lock, { mode: 0o700 }); } catch (error) { if (error.code === "EEXIST") fail("CGB-HELD", HELD_LOCK_DETAIL); throw error; }
   const held = directory(lock);
-  if (activeTransaction !== null) fail("CGB-HELD");
+  if (activeTransaction !== null) fail("CGB-HELD", HELD_LOCK_DETAIL);
   const owner = lockOwnerRecord(); const ownerPath = join(lock, LOCK_OWNER_FILE);
   try { writeLockOwner(ownerPath, owner); }
   catch (error) { try { unlinkSync(ownerPath); } catch {} try { rmdirSync(lock); } catch {} throw error; }
@@ -240,7 +240,9 @@ function judgeLockOwner(record) {
   }
   return "unproven";
 }
-function unlocked(c) { assertNamespace(c); if (existsSync(join(c.root, "transaction.lock"))) fail("CGB-HELD"); }
+// The refusal of a held transaction lock names the sanctioned recovery verbs (D61), as the packet-held refusal names release.
+const HELD_LOCK_DETAIL = "The generic batch store transaction lock is held; if its owner process is gone, inspect it with the session-critic-finalizer inspect-batch-recovery verb (--root <repo>) and release an abandoned empty-store lock with the recover-batch verb (--root <repo> --request <file> carrying the inspected digestSha256).";
+function unlocked(c) { assertNamespace(c); if (existsSync(join(c.root, "transaction.lock"))) fail("CGB-HELD", HELD_LOCK_DETAIL); }
 function ensureStore(c) {
   for (const name of ["logical", "origins"]) createDirectory(join(c.root, name));
   const p = join(c.root, "repository.json");
