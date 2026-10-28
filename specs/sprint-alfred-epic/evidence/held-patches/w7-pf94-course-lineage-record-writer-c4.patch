@@ -1,0 +1,65 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index daa39280c..1101565eb 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -727,6 +727,7 @@ import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mj
+ import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
+ import { addCriticReviewLineage } from "./feature-package-registration.mjs";
+ import { chmodSync, existsSync } from "node:fs";
++import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+ const pf94Commit = (root, message) => { git(root, ["add", "."]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
+ const pf94Guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
+ const pf94Verdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
+@@ -846,13 +847,37 @@ test("PF94 LINEAGE (g) a failing round with an open finding: after the lineage i
+   const registration = pf94Commit(fx.root, "register the lineage");
+   mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
+   const correction = pf94Commit(fx.root, "correction after the failing round");
+-  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: correction, registrationCommit: correction, requestedMode: "delta" });
++  // The deterministic gate needs registered diagnostic evidence bound to the CORRECTION candidate: produced and registered the way the fixture registers its round's diagnostic.
++  const specPath = `specs/${fx.featureId}/spec.md`, logPath = `specs/${fx.featureId}/evidence/targeted-correction.log`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`, capturedPath = `evidence/${fx.featureId}-targeted-correction.log`;
++  const diagnostic = produceCriticDiagnostic({ root: fx.root, candidate: correction, specPath, guardrailPaths: pf94Guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++  writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, capturedPath)));
++  diagnostic.targeted.log.path = logPath;
++  writeFileSync(join(fx.root, diagnosticPath), JSON.stringify(diagnostic));
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++  const evidenceRegistration = pf94Commit(fx.root, "register the correction diagnostic");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: correction, registrationCommit: evidenceRegistration, requestedMode: "delta" });
+   console.log("PF94 (g) registration:", registration, "admission after:", JSON.stringify(after.decision));
+   assert.equal(after.decision.code, "CCA-DELTA-REQUIRED", JSON.stringify(after.decision));
+   const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
+   console.log("PF94 (g) record findings:", JSON.stringify(record.findings), JSON.stringify(record.verdict));
+   assert.ok(record.findings.some((f) => f.status === "open"), JSON.stringify(record.findings));
+ });
++test("PF94 LINEAGE (h) the receipt carries no coverage fields, only the reviewed range: the written coverage is bound to that receipt and range, and a failing round is still a complete review of the diff", () => {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  const consumed = readConsumedCandidateResult({ controlRoot: join(fx.root, ".git", "agent-pipeline", "critic-packets"), packetId: fx.packetId });
++  assert.deepEqual(Object.keys(consumed.receipt).filter((k) => /coverage|package|edge|complete/iu.test(k)), []);
++  assert.deepEqual(consumed.receipt.reviewRange, { base: consumed.packet.candidate.base, commit: consumed.packet.candidate.commit, diffSha256: consumed.packet.diff.sha256 });
++  assert.equal(consumed.receipt.reviewPass, false);
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  assert.equal(record.coverage.receiptSha256, record.consumedResult.receiptSha256);
++  assert.deepEqual(record.coverage.changedPaths, consumed.packet.diffPaths);
++  assert.deepEqual(record.coverage.acceptanceIds, ["AC-1"]);
++  assert.equal(record.verdict.status, "findings");
++});
+ test("PF94 LINEAGE (e) HEAD behind a correction commit is refused FPR-LINEAGE-TRANSPORT and says to register before the next correction", () => {
+   const fx = consumedCourseRoundFixture();
+   mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index e198663f7..fb3507ffc 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -532,6 +532,9 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   const round = history.length + 1;
+   let unit;
+   try { unit = JSON.parse(inspect(root, criticReviewUnitPath(featureId)).bytes.toString("utf8")); } catch { return refused("FPR-LINEAGE-COMPILE", "the review unit is not readable", { packetId }); }
++  // The receipt carries no package, edge or coverage fields (only the reviewed range and the verdict), so those stay synthesized: one package over the whole packet diff. The synthesis claims the round reviewed exactly the packet diff; a receipt that says it reviewed another range contradicts that claim and is refused.
++  const range = consumed.receipt.reviewRange;
++  if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
+   const edges = ["feature-delivery"];
+   const compiled = compileRegisteredCriticReviewLineage({
+     courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath: null },
