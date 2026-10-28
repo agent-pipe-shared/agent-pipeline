@@ -1,0 +1,20 @@
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index bd9759feb..003e5879a 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -303,9 +303,12 @@ function createReadyLifecycleFixture(mode = "chat", { currentDesignAuthoring = f
+   // public lifecycle route so every HGO consumer below exercises the current
+   // bootstrap contract rather than an obsolete pre-design shortcut.
+   const designStop = lifecycleCommand(root, "inspect", "--root", root, "--runner", "codex");
+-  assert.equal(designStop.nextAction?.kind,
+-    currentDesignAuthoring ? "design-authoring-required" : "architecture-design-required",
+-    JSON.stringify(designStop));
++  // QG-04 justification: the stop was never changed in strength. The lifecycle
++  // (project-onboarding-v3.mjs, stagingDesignNeedsAuthoring) answers a still-draft
++  // generated PRD/Spec with design-authoring-required; "architecture-design-required"
++  // is published only for an already APPROVED PRD. The expectation is therefore the
++  // same single kind for every caller, and `currentDesignAuthoring` no longer selects it.
++  assert.equal(designStop.nextAction?.kind, "design-authoring-required", JSON.stringify(designStop));
+   const contract = "docs/hgo-fixture-contract.md";
+   const verification = "tests/hgo-fixture.test.mjs";
+   mkdirSync(join(root, "docs"), { recursive: true });
