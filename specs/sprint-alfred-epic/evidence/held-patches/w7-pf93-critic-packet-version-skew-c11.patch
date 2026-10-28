@@ -1,0 +1,416 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index c2e2404d0..742c7a8e3 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -497,7 +497,8 @@ function appendCorrection(input) {
+ }
+ function actualPacket(c, packetId, claimed = false) {
+   try {
+-    if (claimed) return inspectClaimedCandidatePacket({ controlRoot: c.controlRoot, packetId });
++    // PF-93: a packet claimed before the binding carried an assurance field is read back in its stored pre-assurance form.
++    if (claimed) return inspectClaimedCandidatePacket({ controlRoot: c.controlRoot, packetId }, { allowLegacyPreAssurance: true });
+     try { return inspectClaimedCandidatePacket({ controlRoot: c.controlRoot, packetId }); }
+     catch { return inspectCandidatePacket({ controlRoot: c.controlRoot, packetId }); }
+   } catch { fail("CGB-PHYSICAL"); }
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 9ca535848..2f763feef 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -540,9 +540,13 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+     }
+     const localDispatchEvidence = bound.packet.coordinatorOnly?.localDispatchEvidence;
+     if (localDispatchEvidence !== undefined) {
++      // A packet claimed before the assurance field carries the exact old key set and the old digest; it reads as assurance null.
++      const legacyForm = !Object.hasOwn(localDispatchEvidence ?? {}, "assurance");
+       try {
+-        exactObject(localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256",
+-          "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
++        exactObject(localDispatchEvidence, legacyForm
++          ? ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"]
++          : ["schema", "taskId", "recordPath", "recordSha256",
++            "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
+       } catch {
+         return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
+       }
+@@ -553,7 +557,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+         recordSha256: localDispatchEvidence.recordSha256,
+         sourceCandidateCommit: localDispatchEvidence.sourceCandidateCommit,
+         reviewCandidateCommit: localDispatchEvidence.reviewCandidateCommit,
+-        assurance: localDispatchEvidence.assurance,
++        ...(legacyForm ? {} : { assurance: localDispatchEvidence.assurance }),
+       };
+       const packetCandidate = bound.packet.candidate?.commit;
+       const expectedPath = `evidence/dispatch-record-${addendum.taskId}.json`;
+@@ -569,7 +573,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
+         || localDispatchEvidence.sourceCandidateCommit !== sourceRecord?.candidateCommit
+         || localDispatchEvidence.reviewCandidateCommit !== addendum.reviewCandidateCommit
+         || localDispatchEvidence.reviewCandidateCommit !== packetCandidate
+-        || (localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
++        || (!legacyForm && localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
+         || localDispatchEvidence.snapshotId !== sha256Canonical(binding)
+         || bound.packet.request?.taskId !== addendum.taskId
+         || !Array.isArray(bound.packet.references)
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 2fc83ce58..154b89208 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -324,7 +324,7 @@ function bindingsFor(packet) {
+ function recordBody(packet, revision, priorStateDigest, phase, body, timestamp) {
+   return { schema: STATE_SCHEMA, packetId: packet.packetId, packetDigest: sha256(canonicalJson(packet)), revision, priorStateDigest, timestamp, phase, body };
+ }
+-function validatePacketShape(packet) {
++function validatePacketShape(packet, shapeOptions = {}) {
+   if (!isObject(packet) || packet.schema !== PACKET_SCHEMA || !PACKET_ID.test(packet.packetId)
+     || !SHA256.test(packet.bindings?.requestSha256) || !SHA256.test(packet.bindings?.diffPathsSha256)
+     || !SHA256.test(packet.bindings?.governanceSha256)) fail("CPP-DIGEST", "Packet shape is invalid.");
+@@ -332,17 +332,17 @@ function validatePacketShape(packet) {
+   if (JSON.stringify(expected) !== JSON.stringify(packet.bindings)) fail("CPP-DIGEST", "Packet binding digest mismatch.");
+   if (packet.request?.sessionBinding !== undefined) normalizeSessionBinding(packet.request.sessionBinding, packet.route);
+   if (packet.coordinatorOnly !== undefined) {
+-    const coordinator = normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate);
++    const coordinator = normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, shapeOptions);
+     const taskId = coordinator.localDispatchEvidence?.taskId ?? coordinator.signedQualityImportAnchor?.taskId;
+     if (taskId !== packet.request?.taskId) fail("CPP-COORDINATOR-BINDING", "Coordinator-only binding does not name the packet task.");
+   }
+   if (packet.diagnostics !== undefined && !validateDiagnosticBundleShape(packet.diagnostics)) fail("CPP-DIAGNOSTIC", "Invalid diagnostic bundle.");
+ }
+ 
+-function normalizeCoordinatorOnly(value, candidate) {
++function normalizeCoordinatorOnly(value, candidate, { allowLegacyPreAssurance = false } = {}) {
+   if (isObject(value) && Object.hasOwn(value,"historicalFreshReview")) {
+     const {historicalFreshReview,...ordinary}=value;
+-    const normalized=normalizeCoordinatorOnly(ordinary,candidate);
++    const normalized=normalizeCoordinatorOnly(ordinary,candidate,{allowLegacyPreAssurance});
+     if(historicalFreshReview?.target?.baseCommit!==candidate.base
+       || historicalFreshReview?.target?.candidateCommit!==candidate.commit
+       || !revalidateHistoricalFreshReviewPacketBinding(historicalFreshReview)) fail("CPP-HISTORICAL-ADMISSION","Historical fresh-review binding is unavailable or drifted.");
+@@ -361,6 +361,22 @@ function normalizeCoordinatorOnly(value, candidate) {
+     }
+     return Object.freeze({ signedQualityImportAnchor: Object.freeze({ ...anchor }) });
+   }
++  // Only a packet ALREADY CLAIMED under the older version may be read in this form; a new claim or admission stays strict.
++  if (allowLegacyPreAssurance === true && exactKeys(value, ["localDispatchEvidence"])
++    && exactKeys(value.localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])) {
++    // Pre-assurance form (claimed before the binding carried an assurance field): closed, exact old digest, read as assurance null.
++    const legacy = value.localDispatchEvidence;
++    const { snapshotId: legacySnapshotId, ...legacyBody } = legacy;
++    if (legacy.schema !== "pipeline.local-dispatch-evidence.v1"
++      || !isSafeTaskId(legacy.taskId) || legacy.recordPath !== `evidence/dispatch-record-${legacy.taskId}.json`
++      || !SHA256.test(legacy.recordSha256 ?? "") || !OID.test(legacy.sourceCandidateCommit ?? "")
++      || legacy.sourceCandidateCommit.length !== candidate.commit.length || legacy.reviewCandidateCommit !== candidate.commit
++      || legacySnapshotId !== sha256Canonical(legacyBody)) {
++      fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
++    }
++    const view = { ...legacyBody, assurance: null };
++    return Object.freeze({ localDispatchEvidence: Object.freeze({ ...view, snapshotId: sha256Canonical(view) }) });
++  }
+   if (exactKeys(value, ["localDispatchEvidence"])) {
+     const binding = value.localDispatchEvidence;
+     if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"])
+@@ -379,13 +395,13 @@ function normalizeCoordinatorOnly(value, candidate) {
+   }
+   fail("CPP-COORDINATOR-BINDING", "Coordinator-only packet binding is invalid.");
+ }
+-function packetContext(controlRoot, packetId) {
++function packetContext(controlRoot, packetId, shapeOptions = {}) {
+   if (!PACKET_ID.test(packetId)) fail("CPP-ARGUMENT", "packetId must be 32 lowercase hex characters.");
+   const root = assertRealPrivateDir(resolve(controlRoot), "control root");
+   const packetDir = assertNoSymlinkPath(join(root, packetId), root, "packet directory");
+   if (!existsSync(packetDir)) fail("CPP-ABSENT", "Packet does not exist.");
+   const packet = readJson(join(packetDir, "packet.json"));
+-  validatePacketShape(packet);
++  validatePacketShape(packet, shapeOptions);
+   if (packet.packetId !== packetId) fail("CPP-DIGEST", "Packet ID mismatch.");
+   return { root, packetDir, packet };
+ }
+@@ -649,8 +665,8 @@ export function claimCandidatePacket({ controlRoot, packetId, adapter, claimantN
+ }
+ 
+ /** Read back the exact durable claim without issuing a new one. */
+-export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now = new Date() } = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++export function inspectClaimedCandidatePacket({ controlRoot, packetId }, { now = new Date(), allowLegacyPreAssurance = false } = {}) {
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance });
+   revalidateCandidate(packet);
+   const state = currentState(packetDir, packet);
+   if (state.phase !== "claimed" || state.revision !== 2) fail("CPP-CLAIM-READ", "Packet is not in its claimed phase.");
+@@ -700,8 +716,8 @@ export function publishClaimedSessionAdmission({ controlRoot, packetId, prefligh
+ 
+ /** Re-read the exact admission while the packet is still claimed. */
+ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now = new Date() } = {}) {
+-  const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now });
+-  const { packetDir } = packetContext(controlRoot, packetId);
++  const { packet, claim } = inspectClaimedCandidatePacket({ controlRoot, packetId }, { now, allowLegacyPreAssurance: true });
++  const { packetDir } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   const admissionPath = join(packetDir, "session-admission.json");
+   if (!existsSync(admissionPath)) fail("CPP-SESSION-ADMISSION", "Session admission is absent.");
+   const admission = readJson(admissionPath, "CPP-SESSION-ADMISSION");
+@@ -717,11 +733,15 @@ export function inspectClaimedSessionAdmission({ controlRoot, packetId }, { now
+     || typeof admission.createdAt !== "string" || !Number.isFinite(Date.parse(admission.createdAt))) {
+     fail("CPP-SESSION-ADMISSION", "Session admission is absent or drifted.");
+   }
+-  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet, claim, admission };
++  // Digest checks above use the raw packet; the returned view carries the normalized coordinator binding.
++  const view = packet.coordinatorOnly?.localDispatchEvidence === undefined || packet.coordinatorOnly.historicalFreshReview !== undefined
++    ? packet
++    : { ...packet, coordinatorOnly: { ...packet.coordinatorOnly, localDispatchEvidence: normalizeCoordinatorOnly(packet.coordinatorOnly, packet.candidate, { allowLegacyPreAssurance: true }).localDispatchEvidence } };
++  return { ok: true, code: "CPP-SESSION-ADMISSION-READ", packet: view, claim, admission };
+ }
+ 
+ export function recordCandidateResult({ controlRoot, packetId, result }, { now = new Date() } = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   revalidateCandidate(packet);
+   if (!isObject(result)) fail("CPP-RESULT", "Result must be an object.");
+   const state = currentState(packetDir, packet);
+@@ -741,7 +761,7 @@ export function recordCandidateResult({ controlRoot, packetId, result }, { now =
+ }
+ 
+ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now = new Date() } = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   revalidateCandidate(packet);
+   const state = currentState(packetDir, packet);
+   if (state.phase === "consumed") {
+@@ -812,7 +832,8 @@ export function readConsumedCandidateResult({ controlRoot, packetId }) {
+ 
+ 
+ export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapability }, { now = new Date() } = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  // Cleanup acts on the packet the finalizer just consumed through the explicit legacy read, so it reads it the same way.
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   const state = currentState(packetDir, packet);
+   if (state.phase !== "consumed" || cleanupCapability !== packet.cleanupCapability) fail("CPP-CLEANUP", "Cleanup is not authorized.");
+   revalidateCandidate(packet);
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index ee0bbfad2..fabd0ad9f 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -495,7 +495,12 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+   let admitted;
+   try {
+     admitted = (deps.inspectClaimedSessionAdmissionFn ?? inspectClaimedSessionAdmission)({ controlRoot, packetId }, deps.packetDependencies);
+-  } catch { fail("SCF-PRELAUNCH-ADMISSION"); }
++  } catch (error) {
++    const cause = typeof error?.code === "string" && /^[A-Z0-9-]+$/u.test(error.code) ? error.code : undefined;
++    const failure = new SessionCriticFinalizerError("SCF-PRELAUNCH-ADMISSION");
++    if (cause !== undefined) { failure.cause = cause; failure.message = `Session Critic finalization is invalid (admission cause: ${cause}).`; }
++    throw failure;
++  }
+   const packet = admitted.packet;
+   const signedImportAnchor = signedImportAnchorFor(preflight, options.signedQualityImportAnchor, options.taskId);
+   if (packet.candidate.base !== candidateFor(preflight).base
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index eeb32b034..8cb31af1a 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -11,7 +11,11 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test from "node:test";
+-import { canonicalJson, consumeCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
++import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
++import { createLocalDispatchEvidenceBinding, evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
++import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
++import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
++import { execFileSync } from "node:child_process";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
+ 
+@@ -608,6 +612,196 @@ const ORIGIN_UNAVAILABLE = "SCF-ORIGINAL-SOURCE-UNAVAILABLE";
+ const ORIGIN_BINDING = "SCF-ORIGINAL-SOURCE-BINDING";
+ function codeIs(code) { return (error) => error instanceof SessionCriticFinalizerError && error.code === code; }
+ 
++// PF-93: a packet claimed before the binding carried an assurance field holds the OLD key set and the OLD digest on disk.
++// Rewrite a freshly admitted packet into that stored form (or a tampered variant of it) and re-seal the digest chain
++// (packet bindings, state, claim, admission) exactly as the old creator would have sealed it.
++function legacyBindingVariant(kind, body) {
++  const legacyId = sha256Canonical(body);
++  switch (kind) {
++    case "legacy": return { ...body, snapshotId: legacyId };
++    case "extra-key": return { ...body, snapshotId: legacyId, extra: "x" };
++    case "wrong-snapshot": return { ...body, snapshotId: "0".repeat(64) };
++    case "assurance-null-old-digest": return { ...body, assurance: null, snapshotId: legacyId };
++    case "attested-old-digest": return { ...body, assurance: "orchestrator-attested", snapshotId: legacyId };
++    default: throw new Error(kind);
++  }
++}
++function rewriteAsLegacyPacket(fx, packetId, kind) {
++  const dir = join(fx.root, ".git", "agent-pipeline", "critic-packets", packetId);
++  const read = (name) => JSON.parse(readFileSync(join(dir, name), "utf8"));
++  const write = (name, value) => { rmSync(join(dir, name), { force: true }); writeFileSync(join(dir, name), canonicalJson(value), { mode: 0o600 }); };
++  const packet = read("packet.json");
++  const { assurance, snapshotId, ...body } = packet.coordinatorOnly.localDispatchEvidence;
++  packet.coordinatorOnly = { localDispatchEvidence: legacyBindingVariant(kind, body) };
++  packet.bindings.coordinatorOnlySha256 = sha(canonicalJson(packet.coordinatorOnly));
++  const digest = sha(canonicalJson(packet));
++  const state = read("state.json"); state.packetDigest = digest;
++  const claim = read("claim.json"); claim.packetDigest = digest;
++  const admission = read("session-admission.json"); admission.packetDigest = digest; admission.claimSha256 = sha(canonicalJson(claim));
++  write("packet.json", packet); write("state.json", state); write("claim.json", claim); write("session-admission.json", admission);
++  return { dir, body };
++}
++// The pre-assurance creator: the current binding minus the assurance key, snapshotId over the old key set.
++function legacyBindingFn(args) {
++  const { assurance, snapshotId, ...body } = createLocalDispatchEvidenceBinding(args);
++  return { ...body, snapshotId: sha256Canonical(body) };
++}
++function controlRootOf(fx) { return join(fx.root, ".git", "agent-pipeline", "critic-packets"); }
++// The batch reservation written at admit pins the packet digest, the claim digest and a source digest that embeds the
++// packet digest. Re-seal it the way the old creator would have sealed it for the legacy packet (same chain, mode 0o600).
++function resealReservationForLegacyPacket(fx, request) {
++  const packetDir = join(controlRootOf(fx), request.packetId);
++  const batchDir = join(controlRootOf(fx), "generic-batches", request.genericBatchRef.batchId);
++  const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
++  const reservationPath = join(batchDir, "full-admission.json");
++  const reservation = readJson(reservationPath);
++  const packetDigest = sha(canonicalJson(readJson(join(packetDir, "packet.json"))));
++  const claimSha256 = sha(canonicalJson(readJson(join(packetDir, "claim.json"))));
++  const registration = readJson(join(batchDir, "registration.json"));
++  const member = readJson(join(batchDir, "members", `${request.genericBatchRef.memberSha256}.json`));
++  reservation.packetDigest = packetDigest;
++  reservation.claimSha256 = claimSha256;
++  reservation.sourceSha256 = sha256Canonical({ registration, member, full: null, parent: null, packetDigest });
++  rmSync(reservationPath, { force: true });
++  writeFileSync(reservationPath, canonicalJson(reservation), { mode: 0o600 });
++  // The old creator published the session admission with the same course source digest as the reservation (both derive
++  // from the legacy packet digest), so the admission record carries the re-sealed digest too.
++  const admissionPath = join(packetDir, "session-admission.json");
++  const admission = readJson(admissionPath);
++  admission.courseSourceSha256 = reservation.sourceSha256;
++  rmSync(admissionPath, { force: true });
++  writeFileSync(admissionPath, canonicalJson(admission), { mode: 0o600 });
++}
++
++test("PF-93 (1) the stored pre-assurance binding normalizes to assurance null with the current snapshot formula", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "a1".repeat(16) });
++    const { body } = rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    const readback = inspectClaimedSessionAdmission({ controlRoot: controlRootOf(fx), packetId: request.packetId });
++    assert.deepEqual(readback.packet.coordinatorOnly.localDispatchEvidence,
++      { ...body, assurance: null, snapshotId: sha256Canonical({ ...body, assurance: null }) });
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 (2)+(7) a packet claimed in the pre-assurance form finalizes through the generic batch to the verdict", () => {
++  const fx = fixture();
++  try {
++    // The legacy packet is produced by the real writer (packet, state, claim, admission, batch reservation stay consistent).
++    const request = registered(fx, { packetId: "a2".repeat(16) });
++    // The current writer normalizes a pre-assurance binding to the current form, so the on-disk legacy form is re-sealed after admission.
++    admitSessionCriticReview(request);
++    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    resealReservationForLegacyPacket(fx, request);
++    const stored =JSON.parse(readFileSync(join(controlRootOf(fx), request.packetId, "packet.json"), "utf8"));
++    assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
++    const result = finalizeSessionCriticReview(request);
++    assert.equal(result.status, "completed");
++    assert.equal(result.receipt.reviewPass, true);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 (6) skip coverage accepts the pre-assurance binding exactly and refuses a tampered one", () => {
++  const taskId = "HISTORICAL-AUTHORED";
++  const root = mkdtempSync(join(tmpdir(), "pf93-skip-"));
++  try {
++    const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
++    mkdirSync(join(root, "evidence"), { recursive: true });
++    writeFileSync(join(root, ".gitignore"), "/evidence/\n");
++    writeFileSync(join(root, "source.txt"), "reviewed source\n");
++    git("init", "-q");
++    git("add", ".gitignore", "source.txt");
++    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "historical candidate");
++    const candidateCommit = git("rev-parse", "HEAD");
++    const trigger = { schema: CRITIC_TRIGGER_INPUT_SCHEMA, rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } };
++    const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium",
++      rulesetSha: "0.6.2+local", dispatcher: "Elephant", candidateCommit, resultSha256: sha("Done."), outcome: "completed", commits: [candidateCommit],
++      log: [], report: { text: "Private prose.", changedFiles: ["source.txt"] }, criticRequired: { schema: CRITIC_REQUIRED_SCHEMA, trigger, appliedRow: "T3" } };
++    const recordBytes = `${JSON.stringify(record, null, 2)}\n`;
++    const criticBytes = "Independent Critic review of the historical source range.\n";
++    writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), recordBytes);
++    writeFileSync(join(root, `evidence/critic-${taskId}.md`), criticBytes);
++    const entry = { schema: CRITIC_DISPOSITION_ADDENDUM_SCHEMA, recordPath: `evidence/dispatch-record-${taskId}.json`, recordSha256: sha(recordBytes),
++      taskId, candidateCommit, reviewCandidateCommit: candidateCommit, criticPacketId: "d".repeat(32), criticReceiptSha256: "c".repeat(64),
++      criticEvidence: { schema: "pipeline.critic-evidence-reference.v1", taskId, candidateCommit, path: `evidence/critic-${taskId}.md`, sha256: sha(criticBytes) } };
++    // The binding is created before the addendum exists, exactly as the existing historical-authored case does.
++    const legacy = legacyBindingFn({ root, taskId, reviewCandidateCommit: candidateCommit });
++    writeFileSync(join(root, criticDispositionAddendumPath(taskId)), `${JSON.stringify(entry, null, 2)}\n`);
++    const evaluate = (binding) => evaluateRepositoryCriticSkipCoverage({ root, readChangedPaths: () => ["source.txt"],
++      gitRead: (args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim(),
++      readBoundCriticReceipt: () => ({ packet: { request: { taskId }, candidate: { commit: candidateCommit }, references: [], coordinatorOnly: { localDispatchEvidence: binding } },
++        critic: { reviewPass: true, candidate: { commit: candidateCommit } }, criticReceiptSha256: "c".repeat(64) }) });
++    assert.equal(Object.hasOwn(legacy, "assurance"), false);
++    const valid = evaluate(legacy);
++    assert.equal(valid.ok, true, valid.readFindings.join("\n"));
++    const { snapshotId, ...body } = legacy;
++    for (const tampered of [
++      { ...legacy, extra: "x" },
++      { ...legacy, snapshotId: "f".repeat(64) },
++      { ...legacy, recordSha256: "f".repeat(64) },
++      { ...body, sourceCandidateCommit: "f".repeat(40), snapshotId: sha256Canonical({ ...body, sourceCandidateCommit: "f".repeat(40) }) },
++    ]) assert.match(evaluate(tampered).readFindings.join("\n"), /private local dispatch snapshot does not bind/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++test("PF-93 (3) tampered pre-assurance forms stay refused as CPP-COORDINATOR-BINDING", () => {
++  for (const kind of ["extra-key", "wrong-snapshot", "assurance-null-old-digest"]) {
++    const fx = fixture();
++    try {
++      const request = preadmitted(fx, { packetId: "a3".repeat(16) });
++      rewriteAsLegacyPacket(fx, request.packetId, kind);
++      assert.throws(() => inspectClaimedSessionAdmission({ controlRoot: controlRootOf(fx), packetId: request.packetId }),
++        (error) => error.code === "CPP-COORDINATOR-BINDING", kind);
++    } finally { cleanup(fx); }
++  }
++});
++
++test("PF-93 (4) an orchestrator-attested claim without the full current form is refused", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "a4".repeat(16) });
++    rewriteAsLegacyPacket(fx, request.packetId, "attested-old-digest");
++    assert.throws(() => inspectClaimedSessionAdmission({ controlRoot: controlRootOf(fx), packetId: request.packetId }),
++      (error) => error.code === "CPP-COORDINATOR-BINDING");
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 (5) SCF-PRELAUNCH-ADMISSION names the underlying admission cause", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "a5".repeat(16) });
++    rewriteAsLegacyPacket(fx, request.packetId, "wrong-snapshot");
++    assert.throws(() => finalizeSessionCriticReview(request), (error) => error instanceof SessionCriticFinalizerError
++      && error.code === "SCF-PRELAUNCH-ADMISSION" && error.cause === "CPP-COORDINATOR-BINDING"
++      && error.message.includes("CPP-COORDINATOR-BINDING"));
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 (8) the strict claimed-packet read refuses the pre-assurance form with CPP-COORDINATOR-BINDING", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "a8".repeat(16) });
++    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    assert.throws(() => inspectClaimedCandidatePacket({ controlRoot: controlRootOf(fx), packetId: request.packetId }),
++      (error) => error.code === "CPP-COORDINATOR-BINDING");
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 (9) the explicit legacy option accepts exactly the old key set and digest and refuses every other drift", () => {
++  const fx = fixture();
++  try {
++    const request = preadmitted(fx, { packetId: "a9".repeat(16) });
++    const { body } = rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    const read = () => inspectClaimedCandidatePacket({ controlRoot: controlRootOf(fx), packetId: request.packetId }, { allowLegacyPreAssurance: true });
++    // The plain claimed-packet read returns the stored form (only the session-admission view re-reads it with assurance null).
++    assert.deepEqual(read().packet.coordinatorOnly.localDispatchEvidence, { ...body, snapshotId: sha256Canonical(body) });
++    for (const kind of ["extra-key", "wrong-snapshot", "assurance-null-old-digest", "attested-old-digest"]) {
++      rewriteAsLegacyPacket(fx, request.packetId, kind);
++      assert.throws(read, (error) => error.code === "CPP-COORDINATOR-BINDING", kind);
++    }
++  } finally { cleanup(fx); }
++});
++
+ test("Cut A (1) a caller-authored verdict with no Source origin is refused typed, and the packet stays unconsumed", () => {
+   const fx = fixture();
+   try {
