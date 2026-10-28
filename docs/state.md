@@ -62,20 +62,27 @@ All-at75 remains the continuation objective after transfer.
 
 **Status 2026-10-28 night (round-2 bundle held; apply, install, Full Verify, Critic, native runs and PO acceptance pending):**
 after the 2026-10-27 install the remaining complete held patches are composed in
-`specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v3-2026-10-28.patch` (17 patches, 40 files,
-chain-checked on a fresh clone of HEAD; supersedes the 13-patch and the 15-patch round-2 bundles, apply only one;
+`specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v4-2026-10-28.patch` (22 patches, 44 files,
+chain-checked on a fresh clone of HEAD; supersedes the 13-, 15- and 17-patch round-2 bundles, apply only one;
 apply blocks, test counts and the kernel parts for the batch Critic in `COMPOSED-STACK-VERIFY-2026-10-28.md`).
+v4 = the 17 production and test patches below plus five TEST-ONLY baseline-red repairs (critic-generic-batch origin
+fixture, pipeline-state calibration fixtures c3, codex-pretool-guard ready fixture, catalogue-admit D64 pin,
+guard-dispatch fixtures c2): no production line, each with a QG-04 comment; guard-dispatch is 60 of 75 (15 baseline
+reds left: ten need generator-built briefings, five wait for a guard-owner decision on the check order); the
+codex-pretool-guard check 7 needs the runner HOME and is unconfirmed under the runner. New PO questions in the
+verify document: D64 bootstrap admission (K152/G7, no register entry), the write-carrier policy for Plan,
+general-purpose and Codex worker, `set-phase --verify-command` versus the adopted profile bytes.
 It carries D56 slices 2-5 (attested record admission, binding assurance, writer CLI, guard admission,
 end-to-end chain test and refusal text), D52 checkpoint-commit route, PF-86 read API c6, D31 briefing and
 budget-notice checkpoint return, Phoenix feature directory and reopen dry run, the Phoenix Wanted 4 chain
 (byte-identical rebind clause in the design review chain, recorded `pathRebind` in the signed approval binding,
 present-plan path remap in the state machine), the PowerShell parity of the half-moved repair lane, and the
-preflight scanner and no-sudo slices. Only failing composed-tree test file is `critic-generic-batch.test.mjs`
-CGB002/CGB003, identical on the clean tree; `pipeline-state.test.mjs` aborts with the same assertion on the clean
-tree. Assumed rebind defaults pending the PO: receipt files stay, a rebind always needs a fresh signature. Not built:
+preflight scanner and no-sudo slices. Composed-tree test files: all pass except `guard-dispatch.test.mjs` (60 of 75, the
+15 reds are baseline reds) and `codex-pretool-guard.test.mjs` (own reporter, 38 of 39 under plain node). Assumed rebind
+defaults pending the PO: receipt files stay, a rebind always needs a fresh signature. Not built:
 PF-85 slice 1a (a cancelled predecessor already does not block; the extra case needs a package schema field),
-native Windows proofs of the PowerShell lane, the remaining baseline-red test files. No matrix row is lifted
-before the PO has applied, stamped and installed.
+native Windows proofs of the PowerShell lane, guard-dispatch groups B and C, the other baseline-red test files of the
+2026-10-27 list. No matrix row is lifted before the PO has applied, stamped and installed.
 
 **Status 2026-10-27 evening (composed stack verified; apply, Full Verify, Critic, native runs and PO acceptance pending):**
 the complete held patches are composed in

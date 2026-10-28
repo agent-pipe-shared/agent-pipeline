@@ -1,15 +1,16 @@
-# Round-2 held-patch bundle v3, verification and PO apply blocks (2026-10-28)
+# Round-2 held-patch bundle v4, verification and PO apply blocks (2026-10-28)
 
-Bundle: `w7-round2-bundle-v3-2026-10-28.patch` (40 files, +2236/-122). It stacks on the tree that already
+Bundle: `w7-round2-bundle-v4-2026-10-28.patch` (44 files, +2294/-146). It stacks on the tree that already
 contains the earlier bundle and increment (installed at 4ea7a86b7). It applies cleanly with `git apply`
-on a fresh clone of the repository HEAD (chain check). It is a HELD PATCH: nothing in it is applied,
+on a fresh clone of the repository HEAD (chain check, base 60477ef80). It is a HELD PATCH: nothing in it is applied,
 stamped, installed, reviewed or accepted until the PO has done so.
 
-Apply only ONE round-2 bundle. `w7-round2-bundle-2026-10-28.patch` (v1, 13 patches) and
-`w7-round2-bundle-v2-2026-10-28.patch` (v2, 15 patches) are superseded by v3 (the same plus two more). Superseded
-partials are listed in `SUPERSEDED-PARTIALS-2026-10-27.md`; never apply those.
+Apply only ONE round-2 bundle. v1 (`w7-round2-bundle-2026-10-28.patch`, 13 patches), v2
+(`w7-round2-bundle-v2-2026-10-28.patch`, 15) and v3 (`w7-round2-bundle-v3-2026-10-28.patch`, 17) are superseded by v4
+(the same plus five test-only repairs). Superseded partials are listed in `SUPERSEDED-PARTIALS-2026-10-27.md`;
+never apply those.
 
-## Contents, in apply order (17 patches)
+## Contents, in apply order (22 patches)
 
 1. `w7-d56-admit-attested-record-c2`: admission of the orchestrator-attested record kind (Critic skip coverage).
 2. `w7-d56-binding-assurance-c3`: assurance in the binding, generic batch kind cases.
@@ -33,22 +34,51 @@ partials are listed in `SUPERSEDED-PARTIALS-2026-10-27.md`; never apply those.
     (the state machine remaps companion and report paths under the old PRD directory to the same relative position
     under the new one when that file exists, identity otherwise) with four end-to-end cases.
 
-## Test evidence (composed clone, 19 touched test files)
+New in v4, baseline-red test repairs (TEST FILES ONLY, no production line; each is a stale expectation or fixture
+measured against the clean tree, details in the notes next to each patch):
 
-All pass except `lib/critic-generic-batch.test.mjs`: 26 pass, 2 fail (CGB002, CGB003,
-`SCF-ORIGINAL-SOURCE-UNAVAILABLE`). The same two cases fail identically on the unpatched repository tree
-(baseline 26 tests, 24 pass, 2 fail), so they are pre-existing and not caused by this bundle.
+18. `w7-critic-generic-batch-origin-fixture`: the review helper passes `allowCallerAuthoredFallback: true` (1 line).
+    CGB002 and CGB003: 24 of 26 before, 28 of 28 in the composed clone.
+19. `w7-pipeline-state-neutral-only-fixture-c3` (+14/-5): the plugin `scripts/pipeline-state.test.mjs` aborted at its
+    first loop case; the fixture owns the planned path through its materialized design package, the calibration bytes
+    are built before the architecture fixture, and the architecture is re-adopted before the replay step. The whole file
+    now ends with `all checks passed`.
+20. `w7-codex-pretool-guard-ready-fixture` (+6/-3): the ready lifecycle fixture pins the one current stop kind
+    `design-authoring-required`. Plain `node` run in a scratch clone: 38 of 39 checks ok (13 red before).
+21. `w7-catalogue-admit-d64-pin` (+10/-4): the D64 case pins the governed admission of the exact bootstrap argv
+    (K152 part 3, commit e9e866fec). 21 of 22 before, 22 of 22 after.
+22. `w7-guard-dispatch-test-fixtures-c2` (+27/-11): guard copy gets its `scripts` entry and the write-carrier allow
+    expectations follow the deliberate carrier policy. 53 of 75 before, 60 of 75 after; the 15 remaining reds are a
+    subset of the 22 baseline reds (none new).
+
+## Test evidence (composed clone, 23 touched test files, `node --test <file>`)
+
+Everything passes except two files:
+- `hooks/guard-dispatch.test.mjs`: 75 tests, 60 pass, 15 fail. All 15 are baseline reds, see below.
+- `hooks/codex-pretool-guard.test.mjs`: prints `tests 1 pass 0 fail 1` under `node --test` because the file brings its own
+  `ok N` reporter. Run with plain `node` in a scratch clone it gives 38 ok of 39; the one `not ok` is check 7, which
+  requires the synthetic HOME that `scripts/run-parallel.mjs` provides (and a `scratch/` directory in the clone).
+  Under the repository runner it is expected green; that is NOT yet confirmed.
+
 Counts: grant notice 16/16, budget guard 125 pass and 2 skipped, guard-lifecycle-ready 411 pass and 3 skipped,
-commit-message-policy 42/42, design-approval-binding 49/49, design-consistency-check 60/60,
-devplan-shell-sanctioned-recovery 52/52, native-goldfish-host-state 56/56, host-commit pin file 17/17,
-po-gate-authority 1/1, check-critic-skip-coverage 48/48, checkpoint-commit 6/6, critic-packet-preflight 17/17,
-design-approval-route e2e 18/18, dispatch-authorship-verify 73/73, dispatch-record-write 31/31,
-pipeline-state-observer-conformance 18/18, toolchain-preflight 53/53.
-`scripts/pipeline-state.test.mjs` ends with the same uncaught assertion in the patched and in the baseline tree
-(`neutral-only must not invent an effective decision for the unowned planned path`), so it is pre-existing; only the
-printed tails were compared, the run aborts, so there is no per-test name list.
-Not run: Codex and Antigravity pretool guard test files (they share the PowerShell lane code), any dedicated
-PowerShell dialect test, Full Verify.
+commit-message-policy 42/42, critic-generic-batch 28/28, design-approval-binding 49/49, design-consistency-check
+60/60, devplan-shell-sanctioned-recovery 52/52, native-goldfish-host-state 56/56, catalogue-admit pin file 22/22,
+host-commit pin file 17/17, po-gate-authority 1/1, check-critic-skip-coverage 48/48, checkpoint-commit 6/6,
+critic-packet-preflight 17/17, design-approval-route e2e 18/18, dispatch-authorship-verify 73/73,
+dispatch-record-write 31/31, pipeline-state-observer-conformance 18/18, pipeline-state (plugin) passes,
+toolchain-preflight 53/53.
+
+Baseline reds still open after v4 (all pre-existing on the clean tree):
+- `guard-dispatch.test.mjs`, 15 names (positional ids): group C, ten checks (GD22, GD27, GD58 to GD65) fail on
+  `DBG-GENERATED-BRIEFING-REQUIRED` and need generator-built briefings; two of them (incomplete briefing, filled template)
+  cannot keep their property without forging the sha256 marker. Group B, five checks (GD34, GD36, GD38, GD39, GD43): the
+  write-carrier check runs before the typed ROLE-REQUIRED / ROLE-UNKNOWN / PROMPT-REQUIRED findings.
+- `harness/scripts/pipeline-state.test.mjs` (protected TP-5, not touched, not run), Q9 D55 library suite,
+  `lib/guard/sanctioned-args-scripts` consumers (only the D64 case was red; now fixed), and the other files of the
+  2026-10-27 list that were not re-examined (parallel-work PARWORK, project-onboarding, onboarding-continuity OBC264,
+  approve-announce, plan-authority-staging-guard, measure-tofu, observer-conformance, push-init, configure-verify-names,
+  consumer-approved-plan). They were never in the set of files this bundle touches.
+Not run: Antigravity pretool guard test file, any dedicated PowerShell dialect test, Full Verify.
 
 ## For the batch Critic (kernel and custody parts)
 
@@ -60,7 +90,8 @@ Guard and kernel files touched: `lib/guard/command-catalogue.mjs`, `lib/guard/co
 `lib/dispatch-briefing-build.mjs`. Whether a hunk is a protected path (TP list in
 `templates/prompts/agent-obligations.md` §2) was not re-measured for the composed bundle; if the guard refuses a hunk
 during apply, use the PO approval ceremony for that file. New test file needing Verify registration:
-`scripts/checkpoint-commit.test.mjs` (`harness/scripts/verify.mjs`, protected).
+`scripts/checkpoint-commit.test.mjs` (`harness/scripts/verify.mjs`, protected). The five v4 patches touch no
+protected test path (observed for each, none matches TP-1 to TP-13).
 
 Read first, in this order:
 - The PowerShell patch deviates from the recon: the PowerShell scope verdict returns before the lifecycle gate, so
@@ -70,10 +101,14 @@ Read first, in this order:
   dispatch write scope list and travels in the patch. The refusal for a moved package with a changed byte is the
   companion check (`SDC-AUTHORITY-UNAVAILABLE: companion-presentation-original-receipts`), fail-closed, not a
   review-chain code; its test accepts either.
+- The test repairs 18 to 22 change EXPECTATIONS, not strength: each carries a QG-04 comment. Check that they really pin
+  the production contract and do not paper over a defect, above all patch 22 (the carrier policy refuses Plan,
+  general-purpose, Codex `worker` and a missing Codex type, and a Workflow-transport Explore) and patch 20 (one stop kind
+  for every caller of the ready fixture).
 
 ## PO apply blocks (from the repository root, in this order)
 
-Block 1, apply and look: `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v3-2026-10-28.patch`
+Block 1, apply and look: `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-round2-bundle-v4-2026-10-28.patch`
 then `git status --short`.
 
 Block 2, stage with a path limit and commit with your own ceremony: `git add -A -- plugins/pipeline-core`.
@@ -92,10 +127,19 @@ Block 3, synchronize the installed plugin copy, then stamp and install per `docs
 - PF-85 slice 1a (declared continuation of a still-reserved predecessor). A cancelled predecessor already does
   not block its successor (`native-goldfish-host-state.mjs`, `orderAndCoverAdmittedSlice`), so the cancel route
   covers the common case; the extra case needs a package schema field. Recommended: after the install.
+- Admission of the model-role bootstrap (patch 21): no D-numbered register entry governs it; the only record is
+  commit e9e866fec (K152 part 3, greenfield finding G7). Confirm that admitting exactly
+  `--repo-root <root> --runner codex|claude|antigravity` is intended.
+- Write-carrier policy (patch 22): confirm that Plan, general-purpose, Codex `worker`, a missing Codex type and a
+  Workflow-transport Explore are meant to be refused, and decide the guard order for the five group B checks (typed
+  packet findings before or after the carrier check). The guard file is a custody file; no production edit is in v4.
+- `set-phase --verify-command` rewrites the calibration bytes that an adopted architecture profile binds, so the
+  next entry hits profile drift unless the architecture is re-adopted (patch 19 re-adopts in the test). Intended, or a
+  production gap?
 
 ## Not in this bundle
 
 PF-85 1a, Windows-native proofs of the PowerShell lane (NTFS case and 8.3 behaviour, junction detection, real
-git.exe, PowerShell payload spelling), the Codex and Antigravity pretool test runs, the remaining baseline-red test
-files. Critic, Full Verify, native Windows run and PO acceptance stay open. After install the matrix rows of the
-applied patches may be lifted to 75.
+git.exe, PowerShell payload spelling), the Antigravity pretool test run, guard-dispatch groups B and C, the other
+baseline-red test files named above. Critic, Full Verify, native Windows run and PO acceptance stay open. After install
+the matrix rows of the applied patches may be lifted to 75.

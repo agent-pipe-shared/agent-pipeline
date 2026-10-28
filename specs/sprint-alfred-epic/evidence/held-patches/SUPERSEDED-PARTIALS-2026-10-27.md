@@ -35,5 +35,6 @@ and must NOT be applied. Apply only the replacement.
 | `w7-pipeline-state-neutral-only-fixture.patch` | `w7-pipeline-state-neutral-only-fixture-c3.patch` | fixed only the neutral-only case; the file then aborted in the partial calibration block |
 | `w7-pipeline-state-neutral-only-fixture-c2.patch` | `w7-pipeline-state-neutral-only-fixture-c3.patch` | fixed the partial calibration block too; the file then aborted in the verify deadlock block |
 | `w7-guard-dispatch-test-fixtures.patch` | `w7-guard-dispatch-test-fixtures-c2.patch` | c1 took the file from 53 to 59 of 75; c2 includes it and completes the Workflow Explore check (60 of 75). 15 reds remain in both: generated-briefing fixtures (10) and the group B order question (5) |
+| `w7-round2-bundle-v3-2026-10-28.patch` | `w7-round2-bundle-v4-2026-10-28.patch` | v3 holds 17 patches; v4 is the same plus five test-only baseline-red repairs (critic-generic-batch, pipeline-state, codex-pretool-guard, catalogue-admit D64, guard-dispatch). Apply only one. |
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.
