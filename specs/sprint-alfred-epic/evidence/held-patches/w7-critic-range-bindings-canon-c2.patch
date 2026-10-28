@@ -1,0 +1,171 @@
+diff --git a/docs/adr/0014-critic-contract.md b/docs/adr/0014-critic-contract.md
+index 107f5256e..2285142e1 100644
+--- a/docs/adr/0014-critic-contract.md
++++ b/docs/adr/0014-critic-contract.md
+@@ -94,6 +94,14 @@ ADR-0003 and this ADR. Operative detail: `policies/model-policy.md` MP-07 and
+ amendment: the model route of `goldfish-mechanic` (Ruling 158 also moves it to Haiku at effort `medium`);
+ that is an agent-route change tracked in the same backlog item, not an ADR-0014 decision.
+ 
++### Amendment — the project-state record role and the bindings command (2026-10-28)
++
++**Context:** a feature-course range that contained the project state file and handover files could not be briefed admissibly: the canon admitted exclusion bindings only for a retained prior result or a finding-disposition record, and no command derived the bindings.
++
++**Decision:** one narrow role, project-state record, admissible only for the file the project calibration names as its handover/state file and a `pipeline-handover*.md` file in the same directory, as an exclusion binding only (blob SHA-256 and mode verified, bytes never emitted, never read). One deriving command, `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (schema `pipeline.critic-correction-input-bindings.v1`). The forbidden-material rule for handover, state and history is unchanged.
++
++**Consequences:** the dispatch preflight refusal for a range with such paths and no bindings follows as a separate slice. The Critic still never reads those paths. Operative detail: `templates/prompts/critic-review.md`, `harness/review-protocol.md` §2.2, `roles/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`.
++
+ ## Consequences
+ 
+ Findings are reproducible and tied to the actual diff. Disclosure makes unavoidable context contamination visible instead of pretending it does not exist. The trajectory check prevents claimed-but-unexecuted verification from passing as evidence.
+diff --git a/harness/review-protocol.md b/harness/review-protocol.md
+index fd96c56e8..94b485178 100644
+--- a/harness/review-protocol.md
++++ b/harness/review-protocol.md
+@@ -84,8 +84,8 @@ configuration and source-relevant machine evidence remain review source,
+ regardless of directory or extension.
+ 
+ An exclusion is admissible only for a positively identified coordinator-only
+-report: supply its exact repository path, its role (retained prior result or
+-finding-disposition record), and the committed blob identity, SHA-256 and mode
++report: supply its exact repository path, its role (retained prior result,
++finding-disposition record or project-state record), and the committed blob identity, SHA-256 and mode
+ of every version touched by the enumerated commits, including an explicit
+ absence at an addition/deletion boundary. The Coordinator establishes that the
+ artifact contains no source or operative contract before dispatch. These are
+@@ -95,6 +95,16 @@ JSON, or another directory/file class wholesale. Mixed source/verdict content,
+ an unbound version, or an ambiguous role rejects the input preparation; neither
+ silently carve out source nor hand the mixed artifact to the fresh reviewer.
+ 
++The role project-state record is admissible only for the file the project
++calibration names as its handover/state file and a `pipeline-handover*.md` file
++in the same directory. It is an exclusion binding only: the Critic verifies the
++blob SHA-256 and mode without emitting bytes and never reads it, and the
++forbidden-material rule for handover, state and history is not relaxed. The
++Coordinator derives the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
++(schema `pipeline.critic-correction-input-bindings.v1`) and the Critic verifies
++them; the command refuses a mixed path (CCI-MIXED), and an unknown role, a
++refused path or missing bindings for such paths still stops the review.
++
+ The Critic verifies the commit enumeration and complete path partition using
+ metadata-only Git observations before requesting any patch body. Include
+ per-commit changes as well as the endpoint comparison so an intermediate edit
+diff --git a/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs b/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs
+index 5c7dfa390..077b360f7 100644
+--- a/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs
++++ b/plugins/pipeline-core/lib/pins/opus-critic-only-batched-for-architecture-and-security.test.mjs
+@@ -207,6 +207,17 @@ test("item (e): the Mechanic tier is installed as Haiku at effort medium in agen
+   assert.match(read("policies/model-policy.md"), /^\| `models\.mechanic`\s*\| Goldfish \(Mechanic\)\s*\| haiku\s*\| medium\s*\|$/m);
+ });
+ 
++test("CCI canon names the project-state record role and the derive command in both template copies, the protocol, the role and the skill", () => {
++  const tpl = "templates/prompts/critic-review.md";
++  const tplCopy = "plugins/pipeline-core/templates/prompts/critic-review.md";
++  const docs = [tpl, tplCopy, "harness/review-protocol.md", "roles/critic.md", "plugins/pipeline-core/skills/critic-review/SKILL.md"];
++  for (const p of docs) assert.ok(read(p).includes("project-state record"), `${p} names the project-state record role`);
++  for (const p of [tpl, tplCopy, "harness/review-protocol.md", "plugins/pipeline-core/skills/critic-review/SKILL.md"]) {
++    assert.ok(read(p).includes("critic-correction-input-bindings.mjs derive"), `${p} names the derive command`);
++  }
++  assert.equal(read(tpl), read(tplCopy), "the two template copies are byte-identical");
++});
++
+ test("work item 3: an Opus choice on the Requested route line also fires without rationale", () => {
+   const prompt = "Ruleset SHA: abc123def456\n- Requested route: claude-opus-5 at max\nDispatch metadata: tool budget 30";
+   const r = dispatchFindings({ subagentType: "pipeline-core:critic", prompt });
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index de1c1c490..d32d00a24 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -289,6 +289,8 @@ tool or mutating command, do not delegate, and report the exposure as a
+ residual host limitation. No staleness check (the dispatch fixed the SHA); no
+ handover, no history — ever.
+ 
++**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record or retained prior result exclusion, never readable) and pass the file as the Correction input bindings field; never invent a role.
++
+ **Lifecycle-Guard inspection form (hard):** When the functional-equivalent
+ lane runs under a Lifecycle Guard, perform each repository inspection as one
+ simple, direct, read-only command. Do not use shell pipelines, redirects,
+diff --git a/plugins/pipeline-core/templates/prompts/critic-review.md b/plugins/pipeline-core/templates/prompts/critic-review.md
+index 7b99bb34b..e941a5346 100644
+--- a/plugins/pipeline-core/templates/prompts/critic-review.md
++++ b/plugins/pipeline-core/templates/prompts/critic-review.md
+@@ -136,7 +136,8 @@ USAGE (Elephant)
+    The Coordinator reconciles
+    exact ranges and retains receipt/source coverage lineage and finding
+    dispositions. Do not request or read prior verdict prose or findings.
+-   If the range itself contains retained prior results, prepare the exact
++   If the range itself contains retained prior results or project-state
++   records, derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` and prepare the exact
+    source/report partition under `harness/review-protocol.md` §2.2 before
+    dispatch. Bind base/head/trees, every intervening commit and parent, package
+    source paths, and each coordinator-only report's exact path/role plus every
+@@ -247,11 +248,19 @@ environment dump or a credential read; it reads such strings as text only.
+   {{CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE}}. This metadata reference
+   binds the exact base/head commits and trees, complete intervening commit list
+   and parent relationships, package source paths, and the exact coordinator-only
+-  report exclusions. Each exclusion names its path, role (retained prior result
+-  or finding-disposition record), and every touched version's blob identity,
++  report exclusions. Each exclusion names its path, role (retained prior result,
++  finding-disposition record or project-state record), and every touched version's blob identity,
+   SHA-256 and mode, with explicit absence at addition/deletion boundaries. It
+   contains no prior verdict label, report body, finding or summary. Exclusion
+   entries are not permission to read those artifacts.
++  The Coordinator produces this file with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
++  (schema `pipeline.critic-correction-input-bindings.v1`). A project-state
++  record is admissible only for the file the project calibration names as its
++  handover/state file and a `pipeline-handover*.md` file in the same directory;
++  it is an exclusion binding only: verify its blob SHA-256 and mode without
++  emitting bytes and never read it. The forbidden-material rule for handover,
++  state and history is NOT relaxed. An unknown role, a path the command refused
++  (CCI-MIXED) or missing bindings for such paths still stops the review.
+   First use metadata-only Git observations to reconcile every enumerated
+   commit's changes and the endpoint comparison with the source/report partition;
+   verify excluded blob digests without emitting their bytes. Then reconstruct
+diff --git a/roles/critic.md b/roles/critic.md
+index 5b9df4ce4..5b5d195d3 100644
+--- a/roles/critic.md
++++ b/roles/critic.md
+@@ -37,7 +37,7 @@ You are the **Critic** — an independent verifier in a fresh context, read-only
+ <!-- CRITIC-FAIL-CLOSED: reference-only-stop -->
+ 
+ - **Permitted dispatch material:** references only to the spec, an enumerated diff or archived diff snapshot, guardrails/constraints, machine evidence, and minimal dispatch metadata (project, rigor/risk class, ruleset SHA, and required model/matrix row). A reference is not permission to accept copied content or a substitute source.
+-- **Forbidden material:** handover, state, history, session or chat narrative, implementor explanation, prior verdict, summary, expectation, or any nonreferenced replacement source — including the same material copied into a filename, reference label, or metadata field.
++- **Forbidden material:** handover, state, history, session or chat narrative, implementor explanation, prior verdict, summary, expectation, or any nonreferenced replacement source — including the same material copied into a filename, reference label, or metadata field. A bound project-state record exclusion (`harness/review-protocol.md` §2.2) is a binding, not readable material, so this bullet is unchanged in meaning.
+ - **Mandatory boundary check:** resolve every required reference before substantive review. If a required artifact is missing, unreadable, ambiguous, outside the declared boundary, or accompanied by forbidden material, report only `Briefing violation: <input category> — correct dispatch references required; substantive review stopped.` Do not read the prohibited content, search for a substitute, consume a narrative, continue the review, or issue a substantive pass/fail judgment.
+ - **Why:** a missing or contaminated input cannot be repaired by reviewer inference without destroying the independent, reproducible review boundary.
+ 
+diff --git a/templates/prompts/critic-review.md b/templates/prompts/critic-review.md
+index 7b99bb34b..e941a5346 100644
+--- a/templates/prompts/critic-review.md
++++ b/templates/prompts/critic-review.md
+@@ -136,7 +136,8 @@ USAGE (Elephant)
+    The Coordinator reconciles
+    exact ranges and retains receipt/source coverage lineage and finding
+    dispositions. Do not request or read prior verdict prose or findings.
+-   If the range itself contains retained prior results, prepare the exact
++   If the range itself contains retained prior results or project-state
++   records, derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` and prepare the exact
+    source/report partition under `harness/review-protocol.md` §2.2 before
+    dispatch. Bind base/head/trees, every intervening commit and parent, package
+    source paths, and each coordinator-only report's exact path/role plus every
+@@ -247,11 +248,19 @@ environment dump or a credential read; it reads such strings as text only.
+   {{CORRECTION_INPUT_BINDINGS_PATH_OR_NOT_APPLICABLE}}. This metadata reference
+   binds the exact base/head commits and trees, complete intervening commit list
+   and parent relationships, package source paths, and the exact coordinator-only
+-  report exclusions. Each exclusion names its path, role (retained prior result
+-  or finding-disposition record), and every touched version's blob identity,
++  report exclusions. Each exclusion names its path, role (retained prior result,
++  finding-disposition record or project-state record), and every touched version's blob identity,
+   SHA-256 and mode, with explicit absence at addition/deletion boundaries. It
+   contains no prior verdict label, report body, finding or summary. Exclusion
+   entries are not permission to read those artifacts.
++  The Coordinator produces this file with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out`
++  (schema `pipeline.critic-correction-input-bindings.v1`). A project-state
++  record is admissible only for the file the project calibration names as its
++  handover/state file and a `pipeline-handover*.md` file in the same directory;
++  it is an exclusion binding only: verify its blob SHA-256 and mode without
++  emitting bytes and never read it. The forbidden-material rule for handover,
++  state and history is NOT relaxed. An unknown role, a path the command refused
++  (CCI-MIXED) or missing bindings for such paths still stops the review.
+   First use metadata-only Git observations to reconcile every enumerated
+   commit's changes and the endpoint comparison with the source/report partition;
+   verify excluded blob digests without emitting their bytes. Then reconstruct
