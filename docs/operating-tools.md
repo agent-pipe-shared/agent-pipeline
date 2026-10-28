@@ -29,6 +29,16 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
 
 The version format is `0.7.0+<runner>.<UTC yyyymmddhhmmss>.<7-char HEAD>`, for example `0.7.0+claude.20261022204428.79cda46`. The stamp is its own commit and carries the `Checkpoint-Intent` trailer. The script never installs: installation from the marketplace is the operator's step. Stamp only on the PO's call, from a frozen tree.
 
+### Who does what in a patch-bundle cycle
+
+The PO's standing call (2026-10-28) is that the Elephant stamps and the PO only installs; handing "stamp and install" back to the PO is the failure mode this split closes. The order, because the stamp refuses a dirty or staged tree:
+
+1. The PO applies the held bundle (`git apply <bundle>`) and stages it (`git add -A -- plugins/pipeline-core`, plus any path outside that folder the bundle touches, for example `harness/scripts`). Check the staged file count against the bundle's own count.
+2. The Elephant prepares the commit message in `scratch/` (trailers `AI-Assisted: true` and `Dispatch: stage-0 (elephant)` only, GIT-03). If the bundle touches a protected path (`lib/guard/*`, `scripts/pipeline-state.mjs`), the pre-commit hook refuses the Elephant's commit; the PO then commits it as the human operator, with the one command the Elephant hands over. Without protected paths the Elephant commits it.
+3. The Elephant runs `node scripts/stamp-candidate.mjs --dry-run`, then the real stamp, stages the three manifests and commits them with the `Checkpoint-Intent` trailer.
+4. The PO installs from the marketplace. Nothing else is the PO's step; the Elephant does not edit the tree while a HEAD- or tree-bound PO command is outstanding.
+5. The Elephant reads the installed manifest version back (it must end in the stamped `<7-char HEAD>`), lifts the matrix rows of the applied patches, updates `docs/state.md`, and only then runs Full Verify. Batch Critic, native Windows runs and PO acceptance remain open after that.
+
 ## Isolated Linux single runs
 
 `node scripts/run-parallel.mjs <workers> <label> [--src <dir>] [--allow-dirty] <test-file>...` gives every worker its own clone of the source HEAD, its own private HOME (with the git identity copied) and its own TMPDIR outside every repository. Heavy suites share `~/.apsp`, its lock and repo-local state when they run side by side in one checkout, and then collide on the registry; the private HOME and TMPDIR remove that. Use at most 3 workers; the heavy suites also slow each other down, so a timeout that appears only under load is re-run alone before it is called red.
