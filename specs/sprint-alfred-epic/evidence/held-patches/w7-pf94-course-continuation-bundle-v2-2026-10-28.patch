@@ -1,0 +1,932 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index bd1abe456..9d6f56804 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -167,7 +167,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",146],
++    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",213],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",169],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",66],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index d8ba44417..66ee99b40 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -721,4 +721,299 @@ test("D51-CARRY (e) exact-commit evidence behaves as before and records no carry
+   assert.notEqual(actual.decision.code, "CCA-DETERMINISTIC-UNAVAILABLE", JSON.stringify(actual.decision));
+   assert.equal(actual.deterministicEvidenceSha256, sha256Canonical(fx.entries), JSON.stringify(actual));
+ });
++// PF-94 c16: a REAL consumed course round (claim, session finalization in the owner store), reused by the delta-request slice.
++import { admitSessionCriticReview, finalizeSessionCriticReview } from "../scripts/session-critic-finalizer.mjs";
++import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mjs";
++import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
++import { addCriticReviewLineage } from "./feature-package-registration.mjs";
++import { chmodSync, existsSync } from "node:fs";
++import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
++const pf94Commit = (root, message) => { git(root, ["add", "."]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++const pf94Guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
++const pf94Verdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
++const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
++/** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
++// Options: course (true: course path with claim; false: generic batch + caller-authored fallback, no claim), failing (true: the round did NOT pass and carries one open major finding), featureId, logicalWorkIds, taskId.
++export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task" } = {}) {
++  const root = mkdtempSync(join(tmpdir(), "pf94-course-round-"));
++  git(root, ["init", "-q", "-b", "main"]);
++  mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
++  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngovernance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
++  writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
++  writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
++  writeFileSync(join(root, ".gitignore"), "/evidence/\n");
++  pf94Commit(root, "base");
++  const prefix = `specs/${featureId}`, specPath = `${prefix}/spec.md`, manifestPath = `${prefix}/lifecycle.json`, unitPath = `${prefix}/design/critic-review-unit.json`;
++  mkdirSync(join(root, prefix, "design"), { recursive: true }); mkdirSync(join(root, prefix, "evidence"), { recursive: true });
++  writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\n");
++  const unit = { schema: "pipeline.critic-review-unit.v1", kind: "feature-section", purpose: "Deliver one complete behavior", specPath, logicalWorkIds, criterionIds: ["AC-1"], deliveryBoundary: { mainRef: git(root, ["symbolic-ref", "HEAD"]) }, singletonRationale: null };
++  writeFileSync(join(root, unitPath), JSON.stringify(unit));
++  // The registration writer refuses a manifest that does not validate: the approved topology (closed keys, prd/acceptance/result/candidate-evidence) is part of the fixture.
++  const topo = [["prd", "prd.md", true, "mutable", "active"], ["acceptance", "acceptance.md", false, "mutable", "active"], ["result", "result.md", false, "mutable", "active"], ["candidate-evidence", "evidence/seed.json", false, "immutable", "retain"]].map(([klass, rel, authority, mutability, retention]) => {
++    const path = `${prefix}/${rel}`; writeFileSync(join(root, path), `${klass}\n`);
++    return { class: klass, path, sha256: hash(readFileSync(join(root, path))), authority, mutability, retention };
++  });
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: featureId, rigor: 2 }, state: "approved", candidate: null, supersedes: null, artifacts: [
++    { class: "spec", path: specPath, sha256: hash(readFileSync(join(root, specPath))), authority: true, mutability: "mutable", retention: "active" },
++    { class: "design", path: unitPath, sha256: hash(readFileSync(join(root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }, ...topo] };
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  const base = pf94Commit(root, "declare feature review unit");
++  writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\nImplemented behavior.\n");
++  manifest.artifacts[0].sha256 = hash(readFileSync(join(root, specPath)));
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  const candidate = pf94Commit(root, "integrate feature behavior");
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: [specPath] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  mkdirSync(join(root, "evidence"), { recursive: true });
++  writeFileSync(join(root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
++  const logPath = `${prefix}/evidence/targeted.log`, diagnosticPath = `${prefix}/evidence/diagnostic.json`, capturedPath = `evidence/${featureId}-targeted.log`;
++  const diagnostic = produceCriticDiagnostic({ root, candidate, specPath, guardrailPaths: [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"], command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++  writeFileSync(join(root, logPath), readFileSync(join(root, capturedPath)));
++  diagnostic.targeted.log.path = logPath;
++  writeFileSync(join(root, diagnosticPath), JSON.stringify(diagnostic));
++  for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
++  const registrationCommit = pf94Commit(root, "register captured feature diagnostics");
++  const preflightInput = { root, base, candidate, specPath, guardrailPaths: course ? [] : pf94Guardrails, evidencePaths: [diagnosticPath], priorCriticEvidencePath: null };
++  if (course) preflightInput.courseContext = { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
++  const packetId = "9a".repeat(16);
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: failing ? { ...pf94Verdict, pass: false, findings: [{ gap: "behavior missing", risk: "consumer breaks", severity: "major", evidence: `${specPath}:1`, spec_ref: "AC-1" }] } : pf94Verdict };
++  let preflightBeforeBatch = null;
++  if (!course) {
++    preflightBeforeBatch = preflightCriticDispatch({ ...preflightInput, courseContext: { featureId, registrationCommit, acceptedReference: null, criterionLocator: null, deltaRequestPath: null } });
++    assert.equal(preflightBeforeBatch.status, "packet-ready", JSON.stringify(preflightBeforeBatch));
++    // The pre-rule preflight carried no course admission (generic path); strip it so the finalizer takes the generic-batch branch.
++    preflightBeforeBatch = { ...preflightBeforeBatch, coordinatorOnly: { ...preflightBeforeBatch.coordinatorOnly, courseAdmission: null } };
++    const controlRoot = join(root, ".git", "agent-pipeline", "critic-packets");
++    mkdirSync(controlRoot, { recursive: true, mode: 0o700 }); chmodSync(join(root, ".git", "agent-pipeline"), 0o700); chmodSync(controlRoot, 0o700);
++    const reg = registerGenericCriticBatch({ repoRoot: root, controlRoot, declaration: { taskId, baseCommit: base, candidateCommit: candidate, logicalWorkIds, specPath, guardrailPaths: pf94Guardrails, signedQualityImportAnchor: null, reviewUnitPath: unitPath } });
++    request.genericBatchRef = { ...reg.batchRef, memberSha256: reg.memberSha256 };
++    request.allowCallerAuthoredFallback = true;
++  }
++  // Upgrade state: the round was admitted BEFORE the course rule existed, so its preflight ran with no generic batch registered. Today's preflight refuses a feature unit whose work ids a generic batch owns (CGB-CONFLICT), so the packet-ready result computed beforehand is replayed through the dependency seam.
++  const deps = course ? { readOriginalSourceReturnFn: pf94Origin } : { readOriginalSourceReturnFn: pf94Origin, preflightCriticDispatchFn: () => preflightBeforeBatch };
++  admitSessionCriticReview(request, course ? {} : { preflightCriticDispatchFn: deps.preflightCriticDispatchFn });
++  const finalized = finalizeSessionCriticReview(request, deps);
++  assert.equal(finalized.status, "completed");
++  const courseRequest = { repoRoot: root, featureId, baseCommit: base, candidateCommit: candidate, registrationCommit, requestedMode: "full", acceptedReference: null, criterionLocator: null, deltaRequestPath: null };
++  return { root, featureId, base, candidate, registrationCommit, packetId, manifestPath, courseRequest, decisionBefore: readCriticCourseAdmission(courseRequest).decision, deltaBefore: readCriticCourseAdmission({ ...courseRequest, requestedMode: "delta" }).decision };
++}
++const pf94Lineage = (fx) => addCriticReviewLineage({ root: fx.root, packetId: fx.packetId });
++test("PF94 LINEAGE (a) the verb registers the lineage of a real consumed course round and the next admission asks for the delta request", () => {
++  const fx = consumedCourseRoundFixture();
++  console.log("PF94 fixture admission before:", JSON.stringify(fx.decisionBefore), JSON.stringify(fx.deltaBefore));
++  assert.equal(fx.decisionBefore.code, "RE-FIRST-FULL");
++  assert.equal(fx.deltaBefore.code, "CCA-REQUESTED-MODE");
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  assert.match(added.lineagePath, new RegExp(`^specs/${fx.featureId}/evidence/critic-lineage-[a-f0-9]{64}\\.json$`, "u"));
++  assert.deepEqual(added.commitPaths, [fx.manifestPath, added.lineagePath]);
++  const registration = pf94Commit(fx.root, "register the lineage");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
++  console.log("PF94 admission after:", JSON.stringify(after.decision));
++  // The fixture round PASSED, so the registered history of length 1 ends the course (RE-CONSUMED-PACKAGE-PASS); a round with findings asks for the delta request (CCA-DELTA-REQUIRED). Either way the history is read and CCA-REQUESTED-MODE is gone.
++  assert.notEqual(after.decision.code, "CCA-REQUESTED-MODE", JSON.stringify(after.decision));
++  assert.equal(after.decision.code, "RE-CONSUMED-PACKAGE-PASS", JSON.stringify(after.decision));
++});
++test("PF94 LINEAGE (b) replay is idempotent and names the same path", () => {
++  const fx = consumedCourseRoundFixture();
++  const first = pf94Lineage(fx);
++  const again = pf94Lineage(fx);
++  assert.equal(again.status, "already-registered", JSON.stringify(again));
++  assert.equal(again.lineagePath, first.lineagePath);
++  pf94Commit(fx.root, "register the lineage");
++  const third = pf94Lineage(fx);
++  assert.equal(third.status, "already-registered", JSON.stringify(third));
++  assert.equal(third.lineagePath, first.lineagePath);
++});
++test("PF94 LINEAGE (c) an unconsumed packet is refused FPR-LINEAGE-NOT-CONSUMED and nothing is written", () => {
++  const fx = consumedCourseRoundFixture();
++  const before = readFileSync(join(fx.root, fx.manifestPath));
++  const actual = addCriticReviewLineage({ root: fx.root, packetId: "ab".repeat(16) });
++  assert.equal(actual.code, "FPR-LINEAGE-NOT-CONSUMED", JSON.stringify(actual));
++  assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
++});
++test("PF94 LINEAGE (d) upgrade state: a round finalized outside the course (caller-authored fallback, no claim) is refused with the takeover repair", () => {
++  const fx = consumedCourseRoundFixture({ course: false });
++  const before = readFileSync(join(fx.root, fx.manifestPath));
++  const actual = pf94Lineage(fx);
++  assert.equal(actual.code, "FPR-LINEAGE-NO-COURSE-CLAIM", JSON.stringify(actual));
++  for (const word of ["inspect-course-takeover", "supersede-course-takeover", "round 1"]) assert.ok(actual.reason.includes(word), actual.reason);
++  assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
++});
++test("PF94 LINEAGE (g) a failing round with an open finding: after the lineage is registered the delta admission asks for the delta request", () => {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const registration = pf94Commit(fx.root, "register the lineage");
++  mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
++  const correction = pf94Commit(fx.root, "correction after the failing round");
++  // The deterministic gate needs registered diagnostic evidence bound to the CORRECTION candidate: produced and registered the way the fixture registers its round's diagnostic.
++  const specPath = `specs/${fx.featureId}/spec.md`, logPath = `specs/${fx.featureId}/evidence/targeted-correction.log`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`, capturedPath = `evidence/${fx.featureId}-targeted-correction.log`;
++  const diagnostic = produceCriticDiagnostic({ root: fx.root, candidate: correction, specPath, guardrailPaths: pf94Guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++  writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, capturedPath)));
++  diagnostic.targeted.log.path = logPath;
++  writeFileSync(join(fx.root, diagnosticPath), JSON.stringify(diagnostic));
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
++  writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++  const evidenceRegistration = pf94Commit(fx.root, "register the correction diagnostic");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: correction, registrationCommit: evidenceRegistration, requestedMode: "delta" });
++  console.log("PF94 (g) registration:", registration, "admission after:", JSON.stringify(after.decision));
++  assert.equal(after.decision.code, "CCA-DELTA-REQUIRED", JSON.stringify(after.decision));
++  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  console.log("PF94 (g) record findings:", JSON.stringify(record.findings), JSON.stringify(record.verdict));
++  assert.ok(record.findings.some((f) => f.status === "open"), JSON.stringify(record.findings));
++});
++test("PF94 LINEAGE (h) the receipt carries no coverage fields, only the reviewed range: the written coverage is bound to that receipt and range, and a failing round is still a complete review of the diff", () => {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  const consumed = readConsumedCandidateResult({ controlRoot: join(fx.root, ".git", "agent-pipeline", "critic-packets"), packetId: fx.packetId });
++  assert.deepEqual(Object.keys(consumed.receipt).filter((k) => /coverage|package|edge|complete/iu.test(k)), []);
++  assert.deepEqual(consumed.receipt.reviewRange, { base: consumed.packet.candidate.base, commit: consumed.packet.candidate.commit, diffSha256: consumed.packet.diff.sha256 });
++  assert.equal(consumed.receipt.reviewPass, false);
++  const added = pf94Lineage(fx);
++  assert.equal(added.status, "lineage-added", JSON.stringify(added));
++  const record = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
++  assert.equal(record.coverage.receiptSha256, record.consumedResult.receiptSha256);
++  assert.deepEqual(record.coverage.changedPaths, consumed.packet.diffPaths);
++  assert.deepEqual(record.coverage.acceptanceIds, ["AC-1"]);
++  assert.equal(record.verdict.status, "findings");
++});
++test("PF94 LINEAGE (e) HEAD behind a correction commit is refused FPR-LINEAGE-TRANSPORT and says to register before the next correction", () => {
++  const fx = consumedCourseRoundFixture();
++  mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n");
++  pf94Commit(fx.root, "correction after the round");
++  const actual = pf94Lineage(fx);
++  assert.equal(actual.code, "FPR-LINEAGE-TRANSPORT", JSON.stringify(actual));
++  assert.ok(actual.reason.includes("before the next correction commit"), actual.reason);
++});
++test("PF94 LINEAGE (f) the CLI accepts exactly the lineage shape", () => {
++  const lines = [];
++  for (const argv of [["--root", "/nonexistent-root", "--add-review-lineage"], ["--root", "/nonexistent-root", "--add-review-lineage", "--packet"], ["--root", "/nonexistent-root", "--add-review-lineage", "--packet", "--force"], ["--root", "/nonexistent-root", "--add-review-lineage", "--packet", "xyz"]]) {
++    assert.equal(runRegisterFeaturePackage(argv, (text) => lines.push(text)), 2, argv.join(" "));
++  }
++  for (const line of lines) assert.equal(JSON.parse(line).code, "FPR-ARGS", line);
++});
++// PF94 DELTA: the verb --add-delta-request builds, writes and registers the canonical delta request of the next round. The namespace import keeps a missing export a per-case failure.
++import * as pf94Fpr from "./feature-package-registration.mjs";
++const pf94DeltaInput = () => ({ changedBehaviorClaims: ["fix-one"], pathInvariantMap: { "src/fix.mjs": ["inv-one"] }, coordinatorImpactConfirmed: true, trustBoundaryChanged: false, impactAmbiguous: false });
++const pf94CommitPaths = (root, paths, message) => { git(root, ["add", "--", ...paths]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
++// Default input works the way an operator does: call the verb once with a placeholder map, read the derived changed paths from the refusal, write one entry per printed path.
++const pf94WriteInput = (fx, value) => {
++  if (value === undefined) {
++    writeFileSync(join(fx.root, "delta-input.json"), JSON.stringify({ ...pf94DeltaInput(), pathInvariantMap: { "placeholder.mjs": ["inv-one"] } }));
++    const first = pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath: "delta-input.json" });
++    assert.equal(first.code, "FPR-DELTA-MAP", JSON.stringify(first));
++    value = { ...pf94DeltaInput(), pathInvariantMap: Object.fromEntries(first.changedPaths.map((path) => [path, ["inv-one"]])) };
++  }
++  writeFileSync(join(fx.root, "delta-input.json"), typeof value === "string" ? value : JSON.stringify(value)); return "delta-input.json";
++};
++const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath });
++/** Failing round, lineage registered and committed, a correction commit; with diagnostic=true the correction diagnostic is produced and registered the way PF94 LINEAGE (g) does. */
++function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true } = {}) {
++  const fx = consumedCourseRoundFixture({ failing: true });
++  let lineageAdded = null;
++  if (lineage) { lineageAdded = pf94Lineage(fx); assert.equal(lineageAdded.status, "lineage-added", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
++  let correctionCommit = null, evidenceRegistration = null;
++  if (correction) { mkdirSync(join(fx.root, "src"), { recursive: true }); writeFileSync(join(fx.root, "src/fix.mjs"), "export const fixed = 1;\n"); correctionCommit = pf94Commit(fx.root, "correction after the failing round"); }
++  if (correction && diagnostic) {
++    const specPath = `specs/${fx.featureId}/spec.md`, logPath = `specs/${fx.featureId}/evidence/targeted-correction.log`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`, capturedPath = `evidence/${fx.featureId}-targeted-correction.log`;
++    const produced = produceCriticDiagnostic({ root: fx.root, candidate: correctionCommit, specPath, guardrailPaths: pf94Guardrails, command: [process.execPath, "-e", "process.exit(0)"], logPath: capturedPath });
++    writeFileSync(join(fx.root, logPath), readFileSync(join(fx.root, capturedPath)));
++    produced.targeted.log.path = logPath;
++    writeFileSync(join(fx.root, diagnosticPath), JSON.stringify(produced));
++    const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++    for (const path of [logPath, diagnosticPath]) manifest.artifacts.push({ class: "candidate-evidence", path, sha256: hash(readFileSync(join(fx.root, path))), authority: false, mutability: "immutable", retention: "retain" });
++    writeFileSync(join(fx.root, fx.manifestPath), JSON.stringify(manifest));
++    evidenceRegistration = pf94CommitPaths(fx.root, [fx.manifestPath, logPath, diagnosticPath], "register the correction diagnostic");
++  }
++  return { ...fx, lineageAdded, correctionCommit, evidenceRegistration };
++}
++test("PF94 DELTA (a) after the lineage, the correction and its diagnostic, the verb registers the delta request and the course admission in mode delta ends in an admitted delta", () => {
++  const fx = pf94DeltaFixture();
++  pf94WriteInput(fx);
++  const added = pf94Delta(fx);
++  assert.equal(added.status, "delta-request-added", JSON.stringify(added));
++  assert.match(added.deltaRequestPath, new RegExp(`^specs/${fx.featureId}/evidence/critic-delta-request-[a-f0-9]{64}\\.json$`, "u"));
++  assert.deepEqual(added.commitPaths, [fx.manifestPath, added.deltaRequestPath]);
++  assert.equal(added.preflight.candidateCommit, fx.correctionCommit);
++  assert.equal(added.preflight.baseCommit, fx.candidate);
++  const registration = pf94CommitPaths(fx.root, added.commitPaths, "register the delta request");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration, requestedMode: "delta", deltaRequestPath: added.deltaRequestPath });
++  console.log("PF94 DELTA (a) admission:", JSON.stringify(after.decision));
++  assert.equal(after.decision.status, "admitted", JSON.stringify(after.decision));
++  assert.equal(after.decision.mode, "delta");
++  assert.equal(after.decision.code, "RE-DELTA-ADMITTED");
++  assert.deepEqual(after.decision.affectedInvariantIds, ["inv-one"]);
++});
++test("PF94 DELTA (b) replay is idempotent, before and after the operator commit", () => {
++  const fx = pf94DeltaFixture();
++  pf94WriteInput(fx);
++  const first = pf94Delta(fx);
++  assert.equal(first.status, "delta-request-added", JSON.stringify(first));
++  const again = pf94Delta(fx);
++  assert.equal(again.status, "already-registered", JSON.stringify(again));
++  assert.equal(again.deltaRequestPath, first.deltaRequestPath);
++  pf94CommitPaths(fx.root, first.commitPaths, "register the delta request");
++  const third = pf94Delta(fx);
++  assert.equal(third.status, "already-registered", JSON.stringify(third));
++  assert.equal(third.deltaRequestPath, first.deltaRequestPath);
++});
++test("PF94 DELTA (c) a pathInvariantMap whose keys differ from the changed paths is refused, prints the derived changed paths and writes nothing", () => {
++  const fx = pf94DeltaFixture();
++  pf94WriteInput(fx, { ...pf94DeltaInput(), pathInvariantMap: { "other/file.mjs": ["inv-one"] } });
++  const before = readFileSync(join(fx.root, fx.manifestPath));
++  const actual = pf94Delta(fx);
++  assert.equal(actual.code, "FPR-DELTA-MAP", JSON.stringify(actual));
++  console.log("PF94 DELTA (c) refusal:", JSON.stringify(actual));
++  const courseChanged = git(fx.root, ["diff", "--name-only", fx.candidate, fx.correctionCommit]).split("\n").filter(Boolean).sort();
++  assert.ok(courseChanged.length > 1 && courseChanged.includes("src/fix.mjs"), JSON.stringify(courseChanged));
++  assert.deepEqual([...actual.changedPaths].sort(), courseChanged);
++  for (const path of courseChanged) assert.ok(actual.reason.includes(path), actual.reason);
++  assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
++});
++test("PF94 DELTA (d) a missing, an extra and a mistyped input key are refused FPR-DELTA-INPUT-SHAPE with the expected shape", () => {
++  const fx = pf94DeltaFixture();
++  const { impactAmbiguous: _omitted, ...missing } = pf94DeltaInput();
++  for (const value of [missing, { ...pf94DeltaInput(), surprise: 1 }, { ...pf94DeltaInput(), trustBoundaryChanged: "no" }, "not json"]) {
++    pf94WriteInput(fx, value);
++    const actual = pf94Delta(fx);
++    assert.equal(actual.code, "FPR-DELTA-INPUT-SHAPE", JSON.stringify(actual));
++    assert.ok(actual.reason.includes("pathInvariantMap") && actual.reason.includes("changedBehaviorClaims"), actual.reason);
++  }
++  const absent = pf94Delta(fx, "no-such-input.json");
++  assert.equal(absent.code, "FPR-DELTA-INPUT-PATH", JSON.stringify(absent));
++});
++test("PF94 DELTA (e) no registered lineage yet is refused and names the lineage verb", () => {
++  const fx = pf94DeltaFixture({ lineage: false });
++  pf94WriteInput(fx, pf94DeltaInput());
++  const actual = pf94Delta(fx);
++  assert.equal(actual.code, "FPR-DELTA-NO-LINEAGE", JSON.stringify(actual));
++  assert.ok(actual.reason.includes("--add-review-lineage"), actual.reason);
++});
++test("PF94 DELTA (f) no correction commit since the last round is refused", () => {
++  const fx = pf94DeltaFixture({ correction: false });
++  pf94WriteInput(fx, pf94DeltaInput());
++  const actual = pf94Delta(fx);
++  assert.equal(actual.code, "FPR-DELTA-NO-CORRECTION", JSON.stringify(actual));
++});
++test("PF94 DELTA (g) no registered diagnostic evidence for the candidate is refused and names the produce and register commands", () => {
++  const fx = pf94DeltaFixture({ diagnostic: false });
++  pf94WriteInput(fx, pf94DeltaInput());
++  const before = readFileSync(join(fx.root, fx.manifestPath));
++  const actual = pf94Delta(fx);
++  assert.equal(actual.code, "FPR-DELTA-NO-DIAGNOSTIC", JSON.stringify(actual));
++  for (const word of ["critic-diagnostic-evidence", "--add-diagnostic-evidence"]) assert.ok(actual.reason.includes(word), actual.reason);
++  assert.deepEqual(readFileSync(join(fx.root, fx.manifestPath)), before);
++});
++test("PF94 DELTA (h) the CLI accepts exactly the delta shape", () => {
++  const lines = [];
++  for (const argv of [["--root", "/nonexistent-root", "--add-delta-request"], ["--root", "/nonexistent-root", "--add-delta-request", "--force"], ["--root", "/nonexistent-root", "--add-delta-request", "a.json", "b.json"], ["--root", "/nonexistent-root", "--add-delta-request", ""]]) {
++    assert.equal(runRegisterFeaturePackage(argv, (text) => lines.push(text)), 2, argv.join(" "));
++  }
++  for (const line of lines) assert.equal(JSON.parse(line).code, "FPR-ARGS", line);
++  // The exact shape passes the argument check: with a real root and no authority State it reaches the State check instead.
++  const bare = mkdtempSync(join(tmpdir(), "pf94-delta-cli-")), seen = [];
++  assert.equal(runRegisterFeaturePackage(["--root", bare, "--add-delta-request", "delta-input.json"], (text) => seen.push(text)), 2);
++  assert.equal(JSON.parse(seen[0]).code, "FPR-NO-APPROVED-PLAN", seen[0]);
++});
+ registerTestCaseCompletion({cases: completionCases, fd: 3, maxBytes: 16384});
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 8baf62591..7289f736d 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -732,18 +732,102 @@ export function readCriticReviewUnit(input) {
+     return reviewUnitSource(input.repoRoot, input, logical(input.logicalWorkIds));
+   });
+ }
++// PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
++const TAKEOVER_DETAIL = "The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted.";
++const TAKEOVER_REPAIR = {
++  "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
++  "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
++  "CGB-TAKEOVER-COURSE": "The owner is itself a feature course; its lineage cannot be reset.",
++  "CGB-TAKEOVER-HISTORY": "The feature course already has registered history; continue it in delta mode instead of taking over.",
++  "CGB-TAKEOVER-OPEN": "The old batch has no reserved packet or a packet that is not consumed; finish or release it first.",
++};
+ function featureOwnership(c, courseKey, work) {
+   const hits = work.map(id => indexPath(c, "logical", id)).filter(p => existsSync(p)).map(p => stableJson(p));
+   const origin=indexPath(c,"origins",{kind:"feature-course",courseKey});
+   if (!hits.length) { if(existsSync(origin))fail("CGB-CONFLICT");return null; }
+   const batchRef = ref(hits[0].batchRef);
+-  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) fail("CGB-CONFLICT");
++  if (hits.length !== work.length || !hits.every(h => eq(h.batchRef, batchRef))) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
+   const registered = registration(c, batchRef);
+   if (registered.value.schema !== GENERIC_CRITIC_BATCH_V2_SCHEMA
+     || !eq(registered.value.declaredScope.logicalWorkIds, work)
+-    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT");
++    || !eq(registered.value.originTargets, [{kind:"feature-course",courseKey}])) fail("CGB-CONFLICT", TAKEOVER_DETAIL);
+   return { ...registered, batchRef };
+ }
++function takeoverState(c, courseKey, work, courseHistoryRegistered) {
++  const hits = work.map(id => ({ id, p: indexPath(c, "logical", id) })).filter(h => existsSync(h.p)).map(h => ({ id: h.id, value: stableJson(h.p) }));
++  const facts = { courseKey, logicalWorkIds: work, ownedWorkIds: hits.map(h => h.id), batchRef: null, registrationSchema: null, originKind: null,
++    originTargets: null, packetIds: [], allPacketsConsumed: false, courseHistoryRegistered: courseHistoryRegistered === true };
++  const done = refusalCode => ({ facts, refusalCode });
++  if (!hits.length) return done("CGB-TAKEOVER-NONE");
++  const batchRef = ref(hits[0].value.batchRef);
++  facts.batchRef = batchRef;
++  if (hits.length !== work.length || !hits.every(h => eq(h.value.batchRef, batchRef))) return done("CGB-TAKEOVER-PARTIAL");
++  const r = registration(c, batchRef);
++  facts.registrationSchema = r.value.schema; facts.originTargets = r.value.originTargets; facts.originKind = r.value.originTargets[0].kind;
++  if (!eq(r.value.declaredScope.logicalWorkIds, work)) return done("CGB-TAKEOVER-PARTIAL");
++  const rows = reservations(r.dir);
++  facts.packetIds = rows.map(x => x.packetId);
++  facts.allPacketsConsumed = rows.length > 0 && rows.every(x => {
++    try { readConsumedSessionAdmission({ controlRoot: c.controlRoot, packetId: x.packetId }); return true; } catch { return false; }
++  });
++  if (facts.originKind === "feature-course") return done("CGB-TAKEOVER-COURSE");
++  if (facts.courseHistoryRegistered) return done("CGB-TAKEOVER-HISTORY");
++  if (!facts.allPacketsConsumed) return done("CGB-TAKEOVER-OPEN");
++  return done(null);
++}
++const TAKEOVER_KEYS = ["repoRoot", "controlRoot", "courseKey", "logicalWorkIds", "courseHistoryRegistered"];
++/** PF-94: read-only account of who owns a feature review unit's work ids and whether a takeover is admissible. */
++export function inspectFeatureCourseTakeover(input) {
++  return invoke(() => {
++    shape(input, TAKEOVER_KEYS);
++    if (!SHA.test(input.courseKey) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
++    const work = logical(input.logicalWorkIds);
++    const c = context(input.repoRoot, input.controlRoot); unlocked(c);
++    const first = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered);
++    const second = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered); unlocked(c);
++    if (!eq(first, second)) fail("CGB-STALE");
++    return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-inspection.v1", ...first.facts, refusalCode: first.refusalCode,
++      repair: first.refusalCode === null ? null : TAKEOVER_REPAIR[first.refusalCode], digestSha256: sha256Canonical(first) });
++  });
++}
++/** PF-94: audited, append-only retirement of the old batch's index entries; nothing is deleted. */
++export function supersedeFeatureCourseTakeover(input) {
++  return invoke(() => {
++    shape(input, [...TAKEOVER_KEYS, "digestSha256", "reason"]);
++    if (!SHA.test(input.courseKey) || !SHA.test(input.digestSha256) || typeof input.courseHistoryRegistered !== "boolean") fail("CGB-SHAPE");
++    if (typeof input.reason !== "string" || input.reason.trim().length === 0 || input.reason.length > 256 || /[\\/\u0000-\u001f]/u.test(input.reason)) fail("CGB-TAKEOVER-REASON");
++    const work = logical(input.logicalWorkIds);
++    const c = context(input.repoRoot, input.controlRoot);
++    return transaction(c, () => {
++      const dir = join(c.root, "superseded", input.digestSha256);
++      const auditPath = join(dir, "audit.json"), completePath = join(dir, "complete.json");
++      let audit;
++      const replay = existsSync(auditPath);
++      if (replay) {
++        // Replay or resume of the very same takeover: the audit record was written first, so finish what it names.
++        audit = stableJson(auditPath);
++        if (audit.digestSha256 !== input.digestSha256 || audit.courseKey !== input.courseKey || !eq(audit.logicalWorkIds, work)) fail("CGB-TAKEOVER-STALE");
++      } else {
++        const state = takeoverState(c, input.courseKey, work, input.courseHistoryRegistered);
++        if (sha256Canonical(state) !== input.digestSha256) fail("CGB-TAKEOVER-STALE");
++        if (state.refusalCode !== null) fail(state.refusalCode, TAKEOVER_REPAIR[state.refusalCode]);
++        createDirectory(join(c.root, "superseded")); createDirectory(dir);
++        const moves = [...work.map(id => ["logical", id]), ["origins", state.facts.originTargets[0]]].map(([kind, identity]) => ({ kind, file: `${sha256Canonical(identity)}.json` }));
++        audit = { schema: "pipeline.critic-feature-course-takeover-audit.v1", digestSha256: input.digestSha256, courseKey: input.courseKey, reason: input.reason,
++          batchRef: state.facts.batchRef, registrationSchema: state.facts.registrationSchema, originKind: state.facts.originKind, logicalWorkIds: work, moves,
++          at: new Date().toISOString() };
++        durable(auditPath, audit);
++      }
++      for (const kind of ["logical", "origins"]) createDirectory(join(dir, kind));
++      for (const m of audit.moves) {
++        const from = join(c.root, m.kind, m.file);
++        if (existsSync(from)) renameSync(from, join(dir, m.kind, m.file));
++      }
++      if (!existsSync(completePath)) durable(completePath, { schema: "pipeline.critic-feature-course-takeover-complete.v1", digestSha256: input.digestSha256 });
++      return Object.freeze({ schema: "pipeline.critic-feature-course-takeover-result.v1", status: "superseded", replay, digestSha256: input.digestSha256, batchRef: audit.batchRef });
++    });
++  });
++}
+ /** Read-only shared work-identity check; absence grants no packet or child authority. */
+ export function assertFeatureCriticReviewUnitOwnership(input) {
+   return invoke(() => {
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 9a496a9a9..5c6a380f3 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -40,6 +40,12 @@ import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
+ import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
+ import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
+ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
++import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
++import { prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
++import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
++import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
++import { sha256Canonical } from "./review-economy.mjs";
++import { readdirSync } from "node:fs";
+ 
+ export const FEATURE_PACKAGE_REGISTRATION_SCHEMA = "pipeline.feature-package-registration.v1";
+ /** The CLI result names where the manifest's rigor level came from. */
+@@ -476,3 +482,194 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+     next: "commit commitPaths in one commit, then rerun critic-dispatch-preflight.mjs against that registration commit",
+   };
+ }
++
++/**
++ * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
++ * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
++ * the round candidate/base from the consumed packet, the parent from the registered history tail. The record is compiled by
++ * compileRegisteredCriticReviewLineage, written as the immutable `critic-lineage-<sha>.json` and added to the manifest as
++ * non-authority candidate-evidence. Nothing is committed.
++ */
++const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
++export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract } = {}) {
++  if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
++  let root;
++  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
++  const head = gitOut(root, ["rev-parse", "HEAD"]), common = gitOut(root, ["rev-parse", "--git-common-dir"]);
++  if (!head || !common) return refused("FPR-ARGS", "root is not a git repository with a HEAD");
++  let controlRoot;
++  try { controlRoot = join(realpathSync(resolve(root, common)), "agent-pipeline", "critic-packets"); } catch { return refused("FPR-LINEAGE-NOT-CONSUMED", "no Critic owner store in this repository"); }
++  let consumed;
++  try { consumed = readConsumedCandidateResult({ controlRoot, packetId }); } catch { consumed = null; }
++  if (!consumed?.packet || !consumed.receipt) return refused("FPR-LINEAGE-NOT-CONSUMED", `packet ${packetId} is not a consumed review in this repository's Critic owner store; finalize the round first (session-critic-finalizer)`);
++  const packet = consumed.packet;
++  const noClaim = `packet ${packetId} has no course claim: the round was finalized outside the feature course (for example with the caller-authored fallback). Use inspect-course-takeover and supersede-course-takeover for the work ids of the old batch, or rerun round 1 on the course path (critic-dispatch-preflight with the feature course context); a round outside the course cannot be registered as lineage`;
++  // The single registered feature course: exactly one specs/<id>/lifecycle.json that lists a Critic review unit.
++  let features = [];
++  try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
++  if (features.length === 0) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId });
++  if (features.length > 1) return refused("FPR-LINEAGE-FEATURE-AMBIGUOUS", `more than one feature has a review unit (${features.join(", ")}); the lineage verb needs exactly one registered feature course`, { packetId });
++  const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
++  const manifestRead = inspect(root, manifestPath);
++  const checked = validateFeaturePackage(root, manifestPath);
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  let manifest;
++  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
++  // Idempotent replay: a registered lineage record of this packet is the answer, before anything is compiled.
++  for (const entry of manifest.artifacts) {
++    if (entry.class !== "candidate-evidence" || !LINEAGE_FILE.test(entry.path)) continue;
++    const present = inspect(root, entry.path);
++    let record = null;
++    try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
++    if (record?.consumedResult?.packetId === packetId) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, lineagePath: entry.path, packetId };
++  }
++  const identityInput = { repoRoot: root, featureId, baseCommit: packet.candidate.base, candidateCommit: packet.candidate.commit, registrationCommit: head, acceptedReference: null };
++  const resolved = resolveRegisteredCriticCourseIdentity(identityInput);
++  if (!resolved.ok) return refused(String(resolved.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the course identity does not resolve (${resolved.code}); HEAD must be reachable from the round candidate through evidence-only commits only, so the lineage of round N must be registered BEFORE the next correction commit`, { compileCode: resolved.code, packetId });
++  const claim = readConsumedCourseClaimBinding({ resolvedRepository: resolved.value.resolvedRepository, packetId, expectedCandidate: { commit: packet.candidate.commit, tree: packet.candidate.tree } });
++  if (!claim.ok) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, readerCode: claim.code ?? null });
++  const history = resolved.value.registeredHistory;
++  const round = history.length + 1;
++  let unit;
++  try { unit = JSON.parse(inspect(root, criticReviewUnitPath(featureId)).bytes.toString("utf8")); } catch { return refused("FPR-LINEAGE-COMPILE", "the review unit is not readable", { packetId }); }
++  // The receipt carries no package, edge or coverage fields (only the reviewed range and the verdict), so those stay synthesized: one package over the whole packet diff. The synthesis claims the round reviewed exactly the packet diff; a receipt that says it reviewed another range contradicts that claim and is refused.
++  const range = consumed.receipt.reviewRange;
++  if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
++  const edges = ["feature-delivery"];
++  const compiled = compileRegisteredCriticReviewLineage({
++    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath: null },
++    packetId, reviewId: `review-${round}`, parentReviewId: history.at(-1)?.record?.reviewId ?? null,
++    packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
++    coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
++    correction: round === 1 ? null : { commit: packet.candidate.commit, deltaSha256: packet.diff.sha256, impactSha256: sha256Canonical(edges) },
++    invalidation: { kind: "none", reason: null, evidenceSha256: null },
++  });
++  // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
++  if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
++  if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}`, { compileCode: compiled.code, packetId });
++  const artifact = compiled.value.artifact;
++  const target = join(root, artifact.path), created = !existsSync(target);
++  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
++  const temp = join(root, `${manifestPath}.lineage-${process.pid}.tmp`);
++  try {
++    mkdirSync(dirname(target), { recursive: true });
++    if (created) writeFileSync(target, artifact.bytes, { flag: "wx", mode: 0o644 });
++    const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, artifact.registration] }, null, 2)}\n`);
++    writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath));
++  } catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the lineage could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
++  const validated = validateFeaturePackage(root, manifestPath);
++  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
++  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
++  if (envelopes.length === 1) {
++    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
++  }
++  return {
++    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-added", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`,
++    registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
++    commitMessageHint: `chore(evidence): register Critic lineage review-${round} of ${featureId}`,
++    next: "commit commitPaths in one evidence-only commit BEFORE any correction commit, then continue the course (delta request) against that registration commit",
++  };
++}
++
++/**
++ * PF-94: builds, writes and registers the canonical delta request of the NEXT Critic round (`--add-delta-request <input.json>`).
++ * The operator supplies only the judgment (the five keys of DELTA_INPUT_KEYS); every commit id is derived: the feature (the single
++ * registered feature course), baseCommit = the candidate of the registered lineage tail, candidateCommit = the newest commit that
++ * is not evidence-only, registrationCommit = HEAD. The request is compiled by prepareRegisteredCriticDeltaRequest, written as the
++ * immutable `critic-delta-request-<sha>.json` and added to the manifest as non-authority candidate-evidence. Nothing is committed.
++ */
++const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
++const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"trustBoundaryChanged":false,"impactAmbiguous":false}';
++export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract } = {}) {
++  if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
++  let root;
++  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
++  const head = gitOut(root, ["rev-parse", "HEAD"]);
++  if (!head) return refused("FPR-ARGS", "root is not a git repository with a HEAD");
++  const shapeRepair = (why) => refused("FPR-DELTA-INPUT-SHAPE", `${why}; the input file holds exactly these keys and nothing else: ${DELTA_INPUT_KEYS.join(", ")}; expected shape: ${DELTA_INPUT_SHAPE}`, { inputPath, expectedShape: DELTA_INPUT_SHAPE });
++  // The input file: a repository-relative regular file, no link on the way (the same refusals as the diagnostic file).
++  const seen = repositoryRelative(inputPath) ? inspect(root, inputPath) : { kind: "invalid" };
++  if (seen.kind !== "file") return refused("FPR-DELTA-INPUT-PATH", `${inputPath} is not a repository-relative path to a regular file; write the input file (${DELTA_INPUT_KEYS.join(", ")}) and pass its repository-relative path`, { inputPath });
++  try { if (realpathSync(join(root, inputPath)) !== join(root, inputPath)) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath }); } catch { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not resolve`, { inputPath }); }
++  let input;
++  try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
++  if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
++  const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
++  if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
++  const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
++  if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
++  if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
++  for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
++  // The single registered feature course.
++  let features = [];
++  try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
++  if (features.length !== 1) return refused("FPR-DELTA-FEATURE", features.length === 0 ? "no feature has a Critic review unit; there is no registered feature course" : `more than one feature has a review unit (${features.join(", ")}); the delta verb needs exactly one registered feature course`);
++  const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
++  const manifestRead = inspect(root, manifestPath);
++  const checked = validateFeaturePackage(root, manifestPath);
++  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
++  let manifest;
++  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
++  // The registered history tail: the lineage record with the highest round.
++  let tail = null;
++  for (const entry of manifest.artifacts) {
++    if (entry.class !== "candidate-evidence" || !LINEAGE_FILE.test(entry.path)) continue;
++    const present = inspect(root, entry.path);
++    let record = null;
++    try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
++    const round = record?.course?.reviewRound, commit = record?.candidate?.commit;
++    if (Number.isInteger(round) && typeof commit === "string" && /^[a-f0-9]{40,64}$/u.test(commit) && (!tail || round > tail.round)) tail = { round, commit };
++  }
++  if (!tail) return refused("FPR-DELTA-NO-LINEAGE", "no Critic lineage is registered for this feature yet, so there is no round to follow up; register the finished round first: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>, commit it, then rerun this command", { manifestPath });
++  // candidateCommit = the newest commit of HEAD's first-parent line that is not evidence-only (changes beyond this feature's manifest and evidence directory). The compile re-checks the range with the course's own evidence-only test.
++  const listed = gitOut(root, ["rev-list", "--first-parent", "--parents", "-n", "512", head]);
++  let candidate = null;
++  for (const line of (listed ?? "").split("\n").filter(Boolean)) {
++    const [oid, ...parents] = line.split(/\s+/u);
++    const names = parents.length === 1 ? gitOut(root, ["diff", "--name-only", "-z", parents[0], oid, "--"]) : null;
++    const paths = names === null ? null : names.split("\0").filter(Boolean);
++    if (paths && paths.length > 0 && paths.every((path) => path === manifestPath || path.startsWith(`specs/${featureId}/evidence/`))) continue;
++    candidate = oid; break;
++  }
++  if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
++  const courseRequest = { repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null };
++  const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, trustBoundaryChanged: input.trustBoundaryChanged, impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
++  if (!compiled.ok) {
++    const code = String(compiled.code);
++    const extra2 = { compileCode: code, manifestPath };
++    if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), commit it, register it with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the manifest, then rerun this command`, extra2);
++    if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
++    if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
++    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (${code}); commit only the registration paths between the correction and this command`, extra2);
++    return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
++  }
++  const { descriptor, artifact } = compiled.value;
++  const given = Object.keys(input.pathInvariantMap).sort(), derived = [...descriptor.changedPaths].sort();
++  if (given.length !== derived.length || given.some((path, index) => path !== derived[index])) return refused("FPR-DELTA-MAP", `pathInvariantMap must have exactly the changed paths of ${tail.commit}..${candidate} as keys; the derived changed paths are: ${derived.join(", ")}`, { changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath });
++  const preflight = { candidateCommit: candidate, baseCommit: tail.commit, deltaRequestPath: artifact.path, registrationCommit: "<the commit that contains commitPaths>", arguments: ["--root", "<root>", "--spec", manifest.artifacts.find((entry) => entry.class === "spec" && entry.authority === true)?.path ?? "<the feature spec path>", "--evidence", "<the registered diagnostic evidence path of the candidate>", "--base", tail.commit, "--candidate", candidate, "--registration-commit", "<the commit that contains commitPaths>", "--delta-request", artifact.path] };
++  if (manifest.artifacts.some((entry) => entry.path === artifact.path && entry.sha256 === artifact.sha256)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, deltaRequestPath: artifact.path, preflight };
++  const target = join(root, artifact.path), created = !existsSync(target);
++  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
++  const temp = join(root, `${manifestPath}.delta-${process.pid}.tmp`);
++  try {
++    mkdirSync(dirname(target), { recursive: true });
++    if (created) writeFileSync(target, artifact.bytes, { flag: "wx", mode: 0o644 });
++    const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, artifact.registration] }, null, 2)}\n`);
++    writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath));
++  } catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the delta request could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
++  const validated = validateFeaturePackage(root, manifestPath);
++  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
++  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
++  if (envelopes.length === 1) {
++    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
++  }
++  return {
++    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
++    registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
++    commitMessageHint: `chore(evidence): register the Critic delta request of round ${tail.round + 1} of ${featureId}`,
++    preflight,
++    next: "commit commitPaths in one evidence-only commit (never the input file), then run critic-dispatch-preflight.mjs with the preflight arguments, replacing the registration commit by that commit",
++  };
++}
+diff --git a/plugins/pipeline-core/lib/guard/command-catalogue.mjs b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+index a7d0fded2..3dfd09100 100644
+--- a/plugins/pipeline-core/lib/guard/command-catalogue.mjs
++++ b/plugins/pipeline-core/lib/guard/command-catalogue.mjs
+@@ -208,8 +208,11 @@ function sanctionedRegisterFeaturePackageArgs(args, root) {
+   if (!exactRoot(args, root, 0)) return false;
+   if (args.length === 2) return true;
+   if (args.length === 3) return args[2] === "--add-review-unit";
++  // PF-94: the lineage form names one 32-character lowercase hex packet id (never a path, never a dash-start value).
++  if (args.length === 5) return args[2] === "--add-review-lineage" && args[3] === "--packet" && /^[a-f0-9]{32}$/u.test(args[4]);
++  // PF-94: the delta request form names one repository-relative input file (same path rules as the diagnostic form).
+   // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
+-  return args.length === 4 && args[2] === "--add-diagnostic-evidence" && typeof args[3] === "string" && args[3] !== ""
++  return args.length === 4 && (args[2] === "--add-diagnostic-evidence" || args[2] === "--add-delta-request") && typeof args[3] === "string" && args[3] !== ""
+     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
+ }
+ 
+diff --git a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+index 17c4caf5c..9d2f4e5f3 100644
+--- a/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
++++ b/plugins/pipeline-core/lib/pins/catalogue-admit-prescribed-lifecycle-verbs.test.mjs
+@@ -478,6 +478,38 @@ test("D64 feature-package registration: exactly the documented forms are admitte
+   });
+ });
+ 
++test("PF-94 feature-package registration: --add-review-lineage --packet <32 lowercase hex> is admitted, malformed shapes are not", () => {
++  withFixture("feature", f => {
++    const hex = "0123456789abcdef0123456789abcdef";
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-lineage", "--packet", hex), f, "add review lineage");
++    for (const [label, argv] of [["lineage without packet flag", ["--root", f.root, "--add-review-lineage"]],
++      ["lineage packet without id", ["--root", f.root, "--add-review-lineage", "--packet"]],
++      ["lineage dash id", ["--root", f.root, "--add-review-lineage", "--packet", "--force"]],
++      ["lineage short id", ["--root", f.root, "--add-review-lineage", "--packet", "0123abcd"]],
++      ["lineage uppercase id", ["--root", f.root, "--add-review-lineage", "--packet", hex.toUpperCase()]],
++      ["lineage extra argument", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--force"]],
++      ["lineage wrong second flag", ["--root", f.root, "--add-review-lineage", "--other", hex]],
++      ["lineage before root", ["--add-review-lineage", "--packet", hex, "--root", f.root]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
++  });
++});
++
++test("PF-94 feature-package registration: --add-delta-request <repository-relative path> is admitted, malformed shapes are not", () => {
++  withFixture("feature", f => {
++    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json"), f, "add delta request");
++    for (const [label, argv] of [["delta without path", ["--root", f.root, "--add-delta-request"]],
++      ["delta dash path", ["--root", f.root, "--add-delta-request", "--force"]],
++      ["delta absolute path", ["--root", f.root, "--add-delta-request", join(f.root, "d.json")]],
++      ["delta parent path", ["--root", f.root, "--add-delta-request", "specs/feature/../../x.json"]],
++      ["delta extra argument", ["--root", f.root, "--add-delta-request", "d.json", "--force"]],
++      ["delta wrong flag", ["--root", f.root, "--add-delta-requests", "d.json"]],
++      ["delta before root", ["--add-delta-request", "d.json", "--root", f.root]]]) {
++      bothRefuse(scriptAction(registerScript, ...argv), f, label);
++    }
++  });
++});
++
+ test("D64 architecture baseline diagnosis: the read-only assessment forms and --help are admitted; the writing and file-reading forms are not", () => {
+   withFixture("feature", f => {
+     const base = (...rest) => scriptAction(baselineScript, "--root", f.root, ...rest);
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 13dd1b4cf..9b47f850b 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
+ import { realpathSync, statSync } from "node:fs";
+ import { resolve } from "node:path";
+ import { fileURLToPath } from "node:url";
+-import { addCriticDiagnosticEvidence, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
++import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+ import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
+ 
+ function git(root, args) {
+@@ -60,6 +60,11 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  4. Commit the manifest the registration names.",
+   "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
+   "",
++  "Critic course lineage route (PF-94; register round N BEFORE the next correction commit):",
++  "  1. Finalize the course round (session-critic-finalizer) so the packet is consumed.",
++  "  2. Register it: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>",
++  "  3. Commit the manifest and the critic-lineage file the registration names, in one evidence-only commit.",
++  "",
+ ].join("\n");
+ 
+ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
+@@ -70,7 +75,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+   const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
+   // D165-CDR: `--add-diagnostic-evidence <path>` registers Critic diagnostic evidence in the feature manifest.
+   const addDiagnostic = argv.length === 4 && argv[2] === "--add-diagnostic-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
++  // PF-94: `--add-review-lineage --packet <packetId>` registers the lineage record of a consumed course round.
++  const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
++  // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
++  const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
++  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]" })}\n`);
+     return 2;
+   }
+@@ -85,6 +94,16 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
+     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
+     return 2;
+   }
++  if (addDelta) {
++    const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract });
++    out(`${JSON.stringify(added)}\n`);
++    return added.status === "refused" ? 2 : 0;
++  }
++  if (addLineage) {
++    const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract });
++    out(`${JSON.stringify(added)}\n`);
++    return added.status === "refused" ? 2 : 0;
++  }
+   if (addDiagnostic) {
+     const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });
+     out(`${JSON.stringify(added)}\n`);
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index a597bf583..255bf070e 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -25,7 +25,33 @@ import {
+ } from "../lib/governance-review-action.mjs";
+ import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
+ import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
+-import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore } from "../lib/critic-generic-batch.mjs";
++import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore,
++  inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
++import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
++
++export const SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
++export const SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
++// PF-94: the operator types only the feature id; the course key and the review unit are derived, never typed.
++function takeoverTarget(root, featureId) {
++  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST");
++  const run = (args) => {
++    const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
++    if (!isSuccessfulSpawn(r)) fail("SCF-TAKEOVER-REPOSITORY");
++    return String(r.stdout).trim();
++  };
++  const manifestPath = `specs/${featureId}/lifecycle.json`, unitPath = `specs/${featureId}/design/critic-review-unit.json`;
++  const head = run(["rev-parse", "HEAD"]);
++  const base = run(["rev-list", "--reverse", "HEAD", "--", manifestPath]).split("\n")[0];
++  const introduced = run(["rev-list", "--reverse", "HEAD", "--", unitPath]).split("\n")[0];
++  if (!base || !introduced) fail("SCF-TAKEOVER-REPOSITORY");
++  const declaration = JSON.parse(run(["show", `${introduced}:${unitPath}`]));
++  const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
++    logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
++  const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
++  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY");
++  return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
++    courseHistoryRegistered: resolved.value.registeredHistory.length > 0 };
++}
+ import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import {
+   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
+@@ -838,6 +864,19 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
+       if (!exact(rawRecover, ["schema", "digestSha256"]) || rawRecover.schema !== SESSION_CRITIC_BATCH_RECOVERY_REQUEST_SCHEMA) fail("SCF-BATCH-RECOVERY-REQUEST");
+       return Object.freeze({ exitCode: 0, output: recoverGenericCriticBatchEmptyStore({ controlRoot: controlRootFor(recoverRoot), digestSha256: rawRecover.digestSha256 }) });
+     }
++    if (Array.isArray(argv) && (argv[0] === "inspect-course-takeover" || argv[0] === "supersede-course-takeover")) {
++      if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
++      const takeoverRoot = realpathSync(resolve(argv[2]));
++      const rawTakeover = readPhysicalRequest(takeoverRoot, argv[4]);
++      const supersede = argv[0] === "supersede-course-takeover";
++      if (!exact(rawTakeover, supersede ? ["schema", "featureId", "digestSha256", "reason"] : ["schema", "featureId"])
++        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST");
++      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId);
++      const common = { repoRoot: takeoverRoot, controlRoot: controlRootFor(takeoverRoot), ...target };
++      return Object.freeze({ exitCode: 0, output: supersede
++        ? supersedeFeatureCourseTakeover({ ...common, digestSha256: rawTakeover.digestSha256, reason: rawTakeover.reason })
++        : inspectFeatureCourseTakeover(common) });
++    }
+     if (Array.isArray(argv) && argv[0] === "release") {
+       if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+       const releaseRoot = realpathSync(resolve(argv[2]));
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 559aedfaf..ae4978ae0 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -20,6 +20,8 @@ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } fro
+ import { execFileSync } from "node:child_process";
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+ import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
++import * as CGB from "../lib/critic-generic-batch.mjs";
++import * as CCA from "../lib/critic-course-admission.mjs";
+ import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
+ 
+ import {
+@@ -1520,6 +1522,106 @@ test("Cut A (4) a bound Source record completes with the receipt unchanged and s
+   } finally { cleanup(fx); }
+ });
+ 
++// PF-94: the Glossover shape. Round 1 ran OUTSIDE the feature course (generic batch, caller-authored fallback), so the
++// feature course owns no history but the old batch owns the review unit's logical work ids.
++const TAKEOVER_INSPECT_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
++const TAKEOVER_SUPERSEDE_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
++function takeoverFixture({ consume = true } = {}) {
++  const fx = fixture();
++  const id = "held-feature", prefix = `specs/${id}`;
++  mkdirSync(join(fx.root, prefix, "design"), { recursive: true });
++  const specPath = `${prefix}/spec.md`, unitPath = `${prefix}/design/critic-review-unit.json`;
++  writeFileSync(join(fx.root, specPath), "# Feature\nAC-1 AC-2\n");
++  writeFileSync(join(fx.root, unitPath), JSON.stringify({ ...reviewUnit(), specPath }));
++  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "approved", artifacts: [
++    { class: "spec", path: specPath, sha256: sha(readFileSync(join(fx.root, specPath))), authority: true, mutability: "mutable", retention: "active" },
++    { class: "design", path: unitPath, sha256: sha(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }] };
++  writeFileSync(join(fx.root, `${prefix}/lifecycle.json`), JSON.stringify(manifest));
++  git(fx.root, ["add", prefix]);
++  git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "declare feature review unit"]);
++  fx.featureId = id;
++  if (consume) {
++    fx.packetId = "e1".repeat(16);
++    fx.consumed = finalizeRaw(preadmitted(fx, { packetId: fx.packetId, allowCallerAuthoredFallback: true }));
++  } else batchFor(fx);
++  return fx;
++}
++function takeoverVerb(fx, verb, request) {
++  const run = spawnSync(process.execPath, [FINALIZER_SCRIPT, verb, "--root", fx.root, "--request", writeScratchRequest(fx, `${verb}.json`, request)], { encoding: "utf8" });
++  return { status: run.status, out: JSON.parse(run.stdout) };
++}
++function featureCourseKey(fx) {
++  const manifestPath = `specs/${fx.featureId}/lifecycle.json`;
++  const base = git(fx.root, ["rev-list", "--reverse", "HEAD", "--", manifestPath]).split("\n")[0], head = git(fx.root, ["rev-parse", "HEAD"]);
++  const resolved = CCA.resolveRegisteredCriticCourseIdentity({ repoRoot: fx.root, featureId: fx.featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
++  assert.equal(resolved.ok, true, JSON.stringify(resolved));
++  return resolved.value.courseIdentity.courseKey;
++}
++
++test("PF94 TAKEOVER (1) real state: a consumed non-course batch makes the feature course refuse CGB-CONFLICT, and the text names both verbs", () => {
++  const fx = takeoverFixture();
++  try {
++    assert.equal(fx.consumed.status, "completed");
++    assert.equal(fx.consumed.independence, "caller-authored-fallback");
++    let error = null;
++    try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
++    assert.equal(error?.code, "CGB-CONFLICT");
++    assert.ok(error.message.includes("inspect-course-takeover") && error.message.includes("supersede-course-takeover"), error.message);
++  } finally { cleanup(fx); }
++});
++
++test("PF94 TAKEOVER (2) inspect names the work ids, owner, origin kind, consumption and history, read-only and stable", () => {
++  const fx = takeoverFixture();
++  try {
++    const first = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId });
++    assert.equal(first.status, 0, JSON.stringify(first.out));
++    assert.deepEqual(first.out.logicalWorkIds, ["AC-1", "AC-2"]);
++    assert.equal(first.out.originKind, "authored-delivery");
++    assert.equal(first.out.allPacketsConsumed, true);
++    assert.equal(first.out.courseHistoryRegistered, false);
++    assert.equal(first.out.refusalCode, null);
++    assert.match(first.out.digestSha256, /^[a-f0-9]{64}$/u);
++    assert.ok(first.out.batchRef.batchId);
++    assert.deepEqual(takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId }).out, first.out);
++  } finally { cleanup(fx); }
++});
++
++test("PF94 TAKEOVER (3) supersede audits first, retires only the index entries, keeps the old evidence, is idempotent, and clears the ownership gate", () => {
++  const fx = takeoverFixture();
++  try {
++    const inspected = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId }).out;
++    const request = { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.digestSha256, reason: "round 1 ran outside the course; rerun on the course path" };
++    const done = takeoverVerb(fx, "supersede-course-takeover", request);
++    assert.equal(done.status, 0, JSON.stringify(done.out));
++    assert.equal(done.out.status, "superseded");
++    const store = join(controlRootOf(fx), "generic-batches");
++    assert.ok(existsSync(join(store, inspected.batchRef.batchId, "registration.json")), "old registration stays readable");
++    assert.ok(existsSync(join(controlRootOf(fx), inspected.packetIds[0])), "old packet stays");
++    assert.ok(existsSync(join(store, "superseded", inspected.digestSha256, "audit.json")), "append-only audit record");
++    assert.equal(readdirSync(join(store, "logical")).length, 0);
++    assert.equal(readdirSync(join(store, "origins")).length, 0);
++    assert.deepEqual(CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }), { claimed: false, batchRef: null });
++    const replay = takeoverVerb(fx, "supersede-course-takeover", request);
++    assert.equal(replay.status, 0, JSON.stringify(replay.out));
++    assert.equal(replay.out.replay, true);
++  } finally { cleanup(fx); }
++});
++
++test("PF94 TAKEOVER (4) refusals are typed: stale digest, open batch, registered history, partial work ids, bad reason", () => {
++  const fx = takeoverFixture({ consume: false });
++  try {
++    const base = { repoRoot: fx.root, controlRoot: controlRootOf(fx), courseKey: "c".repeat(64), logicalWorkIds: ["AC-1", "AC-2"], courseHistoryRegistered: false };
++    const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
++    const open = CGB.inspectFeatureCourseTakeover(base);
++    assert.equal(open.refusalCode, "CGB-TAKEOVER-OPEN");
++    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: open.digestSha256, reason: "r" })), "CGB-TAKEOVER-OPEN");
++    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: "a".repeat(64), reason: "r" })), "CGB-TAKEOVER-STALE");
++    assert.equal(CGB.inspectFeatureCourseTakeover({ ...base, courseHistoryRegistered: true }).refusalCode, "CGB-TAKEOVER-HISTORY");
++    assert.equal(CGB.inspectFeatureCourseTakeover({ ...base, logicalWorkIds: ["AC-1", "AC-2", "AC-3"] }).refusalCode, "CGB-TAKEOVER-PARTIAL");
++    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: open.digestSha256, reason: "see /etc/passwd" })), "CGB-TAKEOVER-REASON");
++  } finally { cleanup(fx); }
++});
++
+ test("Cut A (5) the explicit fallback completes with the weaker marker, keeps reviewPass, and never masks a bad binding", () => {
+   const fx = fixture();
+   try {
