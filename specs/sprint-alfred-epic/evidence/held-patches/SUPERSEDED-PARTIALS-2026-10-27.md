@@ -28,5 +28,6 @@ and must NOT be applied. Apply only the replacement.
 | `w7-d56-chain-test-and-refusal-text.patch` | `w7-d56-chain-test-and-refusal-text-c3.patch` | interim; c3 is complete (17/17, 48/48, 31/31) |
 | `w7-d56-chain-test-and-refusal-text-c2.patch` | `w7-d56-chain-test-and-refusal-text-c3.patch` | CPPA-4 untrailered half still asserted the CLI string absent (preflight 15/17); c3 fixes that assertion |
 | `w7-d31-budget-notice-checkpoint.patch` | `w7-d31-budget-notice-checkpoint-c2.patch` | RED cases only, no production edit; c2 is complete (grant notice 16/16, budget guard 125 pass) |
+| `w7-round2-bundle-2026-10-28.patch` | `w7-round2-bundle-v2-2026-10-28.patch` | v1 holds 13 patches; v2 is the same plus the byte-identical rebind and the PowerShell repair lane. Apply only one. |
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.
