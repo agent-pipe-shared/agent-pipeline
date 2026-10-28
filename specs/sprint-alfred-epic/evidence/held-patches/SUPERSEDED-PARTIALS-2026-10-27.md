@@ -32,5 +32,7 @@ and must NOT be applied. Apply only the replacement.
 | `w7-round2-bundle-v2-2026-10-28.patch` | `w7-round2-bundle-v3-2026-10-28.patch` | v2 holds 15 patches; v3 adds the recorded `pathRebind` and the present-plan remap. Apply only one. |
 | `w7-present-plan-after-folder-rebind-pin.patch` | `w7-present-plan-after-folder-rebind-pin-c3.patch` | four test cases only, no production remap and no run |
 | `w7-present-plan-after-folder-rebind-pin-c2.patch` | `w7-present-plan-after-folder-rebind-pin-c3.patch` | remap and cases without a clean green run, one case expectation open, no apply check; c3 is 18/18 with the apply check green |
+| `w7-pipeline-state-neutral-only-fixture.patch` | `w7-pipeline-state-neutral-only-fixture-c3.patch` | fixed only the neutral-only case; the file then aborted in the partial calibration block |
+| `w7-pipeline-state-neutral-only-fixture-c2.patch` | `w7-pipeline-state-neutral-only-fixture-c3.patch` | fixed the partial calibration block too; the file then aborted in the verify deadlock block |
 The replacements still need the independent batch Critic, Full Verify, the native Windows run and
 PO acceptance. `w7-skill-evidence-route-c2.patch` re-baselines a protected Critic policy preimage.
