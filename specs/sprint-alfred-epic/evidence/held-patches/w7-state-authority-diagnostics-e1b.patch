@@ -1,0 +1,306 @@
+diff --git a/harness/scripts/pipeline-state.test.mjs b/harness/scripts/pipeline-state.test.mjs
+index 642c24b0a..9b4513040 100644
+--- a/harness/scripts/pipeline-state.test.mjs
++++ b/harness/scripts/pipeline-state.test.mjs
+@@ -5233,6 +5233,64 @@ runFeaturePackageReconcileTests();
+   );
+ }
+ 
++// ---- SAD diag: the state authority refusal names an untyped failure, its elapsed time, and an opt-in trace ----
++{
++  const mod = await import("./pipeline-state.mjs");
++  const describe = typeof mod.describeStateAuthorityRefusal === "function" ? mod.describeStateAuthorityRefusal : null;
++  const safe = (fn) => { try { return String(fn()); } catch (e) { return "THREW " + e?.message; } };
++  const typed = describe ? safe(() => describe({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 })) : "";
++  ok("SAD diag (1) a typed refusal keeps its text and ends with the elapsed time",
++    typed.includes("State authority route unavailable (SDC-AUTHORITY-HELD: state-operation-in-flight); no success is reported.") && typed.endsWith(" Elapsed: 12 ms."), typed);
++
++  const untyped = describe ? safe(() => describe(new TypeError("boom"), { elapsedMs: 5 })) : "";
++  const framesText = untyped.includes("; at ") ? untyped.slice(untyped.indexOf("; at "), untyped.indexOf(")", untyped.indexOf("; at ") + 4 + 0) ) : "";
++  const afterAt = untyped.split("; at ")[1] ?? "";
++  const framesPart = afterAt.slice(0, afterAt.indexOf("); no success"));
++  const frameCount = framesPart.length === 0 ? 0 : framesPart.split(", ").length;
++  ok("SAD diag (2) an error without code and reason names its class, message and at most two bare frames",
++    untyped.includes("(SDC-AUTHORITY-UNAVAILABLE: untyped TypeError: boom;") && untyped.includes("at ")
++      && frameCount >= 1 && frameCount <= 2 && !/[\\/]/.test(framesPart), untyped + " | frames=" + framesPart + " | " + framesText);
++
++  const coded = describe ? safe(() => describe(Object.assign(new Error("a\nb\r\nc"), { code: "WT-PATH-TYPE" }), { elapsedMs: 1 })) : "";
++  const longText = describe ? safe(() => describe(new Error("x".repeat(1000)), { elapsedMs: 1 })) : "";
++  const xs = /x+/.exec(longText)?.[0] ?? "";
++  ok("SAD diag (3) an error with a code keeps it, a long message is cut to 240 and a multi-line one is one line",
++    coded.includes("(WT-PATH-TYPE: untyped Error: a b c;") && xs.length === 240, coded + " | xlen=" + xs.length);
++
++  const stringThrow = describe ? safe(() => describe("plain text", { elapsedMs: 3 })) : "";
++  ok("SAD diag (4) a non-Error throw prints its type", stringThrow.includes("untyped string") && stringThrow.endsWith(" Elapsed: 3 ms."), stringThrow);
++
++  const traceDir = freshDir("authority-trace");
++  const traceGit = (...args) => spawnSync("git", args, { cwd: traceDir, encoding: "utf8" });
++  traceGit("init", "-q");
++  traceGit("config", "user.email", "goldfish@example.invalid");
++  traceGit("config", "user.name", "Goldfish");
++  writeFileSync(join(traceDir, "README.md"), "fixture\n");
++  traceGit("add", "README.md");
++  traceGit("commit", "-q", "-m", "init");
++  const traceArgs = [CLI, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"];
++  const traced = spawnSync(process.execPath, traceArgs, { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: traceDir, PIPELINE_AUTHORITY_TRACE: "1" } });
++  const traceLines = String(traced.stderr).split("\n").filter(line => line.startsWith("AUTHORITY-TRACE "));
++  let traceJson = null;
++  try { traceJson = JSON.parse(traceLines[0].slice("AUTHORITY-TRACE ".length)); } catch { /* reported below */ }
++  ok("SAD diag (5) PIPELINE_AUTHORITY_TRACE=1 prints exactly one parseable trace line on stderr",
++    traceLines.length === 1 && traceJson?.schema === "pipeline.authority-trace.v1" && traceJson.custodyInspections.count >= 1
++      && typeof traceJson.elapsedMs === "number" && ["ok", "refused"].includes(traceJson.outcome), String(traced.stderr).slice(-600));
++
++  const quiet = spawnSync(process.execPath, traceArgs, { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: traceDir, PIPELINE_AUTHORITY_TRACE: "" } });
++  ok("SAD diag (6) without the variable no trace text appears", !String(quiet.stderr).includes("AUTHORITY-TRACE") && !String(quiet.stdout).includes("AUTHORITY-TRACE"), String(quiet.stderr).slice(-300));
++
++  const backend = await import("../../plugins/pipeline-core/lib/windows-owned-authority-backend.mjs");
++  const hasStats = typeof backend.nativeAuthorityStats === "function" && typeof backend.recordNativeAuthoritySpawn === "function";
++  const fresh = hasStats ? backend.nativeAuthorityStats() : null;
++  let after = null;
++  if (hasStats) { backend.recordNativeAuthoritySpawn("inspect", 10, true); backend.recordNativeAuthoritySpawn("read", 30, false); after = backend.nativeAuthorityStats(); }
++  ok("SAD diag (7) the backend spawn counters start at zero and report count, ms, maxMs, failed and byOperation",
++    fresh !== null && fresh.count === 0 && fresh.ms === 0 && fresh.maxMs === 0 && fresh.failed === 0 && Object.keys(fresh.byOperation).length === 0
++      && after.count === 2 && after.ms === 40 && after.maxMs === 30 && after.failed === 1
++      && JSON.stringify(after.byOperation) === JSON.stringify({ inspect: 1, read: 1 }), JSON.stringify([fresh, after]));
++}
++
+ // ---- Cleanup ------------------------------------------------------------------------------
+ for (const dir of ALL_DIRS) {
+   try {
+diff --git a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+index 93455237f..3691ee42f 100644
+--- a/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
++++ b/plugins/pipeline-core/lib/windows-owned-authority-backend.mjs
+@@ -17,13 +17,27 @@ const factsPattern=/^[0-9]+:[0-9]+:[0-9]+:[0-9]+:[0-9]+:(?:directory|[0-9]+:[0-9
+ function fail(reason,committed=false){const detail=/^WIN-AUTH-DACL-(?:EMPTY|UNPROTECTED|ACE|FOREIGN)$/u.test(reason)?reason:undefined;const error=new Error(reason);error.name='SessionAuthorityError';error.code='SDC-AUTHORITY-UNAVAILABLE';error.reason=detail?'WIN-AUTH-DACL':reason;if(detail)error.detail=detail;error.committed=committed;throw error;}
+ function path(value){if(typeof value!=='string'||!isAbsolute(value)||resolve(value)!==value||value.length>32768||/[\u0000-\u001f]/u.test(value)||value.startsWith('\\\\')||value.slice(2).includes(':'))fail('WIN-AUTH-PATH');return value;}
+ function source(){let fd;try{const before=lstatSync(helperPath);if(!before.isFile()||before.isSymbolicLink()||before.nlink!==1||before.size>32768||realpathSync(helperPath)!==helperPath)fail('WIN-AUTH-HELPER-CUSTODY');fd=openSync(helperPath,constants.O_RDONLY|constants.O_NOFOLLOW);const opened=fstatSync(fd),bytes=readFileSync(fd),after=fstatSync(fd),final=lstatSync(helperPath);for(const stat of [opened,after,final])if(stat.dev!==before.dev||stat.ino!==before.ino||stat.nlink!==1||stat.size!==before.size||stat.mtimeMs!==before.mtimeMs||stat.ctimeMs!==before.ctimeMs)fail('WIN-AUTH-HELPER-CAS');if(digest(bytes)!==HELPER_SHA256)fail('WIN-AUTH-HELPER-CAS');return bytes.toString('utf8');}finally{if(fd!==undefined)closeSync(fd);}}
++// Opt-in authority trace (diagnostics only): plain module-level counters of every native spawn made here.
++const nativeAuthorityCounters={count:0,ms:0,maxMs:0,failed:0};
++const nativeAuthorityByOperation=new Map();
++export function recordNativeAuthoritySpawn(operation,ms,ok){
++ nativeAuthorityCounters.count+=1;nativeAuthorityCounters.ms+=ms;
++ if(ms>nativeAuthorityCounters.maxMs)nativeAuthorityCounters.maxMs=ms;
++ if(!ok)nativeAuthorityCounters.failed+=1;
++ const name=String(operation);nativeAuthorityByOperation.set(name,(nativeAuthorityByOperation.get(name)??0)+1);
++}
++export function nativeAuthorityStats(){
++ const byOperation={};for(const name of [...nativeAuthorityByOperation.keys()].sort())byOperation[name]=nativeAuthorityByOperation.get(name);
++ return {...nativeAuthorityCounters,byOperation};
++}
+ function invoke(request){
+  if(process.platform!=='win32')fail('WIN-AUTH-PLATFORM-UNAVAILABLE');
+  const input=JSON.stringify(request);if(Buffer.byteLength(input)>1500000)fail('WIN-AUTH-INPUT');
+  let executable=null;for(const candidate of WINDOWS_POWERSHELL_PATHS){try{const stat=lstatSync(candidate);if(stat.isFile()&&!stat.isSymbolicLink()&&realpathSync(candidate).toLowerCase()===candidate.toLowerCase()){executable=candidate;break;}}catch{/* fixed system locations only */}}
+  if(executable===null)fail('WIN-AUTH-SYSTEM-HELPER-UNAVAILABLE');
+  // Execute the measured source bytes, not a subsequently reopened helper pathname.
+- const script=source();let result;try{result=spawnSync(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
++ const script=source();let result;const spawnStartedAt=Date.now();try{result=spawnSync(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input,encoding:'utf8',timeout:15000,maxBuffer:1600000,shell:false,windowsHide:true,env:sanitizeChildEnvironment(process.env)});}catch{recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,false);fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
++ recordNativeAuthoritySpawn(request.operation,Date.now()-spawnStartedAt,isSuccessfulSpawn(result));
+  let value;try{value=JSON.parse(result.stdout);}catch{fail('WIN-AUTH-NATIVE-UNAVAILABLE');}
+  if(exact(value,['ok','code','committed'])&&value.ok===false&&typeof value.committed==='boolean'&&/^WIN-AUTH-[A-Z-]{1,64}$/u.test(value.code))fail(value.code,value.committed);
+  if(request.operation==='inspect-source-image'){if(!isSuccessfulSpawn(result)||result.signal!=null||result.stderr!==''||!exact(value,['ok','facts','size','sha256','committed'])||value.ok!==true||value.committed!==false||typeof value.facts!=='string'||!factsPattern.test(value.facts)||!Number.isSafeInteger(value.size)||value.size<0||value.size>134217728||! /^[a-f0-9]{64}$/u.test(value.sha256))fail('WIN-AUTH-NATIVE-OUTPUT');const parts=value.facts.split(':');if(parts.length!==12||BigInt(parts[3])<1n||(BigInt(parts[5])<<32n)+BigInt(parts[6])!==BigInt(value.size))fail('WIN-AUTH-NATIVE-OUTPUT');return value;}
+diff --git a/plugins/pipeline-core/lib/windows-private-state.mjs b/plugins/pipeline-core/lib/windows-private-state.mjs
+index 850da74a9..07d1b8a2e 100644
+--- a/plugins/pipeline-core/lib/windows-private-state.mjs
++++ b/plugins/pipeline-core/lib/windows-private-state.mjs
+@@ -189,9 +189,21 @@ function childFailureReason(operation, result) {
+   return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
+ }
+ 
++// Opt-in authority trace (diagnostics only): plain module-level counters of every native PowerShell spawn made here.
++const nativeObservationCounters = { count: 0, ms: 0, maxMs: 0, failed: 0 };
++export function nativeObservationStats() { return { ...nativeObservationCounters }; }
++function recordNativeObservation(startedAt, succeeded) {
++  const elapsed = Date.now() - startedAt;
++  nativeObservationCounters.count += 1;
++  nativeObservationCounters.ms += elapsed;
++  if (elapsed > nativeObservationCounters.maxMs) nativeObservationCounters.maxMs = elapsed;
++  if (!succeeded) nativeObservationCounters.failed += 1;
++}
++
+ function invoke(path, script, { run = spawnSync, environment = process.env } = {}, operation = "observation") {
+   const executable = fixedPowerShell();
+   if (executable === null) return unavailable("fixed Windows PowerShell is unavailable");
++  const startedAt = Date.now();
+   const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], {
+     encoding: "utf8",
+     timeout: 7_000,
+@@ -199,6 +211,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
+     windowsHide: true,
+     env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
+   });
++  recordNativeObservation(startedAt, isSuccessfulSpawn(result));
+   if (!isSuccessfulSpawn(result)) return unavailable(childFailureReason(operation, result));
+   return result;
+ }
+@@ -324,6 +337,7 @@ function prefetchPrivateTree(path, identity, root) {
+   const batch = [...identities.keys()];
+   const executable = fixedPowerShell();
+   if (executable === null) return null;
++  const batchStartedAt = Date.now();
+   const native = spawnSync(executable, [
+     "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", OBSERVE_BATCH_SCRIPT,
+   ], {
+@@ -335,6 +349,7 @@ function prefetchPrivateTree(path, identity, root) {
+     windowsHide: true,
+     env: sanitizeChildEnvironment(process.env),
+   });
++  recordNativeObservation(batchStartedAt, isSuccessfulSpawn(native));
+   if (!isSuccessfulSpawn(native)) return null;
+   let rows;
+   try {
+diff --git a/plugins/pipeline-core/lib/worktree-lifecycle.mjs b/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+index 80c1107d5..818c923d4 100644
+--- a/plugins/pipeline-core/lib/worktree-lifecycle.mjs
++++ b/plugins/pipeline-core/lib/worktree-lifecycle.mjs
+@@ -2222,9 +2222,21 @@ function custodyTopology(startPath) {
+   return repo;
+ }
+ 
++// Opt-in authority trace (diagnostics only): plain module-level counters, never printed from here.
++const custodyInspectionCounters = { count: 0, ms: 0, maxMs: 0 };
++export function custodyInspectionStats() { return { ...custodyInspectionCounters }; }
++
+ export function inspectSignedDescriptorCustodyRepository(startPath) {
+-  const repo = custodyTopology(startPath);
+-  return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) };
++  const startedAt = Date.now();
++  try {
++    const repo = custodyTopology(startPath);
++    return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) };
++  } finally {
++    const elapsed = Date.now() - startedAt;
++    custodyInspectionCounters.count += 1;
++    custodyInspectionCounters.ms += elapsed;
++    if (elapsed > custodyInspectionCounters.maxMs) custodyInspectionCounters.maxMs = elapsed;
++  }
+ }
+ 
+ /** The exact registration lock namespace, with preexisting locks never reclaimed. */
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index f23391e7a..730692ab9 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -492,7 +492,7 @@ import { collectRigorJournalEntry, rigorVerifyRows, closeArchitectureFitnessDisp
+ import { inspectPublicHandoverDuty, updatePublicHandoverDuty } from "../lib/onboarding-continuity.mjs";
+ import { parseStrictJson } from "../lib/governance-event.mjs";
+ import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
+-import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
++import { custodyInspectionStats, discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { withSessionAuthorityBoundary, isActiveSourceOwnedSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
+ import { readSourceOwnedAuthorityContext, inspectSourceOwnedCurrentAuthorityContext, createSignedCleanupRequesterObserver } from "../lib/session-requester-bridge.mjs";
+ import {
+@@ -556,8 +556,8 @@ import {
+   observeSourceOwnedControlledMethodAfkStateRename,
+   syncStateMdNextAction,
+ } from "../lib/onboarding-continuity.mjs";
+-import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+-import { inspectWindowsOwnedAuthorityPath } from "../lib/windows-owned-authority-backend.mjs";
++import { assessWindowsPrivatePath, nativeObservationStats } from "../lib/windows-private-state.mjs";
++import { inspectWindowsOwnedAuthorityPath, nativeAuthorityStats } from "../lib/windows-owned-authority-backend.mjs";
+ import { windowsAuthorityCause } from "../lib/windows-authority-readiness.mjs";
+ import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
+ import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
+@@ -13562,8 +13562,48 @@ export function observeStateAuthorityWriteTerminal(handle) {
+   }
+   return data.terminal;
+ }
++// The refusal line of the state authority route. A typed error (string reason) prints exactly as before; an error
++// without one names its class, message and at most two bare frames instead of hiding behind the default code.
++// Diagnostics only: the elapsed time is appended after the repair sentence.
++function authorityRefusalFrames(error) {
++  const frames = [];
++  for (const line of String(error?.stack ?? "").split("\n")) {
++    const match = /^\s*at (?:(.+?) \()?(.+?):(\d+):\d+\)?\s*$/u.exec(line);
++    if (!match) continue;
++    const file = match[2].replace(/^file:\/\/\/?/u, "").split(/[\\/]/u).pop();
++    const fn = (match[1] ?? "<anonymous>").replace(/[\\/]/gu, "_");
++    frames.push(`${fn} (${file}:${match[3]})`);
++    if (frames.length === 2) break;
++  }
++  return frames;
++}
++export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".", sub } = {}) {
++  const repairInspect = `node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir}`;
++  const code = typeof error?.code === "string" ? error.code : "SDC-AUTHORITY-UNAVAILABLE";
++  const elapsedText = ` Elapsed: ${Math.max(0, Math.trunc(Number(elapsedMs) || 0))} ms.`;
++  let reasonText;
++  if (typeof error?.reason === "string") reasonText = `: ${error.reason.slice(0, 240)}`;
++  else if (error instanceof Error) {
++    const message = String(error.message ?? "").replace(/\r\n|\r|\n/gu, " ").slice(0, 240);
++    const frames = authorityRefusalFrames(error);
++    reasonText = `: untyped ${String(error.name ?? "Error")}: ${message}${frames.length > 0 ? `; at ${frames.join(", ")}` : ""}`;
++  } else reasonText = `: untyped ${typeof error}`;
++  if (sub === "approve-push" && error?.reason === "state-push-source-requester") {
++    // K103 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74): `inspect` reports a healthy registry for this cause, so the
++    // general sentence below would point at a command that clears nothing. Name the cause and the step that can be run.
++    return `Error: State authority route unavailable (${code}${reasonText}); no success is reported, no approval was recorded. ` +
++      "Cause: in chat mode (gates.push_approval is \"chat\") with the session-authority catalogue present in this repository, so a push approval must run through the State push producer route, which needs a requester bound by the host runner; a plain shell binds none. " +
++      "Repair: approve through the signature route, which stays commit-bound while a catalogue exists: set gates.push_approval to \"signature\" in pipeline.user.yaml, then run " +
++      "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
++      `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}${elapsedText}`;
++  }
++  return `Error: State authority route unavailable (${code}${reasonText}); no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
++}
++
+ export function run(argv = process.argv.slice(2), deps = {}) {
+   const sub = argv[0];
++  const runStartedAt = Date.now();
++  let traceOutcome = "ok";
+   // This read-only command owns its exact explicit root; ambient projectDir
+   // discovery must not replace the target before its existing journal checks.
+   if (sub === "inspect-enrollment-retirement") {
+@@ -13672,28 +13712,38 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+       return runStateSource(argv,deps);
+     });
+   } catch (error) {
++    traceOutcome = "refused";
+     if(owningFailureFrame!==null&&stateAuthorityInvocation===owningFailureFrame
+         &&stateOwnedCompanionFailureFrames.has(owningFailureFrame)
+         &&(error?.name==="SessionAuthorityError"||error instanceof OnboardingContinuityKickoffError))throw error;
+     // D52 (2): the refusal names its reason and the general repair, never only a code.
+-    const repairInspect = `node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir}`;
+-    const reasonText = typeof error?.reason === "string" ? `: ${error.reason.slice(0, 240)}` : "";
+-    if (sub === "approve-push" && error?.reason === "state-push-source-requester") {
+-      // K103 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74): `inspect` reports a healthy registry for this cause, so the
+-      // general sentence below would point at a command that clears nothing. Name the cause and the step that can be run.
+-      console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${reasonText}); no success is reported, no approval was recorded. ` +
+-        "Cause: in chat mode (gates.push_approval is \"chat\") with the session-authority catalogue present in this repository, so a push approval must run through the State push producer route, which needs a requester bound by the host runner; a plain shell binds none. " +
+-        "Repair: approve through the signature route, which stays commit-bound while a catalogue exists: set gates.push_approval to \"signature\" in pipeline.user.yaml, then run " +
+-        "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
+-        `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}`);
+-      return 2;
+-    }
+-    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${reasonText}); no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.`);
++    console.error(describeStateAuthorityRefusal(error, { elapsedMs: Date.now() - runStartedAt, dir, sub }));
+     return 2;
+   } finally {
+     if(owningFailureFrame!==null)stateOwnedCompanionFailureFrames.delete(owningFailureFrame);
+     stateAuthorityInvocation = previous;
+-  }
++    if (process.env.PIPELINE_AUTHORITY_TRACE === "1") writeAuthorityTrace(Date.now() - runStartedAt, traceOutcome);
++  }
++}
++
++// Opt-in (PIPELINE_AUTHORITY_TRACE=1) one-line trace on stderr: counts and milliseconds of git reads (custody
++// inspections) and of native Windows spawns. Diagnostics only; nothing is printed when the variable is unset.
++function writeAuthorityTrace(elapsedMs, outcome) {
++  const custody = custodyInspectionStats(), observed = nativeObservationStats(), authority = nativeAuthorityStats();
++  const trace = {
++    schema: "pipeline.authority-trace.v1",
++    elapsedMs,
++    custodyInspections: { count: custody.count, ms: custody.ms, maxMs: custody.maxMs },
++    nativeObservations: {
++      count: observed.count + authority.count,
++      ms: observed.ms + authority.ms,
++      maxMs: Math.max(observed.maxMs, authority.maxMs),
++      failed: observed.failed + authority.failed,
++      byOperation: authority.byOperation,
++    },
++    outcome,
++  };
++  console.error(`AUTHORITY-TRACE ${JSON.stringify(trace)}`);
+ }
+ 
+ // Source-owned State push lifetime. The opaque handles below are minted only
