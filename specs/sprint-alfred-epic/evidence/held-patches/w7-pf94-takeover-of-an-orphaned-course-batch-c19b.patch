@@ -1,0 +1,29 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index 9d6f56804..84afcb82f 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -169,7 +169,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+     ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",213],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",169],
+-    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",66],
++    ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",74],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+     ["current-session-artifact-cross-runner-tests","plugins/pipeline-core/lib/current-session-artifact-cross-runner.test.mjs","top-level-assertions",11],
+     ["current-session-artifact-export-tests","plugins/pipeline-core/lib/current-session-artifact-export.test.mjs","top-level-assertions",17],
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index ce8064a75..296a7264e 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -1643,7 +1643,10 @@ test("PF94 TAKEOVER (5) a consumed feature-course batch of ANOTHER course key wi
+     const store = join(controlRootOf(fx), "generic-batches");
+     assert.ok(existsSync(join(store, "superseded", inspected.out.digestSha256, "audit.json")));
+     assert.equal(readdirSync(join(store, "logical")).length, 0);
+-    assert.equal(readdirSync(join(store, "origins")).length, 0);
++    // The reserved packet's DELIVERY-TARGET origins entry (targetForPacket) legitimately stays; it only blocks a reserve with the SAME delivery target, which a fresh course after correction commits does not have. The feature-course origin entry must be the one that moved.
++    const remainingOrigins = readdirSync(join(store, "origins"));
++    assert.equal(remainingOrigins.length, 1);
++    assert.ok(!readdirSync(join(store, "superseded", inspected.out.digestSha256, "origins")).includes(remainingOrigins[0]));
+     assert.equal(readdirSync(join(store, "superseded", inspected.out.digestSha256, "logical")).length, 2);
+     assert.equal(readdirSync(join(store, "superseded", inspected.out.digestSha256, "origins")).length, 1);
+     assert.ok(existsSync(join(store, inspected.out.batchRef.batchId, "registration.json")));
