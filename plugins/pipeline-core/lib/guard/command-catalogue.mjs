@@ -208,8 +208,11 @@ function sanctionedRegisterFeaturePackageArgs(args, root) {
   if (!exactRoot(args, root, 0)) return false;
   if (args.length === 2) return true;
   if (args.length === 3) return args[2] === "--add-review-unit";
+  // PF-94: the lineage form names one 32-character lowercase hex packet id (never a path, never a dash-start value).
+  if (args.length === 5) return args[2] === "--add-review-lineage" && args[3] === "--packet" && /^[a-f0-9]{32}$/u.test(args[4]);
+  // PF-94: the delta request form names one repository-relative input file (same path rules as the diagnostic form).
   // D165-CDR: the diagnostic evidence form names one repository-relative path (no dash, no absolute path, no `..`).
-  return args.length === 4 && args[2] === "--add-diagnostic-evidence" && typeof args[3] === "string" && args[3] !== ""
+  return args.length === 4 && (args[2] === "--add-diagnostic-evidence" || args[2] === "--add-delta-request") && typeof args[3] === "string" && args[3] !== ""
     && !args[3].startsWith("-") && !args[3].startsWith("/") && !/^[A-Za-z]:/u.test(args[3]) && !args[3].includes("\\") && !args[3].split("/").includes("..");
 }
 

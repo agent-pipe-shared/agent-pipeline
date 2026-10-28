@@ -478,6 +478,38 @@ test("D64 feature-package registration: exactly the documented forms are admitte
   });
 });
 
+test("PF-94 feature-package registration: --add-review-lineage --packet <32 lowercase hex> is admitted, malformed shapes are not", () => {
+  withFixture("feature", f => {
+    const hex = "0123456789abcdef0123456789abcdef";
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-review-lineage", "--packet", hex), f, "add review lineage");
+    for (const [label, argv] of [["lineage without packet flag", ["--root", f.root, "--add-review-lineage"]],
+      ["lineage packet without id", ["--root", f.root, "--add-review-lineage", "--packet"]],
+      ["lineage dash id", ["--root", f.root, "--add-review-lineage", "--packet", "--force"]],
+      ["lineage short id", ["--root", f.root, "--add-review-lineage", "--packet", "0123abcd"]],
+      ["lineage uppercase id", ["--root", f.root, "--add-review-lineage", "--packet", hex.toUpperCase()]],
+      ["lineage extra argument", ["--root", f.root, "--add-review-lineage", "--packet", hex, "--force"]],
+      ["lineage wrong second flag", ["--root", f.root, "--add-review-lineage", "--other", hex]],
+      ["lineage before root", ["--add-review-lineage", "--packet", hex, "--root", f.root]]]) {
+      bothRefuse(scriptAction(registerScript, ...argv), f, label);
+    }
+  });
+});
+
+test("PF-94 feature-package registration: --add-delta-request <repository-relative path> is admitted, malformed shapes are not", () => {
+  withFixture("feature", f => {
+    bothAdmit(scriptAction(registerScript, "--root", f.root, "--add-delta-request", "specs/feature/evidence/delta-input.json"), f, "add delta request");
+    for (const [label, argv] of [["delta without path", ["--root", f.root, "--add-delta-request"]],
+      ["delta dash path", ["--root", f.root, "--add-delta-request", "--force"]],
+      ["delta absolute path", ["--root", f.root, "--add-delta-request", join(f.root, "d.json")]],
+      ["delta parent path", ["--root", f.root, "--add-delta-request", "specs/feature/../../x.json"]],
+      ["delta extra argument", ["--root", f.root, "--add-delta-request", "d.json", "--force"]],
+      ["delta wrong flag", ["--root", f.root, "--add-delta-requests", "d.json"]],
+      ["delta before root", ["--add-delta-request", "d.json", "--root", f.root]]]) {
+      bothRefuse(scriptAction(registerScript, ...argv), f, label);
+    }
+  });
+});
+
 test("D64 architecture baseline diagnosis: the read-only assessment forms and --help are admitted; the writing and file-reading forms are not", () => {
   withFixture("feature", f => {
     const base = (...rest) => scriptAction(baselineScript, "--root", f.root, ...rest);

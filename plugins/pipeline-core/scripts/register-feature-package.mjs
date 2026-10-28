@@ -28,7 +28,7 @@ import { spawnSync } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addCriticDiagnosticEvidence, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
+import { addCriticDeltaRequest, addCriticDiagnosticEvidence, addCriticReviewLineage, addCriticReviewUnit, registerFeaturePackage } from "../lib/feature-package-registration.mjs";
 import { readAcceptedDeliveryContract, readState } from "./pipeline-state.mjs";
 
 function git(root, args) {
@@ -60,6 +60,11 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
   "  4. Commit the manifest the registration names.",
   "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
   "",
+  "Critic course lineage route (PF-94; register round N BEFORE the next correction commit):",
+  "  1. Finalize the course round (session-critic-finalizer) so the packet is consumed.",
+  "  2. Register it: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>",
+  "  3. Commit the manifest and the critic-lineage file the registration names, in one evidence-only commit.",
+  "",
 ].join("\n");
 
 export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.write(text)) {
@@ -70,7 +75,11 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   const addReviewUnit = argv.length === 3 && argv[2] === "--add-review-unit";
   // D165-CDR: `--add-diagnostic-evidence <path>` registers Critic diagnostic evidence in the feature manifest.
   const addDiagnostic = argv.length === 4 && argv[2] === "--add-diagnostic-evidence" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
-  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
+  // PF-94: `--add-review-lineage --packet <packetId>` registers the lineage record of a consumed course round.
+  const addLineage = argv.length === 5 && argv[2] === "--add-review-lineage" && argv[3] === "--packet" && /^[a-f0-9]{32}$/u.test(argv[4] ?? "");
+  // PF-94: `--add-delta-request <input.json>` builds, writes and registers the delta request of the next Critic round.
+  const addDelta = argv.length === 4 && argv[2] === "--add-delta-request" && typeof argv[3] === "string" && argv[3] !== "" && !argv[3].startsWith("--");
+  if ((argv.length !== 2 && !addReviewUnit && !addDiagnostic && !addLineage && !addDelta) || rootIndex !== 0 || typeof rootValue !== "string" || rootValue === "" || rootValue.startsWith("--")) {
     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-ARGS", reason: "usage: register-feature-package.mjs --root <root> [--add-review-unit | --add-diagnostic-evidence <path>]" })}\n`);
     return 2;
   }
@@ -84,6 +93,16 @@ export function runRegisterFeaturePackage(argv, out = (text) => process.stdout.w
   if (read?.status !== "ok") {
     out(`${JSON.stringify({ schema: "pipeline.feature-package-registration.v1", status: "refused", code: "FPR-NO-APPROVED-PLAN", reason: "the project authority State is unavailable; run set-feature, submit-plan, present-plan and approve-plan first", stateStatus: read?.status ?? null })}\n`);
     return 2;
+  }
+  if (addDelta) {
+    const added = addCriticDeltaRequest({ root, inputPath: argv[3], readAcceptedDeliveryContract });
+    out(`${JSON.stringify(added)}\n`);
+    return added.status === "refused" ? 2 : 0;
+  }
+  if (addLineage) {
+    const added = addCriticReviewLineage({ root, packetId: argv[4], readAcceptedDeliveryContract });
+    out(`${JSON.stringify(added)}\n`);
+    return added.status === "refused" ? 2 : 0;
   }
   if (addDiagnostic) {
     const added = addCriticDiagnosticEvidence({ root, state: read.state, path: argv[3], readAcceptedDeliveryContract });

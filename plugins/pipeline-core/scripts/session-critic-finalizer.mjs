@@ -25,7 +25,33 @@ import {
 } from "../lib/governance-review-action.mjs";
 import { preflightCriticDispatch } from "./critic-dispatch-preflight.mjs";
 import { selectModelRoleForTask } from "./model-role-dispatch-select.mjs";
-import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore } from "../lib/critic-generic-batch.mjs";
+import { republishGenericCriticBatchIndex, inspectGenericCriticBatchRecovery, recoverGenericCriticBatchEmptyStore,
+  inspectFeatureCourseTakeover, supersedeFeatureCourseTakeover, readCriticReviewUnit } from "../lib/critic-generic-batch.mjs";
+import { resolveRegisteredCriticCourseIdentity } from "../lib/critic-course-admission.mjs";
+
+export const SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
+export const SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
+// PF-94: the operator types only the feature id; the course key and the review unit are derived, never typed.
+function takeoverTarget(root, featureId) {
+  if (typeof featureId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,62}$/u.test(featureId)) fail("SCF-TAKEOVER-REQUEST");
+  const run = (args) => {
+    const r = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
+    if (!isSuccessfulSpawn(r)) fail("SCF-TAKEOVER-REPOSITORY");
+    return String(r.stdout).trim();
+  };
+  const manifestPath = `specs/${featureId}/lifecycle.json`, unitPath = `specs/${featureId}/design/critic-review-unit.json`;
+  const head = run(["rev-parse", "HEAD"]);
+  const base = run(["rev-list", "--reverse", "HEAD", "--", manifestPath]).split("\n")[0];
+  const introduced = run(["rev-list", "--reverse", "HEAD", "--", unitPath]).split("\n")[0];
+  if (!base || !introduced) fail("SCF-TAKEOVER-REPOSITORY");
+  const declaration = JSON.parse(run(["show", `${introduced}:${unitPath}`]));
+  const unit = readCriticReviewUnit({ repoRoot: root, baseCommit: base, candidateCommit: head, specPath: declaration.specPath,
+    logicalWorkIds: declaration.logicalWorkIds, reviewUnitPath: unitPath, ...(introduced !== base ? { declarationCommit: introduced } : {}) });
+  const resolved = resolveRegisteredCriticCourseIdentity({ repoRoot: root, featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
+  if (!resolved.ok) fail("SCF-TAKEOVER-IDENTITY");
+  return { courseKey: resolved.value.courseIdentity.courseKey, logicalWorkIds: unit.declaration.logicalWorkIds,
+    courseHistoryRegistered: resolved.value.registeredHistory.length > 0 };
+}
 import { createLocalDispatchEvidenceBinding, evaluateSignedQualityImportReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
   registerGenericCriticBatch, appendGenericCriticBatchCorrection, reserveGenericCriticBatchAdmission, readReservedGenericCriticBatchAdmission,
@@ -837,6 +863,19 @@ export function runSessionCriticFinalizerCli(argv, deps = {}) {
       const rawRecover = readPhysicalRequest(recoverRoot, argv[4]);
       if (!exact(rawRecover, ["schema", "digestSha256"]) || rawRecover.schema !== SESSION_CRITIC_BATCH_RECOVERY_REQUEST_SCHEMA) fail("SCF-BATCH-RECOVERY-REQUEST");
       return Object.freeze({ exitCode: 0, output: recoverGenericCriticBatchEmptyStore({ controlRoot: controlRootFor(recoverRoot), digestSha256: rawRecover.digestSha256 }) });
+    }
+    if (Array.isArray(argv) && (argv[0] === "inspect-course-takeover" || argv[0] === "supersede-course-takeover")) {
+      if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");
+      const takeoverRoot = realpathSync(resolve(argv[2]));
+      const rawTakeover = readPhysicalRequest(takeoverRoot, argv[4]);
+      const supersede = argv[0] === "supersede-course-takeover";
+      if (!exact(rawTakeover, supersede ? ["schema", "featureId", "digestSha256", "reason"] : ["schema", "featureId"])
+        || rawTakeover.schema !== (supersede ? SESSION_CRITIC_TAKEOVER_SUPERSEDE_REQUEST_SCHEMA : SESSION_CRITIC_TAKEOVER_INSPECT_REQUEST_SCHEMA)) fail("SCF-TAKEOVER-REQUEST");
+      const target = takeoverTarget(takeoverRoot, rawTakeover.featureId);
+      const common = { repoRoot: takeoverRoot, controlRoot: controlRootFor(takeoverRoot), ...target };
+      return Object.freeze({ exitCode: 0, output: supersede
+        ? supersedeFeatureCourseTakeover({ ...common, digestSha256: rawTakeover.digestSha256, reason: rawTakeover.reason })
+        : inspectFeatureCourseTakeover(common) });
     }
     if (Array.isArray(argv) && argv[0] === "release") {
       if (argv.length !== 5 || argv[1] !== "--root" || argv[3] !== "--request") fail("SCF-USAGE");

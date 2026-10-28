@@ -20,6 +20,8 @@ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } fro
 import { execFileSync } from "node:child_process";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
 import { readReservedGenericCriticBatchAdmission, registerGenericCriticBatch } from "../lib/critic-generic-batch.mjs";
+import * as CGB from "../lib/critic-generic-batch.mjs";
+import * as CCA from "../lib/critic-course-admission.mjs";
 import { readBoundConsumedCriticReceipt, readConsumedCriticCourseResult } from "../lib/critic-verify-lifecycle.mjs";
 
 import {
@@ -1517,6 +1519,106 @@ test("Cut A (4) a bound Source record completes with the receipt unchanged and s
     assert.equal(result.nativeAttestation, false);
     assert.equal(validateSessionCriticReceipt(result.receipt), result.receipt);
     assert.equal(Object.hasOwn(result.receipt, "independence"), false);
+  } finally { cleanup(fx); }
+});
+
+// PF-94: the Glossover shape. Round 1 ran OUTSIDE the feature course (generic batch, caller-authored fallback), so the
+// feature course owns no history but the old batch owns the review unit's logical work ids.
+const TAKEOVER_INSPECT_SCHEMA = "pipeline.session-critic-course-takeover-inspect-request.v1";
+const TAKEOVER_SUPERSEDE_SCHEMA = "pipeline.session-critic-course-takeover-supersede-request.v1";
+function takeoverFixture({ consume = true } = {}) {
+  const fx = fixture();
+  const id = "held-feature", prefix = `specs/${id}`;
+  mkdirSync(join(fx.root, prefix, "design"), { recursive: true });
+  const specPath = `${prefix}/spec.md`, unitPath = `${prefix}/design/critic-review-unit.json`;
+  writeFileSync(join(fx.root, specPath), "# Feature\nAC-1 AC-2\n");
+  writeFileSync(join(fx.root, unitPath), JSON.stringify({ ...reviewUnit(), specPath }));
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "approved", artifacts: [
+    { class: "spec", path: specPath, sha256: sha(readFileSync(join(fx.root, specPath))), authority: true, mutability: "mutable", retention: "active" },
+    { class: "design", path: unitPath, sha256: sha(readFileSync(join(fx.root, unitPath))), authority: false, mutability: "immutable", retention: "retain" }] };
+  writeFileSync(join(fx.root, `${prefix}/lifecycle.json`), JSON.stringify(manifest));
+  git(fx.root, ["add", prefix]);
+  git(fx.root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "declare feature review unit"]);
+  fx.featureId = id;
+  if (consume) {
+    fx.packetId = "e1".repeat(16);
+    fx.consumed = finalizeRaw(preadmitted(fx, { packetId: fx.packetId, allowCallerAuthoredFallback: true }));
+  } else batchFor(fx);
+  return fx;
+}
+function takeoverVerb(fx, verb, request) {
+  const run = spawnSync(process.execPath, [FINALIZER_SCRIPT, verb, "--root", fx.root, "--request", writeScratchRequest(fx, `${verb}.json`, request)], { encoding: "utf8" });
+  return { status: run.status, out: JSON.parse(run.stdout) };
+}
+function featureCourseKey(fx) {
+  const manifestPath = `specs/${fx.featureId}/lifecycle.json`;
+  const base = git(fx.root, ["rev-list", "--reverse", "HEAD", "--", manifestPath]).split("\n")[0], head = git(fx.root, ["rev-parse", "HEAD"]);
+  const resolved = CCA.resolveRegisteredCriticCourseIdentity({ repoRoot: fx.root, featureId: fx.featureId, baseCommit: base, candidateCommit: head, registrationCommit: head, acceptedReference: null });
+  assert.equal(resolved.ok, true, JSON.stringify(resolved));
+  return resolved.value.courseIdentity.courseKey;
+}
+
+test("PF94 TAKEOVER (1) real state: a consumed non-course batch makes the feature course refuse CGB-CONFLICT, and the text names both verbs", () => {
+  const fx = takeoverFixture();
+  try {
+    assert.equal(fx.consumed.status, "completed");
+    assert.equal(fx.consumed.independence, "caller-authored-fallback");
+    let error = null;
+    try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
+    assert.equal(error?.code, "CGB-CONFLICT");
+    assert.ok(error.message.includes("inspect-course-takeover") && error.message.includes("supersede-course-takeover"), error.message);
+  } finally { cleanup(fx); }
+});
+
+test("PF94 TAKEOVER (2) inspect names the work ids, owner, origin kind, consumption and history, read-only and stable", () => {
+  const fx = takeoverFixture();
+  try {
+    const first = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId });
+    assert.equal(first.status, 0, JSON.stringify(first.out));
+    assert.deepEqual(first.out.logicalWorkIds, ["AC-1", "AC-2"]);
+    assert.equal(first.out.originKind, "authored-delivery");
+    assert.equal(first.out.allPacketsConsumed, true);
+    assert.equal(first.out.courseHistoryRegistered, false);
+    assert.equal(first.out.refusalCode, null);
+    assert.match(first.out.digestSha256, /^[a-f0-9]{64}$/u);
+    assert.ok(first.out.batchRef.batchId);
+    assert.deepEqual(takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId }).out, first.out);
+  } finally { cleanup(fx); }
+});
+
+test("PF94 TAKEOVER (3) supersede audits first, retires only the index entries, keeps the old evidence, is idempotent, and clears the ownership gate", () => {
+  const fx = takeoverFixture();
+  try {
+    const inspected = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId }).out;
+    const request = { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.digestSha256, reason: "round 1 ran outside the course; rerun on the course path" };
+    const done = takeoverVerb(fx, "supersede-course-takeover", request);
+    assert.equal(done.status, 0, JSON.stringify(done.out));
+    assert.equal(done.out.status, "superseded");
+    const store = join(controlRootOf(fx), "generic-batches");
+    assert.ok(existsSync(join(store, inspected.batchRef.batchId, "registration.json")), "old registration stays readable");
+    assert.ok(existsSync(join(controlRootOf(fx), inspected.packetIds[0])), "old packet stays");
+    assert.ok(existsSync(join(store, "superseded", inspected.digestSha256, "audit.json")), "append-only audit record");
+    assert.equal(readdirSync(join(store, "logical")).length, 0);
+    assert.equal(readdirSync(join(store, "origins")).length, 0);
+    assert.deepEqual(CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }), { claimed: false, batchRef: null });
+    const replay = takeoverVerb(fx, "supersede-course-takeover", request);
+    assert.equal(replay.status, 0, JSON.stringify(replay.out));
+    assert.equal(replay.out.replay, true);
+  } finally { cleanup(fx); }
+});
+
+test("PF94 TAKEOVER (4) refusals are typed: stale digest, open batch, registered history, partial work ids, bad reason", () => {
+  const fx = takeoverFixture({ consume: false });
+  try {
+    const base = { repoRoot: fx.root, controlRoot: controlRootOf(fx), courseKey: "c".repeat(64), logicalWorkIds: ["AC-1", "AC-2"], courseHistoryRegistered: false };
+    const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
+    const open = CGB.inspectFeatureCourseTakeover(base);
+    assert.equal(open.refusalCode, "CGB-TAKEOVER-OPEN");
+    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: open.digestSha256, reason: "r" })), "CGB-TAKEOVER-OPEN");
+    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: "a".repeat(64), reason: "r" })), "CGB-TAKEOVER-STALE");
+    assert.equal(CGB.inspectFeatureCourseTakeover({ ...base, courseHistoryRegistered: true }).refusalCode, "CGB-TAKEOVER-HISTORY");
+    assert.equal(CGB.inspectFeatureCourseTakeover({ ...base, logicalWorkIds: ["AC-1", "AC-2", "AC-3"] }).refusalCode, "CGB-TAKEOVER-PARTIAL");
+    assert.equal(code(() => CGB.supersedeFeatureCourseTakeover({ ...base, digestSha256: open.digestSha256, reason: "see /etc/passwd" })), "CGB-TAKEOVER-REASON");
   } finally { cleanup(fx); }
 });
 

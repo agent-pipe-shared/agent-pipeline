@@ -40,6 +40,12 @@ import { CRITERION_ID_SOURCE } from "./critic-accepted-contract.mjs";
 import { CRITIC_DIAGNOSTIC_SCHEMA, diagnosticEvidenceLocation, readDiagnosticArtifact, validateCriticDiagnostic } from "./critic-diagnostic-evidence.mjs";
 import { FEATURE_PACKAGE_SCHEMA, FEATURE_STATES, validateFeaturePackage } from "./feature-package-topology.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+import { compileRegisteredCriticReviewLineage } from "./critic-review-lineage.mjs";
+import { prepareRegisteredCriticDeltaRequest, resolveRegisteredCriticCourseIdentity } from "./critic-course-admission.mjs";
+import { readConsumedCourseClaimBinding } from "./critic-verify-lifecycle.mjs";
+import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+import { sha256Canonical } from "./review-economy.mjs";
+import { readdirSync } from "node:fs";
 
 export const FEATURE_PACKAGE_REGISTRATION_SCHEMA = "pipeline.feature-package-registration.v1";
 /** The CLI result names where the manifest's rigor level came from. */
@@ -474,5 +480,196 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
     registered: additions.map((entry) => ({ path: entry.path, sha256: entry.sha256 })),
     manifestSha256: digest(bytes), commitPaths: [manifestPath, ...wanted.map((row) => row.path)],
     next: "commit commitPaths in one commit, then rerun critic-dispatch-preflight.mjs against that registration commit",
+  };
+}
+
+/**
+ * PF-94: registers the lineage record of a CONSUMED course round (`--add-review-lineage --packet <id>`). Everything but the
+ * packet id is derived from the repository: the feature (the single registered feature course), registrationCommit = HEAD,
+ * the round candidate/base from the consumed packet, the parent from the registered history tail. The record is compiled by
+ * compileRegisteredCriticReviewLineage, written as the immutable `critic-lineage-<sha>.json` and added to the manifest as
+ * non-authority candidate-evidence. Nothing is committed.
+ */
+const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
+export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract } = {}) {
+  if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
+  let root;
+  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+  const head = gitOut(root, ["rev-parse", "HEAD"]), common = gitOut(root, ["rev-parse", "--git-common-dir"]);
+  if (!head || !common) return refused("FPR-ARGS", "root is not a git repository with a HEAD");
+  let controlRoot;
+  try { controlRoot = join(realpathSync(resolve(root, common)), "agent-pipeline", "critic-packets"); } catch { return refused("FPR-LINEAGE-NOT-CONSUMED", "no Critic owner store in this repository"); }
+  let consumed;
+  try { consumed = readConsumedCandidateResult({ controlRoot, packetId }); } catch { consumed = null; }
+  if (!consumed?.packet || !consumed.receipt) return refused("FPR-LINEAGE-NOT-CONSUMED", `packet ${packetId} is not a consumed review in this repository's Critic owner store; finalize the round first (session-critic-finalizer)`);
+  const packet = consumed.packet;
+  const noClaim = `packet ${packetId} has no course claim: the round was finalized outside the feature course (for example with the caller-authored fallback). Use inspect-course-takeover and supersede-course-takeover for the work ids of the old batch, or rerun round 1 on the course path (critic-dispatch-preflight with the feature course context); a round outside the course cannot be registered as lineage`;
+  // The single registered feature course: exactly one specs/<id>/lifecycle.json that lists a Critic review unit.
+  let features = [];
+  try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
+  if (features.length === 0) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId });
+  if (features.length > 1) return refused("FPR-LINEAGE-FEATURE-AMBIGUOUS", `more than one feature has a review unit (${features.join(", ")}); the lineage verb needs exactly one registered feature course`, { packetId });
+  const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
+  const manifestRead = inspect(root, manifestPath);
+  const checked = validateFeaturePackage(root, manifestPath);
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  let manifest;
+  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+  // Idempotent replay: a registered lineage record of this packet is the answer, before anything is compiled.
+  for (const entry of manifest.artifacts) {
+    if (entry.class !== "candidate-evidence" || !LINEAGE_FILE.test(entry.path)) continue;
+    const present = inspect(root, entry.path);
+    let record = null;
+    try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
+    if (record?.consumedResult?.packetId === packetId) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, lineagePath: entry.path, packetId };
+  }
+  const identityInput = { repoRoot: root, featureId, baseCommit: packet.candidate.base, candidateCommit: packet.candidate.commit, registrationCommit: head, acceptedReference: null };
+  const resolved = resolveRegisteredCriticCourseIdentity(identityInput);
+  if (!resolved.ok) return refused(String(resolved.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the course identity does not resolve (${resolved.code}); HEAD must be reachable from the round candidate through evidence-only commits only, so the lineage of round N must be registered BEFORE the next correction commit`, { compileCode: resolved.code, packetId });
+  const claim = readConsumedCourseClaimBinding({ resolvedRepository: resolved.value.resolvedRepository, packetId, expectedCandidate: { commit: packet.candidate.commit, tree: packet.candidate.tree } });
+  if (!claim.ok) return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, readerCode: claim.code ?? null });
+  const history = resolved.value.registeredHistory;
+  const round = history.length + 1;
+  let unit;
+  try { unit = JSON.parse(inspect(root, criticReviewUnitPath(featureId)).bytes.toString("utf8")); } catch { return refused("FPR-LINEAGE-COMPILE", "the review unit is not readable", { packetId }); }
+  // The receipt carries no package, edge or coverage fields (only the reviewed range and the verdict), so those stay synthesized: one package over the whole packet diff. The synthesis claims the round reviewed exactly the packet diff; a receipt that says it reviewed another range contradicts that claim and is refused.
+  const range = consumed.receipt.reviewRange;
+  if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
+  const edges = ["feature-delivery"];
+  const compiled = compileRegisteredCriticReviewLineage({
+    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath: null },
+    packetId, reviewId: `review-${round}`, parentReviewId: history.at(-1)?.record?.reviewId ?? null,
+    packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
+    coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
+    correction: round === 1 ? null : { commit: packet.candidate.commit, deltaSha256: packet.diff.sha256, impactSha256: sha256Canonical(edges) },
+    invalidation: { kind: "none", reason: null, evidenceSha256: null },
+  });
+  // A generic batch (the old, course-less route) already owns this unit's work ids: the compile conflicts and the round has no course claim by construction.
+  if (!compiled.ok && compiled.code === "CGB-CONFLICT") return refused("FPR-LINEAGE-NO-COURSE-CLAIM", noClaim, { packetId, compileCode: compiled.code });
+  if (!compiled.ok) return refused(String(compiled.code).startsWith("CCA-TRANSPORT") ? "FPR-LINEAGE-TRANSPORT" : "FPR-LINEAGE-COMPILE", `the lineage does not compile (${compiled.code}); the lineage of round N must be registered before the next correction commit${compiled.code === "CCA-DELTA-REQUIRED" ? "; round 2 and later need the delta request first" : ""}`, { compileCode: compiled.code, packetId });
+  const artifact = compiled.value.artifact;
+  const target = join(root, artifact.path), created = !existsSync(target);
+  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
+  const temp = join(root, `${manifestPath}.lineage-${process.pid}.tmp`);
+  try {
+    mkdirSync(dirname(target), { recursive: true });
+    if (created) writeFileSync(target, artifact.bytes, { flag: "wx", mode: 0o644 });
+    const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, artifact.registration] }, null, 2)}\n`);
+    writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath));
+  } catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the lineage could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
+  const validated = validateFeaturePackage(root, manifestPath);
+  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
+  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
+  if (envelopes.length === 1) {
+    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
+  }
+  return {
+    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-added", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`,
+    registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
+    commitMessageHint: `chore(evidence): register Critic lineage review-${round} of ${featureId}`,
+    next: "commit commitPaths in one evidence-only commit BEFORE any correction commit, then continue the course (delta request) against that registration commit",
+  };
+}
+
+/**
+ * PF-94: builds, writes and registers the canonical delta request of the NEXT Critic round (`--add-delta-request <input.json>`).
+ * The operator supplies only the judgment (the five keys of DELTA_INPUT_KEYS); every commit id is derived: the feature (the single
+ * registered feature course), baseCommit = the candidate of the registered lineage tail, candidateCommit = the newest commit that
+ * is not evidence-only, registrationCommit = HEAD. The request is compiled by prepareRegisteredCriticDeltaRequest, written as the
+ * immutable `critic-delta-request-<sha>.json` and added to the manifest as non-authority candidate-evidence. Nothing is committed.
+ */
+const DELTA_INPUT_KEYS = ["changedBehaviorClaims", "pathInvariantMap", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"];
+const DELTA_INPUT_SHAPE = '{"changedBehaviorClaims":["<claim-id>"],"pathInvariantMap":{"<each changed path>":["<invariant-id>"]},"coordinatorImpactConfirmed":true,"trustBoundaryChanged":false,"impactAmbiguous":false}';
+export function addCriticDeltaRequest({ root: rootInput, inputPath, readAcceptedDeliveryContract } = {}) {
+  if (typeof inputPath !== "string" || inputPath === "") return refused("FPR-ARGS", "--add-delta-request needs the repository-relative path of the input file");
+  let root;
+  try { root = realpathSync(resolve(rootInput)); } catch { return refused("FPR-ARGS", "root does not resolve to a directory"); }
+  const head = gitOut(root, ["rev-parse", "HEAD"]);
+  if (!head) return refused("FPR-ARGS", "root is not a git repository with a HEAD");
+  const shapeRepair = (why) => refused("FPR-DELTA-INPUT-SHAPE", `${why}; the input file holds exactly these keys and nothing else: ${DELTA_INPUT_KEYS.join(", ")}; expected shape: ${DELTA_INPUT_SHAPE}`, { inputPath, expectedShape: DELTA_INPUT_SHAPE });
+  // The input file: a repository-relative regular file, no link on the way (the same refusals as the diagnostic file).
+  const seen = repositoryRelative(inputPath) ? inspect(root, inputPath) : { kind: "invalid" };
+  if (seen.kind !== "file") return refused("FPR-DELTA-INPUT-PATH", `${inputPath} is not a repository-relative path to a regular file; write the input file (${DELTA_INPUT_KEYS.join(", ")}) and pass its repository-relative path`, { inputPath });
+  try { if (realpathSync(join(root, inputPath)) !== join(root, inputPath)) return refused("FPR-DELTA-INPUT-PATH", `${inputPath} resolves through a link`, { inputPath }); } catch { return refused("FPR-DELTA-INPUT-PATH", `${inputPath} does not resolve`, { inputPath }); }
+  let input;
+  try { input = JSON.parse(seen.bytes.toString("utf8")); } catch { return shapeRepair("the input file is not JSON"); }
+  if (!object(input) || Array.isArray(input)) return shapeRepair("the input file is not a JSON object");
+  const keys = Object.keys(input), missing = DELTA_INPUT_KEYS.filter((key) => !keys.includes(key)), extra = keys.filter((key) => !DELTA_INPUT_KEYS.includes(key));
+  if (missing.length || extra.length) return shapeRepair(`missing keys [${missing.join(", ")}], unexpected keys [${extra.join(", ")}]`);
+  const stringsOk = (value) => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string" && item !== "");
+  if (!stringsOk(input.changedBehaviorClaims)) return shapeRepair("changedBehaviorClaims must be a non-empty array of strings");
+  if (!object(input.pathInvariantMap) || Array.isArray(input.pathInvariantMap) || !Object.values(input.pathInvariantMap).every(stringsOk)) return shapeRepair("pathInvariantMap must map each changed path to a non-empty array of invariant ids");
+  for (const key of ["coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"]) if (typeof input[key] !== "boolean") return shapeRepair(`${key} must be true or false`);
+  // The single registered feature course.
+  let features = [];
+  try { features = readdirSync(join(root, "specs")).filter((id) => SAFE_ID.test(id) && inspect(root, `specs/${id}/lifecycle.json`).kind === "file" && inspect(root, criticReviewUnitPath(id)).kind === "file"); } catch { features = []; }
+  if (features.length !== 1) return refused("FPR-DELTA-FEATURE", features.length === 0 ? "no feature has a Critic review unit; there is no registered feature course" : `more than one feature has a review unit (${features.join(", ")}); the delta verb needs exactly one registered feature course`);
+  const featureId = features[0], manifestPath = `specs/${featureId}/lifecycle.json`;
+  const manifestRead = inspect(root, manifestPath);
+  const checked = validateFeaturePackage(root, manifestPath);
+  if (!checked.ok) return refused("FPR-MANIFEST-CONFLICT", "the manifest does not validate; it is never amended", { manifestPath, findings: checked.findings });
+  let manifest;
+  try { manifest = JSON.parse(manifestRead.bytes.toString("utf8")); } catch { return refused("FPR-MANIFEST-CONFLICT", "the manifest is not JSON", { manifestPath }); }
+  // The registered history tail: the lineage record with the highest round.
+  let tail = null;
+  for (const entry of manifest.artifacts) {
+    if (entry.class !== "candidate-evidence" || !LINEAGE_FILE.test(entry.path)) continue;
+    const present = inspect(root, entry.path);
+    let record = null;
+    try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
+    const round = record?.course?.reviewRound, commit = record?.candidate?.commit;
+    if (Number.isInteger(round) && typeof commit === "string" && /^[a-f0-9]{40,64}$/u.test(commit) && (!tail || round > tail.round)) tail = { round, commit };
+  }
+  if (!tail) return refused("FPR-DELTA-NO-LINEAGE", "no Critic lineage is registered for this feature yet, so there is no round to follow up; register the finished round first: register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>, commit it, then rerun this command", { manifestPath });
+  // candidateCommit = the newest commit of HEAD's first-parent line that is not evidence-only (changes beyond this feature's manifest and evidence directory). The compile re-checks the range with the course's own evidence-only test.
+  const listed = gitOut(root, ["rev-list", "--first-parent", "--parents", "-n", "512", head]);
+  let candidate = null;
+  for (const line of (listed ?? "").split("\n").filter(Boolean)) {
+    const [oid, ...parents] = line.split(/\s+/u);
+    const names = parents.length === 1 ? gitOut(root, ["diff", "--name-only", "-z", parents[0], oid, "--"]) : null;
+    const paths = names === null ? null : names.split("\0").filter(Boolean);
+    if (paths && paths.length > 0 && paths.every((path) => path === manifestPath || path.startsWith(`specs/${featureId}/evidence/`))) continue;
+    candidate = oid; break;
+  }
+  if (!candidate || candidate === tail.commit) return refused("FPR-DELTA-NO-CORRECTION", `no correction commit exists since the candidate of round ${tail.round} (${tail.commit}); make the correction commit first, produce and register its diagnostic evidence, then rerun this command`, { manifestPath, baseCommit: tail.commit });
+  const courseRequest = { repoRoot: root, featureId, baseCommit: tail.commit, candidateCommit: candidate, registrationCommit: head, requestedMode: "delta", acceptedReference: null, criterionLocator: null };
+  const compiled = prepareRegisteredCriticDeltaRequest({ courseRequest, changedBehaviorClaims: input.changedBehaviorClaims, pathInvariantMap: input.pathInvariantMap, coordinatorImpactConfirmed: input.coordinatorImpactConfirmed, trustBoundaryChanged: input.trustBoundaryChanged, impactAmbiguous: input.impactAmbiguous, deterministicEvidencePaths: null });
+  if (!compiled.ok) {
+    const code = String(compiled.code);
+    const extra2 = { compileCode: code, manifestPath };
+    if (code === "CCA-DETERMINISTIC-UNAVAILABLE") return refused("FPR-DELTA-NO-DIAGNOSTIC", `no registered diagnostic evidence is bound to the candidate ${candidate}; produce it with scripts/critic-diagnostic-evidence.mjs (--log and --out under specs/${featureId}/evidence/), commit it, register it with register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>, commit the manifest, then rerun this command`, extra2);
+    if (code === "CCA-REVIEW-BUDGET-EXHAUSTED") return refused("FPR-DELTA-BUDGET", "the round budget or the correction-commit budget of the course is exhausted; no further Critic round can be requested without the PO gate", extra2);
+    if (code === "CCA-CORRECTION-RANGE") return refused("FPR-DELTA-NO-CORRECTION", "no correction commit exists since the last round", extra2);
+    if (code.startsWith("CCA-TRANSPORT")) return refused("FPR-DELTA-TRANSPORT", `HEAD must be reachable from the candidate through evidence-only commits only (${code}); commit only the registration paths between the correction and this command`, extra2);
+    return refused("FPR-DELTA-COMPILE", `the delta request does not compile (${code})`, extra2);
+  }
+  const { descriptor, artifact } = compiled.value;
+  const given = Object.keys(input.pathInvariantMap).sort(), derived = [...descriptor.changedPaths].sort();
+  if (given.length !== derived.length || given.some((path, index) => path !== derived[index])) return refused("FPR-DELTA-MAP", `pathInvariantMap must have exactly the changed paths of ${tail.commit}..${candidate} as keys; the derived changed paths are: ${derived.join(", ")}`, { changedPaths: derived, baseCommit: tail.commit, candidateCommit: candidate, inputPath });
+  const preflight = { candidateCommit: candidate, baseCommit: tail.commit, deltaRequestPath: artifact.path, registrationCommit: "<the commit that contains commitPaths>", arguments: ["--root", "<root>", "--spec", manifest.artifacts.find((entry) => entry.class === "spec" && entry.authority === true)?.path ?? "<the feature spec path>", "--evidence", "<the registered diagnostic evidence path of the candidate>", "--base", tail.commit, "--candidate", candidate, "--registration-commit", "<the commit that contains commitPaths>", "--delta-request", artifact.path] };
+  if (manifest.artifacts.some((entry) => entry.path === artifact.path && entry.sha256 === artifact.sha256)) return { schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "already-registered", manifestPath, deltaRequestPath: artifact.path, preflight };
+  const target = join(root, artifact.path), created = !existsSync(target);
+  const restore = () => { try { writeFileSync(join(root, manifestPath), manifestRead.bytes); } catch { /* reported by the readback */ } if (created) { try { unlinkSync(target); } catch { /* not created */ } } };
+  const temp = join(root, `${manifestPath}.delta-${process.pid}.tmp`);
+  try {
+    mkdirSync(dirname(target), { recursive: true });
+    if (created) writeFileSync(target, artifact.bytes, { flag: "wx", mode: 0o644 });
+    const bytes = Buffer.from(`${JSON.stringify({ ...manifest, artifacts: [...manifest.artifacts, artifact.registration] }, null, 2)}\n`);
+    writeFileSync(temp, bytes, { flag: "wx", mode: 0o644 }); renameSync(temp, join(root, manifestPath));
+  } catch (error) { try { unlinkSync(temp); } catch { /* not created */ } restore(); return refused("FPR-WRITE-FAILED", `the delta request could not be registered (${error?.code ?? "error"}); the manifest was restored`, { manifestPath }); }
+  const validated = validateFeaturePackage(root, manifestPath);
+  if (!validated.ok) { restore(); return refused("FPR-VALIDATION-FAILED", "the topology validator refused the amended manifest; it was restored", { manifestPath, findings: validated.findings }); }
+  const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
+  if (envelopes.length === 1) {
+    const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
+  }
+  return {
+    schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
+    registered: [{ path: artifact.path, sha256: artifact.sha256 }], manifestSha256: digest(readFileSync(join(root, manifestPath))), commitPaths: [manifestPath, artifact.path],
+    commitMessageHint: `chore(evidence): register the Critic delta request of round ${tail.round + 1} of ${featureId}`,
+    preflight,
+    next: "commit commitPaths in one evidence-only commit (never the input file), then run critic-dispatch-preflight.mjs with the preflight arguments, replacing the registration commit by that commit",
   };
 }
