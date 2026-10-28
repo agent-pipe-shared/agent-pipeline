@@ -1,0 +1,255 @@
+diff --git a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+index 154b89208..0f7831555 100644
+--- a/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-packet-preflight.mjs
+@@ -421,7 +421,7 @@ export function inspectCandidatePacket({ controlRoot, packetId }, { now = new Da
+ 
+ /** Persist exactly one recomputable, redacted pre-export authorization per assurance class. */
+ export function recordCandidateExport({ controlRoot, packetId, receipt, exportView, policy }, options = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   if (currentState(packetDir, packet).phase !== "claimed") fail("CPP-EXPORT", "Packet is not claimed for export authorization.");
+   if (!validateCriticExportAuthorization({ receipt, packet, exportView, policy }, options)) {
+     fail("CPP-EXPORT", "Critic export authorization receipt is invalid or not authorized.");
+@@ -433,7 +433,7 @@ export function recordCandidateExport({ controlRoot, packetId, receipt, exportVi
+ 
+ /** Re-read and revalidate the immutable authorization used by a final receipt. */
+ export function readCandidateExport({ controlRoot, packetId, assuranceClass, policy }, options = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   if (options.requireLiveCandidate === true) {
+     assertLive(packet, options.now ?? new Date());
+     revalidateCandidate(packet);
+@@ -778,7 +778,8 @@ export function consumeCandidatePacket({ controlRoot, packetId, receipt }, { now
+ }
+ 
+ function readConsumedCandidateSnapshot({ controlRoot, packetId }) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  // A packet claimed in the pre-assurance form is consumed by the finalizer through the explicit legacy read; read it back the same way.
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   const state = currentState(packetDir, packet);
+   if (state.phase !== "consumed") fail("CPP-CONSUMED", "Packet is not consumed.");
+   const receiptRecord = readJson(join(packetDir, "receipt.json"), "CPP-RECEIPT");
+@@ -847,7 +848,7 @@ export function cleanupCandidatePacket({ controlRoot, packetId, cleanupCapabilit
+ }
+ 
+ export function blockCandidatePacket({ controlRoot, packetId, code, detail = null }, { now = new Date() } = {}) {
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   if (typeof code !== "string" || !code.startsWith("CPP-")) fail("CPP-BLOCK", "Invalid block code.");
+   const state = currentState(packetDir, packet);
+   if (["consumed", "blocked"].includes(state.phase)) fail("CPP-BLOCK", "Terminal packet cannot be blocked again.");
+@@ -860,7 +861,7 @@ export const __test = Object.freeze({ bindingsFor, observeCheckout, candidateInv
+ /** Read the immutable prelaunch admission only after genuine journal consumption. */
+ export function readConsumedSessionAdmission({ controlRoot, packetId }) {
+   const consumed = readConsumedCandidateResult({ controlRoot, packetId });
+-  const { packetDir, packet } = packetContext(controlRoot, packetId);
++  const { packetDir, packet } = packetContext(controlRoot, packetId, { allowLegacyPreAssurance: true });
+   const admissionPath = join(packetDir, "session-admission.json");
+   if (!existsSync(admissionPath) || packet.request.sessionBinding === undefined) {
+     fail("CPP-CONSUMED-ADMISSION-UNAVAILABLE", "Consumed session admission is unavailable.");
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+index fabd0ad9f..9e222858d 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.mjs
+@@ -411,10 +411,10 @@ function buildResult({ packet, packetDigest, session, verdict }) {
+     verdict: assertVerdict(verdict),
+   });
+ }
+-function validateResult(result, packet) {
++function validateResult(result, packet, packetDigest = sha256(canonicalJson(packet))) {
+   const sessionBinding = packet.request.sessionBinding;
+   if (!exact(result, RESULT_KEYS) || result.schema !== SESSION_CRITIC_RESULT_SCHEMA
+-    || result.packetId !== packet.packetId || result.packetDigest !== sha256(canonicalJson(packet))
++    || result.packetId !== packet.packetId || result.packetDigest !== packetDigest
+     || !exact(sessionBinding, Object.hasOwn(sessionBinding ?? {}, "modelRole")
+       ? ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate", "modelRole"]
+       : ["schema", "sessionId", "preflightSha256", "assurance", "freshContext", "historyInherited", "mayDelegate"])
+@@ -542,11 +542,13 @@ export function finalizeSessionCriticReview(options, deps = {}) {
+     || canonicalJson(packet.route) !== canonicalJson(admittedRouteFor(packet, options.route,
+       options.trigger ?? "T1", preflightSha256))
+     || canonicalJson(actualReferences) !== canonicalJson(expectedReferences)) fail("SCF-PRELAUNCH-BINDING");
+-  const prepared = { packet, packetDigest: sha256(canonicalJson(packet)) };
++  // The packet view may carry a normalized legacy binding; the receipt binds the digest of the packet as it lies on disk
++  // (the admission digest, already verified against the raw packet), which is what every consumed-packet reader recomputes.
++  const prepared = { packet, packetDigest: admitted.admission?.packetDigest ?? sha256(canonicalJson(packet)) };
+ 
+   let event = null;
+   const result = buildResult({ packet: prepared.packet, packetDigest: prepared.packetDigest, session: id, verdict: options.verdict });
+-  validateResult(result, prepared.packet);
++  validateResult(result, prepared.packet, prepared.packetDigest);
+   const expectedReceipt = validateSessionCriticReceipt(receiptFor(result));
+   const independence = originGate({ packetId, packetDigest: prepared.packetDigest,
+     claimant: { runner: options.route?.runner, adapter: options.route?.adapter },
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index 8cb31af1a..5398bb3d0 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -11,7 +11,9 @@ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { fileURLToPath } from "node:url";
+ import test from "node:test";
+-import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission } from "./critic-packet-preflight.mjs";
++import { canonicalJson, consumeCandidatePacket, inspectClaimedCandidatePacket, inspectClaimedSessionAdmission,
++  readConsumedCandidateReceipt, readConsumedCandidateResult, readConsumedSessionAdmission,
++  recordCandidateExport, blockCandidatePacket } from "./critic-packet-preflight.mjs";
+ import { createLocalDispatchEvidenceBinding, evaluateRepositoryCriticSkipCoverage } from "./check-critic-skip-coverage.mjs";
+ import { CRITIC_REQUIRED_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
+ import { CRITIC_DISPOSITION_ADDENDUM_SCHEMA, criticDispositionAddendumPath } from "../lib/critic-disposition-addendum.mjs";
+@@ -635,8 +637,12 @@ function rewriteAsLegacyPacket(fx, packetId, kind) {
+   packet.coordinatorOnly = { localDispatchEvidence: legacyBindingVariant(kind, body) };
+   packet.bindings.coordinatorOnlySha256 = sha(canonicalJson(packet.coordinatorOnly));
+   const digest = sha(canonicalJson(packet));
++  // The old creator sealed the claim over the prepared state of ITS packet digest: re-chain claim.priorStateDigest to the
++  // prepared record of the rewritten packet (readConsumedSessionAdmission recomputes exactly this record).
++  const preparedState = { ...read("state.json"), packetDigest: digest, revision: 1, priorStateDigest: null, phase: "prepared", body: { code: "CPP-PREPARED" }, timestamp: packet.createdAt };
+   const state = read("state.json"); state.packetDigest = digest;
+   const claim = read("claim.json"); claim.packetDigest = digest;
++  claim.priorStateDigest = sha(canonicalJson(preparedState)); state.priorStateDigest = claim.priorStateDigest;
+   const admission = read("session-admission.json"); admission.packetDigest = digest; admission.claimSha256 = sha(canonicalJson(claim));
+   write("packet.json", packet); write("state.json", state); write("claim.json", claim); write("session-admission.json", admission);
+   return { dir, body };
+@@ -701,6 +707,143 @@ test("PF-93 (2)+(7) a packet claimed in the pre-assurance form finalizes through
+   } finally { cleanup(fx); }
+ });
+ 
++// PF-93 follow-up: a legacy-form packet that finalization consumed must stay readable by every read-back path.
++function finalizedLegacyPacket(fx, packetId) {
++  const request = registered(fx, { packetId });
++  admitSessionCriticReview(request);
++  rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++  resealReservationForLegacyPacket(fx, request);
++  assert.equal(finalizeSessionCriticReview(request).status, "completed");
++  const stored = JSON.parse(readFileSync(join(controlRootOf(fx), packetId, "packet.json"), "utf8"));
++  assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
++  return request;
++}
++
++test("PF-93 follow-up (a) export publishes a finalized pre-assurance packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a3".repeat(16);
++    finalizedLegacyPacket(fx, packetId);
++    criticNotes(fx);
++    const result = exportSessionCriticEvidence(exportOptions(fx, packetId));
++    assert.equal(result.status, "exported");
++    assert.deepEqual(readdirSync(join(fx.root, `specs/alpha/evidence/critic/${packetId}`)).sort(), [...EXPORT_FILES].sort());
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (b) receipt and result reads (delta round and Verify binding) accept a consumed pre-assurance packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a4".repeat(16);
++    finalizedLegacyPacket(fx, packetId);
++    const input = { controlRoot: controlRootOf(fx), packetId };
++    const read = readConsumedCandidateReceipt(input);
++    assert.equal(read.packet.packetId, packetId);
++    assert.equal(read.receipt.packetId, packetId);
++    const result = readConsumedCandidateResult(input);
++    assert.equal(result.packet.packetId, packetId);
++    assert.deepEqual(result.receipt, read.receipt);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (c) the consumed session admission read accepts a consumed pre-assurance packet", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a5".repeat(16);
++    finalizedLegacyPacket(fx, packetId);
++    const read = readConsumedSessionAdmission({ controlRoot: controlRootOf(fx), packetId });
++    assert.equal(read.packet.packetId, packetId);
++    assert.equal(read.admission.packetId, packetId);
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (d) a claimed pre-assurance packet can be blocked", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "a6".repeat(16) });
++    admitSessionCriticReview(request);
++    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    const blocked = blockCandidatePacket({ controlRoot: controlRootOf(fx), packetId: request.packetId, code: "CPP-TEST-BLOCK" });
++    assert.equal(blocked.code, "CPP-TEST-BLOCK");
++    assert.equal(blocked.state.phase, "blocked");
++  } finally { cleanup(fx); }
++});
++
++test("PF-93 follow-up (e) the export write on a claimed pre-assurance packet reaches the authorization check, not the binding refusal", () => {
++  const fx = fixture();
++  try {
++    const request = registered(fx, { packetId: "a7".repeat(16) });
++    admitSessionCriticReview(request);
++    rewriteAsLegacyPacket(fx, request.packetId, "legacy");
++    assert.throws(() => recordCandidateExport({ controlRoot: controlRootOf(fx), packetId: request.packetId, receipt: {}, exportView: {}, policy: {} }),
++      (error) => error.code === "CPP-EXPORT");
++  } finally { cleanup(fx); }
++});
++
++// One lifecycle walk of a legacy packet; a failing step names itself in the error message.
++function e2eStep(name, fn) {
++  try { return fn(); } catch (error) {
++    error.message = `PF-93 e2e step "${name}" failed: ${error.message}`;
++    throw error;
++  }
++}
++
++test("PF-93 e2e a pre-assurance packet survives the whole lifecycle, and a blocked one reads back", () => {
++  const fx = fixture();
++  try {
++    const packetId = "a8".repeat(16);
++    const controlRoot = controlRootOf(fx);
++    const request = e2eStep("claimed in the pre-assurance form", () => {
++      const r = registered(fx, { packetId });
++      admitSessionCriticReview(r);
++      rewriteAsLegacyPacket(fx, packetId, "legacy");
++      resealReservationForLegacyPacket(fx, r);
++      const stored = JSON.parse(readFileSync(join(controlRoot, packetId, "packet.json"), "utf8"));
++      assert.equal(Object.hasOwn(stored.coordinatorOnly.localDispatchEvidence, "assurance"), false);
++      assert.equal(inspectClaimedCandidatePacket({ controlRoot, packetId }, { allowLegacyPreAssurance: true }).ok, true);
++      return r;
++    });
++    e2eStep("session admission read (claimed)", () => {
++      assert.equal(inspectClaimedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
++    });
++    e2eStep("finalize", () => { assert.equal(finalizeSessionCriticReview(request).status, "completed"); });
++    e2eStep("consumed receipt read", () => { assert.equal(readConsumedCandidateReceipt({ controlRoot, packetId }).receipt.packetId, packetId); });
++    e2eStep("consumed result read (also the only preflight read the review lineage and Verify lifecycle call)", () => {
++      assert.equal(readConsumedCandidateResult({ controlRoot, packetId }).packet.packetId, packetId);
++    });
++    e2eStep("consumed session admission read", () => {
++      assert.equal(readConsumedSessionAdmission({ controlRoot, packetId }).admission.packetId, packetId);
++    });
++    e2eStep("export write", () => {
++      criticNotes(fx);
++      assert.equal(exportSessionCriticEvidence(exportOptions(fx, packetId)).status, "exported");
++    });
++    e2eStep("export read back", () => {
++      const dir = join(fx.root, `specs/alpha/evidence/critic/${packetId}`);
++      assert.deepEqual(readdirSync(dir).sort(), [...EXPORT_FILES].sort());
++      assert.equal(JSON.parse(readFileSync(join(dir, "index.json"), "utf8")).packetId, packetId);
++    });
++    // Second leg: a claimed legacy packet that is blocked, then read back from the durable state.
++    // A registered generic batch stops after its first pass, so the second leg runs in its own fixture.
++    const fx2 = fixture();
++    try {
++      const blockedId = "a9".repeat(16);
++      const controlRoot2 = controlRootOf(fx2);
++      e2eStep("blocked leg: claim legacy and block", () => {
++        const r = registered(fx2, { packetId: blockedId });
++        admitSessionCriticReview(r);
++        rewriteAsLegacyPacket(fx2, blockedId, "legacy");
++        assert.equal(blockCandidatePacket({ controlRoot: controlRoot2, packetId: blockedId, code: "CPP-TEST-BLOCK" }).state.phase, "blocked");
++      });
++      e2eStep("blocked leg: read back", () => {
++        const state = JSON.parse(readFileSync(join(controlRoot2, blockedId, "state.json"), "utf8"));
++        assert.equal(state.phase, "blocked");
++        assert.equal(state.body.code, "CPP-TEST-BLOCK");
++      });
++    } finally { cleanup(fx2); }
++  } finally { cleanup(fx); }
++});
++
+ test("PF-93 (6) skip coverage accepts the pre-assurance binding exactly and refuses a tampered one", () => {
+   const taskId = "HISTORICAL-AUTHORED";
+   const root = mkdtempSync(join(tmpdir(), "pf93-skip-"));
