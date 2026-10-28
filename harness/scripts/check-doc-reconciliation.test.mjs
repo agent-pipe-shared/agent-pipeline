@@ -534,6 +534,40 @@ check("CLI: exits 2 (deliberate break) against an unreconciled fixture root, and
   cleanup(root);
 });
 
+// ------------------------------------------------- large tracked-file listing
+
+// Justification: the real repository's `git ls-files` output now exceeds the Node default 1 MiB
+// spawnSync buffer; a fixture whose index lists more than 1 MiB must still be listed completely.
+check("a repository whose `git ls-files` output exceeds 1 MiB is listed completely (no GIT-LS-FILES-ERROR)", () => {
+  const root = buildRoot();
+  writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt");
+  writeFileSync(join(root, "docs", "doc-reconciliation.md"), "seed\n");
+  writeFileSync(join(root, "src.placeholder"), "seed\n");
+  const base = commitAll(root, "base");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "alpha.txt"), "changed\n");
+  const candidate = commitAll(root, "candidate");
+  writeRecord(root, ["# Doc reconciliation record", "", `## Candidate ${candidate}`, "", "- ADR-0001: checked, no change needed.", ""].join("\n"));
+  commitAll(root, "record: reconcile the candidate");
+
+  // Index-only bulk entries sharing one blob: cheap, and `git ls-files` reads the index.
+  const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: root, encoding: "utf8", input: "bulk\n" }).trim();
+  const pad = "x".repeat(90);
+  const lines = [];
+  for (let i = 0; i < 13000; i += 1) lines.push(`100644 ${blob}\t0\tbulk/${pad}/entry-${String(i).padStart(6, "0")}.txt`);
+  execFileSync("git", ["update-index", "--add", "--index-info"], { cwd: root, encoding: "utf8", input: `${lines.join("\n")}\n`, maxBuffer: 1 << 28 });
+  const listed = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
+  assert.ok(listed.length > 1048576, `fixture must exceed 1 MiB, got ${listed.length}`);
+
+  const result = run(root, base, candidate);
+  assert.ok(
+    !result.findings.some((f) => f.startsWith("GIT-LS-FILES-ERROR")),
+    `expected a complete listing, got:\n  ${result.findings.join("\n  ").slice(0, 600)}`,
+  );
+  assert.equal(result.ok, true, `expected ok, got findings:\n  ${result.findings.join("\n  ").slice(0, 600)}`);
+  cleanup(root);
+});
+
 // ---------------------------------------------------------- real corpus
 
 check("CLI: exits 0 against the real repository over a range that changes nothing implicated (regression proof, DoD 2)", () => {

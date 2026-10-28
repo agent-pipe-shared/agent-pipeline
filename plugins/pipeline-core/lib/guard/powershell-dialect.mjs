@@ -5,7 +5,20 @@ import { basename, win32 } from "node:path";
 import { parseGuardCommand } from "../../hooks/guard-command-grammar.mjs";
 import { isSafeNamesOnlyDirectory } from "./shell-grammar.mjs";
 import { verdict } from "./verdict.mjs";
-import { isPhysicalIntakeScratchPath } from "./write-scope.mjs";
+import { isHalfMovedRepairArgv, isPhysicalIntakeScratchPath } from "./write-scope.mjs";
+import { ProjectOnboardingReadyError, requireProjectOnboardingReady } from "../project-onboarding-ready-gate.mjs";
+
+// W7 Slice B parity: the lifecycle gate is never reached for PowerShell (evaluate.mjs returns powerShellScopeVerdict first), so the
+// dialect observes readiness itself, and only after the argv already passed the operand validator. Admitted solely for a
+// session-intent PORG-INVALID-OBSERVATION; a ready, partial, drifted or bootstrap-intent observation admits nothing.
+function invalidSessionObservation(root, dependencies) {
+  try {
+    (dependencies?.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({ rootDir: root, intent: "session", runner: dependencies?.runner });
+    return false;
+  } catch (error) {
+    return error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION" && error.intent === "session";
+  }
+}
 import { containedLiteralReadPath, sessionReadScopeRoots } from "./read-scope.mjs";
 import { isSanctionedLifecycleCommand } from "./command-catalogue.mjs";
 
@@ -99,5 +112,9 @@ export function powerShellScopeVerdict(input, root, dependencies) {
       : verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-READ-TARGET: use an exact passive path outside protected credential roots.\n");
   }
   if (["node", "node.exe"].includes(name) && isSanctionedLifecycleCommand(command, root)) return verdict(0);
+  // Only the literal executable `git` / `git.exe` (never a path), argv exactly `mv A B` or `restore P`.
+  if (["git", "git.exe"].includes(executable.toLowerCase())
+    && isHalfMovedRepairArgv(argv, root, dependencies, { windows: true })
+    && invalidSessionObservation(root, dependencies)) return verdict(0);
   return verdict(2, "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-POWERSHELL-GRAMMAR: use a sanctioned Pipeline action or a contained literal read.\n");
 }

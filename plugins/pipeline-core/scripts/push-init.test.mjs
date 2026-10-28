@@ -196,6 +196,9 @@ function prepareDepsAllGreen(overrides = {}) {
     gitCommonDir: () => "/external/po-dir/.fake-common",
     derivePoGateRepositoryFingerprint: () => "0123456789ab",
     now: () => new Date("2026-08-16T20:00:00.000Z"),
+    // Fixture roots never carry a Critic/Verify binding, so the publication review gate (push-prepare critic-bound-verify, CBV-ROOT) is neutralised through its existing seam; all-green cases are not about that gate.
+    requiresPublicationReview: () => false,
+    checkCriticBoundVerify: () => ({ ok: true }),
     pipelineStateRun: () => {
       console.log(JSON.stringify({ schema: "pipeline.push-subject-preview.v1", subjectSha256: "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a" }));
       return 0;

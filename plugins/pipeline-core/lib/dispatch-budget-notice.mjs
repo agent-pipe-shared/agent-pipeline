@@ -7,7 +7,7 @@
 import { CLOSING_ALLOWANCE } from "./dispatch-budget-core.mjs";
 
 export const NATIVE_HOST_RETURN_SCHEMA = "pipeline.native-goldfish-host-return.v1";
-export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "blocked" and an interim report (done / remaining / next step) in its report field`;
+export const NATIVE_HOST_RETURN_INSTRUCTION = `return your final message as exactly one JSON object matching ${NATIVE_HOST_RETURN_SCHEMA} with outcome: "checkpoint" (changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form) and a report carrying the condensed report plus a continuation card (done / remaining / next step) in its report field`;
 
 export function nativeHostBlockedContinuation(remainingClosingCalls) {
   return remainingClosingCalls > 0

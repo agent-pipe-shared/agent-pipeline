@@ -9450,8 +9450,16 @@ function readDesignApprovalInputs(dir, submission, paths) {
     const refused = summaries.find(entry => !entry.ok);
     if (refused) return refused;
     const latest = summaries.at(-1).summary;
-    const companions = latest.sources.companions.map(entry => entry.path);
-    const bound = [...new Set([submission.planPath, submission.specPath, ...companions, ...paths, ...summaries.map(entry => entry.summary.report.path)])];
+    // Folder rebind: when the submission's feature directory differs from the latest receipt's, a path under the old directory is
+    // observed at the same relative position under the new one if it exists there; otherwise the receipt's own path is kept.
+    const fromDir = dirname(latest.sources.prd.path).replaceAll("\\", "/"), toDir = dirname(submission.planPath).replaceAll("\\", "/");
+    const moved = path => {
+      if (fromDir === toDir || !path.startsWith(`${fromDir}/`)) return path;
+      const candidate = `${toDir}/${path.slice(fromDir.length + 1)}`;
+      return physicalRebindFile(dir, candidate) !== null ? candidate : path;
+    };
+    const companions = latest.sources.companions.map(entry => moved(entry.path));
+    const bound = [...new Set([submission.planPath, submission.specPath, ...companions, ...paths, ...summaries.map(entry => moved(entry.summary.report.path))])];
     const git = (...args) => { const out = spawnSync("git", args, { cwd: dir, encoding: "utf8" }); if (out.status !== 0 && out.status !== 1) throw Error("git observation unavailable"); return out; };
     const pathStates = bound.map(path => {
       const file = physicalRebindFile(dir, path);
@@ -11635,6 +11643,42 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "reopen-design": {
+      if (rest.includes("--dry-run")) {
+        // Preview only: nothing below writes state, an audit entry or an invalidation record.
+        const previewFlags = parseFlags(rest.filter((token) => token !== "--dry-run"));
+        if (isBlank(previewFlags.by)) {
+          console.error("Error: reopen-design requires --by <name>.");
+          return 2;
+        }
+        const submission = base.planSubmission;
+        const approval = base.planApproval;
+        const previewAt = now();
+        const transition = reopenPlanDesign({
+          state: base,
+          expectedStateSha256: sha256CanonicalJson(base),
+          by: previewFlags.by,
+          at: previewAt,
+        });
+        const wouldChange = transition.ok === true && transition.replay !== true;
+        console.log(JSON.stringify({
+          schema: "pipeline.reopen-design-preview.v1",
+          dryRun: true,
+          wrote: false,
+          ok: transition.ok === true,
+          code: transition.ok === true ? null : transition.code ?? null,
+          wouldChange,
+          phase: { current: base.activeFeature?.phase ?? null, after: wouldChange ? "design" : base.activeFeature?.phase ?? null },
+          voids: {
+            planSubmissionSha256: submission ? sha256CanonicalJson(submission) : null,
+            planApprovalPresent: approval !== undefined && approval !== null,
+            planApprovalSha256: approval ? sha256CanonicalJson(approval) : null,
+            approvalSignaturePresent: Boolean(approval?.designApproval),
+            // Receipts and reviews are files bound to the plan hash, not state fields: name the hash they bind to.
+            receiptsBoundToPlanSha256: submission?.planSha256 ?? null,
+          },
+        }, null, 2));
+        return 0;
+      }
       const by = flags.by;
       if (isBlank(by)) {
         console.error("Error: reopen-design requires --by <name>.");

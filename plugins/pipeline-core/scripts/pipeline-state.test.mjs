@@ -2215,8 +2215,10 @@ function awaitingApprovalFixture() {
     assert.ok(decisionLine, `${label} must display task-scoped architecture decisions`);
     const decisionSummary = JSON.parse(decisionLine.slice("Architecture decisions: ".length));
     assert.equal(decisionSummary.schema, "pipeline.architecture-planning-decisions.v1");
-    assert.deepEqual(decisionSummary.areas, [], `${label} must not invent an effective decision for the unowned planned path`);
-    assert.deepEqual(decisionSummary.unresolvedPaths, ["src/change.mjs"], `${label} must display the actual task-scoped planning path`);
+    // The fixture's module `application` owns src/**, so the planned path is owned: it lands in areas, not unresolvedPaths
+    // (same shape as lib/architecture-entry-readiness.test.mjs, owned versus unowned planned path).
+    assert.deepEqual(decisionSummary.areas, [{ area: "application", status: "ready", decisions: [], findingCount: 0 }], `${label} must display the owned planned path's area without inventing an effective decision`);
+    assert.deepEqual(decisionSummary.unresolvedPaths, [], `${label} must leave no unresolved path for the owned planned path`);
     for (const path of expectedPaths) assert.equal(JSON.parse(readFileSync(join(root, path), "utf8")).verify, verifyCommand, `${label} must configure ${path}`);
   }
 
@@ -2248,8 +2250,11 @@ function awaitingApprovalFixture() {
   // and uncommitted calibration now correctly fail before the writer.
   const root = mkdtempSync(join(nativeContractFixtureParent(), "partial-calibration-io-"));
   prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
-  prepareCalibrationArchitectureFixture(root);
   const calibration = { project: "partial-calibration-io", verify: "node -e \"console.error('pipeline: the verify contract of this project is not configured'); process.exit(1)\"", handover: "docs/state.md" };
+  // QG-04: the adopted profile binds project/pipeline.json, so the calibration committed below must be the bytes the
+  // adoption is taken over (same contract as the three layout cases above); otherwise the later commit is profile drift
+  // and the planning fitness refuses with ARCHITECTURE-FITNESS-NOT-READY before the injected writer.
+  prepareCalibrationArchitectureFixture(root, `${JSON.stringify(calibration, null, 2)}\n`);
   const calibrationPath = join(root, "project", "pipeline.json");
   const legacyPath = join(root, ".claude", "pipeline.json");
   const stateFile = statePath(root);
@@ -2305,10 +2310,12 @@ function awaitingApprovalFixture() {
   // not satisfy the sanctioned calibration commit transition.
   const root = mkdtempSync(join(nativeContractFixtureParent(), "phase-verify-deadlock-"));
   prepareApprovedItemCourseFixture({ root, initialPlanSurfacePath: "src/change.mjs" });
-  prepareCalibrationArchitectureFixture(root);
+  // QG-04: the adopted profile binds project/pipeline.json, so the calibration is built first and its bytes are
+  // passed to the helper; seeding it afterwards is profile drift (ARCHITECTURE-FITNESS-NOT-READY). No assertion changed.
   const seededVerify = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
-  mkdirSync(join(root, "project"), { recursive: true });
   const calibration = { project: "new-project", verify: seededVerify, handover: "docs/state.md" };
+  prepareCalibrationArchitectureFixture(root, `${JSON.stringify(calibration, null, 2)}\n`);
+  mkdirSync(join(root, "project"), { recursive: true });
   writeFileSync(join(root, "project", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
   const committedBaseline = spawnSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "add", "--", "project/pipeline.json", ".claude/pipeline.json"], { encoding: "utf8" });
@@ -2364,6 +2371,8 @@ function awaitingApprovalFixture() {
 
   // 5. Idempotent replay: once configured, re-entering implementation (e.g. after
   // reopen-design) without --verify-command is no longer refused.
+  // QG-04: the configure step above rewrote the bound calibration bytes; re-adopt over them so the replay below is not profile drift.
+  prepareCalibrationArchitectureFixture(root, readFileSync(join(root, "project", "pipeline.json"), "utf8"));
   const revertedToDesign = { ...afterState, activeFeature: { ...afterState.activeFeature, phase: "design" } };
   writeFileSync(statePath(root), JSON.stringify(revertedToDesign, null, 2));
   assert.equal(run(["set-phase", "--phase", "implementation"], deps), 0,

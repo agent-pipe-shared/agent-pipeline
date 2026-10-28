@@ -31,6 +31,30 @@ export function sanctionedSessionCriticFinalizerArgs(args, root) {
 }
 
 /**
+ * D56: the Elephant's argv for the attested dispatch-record writer. Exactly
+ * `--repo-root <root|.> --attested-request <scratch/...json>` (order-insensitive, nothing else).
+ * The request obeys the finalizer's physical-scratch and realpath-containment rules; the
+ * host route spelling (`--request`) is deliberately not part of this shape.
+ */
+export function sanctionedDispatchRecordAttestedWriterArgs(args, root) {
+  if (args.length !== 4) return false;
+  const rootValue = (value) => value === root
+    || (value === "." && resolve(root, value) === resolve(root) && isRealpathedWithinBoundary(resolve(root, value), root));
+  const requestValue = (request) => {
+    if (typeof request !== "string" || request.length === 0 || request.length > 256
+      || request.includes("\\") || request.includes("\0") || isAbsolute(request)
+      || !request.endsWith(".json")) return false;
+    const components = request.split("/");
+    if (components[0] !== "scratch" || components.some((part) => part === "" || part === "." || part === "..")) return false;
+    return isRealpathedWithinBoundary(resolve(root, request), root)
+      && isPhysicalScratchTarget(request, { rootDir: root });
+  };
+  return matchFlagSpec(args, {
+    requiredValue: { "--repo-root": rootValue, "--attested-request": requestValue },
+  });
+}
+
+/**
  * NVA-K-DRIVERREACH: the guided driver's own exact argv surface (`parseArgs()` in
  * scripts/onboarding-init.mjs). The ordinary driving shape keeps `--root <root>` required,
  * with `--runner <claude|codex|antigravity>` and `--step-cap <positive integer>` optional.
@@ -422,7 +446,9 @@ export function sanctionedPipelineStateArgs(args, root) {
   // valid digest-bound argv is never Human authority.
   if (args[0] === "apply-legacy-v2-revocation-recovery") return false;
   if (args[0] === "reopen-design") {
-    return args[1] === "--by" && validBy(args[2]) && args.length === 3;
+    // `--dry-run` previews the void without writing (pipeline.reopen-design-preview.v1); it is a pure read.
+    return args[1] === "--by" && validBy(args[2])
+      && (args.length === 3 || (args.length === 4 && args[3] === "--dry-run"));
   }
   if (args[0] === "cancel-submitted-plan") {
     return args[1] === "--by" && validBy(args[2])

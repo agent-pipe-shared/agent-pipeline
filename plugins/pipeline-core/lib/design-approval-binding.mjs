@@ -57,7 +57,7 @@ const DELTA_ROUND = 2;
 const MAX_DELTA_ENTRIES = 2 * (MAX_COMPANIONS + 2);
 
 const BINDING_REQUIRED_KEYS = ["schema", "featureId", "sources", "reviewReceipts", "verdict", "openFindingIds"];
-const BINDING_OPTIONAL_KEYS = ["unreviewedSourceDelta"];
+const BINDING_OPTIONAL_KEYS = ["unreviewedSourceDelta", "pathRebind"];
 const REQUEST_KEYS = ["schema", "binding", "bindingSha256", "approvalIntent"];
 const CREATE_BINDING_KEYS = ["featureId", "receipts", "currentSources"];
 const CREATE_REQUEST_KEYS = ["binding", "candidate"];
@@ -159,7 +159,18 @@ function isValidBinding(binding) {
     if (binding.reviewReceipts[binding.reviewReceipts.length - 1].round !== DELTA_ROUND) return false;
     if (!isUnreviewedDelta(binding.unreviewedSourceDelta, binding.sources)) return false;
   }
+  if (Object.hasOwn(binding, "pathRebind") && !isPathRebind(binding.pathRebind, binding.sources)) return false;
   return true;
+}
+
+/** The closed rebind record: exactly two distinct safe directories, the second being where the bound sources now sit. */
+function isPathRebind(value, sources) {
+  if (!hasExactKeys(value, ["fromDir", "toDir"]) || !isSafePath(value.fromDir) || !isSafePath(value.toDir) || value.fromDir === value.toDir) return false;
+  const prefix = `${value.toDir}/`;
+  const dirOfPrd = sources.prd.path.slice(0, sources.prd.path.lastIndexOf("/"));
+  return dirOfPrd === value.toDir
+    && sources.spec.path.startsWith(prefix)
+    && allOf(sources.companions, (companion) => companion.path.startsWith(prefix));
 }
 
 // ----------------------------------------------------------------------------- building
@@ -175,6 +186,30 @@ function unreviewedSourceDelta(reviewedSources, currentSources) {
     delta.push({ path, reviewedSha256: reviewed.has(path) ? reviewed.get(path) : null, currentSha256: current.has(path) ? current.get(path) : null });
   }
   return delta;
+}
+
+/**
+ * Byte-identical feature-directory rebind: `{ fromDir, toDir }` when the reviewed sources and the
+ * current sources are the same files moved from one directory to another, else null. Same rule as
+ * the review-chain comparison in design-consistency-check.mjs (implemented locally because that
+ * helper is not exported): PRD, Spec and the same number of companions, every digest equal, the
+ * old paths under the PRD's old directory and the current paths under its current directory with
+ * identical relative suffixes per role (companions paired in sorted order), the directories differ.
+ */
+function sourceRebind(reviewed, current) {
+  if (reviewed.companions.length !== current.companions.length) return null;
+  const dirOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : null);
+  const fromDir = dirOf(reviewed.prd.path);
+  const toDir = dirOf(current.prd.path);
+  if (fromDir === null || toDir === null || fromDir === toDir || !isSafePath(fromDir) || !isSafePath(toDir)) return null;
+  const relativeTo = (path, dir) => (path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : null);
+  const pairs = [[reviewed.prd, current.prd], [reviewed.spec, current.spec], ...reviewed.companions.map((old, index) => [old, current.companions[index]])];
+  for (const [old, now] of pairs) {
+    const oldRelative = relativeTo(old.path, fromDir);
+    const nowRelative = relativeTo(now.path, toDir);
+    if (oldRelative === null || oldRelative !== nowRelative || !isSha(old.sha256) || old.sha256 !== now.sha256 || !isSafePath(now.path)) return null;
+  }
+  return { fromDir, toDir };
 }
 
 const copySources = (sources) => ({
@@ -222,7 +257,11 @@ export function createDesignApprovalBinding(input) {
     verdict: latest.verdict,
     openFindingIds: [...latest.openFindingIds],
   };
-  if (latest.kind === "delta") {
+  // A byte-identical feature-directory move is recorded as a closed reason (the digest binds it),
+  // and is not an unreviewed delta. No move: the binding is exactly what it was before.
+  const rebind = sourceRebind(latest.sources, currentSources);
+  if (rebind !== null) binding.pathRebind = rebind;
+  if (latest.kind === "delta" && rebind === null) {
     const delta = unreviewedSourceDelta(latest.sources, currentSources);
     if (delta.length > 0) binding.unreviewedSourceDelta = delta;
   }

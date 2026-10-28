@@ -226,9 +226,9 @@ check("a missing configured prerequisite names the blocked claim and a copyable 
     assert.equal(result.ok, false);
     assert.equal(missing.status, "binary_missing");
     assert.equal(missing.affectedClaim, "Security readiness cannot be claimed until semgrep is installed.");
-    assert.equal(missing.installCommand, "pipx install semgrep");
+    assert.equal(missing.installCommand, null);
     assert.equal(missing.installAttempted, false);
-    assert.equal(missing.guidance.includes(missing.installCommand), true);
+    assert.match(missing.guidance, /probe: semgrep --version/u);
     assert.equal(probeCalls, 0);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
@@ -276,8 +276,10 @@ check("missing installer prerequisites are embedded in copyable Ubuntu chains wh
         assert.match(gitleaks.guidance, /npm is not an approved installer/u);
         assert.match(semgrep.guidance, /npm is not an approved installer/u);
       } else {
-        assert.equal(gitleaks.installCommand, "sudo apt-get update && sudo apt-get install -y golang-go && go install github.com/zricethezav/gitleaks/v8@latest");
-        assert.equal(semgrep.installCommand, "sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep");
+        assert.equal(gitleaks.installCommand, null);
+        assert.equal(semgrep.installCommand, null);
+        assert.match(gitleaks.guidance, /probe: gitleaks version; source: /u);
+        assert.match(semgrep.guidance, /probe: semgrep --version; source: /u);
       }
     } finally { rmSync(repo, { recursive: true, force: true }); }
   }
@@ -401,7 +403,8 @@ check("capability-completeness: performs zero filesystem/git mutation (repo stat
 // Fixtures: per-test temporary repositories whose git configuration is isolated from the machine
 // (empty global config, no system config, HOME redirected), removed afterwards. Nothing here reads
 // or writes the real repository's hooks or the real machine's git configuration.
-const R77_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable"]);
+const R77_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable", "scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
+const R77_SCANNER_FINDING_IDS = Object.freeze(["scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
 const R77_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
 const R77_FINDING_KEYS = Object.freeze(["cause", "findingId", "repair", "status"]);
 const R77_KNOWN_BAD_GIT = "2.56.0.windows.1";
@@ -423,7 +426,7 @@ function r77IsAgentAction(repair) {
 function r77AssertFinding(finding, label) {
   assert.ok(finding !== null && typeof finding === "object", `${label}: a finding must be an object`);
   assert.deepEqual(Object.keys(finding).sort(), [...R77_FINDING_KEYS], `${label}: a finding carries exactly the closed fields findingId, status, cause, repair`);
-  assert.ok(R77_FINDING_IDS.includes(finding.findingId), `${label}: findingId must be one of the eight closed ids`);
+  assert.ok(R77_FINDING_IDS.includes(finding.findingId), `${label}: findingId must be one of the closed ids`);
   assert.ok(R77_STATES.includes(finding.status), `${label}: status must be ok, repairable, attended or unknown`);
   assert.equal(typeof finding.cause, "string", `${label}: cause must be a string`);
   if (finding.status === "ok") return;
@@ -522,7 +525,7 @@ check("R7-7a: the matrix checker itself fails a non-ok finding without its typed
   assert.doesNotThrow(() => r77AssertFinding({ ...base, status: "repairable", repair: r77Action("x") }, "repairable"));
   assert.doesNotThrow(() => r77AssertFinding({ ...base, status: "attended", repair: r77Attended() }, "attended"));
 });
-check("R7-7a: a fixture matrix puts each of the eight finding ids in ok, repairable and attended, each non-ok with its typed repair, cause path-redacted", async () => {
+check("R7-7a: a fixture matrix puts each of the closed finding ids in ok, repairable and attended, each non-ok with its typed repair, cause path-redacted", async () => {
   await r77WithFixtureRepo(async (repo) => {
     for (const id of R77_FINDING_IDS) {
       for (const status of ["ok", "repairable", "attended"]) {
@@ -530,7 +533,7 @@ check("R7-7a: a fixture matrix puts each of the eight finding ids in ok, repaira
         const repair = status === "ok" ? null : status === "repairable" ? r77Action(repo) : r77Attended();
         const probe = () => ({ status, cause: `fixture ${label} observed under ${repo}`, repair });
         const report = await r77Report(repo, { [R77_PROBES_DEP]: r77Probes({ [id]: probe }) });
-        assert.deepEqual(report.findings.map((finding) => finding.findingId).sort(), [...R77_FINDING_IDS].sort(), `${label}: the report carries exactly the eight closed finding ids, once each`);
+        assert.deepEqual(report.findings.map((finding) => finding.findingId).sort(), [...R77_FINDING_IDS].sort(), `${label}: the report carries exactly the closed finding ids, once each`);
         for (const finding of report.findings) r77AssertFinding(finding, `${label}/${finding.findingId}`);
         const finding = r77Finding(report, id);
         assert.equal(finding.status, status, `${label}: the fixture state must surface as the finding status`);
@@ -777,6 +780,118 @@ check("R7-6n: an invalid legacy per-repository store is a failure, never absent"
   } finally {
     if (savedEnv === undefined) delete process.env[R76J_ENV]; else process.env[R76J_ENV] = savedEnv;
     rmSync(base, { recursive: true, force: true, maxRetries: 3 });
+  }
+});
+// W7 preflight slice 1: gitleaks, osv-scanner and semgrep are typed prerequisite findings (AC-264 slice; the environment
+// readiness never reports a missing scanner as ready or clean). Fixtures inject the resolver and probes; nothing is spawned.
+const W7_SCANNER_TOOLS = Object.freeze({ "scanner-gitleaks": "gitleaks", "scanner-osv-scanner": "osv-scanner", "scanner-semgrep": "semgrep" });
+const W7_SCANNER_OBSERVED = () => ({
+  gitleaks: () => observed("gitleaks", "8.18.0", ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"]),
+  "osv-scanner": () => observed("osv-scanner", "2.0.0", ["--format", "recursive-source"]),
+  semgrep: () => observed("semgrep", "1.50.0", ["--json", "--config"]),
+});
+const w7ScannerDeps = (resolveExecutableFn) => ({
+  probeNodeFn: nodeReady, probeGitFn: gitReady, resolveExecutableFn, resolveInstallerFn: () => null, scannerProbes: W7_SCANNER_OBSERVED(),
+  [R77_PROBES_DEP]: r77Probes({}, R77_SCANNER_FINDING_IDS),
+});
+check("W7-1a: the closed finding id list exports the three scanner ids", () => {
+  for (const id of R77_SCANNER_FINDING_IDS) assert.ok(toolchainModule.ENVIRONMENT_FINDING_IDS.includes(id), `${id} must be in ENVIRONMENT_FINDING_IDS`);
+  assert.deepEqual([...toolchainModule.ENVIRONMENT_FINDING_IDS], [...R77_FINDING_IDS], "the id list is the previous eight ids followed by the three scanner ids");
+});
+check("W7-1b: an injected missing scanner yields a non-ready attended finding with its scanner id; the report is not ok", async () => {
+  await r77WithFixtureRepo(async (repo) => {
+    const report = await r77Report(repo, w7ScannerDeps(() => null));
+    for (const id of R77_SCANNER_FINDING_IDS) {
+      const finding = r77Finding(report, id);
+      r77AssertFinding(finding, `missing ${id}`);
+      assert.equal(finding.status, "attended", `${id}: a missing scanner is attended, never ok`);
+      assert.match(finding.cause, new RegExp(W7_SCANNER_TOOLS[id], "u"), `${id}: the cause names the scanner`);
+      assert.equal(finding.repair.kind, "attended-prerequisite");
+      assert.match(finding.repair.prerequisite, new RegExp(W7_SCANNER_TOOLS[id], "u"), `${id}: the prerequisite names the scanner`);
+    }
+    assert.equal(report.ok, false, "a missing scanner is never clean");
+  });
+});
+check("W7-1c: an injected present scanner yields a ready (ok) finding with no repair", async () => {
+  await r77WithFixtureRepo(async (repo) => {
+    const report = await r77Report(repo, w7ScannerDeps((name) => `/tools/${name}`));
+    for (const id of R77_SCANNER_FINDING_IDS) {
+      const finding = r77Finding(report, id);
+      r77AssertFinding(finding, `present ${id}`);
+      assert.equal(finding.status, "ok", `${id}: a present compatible scanner is ready`);
+      assert.equal(finding.repair, null);
+    }
+  });
+});
+check("W7-1d: the report carries the previous eight findings plus exactly three scanner findings", async () => {
+  await r77WithFixtureRepo(async (repo) => {
+    const report = await r77Report(repo, w7ScannerDeps((name) => `/tools/${name}`));
+    assert.equal(report.findings.length, 8 + 3);
+    assert.deepEqual(report.findings.map((finding) => finding.findingId), [...R77_FINDING_IDS]);
+  });
+});
+check("W7-1e: the scanner findings expose no install command text and an incompatible scanner is attended", async () => {
+  await r77WithFixtureRepo(async (repo) => {
+    const deps = w7ScannerDeps((name) => `/tools/${name}`);
+    deps.scannerProbes = { ...deps.scannerProbes, "osv-scanner": () => observed("osv-scanner", "3.0.0", ["--format", "recursive-source"]) };
+    const report = await r77Report(repo, deps);
+    assert.equal(r77Finding(report, "scanner-osv-scanner").status, "attended", "an incompatible version is not ready");
+    assert.equal(r77Finding(report, "scanner-gitleaks").status, "ok");
+    for (const id of R77_SCANNER_FINDING_IDS) assert.doesNotMatch(JSON.stringify(r77Finding(report, id)), /sudo|apt-get|go install|brew install|winget/u, `${id}: no install command text`);
+  });
+});
+// W7-2: the attended action is a capability contract, not a hard-coded install command.
+function w7NoSudoActions() {
+  const actions = [];
+  for (const platform of ["linux", "darwin", "win32"]) {
+    for (const mode of ["missing", "incompatible"]) {
+      const repo = root();
+      try {
+        const everyInstaller = (name) => `/tools/${name}`;
+        const nodeBad = mode === "missing" ? () => ({ ok: false, status: "binary_missing" }) : () => observed("node", "20.0.0", ["spawn-shell-false"]);
+        const gitBad = mode === "missing" ? () => ({ ok: false, status: "binary_missing" }) : () => observed("git", "1.0.0", []);
+        const report = runToolchainPreflight({ rootDir: repo, platform, manifestResult: manifest({ gitleaks: { enabled: true }, "osv-scanner": { enabled: true }, semgrep: { enabled: true } }) }, {
+          probeNodeFn: nodeBad, probeGitFn: gitBad, resolveExecutableFn: () => null, resolveInstallerFn: everyInstaller, scannerProbes: {},
+        });
+        for (const result of report.results) actions.push({ platform, mode, result });
+      } finally { rmSync(repo, { recursive: true, force: true }); }
+    }
+  }
+  return actions;
+}
+const W7_ACTIONABLE = new Set(["binary_missing", "incompatible_version", "incompatible_capability"]);
+check("W7-2a: no returned action text of any tool on any supported platform contains sudo", () => {
+  const actions = w7NoSudoActions();
+  assert.ok(actions.length >= 36);
+  for (const { platform, result } of actions) assert.doesNotMatch(JSON.stringify(result), /sudo/iu, `${platform}/${result.tool}`);
+});
+check("W7-2b: no returned action text contains a fixed version pattern or @latest", () => {
+  for (const { platform, result } of w7NoSudoActions()) {
+    const text = `${result.installCommand ?? ""} ${result.guidance ?? ""}`;
+    assert.doesNotMatch(text, /\d+\.\d+|\d+\.x|@latest|node@\d+|\b(?:newer|or newer)\b.*\d/iu, `${platform}/${result.tool}`);
+    assert.doesNotMatch(text, /apt-get|go install|brew install|winget install|pipx install/u, `${platform}/${result.tool}: no hard-coded command`);
+  }
+});
+check("W7-2c: every actionable result names the tool, its probe, a source hint and the re-read instruction", () => {
+  const actionable = w7NoSudoActions().filter(({ result }) => W7_ACTIONABLE.has(result.status));
+  assert.ok(actionable.length >= 30);
+  for (const { platform, result } of actionable) {
+    const label = `${platform}/${result.tool}`;
+    assert.equal(result.installCommand, null, `${label}: no command string`);
+    assert.equal(result.installAttempted, false, label);
+    assert.ok(result.guidance.includes(result.tool), `${label}: names the tool`);
+    assert.match(result.guidance, /probe: \S+/u, `${label}: names the probe`);
+    assert.match(result.guidance, /source: \S+/u, `${label}: names a source`);
+    assert.match(result.guidance, /run the install yourself/iu, label);
+    assert.match(result.guidance, /re-read the preflight/iu, label);
+  }
+});
+check("W7-2d: the readiness status values are unchanged by the capability contract", () => {
+  for (const { mode, result } of w7NoSudoActions()) {
+    if (result.tool === "license-check") continue;
+    if (result.tool === "node") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_version", `${mode}/node`);
+    else if (result.tool === "git") assert.equal(result.status, mode === "missing" ? "binary_missing" : "incompatible_capability", `${mode}/git`);
+    else assert.equal(result.status, "binary_missing", `${mode}/${result.tool}`);
   }
 });
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 65536 });

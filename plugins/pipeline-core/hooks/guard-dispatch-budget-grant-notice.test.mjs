@@ -14,7 +14,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { planGovernanceScopeDecision, applyGovernanceScopeDecision, observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { appendGrant } from "../lib/dispatch-budget-core.mjs";
-import { checkpointNoticeText, grantStateSentence } from "../lib/dispatch-budget-notice.mjs";
+import { checkpointNoticeText, grantStateSentence, nativeHostBlockedContinuation } from "../lib/dispatch-budget-notice.mjs";
+import { validateNativeGoldfishFinal, NATIVE_GOLDFISH_RETURN_SCHEMA } from "../lib/native-goldfish-host-return.mjs";
 import { grantDispatchBudget } from "../scripts/dispatch-budget-grant.mjs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -287,7 +288,37 @@ test("PF-64: the grant script's success result carries a continuationMessage nam
 test("PF-69: the native-host checkpoint lets a child whose every targeted check is green return succeeded, otherwise blocked with the interim report", () => {
   const text = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
   assert.match(text, /if every targeted check of your briefing is already green and no work remains, return the succeeded contract with your report instead of blocked/u);
-  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "blocked" and an interim report/u);
+  assert.match(text, /otherwise return your final message as exactly one JSON object matching pipeline\.native-goldfish-host-return\.v1 with outcome: "checkpoint" \(changedPaths listing the files changed so far; if no file changed so far, the plain-text stop report is the only legal form\) and a report carrying the condensed report plus a continuation card/u);
+  // D31 pin update: validateNativeGoldfishFinal accepts only succeeded|checkpoint, so asserting "blocked" here pinned a refused word.
   const plain = checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: false });
   assert.doesNotMatch(plain, /succeeded contract/u, "only the native-host variant changes for PF-69");
+});
+
+// ---- D31 budget notice: the native-host hand-back word must be one the return validator accepts (succeeded | checkpoint).
+const nativeNotice = () => checkpointNoticeText({ ...checkpointArgs, critic: false, nativeHost: true });
+
+test("D31-BUDGET-NOTICE-1: the native-host checkpoint notice names outcome checkpoint and the continuation card", () => {
+  const text = nativeNotice();
+  assert.match(text, /with outcome: "checkpoint"/u);
+  assert.match(text, /changedPaths/u);
+  assert.match(text, /done \/ remaining \/ next step/u);
+  assert.match(text, /CONTINUATION CARD -- done: \.\.\.; remaining: \.\.\.; next step: \.\.\./u);
+  assert.match(text, /no file changed so far, the plain-text stop report is the only legal form/u);
+});
+
+test("D31-BUDGET-NOTICE-2: no native-host budget text instructs outcome blocked any more", () => {
+  assert.doesNotMatch(nativeNotice(), /outcome: "blocked"/u);
+  for (const remaining of [0, 3]) assert.doesNotMatch(nativeHostBlockedContinuation(remaining), /outcome: "blocked"/u);
+});
+
+test("D31-BUDGET-NOTICE-3: a final built exactly as the notice describes validates against the real return validator with allowCheckpoint", () => {
+  const outcome = /with outcome: "(\w+)"/u.exec(nativeNotice())?.[1];
+  const binding = { dispatchId: "D31-NOTICE", candidateCommit: "a".repeat(40), allowedPaths: ["a.txt", "b.txt"] };
+  const final = JSON.stringify({
+    schema: NATIVE_GOLDFISH_RETURN_SCHEMA, dispatchId: binding.dispatchId, candidateCommit: binding.candidateCommit, outcome,
+    report: "done: a; remaining: b; next step: c. CONTINUATION CARD -- done: a; remaining: b; next step: c", changedPaths: ["a.txt", "b.txt"],
+  });
+  const verdict = validateNativeGoldfishFinal(final, { binding, allowCheckpoint: true });
+  assert.equal(verdict.ok, true, JSON.stringify(verdict));
+  assert.equal(verdict.final.outcome, "checkpoint");
 });

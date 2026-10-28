@@ -125,9 +125,40 @@ export function isHalfMovedRepairCommand(command, root, dependencies = {}) {
   try {
     const words = simpleWords(command, root);
     if (!words || words[0] !== "git") return false;
+    return isHalfMovedRepairArgv(words.slice(1), root, dependencies);
+  } catch { return false; }
+}
+
+/**
+ * W7 Slice B parity (PowerShell): the pure Windows spelling step. Returns the root-relative POSIX spelling of one operand, or
+ * null. Accepts both separators; a drive-absolute spelling only when it is strictly under `windowsRoot` (prefix compared
+ * case-insensitively, the returned remainder keeps its case for the physical check). Refuses UNC / extended-length / rooted
+ * spellings, any colon beyond the drive, tilde (8.3 short names), and empty, dot, parent or trailing-dot/space segments.
+ */
+export function halfMovedWindowsOperandRelative(word, windowsRoot) {
+  if (typeof word !== "string" || word === "" || /[\0*?[\]{}~$`!#&|;<>"'\s@]/u.test(word)) return null;
+  const drive = /^[A-Za-z]:[\\/]/u.test(word);
+  if ((drive ? word.slice(3) : word).includes(":")) return null;
+  if (!drive && /^[\\/]/u.test(word)) return null;
+  const segments = word.replaceAll("\\", "/").split("/");
+  if (segments.slice(drive ? 1 : 0).some((segment) => segment === "" || segment === "." || segment === ".." || /[. ]$/u.test(segment))) return null;
+  if (!drive) return segments.join("/");
+  if (typeof windowsRoot !== "string" || !/^[A-Za-z]:[\\/]/u.test(windowsRoot)) return null;
+  const rootSegments = windowsRoot.replaceAll("\\", "/").replace(/\/+$/u, "").split("/");
+  if (segments.length <= rootSegments.length
+    || !rootSegments.every((segment, index) => segment.toLowerCase() === segments[index].toLowerCase())) return null;
+  return segments.slice(rootSegments.length).join("/");
+}
+
+/**
+ * The operand validator, split out of the POSIX tokenizer: `argv` is the dequoted argument vector after `git`, exactly
+ * `["mv", A, B]` or `["restore", P]`. `options.windows` first maps each operand through halfMovedWindowsOperandRelative.
+ */
+export function isHalfMovedRepairArgv(argv, root, dependencies = {}, options = {}) {
+  try {
     let operands;
-    if (words[1] === "mv" && words.length === 4) operands = [words[2], words[3]];
-    else if (words[1] === "restore" && words.length === 3) operands = [words[2]];
+    if (argv[0] === "mv" && argv.length === 3) operands = [argv[1], argv[2]];
+    else if (argv[0] === "restore" && argv.length === 2) operands = [argv[1]];
     else return false;
     const dirs = w04BoundFeatureDirectories(root);
     const bound = w04BoundAuthorityPaths(root);
@@ -136,8 +167,13 @@ export function isHalfMovedRepairCommand(command, root, dependencies = {}) {
     const lstat = dependencies.lstatSyncFn ?? lstatSync;
     const realRoot = realpath(root);
     const resolved = [];
-    for (const word of operands) {
-      if (word === "" || word.startsWith("-") || /[\0\\*?[\]{}~$`!#&|;<>"'\s]/u.test(word)) return false;
+    for (const operand of operands) {
+      let word = operand;
+      if (options.windows === true) {
+        word = halfMovedWindowsOperandRelative(operand, dependencies.halfMovedWindowsRoot ?? (process.platform === "win32" ? root : null));
+        if (word === null) return false;
+      }
+      if (typeof word !== "string" || word === "" || word.startsWith("-") || /[\0\\*?[\]{}~$`!#&|;<>"'\s]/u.test(word)) return false;
       if (word.split("/").includes("..")) return false;
       const absolute = resolve(root, word);
       const rel = relative(root, absolute).split(sep).join("/");

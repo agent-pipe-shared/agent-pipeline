@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import { nativeManagedDigest, nativeManagedFault, nativeManagedRepository, nativeManagedCurrentOwner, nativeManagedSourceRef, readNativeManagedSource, readNativeManagedInventory, nativeManagedRegistryPresent, nativeManagedAssociation } from './native-managed-authority-support.mjs';
 import { createSessionAuthorityParticipantPorts } from './session-authority-observers.mjs';
-import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
+import { initializeSessionAuthorityRegistry, migrateSourceUpdatedSessionAuthorityRegistry, withSessionAuthorityBoundary, withSessionAuthorityReadScope, readSessionAuthorityGeneration, reserveSessionAuthorityMember, advanceSessionAuthorityMember, refreshSourceOwnedDispatchAuthorityMember, releaseSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityMemberRecords, inspectSourceOwnedNativeDispatchPendingRecord } from './session-authority-registry.mjs';
 import { inspectSignedDescriptorCustodyRepository } from './worktree-lifecycle.mjs';
 import { inspectNativeGoldfishAuthorityTerminal } from './native-goldfish-host-finalizer.mjs';
 /** Private runner-hook correlation state for native Goldfish host commits. */
@@ -737,11 +737,17 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
     bindingSha256:nativeManagedDigest({repository:{primaryRoot:repository.primaryRoot,commonDir:repository.commonDir},runner:state.runner,sessionId:state.sessionId,correlation:state.toolUseId,dispatchId:state.binding.dispatchId,candidate:state.binding.candidateCommit}),phase:'reserved',sourceFacts:[],pendingSha256:null};
   if(owner.operations.has(name))throw nativeManagedFault('native-authority-duplicate-operation');
   owner.assurance=current.assurance;
+  // PF-86: the boundary-independent git read runs before the registry lock; a fault falls back to the in-boundary read.
+  let prescan=null;
+  let facts=null;
+  if(state.delivery){try{const pre=resolveGovernedItemQueue({root:state.root});prescan=prescanCommitIntegratedSlices({repository,governed:pre});facts=prescanAdmissionFacts({repository,governed:pre,dependsOn:pre.status==='required'?(pre.normalized.slices.find(row=>row.id===state.delivery.sliceId)?.dependsOn??[]):[]});}catch{facts=null;}}
   return withSessionAuthorityBoundary({repository},boundary=>{
     if(state.runner==="codex"){state.configuredRoute=configuredNativeCodexRoute(state);state.schema=NATIVE_GOLDFISH_CONFIGURED_HOST_STATE_SCHEMA;}
     if(state.delivery){
       const governed=resolveGovernedItemQueue({root:state.root});
       if(governed.status!=='required'||governed.sha256!==state.delivery.queueSha256)throw nativeManagedFault('item-delivery-queue-drift');
+      adoptPrescanInBoundary({boundary,repository,governed,prescan});
+      adoptAdmissionFacts({boundary,repository,governed,facts});
       if(current.association.state!=='bound')throw nativeManagedFault('item-delivery-owner-unbound');
       const item=governed.normalized.slices.find(row=>row.id===state.delivery.sliceId);
       if(!item||item.state!=='ready')throw nativeManagedFault('item-delivery-not-ready');
@@ -1559,6 +1565,43 @@ export function memoPerAdmission(boundary,key,compute){
   let memo=admissionMemos.get(boundary);if(!memo){memo=new Map();admissionMemos.set(boundary,memo);}
   if(!memo.has(key))memo.set(key,compute());
   return memo.get(key);
+}
+// PF-86: the commit-evidence git read needs no registry boundary, so it runs BEFORE the lock and is adopted inside the boundary
+// only when the queue digest and the candidate commit still match (its validity key); otherwise it is re-read under the boundary.
+export function prescanCommitIntegratedSlices({repository,governed,read=readOrchestratorCommitIntegratedSlices}){
+  if(governed?.status!=='required')return null;
+  return {queueSha256:governed.sha256,candidateCommit:repository.candidate.commit,integrated:read({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices})};
+}
+export function adoptPrescanInBoundary({boundary,repository,governed,prescan,read=readOrchestratorCommitIntegratedSlices}){
+  const key=JSON.stringify(['commit-integrated',governed.sha256,repository.candidate.commit]);
+  if(prescan&&prescan.queueSha256===governed.sha256&&prescan.candidateCommit===repository.candidate.commit){
+    memoPerAdmission(boundary,key,()=>prescan.integrated);return {status:'reused'};
+  }
+  memoPerAdmission(boundary,key,()=>read({root:repository.primaryRoot,candidateCommit:repository.candidate.commit,slices:governed.normalized.slices}));
+  return {status:prescan?'recomputed-after-drift':'computed'};
+}
+// PF-86 c2: the registry-dependent admission facts (integrated slices for the item's dependencies, the settled set, the member records
+// they read) are computed through the lock-free registry read scope and carried with the registry generation, the queue digest and the
+// candidate commit. They are adopted into the per-admission memo under the real boundary only when all three still match; otherwise the
+// ordinary in-boundary reads run (one bounded re-read, never an adoption of stale facts). A fault in the scan returns null: same fallback.
+export function prescanAdmissionFacts({repository,governed,dependsOn=[],slowScan=null}){
+  if(governed?.status!=='required')return null;
+  const {result,generation}=withSessionAuthorityReadScope({repository},boundary=>{
+    if(typeof slowScan==='function')slowScan();
+    readNativeIntegratedSlices({governed,repository,boundary,only:new Set(dependsOn)});
+    readSettledItemSliceIds({repository,boundary,governed});
+    return [...(admissionMemos.get(boundary)??new Map())];
+  });
+  return {generation,queueSha256:governed.sha256,candidateCommit:repository.candidate.commit,entries:result};
+}
+export function adoptAdmissionFacts({boundary,repository,governed,facts}){
+  if(!facts)return {status:'computed'};
+  let current=null;try{current=readSessionAuthorityGeneration({repository});}catch{current=null;}
+  if(current!==null&&facts.generation===current&&facts.queueSha256===governed.sha256&&facts.candidateCommit===repository.candidate.commit){
+    for(const [key,value] of facts.entries)memoPerAdmission(boundary,key,()=>value);
+    return {status:'reused'};
+  }
+  return {status:'recomputed-after-drift'};
 }
 // D182: every member record is a full registry read (about 0.8 s each with 25 members). The integrated-slice computation and the
 // released-reservation read both walked all members, and the computation itself ran once per (skipCancelled, only) shape, so one

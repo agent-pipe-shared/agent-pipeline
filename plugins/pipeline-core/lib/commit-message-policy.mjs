@@ -82,6 +82,8 @@ const SESSION_URL = /https?:\/\/(?:claude\.ai|chat\.openai\.com|chatgpt\.com|gem
 const MARKER_KEY = "AI-Assisted";
 const MARKER_VALUE = "true";
 const DISPATCH_KEY = "Dispatch";
+const CHECKPOINT_KEY = "Checkpoint-Act";
+const CHECKPOINT_VALUE = "elephant";
 const DISPATCH_VALUE = /^(\S+) \((goldfish|critic|elephant-generated)\)$/u;
 const PROVENANCE_SIGNAL = /^\s*(?:AI-Assisted|Dispatch)\s*:/imu;
 export const ELEPHANT_EXCEPTION_DISPATCH = /^D[1-9][0-9]{0,3} \(elephant-exception\)$/u;
@@ -168,7 +170,12 @@ export function finishedCommitMessageFindings(message, {
       });
     }
   }
-  if (requireDispatch || enforceProvenance) {
+  // D52: the exact checkpoint pair needs no Dispatch entry. Path-neutral on purpose: path
+  // enforcement belongs to dispatch-authorship-verify and checkpoint-commit.mjs.
+  const checkpointPair = trailers.length === 2
+    && trailers.some((entry) => entry.key === MARKER_KEY && entry.value === MARKER_VALUE)
+    && trailers.some((entry) => entry.key === CHECKPOINT_KEY && entry.value === CHECKPOINT_VALUE);
+  if ((requireDispatch || enforceProvenance) && !checkpointPair) {
     const dispatches = trailers.filter((entry) => entry.key === DISPATCH_KEY);
     if (dispatches.length === 0) {
       findings.push({ code: "GIT-03-DISPATCH-MISSING", detail: "no `Dispatch:` entry in the final Git trailer block" });

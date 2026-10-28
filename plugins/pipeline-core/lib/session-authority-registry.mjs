@@ -329,6 +329,22 @@ export function releaseSessionAuthorityLock({repository:input,reason,judge=judge
 }
 
 export function withSessionAuthorityBoundary({repository:input},callback){const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-boundary-callback');const active=boundaryContext.getStore();if(active&&boundaryBrands.has(active.token)){if(!equal(active.repository,repo))fail('SDC-ROOT','nested-boundary-repository');return callback(active.token);}const path=LOCK_PATH,{abs,nativeLock}=acquireRegistryLock(repo,'pipeline.session-authority-lock.v2','registry-lock-held');const lock=readRaw(repo,path).ref;const token=Object.freeze({});const data={repository:repo,token,...(process.platform==='win32'?{nativeWitnesses:new Map([[abs,nativeLock.nativeFacts]])}:{})};boundaryBrands.set(token,data);try{return withCustodyTopologyScope(()=>boundaryContext.run(data,()=>{if(!migrateSourceUpdatedCatalogue(repo))healDriftedCatalogue(repo);const result=callback(token);if(result&&typeof result.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-boundary');return result;}));}finally{boundaryBrands.delete(token);if(!equal(readRaw(repo,path).ref,lock))fail('SDC-LOCK-HELD','registry-lock-ownership-changed');if(data.retainDomainTransition===true)fail('SDC-LOCK-HELD','domain-transition-partial-effect-retained');if(process.platform==='win32')nativeLockRemove(abs,lock,nativeLock);else{unlinkSync(abs);syncDirectory(dirname(abs));}}}
+// PF-86 c2: a read path WITHOUT the registry lock. The generation is the digest of the catalogue record reference (every producer or
+// member change republishes it), read before and after the scan; a scan whose generation moved is refused, never returned. The
+// token it hands the callback is a read-only brand for the inspect* readers; it never acquires, holds or releases the lock, and it
+// performs no migration or heal. A caller that publishes under the real boundary compares the generation again before adopting.
+export function readSessionAuthorityGeneration({repository:input}){const repo=repository(input);return digest(readRecord(repo,cataloguePath).ref);}
+export function withSessionAuthorityReadScope({repository:input,generationOf=null},callback){
+  const repo=repository(input);if(typeof callback!=='function')fail('SDC-AUTHORITY-UNAVAILABLE','invalid-read-scope-callback');
+  const read=generationOf??(()=>digest(readRecord(repo,cataloguePath).ref));
+  const before=read(),token=Object.freeze({}),data={repository:repo,token,readOnly:true};
+  boundaryBrands.set(token,data);
+  let result;
+  try{result=boundaryContext.run(data,()=>{const value=callback(token);if(value&&typeof value.then==='function')fail('SDC-AUTHORITY-UNAVAILABLE','asynchronous-read-scope');return value;});}
+  finally{boundaryBrands.delete(token);}
+  const after=read();if(after!==before)fail('SDC-AUTHORITY-CAS','read-generation-drift');
+  return {result,generation:after};
+}
 function boundary(token){const found=boundaryBrands.get(token);if(!found||boundaryContext.getStore()?.token!==token)fail('SDC-AUTHORITY-UNAVAILABLE','expired-boundary');repository(found.repository);return found.repository;}
 export function isActiveSourceOwnedSessionAuthorityBoundary({boundary:token,rootDir}={}) {
   const found=boundaryBrands.get(token);

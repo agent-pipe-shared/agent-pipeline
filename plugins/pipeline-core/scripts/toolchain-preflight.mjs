@@ -77,49 +77,28 @@ const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-c
 const STATUS_PRECEDENCE = Object.freeze(["execution_environment", "untrusted_path", "binary_missing", "input_missing", "probe_timeout", "probe_error", "incompatible_version", "incompatible_capability"]);
 const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"] });
 const GUIDANCE = Object.freeze({
-  linux: { node: "Install Node.js 24 or newer from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install OSV-Scanner 2.x in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
-  darwin: { node: "Install Node.js 24 or newer through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install managed OSV-Scanner 2.x.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
-  win32: { node: "Install Node.js 24 or newer through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install managed OSV-Scanner 2.x.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
+  linux: { node: "Install a Node.js release that meets the pipeline minimum from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install a supported OSV-Scanner major release in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
+  darwin: { node: "Install a Node.js release that meets the pipeline minimum through the managed macOS toolchain.", git: "Install Xcode Command Line Tools or managed Git.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
+  win32: { node: "Install a Node.js release that meets the pipeline minimum through the managed Windows toolchain.", git: "Install Git for Windows.", gitleaks: "Install managed Gitleaks.", "osv-scanner": "Install a managed OSV-Scanner of the supported major release.", semgrep: "Install managed Semgrep.", "license-check": "Create the configured license inputs." },
   unsupported: { node: "Use a supported linux, darwin, or win32 runner.", git: "Use a supported linux, darwin, or win32 runner.", gitleaks: "Use a supported runner.", "osv-scanner": "Use a supported runner.", semgrep: "Use a supported runner.", "license-check": "Use a supported runner." },
 });
 const INSTALLER_NAMES = Object.freeze(["apt-get", "brew", "go", "pipx", "sudo", "winget"]);
 
-function installCommandFor(platform, tool, installers) {
-  const has = (name) => installers.has(name);
-  if (platform === "linux") {
-    if (tool === "node" && has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y nodejs";
-    if (tool === "git" && has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y git";
-    if (tool === "gitleaks") {
-      if (has("go")) return "go install github.com/zricethezav/gitleaks/v8@latest";
-      if (has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y golang-go && go install github.com/zricethezav/gitleaks/v8@latest";
-    }
-    if (tool === "osv-scanner") {
-      if (has("go")) return "go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest";
-      if (has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y golang-go && go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest";
-    }
-    if (tool === "semgrep") {
-      if (has("pipx")) return "pipx install semgrep";
-      if (has("apt-get") && has("sudo")) return "sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep";
-    }
-    return null;
-  }
-  if (platform === "darwin") {
-    if (has("brew") && tool === "node") return "brew install node@24";
-    if (tool === "git") return "xcode-select --install";
-    if (has("brew") && ["gitleaks", "osv-scanner", "semgrep"].includes(tool)) return `brew install ${tool}`;
-    if (has("go") && tool === "gitleaks") return "go install github.com/zricethezav/gitleaks/v8@latest";
-    if (has("go") && tool === "osv-scanner") return "go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest";
-    if (has("pipx") && tool === "semgrep") return "pipx install semgrep";
-    return null;
-  }
-  if (platform === "win32") {
-    if (has("winget") && tool === "node") return "winget install OpenJS.NodeJS.LTS";
-    if (has("winget") && tool === "git") return "winget install Git.Git";
-    if (has("go") && tool === "gitleaks") return "go install github.com/zricethezav/gitleaks/v8@latest";
-    if (has("winget") && tool === "osv-scanner") return "winget install Google.OSVScanner";
-    if (has("pipx") && tool === "semgrep") return "pipx install semgrep";
-  }
-  return null;
+// Capability contract (W7-2): the preflight names the tool, the probe that proves it present and the kind of
+// source the human uses. It emits no command string, no sudo and no pinned version; the human installs, then
+// re-reads the preflight. Installer discovery (INSTALLER_NAMES) is still read but no longer shapes a command.
+const PROBES = Object.freeze({ node: "node --version", git: "git --version", gitleaks: "gitleaks version", "osv-scanner": "osv-scanner --version", semgrep: "semgrep --version" });
+const SOURCE_HINTS = Object.freeze({
+  linux: { node: "the distribution package source or the official Node.js download page", git: "the distribution package source", gitleaks: "the official Gitleaks release page or a trusted package source", "osv-scanner": "the official OSV-Scanner release page or a trusted package source", semgrep: "the official Semgrep page or an isolated pipx environment" },
+  darwin: { node: "the managed macOS package source or the official Node.js download page", git: "Xcode Command Line Tools or a managed package source", gitleaks: "a managed macOS package source or the official Gitleaks release page", "osv-scanner": "a managed macOS package source or the official OSV-Scanner release page", semgrep: "a managed macOS package source or an isolated pipx environment" },
+  win32: { node: "the official Node.js download page or a managed Windows package source", git: "the official Git for Windows page", gitleaks: "the official Gitleaks release page", "osv-scanner": "the official OSV-Scanner release page", semgrep: "the official Semgrep page or an isolated pipx environment" },
+});
+function attendedContract(platform, tool) {
+  const probe = PROBES[tool];
+  if (probe === undefined) return null;
+  const source = SOURCE_HINTS[platform]?.[tool] ?? "the vendor's official page";
+  const scannerNote = ["gitleaks", "osv-scanner", "semgrep"].includes(tool) ? " npm is not an approved installer for these scanners." : "";
+  return `Capability contract for ${tool}: probe: ${probe}; source: ${source}. Run the install yourself, then re-read the preflight; the preflight installs nothing and emits no command.${scannerNote}`;
 }
 
 function semver(value) { const match = typeof value === "string" && value.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/); return match ? match.slice(1, 4).map(Number) : null; }
@@ -129,8 +108,9 @@ function result(tool, status, observed = {}) {
 function actionableResult(entry, platform, installers = new Set()) {
   const prerequisiteMissing = !["ready", "not_required"].includes(entry.status);
   const hostBoundaryFailure = ["execution_environment", "probe_timeout", "probe_error"].includes(entry.status);
-  const installCommand = ["binary_missing", "incompatible_version", "incompatible_capability"].includes(entry.status)
-    ? installCommandFor(platform, entry.tool, installers)
+  const installCommand = null;
+  const contract = ["binary_missing", "incompatible_version", "incompatible_capability"].includes(entry.status)
+    ? attendedContract(platform, entry.tool)
     : null;
   const affectedClaim = hostBoundaryFailure
     ? `Toolchain readiness for ${entry.tool} was not observed at the current execution boundary.`
@@ -154,15 +134,13 @@ function actionableResult(entry, platform, installers = new Set()) {
       ? `Create the configured project inputs required by ${entry.tool}.`
       : GUIDANCE[platform][entry.tool]
     : null;
-  const installerGuidance = installCommand === null && ["binary_missing", "incompatible_version", "incompatible_capability"].includes(entry.status)
-    ? " No verified installer chain is available on this host; install a supported package manager or use the official prebuilt binary. npm is not an approved installer for these scanners."
-    : "";
+  const installerGuidance = contract === null ? "" : ` ${contract}`;
   return {
     ...entry,
     affectedClaim,
     installCommand,
     installAttempted: false,
-    guidance: installCommand === null ? `${baseGuidance ?? ""}${installerGuidance}`.trim() : `${baseGuidance} Run: ${installCommand}`,
+    guidance: `${baseGuidance ?? ""}${installerGuidance}`.trim(),
   };
 }
 function readyCompatibility(tool, observed) {
@@ -328,7 +306,7 @@ export function evaluateCapabilityCompleteness(preflightResult, requiredCapabili
  */
 export const ENVIRONMENT_READINESS_SCHEMA = "pipeline.environment-readiness.v1";
 export const GIT_HOOKS_REPAIR_SCHEMA = "pipeline.git-hooks-repair.v1";
-export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable"]);
+export const ENVIRONMENT_FINDING_IDS = Object.freeze(["git-version", "signing-toolchain", "po-key-directory", "trust-anchor-match", "git-hooks", "bound-paths-tracked", "orphan-descriptors", "approval-verifiable", "scanner-gitleaks", "scanner-osv-scanner", "scanner-semgrep"]);
 const FINDING_STATES = Object.freeze(["ok", "repairable", "attended", "unknown"]);
 const MAX_CAUSE_CHARS = 400;
 const MANDATORY_HOOK_IDS = Object.freeze(["pre-push-hook", "pre-commit-hook", "commit-msg-hook"]);
@@ -484,6 +462,21 @@ const pendingOwnerProbe = (findingId) => () => ({
   repair: attendedPrerequisite(`${findingId}-probe`, "the probe for this finding belongs to its owning R7 contract (R7-2, R7-3 or R7-5) and registers through the findingProbes seam; until it ships this finding stays unknown and the report stays non-gating."),
 });
 
+/** One scanner observation per report: reuses runToolchainPreflight's statuses (never a second probe path). A scanner that is
+ * not ready is an attended prerequisite finding, never ok and never clean; the install-command text stays out of this report. */
+const scannerProbe = (tool) => (context) => {
+  context.scanners ??= runToolchainPreflight({
+    rootDir: context.rootDir,
+    manifestResult: { status: "ok", manifest: { security: { scanners: { gitleaks: { enabled: true }, "osv-scanner": { enabled: true }, semgrep: { enabled: true } } } } },
+    platform: context.platform,
+    tempDir: context.tempDir,
+  }, context.deps);
+  const entry = context.scanners.results.find((candidate) => candidate.tool === tool);
+  if (entry?.status === "ready") return { status: "ok", cause: `${tool} ${entry.version ?? "(version unreported)"} is ready`, repair: null };
+  const status = entry?.status ?? "unobserved";
+  return { status: "attended", cause: `${tool} prerequisite status: ${status}`, repair: attendedPrerequisite(`${tool}-installed`, GUIDANCE[platformName(context.platform)][tool]) };
+};
+
 const DEFAULT_FINDING_PROBES = Object.freeze({
   "git-version": gitVersionProbe,
   "signing-toolchain": signingProbe("signing-toolchain"),
@@ -493,6 +486,9 @@ const DEFAULT_FINDING_PROBES = Object.freeze({
   "bound-paths-tracked": pendingOwnerProbe("bound-paths-tracked"),
   "orphan-descriptors": pendingOwnerProbe("orphan-descriptors"),
   "approval-verifiable": pendingOwnerProbe("approval-verifiable"),
+  "scanner-gitleaks": scannerProbe("gitleaks"),
+  "scanner-osv-scanner": scannerProbe("osv-scanner"),
+  "scanner-semgrep": scannerProbe("semgrep"),
 });
 
 export async function runEnvironmentReadinessReport({ rootDir = process.cwd(), platform = process.platform, tempDir = tmpdir() } = {}, deps = {}) {

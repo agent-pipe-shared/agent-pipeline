@@ -40,6 +40,7 @@ import {
   runGeneratorInIsolatedParentTree,
   verifyCommit,
 } from "./dispatch-authorship-verify.mjs";
+import * as verifierNs from "./dispatch-authorship-verify.mjs";
 import { CRITIC_REQUIRED_SCHEMA, CRITIC_SKIP_SCHEMA, CRITIC_TRIGGER_INPUT_SCHEMA } from "../lib/critic-skip-decision.mjs";
 import { authorizeQualityPackageCommit, qualityPackageIntentSha256, SIGNED_QUALITY_PACKAGE_SCHEMA } from "../lib/signed-quality-package.mjs";
 
@@ -1156,4 +1157,58 @@ test("D56-3c the other non-authoring kinds keep their FAIL, so only the attested
   const verdict = verifyCommit(sha, commit({ message: "feat(x): done\n\nDispatch: DOD-ATT-3 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
   assert.equal(verdict.verdict, VERDICT.fail);
   assert.equal(verdict.classification, "record-outcome-does-not-attest-authorship");
+});
+
+// D52: the checkpoint-commit binding. Namespace access keeps a missing export a failing case, not a file-level import error.
+const CP_TRAILERS = "\n\nAI-Assisted: true\nCheckpoint-Act: elephant\n";
+
+test("D52-1 (vi) a Checkpoint-Act commit touching only allowlisted paths binds as checkpoint (elephant)", () => {
+  const verdict = verifyCommit("c".repeat(40), commit({
+    message: `chore(state): checkpoint${CP_TRAILERS}`,
+    paths: ["docs/state.md", "project/pipeline-state.json", "specs/t/slice-queue.json", "specs/t/evidence/accepted-delivery-contract-1.json"],
+  }));
+  assert.equal(verdict.classification, "elephant-checkpoint");
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.assurance, "checkpoint-elephant");
+});
+
+test("D52-2 (vi) the same trailer on a commit that also touches code is refused, naming the offending paths", () => {
+  const verdict = verifyCommit("d".repeat(40), commit({
+    message: `chore(state): checkpoint${CP_TRAILERS}`,
+    paths: ["docs/state.md", "plugins/pipeline-core/scripts/x.mjs", "project/pipeline.json", "specs/t/evidence/run.mjs"],
+  }));
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "elephant-checkpoint-outside-allowlist");
+  assert.deepEqual(verdict.outside, ["plugins/pipeline-core/scripts/x.mjs", "project/pipeline.json", "specs/t/evidence/run.mjs"]);
+});
+
+test("D52-3 (vi) a Checkpoint-Act trailer alongside a Dispatch trailer, a wrong value, a duplicate or an empty path list is refused", () => {
+  const both = verifyCommit("e".repeat(40), commit({ message: "chore: x\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\nCheckpoint-Act: elephant\n", paths: ["docs/state.md"] }));
+  assert.equal(both.verdict, VERDICT.fail);
+  assert.equal(both.classification, "elephant-checkpoint-malformed");
+  const wrong = verifyCommit("e".repeat(40), commit({ message: "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: goldfish\n", paths: ["docs/state.md"] }));
+  assert.equal(wrong.classification, "elephant-checkpoint-malformed");
+  const dup = verifyCommit("e".repeat(40), commit({ message: "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: elephant\nCheckpoint-Act: elephant\n", paths: ["docs/state.md"] }));
+  assert.equal(dup.classification, "elephant-checkpoint-malformed");
+  const empty = verifyCommit("e".repeat(40), commit({ message: `chore: x${CP_TRAILERS}`, paths: [] }));
+  assert.equal(empty.verdict, VERDICT.fail);
+  assert.equal(empty.classification, "elephant-checkpoint-empty");
+});
+
+test("D52-4 the allowlist is one exported constant; protected project files and traversal never match", () => {
+  const ns = verifierNs;
+  assert.equal(typeof ns.isCheckpointPath, "function");
+  assert.ok(ns.CHECKPOINT_ALLOWLIST && Array.isArray(ns.CHECKPOINT_ALLOWLIST.exact));
+  for (const ok of ["docs/state.md", "project/pipeline-state.json", "specs/a-b/slice-queue.json", "specs/a-b/evidence/x/y.json"]) assert.equal(ns.isCheckpointPath(ok), true, ok);
+  for (const bad of ["project/pipeline.json", "project/guard-config.json", ".claude/pipeline.json", "specs/a/evidence/../../x", "specs/a/spec.md", "plugins/x/y.mjs", "specs/a/evidence/run.mjs", "/docs/state.md", "docs/state.md/x"]) assert.equal(ns.isCheckpointPath(bad), false, bad);
+});
+
+test("D52-5 (vii) the existing stage-0, design and administrative bindings are unchanged", () => {
+  const stage0 = verifyCommit("f".repeat(40), commit({ message: "fix(x): y\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n", paths: ["docs/state.md"] }));
+  assert.equal(stage0.classification, "elephant-direct-declared");
+  assert.equal(stage0.verdict, VERDICT.pass);
+  const design = verifyCommit("f".repeat(40), commit({ message: "docs(x): y\n\nDispatch: design (elephant)\nAI-Assisted: true\n", paths: ["specs/a/spec.md"] }));
+  assert.equal(design.classification, "elephant-direct-declared");
+  const undeclared = verifyCommit("f".repeat(40), commit({ message: "docs(x): y\n", paths: ["docs/state.md"] }));
+  assert.equal(undeclared.classification, "elephant-direct-undeclared");
 });

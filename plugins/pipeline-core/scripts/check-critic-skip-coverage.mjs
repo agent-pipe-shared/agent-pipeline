@@ -188,8 +188,12 @@ function terminalAuthoredDelivery(record) {
     && Array.isArray(record?.commits) && record.commits.length > 0
     && record.commits.at(-1) === record.candidateCommit;
   if (record?.schema === PREVIOUS_DISPATCH_RECORD_SCHEMA) return delivered;
-  return record?.schema === DISPATCH_RECORD_SCHEMA
-    && record?.outcomeClassification?.kind === "authored-commit" && delivered;
+  return record?.schema === DISPATCH_RECORD_SCHEMA && delivered
+    && (record?.outcomeClassification?.kind === "authored-commit"
+      || record?.outcomeClassification?.kind === "orchestrator-attested");
+}
+function admittedKindOf(record) {
+  return record?.schema === DISPATCH_RECORD_SCHEMA ? record.outcomeClassification.kind : null;
 }
 
 function verifyCandidateDescendsFromRecord(root, recordCandidate, reviewCandidate, options = {}) {
@@ -344,6 +348,7 @@ export function createLocalDispatchEvidenceBinding({ root, taskId, reviewCandida
     recordSha256: entry.sha256,
     sourceCandidateCommit: record.candidateCommit,
     reviewCandidateCommit,
+    assurance: admission.assurance === "orchestrator-attested" ? "orchestrator-attested" : null,
   };
   return Object.freeze({ ...binding, snapshotId: sha256Canonical(binding) });
 }
@@ -537,7 +542,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
     if (localDispatchEvidence !== undefined) {
       try {
         exactObject(localDispatchEvidence, ["schema", "taskId", "recordPath", "recordSha256",
-          "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"], "private local dispatch evidence");
+          "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"], "private local dispatch evidence");
       } catch {
         return "Critic packet private local dispatch snapshot does not bind the exact immutable dispatch record";
       }
@@ -548,6 +553,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
         recordSha256: localDispatchEvidence.recordSha256,
         sourceCandidateCommit: localDispatchEvidence.sourceCandidateCommit,
         reviewCandidateCommit: localDispatchEvidence.reviewCandidateCommit,
+        assurance: localDispatchEvidence.assurance,
       };
       const packetCandidate = bound.packet.candidate?.commit;
       const expectedPath = `evidence/dispatch-record-${addendum.taskId}.json`;
@@ -563,6 +569,7 @@ function boundCriticReviewFinding(root, addendum, recordBytes, options = {}) {
         || localDispatchEvidence.sourceCandidateCommit !== sourceRecord?.candidateCommit
         || localDispatchEvidence.reviewCandidateCommit !== addendum.reviewCandidateCommit
         || localDispatchEvidence.reviewCandidateCommit !== packetCandidate
+        || (localDispatchEvidence.assurance !== null && localDispatchEvidence.assurance !== "orchestrator-attested")
         || localDispatchEvidence.snapshotId !== sha256Canonical(binding)
         || bound.packet.request?.taskId !== addendum.taskId
         || !Array.isArray(bound.packet.references)
@@ -816,6 +823,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
   const pendingRecordPaths = [];
   let targetRecordCandidateCommit = null;
   let admittedByDescendant = false;
+  let admittedRecordKind = null;
   if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
   if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
 
@@ -864,13 +872,18 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
         const addendumFinding = resolvedCriticAddendumFinding(root, entry, addendum, options);
         if (addendumFinding) findings.push(addendumFinding);
         else coveredRecordCount += 1;
+      } else if (record.taskId === taskId && record.candidateCommit === candidateCommit && isV4
+        && !["authored-commit", "orchestrator-attested"].includes(record.outcomeClassification.kind)) {
+        targetRecordCandidateCommit = record.candidateCommit;
+        findings.push(`${path}: a v4 ${record.outcomeClassification.kind} record does not deliver an authored commit and cannot admit a review at its candidate`);
       } else if (record.taskId === taskId && record.candidateCommit === candidateCommit) {
         targetRecordCandidateCommit = record.candidateCommit;
         admittedCount += 1;
+        admittedRecordKind = admittedKindOf(record);
       } else if (record.taskId === taskId && terminalAuthoredDelivery(record)) {
         targetRecordCandidateCommit = record.candidateCommit;
         const ancestry = verifyCandidateDescendsFromRecord(root, record.candidateCommit, candidateCommit, options);
-        if (ancestry.ok) { admittedCount += 1; admittedByDescendant = true; }
+        if (ancestry.ok) { admittedCount += 1; admittedByDescendant = true; admittedRecordKind = admittedKindOf(record); }
         else if (ancestry.finding) findings.push(`${path}: ${ancestry.finding}`);
         else findings.push(`${path}: requested review candidate is not a descendant of the record's original candidateCommit`);
       } else if (record.taskId === taskId) {
@@ -902,14 +915,16 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
   if (signedImportAnchor !== null) admittedCount = 1;
   if (admittedCount !== 1) {
     const missingRecordHint = admittedCount === 0
-      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none; a range with no dispatch history has no admitted route yet and needs a PO decision (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
       : "";
     findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
   }
   const ok = findings.length === 0 && admittedCount === 1;
   return { ok, finding: !ok, taskId, candidateCommit, admittedCount, applicableRecordCount, coveredRecordCount,
     pendingRecordCount, pendingRecordPaths, administrativelyRetiredRecordCount, targetRecordCandidateCommit,
-    admittedByDescendant, readFindings: findings };
+    admittedByDescendant, admittedRecordKind: admittedCount === 1 ? admittedRecordKind : null,
+    assurance: admittedCount === 1 && admittedRecordKind === "orchestrator-attested" ? "orchestrator-attested" : null,
+    readFindings: findings };
 }
 
 

@@ -11745,6 +11745,96 @@ test("HM-6 without a readable bound feature directory in the state the repair la
   }
 });
 
+// W7 Slice B parity (item half-moved-feature-directory-locks-every-shell-and-source-write): the same two repair commands under the
+// PowerShell tool. NOTE: for PowerShell the lifecycle gate is never reached (evaluate.mjs returns powerShellScopeVerdict first), so the
+// dialect itself observes readiness and admits only on a session-intent PORG-INVALID-OBSERVATION.
+import * as hmpsWs from "../lib/guard/write-scope.mjs";
+import { win32 as hmpsWin32 } from "node:path";
+function hmPs(path, commandLine, outcome = "invalid") { return qw04Run(path, "PowerShell", { CommandLine: commandLine }, outcome); }
+
+test("HMPS-1 an invalid session observation admits git mv and git restore under PowerShell inside the bound feature directory", () => {
+  const path = hmRoot();
+  for (const command of [
+    "git mv specs/f/a.md specs/f/b.md", "git mv specs/f/a.md specs/f/sub/a.md", "git restore specs/f/a.md",
+    "git restore specs/f/not-yet.md", "git.exe mv specs/f/a.md specs/f/b.md", "git mv 'specs/f/a.md' \"specs/f/b.md\"",
+  ]) {
+    const result = hmPs(path, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+  }
+});
+
+test("HMPS-2 backslash separated relative spellings are admitted", () => {
+  const path = hmRoot();
+  for (const command of [
+    `git mv ${hmpsWin32.join("specs", "f", "a.md")} ${hmpsWin32.join("specs", "f", "b.md")}`,
+    `git restore ${hmpsWin32.join("specs", "f", "a.md")}`,
+  ]) {
+    const result = hmPs(path, command);
+    assert.equal(result.exitCode, 0, `${command}: ${result.stderr}`);
+  }
+});
+
+test("HMPS-3 a drive-absolute path is admitted only when it normalises strictly under the root", () => {
+  const winRoot = "C:\\work\\proj";
+  const rel = (word) => hmpsWs.halfMovedWindowsOperandRelative(word, winRoot);
+  assert.equal(rel(hmpsWin32.join(winRoot, "specs", "f", "a.md")), "specs/f/a.md");
+  assert.equal(rel("c:\\WORK\\Proj\\specs\\f\\a.md"), "specs/f/a.md", "prefix compared case-insensitively");
+  assert.equal(rel("C:/work/proj/specs/f/a.md"), "specs/f/a.md");
+  for (const word of [
+    "C:\\work\\proj", "C:\\work\\proj\\", "C:\\work\\project\\specs\\f\\a.md", "D:\\work\\proj\\specs\\f\\a.md",
+    "C:\\work\\proj\\specs\\..\\..\\x.md", "C:\\work\\other\\specs\\f\\a.md", "\\specs\\f\\a.md", "/specs/f/a.md",
+  ]) assert.equal(rel(word), null, word);
+  assert.equal(hmpsWs.halfMovedWindowsOperandRelative("C:\\work\\proj\\specs\\f\\a.md", null), null, "no Windows root: fail closed");
+  const path = hmRoot();
+  const result = evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { CommandLine: "git mv C:\\work\\proj\\specs\\f\\a.md C:\\work\\proj\\specs\\f\\b.md" } }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn: QW04_OUTCOMES.invalid, halfMovedWindowsRoot: winRoot,
+  });
+  assert.equal(result.exitCode, 0, result.stderr);
+  assert.equal(hmPs(path, "git mv C:\\work\\proj\\specs\\f\\a.md C:\\work\\proj\\specs\\f\\b.md").exitCode, 2, "POSIX host without a Windows root refuses drive paths");
+});
+
+test("HMPS-4 traversal, UNC, other volume, extended-length prefix, ADS, 8.3, trailing dot, link escape, options, aliases, chaining and expansion are refused", () => {
+  const path = hmRoot();
+  symlinkSync(join(path, "src"), join(path, "specs", "f", "escape"), "dir");
+  for (const command of [
+    "git mv specs\\f\\..\\..\\src\\a.md specs\\f\\b.md", "git mv specs/f/a.md ..\\outside.md",
+    "git mv \\\\server\\share\\specs\\f\\a.md specs\\f\\b.md", "git mv D:\\other\\specs\\f\\a.md specs\\f\\b.md",
+    "git mv \\\\?\\C:\\proj\\specs\\f\\a.md specs\\f\\b.md", "git mv specs/f/a.md:stream specs/f/b.md",
+    "git mv specs/f/SPECS~1.md specs/f/b.md", "git mv specs/f/a.md. specs/f/b.md", "git mv specs/f./a.md specs/f/b.md",
+    "git mv specs\\f\\escape\\a.md specs\\f\\b.md", "git mv -f specs/f/a.md specs/f/b.md", "git restore --staged specs/f/a.md",
+    "git restore src/prod.mjs", "git rm specs/f/a.md", "git checkout -- specs/f/a.md",
+    "Move-Item specs/f/a.md specs/f/b.md", "mv specs/f/a.md specs/f/b.md", "move specs\\f\\a.md specs\\f\\b.md", "mi specs/f/a.md specs/f/b.md",
+    "git mv specs/f/a.md specs/f/b.md ; git mv specs/f/b.md specs/f/c.md", "git mv specs/f/a.md specs/f/b.md && git restore specs/f/a.md",
+    "git mv $env:TEMP\\a.md specs/f/b.md", "git mv specs/f/a`.md specs/f/b.md", "git mv specs/f/a.md specs/f/b.md | cat",
+    "C:\\tools\\git.exe mv specs/f/a.md specs/f/b.md",
+  ]) {
+    const result = hmPs(path, command);
+    assert.equal(result.exitCode, 2, `admitted: ${command}`);
+    assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, command);
+  }
+});
+
+test("HMPS-5 session intent PORG-INVALID-OBSERVATION only: bootstrap intent, partial, drift and a ready lifecycle stay refused", () => {
+  const path = hmRoot();
+  for (const outcome of ["invalidBootstrapIntent", "partial", "drift"]) {
+    for (const command of ["git mv specs/f/a.md specs/f/b.md", "git restore specs/f/a.md"]) {
+      assert.equal(hmPs(path, command, outcome).exitCode, 2, `${outcome}: ${command}`);
+    }
+  }
+  const ready = evaluateLifecycleReadyGuard({ tool_name: "PowerShell", tool_input: { CommandLine: "git mv specs/f/a.md specs/f/b.md" } }, {
+    projectDir: path, runner: "claude", requireProjectOnboardingReadyFn() { return {}; },
+  });
+  assert.equal(ready.exitCode, 2, "a ready lifecycle gets no git through the PowerShell dialect");
+});
+
+test("HMPS-6 without a readable bound feature directory the PowerShell repair lane admits nothing", () => {
+  for (const state of [null, "{ not json", { schema: "pipeline.state.v0", activeFeature: { id: "f", planPath: "docs/prd-bound.md" }, planApproved: true }]) {
+    const path = hmRoot(state);
+    assert.equal(hmPs(path, "git mv specs/f/a.md specs/f/b.md").exitCode, 2, `state ${JSON.stringify(state)}`);
+    assert.equal(hmPs(path, "git restore specs/f/a.md").exitCode, 2, `state ${JSON.stringify(state)} restore`);
+  }
+});
+
 // ALFRED-QP4-BUILD2: tests for the fourth signed quality package (appended to the HEAD test file); re-scoped to the guard-side changes only.
 // Contract: scratch/qp4/false-positives.md. The refusal label GUARD-READ-SCOPE-OUTSIDE-ROOT used to be printed for EVERY non-admitted single read-family
 // command (isRejectedReadFamilyCommand), so R1-R3/R6 were never outside-root reads: they are refused for rg flags the closed grammar does not know

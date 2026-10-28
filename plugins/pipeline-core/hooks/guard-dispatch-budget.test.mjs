@@ -676,7 +676,8 @@ test("ALF-G2B2: under native-host the exhaustion refusal names the host-commit r
   assert.match(text, /leave all changes uncommitted/u);
   assert.match(text, /do not write a dispatch record/u);
   assert.ok(text.includes(NATIVE_RETURN_SCHEMA));
-  assert.match(text, /outcome: "blocked"/u);
+  // D31 pin update: the return validator accepts only succeeded|checkpoint, so the instructed word is "checkpoint".
+  assert.match(text, /outcome: "checkpoint"/u);
   assert.doesNotMatch(text, /only these acts are permitted/u);
   assert.doesNotMatch(text, /goldfish-commit-command-flow/u);
   assert.doesNotMatch(text, /sanctioned public writer/u);
@@ -698,7 +699,8 @@ test("ALF-G2B2: the 80 % checkpoint notice branches on the commit mode and stays
     assert.match(context, /leave all changes uncommitted/u);
     assert.match(context, /do not write a dispatch record/u);
     assert.ok(context.includes(NATIVE_RETURN_SCHEMA));
-    assert.match(context, /outcome: "blocked"/u);
+    // D31 pin update: same validator contract (succeeded|checkpoint only).
+    assert.match(context, /outcome: "checkpoint"/u);
     assert.doesNotMatch(context, /commit what is already green/u);
     assert.doesNotMatch(context, /evidence\/dispatch-record-<TASK_ID>/u);
   }

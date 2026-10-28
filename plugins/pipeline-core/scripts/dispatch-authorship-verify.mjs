@@ -153,6 +153,33 @@ export const ELEPHANT_STAGE0_ID = "stage-0";
 export const ELEPHANT_STAGE0_MAX_PATHS = 10;
 
 /**
+ * D52: the paths a `Checkpoint-Act: elephant` commit may touch. ONE constant, read by both
+ * `checkpoint-commit.mjs` (which refuses to stage anything else) and `verifyCommit` (which
+ * refuses the trailer on a commit that touches anything else), so a hand-written trailer cannot
+ * smuggle code. Deliberately narrow and easy to shrink: delete an entry. Gate-strength files
+ * (`project/pipeline.json`, `project/guard-config.json`, ...) are NOT here and never match.
+ * Executable extensions are refused even under `evidence/`, so evidence cannot carry code.
+ */
+export const CHECKPOINT_ALLOWLIST = Object.freeze({
+  exact: Object.freeze(["docs/state.md", "project/pipeline-state.json"]),
+  patterns: Object.freeze([
+    /^specs\/[A-Za-z0-9._-]+\/slice-queue\.json$/u,
+    /^specs\/[A-Za-z0-9._-]+\/evidence\/.+$/u,
+  ]),
+  deniedExtensions: Object.freeze([".mjs", ".js", ".cjs", ".ts", ".sh", ".bash", ".ps1", ".py"]),
+});
+
+/** True when a repo-relative, forward-slash path may ride a checkpoint commit. */
+export function isCheckpointPath(path) {
+  if (typeof path !== "string" || path === "" || path.startsWith("/") || path.includes("\\") || path.includes("\0")) return false;
+  if (path.split("/").some((segment) => segment === ".." || segment === "." || segment === "")) return false;
+  if (CHECKPOINT_ALLOWLIST.exact.includes(path)) return true;
+  const lower = path.toLowerCase();
+  if (CHECKPOINT_ALLOWLIST.deniedExtensions.some((ext) => lower.endsWith(ext))) return false;
+  return CHECKPOINT_ALLOWLIST.patterns.some((pattern) => pattern.test(path));
+}
+
+/**
  * Direction 3 Option B (`2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-
  * vouches-for.md`): `Dispatch: <generator-script-path> (elephant-generated)` is verified by
  * MECHANICAL PROOF rather than trust — re-running the named script against the commit's
@@ -343,6 +370,34 @@ export function verifyCommit(sha, deps) {
   if (hasAdministrativeDispatch(message)) {
     const inspected = inspectAdministrativeCommit({repoRoot:deps.repoRoot,message,commitSha:sha});
     return result(sha,inspected.ok ? VERDICT.pass : VERDICT.fail,"elephant-administrative",inspected.code);
+  }
+  const checkpointActs = finalBlock.filter((entry) => entry.key.toLowerCase() === "checkpoint-act");
+  if (checkpointActs.length > 0) {
+    // D52: a checkpoint commit of runtime files, evidence or the handover. A distinct, weaker class than a
+    // dispatch record: it vouches for nothing about code, and the path allowlist is what keeps it so.
+    const alsoDispatch = finalBlock.some((entry) => entry.key.toLowerCase() === "dispatch");
+    if (checkpointActs.length !== 1 || checkpointActs[0].value !== "elephant" || alsoDispatch) {
+      return result(sha, VERDICT.fail, "elephant-checkpoint-malformed",
+        "exactly one `Checkpoint-Act: elephant` trailer is admitted, and never together with a `Dispatch:` trailer: two authorship claims on one commit are not resolved here");
+    }
+    let checkpointPaths;
+    try {
+      checkpointPaths = readChangedPaths(sha);
+    } catch (error) {
+      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`);
+    }
+    if (checkpointPaths.length === 0) {
+      return result(sha, VERDICT.fail, "elephant-checkpoint-empty", "a checkpoint commit with no changed path binds nothing");
+    }
+    const outside = checkpointPaths.filter((path) => !isCheckpointPath(path));
+    if (outside.length > 0) {
+      return result(sha, VERDICT.fail, "elephant-checkpoint-outside-allowlist",
+        `\`Checkpoint-Act: elephant\` is admitted only for runtime files, evidence and the handover; ${outside.length} path(s) lie outside that allowlist, so the trailer cannot vouch for this commit`,
+        { outside, pathCount: checkpointPaths.length });
+    }
+    return result(sha, VERDICT.pass, "elephant-checkpoint",
+      `declared Elephant checkpoint (\`Checkpoint-Act: elephant\`), ${checkpointPaths.length} path(s), all inside the checkpoint allowlist; weaker than a dispatch record and never delivery authorship for code`,
+      { assurance: "checkpoint-elephant", pathCount: checkpointPaths.length });
   }
   const dispatch = parseDispatchTrailer(message);
   if (!dispatch) {

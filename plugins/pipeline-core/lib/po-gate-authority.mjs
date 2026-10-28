@@ -850,11 +850,21 @@ function activeFeatureState(repoRoot) {
   // own marker was {de, en} (the operator-facing axis drove humanFacingLanguage
   // instead, unchanged) or whenever no promotion has set it at all.
   const documentLanguage = state?.continuity?.runtime?.documentLanguage ?? null;
-  return { status: "active", id: active.id, planPath, documentLanguage };
+  // After a Phoenix authority revision to a new folder, the continuity authority PRD path points
+  // into the new folder while activeFeature.planPath still names the old one. The authority PRD
+  // path is trusted only when it is a normalized prd_*.md path under specs/; anything else falls
+  // back to planPath exactly as before.
+  const authorityPrd = normalizeRepositoryPath(state?.continuity?.authority?.prd?.path);
+  const authorityPrdPath = authorityPrd !== null && authorityPrd.startsWith("specs/") && PRD_NAME.test(basename(authorityPrd))
+    ? authorityPrd
+    : null;
+  return { status: "active", id: active.id, planPath, authorityPrdPath, documentLanguage };
 }
 
 function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement) {
-  const featureDirectory = dirname(active.planPath).split(sep).join("/");
+  // The PRD the gate binds: the authority PRD path when present and valid, else planPath.
+  const boundPlanPath = active.authorityPrdPath ?? active.planPath;
+  const featureDirectory = dirname(boundPlanPath).split(sep).join("/");
   let directory;
   try {
     directory = physicalPath(repoRoot, featureDirectory, "directory");
@@ -887,22 +897,22 @@ function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement
       : "";
     return fail(
       "PO-GATE-PRD-CARDINALITY",
-      `The active feature directory must contain exactly one prd_*.md file. Feature directory: ${featureDirectory}; bound plan path: ${active.planPath}; prd_*.md files found: ${prds.length} (${found}).${hint}`,
+      `The active feature directory must contain exactly one prd_*.md file. Feature directory: ${featureDirectory}; bound plan path: ${boundPlanPath}; prd_*.md files found: ${prds.length} (${found}).${hint}`,
       PRD_REPAIR,
     );
   }
   const onlyPlanPath = `${featureDirectory}/${prds[0]}`;
-  if (onlyPlanPath !== active.planPath) {
+  if (onlyPlanPath !== boundPlanPath) {
     return fail(
       "PO-GATE-PLAN-PATH-MISMATCH",
-      `The sole active PRD does not equal activeFeature.planPath. Sole PRD found: ${onlyPlanPath}; bound plan path: ${active.planPath}.`,
+      `The sole active PRD does not equal activeFeature.planPath. Sole PRD found: ${onlyPlanPath}; bound plan path: ${boundPlanPath}.`,
       PRD_REPAIR,
     );
   }
 
   let planBytes;
   try {
-    planBytes = readPhysicalFile(repoRoot, active.planPath);
+    planBytes = readPhysicalFile(repoRoot, boundPlanPath);
     if (JSON.stringify(listPrds()) !== JSON.stringify(prds)) {
       return fail("PO-GATE-PRD-CARDINALITY", "The active PRD set changed while authority was inspected.", PRD_REPAIR);
     }
@@ -1034,7 +1044,7 @@ export function validatePoGateAuthority({
     runtimeSha256: profileEvidence.runtimeSha256,
     receiptSha256: profileEvidence.receiptSha256,
     repositoryFingerprint: profileEvidence.repositoryFingerprint,
-    planPath: active.planPath,
+    planPath: active.authorityPrdPath ?? active.planPath,
     planSha256: prd.planSha256,
     specPath: prd.specPath,
     specSha256: prd.specSha256,

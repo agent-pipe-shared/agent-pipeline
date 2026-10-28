@@ -328,6 +328,25 @@ check("integration trailer parser rejects malformed, duplicate and extended bloc
   ])assert.equal(parseIntegrationTrailerBlock(message).ok,false);
 });
 
+check("CMP17 the exact AI-Assisted plus Checkpoint-Act pair is admitted without a Dispatch entry", () => {
+  const pair = "chore(state): checkpoint\n\nBody.\n\nAI-Assisted: true\nCheckpoint-Act: elephant\n";
+  assert.deepEqual(finishedCommitMessageFindings(pair, { requireMarker: true, requireDispatch: true, requireProvenanceWhenSignaled: true }).findings, []);
+  assert.deepEqual(finishedCommitMessageFindings(pair, { requireProvenanceWhenSignaled: true }).findings, []);
+});
+
+check("CMP18 any other Checkpoint-Act combination stays refused as before", () => {
+  const opts = { requireMarker: true, requireDispatch: true, requireProvenanceWhenSignaled: true };
+  const refused = [
+    "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: elephant\nCheckpoint-Act: elephant\n",
+    "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: elephant\nDispatch: not-admitted\n",
+    "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: goldfish\n",
+    "chore: x\n\nCheckpoint-Act: elephant\n",
+    "chore: x\n\nAI-Assisted: true\nCheckpoint-Act: elephant\nReview: required\n",
+  ];
+  for (const message of refused) assert.notDeepEqual(finishedCommitMessageFindings(message, opts).findings, [], message);
+  assert.ok(codes(finishedCommitMessageFindings(refused[0], opts)).includes("GIT-03-DISPATCH-MISSING"));
+});
+
 afterTests(() => {
 process.stdout.write(`\n${checks}/${checks} commit-message policy checks passed\n`);
 });

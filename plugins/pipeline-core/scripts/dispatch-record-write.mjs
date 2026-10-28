@@ -7,7 +7,7 @@ import { closeSync, constants, existsSync, fstatSync, fsyncSync, linkSync, lstat
 import { basename, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
+import { DISPATCH_RECORD_SCHEMA, PREVIOUS_DISPATCH_RECORD_SCHEMA, reportSha256, assertTerminalLogForWrite, isTerminalOutcome, normalizeDispatchRecordPath, validateDispatchRecord, validatePreviousDispatchRecord } from "../lib/dispatch-record.mjs";
 import { criticDispositionAddendumPath, validateCriticDispositionAddendum } from "../lib/critic-disposition-addendum.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
@@ -528,18 +528,96 @@ export function writeCriticDispositionAddendumObject({ repoRoot, addendum }, dep
     bytes: bytes.length, taskId: addendum.taskId, candidateCommit: addendum.candidateCommit, recordSha256: addendum.recordSha256 };
 }
 
-function parseArgs(argv) {
+const ATTESTED_REQUEST_SCHEMA = "pipeline.dispatch-attested-request.v1";
+const BRIEFING_MARKER = /^<!-- pipeline-native-goldfish-host-commit:[^\n]*\n([\s\S]*?)\n-->/mu;
+const ATTESTED_PATH_PREFIXES = ["scratch/", "evidence/", "specs/"];
+function attestedInputPath(value, label) {
+  if (typeof value !== "string" || value === "" || value.startsWith("/") || /^[A-Za-z]:/u.test(value) || value.includes("\\")
+    || value.split("/").some((part) => part === ".." || part === "." || part === "")
+    || !ATTESTED_PATH_PREFIXES.some((prefix) => value.startsWith(prefix))) fail("attested-request-path", `${label} must be a repository-relative path under scratch/, evidence/ or specs/`);
+  return value;
+}
+function inAllowedScope(path, allowed) { return allowed.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry)); }
+
+/**
+ * D56 Elephant-side CLI mode. Reconstructs the full orchestrator-attested v4 record from three inputs only: the generated
+ * Goldfish briefing, the hand-back text the Elephant received, and the commit chain. Every other field is refused, never defaulted.
+ */
+export function runAttestedRequest({ repoRoot, attestedRequestPath }, dependencies = {}) {
+  const root = physicalRoot(repoRoot);
+  let request;
+  try { request = decodeJson(readPhysicalRequest(root, attestedRequestPath, dependencies)); } catch (error) { if (error?.code) throw error; fail("attested-request-shape", "attested request is not JSON"); }
+  try { exactKeys(request, ["schema", "briefingPath", "handbackPath", "commits"], "attested request"); } catch { fail("attested-request-shape", "attested request is not a closed object"); }
+  if (request.schema !== ATTESTED_REQUEST_SCHEMA) fail("attested-request-shape", `attested request schema must be ${ATTESTED_REQUEST_SCHEMA}`);
+  const briefingPath = attestedInputPath(request.briefingPath, "briefingPath");
+  const handbackPath = attestedInputPath(request.handbackPath, "handbackPath");
+  if (!Array.isArray(request.commits) || request.commits.length === 0 || !request.commits.every((commit) => typeof commit === "string" && /^[a-f0-9]{40}$/u.test(commit))
+    || new Set(request.commits).size !== request.commits.length) fail("attested-request-shape", "commits must be a non-empty list of distinct full 40-hex shas in chain order");
+  const briefingBytes = readPhysicalRequest(root, briefingPath, dependencies);
+  const handbackBytes = readPhysicalRequest(root, handbackPath, dependencies);
+  const decode = (bytes, code) => { try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { fail(code, "input is not valid UTF-8"); } };
+  const marker = BRIEFING_MARKER.exec(decode(briefingBytes, "attested-briefing"));
+  if (!marker) fail("attested-briefing", "the briefing carries no pipeline-native-goldfish-host-commit block");
+  let block;
+  try { block = JSON.parse(marker[1]); } catch { fail("attested-briefing", "the briefing block is not JSON"); }
+  if (!block || typeof block !== "object" || Array.isArray(block)) fail("attested-briefing", "the briefing block is not an object");
+  for (const key of ["dispatchId", "runner", "agentType", "model", "effort", "rulesetSha", "candidateCommit"]) {
+    if (typeof block[key] !== "string" || block[key] === "") fail("attested-briefing", `the briefing block lacks ${key}`);
+  }
+  if (!Array.isArray(block.allowedPaths) || block.allowedPaths.length === 0 || !block.allowedPaths.every((entry) => typeof entry === "string" && entry !== "")) fail("attested-briefing", "the briefing block lacks allowedPaths");
+  if (!block.criticDecision || block.criticDecision.schema !== CRITIC_REQUIRED_SCHEMA) fail("attested-briefing", "the briefing criticDecision is not a required-review decision");
+  const handbackText = decode(handbackBytes, "attested-handback");
+  let text = handbackText;
+  if (handbackText.trimStart().startsWith("{")) {
+    let parsed = null;
+    try { parsed = JSON.parse(handbackText); } catch { /* plain text that merely starts with a brace */ }
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.hasOwn(parsed, "report")) {
+      if (typeof parsed.report !== "string") fail("attested-handback", "the JSON hand-back report is not a string");
+      text = parsed.report;
+    }
+  }
+  if (text.trim() === "") fail("attested-handback", "the hand-back text is empty");
+  const readChangedPaths = dependencies.readChangedPaths ?? ((commit) => gitText(root, ["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", commit]).split("\n").filter(Boolean));
+  const changed = new Set();
+  for (const commit of request.commits) {
+    let paths;
+    try { paths = readChangedPaths(commit); } catch { fail("record-attestation-git", "an attested commit is not readable in this repository"); }
+    for (const path of paths) changed.add(path);
+  }
+  const outside = [...changed].filter((path) => !inAllowedScope(path, block.allowedPaths));
+  if (outside.length !== 0) fail("attested-scope", `commit paths outside the briefed allowedPaths: ${outside.join(", ")}`);
+  const report = { text, changedFiles: [...changed].sort() };
+  const record = {
+    schema: DISPATCH_RECORD_SCHEMA, runner: block.runner, taskId: block.dispatchId, agentType: block.agentType, model: block.model, effort: block.effort,
+    rulesetSha: block.rulesetSha, dispatcher: "Elephant", candidateCommit: request.commits[request.commits.length - 1], resultSha256: reportSha256(text),
+    outcome: "completed-orchestrator-attested", commits: [...request.commits],
+    log: [{ phase: "orchestrator-attested", toolUseCount: 0, note: "tool-use count and worker model not observed" }], report,
+    criticRequired: block.criticDecision,
+    outcomeClassification: { schema: "pipeline.dispatch-outcome-classification.v1", kind: "orchestrator-attested" },
+    attestation: { schema: "pipeline.dispatch-orchestrator-attestation.v1", assurance: "orchestrator-attested",
+      briefingSha256: createHash("sha256").update(briefingBytes).digest("hex"), handbackSha256: createHash("sha256").update(handbackBytes).digest("hex") },
+  };
+  return writeOrchestratorAttestedDispatchRecord({ repoRoot: root, target: `evidence/dispatch-record-${record.taskId}.json`, record }, dependencies);
+}
+
+const USAGE = "usage: dispatch-record-write.mjs --repo-root <path> (--request <repo-relative-json> | --attested-request <repo-relative-json>)";
+export function parseArgs(argv) {
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index]; const value = argv[index + 1];
-    if (!["--repo-root", "--request"].includes(key) || !value || Object.hasOwn(values, key)) fail("usage", "usage: dispatch-record-write.mjs --repo-root <path> --request <repo-relative-json>");
+    if (!["--repo-root", "--request", "--attested-request"].includes(key) || !value || Object.hasOwn(values, key)) fail("usage", USAGE);
     values[key] = value;
   }
-  if (!values["--repo-root"] || !values["--request"]) fail("usage", "usage: dispatch-record-write.mjs --repo-root <path> --request <repo-relative-json>");
-  return { repoRoot: values["--repo-root"], requestPath: values["--request"] };
+  if (!values["--repo-root"] || (values["--request"] === undefined) === (values["--attested-request"] === undefined)) fail("usage", USAGE);
+  return values["--request"] !== undefined
+    ? { repoRoot: values["--repo-root"], requestPath: values["--request"] }
+    : { repoRoot: values["--repo-root"], attestedRequestPath: values["--attested-request"] };
 }
 if (isDirectInvocation(import.meta.url)) {
-  try { process.stdout.write(`${JSON.stringify(writeDispatchRecord(parseArgs(process.argv.slice(2))))}\n`); }
+  try {
+    const args = parseArgs(process.argv.slice(2));
+    process.stdout.write(`${JSON.stringify(args.attestedRequestPath !== undefined ? runAttestedRequest(args) : writeDispatchRecord(args))}\n`);
+  }
   catch (error) { process.stderr.write(`DISPATCH-RECORD-WRITE-FAILED: ${error.code ?? "error"}: ${error.message}\n`); process.exitCode = 2; }
 }
 

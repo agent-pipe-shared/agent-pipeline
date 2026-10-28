@@ -421,7 +421,8 @@ function gitDiffNameOnly(root, baseSha, candidateSha) {
 }
 
 function gitLsFiles(root) {
-  const result = spawnSync("git", ["ls-files"], { cwd: root, encoding: "utf8", shell: false });
+  // maxBuffer: the tracked-file listing of a large repository exceeds Node's 1 MiB spawnSync default (ENOBUFS, status null).
+  const result = spawnSync("git", ["ls-files"], { cwd: root, encoding: "utf8", shell: false, maxBuffer: 1 << 28 });
   if (result.status !== 0) return { ok: false, error: (result.stderr ?? "").trim() || `git exited ${result.status}` };
   const files = result.stdout.split("\n").map((line) => line.trim()).filter((line) => line !== "");
   return { ok: true, files };

@@ -43,6 +43,8 @@ import { inspectNativeGoldfishHostObservation, nativeAuthoredRecordBytes } from 
 import { inspectSignedDescriptorCustodyRepository } from "../worktree-lifecycle.mjs";
 import { hardenWindowsPrivateDirectory } from "../windows-private-state.mjs";
 import { createWindowsOwnedAuthorityDirectory, createWindowsOwnedAuthorityExclusiveFile } from "../windows-owned-authority-backend.mjs";
+import { renderGoldfishBriefing } from "../dispatch-briefing-build.mjs";
+import { validateNativeGoldfishFinal } from "../native-goldfish-host-return.mjs";
 
 const AT = "2026-10-10T10:00:00.000Z";
 const FEATURE = "e2e";
@@ -558,4 +560,49 @@ test("(xii) SubagentHandback: a transcript reached through a symlinked subagents
     if (!linked) { linked = true; const elsewhere = join(fx.stopDir, "elsewhere-subagents"); renameSync(dir, elsewhere); symlinkSync(elsewhere, dir); }
     writeTranscript(dir, name, [handbackRecord(finalText(fx))]);
   } }, "a symlinked subagents directory", "NGHR-CLAUDE-STOP-HANDBACK-UNSAFE");
+});
+
+// D31: the generated briefing's return contract names the typed checkpoint, so a budget stop keeps the reservation live.
+function renderedReturnContract() {
+  const binding = { dispatchId: "D31-RETURN", candidateCommit: "a".repeat(40), allowedPaths: ["src/a.mjs", "src/b.mjs"] };
+  const generated = { binding, block: "BLOCK", skeleton: "### 2. Context files\n\n{{CONTEXT_FILES}}\n### 6. Dispatch metadata\n\n- Meta.\n" };
+  const calibration = { path: "project/pipeline.json", project: "p", handover: "docs/state.md", verify: null };
+  const pkg = { title: "T", goal: "G", context: ["`x` — y."], ac: "AC-1", check: "src/a.mjs", targeted: ["`node --test src/a.mjs`"] };
+  const text = renderGoldfishBriefing(pkg, generated, calibration).text;
+  return { binding, text, paragraph: text.split("\n").find((line) => line.startsWith("`outcome` is `succeeded`")) ?? "" };
+}
+const exampleWith = (text, patch) => {
+  const json = /```json\n(.*)\n```/u.exec(text)[1];
+  return JSON.stringify({ ...JSON.parse(json), ...patch });
+};
+
+test("(xiii) D31: the built briefing tells the Goldfish to return outcome checkpoint with a continuation card at a budget stop", () => {
+  const { paragraph } = renderedReturnContract();
+  assert.match(paragraph, /`checkpoint`/u);
+  assert.match(paragraph, /continuation card/u);
+  assert.match(paragraph, /done, remaining, next step/u);
+  assert.match(paragraph, /Never invent another `outcome` word/u);
+});
+
+test("(xiv) D31: the plain-text stop report is no longer the unconditional stop form, only the no-file case", () => {
+  const { paragraph } = renderedReturnContract();
+  assert.doesNotMatch(paragraph, /otherwise stop and return a plain-text stop report instead of the JSON/u);
+  assert.match(paragraph, /no file at all[^.]*plain-text stop report/u);
+});
+
+test("(xv) D31: the briefing's JSON example still validates with outcome succeeded", () => {
+  const { binding, text } = renderedReturnContract();
+  const final = exampleWith(text, { report: "report", changedPaths: ["src/a.mjs"] });
+  const checked = validateNativeGoldfishFinal(final, { binding });
+  assert.equal(checked.ok, true, checked.code);
+  assert.equal(checked.final.outcome, "succeeded");
+});
+
+test("(xvi) D31: a hand-built checkpoint final with changedPaths validates on the SubagentStop route only", () => {
+  const { binding, text } = renderedReturnContract();
+  const final = exampleWith(text, { outcome: "checkpoint", report: "done: a; remaining: b; next step: c", changedPaths: ["src/a.mjs"] });
+  const checked = validateNativeGoldfishFinal(final, { binding, allowCheckpoint: true });
+  assert.equal(checked.ok, true, checked.code);
+  assert.equal(checked.final.outcome, "checkpoint");
+  assert.equal(validateNativeGoldfishFinal(final, { binding }).ok, false);
 });

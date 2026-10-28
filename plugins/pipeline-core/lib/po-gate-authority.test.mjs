@@ -608,6 +608,79 @@ check("D171 PRD gate refusals name the directory, the bound plan path and what w
   assert.deepEqual(d171Failures, []);
 });
 
+// W7-PHOENIX-FEATURE-DIRECTORY-FROM-PRD: after a Phoenix authority revision to a new folder,
+// continuity.authority.prd.path points into the new folder while activeFeature.planPath still
+// points into the old one; the gate derives the feature directory from the authority PRD path.
+const w7Failures = [];
+function w7Case(name, fn) {
+  try {
+    fn();
+    process.stdout.write(`ok W7 - ${name}\n`);
+  } catch (error) {
+    w7Failures.push(name);
+    process.stdout.write(`not ok W7 - ${name}: ${String(error.message).split("\n")[0]}\n`);
+  }
+}
+function stateWithAuthorityPrd(planPath, authorityPrdPath) {
+  const value = JSON.parse(state(planPath));
+  if (authorityPrdPath === undefined) delete value.continuity.authority.prd;
+  else value.continuity.authority.prd.path = authorityPrdPath;
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+function w7NewFolder(primary, prdName = "prd_feature.md") {
+  const specBytes = spec();
+  write(join(primary, "specs", "revised", "spec.md"), specBytes);
+  write(join(primary, "specs", "revised", prdName), prd("de", "# PRD\n", specBytes));
+}
+
+check("W7 the PO gate derives the feature directory from the authority PRD path", () => {
+  w7Case("W7-1 revise to a new folder: PRD path in new folder, planPath in old folder, plan file in new folder passes", () => {
+    withFixture({}, ({ primary, validate }) => {
+      w7NewFolder(primary);
+      unlinkSync(join(primary, "specs", "feature", "prd_feature.md"));
+      write(join(primary, ".claude", "pipeline-state.json"), stateWithAuthorityPrd("specs/feature/prd_feature.md", "specs/revised/prd_feature.md"));
+      const result = validate();
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(result.value.specPath, "specs/revised/spec.md");
+      assert.equal(result.value.planPath, "specs/revised/prd_feature.md");
+    });
+  });
+  w7Case("W7-2 plan file still only in the OLD folder: still refused", () => {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, "specs", "revised", "spec.md"), spec());
+      write(join(primary, ".claude", "pipeline-state.json"), stateWithAuthorityPrd("specs/feature/prd_feature.md", "specs/revised/prd_feature.md"));
+      const result = validate();
+      assert.equal(result.ok, false);
+      assert.equal(result.code, "PO-GATE-PRD-CARDINALITY");
+    });
+    withFixture({}, ({ primary, validate }) => {
+      w7NewFolder(primary, "prd_other.md");
+      write(join(primary, ".claude", "pipeline-state.json"), stateWithAuthorityPrd("specs/feature/prd_feature.md", "specs/revised/prd_feature.md"));
+      const result = validate();
+      assert.equal(result.ok, false);
+      assert.equal(result.code, "PO-GATE-PLAN-PATH-MISMATCH");
+    });
+  });
+  w7Case("W7-3 no authority PRD path: behaviour identical to planPath derivation", () => {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, ".claude", "pipeline-state.json"), stateWithAuthorityPrd("specs/feature/prd_feature.md", undefined));
+      assert.equal(validate().ok, true);
+      write(join(primary, ".claude", "pipeline-state.json"), stateWithAuthorityPrd("specs/feature/prd_absent.md", undefined));
+      assert.equal(validate().code, "PO-GATE-PLAN-PATH-MISMATCH");
+    });
+  });
+  w7Case("W7-4 an authority PRD path outside specs/ is not trusted: falls back to planPath", () => {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, "docs", "elsewhere", "prd_feature.md"), prd("de"));
+      write(join(primary, ".claude", "pipeline-state.json"), stateWithAuthorityPrd("specs/feature/prd_feature.md", "docs/elsewhere/prd_feature.md"));
+      const result = validate();
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(result.value.planPath, "specs/feature/prd_feature.md");
+    });
+  });
+  assert.deepEqual(w7Failures, []);
+});
+
 check("spec, design and SDP artifacts do not affect PRD cardinality", () => {
   withFixture({}, ({ primary, validate }) => {
     for (const name of ["spec_child.md", "design_child.md", "sdp_child.md"]) {

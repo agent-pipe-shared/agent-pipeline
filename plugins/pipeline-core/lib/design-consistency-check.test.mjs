@@ -1021,3 +1021,108 @@ test("U1-21: (d) boundary: a first cell closed by a second | counts even when th
   assert.deepEqual(result.inconsistencies, []);
   assert.deepEqual(result.register, { mode: "declared", mapPath: MAP_PATH, registerCount: 3, traceabilityCount: 3 });
 });
+
+// ---------------------------------------------------------------------------
+// U1-22: a byte-identical feature-directory rebind (Phoenix Wanted 4, slice 1).
+// The receipts keep the OLD paths; every file is observed at the NEW ones.
+// ---------------------------------------------------------------------------
+
+const OLD_DIR = "specs/old-x";
+const toOld = (path) => (path.startsWith(`${DIR}/`) ? `${OLD_DIR}/${path.slice(DIR.length + 1)}` : path);
+const oldSourcesOf = (current) => ({
+  prd: { path: toOld(current.prd.path), sha256: current.prd.sha256 },
+  spec: { path: toOld(current.spec.path), sha256: current.spec.sha256 },
+  companions: current.companions.map(({ path, sha256: digest }) => ({ path: toOld(path), sha256: digest })),
+});
+
+/** The feature folder moved: receipts bind OLD_DIR paths (reports too), pathStates hold the files at the new paths. */
+function movedInput({ alter = (sources) => sources, receipts, ...options } = {}) {
+  const make = receipts ?? ((current) => [makeSummary({ sources: alter(oldSourcesOf(current)) })]);
+  const input = build({ ...options, receipts: make });
+  for (const receipt of input.reviewReceipts) receipt.report.path = toOld(receipt.report.path);
+  return input;
+}
+
+const bindingEntry = (input) => entry("DCC-REVIEW-RECEIPT-BINDING", {
+  path: input.reviewReceipts[0].path,
+  expected: sha256(canonical(sourcesOf(input))),
+  observed: sha256(canonical(input.reviewReceipts[0].sources)),
+});
+
+test("U1-22: (i) the same hashes in a moved directory keep the receipt: no entry and an empty unreviewed delta", () => {
+  const input = movedInput();
+  assert.notEqual(input.reviewReceipts[0].sources.prd.path, input.submission.planPath, "the fixture must be a moved directory");
+  assert.deepEqual(directChain(input), []);
+  const result = checkDesignConsistency(input);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.inconsistencies, []);
+  assert.deepEqual(result.review.unreviewedSourceDelta, []);
+});
+
+test("U1-22: (ii) a moved directory plus one changed byte in the PRD yields DCC-REVIEW-RECEIPT-BINDING", () => {
+  const input = movedInput({ alter: (sources) => ({ ...sources, prd: { ...sources.prd, sha256: digestOf("prd-old") } }) });
+  assert.deepEqual(directChain(input), [bindingEntry(input)]);
+});
+
+test("U1-22: (iii) a moved directory plus a changed companion yields DCC-REVIEW-RECEIPT-BINDING", () => {
+  const input = movedInput({ alter: (sources) => ({ ...sources, companions: sources.companions.map((c, i) => (i === 0 ? { ...c, sha256: digestOf("companion-old") } : c)) }) });
+  assert.deepEqual(directChain(input), [bindingEntry(input)]);
+});
+
+test("U1-22: (iv) PRD and Spec swapped between two byte-identical files yield DCC-REVIEW-RECEIPT-BINDING", () => {
+  const same = digestOf("identical-bytes");
+  const reviewed = { prd: { path: `${OLD_DIR}/prd_feat-x.md`, sha256: same }, spec: { path: `${OLD_DIR}/spec.md`, sha256: same }, companions: [] };
+  const control = { prd: { path: `${DIR}/prd_feat-x.md`, sha256: same }, spec: { path: `${DIR}/spec.md`, sha256: same }, companions: [] };
+  const swapped = { prd: { path: `${DIR}/spec.md`, sha256: same }, spec: { path: `${DIR}/prd_feat-x.md`, sha256: same }, companions: [] };
+  const receipts = [makeSummary({ sources: reviewed })];
+  assert.deepEqual(reviewChainInconsistencies({ featureId: FEATURE, receipts, currentSources: control }), [], "control: the plain move is accepted");
+  const result = reviewChainInconsistencies({ featureId: FEATURE, receipts, currentSources: swapped });
+  assert.deepEqual(result.map(({ code }) => code), ["DCC-REVIEW-RECEIPT-BINDING"]);
+});
+
+test("U1-22: (v) a moved directory with a different relative layout or companion count yields DCC-REVIEW-RECEIPT-BINDING", () => {
+  const input = movedInput();
+  const current = sourcesOf(input);
+  const check = (currentSources) => reviewChainInconsistencies({ featureId: FEATURE, receipts: input.reviewReceipts, currentSources });
+  assert.deepEqual(check(current), [], "control: the plain move is accepted");
+  const relocated = structuredClone(current);
+  relocated.companions = relocated.companions
+    .map((c) => (c.path === DESIGN_PATH ? { ...c, path: `${DIR}/sub/design.md` } : c))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  assert.deepEqual(check(relocated).map(({ code }) => code), ["DCC-REVIEW-RECEIPT-BINDING"], "layout");
+  const fewer = structuredClone(current);
+  fewer.companions = fewer.companions.slice(1);
+  assert.deepEqual(check(fewer).map(({ code }) => code), ["DCC-REVIEW-RECEIPT-BINDING"], "companion count");
+});
+
+test("U1-22: (vi) a changed report hash at the new path yields DCC-REVIEW-RECEIPT-BINDING at that path", () => {
+  const changed = digestOf("report-changed");
+  const input = movedInput({ states: { [REPORT_1]: { sha256: changed } } });
+  const result = checkDesignConsistency(input);
+  assertInconsistent(result, [entry("DCC-REVIEW-RECEIPT-BINDING", { path: REPORT_1, expected: input.reviewReceipts[0].report.sha256, observed: changed })]);
+  assert.equal(result.review, null);
+});
+
+function movedDelta(current) {
+  const initial = makeSummary({ n: 1, sources: oldSourcesOf(withDigest(current, DESIGN_PATH, OLD_DESIGN)) });
+  return [initial, makeSummary({ n: 2, kind: "delta", sources: oldSourcesOf(current), previous: initial, verdict: "open-findings", openFindingIds: ["F-3"] })];
+}
+
+test("U1-22: (vii) a delta chain moved consistently is accepted with an empty unreviewed delta", () => {
+  const input = movedInput({ receipts: movedDelta });
+  assert.deepEqual(directChain(input), []);
+  const result = checkDesignConsistency(input);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.review.unreviewedSourceDelta, []);
+});
+
+test("U1-22: (vii) a delta chain with only one receipt moved yields DCC-REVIEW-DELTA-CHAIN", () => {
+  const input = build({
+    receipts: (current) => {
+      const initial = makeSummary({ n: 1, sources: oldSourcesOf(withDigest(current, DESIGN_PATH, OLD_DESIGN)) });
+      return [initial, makeSummary({ n: 2, kind: "delta", sources: current, previous: initial })];
+    },
+  });
+  const [initial, delta] = input.reviewReceipts;
+  assert.deepEqual(directChain(input), [entry("DCC-REVIEW-DELTA-CHAIN", { path: delta.path, expected: initial.sha256, observed: initial.sha256 })]);
+});

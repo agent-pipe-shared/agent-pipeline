@@ -19,7 +19,7 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -56,6 +56,12 @@ function tempRoot(name, { withStateMd = true } = {}) {
     constraints: [],
   };
   writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify(calibration, null, 2)}\n`);
+  // submit-plan resolves the real git HEAD of the fixture repository (PLAN-SUBMIT-HEAD-UNAVAILABLE
+  // without a commit), so every fixture gets one initial commit; author is repository-local only.
+  for (const args of [["add", "-A"], ["commit", "-q", "--allow-empty", "--no-verify", "-m", "fixture"]]) {
+    const r = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+    assert.equal(r.status, 0, r.stderr);
+  }
   return root;
 }
 
@@ -317,6 +323,125 @@ test("conformance: reopen-design after approved plan produces state accepted by 
     assert.equal(classification.status, "valid");
     assert.equal(cleanupState.mode, "active");
     assert.equal(cleanupState.activeFeatureId, featureId);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// reopen-design --dry-run (Phoenix slice b, backlog Wanted 3): preview of what a real reopen voids.
+function captureRun(argv, deps) {
+  const lines = [];
+  const original = console.log;
+  console.log = (...parts) => { lines.push(parts.join(" ")); };
+  let exit;
+  try { exit = run(argv, deps); } finally { console.log = original; }
+  return { exit, out: lines.join("\n") };
+}
+
+function sha256File(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function approvedFixture(name) {
+  const root = tempRoot(name);
+  const featureId = `feature-${name}`;
+  const planPath = `specs/${featureId}/prd.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  writeFileSync(join(root, planPath), `# PRD for ${featureId}\n\nRequirements.\n`);
+  writeFileSync(join(root, specPath), `# Spec for ${featureId}\n\nDetails.\n`);
+  const deps = createDeps(root, featureId, planPath, specPath);
+  assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
+  initContinuity(root, featureId, planPath, specPath, deps);
+  assert.equal(run(["submit-plan", "--by", "Elephant", "--profile", OBSERVER_APPROVAL_PROFILE], deps), 0);
+  assert.equal(run(["present-plan", "--by", "Elephant"], deps), 0);
+  assert.equal(run(["approve-plan", "--by", "PO"], deps), 0);
+  return { root, deps, featureId };
+}
+
+test("conformance: reopen-design --dry-run previews an approved plan and leaves state byte-identical", () => {
+  const { root, deps } = approvedFixture("dryrun-preview");
+  try {
+    const stateFile = resolveStatePath(root);
+    const before = sha256File(stateFile);
+    const dirBefore = readdirSync(join(root, ".claude")).sort();
+    const { exit, out } = captureRun(["reopen-design", "--by", "PO", "--dry-run"], deps);
+    assert.equal(exit, 0);
+    const preview = JSON.parse(out);
+    assert.equal(preview.schema, "pipeline.reopen-design-preview.v1");
+    assert.equal(preview.dryRun, true);
+    assert.equal(preview.wrote, false);
+    assert.equal(preview.ok, true);
+    assert.equal(preview.wouldChange, true);
+    assert.equal(preview.voids.planApprovalPresent, true);
+    assert.equal(preview.phase.after, "design");
+    assert.equal(sha256File(stateFile), before, "dry-run must not touch the state file");
+    assert.deepEqual(readdirSync(join(root, ".claude")).sort(), dirBefore, "dry-run must not create audit or invalidation files");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("conformance: reopen-design --dry-run voided set equals what the real reopen then voids", () => {
+  const { root, deps } = approvedFixture("dryrun-equals-real");
+  try {
+    const stateFile = resolveStatePath(root);
+    const pre = JSON.parse(readFileSync(stateFile, "utf8"));
+    const { exit, out } = captureRun(["reopen-design", "--by", "PO", "--dry-run"], deps);
+    assert.equal(exit, 0);
+    const preview = JSON.parse(out);
+    assert.ok(pre.planApproval, "fixture must carry an approved plan");
+    assert.equal(preview.voids.planApprovalSha256, sha256CanonicalJson(pre.planApproval));
+    assert.equal(preview.voids.planSubmissionSha256, pre.planSubmission ? sha256CanonicalJson(pre.planSubmission) : null);
+    assert.equal(preview.voids.approvalSignaturePresent, Boolean(pre.planApproval.designApproval));
+    assert.equal(preview.phase.current, pre.activeFeature.phase);
+    assert.equal(run(["reopen-design", "--by", "PO"], deps), 0);
+    const post = JSON.parse(readFileSync(stateFile, "utf8"));
+    // The real reopen voids by recording planInvalidation (planApproval stays as the invalidated record).
+    assert.equal(post.planApproved, false, "real reopen withdraws the approval the preview named");
+    assert.equal(post.planInvalidation.invalidatedApprovalSha256, preview.voids.planApprovalSha256);
+    assert.equal(post.planInvalidation.invalidatedSubmissionSha256, preview.voids.planSubmissionSha256);
+    assert.equal(post.activeFeature.phase, preview.phase.after);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("conformance: reopen-design --dry-run without an approved plan exits 0 with an empty preview", () => {
+  const root = tempRoot("dryrun-no-plan");
+  try {
+    const featureId = "feature-dryrun-no-plan";
+    const planPath = `specs/${featureId}/prd.md`;
+    const specPath = `specs/${featureId}/spec.md`;
+    mkdirSync(join(root, "specs", featureId), { recursive: true });
+    writeFileSync(join(root, planPath), `# PRD\n`);
+    writeFileSync(join(root, specPath), `# Spec\n`);
+    const deps = createDeps(root, featureId, planPath, specPath);
+    assert.equal(run(["set-feature", "--id", featureId, "--plan-path", planPath], deps), 0);
+    const stateFile = resolveStatePath(root);
+    const before = sha256File(stateFile);
+    const { exit, out } = captureRun(["reopen-design", "--by", "PO", "--dry-run"], deps);
+    assert.equal(exit, 0);
+    const preview = JSON.parse(out);
+    assert.equal(preview.wrote, false);
+    assert.equal(preview.voids.planApprovalPresent, false);
+    assert.equal(preview.voids.planApprovalSha256, null);
+    assert.equal(preview.voids.planSubmissionSha256, null);
+    assert.equal(preview.voids.receiptsBoundToPlanSha256, null);
+    assert.equal(sha256File(stateFile), before);
+    // wouldChange must predict whether the real reopen writes anything.
+    assert.equal(run(["reopen-design", "--by", "PO"], deps), 0);
+    assert.equal(preview.wouldChange, sha256File(stateFile) !== before, "preview wouldChange equals the real reopen's effect");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("conformance: reopen-design without --dry-run still writes and prints no preview", () => {
+  const { root, deps } = approvedFixture("dryrun-real-unchanged");
+  try {
+    const stateFile = resolveStatePath(root);
+    const before = sha256File(stateFile);
+    const { exit, out } = captureRun(["reopen-design", "--by", "PO"], deps);
+    assert.equal(exit, 0);
+    assert.ok(!out.includes("pipeline.reopen-design-preview.v1"), "real reopen must not print the preview");
+    assert.notEqual(sha256File(stateFile), before, "real reopen must still write state");
+    const post = JSON.parse(readFileSync(stateFile, "utf8"));
+    assert.equal(post.activeFeature.phase, "design");
+    assert.equal(post.planApproved, false);
+    assert.ok(post.planInvalidation, "real reopen records the invalidation");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

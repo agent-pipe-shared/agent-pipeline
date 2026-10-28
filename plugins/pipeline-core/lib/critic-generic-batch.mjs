@@ -245,7 +245,7 @@ function sourceTarget(root, declaration) {
   const anchor = declaration.signedQualityImportAnchor;
   if (anchor === null) {
     const b = createLocalDispatchEvidenceBinding({ root, taskId: declaration.taskId, baseCommit: declaration.baseCommit, reviewCandidateCommit: declaration.candidateCommit });
-    return { kind: "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
+    return { kind: b.assurance === "orchestrator-attested" ? "orchestrator-attested-delivery" : "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
   }
   shape(anchor, ["schema", "intentSha256", "integrationCommit"]);
   if (anchor.schema !== "pipeline.signed-quality-import-review-anchor.v1" || !SHA.test(anchor.intentSha256) || !OID.test(anchor.integrationCommit)
@@ -308,7 +308,7 @@ function reviewUnitSource(root, d, work) {
 }
 function targetForPacket(packet) {
   const b = packet.coordinatorOnly?.localDispatchEvidence;
-  if (b) return { kind: "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
+  if (b) return { kind: b.assurance === "orchestrator-attested" ? "orchestrator-attested-delivery" : "authored-delivery", taskId: b.taskId, recordPath: b.recordPath, recordSha256: b.recordSha256, sourceCandidateCommit: b.sourceCandidateCommit };
   const a = packet.coordinatorOnly?.signedQualityImportAnchor;
   if (a) return { kind: "signed-quality-import", intentSha256: a.intentSha256, integrationCommit: a.integrationCommit };
   fail("CGB-TARGET");
@@ -481,7 +481,7 @@ function appendCorrection(input) {
     const parent = consumedParent(c, prior, input.parent);
     if (parent.result.verdict.pass) fail("CGB-PASS-STOPS");
     // Delivery owner ends at integration; one fresh fix owner carries this same batch.
-    if (s.target.kind !== "authored-delivery") fail("CGB-CORRECTION-OWNER");
+    if (s.target.kind !== "authored-delivery" && s.target.kind !== "orchestrator-attested-delivery") fail("CGB-CORRECTION-OWNER");
     if (prior.ordinal === 1) {
       if (s.target.taskId === r.value.originTargets[0].taskId) fail("CGB-CORRECTION-OWNER");
     } else {

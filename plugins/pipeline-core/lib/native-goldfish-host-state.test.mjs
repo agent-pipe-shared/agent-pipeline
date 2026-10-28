@@ -1288,8 +1288,142 @@ const cases = [
     assert.match(source,/item-delivery-integration-dependency-held:[^\n]*\n?[^\n]*heldDependencyRepair\(\)|heldDependencyRepair\(\)[^\n]*item-delivery-integration-dependency-held/u,"the reservation-publish throw attaches the repair");
   })}},
 
+  { id: "NGHS45", name: "PF-86 (i): two admissions with disjoint scopes both succeed through the lock-free pre-scan, and a third on the first scope sees the first reservation", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture(({root,commit,tree,dependencies})=>{
+    assert.equal(typeof mod.prescanCommitIntegratedSlices,"function","the pre-scan is exported");
+    assert.equal(typeof mod.adoptPrescanInBoundary,"function","the compare-and-adopt step is exported");
+    const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
+    const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
+    controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
+    mkdirSync(join(root,".claude"));mkdirSync(join(root,"specs/unit"),{recursive:true});
+    writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
+    writeFileSync(join(root,".claude/pipeline-state.json"),JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/plan.md",phase:"implementation"},planApproved:true}));
+    const item=(id,itemId,path,dependsOn=[])=>({id,title:id,state:"ready",dependsOn,writeScope:[path],tier:"implementor",commitMode:"diff-only",loadClass:"light",delivery:{itemId,criteria:["CR-1"],baseCommit:commit}});
+    writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify({schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-A","AC-1","src/a.mjs"),item("ITEM-B","AC-2","src/b.mjs"),item("ITEM-C","AC-1","src/c.mjs")]}));
+    const statePath=join(root,".claude/pipeline-state.json");
+    writeFileSync(statePath,JSON.stringify({...JSON.parse(readFileSync(statePath,"utf8")),continuity:itemContinuity()}));
+    chmodSync(statePath,0o600);
+    const repository=inspectSignedDescriptorCustodyRepository(root);
+    const runtime=createControlledMethodRuntimeFixture({repository,fixtureRoot:join(repository.commonDir,"agent-pipeline/controlled-method-fixtures/item-owner"),sessionId:"item-owner-unit"});
+    const ports=createSessionAuthorityParticipantPorts({repository});
+    assert.equal(initializeSessionAuthorityRegistry({repository},ports).status,"initialized");
+    const launch=(id,path,session)=>{
+      const binding={...makeBinding({dispatchId:id,commit,tree}),allowedPaths:[path]};
+      const input=toolInput("claude",{root,session,toolUseId:`tool-${id}`,binding});
+      input.tool_input.prompt+=`\nSlice: ${id}\nWrite scope: ${path}\n`;
+      return runtime.run(()=>prepareNativeGoldfishHostState({root,runner:"claude",input},dependencies));
+    };
+    const firstLaunch=launch("ITEM-A","src/a.mjs","session-one");
+    assert.equal(firstLaunch.ok,true,JSON.stringify(firstLaunch));
+    const secondLaunch=launch("ITEM-B","src/b.mjs","session-two");
+    assert.equal(secondLaunch.ok,true,JSON.stringify(secondLaunch));
+    const third=launch("ITEM-C","src/c.mjs","session-three");
+    assert.equal(third.ok,false,JSON.stringify(third));
+    assert.match(String(third.reason),/item-delivery-(scope|owner|criterion-owner)-collision/u);
+  })}},
+
+  { id: "NGHS46", name: "PF-86 (ii): a pre-scan is adopted only when the queue digest and the candidate commit still match; a competing change is re-read, never silently overwritten", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
+    assert.equal(typeof mod.prescanCommitIntegratedSlices,"function");assert.equal(typeof mod.adoptPrescanInBoundary,"function");
+    const repository={primaryRoot:"/fixture-root",candidate:{commit:"c1"}};
+    const governed=(sha,ids)=>({status:"required",sha256:sha,normalized:{slices:ids.map(id=>({id}))}});
+    const reads=[];
+    const read=({candidateCommit,slices})=>{reads.push([candidateCommit,slices.map(row=>row.id)]);return slices.map(row=>row.id);};
+    const key=(g,c)=>JSON.stringify(["commit-integrated",g.sha256,c]);
+    // match: one read in total (the pre-scan), the boundary memo is seeded from it
+    const g1=governed("a".repeat(64),["S1"]);
+    const scan=mod.prescanCommitIntegratedSlices({repository,governed:g1,read});
+    assert.equal(reads.length,1);
+    const b1={};
+    assert.equal(mod.adoptPrescanInBoundary({boundary:b1,repository,governed:g1,prescan:scan,read}).status,"reused");
+    assert.equal(reads.length,1,"no second read under the boundary");
+    assert.deepEqual(mod.memoPerAdmission(b1,key(g1,"c1"),()=>{throw new Error("memo must be seeded");}),["S1"]);
+    // queue digest changed between pre-scan and publish: the delta is re-read under the boundary from the CURRENT queue
+    const g2=governed("b".repeat(64),["S1","S2"]);
+    const b2={};
+    assert.equal(mod.adoptPrescanInBoundary({boundary:b2,repository,governed:g2,prescan:scan,read}).status,"recomputed-after-drift");
+    assert.equal(reads.length,2);
+    assert.deepEqual(mod.memoPerAdmission(b2,key(g2,"c1"),()=>{throw new Error("memo must be seeded");}),["S1","S2"]);
+    // candidate commit changed: same refusal to adopt
+    const b3={},moved={primaryRoot:"/fixture-root",candidate:{commit:"c2"}};
+    assert.equal(mod.adoptPrescanInBoundary({boundary:b3,repository:moved,governed:g1,prescan:scan,read}).status,"recomputed-after-drift");
+    assert.equal(reads.at(-1)[0],"c2");
+  }},
+
+  { id: "NGHS47", name: "PF-86 (iii): the pre-scanned admission yields the same integrated set as the unchanged in-boundary read, and a pre-scan fault or an absent queue falls back to it", run: async () => { const mod = await import("./native-goldfish-host-state.mjs");
+    assert.equal(typeof mod.prescanCommitIntegratedSlices,"function");assert.equal(typeof mod.adoptPrescanInBoundary,"function");
+    const repository={primaryRoot:"/fixture-root",candidate:{commit:"c1"}};
+    const g={status:"required",sha256:"c".repeat(64),normalized:{slices:[{id:"S1"},{id:"S2"}]}};
+    const read=({slices})=>slices.map(row=>row.id).filter(id=>id==="S2");
+    const key=JSON.stringify(["commit-integrated",g.sha256,"c1"]);
+    const direct=read({slices:g.normalized.slices});
+    const withScan={};mod.adoptPrescanInBoundary({boundary:withScan,repository,governed:g,prescan:mod.prescanCommitIntegratedSlices({repository,governed:g,read}),read});
+    const without={};assert.equal(mod.adoptPrescanInBoundary({boundary:without,repository,governed:g,prescan:null,read}).status,"computed");
+    assert.deepEqual(mod.memoPerAdmission(withScan,key,()=>[]),direct);
+    assert.deepEqual(mod.memoPerAdmission(without,key,()=>[]),direct);
+    assert.equal(mod.prescanCommitIntegratedSlices({repository,governed:{status:"absent"},read}),null);
+  }},
+
+  { id: "NGHS48", name: "PF-86 c2 (i): the lock-free registry read returns the same admission facts as the in-lock path for an unchanged registry", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); const reg = await import("./session-authority-registry.mjs"); return fixture((env)=>{
+    assert.equal(typeof reg.readSessionAuthorityGeneration,"function");assert.equal(typeof reg.withSessionAuthorityReadScope,"function");assert.equal(typeof mod.prescanAdmissionFacts,"function");assert.equal(typeof mod.adoptAdmissionFacts,"function");
+    const {repository,governed}=governedRegistryFixture(env);
+    const generation=reg.readSessionAuthorityGeneration({repository});
+    assert.match(generation,/^[0-9a-f]{64}$/u);
+    const facts=mod.prescanAdmissionFacts({repository,governed,dependsOn:[]});
+    assert.equal(facts.generation,generation);
+    const viaFacts=reg.withSessionAuthorityBoundary({repository},boundary=>{const status=mod.adoptAdmissionFacts({boundary,repository,governed,facts}).status;return {status,settled:[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort(),native:mod.readNativeIntegratedSlices({governed,repository,boundary,only:new Set()}).integrated};});
+    const direct=reg.withSessionAuthorityBoundary({repository},boundary=>({settled:[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort(),native:mod.readNativeIntegratedSlices({governed,repository,boundary,only:new Set()}).integrated}));
+    assert.equal(viaFacts.status,"reused");
+    assert.deepEqual({settled:viaFacts.settled,native:viaFacts.native},direct);
+  })}},
+
+  { id: "NGHS49", name: "PF-86 c2 (ii): a registry generation, queue digest or candidate commit that moved between read and publish is detected and the facts are re-read under the boundary, never adopted", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); const reg = await import("./session-authority-registry.mjs"); return fixture((env)=>{
+    const {repository,governed}=governedRegistryFixture(env);
+    const facts=mod.prescanAdmissionFacts({repository,governed,dependsOn:[]});
+    const direct=reg.withSessionAuthorityBoundary({repository},boundary=>[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort());
+    for(const forged of [{...facts,generation:"0".repeat(64)},{...facts,queueSha256:"1".repeat(64)},{...facts,candidateCommit:"2".repeat(40)}]) {
+      const got=reg.withSessionAuthorityBoundary({repository},boundary=>({status:mod.adoptAdmissionFacts({boundary,repository,governed,facts:forged}).status,settled:[...mod.readSettledItemSliceIds({repository,boundary,governed})].sort()}));
+      assert.equal(got.status,"recomputed-after-drift");assert.deepEqual(got.settled,direct);
+    }
+    assert.equal(reg.withSessionAuthorityBoundary({repository},boundary=>mod.adoptAdmissionFacts({boundary,repository,governed,facts:null}).status),"computed");
+    // the read scope itself refuses a result whose generation moved while it ran
+    assert.throws(()=>reg.withSessionAuthorityReadScope({repository,generationOf:(()=>{let n=0;return ()=>"g"+(n++);})()},()=>"x"),/read-generation-drift/u);
+  })}},
+
+  { id: "NGHS50", name: "PF-86 c2 (iii): a slow admission scan does not hold the registry lock, a second admission acquires it while the first scan runs", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); return fixture((env)=>{
+    const {repository,governed}=governedRegistryFixture(env);
+    let child=null;
+    const facts=mod.prescanAdmissionFacts({repository,governed,dependsOn:[],slowScan:()=>{
+      // the URLs are embedded in the script, never passed as extra args: with `-e` an extra arg becomes process.argv[1], and model-family-approval-request.mjs (imported transitively) runs realpathSync(process.argv[1]) in its main-module guard
+      const script=`const {withSessionAuthorityBoundary}=await import(${JSON.stringify(new URL("./session-authority-registry.mjs",import.meta.url).href)});const {inspectSignedDescriptorCustodyRepository}=await import(${JSON.stringify(new URL("./worktree-lifecycle.mjs",import.meta.url).href)});withSessionAuthorityBoundary({repository:inspectSignedDescriptorCustodyRepository(${JSON.stringify(env.root)})},()=>{process.stdout.write('entered');});`;
+      child=spawnSync(process.execPath,["--input-type=module","-e",script],{encoding:"utf8",timeout:60000});
+    }});
+    assert.ok(facts);assert.equal(child.stdout,"entered",child.stderr);assert.equal(child.status,0);
+  })}},
+
+  { id: "NGHS51", name: "PF-86 c2 (iv): every pre-existing registry and host-state export keeps its name and arity", run: async () => { const mod = await import("./native-goldfish-host-state.mjs"); const reg = await import("./session-authority-registry.mjs");
+    for(const name of ["withSessionAuthorityBoundary","inspectSourceOwnedSessionAuthorityProducerRecord","inspectSourceOwnedSessionAuthorityMemberRecord","inspectSourceOwnedSessionAuthorityMemberRecords","initializeSessionAuthorityRegistry"])assert.equal(typeof reg[name],"function",name);
+    assert.equal(reg.withSessionAuthorityBoundary.length,2);
+    for(const name of ["readNativeIntegratedSlices","readSettledItemSliceIds","memoPerAdmission","prescanCommitIntegratedSlices","adoptPrescanInBoundary","inspectNativeMemberRecords"])assert.equal(typeof mod[name],"function",name);
+    assert.equal(mod.memoPerAdmission.length,3);
+  }},
+
 ];
 
-const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
+function governedRegistryFixture({root,commit}){
+  const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
+  const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
+  controller.applyDecision(plan,{activate:true,planSha256:plan.planSha256});
+  mkdirSync(join(root,".claude"));mkdirSync(join(root,"specs/unit"),{recursive:true});
+  writeFileSync(join(root,".claude/pipeline.yaml"),"schema: pipeline.manifest.v0\n");
+  const statePath=join(root,".claude/pipeline-state.json");
+  writeFileSync(statePath,JSON.stringify({schema:"pipeline.state.v0",activeFeature:{id:"unit",planPath:"specs/unit/plan.md",phase:"implementation"},planApproved:true,continuity:itemContinuity()}));
+  chmodSync(statePath,0o600);
+  const item=(id,itemId,path)=>({id,title:id,state:"ready",dependsOn:[],writeScope:[path],tier:"implementor",commitMode:"diff-only",loadClass:"light",delivery:{itemId,criteria:["CR-1"],baseCommit:commit}});
+  writeFileSync(join(root,"specs/unit/slice-queue.json"),JSON.stringify({schema:"pipeline.slice-queue.v2",feature:"unit",slices:[item("ITEM-A","AC-1","src/a.mjs"),item("ITEM-B","AC-2","src/b.mjs")]}));
+  const repository=inspectSignedDescriptorCustodyRepository(root);
+  assert.equal(initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository})).status,"initialized");
+  return {repository,governed:resolveGovernedItemQueue({root})};
+}
+
+const fd =process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w") : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
 registerTestCaseCompletion({ cases, fd, maxBytes: Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_MAX_BYTES ?? "65536") });

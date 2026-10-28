@@ -180,6 +180,9 @@ export const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../../scripts/sessi
 
 export const SESSION_CRITIC_FINALIZER_SCRIPT = fileURLToPath(new URL("../../scripts/session-critic-finalizer.mjs", import.meta.url));
 
+// D56: the attested dispatch-record writer; only its `--repo-root` + `--attested-request` argv is admitted (sanctioned-args-scripts.mjs).
+export const DISPATCH_RECORD_WRITE_SCRIPT = fileURLToPath(new URL("../../scripts/dispatch-record-write.mjs", import.meta.url));
+
 export const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../../scripts/session-capability-diagnose.mjs", import.meta.url));
 
 export const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../scripts/pipeline-state.mjs", import.meta.url));

@@ -93,6 +93,7 @@ const recoveries = [
   ['marker planner', onboardingScript, ['intake-spec-marker-plan', '--root', root, '--intent', 'session', '--runner', 'codex'], false, false],
   ['marker apply', onboardingScript, ['intake-spec-marker-apply', '--root', root, '--plan-sha256', digest, '--activate', '--runner', 'codex'], true, true],
   ['reopen', script, ['reopen-design', '--by', 'fixture-actor'], true, true],
+  ['reopen dry-run preview', script, ['reopen-design', '--by', 'fixture-actor', '--dry-run'], false, false],
 ];
 for (const [name, entry, argv, mutation, requiresConfirmation] of recoveries) {
   for (const executable of [process.execPath, '/opt/producer-node/bin/node']) {
@@ -150,6 +151,63 @@ for (const [name, suffix] of [
   const hit = devPlanShellRefusalHit(command, root, deps);
   assert.ok(hit?.fault === true || hit?.verdict === 'block', 'actual parser/lane must not admit extra executable syntax');
   }
+});
+
+// D56: the Elephant's attested dispatch-record writer argv. Only the exact two-flag shape is admitted;
+// the host route spelling (--request) of the same script stays refused.
+const { symlinkSync, writeFileSync } = await import('node:fs');
+const writerScript = fileURLToPath(new URL('../../scripts/dispatch-record-write.mjs', import.meta.url));
+const finalizerScript = fileURLToPath(new URL('../../scripts/session-critic-finalizer.mjs', import.meta.url));
+mkdirSync(join(root, 'scratch'), { recursive: true });
+writeFileSync(join(root, 'scratch/attested.json'), '{}');
+writeFileSync(join(root, 'outside-target.json'), '{}');
+const attestedLink = join(root, 'scratch/attested-link.json');
+try { symlinkSync(join(root, 'outside-target.json'), attestedLink); } catch (error) { if (error?.code !== 'EEXIST') throw error; }
+const attestedCommand = (executable, args) => recoveryCommandFor({ executable, argv: args });
+const attestedAdmitted = args => isSanctionedLifecycleCommand(attestedCommand(process.execPath, args), root, { processExecPath: process.execPath });
+check('attested writer exact argv is admitted for the Elephant', () => {
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', 'scratch/attested.json']), true);
+});
+check('attested writer admission is order-insensitive and accepts the "." root', () => {
+  assert.equal(attestedAdmitted([writerScript, '--attested-request', 'scratch/attested.json', '--repo-root', root]), true);
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', '.', '--attested-request', 'scratch/attested.json']), true,
+    'the value is the exact root or ".", the same discipline as the finalizer sibling');
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', '..', '--attested-request', 'scratch/attested.json']), false);
+});
+check('attested writer refuses the host route spelling --request', () => {
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--request', 'scratch/attested.json']), false);
+});
+for (const [name, request] of [
+  ['an absolute request path', join(root, 'scratch/attested.json')],
+  ['a request path outside scratch/', 'evidence/attested.json'],
+  ['a request path with ..', 'scratch/../scratch/attested.json'],
+  ['a non-.json request file', 'scratch/attested.txt'],
+  ['a symlink escaping scratch/', 'scratch/attested-link.json'],
+]) check('attested writer refuses ' + name, () => {
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', request]), false);
+});
+check('attested writer refuses a missing --repo-root', () => {
+  assert.equal(attestedAdmitted([writerScript, '--attested-request', 'scratch/attested.json']), false);
+});
+check('attested writer refuses a missing --attested-request', () => {
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', root]), false);
+});
+check('attested writer refuses a foreign repo root', () => {
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', join(root, 'foreign'), '--attested-request', 'scratch/attested.json']), false);
+});
+check('attested writer refuses an extra flag', () => {
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', 'scratch/attested.json', '--unexpected']), false);
+  assert.equal(attestedAdmitted([writerScript, '--repo-root', root, '--attested-request', 'scratch/attested.json', '--request', 'scratch/attested.json']), false);
+});
+check('attested writer validator does not admit another script with the same flags', () => {
+  assert.equal(attestedAdmitted([join(root, 'other.mjs'), '--repo-root', root, '--attested-request', 'scratch/attested.json']), false);
+  assert.equal(attestedAdmitted([onboardingScript, '--repo-root', root, '--attested-request', 'scratch/attested.json']), false);
+});
+check('attested writer admission leaves the finalizer and reopen-design dry-run admissions unchanged', () => {
+  assert.equal(attestedAdmitted([finalizerScript, 'admit', '--root', root, '--request', 'scratch/attested.json']), true);
+  assert.equal(attestedAdmitted([finalizerScript, 'admit', '--root', root, '--attested-request', 'scratch/attested.json']), false);
+  assert.equal(attestedAdmitted([script, 'reopen-design', '--by', 'fixture-actor', '--dry-run']), true);
+  assert.equal(attestedAdmitted([script, 'reopen-design', '--by', 'fixture-actor', '--dry-run', '--attested-request', 'scratch/attested.json']), false);
 });
 
 registerTestCaseCompletion({ cases, fd: 3, maxBytes: 16384 });

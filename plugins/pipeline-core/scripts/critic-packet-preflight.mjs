@@ -363,14 +363,16 @@ function normalizeCoordinatorOnly(value, candidate) {
   }
   if (exactKeys(value, ["localDispatchEvidence"])) {
     const binding = value.localDispatchEvidence;
-    if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "snapshotId"])
+    if (!exactKeys(binding, ["schema", "taskId", "recordPath", "recordSha256", "sourceCandidateCommit", "reviewCandidateCommit", "assurance", "snapshotId"])
+      || (binding.assurance !== null && binding.assurance !== "orchestrator-attested")
       || binding.schema !== "pipeline.local-dispatch-evidence.v1"
       || !isSafeTaskId(binding.taskId) || binding.recordPath !== `evidence/dispatch-record-${binding.taskId}.json`
       || !SHA256.test(binding.recordSha256 ?? "") || !OID.test(binding.sourceCandidateCommit ?? "")
       || binding.sourceCandidateCommit.length !== candidate.commit.length || binding.reviewCandidateCommit !== candidate.commit
       || binding.snapshotId !== sha256Canonical({ schema: binding.schema, taskId: binding.taskId,
         recordPath: binding.recordPath, recordSha256: binding.recordSha256,
-        sourceCandidateCommit: binding.sourceCandidateCommit, reviewCandidateCommit: binding.reviewCandidateCommit })) {
+        sourceCandidateCommit: binding.sourceCandidateCommit, reviewCandidateCommit: binding.reviewCandidateCommit,
+        assurance: binding.assurance })) {
       fail("CPP-COORDINATOR-BINDING", "Local dispatch evidence binding is not closed or candidate-bound.");
     }
     return Object.freeze({ localDispatchEvidence: Object.freeze({ ...binding }) });
@@ -509,7 +511,16 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const reviewAdmission = signedImportAnchor === undefined
       ? evaluateReviewAdmission({ root: repoRoot, taskId: options.taskId, baseCommit: base, candidateCommit: candidate })
       : evaluateSignedQualityImportReviewAdmissionFn({ root: repoRoot, anchor: signedImportAnchor });
-    if (!reviewAdmission.ok) fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${(reviewAdmission.readFindings ?? reviewAdmission.findings ?? []).join("; ")}`);
+    if (!reviewAdmission.ok) {
+      let producerHint = "";
+      if (signedImportAnchor === undefined && reviewAdmission.admittedCount === 0) {
+        const range = git(repoRoot, ["log", "--format=%B", `${base}..${candidate}`], { allowNonzero: true });
+        if (range.status === 0 && /^Dispatch: \S+ \(goldfish\)$/mu.test(String(range.stdout))) {
+          producerHint = " The range carries a Goldfish Dispatch trailer: the Elephant can reconstruct the missing record with node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, where the closed request names the briefing, the hand-back text and the delivery commits (pipeline.dispatch-attested-request.v1).";
+        }
+      }
+      fail("CPP-REVIEW-ADMISSION", `Critic review admission is blocked: ${(reviewAdmission.readFindings ?? reviewAdmission.findings ?? []).join("; ")}${producerHint}`);
+    }
     if (signedImportAnchor !== undefined && reviewAdmission.code !== "signed-quality-import-review-admitted") fail("CPP-REVIEW-ADMISSION", "Signed import review admission did not return its distinct success code.");
     if (signedImportAnchor !== undefined && options.taskId !== signedImportAnchor.taskId) fail("CPP-COORDINATOR-BINDING", "Packet task identity does not match the signed import intent.");
     const localDispatchEvidence = signedImportAnchor === undefined

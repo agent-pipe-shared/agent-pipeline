@@ -551,11 +551,17 @@ test("D115 architecture baseline --compile-summary: the exact documented form is
   });
 });
 
-test("D64 model-role bootstrap admits a host session and is a decision, not an admission: it stays refused here", () => {
+test("D64 model-role bootstrap admits a host session: admitted by its exact argv (K152/G7, e9e866fec); any other shape stays refused", () => {
   withFixture("feature", f => {
-    // model-role-bootstrap.mjs ADMITS the session's role receipt into the host store after readback; whether the
-    // guard may pre-admit that write for the agent is a product decision (see the D64 report), so it is pinned refused.
-    bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex"), f, "bootstrap");
+    // QG-04 justification: the D64 pin held the bootstrap refused as a pending product decision. That decision was made
+    // afterwards: K152 part 3 (greenfield finding G7, commit e9e866fec) admits model-role-bootstrap.mjs by exactly
+    // `--repo-root <this root> --runner <codex|claude|antigravity>` (sanctionedModelRoleBootstrapArgs) and pins it in
+    // antigravity-design-phase-scripts-refused-in-draft.test.mjs. Every refusal the old case implied still holds below.
+    bothAdmit(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex"), f, "bootstrap");
+    bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "unknown"), f, "foreign runner");
+    bothRefuse(scriptAction(bootstrapScript, "--repo-root", join(f.root, "other"), "--runner", "codex"), f, "foreign root");
+    bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root), f, "no runner");
+    bothRefuse(scriptAction(bootstrapScript, "--repo-root", f.root, "--runner", "codex", "--extra"), f, "extra flag");
   });
 });
 

@@ -16,7 +16,7 @@ import {derivePoGateRepositoryFingerprint} from "./po-gate-authority.mjs";
 import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} from "./critic-generic-batch.mjs";
 import {readdirSync,readlinkSync} from "node:fs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -41,7 +41,7 @@ function review(fx,member,round,pass=false){
     dispatch:{requiredNextGate:"session-critic-dispatch",reviewerInput:{rulesetSha:fx.base}}};
   const options={preflightInput:{root:fx.root,evidencePaths:["evidence/verify.json"]},taskId:fx.taskId,projectId:"pipeline",sessionId:`session-round-${round}`,packetId:String(round).repeat(32),
     route:{routeId:"session-critic",runner:"codex",adapter:"session-functional-equivalent",provider:"openai",modelTier:"higher-capability",effortTier:"xhigh"},
-    genericBatchRef:{...member.batchRef,memberSha256:member.memberSha256}};
+    genericBatchRef:{...member.batchRef,memberSha256:member.memberSha256},allowCallerAuthoredFallback:true};
   const deps={preflightCriticDispatchFn:()=>preflight,modelRoleEnvironment:{}};
   const admitted=admitSessionCriticReview(options,deps);assert.equal(admitted.status,"admitted");
   const verdict={findings:[],deliberately_not_flagged:["scope"],trajectory_verdict:"consistent",trajectory_evidence:"controlled fixture inspected",briefing_violations:[],pass};
@@ -500,5 +500,28 @@ test("D-W7M a non-feat/ mainRef that differs from the primary checkout stays ref
     const fx=fixture({unitOverride:{deliveryBoundary:{mainRef:ref}}});
     try{rejected(()=>readCriticReviewUnit(unitInput(fx)),"CGB-MAIN-INTEGRATION");}finally{rmSync(fx.root,{recursive:true,force:true});}
   }
+});
+function registeredTargets(fx,result){return JSON.parse(readFileSync(join(fx.root,".git/agent-pipeline/critic-packets/generic-batches",result.batchRef.batchId,"registration.json")));}
+test("D56 a host-observed local dispatch binding yields the authored-delivery target kind",()=>{
+  const fx=fixture();try{
+    const result=registeredTargets(fx,register(fx));
+    assert.equal(result.originTargets[0].kind,"authored-delivery");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("D56 an orchestrator-attested local dispatch binding yields the orchestrator-attested-delivery target kind",()=>{
+  const fx=fixture();try{
+    const text="done";
+    const record={schema:"pipeline.dispatch-record.v4",taskId:fx.taskId,agentType:"default",model:"gpt-5.6-luna",effort:"medium",
+      rulesetSha:"b7797309cf6abe175fd52b0a8749d82b43714ea0",dispatcher:"elephant",outcome:"completed",
+      commits:[fx.historicalCandidate],candidateCommit:fx.historicalCandidate,resultSha256:sha256(text),
+      log:[{phase:"verify",toolUseCount:1}],report:{text,changedFiles:["specs/spec.md"]},
+      criticRequired:{schema:"pipeline.critic-required-decision.v1",trigger:{schema:"pipeline.critic-trigger-input.v1",rigorLevel:2,riskClass:"high",riskFlag:true,diff:{mechanical:false,architecture:false,guardrails:true,security:false}},appliedRow:"T1"},
+      outcomeClassification:{schema:"pipeline.dispatch-outcome-classification.v1",kind:"orchestrator-attested"},
+      attestation:{schema:"pipeline.dispatch-orchestrator-attestation.v1",assurance:"orchestrator-attested",briefingSha256:"1".repeat(64),handbackSha256:"2".repeat(64)}};
+    writeFileSync(join(fx.root,fx.recordPath),`${JSON.stringify(record,null,2)}\n`);
+    fx.candidate=commit(fx.root,"attested record rewrite");
+    const result=registeredTargets(fx,register(fx));
+    assert.equal(result.originTargets[0].kind,"orchestrator-attested-delivery");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

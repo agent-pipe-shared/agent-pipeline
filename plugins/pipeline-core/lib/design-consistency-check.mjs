@@ -289,13 +289,57 @@ export function currentDesignSources(args) {
 }
 
 /**
+ * Byte-identical feature-directory rebind: `{ fromDir, toDir }` when the reviewed sources and the
+ * current sources are the same files moved from one directory to another, else null. It holds only
+ * when the PRD and Spec roles and the same number of companions exist, every digest is equal, the
+ * old paths all sit under the PRD's old directory and the current paths under the PRD's current
+ * directory with identical relative suffixes per role (companions paired in sorted order), the two
+ * directories differ, and every current path is safe. Any other difference is no rebind.
+ */
+function sourceRebind(reviewed, current) {
+  if (reviewed.companions.length !== current.companions.length) return null;
+  const dirOf = (path) => (path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : null);
+  const fromDir = dirOf(reviewed.prd.path);
+  const toDir = dirOf(current.prd.path);
+  if (fromDir === null || toDir === null || fromDir === toDir) return null;
+  const relativeTo = (path, dir) => (path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : null);
+  const pairs = [[reviewed.prd, current.prd], [reviewed.spec, current.spec], ...reviewed.companions.map((old, index) => [old, current.companions[index]])];
+  for (const [old, now] of pairs) {
+    const oldRelative = relativeTo(old.path, fromDir);
+    const nowRelative = relativeTo(now.path, toDir);
+    if (oldRelative === null || oldRelative !== nowRelative || old.sha256 !== now.sha256 || !isSafePath(now.path)) return null;
+  }
+  return { fromDir, toDir };
+}
+
+/** Where a receipt's report is observed: moved with the feature directory when the sources were rebound. */
+function reportPathAfterRebind(path, rebind) {
+  return rebind !== null && path.startsWith(`${rebind.fromDir}/`) ? `${rebind.toDir}/${path.slice(rebind.fromDir.length + 1)}` : path;
+}
+
+/** The rebind of the chain's latest receipt against the current sources (null without one or with a stub). */
+function chainRebind(receipts, currentSources) {
+  const latest = receipts.length > 0 ? receipts[receipts.length - 1] : null;
+  if (latest === null || receipts.length > MAX_REVIEW_ROUNDS || receipts.some(isStub) || canonical(latest.sources) === canonical(currentSources)) return null;
+  return sourceRebind(latest.sources, currentSources);
+}
+
+/**
  * Paths whose digest differs between the latest receipt's sources and the current sources
  * (decision Z). A path present on one side only is listed with a null on the missing side.
  */
 function unreviewedSourceDelta(reviewedSources, currentSources) {
-  const flatten = (set) => new Map([[set.prd.path, set.prd.sha256], [set.spec.path, set.spec.sha256], ...set.companions.map(({ path, sha256 }) => [path, sha256])]);
-  const reviewed = flatten(reviewedSources);
-  const current = flatten(currentSources);
+  // A byte-identical feature-directory rebind is not a delta: the sources are keyed by the path
+  // relative to their own directory, so a moved source is the same source (role plus relative path).
+  const rebind = sourceRebind(reviewedSources, currentSources);
+  const relative = (path, side) => (rebind === null ? path : path.slice(rebind[side].length + 1));
+  const flatten = (set, side) => new Map([
+    [relative(set.prd.path, side), set.prd.sha256],
+    [relative(set.spec.path, side), set.spec.sha256],
+    ...set.companions.map(({ path, sha256 }) => [relative(path, side), sha256]),
+  ]);
+  const reviewed = flatten(reviewedSources, "fromDir");
+  const current = flatten(currentSources, "toDir");
   const delta = [];
   for (const path of [...new Set([...reviewed.keys(), ...current.keys()])].sort(compareUnits)) {
     if (reviewed.has(path) && current.has(path) && reviewed.get(path) === current.get(path)) continue;
@@ -339,7 +383,8 @@ function analyzeReviewChain(featureId, receipts, currentSources) {
   }
   const latest = receipts[receipts.length - 1];
   // Decision Z: drift after a round-2 (delta) receipt is a visible delta, not an inconsistency.
-  if (latest.kind === "initial" && canonical(latest.sources) !== canonical(currentSources)) {
+  // A byte-identical feature-directory rebind is accepted beside canonical equality, never instead of it.
+  if (latest.kind === "initial" && canonical(latest.sources) !== canonical(currentSources) && chainRebind(receipts, currentSources) === null) {
     entries.push(makeEntry("DCC-REVIEW-RECEIPT-BINDING", {
       path: latest.path,
       expected: sha256Of(canonical(currentSources)),
@@ -421,10 +466,20 @@ export function checkDesignConsistency(input) {
   assertReceipts(reviewReceipts);
 
   const receipts = reviewReceipts ?? [];
+  // Rebind: when the feature directory moved byte-identically, the reports are observed at the new location.
+  // The sources are read leniently here (a missing companion digest is null, hence no rebind) so the
+  // pathStates errors below keep their order and their messages.
+  const earlyStates = indexPathStates(pathStates);
+  const earlySources = {
+    prd: { path: submission.planPath, sha256: sha256Of(prdBytes) },
+    spec: { path: submission.specPath, sha256: sha256Of(specBytes) },
+    companions: [...companions].sort(compareUnits).map((path) => ({ path, sha256: earlyStates.get(path)?.sha256 ?? null })),
+  };
+  const rebind = chainRebind(receipts, earlySources);
   const bound = new Set([submission.planPath, submission.specPath, ...companions]);
   for (const receipt of receipts) {
     bound.add(receipt.path);
-    if (!isStub(receipt)) bound.add(receipt.report.path);
+    if (!isStub(receipt)) bound.add(reportPathAfterRebind(receipt.report.path, rebind));
   }
   const stateByPath = indexPathStates(pathStates);
   for (const path of stateByPath.keys()) {
@@ -502,9 +557,10 @@ export function checkDesignConsistency(input) {
   const reviewEntries = [...chain.entries];
   if (!chain.stopped) {
     for (const summary of receipts) {
-      const observed = stateByPath.get(summary.report.path).sha256;
+      const reportPath = reportPathAfterRebind(summary.report.path, rebind);
+      const observed = stateByPath.get(reportPath).sha256;
       if (observed !== summary.report.sha256) {
-        reviewEntries.push(makeEntry("DCC-REVIEW-RECEIPT-BINDING", { path: summary.report.path, expected: summary.report.sha256, observed }));
+        reviewEntries.push(makeEntry("DCC-REVIEW-RECEIPT-BINDING", { path: reportPath, expected: summary.report.sha256, observed }));
       }
     }
   }

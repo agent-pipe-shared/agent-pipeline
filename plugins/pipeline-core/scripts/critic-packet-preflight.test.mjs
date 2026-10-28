@@ -21,6 +21,9 @@ import {
   readConsumedCandidateReceipt,
   recordCandidateResult,
 } from "./critic-packet-preflight.mjs";
+import { createLocalDispatchEvidenceBinding } from "./check-critic-skip-coverage.mjs";
+import { runAttestedRequest } from "./dispatch-record-write.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -303,14 +306,14 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged 
     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
     const disposed = records.filter((record) => record.event === "DISPOSED");
     assert.equal(records[0].event, "DECLARED");
-    assert.equal(records[0].caseCount, 12);
-    assert.equal(disposed.length, 12);
+    assert.equal(records[0].caseCount, 17);
+    assert.equal(disposed.length, 17);
     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
     assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
     assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
-    assert.deepEqual(records.at(-1).counts, { pass: 11, fail: 1, skip: 0, todo: 0 });
-    assert.equal(records.at(-1).declaredCount, 12);
-    assert.equal(records.at(-1).disposedCount, 12);
+    assert.deepEqual(records.at(-1).counts, { pass: 16, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 17);
+    assert.equal(records.at(-1).disposedCount, 17);
   }
 });
 
@@ -399,7 +402,111 @@ check("signed import anchor rejects candidate drift and canonical verifier denia
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 12, "the complete candidate packet corpus must be registered before execution begins");
+// D56 slice 4b: the local dispatch evidence binding carries the record assurance as one more closed key.
+function bindingWith(real, overrides) {
+  const { snapshotId: _drop, ...rest } = real;
+  const binding = { ...rest, ...overrides };
+  for (const key of Object.keys(binding)) if (binding[key] === undefined) delete binding[key];
+  return { ...binding, snapshotId: sha256Canonical(binding) };
+}
+
+check("CPPA-1 the minted local dispatch evidence binding carries assurance null for a host-observed record", () => {
+  const f = fixture();
+  try {
+    const result = prepareCandidatePacket(options(f, "a".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 31) });
+    assert.equal(result.packet.coordinatorOnly.localDispatchEvidence.assurance, null);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("CPPA-2 a binding whose assurance was tampered fails the snapshot recomputation", () => {
+  const f = fixture();
+  try {
+    const real = createLocalDispatchEvidenceBinding({ root: f.root, taskId: options(f).taskId, baseCommit: f.base, reviewCandidateCommit: f.candidate });
+    assert.equal(real.assurance, null);
+    const tampered = { ...real, assurance: "orchestrator-attested" };
+    assert.throws(() => prepareCandidatePacket(options(f, "b".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => tampered }), expectCode("CPP-COORDINATOR-BINDING"));
+    const forged = bindingWith(real, { assurance: "host-observed" });
+    assert.throws(() => prepareCandidatePacket(options(f, "c".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => forged }), expectCode("CPP-COORDINATOR-BINDING"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+check("CPPA-3 a binding without the assurance key is refused as not closed", () => {
+  const f = fixture();
+  try {
+    const real = createLocalDispatchEvidenceBinding({ root: f.root, taskId: options(f).taskId, baseCommit: f.base, reviewCandidateCommit: f.candidate });
+    const withoutKey = bindingWith(real, { assurance: undefined });
+    assert.equal("assurance" in withoutKey, false);
+    assert.throws(() => prepareCandidatePacket(options(f, "d".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => withoutKey }), expectCode("CPP-COORDINATOR-BINDING"));
+    const attested = bindingWith(real, { assurance: "orchestrator-attested" });
+    const ok = prepareCandidatePacket(options(f, "e".repeat(32)), { createLocalDispatchEvidenceBindingFn: () => attested, now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 32) });
+    assert.equal(ok.packet.coordinatorOnly.localDispatchEvidence.assurance, "orchestrator-attested");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// D56 finish: a project without dispatch history reconstructs the attested record and is admitted (weaker assurance).
+const TRAILER_TASK = "batman-b1";
+function deliveryFixture({ trailer = true } = {}) {
+  const f = fixture();
+  rmSync(join(f.root, "evidence", "dispatch-record-batman-b1.json"));
+  const message = trailer ? `feat(x): deliver\n\nAI-Assisted: true\nDispatch: ${TRAILER_TASK} (goldfish)\n` : "feat(x): deliver\n";
+  git(f.root, ["commit", "--quiet", "--amend", "-m", message]);
+  return { ...f, candidate: git(f.root, ["rev-parse", "HEAD"]) };
+}
+function writeAttestedInputs(f) {
+  mkdirSync(join(f.root, "scratch"), { recursive: true });
+  const block = { schema: "pipeline.native-goldfish-host-briefing.v3", dispatchId: TRAILER_TASK, candidateCommit: f.base, runner: "claude",
+    role: "pipeline-core:goldfish-implementor", agentType: "goldfish-implementor", model: "claude-sonnet-5", effort: "medium", rulesetSha: "0.6.2+local",
+    allowedPaths: ["specs/review.md", "roles/critic.md"],
+    criticDecision: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "low", riskFlag: false, diff: { mechanical: false, architecture: false, guardrails: false, security: false } }, appliedRow: "T3" } };
+  writeFileSync(join(f.root, "scratch", "briefing.md"), `Briefing.\n\n<!-- pipeline-native-goldfish-host-commit:v3\n${JSON.stringify(block)}\n-->\n\n### 1. Goal\nDo it.\n`);
+  writeFileSync(join(f.root, "scratch", "handback.txt"), "Delivered the change.\n");
+  writeFileSync(join(f.root, "scratch", "attested-request.json"), JSON.stringify({ schema: "pipeline.dispatch-attested-request.v1",
+    briefingPath: "scratch/briefing.md", handbackPath: "scratch/handback.txt", commits: [f.candidate] }));
+}
+const producerRoute = /dispatch-record-write\.mjs --repo-root \. --attested-request/u;
+// The preflight-specific sentence (critic-packet-preflight.mjs) that appears only when the range carries a Goldfish Dispatch trailer.
+const trailerSentence = /The range carries a Goldfish Dispatch trailer: the Elephant can reconstruct the missing record with/u;
+function admissionRefusal(f) {
+  try { prepareCandidatePacket(options(f, "f".repeat(32))); } catch (error) { return error; }
+  return assert.fail("admission was expected to refuse");
+}
+
+check("CPPA-4 admission refusal for a range with a Dispatch trailer names the attested record producer; without a trailer it does not", () => {
+  const withTrailer = deliveryFixture();
+  const without = deliveryFixture({ trailer: false });
+  try {
+    const refused = admissionRefusal(withTrailer);
+    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(refused));
+    assert.match(refused.message, /found 0/u);
+    assert.match(refused.message, producerRoute);
+    assert.match(refused.message, trailerSentence);
+    const plain = admissionRefusal(without);
+    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(plain));
+    assert.doesNotMatch(plain.message, trailerSentence);
+  } finally { rmSync(withTrailer.root, { recursive: true, force: true }); rmSync(without.root, { recursive: true, force: true }); }
+});
+
+check("CPPA-5 chain: no dispatch history refuses, the reconstructed attested record admits with orchestrator-attested assurance, an untrailered commit still refuses", () => {
+  const f = deliveryFixture();
+  const plain = deliveryFixture({ trailer: false });
+  try {
+    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(admissionRefusal(f)));
+    assert.equal(existsSync(join(f.root, "evidence", "dispatch-record-batman-b1.json")), false);
+    writeAttestedInputs(f);
+    const receipt = runAttestedRequest({ repoRoot: f.root, attestedRequestPath: "scratch/attested-request.json" });
+    assert.equal(receipt.target, "evidence/dispatch-record-batman-b1.json");
+    assert.equal(existsSync(join(f.root, "evidence", "dispatch-record-batman-b1.json")), true);
+    const result = prepareCandidatePacket(options(f, "9".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 33) });
+    assert.equal(result.packet.coordinatorOnly.localDispatchEvidence.assurance, "orchestrator-attested");
+    assert.notEqual(result.packet.coordinatorOnly.localDispatchEvidence.assurance, "host-observed");
+    writeAttestedInputs(plain);
+    assert.throws(() => runAttestedRequest({ repoRoot: plain.root, attestedRequestPath: "scratch/attested-request.json" }), (error) => error?.code === "record-attestation-git");
+    assert.equal(existsSync(join(plain.root, "evidence", "dispatch-record-batman-b1.json")), false);
+    assert.ok(expectCode("CPP-REVIEW-ADMISSION")(admissionRefusal(plain)));
+  } finally { rmSync(f.root, { recursive: true, force: true }); rmSync(plain.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 17, "the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);
