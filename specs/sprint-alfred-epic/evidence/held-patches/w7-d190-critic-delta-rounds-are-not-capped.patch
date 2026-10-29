@@ -1,17 +1,27 @@
 diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
-index f548ccde2..040170431 100644
+index f548ccde2..18ebdcece 100644
 --- a/plugins/pipeline-core/lib/critic-course-admission.mjs
 +++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
-@@ -304,7 +304,7 @@ export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, base
+@@ -296,6 +296,9 @@ export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, base
+   });
+ }
+ 
++// The PO decision removed the round cap; this bound only protects against a corrupt file.
++const MAX_COURSE_HISTORY_RECORDS = 4096;
++
+ /**
+  * This is deliberately a pure derivation, not dispatch authority. The caller
+  * must load `history` from immutable feature-package evidence and independently
+@@ -304,7 +307,7 @@ export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, base
   */
  export function deriveCriticCourseAdmission(input) {
    if (!exact(input, ["history", "candidate", "correctionCommitsInRange", "requestedMode", "delta"])
 -    || !Array.isArray(input.history) || input.history.length > 4
-+    || !Array.isArray(input.history) || input.history.length > Number.MAX_SAFE_INTEGER
++    || !Array.isArray(input.history) || input.history.length > MAX_COURSE_HISTORY_RECORDS
      || !exact(input.candidate, ["base", "commit", "tree"])
      || ![input.candidate.base, input.candidate.commit, input.candidate.tree].every((oid) => typeof oid === "string" && OID.test(oid))
      || !Number.isSafeInteger(input.correctionCommitsInRange) || input.correctionCommitsInRange < 0
-@@ -581,8 +581,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+@@ -581,8 +584,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
   if(pass)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
   // Source-owned immutable consumed history fixes the batch's next round.
   // An accepted actual-PASS criterion cannot authorize a fifth invocation.
@@ -21,7 +31,7 @@ index f548ccde2..040170431 100644
   if(history.length && source.correctionCommits.length===0)fail('CCA-CORRECTION-RANGE');
   source.reviewUnit=featureReviewUnit(input,resolved);
   const evidence=deterministic(resolved.resolvedRepository.repoRoot,input.registrationCommit,resolved.courseIdentity.originalFeatureId,source.candidate,evidencePaths);
-@@ -595,7 +594,7 @@ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(inpu
+@@ -595,7 +597,7 @@ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(inpu
  function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
  export function prepareRegisteredCriticDeltaRequest(input){try{
   if(!exact(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
@@ -100,7 +110,7 @@ index 381cd5cbf..67ad61fb9 100644
    return { repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.genesisCommit, candidateCommit: fx.candidateCommit, registrationCommit: fx.candidateCommit, requestedMode: "delta", acceptedReference: null, criterionLocator: null, deltaRequestPath: null, ...overrides };
  }
 diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
-index 5a12cb8d7..114c3fe5d 100644
+index 5a12cb8d7..258982d48 100644
 --- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
 +++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
 @@ -210,10 +210,8 @@ function courseCode(course) {
@@ -124,12 +134,16 @@ index 5a12cb8d7..114c3fe5d 100644
  }
  
  export function compiledRequest(record) {
-@@ -458,7 +457,7 @@ export function validateCriticReviewLineage(record) {
+@@ -457,8 +456,11 @@ export function validateCriticReviewLineage(record) {
+ }
  
  /** Validate a complete oldest-to-newest synthetic or retained review course. */
++// The PO decision removed the round cap; this bound only protects against a corrupt file.
++const MAX_COURSE_HISTORY_RECORDS = 4096;
++
  export function validateCriticReviewHistory(records) {
 -  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
-+  if (!Array.isArray(records) || records.length < 1 || records.length > Number.MAX_SAFE_INTEGER) {
++  if (!Array.isArray(records) || records.length < 1 || records.length > MAX_COURSE_HISTORY_RECORDS) {
      return { ok: false, code: "CRL-HISTORY-SHAPE" };
    }
    const reviewIds = new Set();
@@ -149,9 +163,18 @@ index 15cfa5652..da2ff5855 100644
      return "CRL-REVIEW-ATTEMPT";
    }
 diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
-index 1ab5f6125..8cef29904 100644
+index 1ab5f6125..f4f7355e6 100644
 --- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
 +++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -11,7 +11,7 @@ import {
+   validateCriticReviewLineage,
+   validateReleaseCriticScopeAdmission,
+ } from "./critic-review-lineage.mjs";
+-import { sha256Canonical } from "./review-economy.mjs";
++import { projectCriticReviewEconomy, sha256Canonical } from "./review-economy.mjs";
+ import { safePath } from "./critic-review-lineage-core.mjs";
+ 
+ const H = (character) => character.repeat(64);
 @@ -577,7 +577,8 @@ check("accepts a correction-budget crossing even when the exact Git range adds t
      parent,
      findings: structuredClone(parent.findings),
@@ -162,6 +185,65 @@ index 1ab5f6125..8cef29904 100644
      lane: { laneId: "correction-gate-lane", contextSha256: H("6"), evidenceSha256: H("7") },
    });
    assert.equal(gate.course.status, "po-course-gate");
+@@ -805,5 +806,56 @@ check("compiles and validates a lineage record whose packet diff path carries br
+   assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: ["src/a\nb.ts"] }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
+ });
+ 
+-assert.equal(passed, 17);
+-console.log(`${passed}/17 checks passed.`);
++check("D190 step rule: a delta round may step the correction count by more than one and still chain; full mode, a falling count and a skipped round stay refused", () => {
++  const records = fourRoundHistory();
++  const next = (parent, packet, round, count, mode = "delta") => {
++    const record = compile({
++      packet,
++      reviewId: `review-step-${round}-${count}`,
++      parent,
++      coverage: completeCoverage(packet),
++      verdict: findingsVerdict,
++      findings: [{ ...findingOpen, priorFindingId: findingOpen.id, evidenceSha256: H("a") }],
++      correction: correction(packet),
++      invalidation: none,
++      reviewAttempt: deltaAttempt(round, count, packet),
++      lane: { laneId: `critic-lane-step-${round}-${count}`, contextSha256: H("e"), evidenceSha256: H("d") },
++    });
++    return mode === "delta" ? record : historicalBroad(record, explicitFull);
++  };
++  const packet5 = {
++    ...packet2,
++    packetId: "7".repeat(32),
++    candidate: { base: O("8"), commit: O("a"), tree: O("b") },
++    diff: { ...packet2.diff, base: O("8"), commit: O("a"), sha256: H("9") },
++    bindings: { requestSha256: H("a"), diffPathsSha256: H("b"), governanceSha256: H("c") },
++  };
++  const chained = (history) => ({
++    lineage: validateCriticReviewHistory(history),
++    economy: projectCriticReviewEconomy(history),
++  });
++  // (a) parent round 1 / count 0, child delta round 2 / count 7
++  const a = [records[0], next(records[0], packet2, 2, 7)];
++  assert.equal(a[1].course.correctionCommitCount, 7);
++  assert.equal(chained(a).lineage.ok, true);
++  assert.equal(chained(a).economy.ok, true);
++  // (b) parent at the old limits (round 4 / count 3), child delta round 5 / count 11
++  const b = [...records, next(records.at(-1), packet5, 5, 11)];
++  assert.equal(chained(b).lineage.ok, true);
++  assert.equal(chained(b).economy.ok, true);
++  // (c) a full-mode child with a step larger than one is refused
++  const c = [records[0], next(records[0], packet2, 2, 7, "full")];
++  assert.equal(chained(c).economy.ok, false);
++  // (d) a falling count and a skipped round are refused (at composition or in the chain)
++  const refused = (build) => {
++    let history;
++    try { history = build(); } catch { return true; }
++    const r = chained(history);
++    return r.lineage.ok === false && r.economy.ok === false;
++  };
++  assert.equal(refused(() => [...records, next(records.at(-1), packet5, 5, 2)]), true);
++  assert.equal(refused(() => [...records, next(records.at(-1), packet5, 6, 11)]), true);
++});
++
++assert.equal(passed, 18);
++console.log(`${passed}/18 checks passed.`);
 diff --git a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs b/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
 index 1f1849174..f25727e3a 100644
 --- a/plugins/pipeline-core/lib/pins/critic-round-cap-and-delta-scope-are-not-enforced.test.mjs
@@ -192,7 +274,7 @@ index 1f1849174..f25727e3a 100644
  
  test("AC1 course derivation computes round from history, never from invented counters", () => {
 diff --git a/plugins/pipeline-core/lib/review-economy.mjs b/plugins/pipeline-core/lib/review-economy.mjs
-index f43a2f7f7..8e95c4377 100644
+index f43a2f7f7..0d2b7b4b7 100644
 --- a/plugins/pipeline-core/lib/review-economy.mjs
 +++ b/plugins/pipeline-core/lib/review-economy.mjs
 @@ -185,10 +185,12 @@ function validPathInvariantMap(map) {
@@ -232,12 +314,31 @@ index f43a2f7f7..8e95c4377 100644
      || admitted === (record.request.mode === "none")
      || record.parentReviewId === null
        && (record.previousSha256 !== null || record.lane.freshFromReviewId !== null || record.correction !== null)
-@@ -542,7 +545,7 @@ function criticProjectionTransitionCode(parent, current) {
+@@ -494,8 +497,12 @@ function criticProjectionTransitionCode(parent, current) {
+     return "RE-CRITIC-PROJECTION-COUNTERS";
+   }
+   const correctionStep = current.course.correctionCommitCount - parent.course.correctionCommitCount;
+-  if (![0, 1].includes(correctionStep)) return "RE-CRITIC-PROJECTION-COUNTERS";
+-  if (correctionStep === 1) {
++  // D190: a diff round may follow any number of correction commits; full-mode and old-record steps stay 0 or 1.
++  const stepAllowed = current.request.mode === "delta"
++    ? Number.isSafeInteger(correctionStep) && correctionStep >= 0
++    : [0, 1].includes(correctionStep);
++  if (!stepAllowed) return "RE-CRITIC-PROJECTION-COUNTERS";
++  if (correctionStep >= 1) {
+     if (current.correction === null
+       || current.diff.base !== parent.candidate.commit
+       || current.correction.commit !== current.candidate.commit) {
+@@ -541,8 +548,11 @@ function criticProjectionTransitionCode(parent, current) {
+  * is counted as occurrence only; the terminal status derives from the typed
   * verdict and never uses a generic PASS value.
   */
++// The PO decision removed the round cap; this bound only protects against a corrupt file.
++const MAX_COURSE_HISTORY_RECORDS = 4096;
++
  export function projectCriticReviewEconomy(records) {
 -  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
-+  if (!Array.isArray(records) || records.length < 1 || records.length > Number.MAX_SAFE_INTEGER) {
++  if (!Array.isArray(records) || records.length < 1 || records.length > MAX_COURSE_HISTORY_RECORDS) {
      return { ok: false, code: "RE-CRITIC-PROJECTION-INPUT" };
    }
    const reviewIds = new Set();
