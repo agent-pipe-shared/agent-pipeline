@@ -70,7 +70,10 @@ sentences are superseded:
 - Acceptance bullets 1 to 3 (a design revision rebinds the sources in one step; a native revision opens a child Advisor
   course bound to the registered authoring dispatch; an interrupted export re-run is byte-identical) and the Description
   bullets about `coordinateInitialDesignAdvisory`, `DAC2-COURSE-ALREADY-EXISTS` and `DESIGN-COURSE-INITIAL-CONTEXT-BINDING`
-  describe the Advisor course that D125 retires for this item. They are not the acceptance to build against any more; the
-  restated single-review acceptance and a pin for a single-step revision with zero PO interactions and zero overrides on
-  the review-receipt route are not written yet (the route's pin still has to be located by the implementer).
+  describe the Advisor course that D125 retires for this item. They are not the acceptance to build against any more.
+  Correction 2026-10-29: the pin for a single-step revision with zero PO interactions and zero overrides on the
+  replacement route is committed (`b02abaa78`): case `(v)` in
+  `plugins/pipeline-core/lib/pins/revised-native-design-cannot-reach-a-new-advisor-course.test.mjs`, with the real-guard
+  walk `A10` in `plugins/pipeline-core/lib/pins/design-course-run-v2-refuses-its-own-documented-routes.test.mjs`. The
+  earlier sentence that it was not written yet is stale.
 - The empty Triage block: filled above from D125.
