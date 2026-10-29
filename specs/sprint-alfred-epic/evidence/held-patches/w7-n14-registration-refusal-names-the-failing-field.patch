@@ -1,0 +1,150 @@
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index 1bf6f11f2..4ebb7436d 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -207,7 +207,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+   }
+   const observed = readAcceptedDeliveryContract({ dir: root, envelopePath });
+   if (observed?.code === "CAC-ENVELOPE-UNAVAILABLE") {
+-    return refused("FPR-ENVELOPE-UNAVAILABLE", "the envelope bytes do not re-derive through the existing envelope reader", { envelopePath, readerCode: observed.code });
++    return refused("FPR-ENVELOPE-UNAVAILABLE", "the envelope bytes do not re-derive through the existing envelope reader", { envelopePath, readerCode: observed.code, ...(observed.detail ? { readerDetail: observed.detail } : {}) });
+   }
+   let envelope;
+   try { envelope = JSON.parse(envelopeBytes.toString("utf8")); } catch { envelope = null; }
+@@ -298,7 +298,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
+   const reread = readAcceptedDeliveryContract({ dir: root, envelopePath });
+   if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
+     rollback();
+-    return refused("FPR-REGISTRATION-NOT-RESOLVED", "the existing envelope reader still refuses the registration; everything this call created was removed", { manifestPath, readerCode: reread.code });
++    return refused("FPR-REGISTRATION-NOT-RESOLVED", "the existing envelope reader still refuses the registration; everything this call created was removed", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
+   }
+   const summary = (entry) => ({ class: entry.class, path: entry.path, sha256: digest(entry.bytes), authority: entry.authority, mutability: entry.mutability, retention: entry.retention });
+   return {
+@@ -382,7 +382,7 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
+     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+     if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
+       restore();
+-      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code });
++      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
+     }
+   }
+   return {
+@@ -472,7 +472,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+     if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
+       restore();
+-      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code });
++      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
+     }
+   }
+   return {
+@@ -575,7 +575,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
+   if (envelopes.length === 1) {
+     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+-    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) }); }
+   }
+   return {
+     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-added", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`,
+@@ -676,7 +676,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
+   const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
+   if (envelopes.length === 1) {
+     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
+-    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
++    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) }); }
+   }
+   return {
+     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index bf5253e4b..6d22e743c 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -1061,7 +1061,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
+       const current=nativeManagedCurrentOwner(repository);
+       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
+       const approval=observeCurrentPlanApprovalForCalibration({rootDir:physical});
+-      if(approval.status!=='eligible')return {status:'refused',code:approval.code,reason:`the current plan approval is ${approval.status} (${approval.code})`,
++      if(approval.status!=='eligible')return {status:'refused',code:approval.code,reason:`the current plan approval is ${approval.status} (${approval.code}${approval.detail?`: ${approval.detail}`:''})`,
+         repair:approval.repair??staleApprovalRepair(approval.code)};
+       const paths=resolveProjectAuthorityPaths({rootDir:physical});
+       if(paths.status!=='ready')throw nativeManagedFault('item-course-authority-unavailable');
+@@ -1172,9 +1172,12 @@ function writeGovernedQueue(path,preimage,raw) {
+ /** PF-33 (D56 (3)): the plan approval binds the PO-gate authority (manifest, PRD) and the PO profile, so a later
+  * change to either, such as the checkpoint policy opt-in, makes it stale. The repair names the route that exists. */
+ const STATE_SCRIPT=fileURLToPath(new URL('../scripts/pipeline-state.mjs',import.meta.url));
++const REGISTER_SCRIPT=fileURLToPath(new URL('../scripts/register-feature-package.mjs',import.meta.url));
+ export function staleApprovalRepair(code) {
+   if(code==='CVCT-AUTHORITY-STALE'||code==='CVCT-PROFILE-STALE')
+     return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} no longer matches what the plan approval binds. If this checkout is a clone or a transfer of the approving one and the approved bytes are unchanged, only its device-local values differ: run node ${STATE_SCRIPT} rebind-approval (it re-checks every bound digest, takes no argument and asks for no new approval), then retry. If the approved bytes themselves changed, submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
++  if(code==='CAC-REGISTRATION-INVALID')
++    return `the accepted-contract envelope of the plan approval is not registered in the feature manifest as the reader requires (the reason names the failing field); run node ${REGISTER_SCRIPT} --root <repository root> (it registers the envelope and prints the paths to commit), commit those paths, then retry`;
+   return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;
+ }
+ /** D52 (2), Critic F1: an item operation that another session owns is refused naming that session and the route
+diff --git a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+index 5f2c3e013..b7891764e 100644
+--- a/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
++++ b/plugins/pipeline-core/lib/pins/consumer-approved-plan-reaches-the-first-item-host-commit.test.mjs
+@@ -217,6 +217,9 @@ test("(a) before registration the first item course is refused CAC-REGISTRATION-
+   const refused = prepareGovernedItemQueue({ root: fx.root, itemDelivery: before.itemDelivery, candidate: fx.candidate(), writeScope: [SOURCE] });
+   assert.equal(refused.status, "refused", JSON.stringify(refused));
+   assert.equal(refused.code, "CAC-REGISTRATION-INVALID", JSON.stringify(refused));
++  // N14: the refusal names the failing registration check and the repair route, not only the code.
++  assert.match(refused.reason, /registers no artifact at|registration field [A-Za-z0-9]+ is/u, JSON.stringify(refused));
++  assert.match(refused.repair, /register-feature-package/u, JSON.stringify(refused));
+   assert.equal(existsSync(join(fx.root, "specs/e2e/slice-queue.json")), false, "a refused admission publishes no course");
+ });
+ 
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2161fbef1..b66288f76 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -9672,6 +9672,16 @@ function acceptedOriginalMode({dir,candidate}) {
+   }
+   return acceptedOriginalPolicy({dir,candidate,path:"pipeline.user.yaml"},readHumanApprovalMode);
+ }
++/** N14: the first registration check that fails, with the expected and the observed value, so a refusal says what to change. */
++function acceptedRegistrationFault(registration, envelope, made, envelopePath) {
++  const id = registration?.identity;
++  if (registration?.status !== "resolved" || !id) return `the feature manifest registers no artifact at ${envelopePath} (resolver status ${registration?.status ?? "unavailable"})`;
++  const show = value => typeof value === "string" && value.length === 64 ? `${value.slice(0,12)}...` : JSON.stringify(value);
++  const checks = [["featureId",envelope.featureId,id.featureId],["manifest",envelope.manifestPath,id.manifest],["path",envelopePath,id.path],["sha256",made.sha256,id.sha256],
++    ["class","candidate-evidence",id.class],["authority",false,id.authority],["mutability","immutable",id.mutability],["retention","retain",id.retention]];
++  const bad = checks.find(([,expected,observed]) => expected !== observed);
++  return bad ? `registration field ${bad[0]} is ${show(bad[2])}, the accepted-contract envelope needs ${show(bad[1])}` : null;
++}
+ export function readAcceptedDeliveryContract({dir,envelopePath} = {}, deps = {}) {
+   try {
+     const raw = (deps.readRetainedEnvelope ?? (({dir,path})=>acceptedContractFile(dir,path)))({dir,path:envelopePath});
+@@ -9680,8 +9690,8 @@ export function readAcceptedDeliveryContract({dir,envelopePath} = {}, deps = {})
+     if (!made.ok || envelope.schema !== "pipeline.accepted-delivery-contract-evidence.v1" || made.path !== envelopePath || !Buffer.from(raw).equals(Buffer.from(canonicalDesignApproval(envelope)))) return {ok:false,code:"CAC-ENVELOPE-UNAVAILABLE"};
+     const registration = (deps.resolveCanonicalArtifactIdentity ?? acceptedContractArtifactIdentity)(dir,envelopePath);
+     const id = registration?.identity;
+-    if (registration?.status !== "resolved" || !id || id.featureId !== envelope.featureId || id.manifest !== envelope.manifestPath || id.path !== envelopePath || id.sha256 !== made.sha256
+-      || id.class !== "candidate-evidence" || id.authority !== false || id.mutability !== "immutable" || id.retention !== "retain") return {ok:false,code:"CAC-REGISTRATION-INVALID"};
++    const registrationFault = acceptedRegistrationFault(registration,envelope,made,envelopePath);
++    if (registrationFault) return {ok:false,code:"CAC-REGISTRATION-INVALID",detail:registrationFault};
+     const current = (deps.readState ?? readState)(dir);
+     const currentLifecycle = current?.status === "ok" ? derivePlanLifecycle(current.state) : null;
+     if (current?.status !== "ok" || current.state?.planApproved !== true || !currentLifecycle?.ok || currentLifecycle.approvalCurrent !== true || !["approved", "implementing"].includes(currentLifecycle.status)) return {ok:false,code:"CAC-APPROVAL-STALE"};
+@@ -14670,8 +14680,8 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
+ }
+ 
+ export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = false} = {}) {
+-  const unavailable = (code, windowsAuthorityCause = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
+-    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {})});
++  const unavailable = (code, windowsAuthorityCause = null, detail = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
++    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {}), ...(typeof detail === "string" && detail !== "" ? {detail} : {})});
+   try {
+     const root = resolve(rootDir);
+     if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return unavailable("CVCT-ROOT");
+@@ -14704,7 +14714,7 @@ export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry =
+     let approvalBasis;
+     if (state.planApproval.schema === "pipeline.plan-approval.v9") {
+       const observed = readAcceptedDeliveryContract({dir:root,envelopePath:state.planApproval.acceptedContract.path});
+-      if (!observed.ok || observed.authorityBasis !== (mode.mode === "signature" ? "signature" : "chat-attributed-unattested")) return unavailable(observed.code ?? "CVCT-APPROVAL-UNAVAILABLE");
++      if (!observed.ok || observed.authorityBasis !== (mode.mode === "signature" ? "signature" : "chat-attributed-unattested")) return unavailable(observed.code ?? "CVCT-APPROVAL-UNAVAILABLE", null, observed.detail);
+       retain(state.planApproval.acceptedContract.path);
+       const envelope = JSON.parse(calibrationApprovalFile(root,state.planApproval.acceptedContract.path).bytes.toString("utf8"));
+       retain(envelope.policyBinding.path);
