@@ -36,3 +36,7 @@ Read-only survey of the open clauses that the delivery remeasure assigned to nat
 
 - **PO-DECISION** (decided: D130) — Name the fixture issue the item refers to, or declare that clause out of scope; the backlog text never says which fixture
   The item only says 'has a fixture issue' (RGGRAM split from bundle commit 866be2139) and never names it, so no agent can verify or close that part.
+
+## Re-count 2026-10-29
+
+The pin `plugins/pipeline-core/lib/pins/shell-grammar-file-is-a-kernel-path-without-capability-placement.test.mjs` was run once on a clean clone of HEAD `8848b7000`, after the kernel-path list changed since the earlier 8 of 8: 8 tests, 8 pass, 0 fail. The count still holds.
