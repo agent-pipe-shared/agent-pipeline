@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 4,
-      "50": 5,
-      "75": 247,
+      "25": 2,
+      "50": 4,
+      "75": 250,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 73.73
+    "index": 74.22
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -8904,18 +8904,18 @@
     {
       "itemId": "pipeline.gate-strength-shell-refuses-admitted-reads",
       "title": "GUARD-GATE-STRENGTH-SHELL refuses reads its own message admits",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P2",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Not delivered: gate-strength-lane.mjs is unchanged since 2026-10-12, the find grammar admits no -not or -path, and no test exists. Observed again in this session on an rg read.",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Not delivered: gate-strength-lane.mjs is unchanged since 2026-10-12, the find grammar admits no -not or -path, and no test exists. Observed again in this session on an rg read. Amendment 2026-10-29 night (verified against the tree; the patch is applied and installed in the stamp 4c181e18b): the reads the refusal text admits (rg, cat, head, sha256sum, read-only git) are admitted on the current code, and the one that was still refused, find with -not -path, is admitted by the held patch w7-gate-strength-find-not-path-reads-s4 (find predicates -path, -ipath, -prune, -not; test FOR03). The item text claiming an unchanged lane file is outdated: the fix sits in lib/guard/shell-grammar.mjs. 75 = technically delivered; the open entries are what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-26-gate-strength-shell-refuses-admitted-reads.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "Kernel held patch and tests for the reads the refusal text admits."
+          "what": "Other find predicates (-mtime, -size, -newer) and the text of GUARD-GATE-STRENGTH-SHELL are unchanged; the other seven reads of the item were not re-probed after the patch."
         },
         {
           "owner": "verify-wsl",
@@ -8937,18 +8937,18 @@
     {
       "itemId": "pipeline.greenfield.r2.guard-denials-fill-the-override-request-namespace",
       "title": "Guard-Ablehnungen füllen den Override-Antrags-Namespace",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Partly delivered in 9ce6c2361 (AC-160): sweep-requests --all is bounded and the full-namespace refusal names the repair; seeding is skipped for the unsupported-read, missing-target, PO-discard, lifecycle-not-ready and retry-action denials. Whether other no-route refusals still seed is not verified.",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Partly delivered in 9ce6c2361 (AC-160): sweep-requests --all is bounded and the full-namespace refusal names the repair; seeding is skipped for the unsupported-read, missing-target, PO-discard, lifecycle-not-ready and retry-action denials. Whether other no-route refusals still seed is not verified. Amendment 2026-10-29 night (verified against the tree; the patch is applied and installed in the stamp 4c181e18b): the open point 'whether other no-route refusals still seed' is answered by measurement: the pin lib/guard/no-route-denials-seed-no-override-request.test.mjs (NRS01, NRS02) counts the request files for the lifecycle guard's no-route classes (zero) and the offer classes (exactly one). 75 = technically delivered; the open entries are what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-26-guard-denials-fill-the-override-request-namespace.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "Check the remaining no-route refusal classes for request seeding."
+          "what": "Denials of the other hooks (guard-testpath, guard-gate-strength, Codex and Antigravity guards) and the dev-plan and test-path shell lanes are not probed."
         },
         {
           "owner": "verify-wsl",
@@ -9290,11 +9290,11 @@
     {
       "itemId": "pipeline.git-hook-runtime-snapshots-are-never-collected",
       "title": "Git-hook runtime snapshots are never collected",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 evening. Measured: about 2.3 GB of the 2.5 GB under .git/agent-pipeline were unreferenced runtime snapshots of the three git hooks (about 300 each); the PO moved all but the live one aside by hand and the state fell to about 300 MB with every hook working. No collector or retention rule exists, and whether the snapshots slow the PreToolUse hooks is not measured. No Full Verify, Critic, native or acceptance claim.",
+      "reason": "Joined 2026-10-29 evening. Measured: about 2.3 GB of the 2.5 GB under .git/agent-pipeline were unreferenced runtime snapshots of the three git hooks (about 300 each); the PO moved all but the live one aside by hand and the state fell to about 300 MB with every hook working. No collector or retention rule exists, and whether the snapshots slow the PreToolUse hooks is not measured. No Full Verify, Critic, native or acceptance claim. Amendment 2026-10-29 night (verified against the tree; the patch is applied and installed in the stamp 4c181e18b): scripts/housekeeping.mjs plan and apply with the collector hook-runtime-snapshots (move aside, never delete, digest-bound plan) is delivered and registered in the Verify suites (housekeeping-tests, 10 of 10). 75 = technically delivered; the open entries are what tests and acceptance still miss.",
       "evidence": [
         "backlog/items/2026-10-29-git-hook-runtime-snapshots-are-never-collected.md",
         "backlog/items/2026-10-29-a-recurring-housekeeping-job-collects-growing-runtime-state.md"
@@ -9302,7 +9302,7 @@
       "open": [
         {
           "owner": "agent",
-          "what": "Measure the four PreToolUse hooks of an Agent dispatch, then build a digest-bound plan and apply command for unreferenced snapshots (first collector of the recurring housekeeping job)."
+          "what": "Measure whether the unreferenced snapshots slow the PreToolUse hooks; the scheduled plan run and further collectors of the recurring job are not built."
         },
         {
           "owner": "verify-wsl",
