@@ -653,6 +653,16 @@ test("the generated briefing prescribes the test-first order in one dispatch (AC
   assert.doesNotMatch(text, /separate test-author dispatch/u);
 });
 
+test("PF-100 the generated briefing names the readable copy of the obligations file when the project has none at its root", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const { text } = runDispatchBriefing(argv, depsOf(fx));
+  const line = text.split("\n").find((l) => l.startsWith("Read `templates/prompts/agent-obligations.md`")) ?? "";
+  assert.match(line, /at the repository root first/u);
+  assert.match(line, /\$\{PIPELINE_PLUGIN_ROOT\}\/templates\/prompts\/agent-obligations\.md/u);
+  assert.match(line, /follow it: it carries the closed shell grammar/u);
+});
+
 // AC-187 (item goldfish-test-briefs-lack-targeted-and-quick-command-routes): the emitted briefing carries the three
 // check routes in the order targeted -> quick -> final Verify, never invents a quick command, and leaves the final
 // Verify to the Coordinator. The template wording is pinned in lib/pins/goldfish-test-briefs-lack-targeted-and-quick-command-routes.test.mjs;

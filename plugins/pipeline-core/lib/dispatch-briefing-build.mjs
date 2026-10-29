@@ -241,7 +241,7 @@ export function renderGoldfishBriefing(pkg, generated, calibration, budget = { r
   const verify = calibration.verify === null
     ? "- Final integrated Verify: this project calibrates no Verify command."
     : `- Final integrated Verify — Coordinator owner, after the local candidate exists: \`${calibration.verify}\`; not yours to run.`;
-  const body = `Read \`templates/prompts/agent-obligations.md\` at the repository root first and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
+  const body = `Read \`templates/prompts/agent-obligations.md\` at the repository root first (a project that has no such file reads the identical copy at \`\${PIPELINE_PLUGIN_ROOT}/templates/prompts/agent-obligations.md\`) and follow it: it carries the closed shell grammar, the protected test paths and the commit rules, generated from the guards themselves.
 
 ${generated.block}
 
