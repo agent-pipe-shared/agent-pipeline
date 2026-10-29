@@ -1,8 +1,8 @@
 ---
 name: goldfish-deep
-description: "Agent-Pipeline Goldfish (deep tier, effort xhigh) - fresh-context executor for tasks that genuinely need the full reasoning budget: test-suite/verify authorship, guardrail/hook/canon code, tasks with real in-task design latitude, or class-high risk work. Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); for ordinary clearly-briefed implementation without design latitude, use goldfish-implementor (effort medium) instead - this tier is reserved, not a safe-default upgrade. Delivers diff + condensed evidence-backed report, or a clean stop."
+description: "Agent-Pipeline Goldfish (deep tier, effort high) - fresh-context executor for tasks that genuinely need the full reasoning budget: test-suite/verify authorship, guardrail/hook/canon code, tasks with real in-task design latitude, or class-high risk work. Dispatch ONLY with the complete 6-field briefing (goal, context files, DoD checks, prohibitions, stop conditions, dispatch metadata incl. ruleset SHA); for ordinary clearly-briefed implementation without design latitude, use goldfish-implementor (effort medium) instead - this tier is reserved, not a safe-default upgrade. Delivers diff + condensed evidence-backed report, or a clean stop."
 model: sonnet
-effort: xhigh
+effort: high
 maxTurns: 80
 tools: [Read, Edit, Write, Grep, Glob, Bash]
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
@@ -14,15 +14,16 @@ tools: [Read, Edit, Write, Grep, Glob, Bash]
 #   when enabling worktree isolation.
 # model: sonnet = implement-tier shipped default (MP-02; configured in pipeline.user.yaml ->
 #   models.implement, overridable per project) - the deep tier is implement-tier work run at effort
-#   xhigh, not a separate model tier. The mechanic tier is the floor for a Goldfish dispatch
+#   high, not a separate model tier. The mechanic tier is the floor for a Goldfish dispatch
 #   (MP-03/MP-25 rescope): no weaker model for THIS implementing role; a weakest-tier model is
 #   permitted only for a separate, non-implementing read-only research-fetcher role. Escalation to a
 #   higher-capability (design-tier) model is an ELEPHANT dispatch decision, passed as invocation model
 #   parameter WITH a model justification in briefing field 6 (MP-05) - never self-chosen. Every
 #   dispatch names the model explicitly. CLAUDE_CODE_SUBAGENT_MODEL must stay unset (MP-04) or it
 #   silently overrides this frontmatter.
-# effort: xhigh = the DEEP tier of the 3-tier goldfish effort matrix (MP-27): this is where the
-#   former blanket xhigh standard now lives, scoped down to where it actually matters - test-suite/
+# effort: high = the DEEP tier of the 3-tier goldfish effort matrix (MP-27; PO decision D184,
+#   2026-10-29: high, because xhigh is too expensive for a Goldfish): it is where the
+#   former blanket xhigh standard was scoped down to what actually matters - test-suite/
 #   verify authorship, guardrail/hook/canon code, tasks with genuine in-task design latitude, and
 #   class-high work. Ordinary clearly-briefed implementation belongs to goldfish-implementor (effort
 #   medium, the standard tier) instead; purely mechanical/uniform/pure-plan-execution work belongs to

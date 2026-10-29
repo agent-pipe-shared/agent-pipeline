@@ -52,7 +52,7 @@ const criticDecision = { schema: "pipeline.critic-required-decision.v1",
   trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 1, riskClass: "medium", riskFlag: false,
     diff: { mechanical: false, architecture: true, guardrails: false, security: false } }, appliedRow: "T1" };
 
-// Claude binding effort mirrors the agent definition (owner: agents/<name>.md frontmatter): goldfish-deep declares xhigh, the others medium.
+// Claude binding effort mirrors the agent definition (owner: agents/<name>.md frontmatter): goldfish-deep declares high (PO decision D184, 2026-10-29; was xhigh), the others medium.
 // `options.background` launches the Claude dispatch with an explicit run_in_background: true while the SubagentStop
 // completion route is registered, so the pending state carries completionRoute "subagent-stop". The stop-hook fixtures
 // (meta files, SubagentStop input) live in a directory OUTSIDE the repository root: the host-commit admission compares
@@ -116,7 +116,7 @@ function fixture(run, runner = "claude", adapterVersion = 1, agentName = "goldfi
     return runtime.run(()=> {
       const binding={schema:adapterVersion===2?"pipeline.native-goldfish-host-briefing.v2":"pipeline.native-goldfish-host-briefing.v1",dispatchId:`NGHF-${runner.toUpperCase()}-1`,
         candidateCommit:git("rev-parse","HEAD"),candidateTree:git("rev-parse","HEAD^{tree}"),runner,role:`pipeline-core:${agentName}`,
-        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?(agentName==="goldfish-deep"?"xhigh":"medium"):"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
+        ...(adapterVersion===2?{nativeAgentType:"worker"}:{agentType:agentName}),model:runner==="claude"?"sonnet":"gpt-6-luna",effort:runner==="claude"?(agentName==="goldfish-deep"?"high":"medium"):"high",rulesetSha,allowedPaths:["src/change.mjs"],criticDecision};
       const prompt=`Goldfish task\n<!-- pipeline-native-goldfish-host-commit:v${adapterVersion}\n${JSON.stringify(binding)}\n-->\n${NATIVE_GOLDFISH_HOST_DIRECTIVE}`;
       const input=runner==="claude"?{cwd:root,session_id:"session-claude",hook_event_name:"PreToolUse",tool_name:"Agent",tool_use_id:"tool-claude",tool_input:{subagent_type:binding.role,prompt,run_in_background:background}}
         :{cwd:root,session_id:"session-codex",hook_event_name:"PreToolUse",tool_name:"spawn_agent",tool_use_id:"tool-codex",tool_input:{agent_type:binding.nativeAgentType??binding.agentType,message:prompt}};

@@ -28,9 +28,9 @@ test("parseAgentFrontmatter reads model/effort out of a real agent file's frontm
   assert.deepEqual(resolved, { model: "sonnet", effort: "medium" });
 });
 
-test("resolveAgentModel resolves goldfish-deep to sonnet/xhigh -- the tier the incident confused for a different model", () => {
+test("resolveAgentModel resolves goldfish-deep to sonnet/high (PO decision D184, was xhigh) -- the tier the incident confused for a different model", () => {
   const resolved = resolveAgentModel("goldfish-deep");
-  assert.deepEqual(resolved, { model: "sonnet", effort: "xhigh" });
+  assert.deepEqual(resolved, { model: "sonnet", effort: "high" });
 });
 
 test("resolveAgentModel returns null for an unknown agent type, never throws", () => {

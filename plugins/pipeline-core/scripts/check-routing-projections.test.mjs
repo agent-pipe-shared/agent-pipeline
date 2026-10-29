@@ -146,7 +146,9 @@ const CLAUDE_654EBAF_MODEL_ROUTING = Object.freeze({
   // PO decision 2026-10-16 (decision #22): the Mechanic tier is Haiku at effort
   // medium (MP-03/MP-27); only this one entry deviates from the 654ebaf shape.
   goldfish_mechanic: { model: "haiku", effort: "medium" },
-  goldfish_deep: { model: "sonnet-5", effort: "xhigh" },
+  // PO decision D184 (2026-10-29): the Deep tier is effort high, xhigh is too expensive for a Goldfish;
+  // second entry that deviates from the 654ebaf shape (QG-04: the pin follows the PO decision, it is not weakened).
+  goldfish_deep: { model: "sonnet-5", effort: "high" },
   critic: { model: "sonnet-5", effort: "max" },
 });
 check("RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf", JSON.stringify(projectClaudeManifestRouting(direct)) === JSON.stringify(CLAUDE_654EBAF_MODEL_ROUTING));
