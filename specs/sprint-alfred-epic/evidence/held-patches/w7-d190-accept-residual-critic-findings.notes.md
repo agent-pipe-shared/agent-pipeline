@@ -290,3 +290,26 @@ First run: C11-b..e PASS, C11-a FAIL (waiver mode was "chat", case expects chat-
 Catalog entry plus drift suite, multi-suite comparison, revert proof, po-human-approval kind routing for prepare-critical and authorize-critical, pipeline-state printing, push-prepare closing sentence with its case. Batch Critic, Full Verify and PO acceptance stay pending.
 
 CONTINUATION CARD -- done: production edit and correction round 1; remaining: items under NOT done; next step: catalog entry plus drift suite.
+
+## C13 slice: catalog entry added; drift suite RED in the clone, STOPPED on a companion file outside the allowed list
+
+### Catalog entry (clone; script scratch/agent-out/w7ar9/c13-catalog.mjs)
+Inserted before the critical-action-family entry of plugins/pipeline-core/templates/human-terminal-actions/catalog.json: id and inventoryId accept-residual-critic-findings, revision 1, audience user, disposition legacy-renderer, templateId null, builderId null, producerRefs plugins/pipeline-core/scripts/pipeline-state.mjs#approve-residual-acceptance, all other fields null (modelled on interruption-promotion).
+
+### Drift suite (harness/scripts/check-auth-gate-inventory-drift.test.mjs)
+- clone3 (budget only, log-c13drift3.txt): exit 0, pass 35, fail 0 (as before).
+- clone (log-c13drift.txt): exit 1, pass 33, fail 2:
+  1. "the real repository state passes clean today": AUTH-GATE-UNDOCUMENTED approve-residual-acceptance (discovered in plugins/pipeline-core/scripts/pipeline-state.mjs) is not acknowledged in docs/human-authorization-inventory.md.
+  2. "shipped terminal catalog is immutable and covers unique inventory dispositions": catalog entries length 21, test pins 20 (line 281).
+
+### STOP: files needed outside the allowed list
+- docs/human-authorization-inventory.md: the discoverer must find the subcommand approve-residual-acceptance acknowledged in the doc (for example named in the existing accept-residual-critic-findings row, line 46, alongside its other producers, as the deploy row names approve-deploy).
+- harness/scripts/check-auth-gate-inventory-drift.test.mjs line 281: entry count 20 to 21.
+Neither is in the allowed list, so no further call of the plan (C12 log comparison, lifecycle re-run, revert proof) was run in this slice.
+
+### NOT done
+Docs/inventory and drift-test count edits above (need an allowed-list extension), C12 failing-name comparison from finished logs, lifecycle re-run, revert proof with restore, po-human-approval kind routing for prepare-critical and authorize-critical, pipeline-state printing, push-prepare closing sentence with its case, multi-suite comparison (critical-action-authorization, critical-action-approval-request, push-prepare, po-human-approval, session-critic-finalizer, guard-maintenance-window-kernel-closure, generate-architecture-overview --check). Batch Critic, Full Verify and PO acceptance stay pending.
+
+Patch installed (driver patch install, apply-check against the budget state exit 0).
+
+CONTINUATION CARD -- done: catalog entry; remaining: extend allowed list by docs/human-authorization-inventory.md and harness/scripts/check-auth-gate-inventory-drift.test.mjs, make drift green, then the log comparison, lifecycle re-run and revert proof; next step: apply those two edits in the clone.

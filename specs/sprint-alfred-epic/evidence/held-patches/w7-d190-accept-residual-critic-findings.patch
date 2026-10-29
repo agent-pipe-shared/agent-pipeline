@@ -995,3 +995,34 @@ index 2daf78f02..262e56403 100644
 +
 +assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
 +console.log("D190 residual acceptance C11-a..e complete.");
+diff --git a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+index d7f50d00b..a5eca4b05 100644
+--- a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
++++ b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
+@@ -217,6 +217,26 @@
+       "runners": null,
+       "platforms": null
+     },
++    {
++      "id": "accept-residual-critic-findings",
++      "inventoryId": "accept-residual-critic-findings",
++      "revision": 1,
++      "purpose": "Record the residual Critic findings acceptance terminal-template disposition",
++      "audience": "user",
++      "disposition": "legacy-renderer",
++      "templateId": null,
++      "builderId": null,
++      "producerRefs": [
++        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-residual-acceptance"
++      ],
++      "boundary": null,
++      "mutation": null,
++      "requiresPoApproval": null,
++      "slots": null,
++      "expectedReadback": null,
++      "runners": null,
++      "platforms": null
++    },
+     {
+       "id": "critical-action-family",
+       "inventoryId": "critical-action-family",
