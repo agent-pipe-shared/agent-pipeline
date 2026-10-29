@@ -8802,14 +8802,14 @@
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Analysed only: the probe scripts/time-agent-hooks.mjs is committed (adf52ff77) but the consumer symptom was never reproduced and no timing diagnostic exists in guard-dispatch-budget.mjs.",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Analysed only: the probe scripts/time-agent-hooks.mjs is committed (adf52ff77) but the consumer symptom was never reproduced and no timing diagnostic exists in guard-dispatch-budget.mjs. First Toolbox trace 2026-10-29 (evidence windows-authority-trace-toolbox-2026-10-29.md): a state command takes about 3 s, 88 % in native PowerShell observations at roughly 0.4 to 0.5 s each; the memo as built saves nothing measurable; the dispatch hooks do not emit the trace yet, so the minutes themselves are still unmeasured.",
       "evidence": [
         "backlog/items/2026-10-26-agent-dispatch-pretooluse-step-takes-minutes-in-a-consumer.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "Measure the PreToolUse step in a consumer and add the timing diagnostic."
+          "what": "Let the dispatch hooks emit the authority trace, measure one real dispatch in the consumer, then cut the native spawns (batching or no write probe in read-only paths)."
         },
         {
           "owner": "native-host",
@@ -9067,14 +9067,14 @@
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Bundle of consumer findings. Delivered per sub-finding: PF-58 (29d4b4619), PF-59, PF-64, PF-65 and PF-69 (9ce6c2361); PF-62 and PF-67 are covered by the PF-86 row, PF-61 by the PF-82 row. Not fixed: PF-60 (find -o), PF-66 (slice-queue cancel has no --root); PF-63, PF-68 and PF-70 are partly delivered or not verified. Re-verified 2026-10-29: the PF-59 pin flip (D160) is already applied in 9ce6c2361 (the block-owning update `syncStateMdNextAction(..., { ownBlock: true })` exists and lib/public-handover-duty.test.mjs is 11 of 11 green), so the po-decision entry is closed; PF-63 (obligations path, calibration path) is delivered by 5e2909ee2 except the trailing newline after the marker, which D183 removes; PF-68 (newFiles do not reach allowedPaths) is still open and its intended semantics need a one-line decision.",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Bundle of consumer findings. Delivered per sub-finding: PF-58 (29d4b4619), PF-59, PF-64, PF-65 and PF-69 (9ce6c2361); PF-62 and PF-67 are covered by the PF-86 row, PF-61 by the PF-82 row. Not fixed: PF-60 (find -o), PF-66 (slice-queue cancel has no --root); PF-63, PF-68 and PF-70 are partly delivered or not verified. Re-verified 2026-10-29: the PF-59 pin flip (D160) is already applied in 9ce6c2361 (the block-owning update `syncStateMdNextAction(..., { ownBlock: true })` exists and lib/public-handover-duty.test.mjs is 11 of 11 green), so the po-decision entry is closed; PF-63 (obligations path, calibration path) is delivered by 5e2909ee2 except the trailing newline after the marker, which D183 removes; PF-68 (newFiles do not reach allowedPaths) is still open and its intended semantics need a one-line decision. PF-68 (newFiles join the write scope, PO decision 2026-10-29) is delivered in d0a402b42, source only and unstamped; PF-63 is closed as delivered except the trailing newline that D183 removes.",
       "evidence": [
         "backlog/items/2026-10-26-report-05-consumer-findings.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "PF-60, PF-63, PF-66, PF-68, PF-70 and the PF-65 estimate calibration."
+          "what": "PF-60, PF-66, PF-70 and the PF-65 estimate calibration."
         },
         {
           "owner": "native-host",
