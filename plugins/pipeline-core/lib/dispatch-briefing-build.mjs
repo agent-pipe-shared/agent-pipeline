@@ -68,25 +68,32 @@ export function validateBriefingPackage(pkg) {
   if (pkg.schema !== undefined && pkg.schema !== BRIEFING_PACKAGE_SCHEMA) {
     refuse("DBG-PACKAGE-SCHEMA", `package schema ${JSON.stringify(pkg.schema)} is not ${BRIEFING_PACKAGE_SCHEMA}; repair: set "schema" to ${BRIEFING_PACKAGE_SCHEMA} or omit it`);
   }
+  // The field checks collect every problem, so one answer lists all repairs instead of one per round trip.
+  const problems = [];
+  const note = (code, message) => { problems.push({ code, message }); };
   for (const key of REQUIRED_STRINGS) {
-    if (!nonEmpty(pkg[key])) refuse("DBG-PACKAGE-FIELD-MISSING", `package field "${key}" must be a non-empty string; repair: fill it in the package`);
+    if (!nonEmpty(pkg[key])) note("DBG-PACKAGE-FIELD-MISSING", `package field "${key}" must be a non-empty string; repair: fill it in the package`);
   }
   for (const key of OPTIONAL_STRINGS) {
-    if (pkg[key] !== undefined && !nonEmpty(pkg[key])) refuse("DBG-PACKAGE-FIELD-TYPE", `package field "${key}" must be a non-empty string when present; repair: fill it or remove it`);
+    if (pkg[key] !== undefined && !nonEmpty(pkg[key])) note("DBG-PACKAGE-FIELD-TYPE", `package field "${key}" must be a non-empty string when present; repair: fill it or remove it`);
   }
   if (pkg.reconNote !== undefined && !isReconNotePath(pkg.reconNote)) {
-    refuse("DBG-PACKAGE-FIELD-TYPE", `package field "reconNote" must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")}; repair: write the recon note there and name its path, or remove the field`);
+    note("DBG-PACKAGE-FIELD-TYPE", `package field "reconNote" must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")}; repair: write the recon note there and name its path, or remove the field`);
   }
   for (const key of [...REQUIRED_LISTS, ...OPTIONAL_LISTS]) {
     const value = pkg[key];
     if (value === undefined && OPTIONAL_LISTS.includes(key)) continue;
     if (!Array.isArray(value) || value.length === 0 && REQUIRED_LISTS.includes(key) || !value.every(nonEmpty)) {
-      refuse(REQUIRED_LISTS.includes(key) && value === undefined ? "DBG-PACKAGE-FIELD-MISSING" : "DBG-PACKAGE-FIELD-TYPE",
+      note(REQUIRED_LISTS.includes(key) && value === undefined ? "DBG-PACKAGE-FIELD-MISSING" : "DBG-PACKAGE-FIELD-TYPE",
         `package field "${key}" must be ${REQUIRED_LISTS.includes(key) ? "a non-empty" : "an"} array of non-empty strings; repair: fill it in the package`);
     }
   }
   if (pkg.estimatedToolCalls !== undefined && (!Number.isSafeInteger(pkg.estimatedToolCalls) || pkg.estimatedToolCalls < 1)) {
-    refuse("DBG-PACKAGE-FIELD-TYPE", `package field "estimatedToolCalls" must be a positive integer when present; repair: give the estimated tool calls of the whole test-first cycle`);
+    note("DBG-PACKAGE-FIELD-TYPE", `package field "estimatedToolCalls" must be a positive integer when present; repair: give the estimated tool calls of the whole test-first cycle`);
+  }
+  if (problems.length === 1) refuse(problems[0].code, problems[0].message);
+  if (problems.length > 1) {
+    refuse(problems[0].code, `the package has ${problems.length} field problems, all listed here; ${problems.map((problem, index) => `(${index + 1}) ${problem.message}`).join(" ")}`);
   }
   return pkg;
 }

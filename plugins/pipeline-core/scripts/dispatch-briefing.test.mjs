@@ -616,6 +616,16 @@ test("build refuses an unknown package key and a missing required field, each na
   assert.match(refusedField.message, /"goal".*repair: /u);
 });
 
+test("first dispatch: build reports every field problem of the package in one answer, the first code kept", async () => {
+  const { runDispatchBriefing } = await lib();
+  const bad = packageFixture({ goal: undefined, estimatedToolCalls: 0, facts: "a string" });
+  const refused = runDispatchBriefing(bad.argv, depsOf(bad.fx));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "DBG-PACKAGE-FIELD-MISSING");
+  assert.match(refused.message, /3 field problems/u);
+  for (const field of ["goal", "facts", "estimatedToolCalls"]) assert.match(refused.message, new RegExp(`"${field}".*repair: `, "u"), field);
+});
+
 test("build refuses a repository without a calibration and names how to calibrate", async () => {
   const { runDispatchBriefing } = await lib();
   const { fx, argv } = packageFixture({}, { calibration: false });
