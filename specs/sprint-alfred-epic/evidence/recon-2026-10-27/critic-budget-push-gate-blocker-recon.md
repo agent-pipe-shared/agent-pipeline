@@ -34,6 +34,10 @@ Status: read-only recon, 2026-10-29. No code changed. Source: the PO's relay of 
 
 Authority follows `gates.push_approval` (chat means chat, signature means signature); the acceptance covers P2 and below only; N10 is built immediately in the same candidate as N12 and N13. The path-set question for N10 (which paths count as code) and the carry-forward rule stay with the Elephant's design under the recon's hazards, to be reviewed in the patch.
 
+## Superseded the same evening by D190 (the budget model itself changes)
+
+The PO then set the target model: one full Critic, then diff Critics until PASS or a PO exception, no count refusing a diff round, residue acceptance only for the lowest severity. That makes the counting class of N10 unnecessary (no commit count blocks a diff round) and shrinks N12 to the exception route. The hazards above still bind the new patch: retained records are checked against `REVIEW_LIMITS` in `lib/review-economy.mjs` (`:385-400`, `:485-488`, `:545`, brief limits `:853-865`), so the limits cannot simply be deleted; the lineage must keep validating old records. A second consumer (round 2 FAIL with one major finding, budget empty, `CVL-CRITIC-FAILED`) hits the same wall, so the model change unblocks both once installed, provided the major finding is fixed first.
+
 ## Open design questions for the PO (answered above, kept for the record)
 
 - Is a signed PO acceptance (detached signature, like the push approval) the right authority for N12, or is a chat-recorded acceptance enough here as an attribution record? (The push approval has both modes, ADR-0056.)
