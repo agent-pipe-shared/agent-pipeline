@@ -309,9 +309,13 @@ export function resolveEvidenceRoot(rootDir, { spawnFn = spawnSync } = {}) {
   }
 }
 
+const GIT_TEXT_MAX_BUFFER = 256 * 1024 * 1024;
+
 function gitText(rootDir, args) {
   try {
-    const result = spawnSync("git", args, { encoding: "buffer", cwd: rootDir });
+    // Node's 1 MiB default would silently drop a large tracked-input inventory (`ls-tree -r`) and
+    // turn a healthy repository into `git-identity-unavailable`.
+    const result = spawnSync("git", args, { encoding: "buffer", cwd: rootDir, maxBuffer: GIT_TEXT_MAX_BUFFER });
     return result.status === 0 ? result.stdout : null;
   } catch { return null; }
 }
