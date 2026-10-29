@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c1bb8406a8a161d81d5f44537b60d7098b83a33b9eab7d1f7aabd438f66b39b1"
+    "transitionHead": "7d45f82aca3b0654442623d25c97555fdf2d2a84ffd55e07d1bd1e9e09b68c9e"
   },
   "counts": {
-    "open": 273,
+    "open": 333,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -291,6 +291,16 @@
       "closureEvidence": "backlog/items/2026-08-29-a-node-script-defeats-every-file-protection-guard.md"
     },
     {
+      "id": "pipeline.a-one-off-guard-warning-disarms-an-armed-override",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Elephant, 2026-10-29, measured while diagnosing case 17 of plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs (Pipeline Author Repair), see specs/sprint-alfred-epic/evidence/held-patches/w7-codex-pretool-author-repair-private-state-mode-q1.notes.md",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.a-promoted-feature-can-never-pass-the-plan-gate",
       "status": "closed",
       "type": "defect",
@@ -473,6 +483,16 @@
       "sprint": "nightwing"
     },
     {
+      "id": "pipeline.a-stop-failure-diagnostic-makes-the-native-goldfish-inventory-unreadable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "Observed in the Elephant session of 2026-10-27 after dispatch W6-D174-PF81-PNPMLOCK-C1-20261027 stopped with NGHR-FINAL-JSON",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.a-symlinked-project-root-is-refused-by-the-state-authority-route",
       "status": "open",
       "type": "defect",
@@ -538,6 +558,16 @@
       "closureEvidence": "backlog/items/2026-08-17-a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question.md"
     },
     {
+      "id": "pipeline.abandoned-generic-batch-lock-has-no-sanctioned-recovery-verb",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "PO relay of a consumer session, 2026-10-28 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
       "status": "closed",
       "type": "defect",
@@ -576,6 +606,16 @@
       "closureRepository": "self",
       "closureCommit": "b85613905f13ed153eeb45f90e07a798354c960d",
       "closureEvidence": "backlog/items/2026-08-09-accepted-adrs-contradict-the-implementation-and-nothing-detects-it.md"
+    },
+    {
+      "id": "pipeline.admit-refuses-on-a-held-packet-it-would-resume",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "PO relay of a consumer session, 2026-10-28 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.adr-0045-topology-divergence-from-package-and-skill",
@@ -809,6 +849,26 @@
       "closureRepository": "self",
       "closureCommit": "08684e7874b79c04a44601c487f343be0dfaefa5",
       "closureEvidence": "backlog/items/2026-08-07-agent-definitions-pin-the-review-tier-model.md"
+    },
+    {
+      "id": "pipeline.agent-dispatch-leaves-a-dead-registry-lock-that-blocks-the-next-dispatch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Elephant session 2026-10-26 on the WSL PC: two consecutive Agent dispatches, the second refused with SDC-LOCK-HELD; plus the PO's consumer reports that user repositories cannot dispatch without an error",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.agent-dispatch-pretooluse-step-takes-minutes-in-a-consumer",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO paste of a consumer session (Windows terminal), 2026-10-26: the Agent call shows 'running PreToolUse hooks 3/4 · 4m 40s'",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.agent-never-asks-po-for-key-directory-invents-one-instead",
@@ -1809,6 +1869,16 @@
       "closureEvidence": "backlog/evidence/2026-09-03-nova-b-batch-2-closure-verification.md"
     },
     {
+      "id": "pipeline.briefing-dispatch-needs-hand-retyping",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO remarks during the D165 fix wave, 2026-10-26: the briefing generator is used permanently and must work reliably; later the same day a consumer repository session hit the same refusal on its first dispatch (CMS-ADMIN-ACCESS-01) and the PO noted that user repositories can never dispatch without an error",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.briefing-generator-is-not-a-product-capability",
       "status": "open",
       "type": "requirement",
@@ -1831,6 +1901,26 @@
       "closureRepository": "self",
       "closureCommit": "e7d729042a1dfdf6439c74959b143eade6d7870c",
       "closureEvidence": "backlog/items/2026-08-08-a-briefings-model-field-can-contradict-the-agent-it-dispatches.md"
+    },
+    {
+      "id": "pipeline.brownfield-architecture-deferral-blocks-implementation-entry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO observation in a consumer repository, relayed in chat 2026-10-26: a brownfield project could defer architecture adoption at onboarding, but the switch to implementation then demanded it and forced reopen-design; PO direction D162",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.brownfield-architecture-gate-never-passes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of a consumer handover (Toolbox, Windows), 2026-10-26, on the D163 hotfix candidate; full handover with code sites, fix proposals and a regression test is on the PO's Windows machine at D:/Dev/Web/Toolbox/scratch/defekt-uebergabe-architektur-gate.md (not yet in this repository)",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.brownfield-implementation-entry-demands-a-greenfield-design-block",
@@ -1863,6 +1953,16 @@
       "owner": "pipeline",
       "created": "2026-10-05",
       "source": "Observed live, Alfred session, 2026-10-05.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.budget-exhaustion-is-a-checkpoint-the-elephant-answers-not-a-failed-stop",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "PO direction 2026-10-27: dispatches should report to the Elephant at budget exhaustion and keep running; the Elephant decides to let them run or abort",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -2834,6 +2934,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.consumer-defined-scanner-exceptions-need-a-po-approved-route",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "PO, 2026-10-29 (answer to the PF-99 decision): a path in which, with a PO exception, a user repository can define further exceptions as well; Elephant triage 2026-10-29",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.consumer-must-allowlist-every-runner-lane",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2861,6 +2971,16 @@
       "closureRepository": "self",
       "closureCommit": "4b730f41e036238369a5aba74057139f8581ed88",
       "closureEvidence": "backlog/evidence/2026-08-10-goldfish-dispatch-instruction-closure.md"
+    },
+    {
+      "id": "pipeline.consumer-push-blocked-by-late-review-unit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of a consumer handover (push block), 2026-10-26, plugin 0.7.0+claude.20261026134650.9ce6c23 local-development; preflight and onboarding ready, hooks refreshed",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json",
@@ -2966,6 +3086,16 @@
       "closureEvidence": "backlog/evidence/2026-09-12-hgo-crash-and-idempotency-critic-pass.md"
     },
     {
+      "id": "pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "Consumer blocker relayed 2026-10-27 (Glossover, PF-79, handover-07 Nachtrag 2) on the installed build 0.7.0+claude.20261026222010.17e002a: Epic 1 cannot start its Critic, so there is no signed push",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
       "status": "closed",
       "type": "workflow-improvement",
@@ -3005,6 +3135,36 @@
       "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
     },
     {
+      "id": "pipeline.critic-delta-round-has-no-sanctioned-way-to-build-its-delta-request",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "PO relay of a consumer session, 2026-10-28 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.critic-diagnostic-evidence-has-no-sanctioned-route-into-the-feature-manifest",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of a consumer handover (Critic blocker on the signed-push path), 2026-10-26; the consumer's anonymised handover note is not in this repository",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the consumer handover (glossover path, 2026-10-26, finding PF-78, installed build 0.7.0+claude.20261026181519.1bcce7a): after the CDR patch the signed push is still impossible because producer and registrar of the Critic diagnostic evidence demand different locations",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.critic-dispatches-cannot-persist-their-scratch-notes",
       "status": "closed",
       "type": "defect",
@@ -3017,6 +3177,16 @@
       "closureRepository": "self",
       "closureCommit": "6b8bb0585d4cdfd6838b372f927e5e54394e3dec",
       "closureEvidence": "specs/sprint-alfred-epic/evidence/c2-economics-operations.md"
+    },
+    {
+      "id": "pipeline.critic-finalizer-cli-reports-scf-internal-without-the-cause",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "Consumer finding relayed 2026-10-27 (Glossover, PF-80): the admit step printed only SCF-INTERNAL; the real cause was found only by calling the same function directly",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.critic-md-protected-preimage-drift",
@@ -3032,6 +3202,26 @@
       "closureRepository": "self",
       "closureCommit": "2c38d704f88685a58e8b580a9a3a9f6e9276e78e",
       "closureEvidence": "backlog/items/2026-09-06-roles-critic-md-drifted-from-its-pinned-protected-preimage-hash.md"
+    },
+    {
+      "id": "pipeline.critic-packet-claimed-under-an-older-version-cannot-finalize",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "PO relay of a consumer session, 2026-10-28 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.critic-range-with-state-or-handover-files-has-no-admissible-briefing",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "Hit live, 2026-10-28, by a consumer repository: a feature-course Critic stopped with a briefing violation before reading anything; checked afterwards against templates/prompts/critic-review.md, harness/review-protocol.md section 2.2 and roles/critic.md.",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
@@ -3351,6 +3541,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.design-course-and-registrar-disagree-on-the-feature-directory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, findings D7, D15, D16, D17, D24): the design course wrote the PRD and Spec to a date-prefixed folder the feature package registrar rejects; the correction cost three signatures, one passphrase ceremony, one discard-feature and one new review round",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.design-course-does-not-name-the-criterion-renderings-the-delivery-course-admits",
       "status": "open",
       "type": "defect",
@@ -3545,6 +3745,26 @@
       "owner": "pipeline",
       "created": "2026-09-29",
       "source": "0.7 evening integration: three disjoint exact native actions were signed and armed; delivering the nine-file action changed whole-repository status and invalidated the two remaining capabilities despite unchanged tool-input digests and target preimages. See scratch/0.7-evening-signature-batch-20260929/serial-override-invalidates-disjoint-plans.md.",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.dispatch-admission-holds-the-registry-lock-for-minutes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Elephant session 2026-10-26: three consecutive background Agent dispatches hung in the PreToolUse hooks (3 of 4 finished, over five minutes) and were interrupted by the PO; each interrupt left a dead registry lock; measured with a CPU profile of guard-dispatch.mjs",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.dispatch-authority-store-check-fails-on-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, finding D25, build 0.7.0+claude.20261026152532.b8a2ec6): the first Goldfish dispatch fails before start with SDC-AUTHORITY-UNAVAILABLE / item-delivery-registry-initialization-failed (AGY-AUTHORITY-PRIVATE-PATH)",
       "deferred": false,
       "sprint": "alfred"
     },
@@ -3837,6 +4057,16 @@
       "source": "Reconstructed 2026-10-23 with explicit PO permission for exactly this file (decision tile batch 8, row 17). The original item file has no git history; this text is derived 1:1 from the acceptance points in the header of plugins/pipeline-core/lib/pins/domain-scanner-findings-need-reproduction-before-remedy.test.mjs (ALF-C-P21-05 / AC-166).",
       "deferred": false,
       "sprint": "none"
+    },
+    {
+      "id": "pipeline.draft-guard-blocks-the-sanctioned-recovery-wrappers",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, findings D21 and the open rest of D3): phoenix-authority-revision.mjs plan|apply and materialize-architecture are refused in draft as opaque-script-execution",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.draft-phase-blocks-commit-and-unstage-of-po-concept-files",
@@ -4240,6 +4470,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-runner-usage-selectors-closure.md"
     },
     {
+      "id": "pipeline.finalized-legacy-packet-receipt-digest-refused-by-export",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "PO relay of a consumer session, 2026-10-28 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.first-enrollment-enters-retirement-before-consent",
       "status": "open",
       "type": "defect",
@@ -4262,6 +4502,16 @@
       "closureRepository": "self",
       "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
       "closureEvidence": "backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md"
+    },
+    {
+      "id": "pipeline.fitness-class-6-blocks-documentation-modules-without-a-verification-entry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, finding D9): GUARD-ARCHITECTURE-FITNESS-NON-GREEN from class 6 for a documentation module",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.fitness-denial-names-no-finding-and-inspect-recommends-the-refused-transition",
@@ -4469,6 +4719,16 @@
       "closureRepository": "self",
       "closureCommit": "a80236d874b214f14593f1504ba9c4e7c3171234",
       "closureEvidence": "backlog/items/2026-08-27-gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard.md"
+    },
+    {
+      "id": "pipeline.gate-strength-shell-refuses-admitted-reads",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Elephant session on the D163 hotfix candidate 0.7.0+claude.20261026134650.9ce6c23, 2026-10-26",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit",
@@ -5158,6 +5418,166 @@
       "closureEvidence": "backlog/evidence/2026-08-08-consumer-seed-calibration-closure.md"
     },
     {
+      "id": "pipeline.greenfield.g33.post-close-push-continuity",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Greenfield Burg/AGY report §2 P1 (burg-agy.G33), intake 2026-10-25",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.agent-frontmatter-effort-overrides-configured-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO observation 2026-10-26: dispatches ran at xhigh although the config routes medium",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.behavioral-evidence-oracle",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.branch-checkout-runtime-continuity",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.concurrent-hooks-refuse-dispatch-on-registry-lock",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Live Claude Elephant session on the WSL PC, 2026-10-26",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.critic-diagnostic-evidence-carry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.critic-finalizer-original-independence",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.critic-generated-manifest-reference",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.critic-validation-transaction-recovery",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.guard-denials-fill-the-override-request-namespace",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Live WSL PC re-entry 2026-10-26; PO decision Q17 (a)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.onboarding-identity-and-actor-reuse",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.ref-updating-git-runs-before-bootstrap",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO observation 2026-10-26 (WSL PC); PO decision Q18",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.transfer-invalidates-plan-approval",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Live WSL PC re-entry after the 2026-10-25 PC/runner transfer (D155)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.windows-lock-release-postcondition",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.windows-main-entry-identity",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.greenfield.r2.windows-session-lock-owner-recovery",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-25",
+      "source": "PO-supplied second Greenfield reports, consolidated under D152",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit",
       "status": "closed",
       "type": "idea",
@@ -5284,6 +5704,16 @@
       "closureRepository": "self",
       "closureCommit": "5283618ea8f2b81cc7756c1b0d22679c15476733",
       "closureEvidence": "plugins/pipeline-core/hooks/hooks.json"
+    },
+    {
+      "id": "pipeline.guard-dispatch-suite-red-before-the-hotfix",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "D165 fix wave, 2026-10-26: baseline measurement of hooks/guard-dispatch.test.mjs in fresh clones",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally",
@@ -5643,6 +6073,16 @@
       "closureEvidence": "backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md"
     },
     {
+      "id": "pipeline.half-moved-feature-directory-locks-every-shell-and-source-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, findings D14 and D18): a half-finished move of the bound spec folder locked every shell and every source write, including scratch/",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.half-the-dispatch-records-omit-the-field-that-binds-them-to-their-commit",
       "status": "closed",
       "type": "defect",
@@ -5793,6 +6233,16 @@
       "closureRepository": "self",
       "closureCommit": "c8dee9d47692fd5f87a6a3f4cc15a666cc7fb247",
       "closureEvidence": "backlog/items/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md"
+    },
+    {
+      "id": "pipeline.held-kernel-patch-dispatches-do-not-fit-the-implementor-cap",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "WSL PC session 2026-10-26: eleven goldfish-implementor dispatches building held kernel patches; follow-up of the closed item 2026-09-06-briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.heredoc-fed-to-non-shell-command-runners-is-data-to-the-push-classifier",
@@ -6840,6 +7290,16 @@
       "closureEvidence": "backlog/README.md"
     },
     {
+      "id": "pipeline.missing-docs-adr-directory-blocks-implementation-entry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, finding D8): set-phase implementation refused with ARCHITECTURE-DECISION-APPLICABILITY-BLOCKED (ARCH-DECISION-SOURCE-UNAVAILABLE) in a project without ADRs",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have",
       "status": "closed",
       "type": "defect",
@@ -7614,6 +8074,16 @@
       "closureEvidence": "backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md"
     },
     {
+      "id": "pipeline.osv-findings-have-no-reviewed-waiver-route",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Consumer handover (PF-99 part b), 2026-10-29; Elephant triage 2026-10-29",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.outside-root-read-label-skips-option-value-file-tokens",
       "status": "open",
       "type": "defect",
@@ -7684,6 +8154,16 @@
       "closureRepository": "self",
       "closureCommit": "6919b55bd7d2b68255ab7ed1d820adec63dea369",
       "closureEvidence": "backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md"
+    },
+    {
+      "id": "pipeline.p0-p1-findings-round-3-toolbox-and-glossover",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "PO intake message and the consumer hand-overs of 2026-10-27 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
@@ -8250,6 +8730,16 @@
       "closureEvidence": "backlog/evidence/2026-08-11-po-keydir-01-landed.md"
     },
     {
+      "id": "pipeline.po-key-directory-fills-up-with-signing-artifacts",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO remark 2026-10-26 with a directory listing of the PO key directory on a Windows consumer machine",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.po-key-trust-anchor-onboarding",
       "status": "closed",
       "type": "workflow-improvement",
@@ -8289,6 +8779,16 @@
       "closureRepository": "self",
       "closureCommit": "09696633932428f93c5a9c097a715730f01f994a",
       "closureEvidence": "backlog/items/2026-08-29-po-signing-key-pointer-does-not-cross-wsl-windows-boundary.md"
+    },
+    {
+      "id": "pipeline.po-standing-directions-must-be-enforced-not-remembered",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "Elephant session 2026-10-27: after a context compaction three acknowledged PO directions were dropped; PO direction that hooks, templates and hand-backs carry such rules fresh",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.post-compact-reground-carries-no-state-md-narrative",
@@ -8425,6 +8925,16 @@
       "closureRepository": "self",
       "closureCommit": "1522567a0e69d4b720b9e052f7e8d33861e7ce99",
       "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
+    },
+    {
+      "id": "pipeline.preflight-establishes-runner-prerequisites",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO decision D164 (3), 2026-10-26, after the hotfix install on the WSL PC",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.preflight-hides-the-git-error-behind-gs-git-unavailable",
@@ -8788,6 +9298,16 @@
       "closureRepository": "self",
       "closureCommit": "3783c88ac6a366ea2082f0db61be638d164d43ee",
       "closureEvidence": "backlog/evidence/2026-08-30-nova-open-item-code-map.md"
+    },
+    {
+      "id": "pipeline.push-approval-record-folds-at-push-close",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "Re-entry handover on the WSL PC, 2026-10-26, reproduced the trailing push-approval write after the closed item pipeline.push-approval-record-always-trails-the-signed-commit; PO decision D161 (Q21 (a))",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
@@ -9514,6 +10034,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.report-05-consumer-findings",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO consumer report pipeline-feedback-05 (findings PF-58 to PF-70, plugin 0.7.0+claude.20261025134513.977dad8), relayed 2026-10-26",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
       "status": "closed",
       "type": "defect",
@@ -9744,6 +10274,16 @@
       "sprint": "alfred"
     },
     {
+      "id": "pipeline.routine-repair-loop-must-not-need-the-human",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "PO direction 2026-10-27: routine repairs run without asking and are only reported, as a rule for every user repository; the frequency of the repair loops must stop",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
       "status": "closed",
       "type": "defect",
@@ -9857,6 +10397,16 @@
       "closureRepository": "self",
       "closureCommit": "6970805a573550ddf7835f28f80dae83e66b4851",
       "closureEvidence": "backlog/evidence/2026-09-17-precommit-hook-sandbox-reclassification.md"
+    },
+    {
+      "id": "pipeline.scan-exception-commits-spend-the-critic-correction-budget",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Consumer handover (PF-99 part d), 2026-10-29; Elephant triage 2026-10-29",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.scanner-bootstrap-is-not-self-sufficient",
@@ -10969,6 +11519,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.the-first-dispatch-in-a-consumer-repository-takes-four-guard-round-trips",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO consumer run 2026-10-26: about eight minutes and two dozen tool calls for a first native dispatch that was still not admitted",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.the-guard-git-test-is-past-its-line-bound",
       "status": "open",
       "type": "defect",
@@ -11297,6 +11857,16 @@
       "closureRepository": "self",
       "closureCommit": "1bfe7fe57d978f12bf8790606e232dcb7cdc09a2",
       "closureEvidence": "backlog/evidence/2026-09-18-dispatch-tool-budget-enforcement-closure.md"
+    },
+    {
+      "id": "pipeline.toolbox-session-friction-and-feature-wishes",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO relay of the Toolbox consumer handover (Windows, 2026-10-26, findings D10-D13, D19, D20, D22, D23, D26 and two side findings), classified P2/P3 by the consumer",
+      "deferred": false,
+      "sprint": "none"
     },
     {
       "id": "pipeline.tp-ceremony-denials-inline-a-150-line-multi-shell-block-by-default",
@@ -11808,6 +12378,16 @@
       "closureEvidence": "backlog/evidence/2026-09-18-browser-evidence-preflight-strength-closure.md"
     },
     {
+      "id": "pipeline.verify-for-an-older-commit-demands-package-lock-in-a-pnpm-project",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-27",
+      "source": "Consumer finding relayed 2026-10-27 (Glossover, PF-81): Verify for an older commit asks for package-lock.json although the project uses pnpm",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.verify-gate-scoped-registration",
       "status": "closed",
       "type": "workflow-improvement",
@@ -12052,6 +12632,16 @@
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
+      "id": "pipeline.windows-directory-fsync-eperm-blocks-critic-admit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-28",
+      "source": "PO relay of a consumer session, 2026-10-28 (see the item body)",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.windows-greenfield-scratch-write-denied",
       "status": "open",
       "type": "defect",
@@ -12117,6 +12707,16 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.windows-private-state-check-counts-acls-inherited-from-above-the-repository",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-26",
+      "source": "PO consumer run 2026-10-26 (brownfield repo on a Windows data drive, first native dispatch after implementation entry): guard-dispatch blocked with CVCT-FILE although the plan was approved",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.windows-runtime-baseline-containment",
