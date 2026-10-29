@@ -1,0 +1,44 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index 3201ef5ad..4ab436b6b 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -326,6 +326,9 @@ below assumes it holds and is written to catch a change that would break it.
+   The pure validation half split out of `lib/critic-review-lineage.mjs`
+   (`lib/critic-review-lineage-core.mjs`, imported by that kernel path and re-exported
+   unchanged) is protected for the same reason.
++  The Critic preflight, the session finalizer and the diagnostic producer also import
++  `lib/critic-correction-input-bindings.mjs`, `lib/critic-packet-release.mjs`, and
++  `lib/critic-required-guardrails.mjs`, which are protected for the same reason.
+   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
+ - The 2026-09-27 design-workflow, model-role and readiness closure adds:
+   `lib/design-workflow-package.mjs`, `lib/design-workflow-approval.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+index b8f1a364c..2a4e4b3ae 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+@@ -255,7 +255,9 @@ const DYNAMIC_IMPORT_EDGES = {
+     },
+   ],
+   // CLOSURE-REPAIR (Ruling 86a): the human-override script loads the toolchain coordinator lazily.
++  // It has a second call site that loads the PO key-directory resolver from po-human-approval.mjs.
+   "plugins/pipeline-core/scripts/guard-human-override.mjs": [
++    "./po-human-approval.mjs",
+     "./toolchain-preflight.mjs",
+   ],
+   // NVA-CF-GMWKC-RETRY: pre-commit-hook-install.mjs's renderImpl() template-string
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 67a5f3fff..a91aa4f91 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -530,6 +530,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   "plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs",
+   "plugins/pipeline-core/scripts/critic-packet-preflight.mjs",
+   "plugins/pipeline-core/scripts/session-critic-finalizer.mjs",
++  // Modules imported by the Critic preflight, the session finalizer and the diagnostic producer
++  // (GMWKC01): correction input bindings, required guardrails, and packet release.
++  "plugins/pipeline-core/lib/critic-correction-input-bindings.mjs",
++  "plugins/pipeline-core/lib/critic-packet-release.mjs",
++  "plugins/pipeline-core/lib/critic-required-guardrails.mjs",
+   // The session Critic finalizer selects its admitted model through this
+   // route resolver. Keep both the resolver and its dynamically loaded
+   // host-managed bootstrap in the kernel: changing either could alter the
