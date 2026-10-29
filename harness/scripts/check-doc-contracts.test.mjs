@@ -1301,7 +1301,7 @@ test("a vendored link exclusion that stops matching is reported, and stays inert
 });
 
 test("every shipped vendored link exclusion is justified by a byte-identical origin whose links resolve", () => {
-  const tracked = new Set(execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8" }).split("\0").filter(Boolean));
+  const tracked = new Set(execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }).split("\0").filter(Boolean));
   assert(VENDORED_LINK_EXCLUSIONS.length > 0, "the exclusion list must not be silently emptied");
 
   for (const entry of VENDORED_LINK_EXCLUSIONS) {
