@@ -1,0 +1,57 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 381cd5cbf..a9078e459 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -18,7 +18,7 @@ const H = (c) => c.repeat(64);
+ const O = (c) => c.repeat(40);
+ const path = "src/example.mjs";
+ const packet = (index) => {
+-  const chars = ["1", "2", "3", "4", "5", "6"];
++  const chars = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c"];
+   const base = O(chars[index]);
+   const commit = O(chars[index + 1]);
+   return {
+@@ -372,6 +372,43 @@ test("CCA15 a new full review cannot be admitted after retained findings", () =>
+   assert.equal(decision.admission.code, "RE-FOLLOWUP-DELTA-REQUIRED");
+ });
+ 
++test("D190 (a) a course at the old round limit admits a DIFF round, and the round after it", () => {
++  for (const retainedCount of [4, 5]) {
++    const rows = fourRoundHistory(retainedCount);
++    const next = packet(retainedCount);
++    const decision = deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 1, requestedMode: "delta", delta });
++    assert.equal(decision.attempt.round, retainedCount + 1);
++    assert.equal(decision.admission.ok, true);
++    assert.equal(decision.admission.mode, "delta");
++    assert.equal(decision.parentRecordSha256, rows.at(-1).recordSha256);
++  }
++});
++
++test("D190 (a2) a course past the old correction-commit limit admits a DIFF round", () => {
++  const rows = fourRoundHistory(2);
++  const next = packet(2);
++  const decision = deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 5, requestedMode: "delta", delta });
++  assert.equal(decision.attempt.correctionCommits, 6);
++  assert.equal(decision.admission.ok, true);
++  assert.equal(decision.admission.mode, "delta");
++});
++
++test("D190 (b) a FULL request after a consumed round is still refused, also past the old limits", () => {
++  const rows = fourRoundHistory(4);
++  const decision = deriveCriticCourseAdmission({ history: rows, candidate: { base: rows.at(-1).candidate.commit, commit: O("6"), tree: O("7") }, correctionCommitsInRange: 1, requestedMode: "full", delta: {} });
++  assert.equal(decision.admission.ok, false);
++  assert.equal(decision.admission.code, "RE-CRITIC-ROUND-LIMIT");
++  const early = deriveCriticCourseAdmission({ ...correction(), requestedMode: "full", delta: {} });
++  assert.equal(early.admission.ok, false);
++  assert.equal(early.admission.code, "RE-FOLLOWUP-DELTA-REQUIRED");
++});
++
++test("D190 (c) a DIFF round past the old limits whose range has no correction commit is still refused", () => {
++  const rows = fourRoundHistory(4);
++  const next = packet(4);
++  assert.throws(() => deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 0, requestedMode: "delta", delta }), rejects("CCA-CORRECTION-RANGE"));
++});
++
+ function runtimeRequest(fx, overrides = {}) {
+   return { repoRoot: fx.root, featureId: fx.featureId, baseCommit: fx.genesisCommit, candidateCommit: fx.candidateCommit, registrationCommit: fx.candidateCommit, requestedMode: "delta", acceptedReference: null, criterionLocator: null, deltaRequestPath: null, ...overrides };
+ }
