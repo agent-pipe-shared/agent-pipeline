@@ -34,7 +34,7 @@ index 9c0f32d78..46b243dce 100644
    assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
    assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
 diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
-index 281878aa5..2f0b6defb 100644
+index 281878aa5..3c70c8b1d 100644
 --- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
 +++ b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
 @@ -25,6 +25,8 @@ import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission
@@ -46,13 +46,20 @@ index 281878aa5..2f0b6defb 100644
  const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
  const SHA = /^[a-f0-9]{64}$/u;
  const PACKET = /^[a-f0-9]{32}$/u;
-@@ -45,6 +47,33 @@ function recordPath(privateRoot, id) {
+@@ -45,6 +47,40 @@ function recordPath(privateRoot, id) {
    return join(privateRoot, "critic-verify-lifecycle", `${id}.json`);
  }
  
 +/** Derived id of one open Critic finding (verdict findings carry no id of their own). */
 +export function residualFindingId(finding) {
 +  return sha256(canonicalJson(finding));
++}
++
++/** The subject a PO residual acceptance is bound to; one definition for the signature route and the chat route. */
++export function residualAcceptanceSubject({ receipt, findings }) {
++  return { criticReceiptSha256: sha256(canonicalJson(receipt)),
++    findings: findings.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
++      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
 +}
 +
 +// A failed receipt qualifies only through a PO acceptance bound to the exact open findings, all minor.
@@ -80,7 +87,7 @@ index 281878aa5..2f0b6defb 100644
  /**
   * Read a consumed Critic receipt from its private packet and prove that the
   * receipt is the receipt for that packet's exact candidate and diff.  A
-@@ -71,12 +100,20 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
+@@ -71,12 +107,20 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
      || packet.diff?.commit !== critic.reviewRange.commit || packet.diff?.sha256 !== critic.reviewRange.diffSha256) {
      fail("CVL-CRITIC-PACKET-MISMATCH", "Private Critic receipt is not bound to its consumed packet.");
    }
@@ -103,7 +110,7 @@ index 281878aa5..2f0b6defb 100644
  }
  
  const CRITIC_HOST_OBSERVATION_SCHEMA = "pipeline.critic-host-observation.v1";
-@@ -194,12 +231,14 @@ export function recordCriticVerifyLifecycle({ repoRoot = null, featureId = null,
+@@ -194,12 +238,14 @@ export function recordCriticVerifyLifecycle({ repoRoot = null, featureId = null,
    const criticReceiptSha256 = bound.criticReceiptSha256;
    const id = criticVerifyLifecycleId({ candidate: sourceCandidate, criticPacketId, verifyEvidenceSha256 });
    const receipt = Object.freeze({
@@ -119,7 +126,7 @@ index 281878aa5..2f0b6defb 100644
    });
    const target = recordPath(privateRoot, id);
    mkdirSync(join(privateRoot, "critic-verify-lifecycle"), { recursive: true, mode: 0o700 });
-@@ -225,9 +264,10 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
+@@ -225,9 +271,10 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
    let receipt;
    try { receipt = JSON.parse(readFileSync(target, "utf8")); } catch { fail("CVL-RECEIPT-UNAVAILABLE", "Private Critic/Verify lifecycle receipt is unavailable."); }
    const carrying = receipt?.schema === CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA;
@@ -132,7 +139,7 @@ index 281878aa5..2f0b6defb 100644
      || receipt.id !== id || !candidate(receipt.candidate)
      || receipt.candidate.commit !== sourceCandidate.commit || receipt.candidate.tree !== sourceCandidate.tree
      || !exact(receipt.critic, ["packetId", "packetDigest", "receiptSha256", "verdictSha256", "reviewRange"])
-@@ -266,6 +306,10 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
+@@ -266,6 +313,10 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
    }
    const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId: receipt.critic.packetId,
      candidate: carry === null ? sourceCandidate : carry.proof.reviewedCandidate }, deps);
@@ -631,7 +638,7 @@ index a9052295e..c5b8104ee 100644
  
  /**
 diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
-index c14dd36bb..113ea6d45 100644
+index c14dd36bb..2161fbef1 100644
 --- a/plugins/pipeline-core/scripts/pipeline-state.mjs
 +++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
 @@ -533,7 +533,8 @@ import {
@@ -639,8 +646,8 @@ index c14dd36bb..113ea6d45 100644
  } from "./publication-close-journal.mjs";
  import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
 -import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
-+import { readCriticVerifyLifecycle, residualFindingId } from "../lib/critic-verify-lifecycle.mjs";
-+import { canonicalJson as residualCanonicalJson, sha256 as residualSha256, readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
++import { readCriticVerifyLifecycle, residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
++import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
  import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
  import { isDirectInvocation } from "../lib/entrypoint.mjs";
  import {
@@ -714,9 +721,9 @@ index c14dd36bb..113ea6d45 100644
 +    console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
 +    return 2;
 +  }
-+  const criticReceiptSha256 = residualSha256(residualCanonicalJson(receipt));
-+  const findings = rawFindings.map((finding) => ({ id: residualFindingId(finding), severity: finding.severity }))
-+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
++  const { criticReceiptSha256, findings } = residualAcceptanceSubject({
++    receipt, findings: rawFindings,
++  });
 +  if (findings.length === 0 || findings.some((finding) => finding.severity !== "minor")) {
 +    console.error("Error: approve-residual-acceptance refused (RESIDUAL-PROOF-SEVERITY); only findings of the lowest severity (minor) can be accepted, a blocker or major finding never.");
 +    return 2;
@@ -1008,6 +1015,284 @@ index 2daf78f02..262e56403 100644
 +
 +assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
 +console.log("D190 residual acceptance C11-a..e complete.");
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.mjs b/plugins/pipeline-core/scripts/po-human-approval.mjs
+index ad73ca4dc..4c457df8f 100755
+--- a/plugins/pipeline-core/scripts/po-human-approval.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.mjs
+@@ -32,6 +32,8 @@ import { decodeTypedLine, runOwnedPoHumanApprovalCeremony } from "../lib/chat-ga
+ import { inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+ import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
++import { residualAcceptanceSubject } from "../lib/critic-verify-lifecycle.mjs";
++import { readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { SIGNED_QUALITY_PACKAGE_SCHEMA, describeSignedQualityPackageIntent, physicalQualityPackageFile } from "../lib/signed-quality-package.mjs";
+ import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+ import { describeHumanGuardOverrideSelection, describeHumanGuardOverrideSignatureRequest } from "../lib/human-guard-override.mjs";
+@@ -1023,7 +1025,8 @@ function suggestSubcommand(input, candidates) {
+  * disclosure lines (see `releasePreflightConfirmationLines`) -- no
+  * governance-fork-disposition-style verification bypass concern either.
+  */
+-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion"]);
++const RESIDUAL_ACCEPTANCE_KIND = "accept-residual-critic-findings";
++const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", RESIDUAL_ACCEPTANCE_KIND]);
+ const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+ const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+ 
+@@ -1073,7 +1076,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
+     const key = tokens[index]; const value = tokens[index + 1];
+     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
+     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
+-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
++    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "criticPacket", "expiresAt", "intentSha256", "request", "repositoryFingerprint", "streamId", "sequence", "existingKey"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+     supplied.add(normalized); values[normalized] = value; index += 1;
+   }
+   // GF-104: keyReference always carries a default ("local-po-key") even when the
+@@ -1141,6 +1144,12 @@ export function parseHumanArgs(argv, dependencies = {}) {
+   // re-reads an existing record must not be forced to repeat a name it already has.
+   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
+   if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
++  // D190: the residual acceptance subject is computed from the consumed Critic packet and from nothing else.
++  if (values.criticPacket !== undefined && !(command.endsWith("-critical") && values.kind === RESIDUAL_ACCEPTANCE_KIND)) return { error: `${USAGE}\n--critic-packet is only valid for --kind ${RESIDUAL_ACCEPTANCE_KIND} with prepare-critical or authorize-critical.` };
++  if (values.kind === RESIDUAL_ACCEPTANCE_KIND && (command === "prepare-critical" || command === "authorize-critical")) {
++    if (values.subject !== undefined) return { error: `${USAGE}\n${RESIDUAL_ACCEPTANCE_KIND} takes no --subject: the subject is computed from the consumed Critic packet named by --critic-packet.` };
++    if (!/^[a-f0-9]{32}$/u.test(values.criticPacket ?? "")) return { error: `${USAGE}\n${RESIDUAL_ACCEPTANCE_KIND} requires --critic-packet <32 lowercase hexadecimal characters>.` };
++  }
+   // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-
+   // the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request` is an
+   // ALTERNATIVE source for the digest, never a second one accepted alongside
+@@ -1836,6 +1845,43 @@ function resolveSubjectPreimage({ args, repository, candidate }) {
+   return preimage;
+ }
+ 
++/**
++ * D190: the subject of a PO acceptance of residual Critic findings, rebuilt from the consumed
++ * Critic packet (receipt digest plus every open finding id and severity) through the one shared
++ * definition. A non-minor or an empty finding list is refused before any prompt or write; a
++ * typed --subject-sha256 must agree with the rebuilt digest, never replace it.
++ */
++function resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies }) {
++  const controlRoot = join(gitCommonDir, "agent-pipeline", "critic-packets");
++  const packetId = args.criticPacket;
++  let receipt;
++  let findings;
++  try {
++    receipt = (dependencies.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt)({ controlRoot, packetId }).receipt;
++    findings = (dependencies.readOpenFindingsFn ?? (({ controlRoot: root, packetId: id }) => readConsumedCandidateResult({ controlRoot: root, packetId: id }).result.verdict.findings))({ controlRoot, packetId });
++  } catch (error) { fail(`critical approval request is invalid: the consumed Critic packet could not be read (${typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"})`); }
++  if (!receipt || !Array.isArray(findings)) fail("critical approval request is invalid: the consumed Critic packet could not be read (CRITIC-PACKET-UNREADABLE)");
++  if (findings.length === 0 || findings.some((finding) => finding?.severity !== "minor")) {
++    fail("critical approval request is invalid (RESIDUAL-PROOF-SEVERITY): only findings of the lowest severity (minor) can be accepted, a blocker or major finding never");
++  }
++  const subject = residualAcceptanceSubject({ receipt, findings });
++  const computed = criticalActionSubjectSha256({ kind: RESIDUAL_ACCEPTANCE_KIND, candidate, subject });
++  if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
++    fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from the consumed Critic packet (expected ${computed})`);
++  }
++  args.subjectSha256 = computed;
++  return subject;
++}
++
++function residualAcceptanceConfirmationLines(kind, subject) {
++  if (kind !== RESIDUAL_ACCEPTANCE_KIND || subject === null || typeof subject !== "object") return [];
++  return [
++    `critic receipt sha256: ${subject.criticReceiptSha256}`,
++    ...subject.findings.map((finding) => `accepted finding: ${finding.severity} ${finding.id}`),
++    "this approval accepts ONLY the minor findings listed above as residual for the candidate above; it is not a Critic pass, it does not accept any finding that is not listed, and a new finding blocks again.",
++  ];
++}
++
+ /**
+  * The one construction of a critical request, shared by the agent-facing
+  * `prepare-critical` and the human-facing `authorize-critical`. Deliberately a
+@@ -1847,9 +1893,11 @@ function resolveSubjectPreimage({ args, repository, candidate }) {
+  * so a caller that wants to *show* the human what they are approving -- only
+  * `authorize-critical` does -- has it, without re-reading or re-parsing the file.
+  */
+-function criticalApprovalRequest({ args, repository, featureId, dependencies }) {
++function criticalApprovalRequest({ args, repository, featureId, gitCommonDir, dependencies }) {
+   const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+-  const subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
++  const subjectPreimage = args.kind === RESIDUAL_ACCEPTANCE_KIND
++    ? resolveResidualAcceptanceSubject({ args, candidate, gitCommonDir, dependencies })
++    : resolveSubjectPreimage({ args, repository, candidate });
+   if (args.kind === "interruption-promotion" && subjectPreimage === null) {
+     fail("critical approval request is invalid: interruption-promotion requires the current baseline through --subject");
+   }
+@@ -2482,7 +2530,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before authorize-critical");
+     // TR-S1 (Ruling 78): refuse an unreadable or unencrypted key before the request is built or written.
+     assertPoPrivateKeyProtected(paths.privateKey, dependencies);
+-    const { request, subjectPreimage } = criticalApprovalRequest({ args, repository, featureId, dependencies });
++    const { request, subjectPreimage } = criticalApprovalRequest({ args, repository, featureId, gitCommonDir, dependencies });
+     // Written before the prompt, and only ever the request built above: any file
+     // already sitting at this path is overwritten, never read, so a stale request
+     // has no path to a signature.
+@@ -2498,6 +2546,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+       `approval intent sha256: ${intentSha256}`,
+       ...releasePreflightConfirmationLines(request.action.kind, subjectPreimage),
+       ...interruptionPromotionConfirmationLines(request.action.kind, subjectPreimage),
++      ...residualAcceptanceConfirmationLines(request.action.kind, subjectPreimage),
+       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
+     ], dependencies, humanFacingLanguage);
+     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
+@@ -2512,7 +2561,7 @@ function executeHumanApprovalCore(args, dependencies = {}) {
+   }
+   if (args.command === "prepare" || args.command === "prepare-critical") {
+     if (critical) {
+-      const { request } = criticalApprovalRequest({ args, repository, featureId, dependencies });
++      const { request } = criticalApprovalRequest({ args, repository, featureId, gitCommonDir, dependencies });
+       write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+       // NVA-CLI-FEEDBACK-1: state the path this call just wrote.
+       return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action, paths: { request: paths.request } };
+diff --git a/plugins/pipeline-core/scripts/po-human-approval.test.mjs b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+index 4ebfb73e8..ea5179174 100644
+--- a/plugins/pipeline-core/scripts/po-human-approval.test.mjs
++++ b/plugins/pipeline-core/scripts/po-human-approval.test.mjs
+@@ -2395,8 +2395,8 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
+     // for the same reason (ALF-B5-AC256, QG-04): prepare-critical composes it (the refused call reached the
+     // clean-candidate check instead of the Usage refusal), so asserting Usage for it is a premise the source
+     // no longer holds. This file holds NO positive-path test for interruption-promotion: that is a coverage
+-    // gap, reported and not built here. Every other kind keeps the Usage assertion.
+-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion"].includes(entry))) {
++    // gap, reported and not built here. `accept-residual-critic-findings` (D190) is excluded for the same reason and has its own positive-path tests at the end of this file. Every other kind keeps the Usage assertion.
++    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings"].includes(entry))) {
+       assert.throws(() => runHumanApproval([
+         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+@@ -6111,3 +6111,133 @@ test("the agent-facing approval gate cannot invoke authorize-critical: signing s
+     cleanup(dirs);
+   }
+ });
++
++/* ------------------------------------------------------------------ *
++ * D190: accept-residual-critic-findings routed through the two critical
++ * commands. The finding list is computed from the consumed Critic packet
++ * (readers injected here), shown before the signature and rebuilt into the
++ * subject digest; it is never typed and never taken from a file.
++ * ------------------------------------------------------------------ */
++import { canonicalJson as residualRouteCanonicalJson, sha256 as residualRouteSha256 } from "./critic-packet-preflight.mjs";
++import { residualFindingId as residualRouteFindingId } from "../lib/critic-verify-lifecycle.mjs";
++
++const RESIDUAL_ROUTE_KIND = "accept-residual-critic-findings";
++const RESIDUAL_ROUTE_PACKET = "c".repeat(32);
++const RESIDUAL_ROUTE_RECEIPT = Object.freeze({ schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: RESIDUAL_ROUTE_PACKET });
++const RESIDUAL_ROUTE_MINOR = Object.freeze([
++  { severity: "minor", title: "wording of the refusal text", location: "plugins/pipeline-core/lib/example.mjs:10" },
++  { severity: "minor", title: "unused import", location: "plugins/pipeline-core/lib/example.mjs:2" },
++]);
++
++function residualRouteExpectedSubject(findings) {
++  return {
++    criticReceiptSha256: residualRouteSha256(residualRouteCanonicalJson(RESIDUAL_ROUTE_RECEIPT)),
++    findings: findings.map((finding) => ({ id: residualRouteFindingId(finding), severity: finding.severity }))
++      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
++  };
++}
++
++function residualRouteDependencies(findings, extra = {}) {
++  return {
++    observeCandidate: () => ({ ...CANDIDATE }),
++    readConsumedCandidateReceiptFn: ({ packetId }) => {
++      assert.equal(packetId, RESIDUAL_ROUTE_PACKET);
++      return { packet: { packetId }, receipt: RESIDUAL_ROUTE_RECEIPT };
++    },
++    readOpenFindingsFn: ({ packetId }) => {
++      assert.equal(packetId, RESIDUAL_ROUTE_PACKET);
++      return findings;
++    },
++    ...extra,
++  };
++}
++
++function residualRouteArgv(command, dirs, extra = []) {
++  return [
++    command, "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
++    "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
++    "--kind", RESIDUAL_ROUTE_KIND, "--critic-packet", RESIDUAL_ROUTE_PACKET, "--expires-at", futureExpiry(),
++    ...extra,
++  ];
++}
++
++test("authorize-critical --kind accept-residual-critic-findings derives the subject digest from the consumed packet and shows every accepted finding before the signature", { skip: REQUIRES_OPENSSL }, () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    const expected = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteExpectedSubject(RESIDUAL_ROUTE_MINOR) });
++    const prompts = [];
++    const result = runHumanApproval(residualRouteArgv("authorize-critical", dirs), residualRouteDependencies(RESIDUAL_ROUTE_MINOR, {
++      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
++    }));
++    assert.equal(result.ok, true);
++    assert.equal(result.action.kind, RESIDUAL_ROUTE_KIND);
++    assert.equal(result.action.subjectSha256, expected, "the digest must be rebuilt from the packet, not supplied");
++    assert.equal(prompts.length, 1);
++    const subject = residualRouteExpectedSubject(RESIDUAL_ROUTE_MINOR);
++    assert.ok(prompts[0].includes(subject.criticReceiptSha256), "must show the Critic receipt digest");
++    for (const finding of subject.findings) assert.ok(prompts[0].includes(finding.id), "must list every accepted finding id");
++    assert.match(prompts[0], /accepts ONLY the minor findings listed above/u);
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("authorize-critical --kind accept-residual-critic-findings refuses a non-minor finding before any prompt or write", () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    let confirmationAsked = false;
++    const findings = [...RESIDUAL_ROUTE_MINOR, { severity: "major", title: "wrong precedence", location: "plugins/pipeline-core/lib/example.mjs:30" }];
++    assert.throws(
++      () => runHumanApproval(residualRouteArgv("authorize-critical", dirs), residualRouteDependencies(findings, {
++        readConfirmation: () => { confirmationAsked = true; return "approve"; },
++      })),
++      /RESIDUAL-PROOF-SEVERITY/u,
++    );
++    assert.equal(confirmationAsked, false);
++    assert.equal(existsSync(criticalArtifacts(dirs, RESIDUAL_ROUTE_KIND).request), false);
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("accept-residual-critic-findings takes --critic-packet and never --subject or a typed --subject-sha256 mismatch; --critic-packet is refused for every other kind", () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    writeFileSync(join(dirs.repoRoot, "subject.json"), `${JSON.stringify({ criticReceiptSha256: "d".repeat(64), findings: [] })}\n`);
++    assert.throws(
++      () => runHumanApproval(residualRouteArgv("prepare-critical", dirs, ["--subject", "subject.json"]), residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
++      /takes no --subject/u,
++    );
++    assert.throws(
++      () => runHumanApproval(residualRouteArgv("prepare-critical", dirs, ["--subject-sha256", "e".repeat(64)]), residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
++      /--subject-sha256 does not match the digest computed from the consumed Critic packet/u,
++    );
++    assert.throws(
++      () => runHumanApproval([
++        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
++        "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
++        "--kind", "push", "--critic-packet", RESIDUAL_ROUTE_PACKET, "--subject-sha256", "a".repeat(64), "--expires-at", futureExpiry(),
++      ], residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
++      /--critic-packet is only valid for --kind accept-residual-critic-findings/u,
++    );
++  } finally {
++    cleanup(dirs);
++  }
++});
++
++test("prepare-critical --kind accept-residual-critic-findings writes a request bound to the packet-derived subject digest", () => {
++  const dirs = criticalDirs();
++  try {
++    keyFixture(dirs.directory);
++    const expected = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteExpectedSubject(RESIDUAL_ROUTE_MINOR) });
++    const result = runHumanApproval(residualRouteArgv("prepare-critical", dirs), residualRouteDependencies(RESIDUAL_ROUTE_MINOR));
++    assert.equal(result.ok, true);
++    assert.equal(result.action.subjectSha256, expected);
++    assert.equal(existsSync(criticalArtifacts(dirs, RESIDUAL_ROUTE_KIND).request), true);
++  } finally {
++    cleanup(dirs);
++  }
++});
 diff --git a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json b/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
 index d7f50d00b..a5eca4b05 100644
 --- a/plugins/pipeline-core/templates/human-terminal-actions/catalog.json
