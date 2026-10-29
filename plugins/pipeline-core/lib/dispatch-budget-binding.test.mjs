@@ -160,15 +160,15 @@ check("keeps a pending record written before the commit mode existed valid and u
   } finally { rmSync(commonDir, { recursive: true, force: true }); }
 });
 
-check("the shipped implementor definition keeps the PO ceiling: maxTurns 76, ceiling 70, one grant of 30 at base 40", () => {
+check("the shipped implementor definition keeps the PO ceiling: maxTurns 400, ceiling 394, base 80, headroom 314 (D191)", () => {
   const pluginRoot = join(import.meta.dirname, "..");
   const maxTurns = readAgentMaxTurns("pipeline-core:goldfish-implementor", pluginRoot);
-  assert.equal(maxTurns, 76);
-  assert.equal(maxTurns - CLOSING_ALLOWANCE - 1, 70, "the ceiling a Goldfish may reach through one grant");
-  assert.equal(effectiveDispatchBaseCap(40, maxTurns), 40, "the briefed Tool budget line stays 40");
-  assert.equal(dispatchGrantHeadroom(40, maxTurns), 30);
-  assert.equal(effectiveDispatchWorkingCap(40, maxTurns, 30), 70);
-  assert.equal(effectiveDispatchWorkingCap(40, maxTurns, 31), 70, "a larger grant is clamped to the ceiling");
+  assert.equal(maxTurns, 400);
+  assert.equal(maxTurns - CLOSING_ALLOWANCE - 1, 394, "the ceiling a Goldfish may reach through repeated grants");
+  assert.equal(effectiveDispatchBaseCap(80, maxTurns), 80, "the briefed Tool budget line is the base 80");
+  assert.equal(dispatchGrantHeadroom(80, maxTurns), 314);
+  assert.equal(effectiveDispatchWorkingCap(80, maxTurns, 314), 394);
+  assert.equal(effectiveDispatchWorkingCap(80, maxTurns, 315), 394, "a larger grant is clamped to the ceiling");
 });
 
 assert.equal(cases.length, 12, "the complete dispatch budget binding corpus must register before execution");

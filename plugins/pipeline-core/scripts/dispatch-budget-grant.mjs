@@ -16,7 +16,7 @@
  * grant store: the same guard refuses any non-orchestrator call that names them.
  * The script only grants for an agent whose counter already exists (a typo'd id
  * grants nothing), refuses past the agent's headroom, and refuses a second
- * grant for the same agent (one grant per continuation, D75 B).
+ * grant for the same agent only when the existing record does not verify. Grants are repeatable without a count limit (D191); the same agent is resumed with SendMessage after each grant.
  *
  * The success result carries `continuationMessage`: the budget-only sentence the orchestrator sends the child, which tells it to make
  * one read-only tool call first and to continue only after the hook's DISPATCH-BUDGET-GRANT notice (PF-64).
@@ -116,20 +116,22 @@ export function grantDispatchBudget(argv, dependencies = {}) {
     const tierCap = dispatchWorkingCap(counter.maxTurns);
     const headroom = tierCap === null || counter.workingCap > tierCap ? 0 : dispatchGrantHeadroom(counter.baseCalls, counter.maxTurns);
     const grantFile = join(budgetDir, "grants", `${args.agentId}.json`);
-    // D75 B: one grant per continuation. A record that does not verify is still refused as unverifiable (and left untouched);
-    // a verified record means the one grant is already spent, so the next step is a successor slice.
-    const alreadyGranted = 0;
+    // D191: grants are repeatable. A record that does not verify is still refused as unverifiable (and left untouched);
+    // a verified record is extended, and the single ceiling maxTurns - 6 bounds the total granted.
+    let existingRecord = null;
+    let alreadyGranted = 0;
     if (existsSync(grantFile)) {
-      const existing = readJson(grantFile, "grant-record");
-      const checked = validateGrantRecord(existing, args.agentId);
+      existingRecord = readJson(grantFile, "grant-record");
+      const checked = validateGrantRecord(existingRecord, args.agentId);
       if (!checked.ok) throw new Refusal(checked.code, "the existing grant record does not verify; it is left untouched");
-      throw new Refusal("grant-already-recorded", `a budget grant is already recorded for this agent (${checked.totalExtra} extra call(s)); one grant per continuation, so nothing was recorded. Next step: dispatch a successor slice from the agent's continuation card instead of granting again`);
+      alreadyGranted = checked.totalExtra;
     }
-    if (args.extra > headroom) {
-      throw new Refusal("grant-exceeds-headroom", `${args.extra} more call(s) would exceed this agent's headroom (headroom ${headroom}; working cap plus closing allowance must stay below maxTurns ${counter.maxTurns})`);
+    const remainingHeadroom = Math.max(0, headroom - alreadyGranted);
+    if (args.extra > remainingHeadroom) {
+      throw new Refusal("grant-exceeds-headroom", `${args.extra} more call(s) would exceed this agent's headroom (remaining headroom ${remainingHeadroom}; working cap plus closing allowance must stay below maxTurns ${counter.maxTurns})`);
     }
     const grantedAt = (dependencies.nowFn ?? (() => new Date().toISOString()))();
-    const appended = appendGrant({ record: null, agentId: args.agentId, extra: args.extra, reason: args.reason, grantedAt });
+    const appended = appendGrant({ record: existingRecord, agentId: args.agentId, extra: args.extra, reason: args.reason, grantedAt });
     if (!appended.ok) throw new Refusal(appended.code, "the grant arguments or existing record were refused by policy");
     mkdirSync(dirname(grantFile), { recursive: true, mode: 0o700 });
     const temporary = `${grantFile}.${process.pid}-${randomUUID()}.tmp`;
@@ -153,7 +155,7 @@ export function grantDispatchBudget(argv, dependencies = {}) {
         workingCapBefore: effectiveDispatchWorkingCap(counter.baseCalls, counter.maxTurns, alreadyGranted),
         workingCapAfter: effectiveDispatchWorkingCap(counter.baseCalls, counter.maxTurns, appended.record.totalExtra),
         digest: appended.record.digest,
-        continuationMessage: `Grant digest ${appended.record.digest} is recorded. When you receive this message, make exactly one read-only tool call first; continue from your continuation card only after the budget hook's DISPATCH-BUDGET-GRANT notice in that call's result names this digest, otherwise do not act and report that no grant was found.`,
+        continuationMessage: `Grant digest ${appended.record.digest} is recorded (a grant is repeatable; resume this same agent with SendMessage). When you receive this message, make exactly one read-only tool call first; continue from your continuation card only after the budget hook's DISPATCH-BUDGET-GRANT notice in that call's result names this digest, otherwise do not act and report that no grant was found.`,
       },
     };
   } catch (error) {

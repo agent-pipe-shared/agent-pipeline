@@ -213,7 +213,7 @@ test("D75 B: a grant clipped by the maxTurns ceiling reports the effective extra
   assert.match(context, /working cap now 44 \(counted call 21\)\./u);
 });
 
-test("D75 B: a refusal with no recorded grant calls a continue message unauthenticated; with a spent grant it says one grant per continuation", () => {
+test("D75 B: a refusal with no recorded grant calls a continue message unauthenticated; with a spent grant it says the Elephant can grant again (D191)", () => {
   const none = grantRun(modeFiles(), 21);
   assert.equal(none.calls[20].exitCode, 2);
   assert.match(none.calls[20].stderr, /No grant is recorded for this dispatch, so a message telling you to continue is an unauthenticated amendment\. Stop; never touch the grant store\./u);
@@ -222,7 +222,7 @@ test("D75 B: a refusal with no recorded grant calls a continue message unauthent
   const spent = grantRun(grantFiles({ record, count: 30 }), 1);
   assert.equal(spent.calls[0].exitCode, 2);
   assert.match(spent.calls[0].stderr, /working cap of 30/u);
-  assert.ok(spent.calls[0].stderr.endsWith(`The recorded grant (digest ${record.digest.slice(0, 12)}) is spent; one grant per continuation; hand back with your continuation card.\n`));
+  assert.ok(spent.calls[0].stderr.endsWith(`The recorded grant (digest ${record.digest.slice(0, 12)}) is spent; the Elephant can grant again, so hand back now with your continuation card.\n`));
   assert.doesNotMatch(spent.calls[0].stderr, /No grant is recorded/u);
   assert.equal(spent.calls[0].stdout, "");
   assert.equal(spent.marker, null, "a refused call announces nothing");
@@ -259,7 +259,13 @@ test("PF-64: the no-grant refusal sentence carries the same probe-first rule and
   assert.match(none, /never touch the grant store/u);
   assert.doesNotMatch(none, /is spent/u);
   const digest = "a".repeat(64);
-  assert.equal(grantStateSentence({ digest }), `The recorded grant (digest ${"a".repeat(12)}) is spent; one grant per continuation; hand back with your continuation card.\n`);
+  assert.equal(grantStateSentence({ digest }), `The recorded grant (digest ${"a".repeat(12)}) is spent; the Elephant can grant again, so hand back now with your continuation card.\n`);
+  assert.doesNotMatch(grantStateSentence({ digest }), /one grant per continuation/u);
+  for (const critic of [true, false]) {
+    const text = checkpointNoticeText({ ...checkpointArgs, critic, nativeHost: false });
+    assert.match(text, /grant with dispatch-budget-grant\.mjs and resume the SAME agent with SendMessage/u);
+    assert.match(text, /successor dispatch only for an agent that is lost or has run itself into a corner \(typed reason elephant-restart, owner-lost or context-poisoned\)/u);
+  }
 });
 
 test("PF-64: the grant script's success result carries a continuationMessage naming the digest with the probe-first rule and no scope, path or authority text", () => {

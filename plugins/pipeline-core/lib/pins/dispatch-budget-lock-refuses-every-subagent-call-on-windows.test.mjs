@@ -185,7 +185,7 @@ function hookFixture() {
   const counterPath = join(budgetDir, `${agentId}.json`);
   writeFileSync(counterPath, `${JSON.stringify({
     schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType: "pipeline-core:goldfish-implementor",
-    maxTurns: 76, baseCalls: 40, workingCap: 40, count: 0,
+    maxTurns: 400, baseCalls: 40, workingCap: 40, count: 0,
   }, null, 2)}\n`);
   return { root, agentId, counterPath, lockPath: `${counterPath}.binding.lock` };
 }

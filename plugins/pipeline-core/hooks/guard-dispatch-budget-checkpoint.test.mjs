@@ -65,7 +65,7 @@ const counterFile = (root, agentId) => join(budgetDir(root), `${agentId}.json`);
 const GOLDFISH = "pipeline-core:goldfish-deep";
 const CRITIC = "pipeline-core:critic";
 
-function seed(root, { agentId, agentType = GOLDFISH, maxTurns = 80, baseCalls = 20, count, workingCap = Math.min(baseCalls, maxTurns - 15) }) {
+function seed(root, { agentId, agentType = GOLDFISH, maxTurns = 400, baseCalls = 20, count, workingCap = Math.min(baseCalls, maxTurns - 15) }) {
   mkdirSync(budgetDir(root), { recursive: true });
   writeFileSync(counterFile(root, agentId), `${JSON.stringify({ schema: "pipeline.dispatch-budget-counter.v1", agentId, agentType, maxTurns, baseCalls, workingCap, count }, null, 2)}\n`);
 }
@@ -389,19 +389,19 @@ register("GDBC12", "hook: the granted cap is bounded by maxTurns - 1 including t
   const root = activeRoot("bound");
   seed(root, { agentId: "b1", baseCalls: 50, count: 0 });
   const grant = (extra) => grantDispatchBudget(["--agent-id", "b1", "--extra", String(extra), "--reason", "bounded", "--root", root]);
-  const over = grant(40);
-  assert.deepEqual([over.status, over.code], ["refused", "grant-exceeds-headroom"]);
+  for (let step = 0; step < 8; step += 1) assert.equal(grant(40).status, "granted", "grants repeat (D191)");
   const last = grant(24);
   assert.equal(last.status, "granted");
-  assert.equal(last.result.workingCapAfter, 74);
-  assert.equal(grant(1).code, "grant-already-recorded", "one grant per continuation");
-  seed(root, { agentId: "b1", baseCalls: 50, count: 73 });
-  assert.equal(read(root, "b1").status, 0, "call 74 is the last working call");
+  assert.equal(last.result.workingCapAfter, 394);
+  // D191: the single ceiling stays maxTurns - 6; a further grant past it is refused for headroom, not for being a second grant.
+  assert.equal(grant(1).code, "grant-exceeds-headroom", "ceiling stays maxTurns - 6 after a full grant");
+  seed(root, { agentId: "b1", baseCalls: 50, count: 393 });
+  assert.equal(read(root, "b1").status, 0, "call 394 is the last working call");
   const past = read(root, "b1");
-  assert.equal(past.status, 2, "call 75 is denied");
-  assert.match(past.stderr, /working cap of 74/u);
+  assert.equal(past.status, 2, "call 395 is denied");
+  assert.match(past.stderr, /working cap of 394/u);
   // The documented ceiling: 74 working + 5 closing = 79 = maxTurns - 1.
-  assert.equal(74 + 5, 80 - 1);
+  assert.equal(394 + 5, 400 - 1);
 });
 
 register("GDBC13", "hook: a malformed or tampered grant record on disk grants nothing", () => {
@@ -466,8 +466,10 @@ register("GDBC15", "grant script: refuses malformed arguments, an unknown agent 
   const file = join(budgetDir(root), "grants", "s1.json");
   const kept = readFileSync(file, "utf8");
   const second = grantDispatchBudget(["--extra", "3", ...base]);
-  assert.equal(second.code, "grant-already-recorded", "one grant per continuation");
-  assert.equal(readFileSync(file, "utf8"), kept, "the refused second grant leaves the record byte-identical");
+  // D191: grants are repeatable; the second grant is accepted and appended to the verified record.
+  assert.equal(second.status, "granted", JSON.stringify(second));
+  assert.equal(second.result.totalExtra, 8);
+  assert.notEqual(readFileSync(file, "utf8"), kept, "the second grant extends the record");
   const broken = JSON.parse(kept); broken.grants[0].reason = "edited";
   writeFileSync(file, `${JSON.stringify(broken)}\n`);
   assert.equal(grantDispatchBudget(["--extra", "1", ...base]).code, "grant-entry-digest-mismatch", "an unverifiable record is never extended");
@@ -480,7 +482,31 @@ function readdirSafe(dir) {
   try { return readFileSync(dir); } catch { return null; }
 }
 
-assert.equal(cases.length, 15, "the complete dispatch-budget checkpoint corpus must register before execution");
+register("GDBC16", "policy: D191 base budgets are 80 (implementor) and 160 (deep); critic and mechanic stay", () => {
+  assert.match(dispatchBudgetLineForRole("pipeline-core:goldfish-implementor"), /≤80 tool uses/u);
+  assert.match(dispatchBudgetLineForRole("pipeline-core:goldfish-deep"), /≤160 tool uses/u);
+  assert.match(dispatchBudgetLineForRole("pipeline-core:critic"), /≤30 tool uses/u);
+  assert.match(dispatchBudgetLineForRole("pipeline-core:goldfish-mechanic"), /≤40 tool uses/u);
+});
+
+register("GDBC17", "grant script: D191 grants repeat without a count limit; second and third accepted; ceiling maxTurns - 6 still refused", () => {
+  const root = activeRoot("repeat");
+  seed(root, { agentId: "r1", maxTurns: 80, count: 20 });
+  const grant = (extra) => grantDispatchBudget(["--agent-id", "r1", "--extra", String(extra), "--reason", "repeat", "--root", root]);
+  const first = grant(20);
+  const second = grant(20);
+  const third = grant(14);
+  assert.deepEqual([first.status, second.status, third.status], ["granted", "granted", "granted"]);
+  assert.deepEqual([first.result.totalExtra, second.result.totalExtra, third.result.totalExtra], [20, 40, 54]);
+  assert.match(second.result.continuationMessage, /repeatable|SendMessage/u);
+  assert.equal(third.result.workingCapAfter, 74, "ceiling maxTurns - 6");
+  const over = grant(1);
+  assert.deepEqual([over.status, over.code], ["refused", "grant-exceeds-headroom"]);
+  const record = JSON.parse(readFileSync(join(budgetDir(root), "grants", "r1.json"), "utf8"));
+  assert.equal(record.grants.length, 3);
+});
+
+assert.equal(cases.length, 17, "the complete dispatch-budget checkpoint corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

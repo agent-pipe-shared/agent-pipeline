@@ -73,20 +73,20 @@ test("RED: a mutant computing the checkpoint on the briefed cap fails the contra
   assert.throws(() => assertCapContract(briefedBased), assert.AssertionError);
 });
 
-test("P1 the agent definition frontmatter is the maxTurns source (76 / 50 / 80)", () => {
-  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT), 76);
+test("P1 the agent definition frontmatter is the maxTurns source (400 / 50 / 400)", () => {
+  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT), 400);
   assert.equal(readAgentMaxTurns("goldfish-mechanic", PLUGIN_ROOT), 50);
-  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-deep", PLUGIN_ROOT), 80);
+  assert.equal(readAgentMaxTurns("pipeline-core:goldfish-deep", PLUGIN_ROOT), 400);
 });
 
-test("P1/P3 the briefing Tool budget line is the briefed base cap; 70 on the implementor binds effective 61", () => {
+test("P1/P3 the briefing Tool budget line is the briefed base cap; 70 on the implementor binds effective 70 under maxTurns 400", () => {
   const maxTurns = readAgentMaxTurns("pipeline-core:goldfish-implementor", PLUGIN_ROOT);
   const binding = bindDispatchBudget({ prompt: briefing(70), maxTurns, applicable: true });
   assert.equal(binding.status, "prepared");
   assert.equal(binding.baseCalls, 70);
-  assert.equal(binding.workingCap, 61);
-  assert.equal(binding.effectiveCap, 61);
-  assert.equal(binding.tierLimited, true);
+  assert.equal(binding.workingCap, 385);
+  assert.equal(binding.effectiveCap, 70);
+  assert.equal(binding.tierLimited, false);
   const within = bindDispatchBudget({ prompt: briefing(30), maxTurns, applicable: true });
   assert.equal(within.effectiveCap, 30);
   assert.equal(within.tierLimited, false);
@@ -122,7 +122,7 @@ test("P4 the template states which source wins and the effective-cap rule", () =
   assert.match(TEMPLATE, /Treat the effective cap, not the stated number, as the base cap everywhere/u);
   assert.match(TEMPLATE, /a stated 40 would silently be clamped to 35/u);
   assert.match(TEMPLATE, /80 % checkpoint is computed on that effective cap \(e\.g\. call 28 of 35 on the implementor\)/u);
-  assert.match(TEMPLATE, /`goldfish-deep` ships a higher `maxTurns: 80`[^.]*effective cap is at most 65/u);
+  assert.match(TEMPLATE, /`goldfish-implementor` and `goldfish-deep` ship `maxTurns: 400`[^.]*effective cap is at most 385/u);
   assert.match(TEMPLATE, /80 % of the effective tool cap \(the base cap as the hook enforces it: `min\(stated base cap, maxTurns - 15\)`/u);
 });
 
