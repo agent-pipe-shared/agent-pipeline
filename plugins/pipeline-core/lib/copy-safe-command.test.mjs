@@ -571,7 +571,8 @@ test("test-path default hand-off round-trips the bounded POSIX/PowerShell plan c
   try {
     const stderr = testpathDenial(root);
     assertBoundedTestpathDefault(stderr);
-    assert.match(stderr, /Step: authorize-by-signature/u);
+    assert.match(stderr, /Step: prepare-for-signature/u);
+    assert.doesNotMatch(stderr, /Step: authorize-by-signature|<external-proof\.json>/u);
 
     const posix = spawnSync("bash", ["-c", handoffShellBlock(stderr, "plan", "posix")], {
       encoding: "utf8",

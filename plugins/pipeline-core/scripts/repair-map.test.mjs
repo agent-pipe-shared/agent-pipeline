@@ -53,15 +53,17 @@ test("AC-7 (contract): every eligibility()-derived row matches a fresh, independ
       assert.equal(row.liftable, "in-session-or-signed");
       const freshMode = readPushApprovalMode(ROOT)?.mode ?? "signature";
       assert.equal(row.approvalMode, freshMode, "the row's approval mode must track the live reader, not a stored value");
-      // NVA-SIGENTRY-2 F2: signature mode's sequence grew a 4th command
-      // (emit-signature-digest, run before the human signs anything out-of-band); chat
-      // mode has no signing step at all and stays at 3.
-      const expectedLength = freshMode === "chat" ? 3 : 4;
+      // Slice A2 (PO decision 2026-10-27): signature mode is plan, prepare-for-signature,
+      // authorize-by-signature (the former emit-signature-digest step and the proof placeholder are gone;
+      // equivalent assertion on the new sequence); chat mode has no signing step and stays at 3.
+      const expectedLength = 3;
       assert.ok(Array.isArray(row.command) && row.command.length === expectedLength,
         `expected ${expectedLength} commands for mode=${freshMode}, got ${row.command?.length}`);
       if (freshMode !== "chat") {
-        assert.equal(row.command[2].argv[1], "emit-signature-digest",
-          "signature mode's 3rd command must be the digest-emission step, between prepare-authorization and authorize-by-signature");
+        assert.equal(row.command[1].argv[1], "prepare-for-signature",
+          "signature mode's 2nd command must be prepare-for-signature, followed by authorize-by-signature");
+        assert.equal(row.command[2].argv[1], "authorize-by-signature");
+        assert.ok(!JSON.stringify(row.command).includes("<external-proof.json>"), "no proof placeholder in signature-mode map rows");
       }
     } else if (fresh.authorCandidate) {
       assert.equal(row.liftable, "author-repair-required");

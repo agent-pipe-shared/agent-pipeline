@@ -329,12 +329,16 @@ test("render-copy-safe keeps its backward-compatible entry point on the shared b
     assert.equal(status, 0, captured.stderr);
     assert.equal(captured.stderr, "", "render-copy-safe prints nothing but the rendered block");
 
-    // Signature mode: plan/prepare-authorization/emit-signature-digest/authorize-by-signature,
+    // Signature mode (PO decision 2026-10-27): plan, then the one prepare-for-signature command;
+    // the person gets exactly one sign-intent command and the agent imports the proof itself.
+    // Never the former four-step sequence, never the `<external-proof.json>` placeholder, and
     // never the in-session activate step (that belongs to chat mode only).
     assert.match(captured.stdout, /Step: plan\nPOSIX:/u);
-    assert.match(captured.stdout, /Step: prepare-authorization/u);
-    assert.match(captured.stdout, /Step: emit-signature-digest/u);
-    assert.match(captured.stdout, /Step: authorize-by-signature/u);
+    assert.match(captured.stdout, /Step: prepare-for-signature/u);
+    assert.doesNotMatch(captured.stdout, /Step: prepare-authorization/u);
+    assert.doesNotMatch(captured.stdout, /Step: emit-signature-digest/u);
+    assert.doesNotMatch(captured.stdout, /Step: authorize-by-signature/u);
+    assert.doesNotMatch(captured.stdout, /<external-proof\.json>/u);
     assert.doesNotMatch(captured.stdout, /Step: authorize\n/u,
       "signature mode has no in-session activate step; nothing to bound-render for it");
     assert.match(captured.stdout, /eval "\$CMD"/u);

@@ -980,6 +980,24 @@ check("Antigravity signature guidance assigns only sign-intent to the external P
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+check("Antigravity signature continuation names the configured mode inside the one-command sentence (slice A2-c3)", () => {
+  const root = readyLifecycleFixture("signature");
+  try {
+    const res = decision(run({
+      toolCall: {
+        name: "replace_file_content",
+        args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "signature", ReplacementContent: "chat" },
+      },
+    }, root));
+    assert.equal(res.decision, "deny");
+    assert.match(
+      res.reason,
+      /Then, in this session, the agent runs prepare-for-signature[^\n]*gates\.human_approval is "signature"[^\n]*exactly one sign-intent command[^\n]*authorize-by-signature by the full path that command writes:\n[^\n]*prepare-for-signature --repo/u,
+      "the one-command continuation must name the configured approval mode",
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 // PO decision 2026-10-23 (row 29): the signed-override route for pipeline.user.yaml must not become
 // an admission. Without an armed capability an agent widening (signature -> chat) is still denied
 // and nothing is written; the route only names the human ceremony that could authorize it.

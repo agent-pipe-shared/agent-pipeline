@@ -379,16 +379,11 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
         "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
       );
-      const prepareAuthorizationSignature = ceremonyCommand(
-        "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
-      );
-      const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
-      const authorizeBySignature = ceremonyCommand(
-        "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
-      );
+      // Slice A2: signature mode prints the one agent command; the person gets one sign-intent command from it.
+      const prepareForSignature = ceremonyCommand("prepare-for-signature", "prepare-for-signature");
       const ceremonySteps = approvalMode === "chat"
         ? [planCommand, prepareAuthorizationChat, authorizeChat]
-        : [planCommand, prepareAuthorizationSignature, emitSignatureDigest, authorizeBySignature];
+        : [planCommand, prepareForSignature];
       write(`${globalChat ? "Committed global chat approval: chat-attributed-unattested; no terminal ceremony, key, or proof is required.\n\n" : ""}${ceremonySteps.map((step) => step.text).join("\n\n")}\n`);
       return 0;
     }

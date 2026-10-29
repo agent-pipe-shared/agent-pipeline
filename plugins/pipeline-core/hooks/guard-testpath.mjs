@@ -334,13 +334,8 @@ if (matched) {
           "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
           "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
         );
-        const prepareAuthorizationSignature = ceremonyCommand(
-          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
-        );
-        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
-        const authorizeBySignature = ceremonyCommand(
-          "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
-        );
+        // Slice A2 (PO decision 2026-10-27): signature mode prints the one agent command.
+        const prepareForSignature = ceremonyCommand("prepare-for-signature", "prepare-for-signature");
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
         // mode, not just the mode-common `plan` step -- mirrors the continuation
         // codex-pretool-guard.mjs's own adapter prints, adapted to this guard's shorter
@@ -354,14 +349,10 @@ if (matched) {
             authorizeChat.text,
           ].join("\n")
           : [
-            `Then, in this session (pure digest computation against data already in the ` +
-              `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-            prepareAuthorizationSignature.text,
-            emitSignatureDigest.text,
-            `Then, outside this session (only the signature itself needs the external Ed25519 ` +
-              `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
-              `there is no in-session activate step for this mode):`,
-            authorizeBySignature.text,
+            `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1); ` +
+              `the person then receives exactly one sign-intent command, and the agent imports the proof ` +
+              `with authorize-by-signature by the full path that command writes:`,
+            prepareForSignature.text,
           ].join("\n");
         overrideGuidance = [
           "",

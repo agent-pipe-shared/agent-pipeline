@@ -124,6 +124,44 @@ test("signing command handed to the human is paste-safe for PowerShell and Bash:
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+// Slice A2 (PO decision 2026-10-27): every denial-guidance site prints the one-command signature flow
+// (prepare-for-signature) in signature mode; the former four-step sequence and the proof placeholder are gone.
+test("A2: render-copy-safe in signature mode prints plan then prepare-for-signature, no placeholder and no emit-signature-digest", () => {
+  const root = fixture({ born: true });
+  try {
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "a2\n" },
+      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
+    });
+    assert.equal(recorded.status, "planned");
+    const out = io();
+    const status = main(["render-copy-safe", "--repo", root, "--request-sha256", recorded.requestSha256], out);
+    assert.equal(status, 0, out.stderr);
+    assert.match(out.stdout, /prepare-for-signature/u);
+    assert.doesNotMatch(out.stdout, /<external-proof\.json>/u);
+    assert.doesNotMatch(out.stdout, /emit-signature-digest|prepare-authorization/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const site of ["hooks/guard-testpath.mjs", "hooks/codex-pretool-guard.mjs", "hooks/antigravity-pretool-guard.mjs"]) {
+  test(`A2: ${site} signature-mode guidance names prepare-for-signature, not the four-step sequence or the proof placeholder`, () => {
+    const src = readFileSync(join(PLUGIN_ROOT, site), "utf8");
+    assert.match(src, /"prepare-for-signature"/u);
+    assert.doesNotMatch(src, /<external-proof\.json>/u);
+    assert.doesNotMatch(src, /"emit-signature-digest"/u);
+    assert.doesNotMatch(src, /<intent-sha256-from-emit-signature-digest>/u);
+    assert.doesNotMatch(src, /<fixed HGO_SIGNATURE_REASON text>/u);
+  });
+}
+
+test("A2: repair-map.mjs signature-mode rows are prepare-for-signature then authorize-by-signature with no placeholder", () => {
+  const src = readFileSync(join(PLUGIN_ROOT, "scripts", "repair-map.mjs"), "utf8");
+  assert.match(src, /"prepare-for-signature"/u);
+  assert.doesNotMatch(src, /<external-proof\.json>/u);
+  assert.doesNotMatch(src, /"emit-signature-digest"/u);
+});
+
 test("RED: a commit refused by the git pre-commit hook seeds a human-override request and prints a signing command", () => {
   // Source of the gap: the generated hook impl in
   // plugins/pipeline-core/scripts/pre-commit-hook-install.mjs (renderImpl template; the

@@ -53,7 +53,6 @@ const { commandDisclosureFields } = humanGuardOverrideInternals;
 
 const DEBUG_PREFIX = "[pipeline.agy-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
 const AGY_NATIVE_DISPATCH_PREPARE = join(PLUGIN_ROOT, "scripts", "antigravity-native-dispatch-prepare.mjs");
@@ -976,26 +975,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
               ),
             ].join("\n")
             : [
-              `Then, in this session (pure digest computation against data already in the repository -- neither step needs the external key, ADR-0059 Decision 1):`,
-              ceremonyCommand(
-                "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
-              ),
-              ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
-              // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
-              // only this command enters the attended private-key boundary.
-              `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). sign-intent resolves the configured local approval directory itself, so this one command prints no private path and needs no second apply step:`,
-              boundedCopySafeCommand({
-                executable: process.execPath,
-                argv: [
-                  placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
-                  "--repo-root", placeholder(JSON.stringify(overrideRepo)),
-                  "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
-                ],
-              }).command,
-              "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
-              ceremonyCommand(
-                "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
-              ),
+              `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1; gates.human_approval is "${approvalMode}"); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
+              ceremonyCommand("prepare-for-signature"),
             ].join("\n");
           overrideGuidance = [
             "",

@@ -938,11 +938,25 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
     // The mode-common first step is always the read-only planner.
     assert.match(reason, /Human override available for this exact action/u, `mode=${committed}`);
     assert.match(reason, /\bplan --repo\b/u, `mode=${committed}`);
-    assert.match(reason, /prepare-authorization --repo/u, `mode=${committed}`);
+    if (committed === "chat") {
+      assert.match(reason, /prepare-authorization --repo/u, `mode=${committed}`);
+    }
     if (committed === "signature") {
-      assert.match(reason, new RegExp(`gates\\.human_approval is "${committed}"`, "u"), `mode=${committed}`);
+      // The explicit `gates.human_approval is "signature"` clause lived in the removed
+      // sign-intent sentence (A2, PO decision 2026-10-27). Slice A2-c3 puts the clause back
+      // inside the single continuation sentence, so the printed mode is asserted again here
+      // (the committed mode, not the loop variable), in addition to the fact that
+      // prepare-for-signature is printed in signature mode only (the chat-mode branch below
+      // refuses it).
+      assert.match(reason, /prepare-for-signature --repo/u, `mode=${committed}`);
+      assert.ok(
+        reason.includes(`gates.human_approval is "${committed}"`),
+        `the continuation must name the configured mode again (mode=${committed})`,
+      );
     }
     if (committed === "chat") {
+      assert.doesNotMatch(reason, /prepare-for-signature/u,
+        "chat mode must not offer the signature-only prepare-for-signature command");
       assert.match(reason, /\bauthorize --repo\b[^\n]*--selection-sha256[^\n]*--activate/u,
         "chat mode must offer the in-session activate step");
       assert.doesNotMatch(reason, /authorize-by-signature/u,
@@ -952,36 +966,24 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
       assert.doesNotMatch(reason, /sign-intent|human-held Ed25519 key/u,
         "chat mode must not advertise the PO/operator's external signing step");
     } else {
-      // NVA-SIGENTRY-2 F2: the digest-emission step must be reachable from the printed
-      // guidance alone, at the point where the human/agent actually needs it -- before
-      // signing, i.e. between prepare-authorization and authorize-by-signature.
-      assert.match(reason, /emit-signature-digest --repo/u,
-        "signature mode must offer the digest-emission step before signing");
-      // PO decision 2026-08-18 #12 (backlog/items/2026-08-18-hgo-signature-ceremony-
-      // requires-more-human-steps-than-the-key-actually-needs.md): prepare-authorization
-      // and emit-signature-digest are pure local digest computation (ADR-0059 Decision 1)
-      // and now run agentically, in-session. Only sign-intent needs the external Ed25519
-      // key; authorize-by-signature is the local proof verifier/consumer and therefore
-      // returns to the agent session without access to that key.
+      // PO decision 2026-10-27 (backlog/items/2026-10-03-signature-ceremony-requires-
+      // operator-work-and-breaks.md), superseding the 2026-08-18 four-step sequence: the
+      // agent runs the one prepare-for-signature command in-session (pure local digest
+      // computation, ADR-0059 Decision 1), the person then receives exactly one sign-intent
+      // command, and the agent imports the proof by the full path that command writes.
       assert.match(
         reason,
-        /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n[^\n]*PO\/operator[^\n]*intentSha256[^\n]*\n[^\n]*sign-intent --repo-root[^\n]*--intent-sha256 <intent-sha256-from-emit-signature-digest>[^\n]*\n[^\n]*back in this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
-        "the external signing action must sit between digest emission and local proof verification",
+        /Then, in this session, the agent runs prepare-for-signature[^\n]*exactly one sign-intent command[^\n]*authorize-by-signature by the full path that command writes:\n[^\n]*prepare-for-signature --repo/u,
+        "signature mode must offer the one prepare-for-signature command with its one-command explanation",
       );
-      assert.match(
-        reason,
-        /Then, in this session[^\n]*\n[^\n]*prepare-authorization --repo/u,
-        "prepare-authorization must be labelled as running in this session",
-      );
-      assert.match(
-        reason,
-        /PO\/operator[^\n]*human-held Ed25519 key[^\n]*\n[^\n]*sign-intent --repo-root/u,
-        "sign-intent must be assigned to the PO/operator's attended external terminal",
-      );
-      assert.match(reason, /back in this session[^\n]*proof path, not the private key/u,
-        "proof verification must be assigned back to the agent session without key access");
-      assert.match(reason, /\bauthorize-by-signature --repo\b[^\n]*--proof <proof-path-from-sign-intent>/u,
-        "signature mode must offer its own decisive final step");
+      assert.doesNotMatch(reason, /prepare-authorization --repo/u,
+        "signature mode no longer offers the former separate prepare-authorization step");
+      assert.doesNotMatch(reason, /emit-signature-digest/u,
+        "signature mode no longer offers the separate digest-emission step");
+      assert.doesNotMatch(reason, /<external-proof\.json>|<proof-path-from-sign-intent>|<intent-sha256-from-emit-signature-digest>/u,
+        "signature mode prints no proof or intent placeholder token");
+      assert.doesNotMatch(reason, /\bauthorize-by-signature --repo\b/u,
+        "signature mode prints no separate authorize-by-signature command line");
       assert.doesNotMatch(reason, /--activate/u,
         "signature mode must not offer the in-session activate step");
       assert.doesNotMatch(reason, /--selection-sha256/u,

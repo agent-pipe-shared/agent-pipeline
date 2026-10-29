@@ -49,7 +49,6 @@ const { commandDisclosureFields } = humanGuardOverrideInternals;
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
 const HOOK_STARTED_AT = Date.now();
@@ -605,27 +604,9 @@ if (denials.length > 0) {
             ]),
           ].join("\n")
           : [
-            `Then, in this session (pure digest computation against data already in the repository -- neither step needs the external key, ADR-0059 Decision 1):`,
+            `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1; gates.human_approval is "${approvalMode}"); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
             renderOverrideCommand(script, [
-              "prepare-authorization", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
-              "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
-            ]),
-            renderOverrideCommand(script, [
-              "emit-signature-digest", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
-              "--plan-sha256", placeholder("<plan-sha256>"),
-            ]),
-            // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand: the
-            // intent digest is the exact emitted value, and only this command crosses
-            // into the attended terminal that holds the PO/operator's private key.
-            `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). sign-intent resolves the configured local approval directory itself, so this one command prints no private path and needs no second apply step:`,
-            renderOverrideCommand(PO_HUMAN_APPROVAL_SCRIPT, [
-              "sign-intent", "--repo-root", forcedQuote(overrideRepo),
-              "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
-            ]),
-            "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
-            renderOverrideCommand(script, [
-              "authorize-by-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
-              "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
+              "prepare-for-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
             ]),
           ].join("\n");
         overrideGuidance = [
