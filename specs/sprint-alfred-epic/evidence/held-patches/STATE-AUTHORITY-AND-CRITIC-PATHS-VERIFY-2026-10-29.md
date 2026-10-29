@@ -51,6 +51,14 @@ Patches 12 and 13 were measured separately on a fresh clone of `50b4f5a4c` with 
 
 Patch 14 was measured on a fresh clone of `5cf6f2baa` with patches 5 to 9 and 11 to 13 applied in order: finalizer 89 tests, 88 pass, 1 fail (the same known baseline red), critic-generic-batch 35 of 35, critic-course-admission 68 of 68, check-verify-case-completion 32 of 32, architecture overview current. With the one production hunk reverted the new case fails at `the leftover delivery entry is no longer live`; restored, it passes.
 
+## Status of the three agent entries of the PF-94 row (`pipeline.glossover.pf94-critic-course-cannot-continue-past-a-consumed-non-course-batch`)
+
+The matrix is not changed: held patches count only once applied and installed. What the held evidence says, for the Elephant who stamps:
+
+- "Walk the path after the admitted delta end to end": walked on the real route in patches 12 and 13 (case `PF94 ROUND2 (a)`: round 2 course admit with its claim, finalize, the lineage of round 2, the next admission). Two production defects were found and fixed there (`CGB-PARENT` at the round 2 admit, `CCA-DELTA-REQUIRED` at the round 2 lineage). Entry can fall after patches 12 and 13 are applied and installed.
+- "Pin the untested refusal `FPR-LINEAGE-COVERAGE-CLAIM`": examined in `w7-pf94-lineage-coverage-claim-pin-g1.notes.md`; the branch is defensive (the receipt range equals the packet range by construction, and the claim reader refuses first), so no case is written and none is wanted; a case would have to forge the claim binding as well, which pins a state no route produces. Entry can be closed as "defensive, documented", the PO may overrule.
+- "Surface the detail of the delivery-target `CGB-CONFLICT` through the finalizer admit output; move the leftover origins file of an already superseded state by a sanctioned verb": the first half is patch 11 (verb-first lead sentence inside the 200-character cut), the second half is patch 14 (replaying the same supersede request now moves the leftover origins entry). Entry can fall after patches 11 and 14 are applied and installed; the consumer whose state was left by the earlier build then reruns the same supersede request once.
+
 ## Named gaps and gates (not done)
 
 - Memo: no native Windows run was possible; the memo is exercised only with a fake spawn. Residual risk: a change that does not move the stat identity tuple within one command run is not seen. The memo
