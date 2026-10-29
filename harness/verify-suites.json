@@ -3780,6 +3780,12 @@
       "nonOverlapNote": "Unique test suite for scripts/run-parallel.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
     },
     {
+      "name": "housekeeping-tests",
+      "file": "scripts/housekeeping.test.mjs",
+      "invariantPinned": "The housekeeping job plans before it moves anything, moves unreferenced git-hook runtime snapshots aside and never deletes them, refuses to apply a plan whose digest no longer matches the tree, and keeps every referenced snapshot",
+      "nonOverlapNote": "Unique test suite for scripts/housekeeping.mjs; outside the harness and plugins roots the registration checker scans, so only this entry runs it"
+    },
+    {
       "name": "commit-message-policy-administrative-refusal-tests",
       "file": "plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs",
       "invariantPinned": "The commit-message policy refusal for an administrative commit names Dispatch: stage-0 (elephant) as the admitted trailer form (K98 row 7/7)",
