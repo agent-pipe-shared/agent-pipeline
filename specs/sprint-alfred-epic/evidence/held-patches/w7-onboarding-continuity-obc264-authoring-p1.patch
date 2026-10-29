@@ -1,0 +1,25 @@
+diff --git a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+--- a/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
++++ b/plugins/pipeline-core/lib/onboarding-continuity.test.mjs
+@@ -4440,10 +4440,20 @@ check("planOnboardingBootstrapBind: mechanical markers stay mandatory while feat
+     if (profile === "mini") {
+       expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING", () => planOnboardingBootstrapBind({ rootDir: root }));
+     } else {
++      // Generated scaffold bytes cannot be bound until the design is authored (5e939278b, stagingDesignNeedsAuthoring).
++      expectKickoffError("BOOTSTRAP-BIND-DESIGN-AUTHORING-REQUIRED", () => planOnboardingBootstrapBind({ rootDir: root }));
++      const spec = "# Bootstrap binding specification\n\n## Acceptance criteria\n- AC-01: WHEN a completed package is acknowledged, the system SHALL bind its exact PRD and Spec digests to the active feature.\n- AC-02: WHEN the same binding is applied twice, the system SHALL preserve all stored bytes on replay.\n- AC-03: WHEN activation is absent, the system SHALL refuse binding without publishing authority.\n- AC-04: WHEN binding succeeds, the system SHALL publish authority accepted by the PO gate.\n\n## Architecture\nThe intake checkpoint owns the design paths. The existing acknowledgement writer binds the final documents; the existing promotion writer publishes continuity and profile authority. No new decision is introduced.\n";
++      const prd = "<!-- po-language: en -->\n<!-- technical-spec-sha256: " + generatePlan.targets.spec.afterSha256 + " -->\n# Completed bootstrap binding design\n\n## Goal\nBind the reviewed intake design package to a local active feature so implementation can use its exact authority.\n\n## Scope\nPreserve digest checks, explicit activation, byte-null replay and PO profile validation. Refuse re-planning once continuity is bound.\n\n## Acceptance\nThe specification defines observable binding, replay, activation and authority outcomes. The existing writers own these transitions.\n";
++      writeFileSync(join(root, generatePlan.targets.spec.path), spec);
++      writeFileSync(prdPath, prd);
++      const marker = planOnboardingIntakeSpecMarker({ rootDir: root });
++      applyOnboardingIntakeSpecMarker({ rootDir: root, expectedPlanSha256: marker.planSha256, activate: true });
+       const plan = planOnboardingBootstrapBind({ rootDir: root });
+       assert.equal(plan.targets.state.value.planApproved, false);
+       assert.equal(plan.targets.state.value.bootstrapAcknowledgementRequired, undefined);
+-      writeFileSync(prdPath, prdText.split("\n").filter(line => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
++      const authoredText = readFileSync(prdPath, "utf8");
++      assert.equal(authoredText.includes("<!-- technical-spec-sha256:"), true);
++      writeFileSync(prdPath, authoredText.split("\n").filter(line => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+       expectKickoffError("KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING", () => planOnboardingBootstrapBind({ rootDir: root }));
+     }
+   }
