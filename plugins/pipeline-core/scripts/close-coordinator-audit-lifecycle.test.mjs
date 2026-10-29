@@ -103,7 +103,9 @@ function fixture(t) {
     specPath: "specs/audit-feature/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
   review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
   admitSessionCriticReview(review);
-  finalizeSessionCriticReview(review);
+  // No runner issues a Source return record yet (SCF-ORIGINAL-SOURCE-UNAVAILABLE); this fixture asks for the
+  // visibly weaker caller-authored classification explicitly, as the finalizer's own option allows.
+  finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
   const lifecycle = recordCriticVerifyLifecycle({ gitCommonDir: join(root, common),
     criticPacketId, candidate, evidencePath: "specs/audit-feature/verify.json", evidence: verify });
   const request = { schema: "pipeline.feature-close-audit-request.v1", manifestPath: "specs/audit-feature/lifecycle.json", coreVersion: "0.7.0", packs: [{ schema: "pipeline.organization-policy-pack.v1", packId: "test-policy", revision: h("5"), compatibility: { minimumCoreVersion: "0.1.0", maximumCoreVersion: "9.0.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] }], criticVerifyLifecycleId: lifecycle.receipt.id };
