@@ -1061,7 +1061,7 @@ export function prepareGovernedItemQueue({root,itemDelivery,candidate,writeScope
       const current=nativeManagedCurrentOwner(repository);
       if(current.association.state!=='bound')throw nativeManagedFault('item-course-requester-unavailable');
       const approval=observeCurrentPlanApprovalForCalibration({rootDir:physical});
-      if(approval.status!=='eligible')return {status:'refused',code:approval.code,reason:`the current plan approval is ${approval.status} (${approval.code})`,
+      if(approval.status!=='eligible')return {status:'refused',code:approval.code,reason:`the current plan approval is ${approval.status} (${approval.code}${approval.detail?`: ${approval.detail}`:''})`,
         repair:approval.repair??staleApprovalRepair(approval.code)};
       const paths=resolveProjectAuthorityPaths({rootDir:physical});
       if(paths.status!=='ready')throw nativeManagedFault('item-course-authority-unavailable');
@@ -1172,9 +1172,12 @@ function writeGovernedQueue(path,preimage,raw) {
 /** PF-33 (D56 (3)): the plan approval binds the PO-gate authority (manifest, PRD) and the PO profile, so a later
  * change to either, such as the checkpoint policy opt-in, makes it stale. The repair names the route that exists. */
 const STATE_SCRIPT=fileURLToPath(new URL('../scripts/pipeline-state.mjs',import.meta.url));
+const REGISTER_SCRIPT=fileURLToPath(new URL('../scripts/register-feature-package.mjs',import.meta.url));
 export function staleApprovalRepair(code) {
   if(code==='CVCT-AUTHORITY-STALE'||code==='CVCT-PROFILE-STALE')
     return `the ${code==='CVCT-PROFILE-STALE'?'PO profile':'project manifest or PRD'} no longer matches what the plan approval binds. If this checkout is a clone or a transfer of the approving one and the approved bytes are unchanged, only its device-local values differ: run node ${STATE_SCRIPT} rebind-approval (it re-checks every bound digest, takes no argument and asks for no new approval), then retry. If the approved bytes themselves changed, submit the plan again (node ${STATE_SCRIPT} submit-plan --by <PO name> --profile <profile>) and have the PO approve it again, then retry`;
+  if(code==='CAC-REGISTRATION-INVALID')
+    return `the accepted-contract envelope of the plan approval is not registered in the feature manifest as the reader requires (the reason names the failing field); run node ${REGISTER_SCRIPT} --root <repository root> (it registers the envelope and prints the paths to commit), commit those paths, then retry`;
   return `the item course needs an eligible PO plan approval of the current PRD and spec; read node ${STATE_SCRIPT} inspect`;
 }
 /** D52 (2), Critic F1: an item operation that another session owns is refused naming that session and the route

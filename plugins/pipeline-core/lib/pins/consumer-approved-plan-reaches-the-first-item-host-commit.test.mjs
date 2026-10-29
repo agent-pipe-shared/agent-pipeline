@@ -217,6 +217,9 @@ test("(a) before registration the first item course is refused CAC-REGISTRATION-
   const refused = prepareGovernedItemQueue({ root: fx.root, itemDelivery: before.itemDelivery, candidate: fx.candidate(), writeScope: [SOURCE] });
   assert.equal(refused.status, "refused", JSON.stringify(refused));
   assert.equal(refused.code, "CAC-REGISTRATION-INVALID", JSON.stringify(refused));
+  // N14: the refusal names the failing registration check and the repair route, not only the code.
+  assert.match(refused.reason, /registers no artifact at|registration field [A-Za-z0-9]+ is/u, JSON.stringify(refused));
+  assert.match(refused.repair, /register-feature-package/u, JSON.stringify(refused));
   assert.equal(existsSync(join(fx.root, "specs/e2e/slice-queue.json")), false, "a refused admission publishes no course");
 });
 

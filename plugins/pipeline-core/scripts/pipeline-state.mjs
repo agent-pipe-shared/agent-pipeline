@@ -9672,6 +9672,16 @@ function acceptedOriginalMode({dir,candidate}) {
   }
   return acceptedOriginalPolicy({dir,candidate,path:"pipeline.user.yaml"},readHumanApprovalMode);
 }
+/** N14: the first registration check that fails, with the expected and the observed value, so a refusal says what to change. */
+function acceptedRegistrationFault(registration, envelope, made, envelopePath) {
+  const id = registration?.identity;
+  if (registration?.status !== "resolved" || !id) return `the feature manifest registers no artifact at ${envelopePath} (resolver status ${registration?.status ?? "unavailable"})`;
+  const show = value => typeof value === "string" && value.length === 64 ? `${value.slice(0,12)}...` : JSON.stringify(value);
+  const checks = [["featureId",envelope.featureId,id.featureId],["manifest",envelope.manifestPath,id.manifest],["path",envelopePath,id.path],["sha256",made.sha256,id.sha256],
+    ["class","candidate-evidence",id.class],["authority",false,id.authority],["mutability","immutable",id.mutability],["retention","retain",id.retention]];
+  const bad = checks.find(([,expected,observed]) => expected !== observed);
+  return bad ? `registration field ${bad[0]} is ${show(bad[2])}, the accepted-contract envelope needs ${show(bad[1])}` : null;
+}
 export function readAcceptedDeliveryContract({dir,envelopePath} = {}, deps = {}) {
   try {
     const raw = (deps.readRetainedEnvelope ?? (({dir,path})=>acceptedContractFile(dir,path)))({dir,path:envelopePath});
@@ -9680,8 +9690,8 @@ export function readAcceptedDeliveryContract({dir,envelopePath} = {}, deps = {})
     if (!made.ok || envelope.schema !== "pipeline.accepted-delivery-contract-evidence.v1" || made.path !== envelopePath || !Buffer.from(raw).equals(Buffer.from(canonicalDesignApproval(envelope)))) return {ok:false,code:"CAC-ENVELOPE-UNAVAILABLE"};
     const registration = (deps.resolveCanonicalArtifactIdentity ?? acceptedContractArtifactIdentity)(dir,envelopePath);
     const id = registration?.identity;
-    if (registration?.status !== "resolved" || !id || id.featureId !== envelope.featureId || id.manifest !== envelope.manifestPath || id.path !== envelopePath || id.sha256 !== made.sha256
-      || id.class !== "candidate-evidence" || id.authority !== false || id.mutability !== "immutable" || id.retention !== "retain") return {ok:false,code:"CAC-REGISTRATION-INVALID"};
+    const registrationFault = acceptedRegistrationFault(registration,envelope,made,envelopePath);
+    if (registrationFault) return {ok:false,code:"CAC-REGISTRATION-INVALID",detail:registrationFault};
     const current = (deps.readState ?? readState)(dir);
     const currentLifecycle = current?.status === "ok" ? derivePlanLifecycle(current.state) : null;
     if (current?.status !== "ok" || current.state?.planApproved !== true || !currentLifecycle?.ok || currentLifecycle.approvalCurrent !== true || !["approved", "implementing"].includes(currentLifecycle.status)) return {ok:false,code:"CAC-APPROVAL-STALE"};
@@ -14670,8 +14680,8 @@ function calibrationApprovalFile(root, path, {privateState = false} = {}) {
 }
 
 export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = false} = {}) {
-  const unavailable = (code, windowsAuthorityCause = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
-    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {})});
+  const unavailable = (code, windowsAuthorityCause = null, detail = null) => Object.freeze({status:"unavailable",code,reason:"Current original approval evidence or its physical source binding is unavailable.",
+    ...(windowsAuthorityCause ? {windowsAuthorityCause} : {}), ...(typeof detail === "string" && detail !== "" ? {detail} : {})});
   try {
     const root = resolve(rootDir);
     if (realpathSync(root) !== root || !lstatSync(root).isDirectory()) return unavailable("CVCT-ROOT");
@@ -14704,7 +14714,7 @@ export function observeCurrentPlanApprovalForCalibration({rootDir, phaseEntry = 
     let approvalBasis;
     if (state.planApproval.schema === "pipeline.plan-approval.v9") {
       const observed = readAcceptedDeliveryContract({dir:root,envelopePath:state.planApproval.acceptedContract.path});
-      if (!observed.ok || observed.authorityBasis !== (mode.mode === "signature" ? "signature" : "chat-attributed-unattested")) return unavailable(observed.code ?? "CVCT-APPROVAL-UNAVAILABLE");
+      if (!observed.ok || observed.authorityBasis !== (mode.mode === "signature" ? "signature" : "chat-attributed-unattested")) return unavailable(observed.code ?? "CVCT-APPROVAL-UNAVAILABLE", null, observed.detail);
       retain(state.planApproval.acceptedContract.path);
       const envelope = JSON.parse(calibrationApprovalFile(root,state.planApproval.acceptedContract.path).bytes.toString("utf8"));
       retain(envelope.policyBinding.path);

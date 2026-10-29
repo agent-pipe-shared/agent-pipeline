@@ -207,7 +207,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   }
   const observed = readAcceptedDeliveryContract({ dir: root, envelopePath });
   if (observed?.code === "CAC-ENVELOPE-UNAVAILABLE") {
-    return refused("FPR-ENVELOPE-UNAVAILABLE", "the envelope bytes do not re-derive through the existing envelope reader", { envelopePath, readerCode: observed.code });
+    return refused("FPR-ENVELOPE-UNAVAILABLE", "the envelope bytes do not re-derive through the existing envelope reader", { envelopePath, readerCode: observed.code, ...(observed.detail ? { readerDetail: observed.detail } : {}) });
   }
   let envelope;
   try { envelope = JSON.parse(envelopeBytes.toString("utf8")); } catch { envelope = null; }
@@ -298,7 +298,7 @@ export function registerFeaturePackage({ root: rootInput, state, readAcceptedDel
   const reread = readAcceptedDeliveryContract({ dir: root, envelopePath });
   if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
     rollback();
-    return refused("FPR-REGISTRATION-NOT-RESOLVED", "the existing envelope reader still refuses the registration; everything this call created was removed", { manifestPath, readerCode: reread.code });
+    return refused("FPR-REGISTRATION-NOT-RESOLVED", "the existing envelope reader still refuses the registration; everything this call created was removed", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
   }
   const summary = (entry) => ({ class: entry.class, path: entry.path, sha256: digest(entry.bytes), authority: entry.authority, mutability: entry.mutability, retention: entry.retention });
   return {
@@ -382,7 +382,7 @@ export function addCriticReviewUnit({ root: rootInput, state, readAcceptedDelive
     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
     if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
       restore();
-      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code });
+      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
     }
   }
   return {
@@ -472,7 +472,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
     if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") {
       restore();
-      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code });
+      return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) });
     }
   }
   return {
@@ -575,7 +575,7 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
   if (envelopes.length === 1) {
     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
-    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
+    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) }); }
   }
   return {
     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "lineage-added", manifestPath, lineagePath: artifact.path, packetId, reviewId: `review-${round}`,
@@ -676,7 +676,7 @@ export function addCriticDeltaRequest({ root: rootInput, inputPath, readAccepted
   const envelopes = manifest.artifacts.filter((entry) => entry.class === "candidate-evidence" && typeof readAcceptedDeliveryContract === "function");
   if (envelopes.length === 1) {
     const reread = readAcceptedDeliveryContract({ dir: root, envelopePath: envelopes[0].path });
-    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code }); }
+    if (reread?.code === "CAC-REGISTRATION-INVALID" || reread?.code === "CAC-ENVELOPE-UNAVAILABLE") { restore(); return refused("FPR-REGISTRATION-NOT-RESOLVED", "the envelope reader refuses the amended manifest; it was restored", { manifestPath, readerCode: reread.code, ...(reread.detail ? { readerDetail: reread.detail } : {}) }); }
   }
   return {
     schema: FEATURE_PACKAGE_REGISTRATION_SCHEMA, status: "delta-request-added", manifestPath, deltaRequestPath: artifact.path, round: tail.round + 1,
