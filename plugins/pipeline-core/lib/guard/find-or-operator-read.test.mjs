@@ -52,3 +52,32 @@ test("FOR02 quoted or escaped route-group paths are admitted, an unquoted parent
     assert.equal(admitted("cat src/(app)/x/page.tsx"), false);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+// backlog pipeline.gate-strength-shell-refuses-admitted-reads: the locate-the-calibration read the Toolbox typed.
+test("FOR03 find admits -not, -path, -ipath and -prune as read predicates and keeps writers and misplaced -not closed", () => {
+  const base = mkdtempSync(join(tmpdir(), "gs-find-"));
+  const root = join(base, "project");
+  try {
+    mkdirSync(join(root, "node_modules", "x"), { recursive: true });
+    writeFileSync(join(root, "pipeline.json"), "{}\n");
+    const admitted = (command) => isReadOnlyDiagnosticCommand(command, root);
+    assert.equal(admitted("find . -maxdepth 2 -name \"pipeline.json\" -not -path \"./node_modules/*\""), true);
+    assert.equal(admitted("find . -name pipeline.json -not -ipath \"./node_modules/*\""), true);
+    assert.equal(admitted("find . -not -name \"*.map\" -type f"), true);
+    assert.equal(admitted("find . -path ./node_modules -prune -o -name pipeline.json -print"), true);
+    assert.equal(admitted("find . -name a.txt -o -not -name b.txt"), true);
+    // -not negates the next predicate: it cannot repeat, end the expression or precede an operator.
+    assert.equal(admitted("find . -not"), false);
+    assert.equal(admitted("find . -name a.txt -not"), false);
+    assert.equal(admitted("find . -not -not -name a.txt"), false);
+    assert.equal(admitted("find . -not -o -name a.txt"), false);
+    assert.equal(admitted("find . -name a.txt -o -not"), false);
+    // A -path pattern is one non-option word; writers stay closed behind the new predicates.
+    assert.equal(admitted("find . -path"), false);
+    assert.equal(admitted("find . -path -name"), false);
+    assert.equal(admitted("find . -not -path \"./x/*\" -delete"), false);
+    assert.equal(admitted("find . -not -path \"./x/*\" -exec rm {} ;"), false);
+    assert.equal(admitted("find . -path ./x -prune -o -fprint out.txt"), false);
+    assert.equal(admitted("find /etc -not -path \"./x/*\" -name a"), false);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});

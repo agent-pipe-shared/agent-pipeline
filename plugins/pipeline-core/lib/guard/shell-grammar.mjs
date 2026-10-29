@@ -1268,27 +1268,35 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
     if (index === 0) return false;
     // PF-60: -o/-or/-a/-and join two closed predicates; one must sit between two of them.
     let afterOperator = false;
+    let afterNot = false;
     let sawPredicate = false;
     while (index < args.length) {
       const option = args[index++];
       if (["-o", "-or", "-a", "-and"].includes(option)) {
-        if (!sawPredicate || afterOperator) return false;
+        if (!sawPredicate || afterOperator || afterNot) return false;
         afterOperator = true;
+        continue;
+      }
+      // Gate-strength item: -not negates the next predicate only; it may not repeat or end the expression.
+      if (option === "-not") {
+        if (afterNot) return false;
+        afterNot = true;
         continue;
       }
       sawPredicate = true;
       afterOperator = false;
-      if (option === "-print") continue;
+      afterNot = false;
+      if (option === "-print" || option === "-prune") continue;
       if (["-maxdepth", "-mindepth"].includes(option)) {
         if (!/^(?:0|[1-9][0-9]*)$/u.test(args[index++] ?? "")) return false;
       } else if (option === "-type") {
         if (!["f", "d", "l"].includes(args[index++])) return false;
-      } else if (["-name", "-iname"].includes(option)) {
+      } else if (["-name", "-iname", "-path", "-ipath"].includes(option)) {
         if (typeof args[index] !== "string" || !args[index] || args[index].startsWith("-")) return false;
         index += 1;
       } else return false;
     }
-    return !afterOperator;
+    return !afterOperator && !afterNot;
   }
   if (executable !== "git") return false;
   const applyCheck = readOnlyGitApplyCheckArguments(args);
