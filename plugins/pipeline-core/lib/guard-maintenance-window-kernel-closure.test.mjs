@@ -255,7 +255,9 @@ const DYNAMIC_IMPORT_EDGES = {
     },
   ],
   // CLOSURE-REPAIR (Ruling 86a): the human-override script loads the toolchain coordinator lazily.
+  // It has a second call site that loads the PO key-directory resolver from po-human-approval.mjs.
   "plugins/pipeline-core/scripts/guard-human-override.mjs": [
+    "./po-human-approval.mjs",
     "./toolchain-preflight.mjs",
   ],
   // NVA-CF-GMWKC-RETRY: pre-commit-hook-install.mjs's renderImpl() template-string
