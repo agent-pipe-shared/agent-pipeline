@@ -47,6 +47,11 @@ protected-file change with real regression risk in approval and push paths. Targ
 family per ceremony, starting with configure-verify (smallest, already half in
 `lib/calibration-verify-commit-transition.mjs`).
 
+PO direction 2026-10-29 (chat): the refactor happens right after the 0.7.0 release, not before. Fresh
+evidence for the cost: every Goldfish that touches the file spends most of its tool budget reading
+it (the accept-residual slices C8 to C10 ended at the cap having only read), which is one more
+reason to split by family early in the 0.7.x line.
+
 ## Acceptance
 
 - `pipeline-state.mjs` is at or under 3000 lines, and each new module is under the default bound.
