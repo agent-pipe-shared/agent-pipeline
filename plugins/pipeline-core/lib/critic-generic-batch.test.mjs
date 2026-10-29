@@ -17,7 +17,7 @@ import {inspectGenericCriticBatchRecovery,recoverGenericCriticBatchEmptyStore} f
 import {readdirSync,readlinkSync,fsyncSync,renameSync} from "node:fs";
 import * as CGB from "./critic-generic-batch.mjs";
 
-const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035"]);
+const completionCaseIds = Object.freeze(["CGB001", "CGB002", "CGB003", "CGB004", "CGB005", "CGB006", "CGB007", "CGB008", "CGB009", "CGB010", "CGB011", "CGB012", "CGB013", "CGB014", "CGB015", "CGB016", "CGB017", "CGB018", "CGB019", "CGB020", "CGB021", "CGB022", "CGB023", "CGB024", "CGB025", "CGB026", "CGB027", "CGB028", "CGB029", "CGB030", "CGB031", "CGB032", "CGB033", "CGB034", "CGB035", "CGB036"]);
 const completionCases = [];
 function test(name,run) { completionCases.push({id:completionCaseIds[completionCases.length],name,run}); }
 function unit(overrides = {}) {
@@ -629,5 +629,13 @@ test("PF95 CGB035 inspect lists every origins entry of the old batch (feature-co
     assert.deepEqual(without.originEntries.map(e=>e.kind),["feature-course"]);
     assert.notEqual(without.digestSha256,full.digestSha256);
   }finally{rmSync(fx.root,{recursive:true,force:true});}
+});
+test("a CGB-BUDGET refusal names its reason: a correction on a batch without an admitted round says the full review comes first",()=>{
+ const fx=fixture();try{const member=register(fx),prior=fx.candidate;
+ writeFileSync(join(fx.root,"repair.txt"),"change\n");git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","change"]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);fx.reviewBase=prior;fx.taskId="correction-owner";
+ writeFileSync(join(fx.root,"evidence/verify.json"),JSON.stringify(produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],command:[process.execPath,"-e","console.log(\"targeted pass\")"],logPath:"evidence/targeted-budget-detail.log"})));
+ const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
+ assert.throws(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent:null,correction}),e=>e.code==="CGB-BUDGET"&&/no admitted round yet/u.test(e.message)&&/full review/u.test(e.message));
+ }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 registerTestCaseCompletion({cases:completionCases,fd:3,maxBytes:8192});

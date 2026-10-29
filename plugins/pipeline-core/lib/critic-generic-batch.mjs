@@ -443,7 +443,7 @@ const MAX_BATCH_DELTA_ORDINAL = 4096;
 function reservations(dir) {
   // Round 2 is stored as delta-admission.json (reservationFile); later rounds carry their number.
   const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^delta-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
-  if (ordinals.some(ordinal => ordinal > MAX_BATCH_DELTA_ORDINAL)) fail("CGB-BUDGET");
+  if (ordinals.some(ordinal => ordinal > MAX_BATCH_DELTA_ORDINAL)) fail("CGB-BUDGET", `A reservation file of this batch carries a round number above ${MAX_BATCH_DELTA_ORDINAL}; the batch directory is corrupt. Nothing is deleted.`);
   const full = reservationAt(dir, "full");
   const rows = full ? [full] : [];
   for (let ordinal = 2; ordinal <= Math.max(1, ...ordinals); ordinal++) {
@@ -498,7 +498,7 @@ function appendCorrection(input) {
       || s.scope.reviewUnit.reference.blobOid !== r.value.declaredScope.reviewUnit.reference.blobOid
       || !eq(s.scope.guardrails.map(x => x.path), r.value.declaredScope.guardrails.map(x => x.path))) fail("CGB-CONFLICT");
     const retained = reservations(r.dir);
-    if (!retained.length) fail("CGB-BUDGET");
+    if (!retained.length) fail("CGB-BUDGET", "This batch holds no admitted round yet, so there is no parent for a correction. Admit the full review of the batch first.");
     const prior = retained.at(-1);
     const parent = consumedParent(c, prior, input.parent);
     // D199: a PASS ends the batch only for the same candidate; real commits after it continue as a diff round.
@@ -907,10 +907,10 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       if(retained) {
         if(retained.packetId!==input.packetId || retained.packetDigest!==packetDigest(packet)
           || retained.claimSha256!==packetDigest(observed.claim) || retained.preflightSha256!==input.preflightSha256
-          || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET");
+          || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET",`Round ${ordinal} of this batch is already reserved for packet ${retained.packetId}, and this request carries a different packet, claim, preflight, source or decision digest. A new commit (for example an evidence commit) changes those digests; resume the reserved packet, or finish it before asking for the same round again.`);
         return {reservation:retained,replay:true};
       }
-      if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET");
+      if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET",`The course asks for round ${ordinal}, but this batch holds ${prior.length} admitted round(s) and needs ${ordinal-1} before round ${ordinal}. An earlier round was reviewed outside this batch or its reservation is missing; register the missing round or take the batch over with the session-critic-finalizer verbs. Nothing is deleted.`);
       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
       if(parent?.result.verdict.pass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
       if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
