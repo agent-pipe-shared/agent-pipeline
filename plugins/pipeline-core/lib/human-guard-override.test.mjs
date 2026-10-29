@@ -696,6 +696,75 @@ test("HGO denial binding (c) an armed capability recorded from a denial that car
   }
 });
 
+// AC-160 (r2): an armed capability that matches the retried call on tool name and tool input but
+// whose recorded denial digests differ is refused as HGO-DRIFT (driftedChecks names denials), not
+// skipped into an unarmed-looking denial. Chat mode: armUnderPty with the PTY seam, no signature.
+function armDenialDriftCapability(root, toolInput, firstDenials, label) {
+  const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+  const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: firstDenials, nowMs: 1000 });
+  const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 1500, scriptPath });
+  const reason = `Exact attended retry ${label}`;
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 1800, scriptPath,
+  });
+  const armed = armUnderPty({
+    rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
+    selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
+    nowMs: 1900, scriptPath,
+  });
+  assert.equal(armed.status, "armed");
+}
+
+test("HGO denial drift (a) an armed capability replayed with different denial text is refused as HGO-DRIFT naming denials, stays armed, and the original text still consumes it", { skip: PTY_HOST_LIMIT }, () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "denial drift a\n" };
+    const original = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL original text" }];
+    const changed = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL a genuinely different text" }];
+    armDenialDriftCapability(root, toolInput, original, "a");
+    const refused = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: changed, nowMs: 2000 });
+    assert.deepEqual(refused, { status: "replan", code: "HGO-DRIFT" });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const auditPath = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    const rejected = readFileSync(auditPath, "utf8").trim().split("\n").map((line) => JSON.parse(line)).find((entry) => entry.event?.code === "HGO-DRIFT");
+    assert.ok(rejected, "expected one HGO-DRIFT audit entry");
+    assert.ok(rejected.event.driftedChecks.includes("denials"), "driftedChecks must name denials");
+    const consumed = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: original, nowMs: 2100 });
+    assert.equal(consumed.status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("HGO denial drift (b) an armed capability for another tool input is still skipped without HGO-DRIFT when the denial text differs", { skip: PTY_HOST_LIMIT }, () => {
+  const root = fixture();
+  try {
+    const armedInput = { file_path: "notes.md", content: "denial drift b armed\n" };
+    const otherInput = { file_path: "notes.md", content: "denial drift b other call\n" };
+    const original = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL original text" }];
+    const changed = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL a genuinely different text" }];
+    armDenialDriftCapability(root, armedInput, original, "b");
+    const result = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput: otherInput, denials: changed, nowMs: 2000 });
+    assert.deepEqual(result, { status: "absent" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("HGO denial drift (c) the unchanged happy path with identical denials and tool input still consumes", { skip: PTY_HOST_LIMIT }, () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "denial drift c\n" };
+    const original = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-DEVPLAN-SHELL original text" }];
+    armDenialDriftCapability(root, toolInput, original, "c");
+    const consumed = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: original, nowMs: 2000 });
+    assert.equal(consumed.status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // NVA-SIGENTRY-1 DoD check 1: the extracted buildHumanGuardOverrideSignatureIntent()
 // helper must produce the IDENTICAL digest this already-passing test's own,
 // independently-reconstructed intent (prepareSignedArming() above builds it without

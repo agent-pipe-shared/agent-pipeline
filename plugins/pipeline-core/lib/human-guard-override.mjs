@@ -5052,16 +5052,20 @@ function consumeHumanGuardOverrideCore({
       skippedInvalidRecords.push({ planSha256, code: error?.code ?? "HGO-CAPABILITY" });
       continue;
     }
-    if (capability.status !== "armed" || capability.toolName !== toolName
-      || canonical(capability.denials) !== canonical(currentDenialDigests)) continue;
+    if (capability.status !== "armed" || capability.toolName !== toolName) continue;
     // ALF-K22 (PO decision 2026-10-22, "skip non-matching capabilities first"): a capability bound
     // to a DIFFERENT tool input is not the requested action. It is set aside here, before any lock,
     // drift computation or audit row, so a sibling signed for another action can neither be
     // reclassified against this call's input (a spurious [toolInputSha256, nativeTargets] HGO-DRIFT
     // row) nor mask the matching capability's own expired/drifted verdict. If nothing matches, the
     // set-aside records are evaluated read-only after this loop.
+    // AC-160 (r2): the denial digests are compared only AFTER the request binding (tool, tool input)
+    // identified the intended capability. A capability for another input whose denials also differ
+    // stays silently skipped; one that matches the call but whose denial digests drifted is NOT
+    // skipped -- it falls through to examineCapability(), which reports `denials` among the
+    // driftedChecks and refuses with the existing HGO-DRIFT, without consuming the capability.
     if (capability.toolInputSha256 !== toolInputSha256) {
-      nonMatching.push({ path });
+      if (canonical(capability.denials) === canonical(currentDenialDigests)) nonMatching.push({ path });
       continue;
     }
     const lock = join(paths.locks, `${planSha256}.lock`);
