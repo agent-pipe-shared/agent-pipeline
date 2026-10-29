@@ -583,6 +583,24 @@ test("D60 c7 (a) pin: the feature-request completion is only for the same task; 
   } finally { cleanup(fx); }
 });
 
+test("D60 c8 pin: the feature-request path refuses another candidate on its exact-candidate evidence binding, leaves the held packet alone, and the original request still completes", () => {
+  const fx = featureCourseFixture();
+  try {
+    assert.throws(() => admitSessionCriticReview(fx.request, { publishClaimedSessionAdmissionFn() { throw new Error("simulated failure after claim"); } }));
+    const heldDir = join(controlRootOf(fx), fx.request.packetId);
+    assert.equal(existsSync(heldDir), true, "a claimed packet is held");
+    const heldNames = readdirSync(heldDir).sort();
+    writeFileSync(join(fx.root, "specs", "other-candidate.md"), "other\n");
+    const other = commit(fx.root, "other candidate");
+    assert.notEqual(other, fx.candidate);
+    assert.throws(() => admitSessionCriticReview({ ...fx.request, packetId: "9b".repeat(16), preflightInput: { ...fx.request.preflightInput, candidate: other } }),
+      (error) => error.code === "CDP-EVIDENCE-BINDING", "D60 c8: another candidate is refused by the exact-candidate evidence binding, not resumed");
+    assert.deepEqual(readdirSync(heldDir).sort(), heldNames, "D60 c8: the held packet is untouched");
+    assert.equal(existsSync(join(controlRootOf(fx), "9b".repeat(16))), false, "D60 c8: the refused request claims no packet of its own");
+    assert.equal(admitSessionCriticReview(fx.request).status, "admitted", "D60 c8: the original request completes the held packet");
+  } finally { cleanup(fx); }
+});
+
 // D61: a REAL second process runs the real registration, is parked inside the transaction right after the
 // transaction itself wrote owner.json (before any index entry), and is then SIGKILLed: the lock it leaves is
 // the lock a consumer holds after an aborted registration.
