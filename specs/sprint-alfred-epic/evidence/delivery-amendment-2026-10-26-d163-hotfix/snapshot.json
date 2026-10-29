@@ -23,13 +23,13 @@
   },
   "current": {
     "counts": {
-      "25": 7,
+      "25": 6,
       "50": 3,
-      "75": 244,
+      "75": 245,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 73.33
+    "index": 73.52
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -373,8 +373,8 @@
     "critic": 255,
     "po-acceptance": 254,
     "native-host": 146,
-    "agent": 50,
-    "po-decision": 10,
+    "agent": 49,
+    "po-decision": 9,
     "verify-wsl": 113,
     "historical-evidence": 1
   },
@@ -8974,23 +8974,15 @@
     {
       "itemId": "pipeline.guard-dispatch-suite-red-before-the-hotfix",
       "title": "The guard-dispatch suite is red at the pre-hotfix commit too",
-      "stage": "25",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Analysed: guard-dispatch.test.mjs stood at 60 of 75 with 15 red cases at the pre-hotfix commit; the cause is measured (hand-assembled fixture briefings against DBG-GENERATED-BRIEFING-REQUIRED); the 15 are unfixed.",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). The cause is measured: hand-assembled fixture briefings against DBG-GENERATED-BRIEFING-REQUIRED and the write-carrier check that runs before the role checks. Delivered in source by PO decision D185 (guard order stays, tests follow): commit 90fa209cf repairs seven cases to the refusal the guard really gives, commit b206d17cb drives the eight background-route cases through a generator-built briefing on an approved course; guard-dispatch.test.mjs stands at 75 of 75 green, native-goldfish-host-state and agy-item-delivery suites green with the fixture option. Source only and unstamped. No Full Verify, Critic, native or acceptance claim.",
       "evidence": [
         "backlog/items/2026-10-26-guard-dispatch-suite-red-before-the-hotfix.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Rebuild the 15 fixtures with generator-built briefings."
-        },
-        {
-          "owner": "po-decision",
-          "what": "Guard-owner decision on the gate order (per the c2 notes)."
-        },
         {
           "owner": "verify-wsl",
           "what": "Candidate-bound integrated Verify/Security remains pending."

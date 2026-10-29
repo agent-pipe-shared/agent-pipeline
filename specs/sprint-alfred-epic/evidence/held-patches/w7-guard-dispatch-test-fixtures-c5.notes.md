@@ -1,5 +1,7 @@
 # W7-GUARD-DISPATCH-TEST-FIXTURES-C5: Elephant probe, seven cases repaired, eight cases need a plan approval fixture
 
+> RESOLVED the same day (commit `b206d17cb`): `lib/test-item-approved-course-fixture.mjs` (`prepareApprovedItemCourseFixture`, new optional `calibrationExtra`) is the plan approval fixture; the package binds `criterion: "AC-1"` with a lowercase slug; the guard writes the queue row itself, so none is seeded. Route (a) was taken; guard-dispatch.test.mjs stands at 75 of 75. The text below is the probe history.
+
 State: direct Elephant work after the two Goldfish checkpoints (c3, c4). No patch file: the repaired cases are committed directly (test-only, `plugins/pipeline-core/hooks/guard-dispatch.test.mjs`, commit `90fa209cf`). Suite: 75 tests, 67 pass, 8 fail (was 60/15).
 
 ## Done (D185: the guard order stays, the tests follow)
