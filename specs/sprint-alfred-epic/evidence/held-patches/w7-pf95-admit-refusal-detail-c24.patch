@@ -1,0 +1,56 @@
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 804ebffea..fa44fb856 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -733,7 +733,7 @@ export function readCriticReviewUnit(input) {
+   });
+ }
+ // PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
+-const TAKEOVER_DETAIL = "The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
++const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
+ const TAKEOVER_REPAIR = {
+   "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
+   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
+@@ -879,7 +879,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       const deliveryIndex=indexPath(c,"origins",targetForPacket(packet));
+       if(existsSync(deliveryIndex)){
+         const entry=stableJson(deliveryIndex);
+-        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
++        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
+       }
+       if (!owned) {
+         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+index c4ddeb85b..57d954073 100644
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -37,6 +37,7 @@ import {
+   SESSION_CRITIC_RECEIPT_SCHEMA,
+   SessionCriticFinalizerError,
+   admitSessionCriticReview,
++  describeCliError,
+   exportSessionCriticEvidence,
+   finalizeSessionCriticReview as finalizeRaw,
+   runSessionCriticFinalizerCli,
+@@ -1580,6 +1581,21 @@ test("PF94 TAKEOVER (1) real state: a consumed non-course batch makes the featur
+   } finally { cleanup(fx); }
+ });
+ 
++test("PF95 admit refusal (1) the CLI detail of a CGB-CONFLICT from an old batch names both takeover verbs", () => {
++  const fx = takeoverFixture();
++  try {
++    let error = null;
++    try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
++    assert.equal(error?.code, "CGB-CONFLICT");
++    const detail = describeCliError(error);
++    assert.equal(typeof detail, "string");
++    assert.ok(detail.includes("inspect-course-takeover") && detail.includes("supersede-course-takeover"), detail);
++    assert.ok(!/[\r\n]/u.test(detail), detail);
++    assert.ok(!/(?:[A-Za-z]:\\|\/)[A-Za-z0-9_.-]/u.test(detail.replaceAll("<path>", "")), detail);
++    assert.ok(detail.length <= 220, String(detail.length));
++  } finally { cleanup(fx); }
++});
++
+ test("PF94 TAKEOVER (2) inspect names the work ids, owner, origin kind, consumption and history, read-only and stable", () => {
+   const fx = takeoverFixture();
+   try {
