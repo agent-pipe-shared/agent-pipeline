@@ -139,6 +139,23 @@ the Elephant default. Validate the preflight identity but never execute its
 onboarding `nextAction`, inspect State/handover/history, or perform an Elephant
 bootstrap. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
+## Which record admits the first review (PF-70)
+
+`CPP-REVIEW-ADMISSION` reads dispatch records (`evidence/dispatch-record-<TASK_ID>.json`), not queue
+reservations. A foreground Goldfish dispatch leaves that record through the host commit; nobody writes it by
+hand. A background dispatch gets no host-commit completion (`NGHF-PENDING-UNAVAILABLE`), so the review is
+refused for want of a record even when the commits carry the right `Dispatch:` trailer. The Elephant then
+writes an orchestrator-attested record, which is admitted as weaker assurance than a host-observed one:
+
+`node <plugin-root>/scripts/dispatch-record-write.mjs --repo-root <root> --attested-request <request.json>`
+
+The request is one closed JSON object: `schema` `pipeline.dispatch-attested-request.v1`, `briefingPath` (the
+generated briefing, which must carry a required-review `criticDecision`), `handbackPath` (the hand-back text
+the Elephant received) and `commits` (full 40-hex shas in chain order). Both paths are repository-relative
+under `scratch/`, `evidence/` or `specs/`. Every path the commits changed must lie inside the briefing's
+`allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. Use the task id of
+that record for every round (next section).
+
 ## Continuing a Critic course after the first round (PF-94)
 
 Script paths resolve under the plugin root the bootstrap prints. **Every later round carries the `taskId`

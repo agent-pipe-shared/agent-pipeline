@@ -239,6 +239,14 @@ Elephant-owned guarantee independent of whether the dispatched subagent
 actually reached that step, rather than trusting compliance with an
 instruction it may never get to.
 
+A background dispatch is the other case: it gets no host-commit completion
+(`NGHF-PENDING-UNAVAILABLE`) and so no host-written record at all. The
+Critic's review admission reads dispatch records only, so for such a
+dispatch the Elephant writes the orchestrator-attested record through
+`dispatch-record-write.mjs --attested-request` (request shape, path rules and
+the allowed-paths check: `skills/critic-review/SKILL.md`, "Which record
+admits the first review").
+
 ## `agentType` needs the `pipeline-core:` prefix
 
 A Workflow `agent()` call's `opts.agentType` resolves from the same registry
