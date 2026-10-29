@@ -141,7 +141,12 @@ bootstrap. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
 ## Continuing a Critic course after the first round (PF-94)
 
-Script paths resolve under the plugin root the bootstrap prints. Order:
+Script paths resolve under the plugin root the bootstrap prints. **Every later round carries the `taskId`
+of the first delivery** (the Goldfish dispatch record the first review was admitted on), never a new one:
+`session-critic-finalizer.mjs admit` accepts a review candidate that descends from that delivered record,
+whoever wrote the commits in between, and a new `taskId` has no record, so it is refused
+(`CPP-REVIEW-ADMISSION`). Pass the same `--task-id` to `critic-dispatch-preflight.mjs` to see the
+refusal before a packet is reserved. Order:
 
 1. `session-critic-finalizer.mjs inspect-course-takeover --root <root> --request <scratch request.json>`,
    then `supersede-course-takeover` with the printed digest and a reason. Only when the old batch

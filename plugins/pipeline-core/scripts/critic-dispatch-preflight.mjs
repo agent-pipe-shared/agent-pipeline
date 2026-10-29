@@ -20,6 +20,8 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
+import { isSafeTaskId } from "../lib/dispatch-record.mjs";
+import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
 import {
   CriticGuardrailDerivationError,
   deriveRequiredCriticGuardrails,
@@ -288,7 +290,7 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
  * state. Evidence is a local, bounded JSON observation that binds the frozen
  * candidate; Spec and guardrails are always read from that candidate tree.
  */
-export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, correctionInputBindings = null }, observer = null) {
+export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, correctionInputBindings = null, taskId = null }, observer = null) {
   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
   try {
   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
@@ -426,6 +428,18 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
 
   if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
 
+  // N13: the dispatch record admission `session-critic-finalizer admit` applies later, asked now, so this tool no longer
+  // says packet-ready for a task id that admit will refuse. Optional: without --task-id nothing changes.
+  let reviewAdmission = null;
+  if (taskId !== null) {
+    if (scope !== null) fail("CDP-ARGUMENT", "--task-id needs an exact base-to-candidate range, not a review scope.");
+    const admission = evaluateReviewAdmission({ root: realRoot, taskId, baseCommit, candidateCommit });
+    if (!admission.ok) {
+      fail("CDP-REVIEW-ADMISSION", `Critic review admission would refuse task id ${taskId}: ${(admission.readFindings ?? []).join("; ")}`);
+    }
+    reviewAdmission = { taskId, mode: admission.admittedByDescendant ? "descendant" : "exact" };
+  }
+
   const result = {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
     // This remains read-only. The ordinary session orchestrator is the next
@@ -434,6 +448,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     status: "packet-ready",
     ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
     candidate: { commit: candidateCommit, tree: candidateTree },
+    ...(reviewAdmission === null ? {} : { reviewAdmission }),
     ...(correctionInputEcho === null ? {} : { correctionInputBindings: correctionInputEcho }),
     spec: specReadback,
     guardrails: guardrailReadback,
@@ -520,8 +535,13 @@ export function parseCriticDispatchPreflightArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     const value = argv[index + 1];
-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings", "--task-id"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
     if (flag === "--correction-input-bindings") values.correctionInputBindings = value;
+    else if (flag === "--task-id") {
+      if (Object.hasOwn(values, "taskId")) fail("CDP-ARGUMENT", "Duplicate --task-id.");
+      if (!isSafeTaskId(value)) fail("CDP-ARGUMENT", "--task-id is not a safe task id.");
+      values.taskId = value;
+    }
     else if (flag === "--root") values.root = value;
     else if (flag === "--base") values.base = value;
     else if (flag === "--candidate") values.candidate = value;

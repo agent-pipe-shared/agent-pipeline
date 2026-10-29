@@ -808,6 +808,18 @@ export function evaluateReviewAdmission(options = {}) {
     historicalDebtCount: historical?.entries.length ?? 0,
     ...(historical ? { historicalFreshReview: historicalFreshReviewPacketBinding({repository:root,currentTarget:{kind:"admitted-dispatch",taskId:options.taskId,baseCommit:options.baseCommit,candidateCommit:options.candidateCommit}}) } : {}) };
 }
+// N13 (Toolbox, 2026-10-29): admission has two routes, and the refusal named only the first. A later Critic round carries the
+// task id of the first delivery; a candidate that descends from that delivered record is admitted without any new record.
+const DESCENDANT_ROUTE_HINT = "a later Critic round carries the task id of its first delivery: a review candidate that descends from a delivered Goldfish record (authored-commit or orchestrator-attested) with the SAME task id is admitted without a new record, so do not invent a task id per round.";
+const DESCENDANT_TASK_ID_SEARCH_LIMIT = 25;
+function descendantTaskIdsOfDeliveredRecords(root, records, candidateCommit, options) {
+  const found = new Set();
+  for (const record of records.slice(-DESCENDANT_TASK_ID_SEARCH_LIMIT)) {
+    try { if (verifyCandidateDescendsFromRecord(root, record.candidateCommit, candidateCommit, options).ok) found.add(record.taskId); }
+    catch { /* a record whose ancestry cannot be read names no suggestion */ }
+  }
+  return [...found].sort();
+}
 function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signedImportAnchor = null) {
   const root = options.root ?? DEFAULT_ROOT;
   const taskId = options.taskId;
@@ -828,6 +840,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
   let targetRecordCandidateCommit = null;
   let admittedByDescendant = false;
   let admittedRecordKind = null;
+  const pendingDeliveredRecords = [];
   if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
   if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
 
@@ -896,6 +909,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
       } else {
         pendingRecordCount += 1;
         pendingRecordPaths.push(path);
+        if (terminalAuthoredDelivery(record)) pendingDeliveredRecords.push(record);
       }
       continue;
     }
@@ -918,8 +932,9 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
   for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
   if (signedImportAnchor !== null) admittedCount = 1;
   if (admittedCount !== 1) {
+    const descendantTaskIds = admittedCount === 0 ? descendantTaskIdsOfDeliveredRecords(root, pendingDeliveredRecords, candidateCommit, options) : [];
     const missingRecordHint = admittedCount === 0
-      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+      ? `; ${DESCENDANT_ROUTE_HINT}${descendantTaskIds.length === 0 ? "" : ` This candidate descends from the delivered record of task id ${descendantTaskIds.join(", ")}: use that task id for this round.`} Otherwise the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
       : "";
     findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
   }

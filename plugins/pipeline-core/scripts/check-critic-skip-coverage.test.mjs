@@ -1090,6 +1090,34 @@ test("CSC-A7a delivered v3 record still admits with no label (documents D-2, no 
   assert.equal(later.admittedByDescendant, true);
 });
 
+// N13 (Toolbox, 2026-10-29): the refusal must teach the descendant route, and name the task id that would be admitted.
+test("CSC-N13a the zero-target refusal names the descendant route and the first delivery's task id rule", () => {
+  const result = evaluateReviewAdmission({ root: fixture({ "evidence/.keep": "" }), taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
+  const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`));
+  assert.ok(text, result.readFindings.join("\n"));
+  assert.match(text, /later Critic round carries the task id of its first delivery/u);
+  assert.match(text, /descends from a delivered Goldfish record/u);
+  assert.match(text, /do not invent a task id per round/u);
+  assert.doesNotMatch(text, /descends from the delivered record of task id/u, "no suggestion without a delivered ancestor record");
+});
+
+test("CSC-N13b a fresh task id for round two is refused and the delivered record's task id is named", () => {
+  const delivered = deliveredV4("FIRST", "orchestrator-attested");
+  const result = evaluateReviewAdmission({
+    root: fixture({ "evidence/dispatch-record-FIRST.json": json(delivered) }),
+    taskId: "FIRST-critic-r2", candidateCommit: DESCENDANT, readChangedPaths: () => [], gitRead: ancestryOk });
+  assert.equal(result.ok, false);
+  assert.equal(result.admittedCount, 0);
+  const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for FIRST-critic-r2@${DESCENDANT}; found 0`));
+  assert.ok(text, result.readFindings.join("\n"));
+  assert.match(text, /descends from the delivered record of task id FIRST: use that task id for this round/u);
+  const reused = evaluateReviewAdmission({
+    root: fixture({ "evidence/dispatch-record-FIRST.json": json(delivered) }),
+    taskId: "FIRST", candidateCommit: DESCENDANT, readChangedPaths: () => [], gitRead: ancestryOk });
+  assert.equal(reused.ok, true, reused.readFindings.join("\n"));
+  assert.equal(reused.admittedByDescendant, true);
+});
+
 test("CSC-A8 the zero-target refusal names the attested-request CLI and no longer defers a no-history range to a PO decision", () => {
   const result = evaluateReviewAdmission({ root: fixture({ "evidence/.keep": "" }), taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
   const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`));

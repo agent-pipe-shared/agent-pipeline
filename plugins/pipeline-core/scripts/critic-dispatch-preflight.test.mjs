@@ -269,6 +269,26 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
   assert.equal(result.dispatch.requiredNextGate, "session-critic-dispatch");
 });
 
+// N13 (Toolbox, 2026-10-29): the preflight asks the dispatch record admission when it is given the task id.
+test("N13 preflight with --task-id refuses a task id no delivered record admits and says why; without it nothing changes", () => {
+  const fx = fixture();
+  const refusal = cdpRefusal(() => preflightCriticDispatch({ ...input(fx), taskId: "FRESH-critic-r2" }), "CDP-REVIEW-ADMISSION");
+  assert.match(refusal.message, /Critic review admission would refuse task id FRESH-critic-r2/u);
+  assert.match(refusal.message, /later Critic round carries the task id of its first delivery/u);
+  const plain = preflightCriticDispatch(input(fx));
+  assert.equal(plain.status, "packet-ready");
+  assert.equal(Object.hasOwn(plain, "reviewAdmission"), false);
+});
+
+test("N13 the argument parser takes one safe --task-id and refuses a repeated or unsafe one", () => {
+  const base = ["--root", ".", "--base", "a".repeat(40), "--candidate", "b".repeat(40), "--spec", "specs/spec.md"];
+  assert.equal(parseCriticDispatchPreflightArgs([...base, "--task-id", "FIRST-1"]).taskId, "FIRST-1");
+  assert.equal(Object.hasOwn(parseCriticDispatchPreflightArgs(base), "taskId"), false);
+  cdpRefusal(() => parseCriticDispatchPreflightArgs([...base, "--task-id", "A", "--task-id", "B"]), "CDP-ARGUMENT");
+  cdpRefusal(() => parseCriticDispatchPreflightArgs([...base, "--task-id", "../x"]), "CDP-ARGUMENT");
+  cdpRefusal(() => parseCriticDispatchPreflightArgs([...base, "--task-id"]), "CDP-ARGUMENT");
+});
+
 test("reviewer input uses an empty governance-directory list when the manifest declares no governance block", () => {
   const fx = fixture();
   writeFileSync(join(fx.root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
