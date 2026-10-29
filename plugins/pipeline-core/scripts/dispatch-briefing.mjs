@@ -68,7 +68,7 @@ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
   Required strings: id, item, agentType, modelId, check, title, ac, goal.
   Required non-empty string arrays: paths, context, targeted.
   Optional strings: schema, modelWhy, broader, spec, criterion, budgetRationale, reconNote, runner.
-  Optional string arrays: newFiles, forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
+  Optional string arrays: newFiles (files the dispatch creates: exempt from the must-exist check AND added to the write scope), forbidden, stops, facts (coordinator facts rendered in section 1); optional positive integer: estimatedToolCalls.
   Unknown keys are refused. --package is repository-relative. Only --out writes,
   to a repository-relative scratch/*.md file; without --out the text is returned as JSON.
 
@@ -961,7 +961,8 @@ export function buildDispatchBriefing(options, deps = {}) {
   const calibration = resolveBriefingCalibration(root, deps.calibration);
   const bind = (agentType) => generateDispatchBinding({
     root, dispatchId: pkg.id, item: pkg.item, agentType, modelId: pkg.modelId,
-    check: pkg.check, paths: [...pkg.paths], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
+    // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
+    check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
   }, deps);
   // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
   let generated = bind(pkg.agentType);

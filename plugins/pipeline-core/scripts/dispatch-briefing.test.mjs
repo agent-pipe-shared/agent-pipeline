@@ -604,6 +604,22 @@ test("build refuses a named path that does not exist unless the package declares
   assert.equal(runDispatchBriefing(declared.argv, depsOf(declared.fx)).ok, true);
 });
 
+// PF-68 (PO decision 2026-10-29): newFiles declares what the dispatch creates, so those files are writable.
+test("build adds every newFiles entry to the write scope, once, whether or not paths names it too", async () => {
+  const { runDispatchBriefing } = await lib();
+  const onlyNew = packageFixture({ newFiles: ["plugins/x/generated.mjs"] });
+  const built = runDispatchBriefing(onlyNew.argv, depsOf(onlyNew.fx));
+  assert.equal(built.ok, true, JSON.stringify(built));
+  const scope = parseNativeGoldfishBriefing(built.text).binding.allowedPaths;
+  assert.deepEqual(scope, [CHECK, PATH_A, "plugins/x/generated.mjs"].sort());
+  assert.ok(built.text.includes("`plugins/x/generated.mjs`"), "the briefing scope line names the new file");
+  const both = packageFixture({ paths: [PATH_A, "plugins/x/new.mjs"], newFiles: ["plugins/x/new.mjs"] });
+  const builtBoth = runDispatchBriefing(both.argv, depsOf(both.fx));
+  assert.deepEqual(parseNativeGoldfishBriefing(builtBoth.text).binding.allowedPaths, [CHECK, PATH_A, "plugins/x/new.mjs"].sort());
+  const invalid = packageFixture({ newFiles: ["../outside.mjs"] });
+  assert.equal(runDispatchBriefing(invalid.argv, depsOf(invalid.fx)).code, "DBG-PATH-INVALID");
+});
+
 test("build refuses an unknown package key and a missing required field, each naming its repair", async () => {
   const { runDispatchBriefing } = await lib();
   const unknown = packageFixture({ cluster: "K13" });
