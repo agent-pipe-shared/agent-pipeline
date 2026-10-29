@@ -1,8 +1,8 @@
 # Project state — Agent-Pipeline
 
-Current runner-neutral handover, 2026-10-25. This is the current open/next
-authority. [Previous state](../specs/sprint-alfred-epic/plans/state-archive-before-pc-transfer-2026-10-25.md)
-is historical and contains superseded goals and counts.
+Current runner-neutral handover ([calibration](../project/pipeline.json)) and
+open/next authority. [Previous state](../specs/sprint-alfred-epic/plans/state-archive-before-pc-transfer-2026-10-25.md)
+is historical (superseded goals and counts).
 
 ## Active goal and matrix
 

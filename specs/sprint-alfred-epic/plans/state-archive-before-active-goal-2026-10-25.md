@@ -25,26 +25,26 @@
 **Current task (2026-10-17): close the 0.7.0 local candidate, no new fixes.**
 Read these three files first, in this order, before any other work:
 
-1. [Current item status](../specs/sprint-alfred-epic/evidence/delivery-status-current.md):
+1. [Current item status](../evidence/delivery-status-current.md):
    the only work list. Per item it gives the stage and what is still open, each entry with
    an owner (agent, critic, verify-wsl, native-host, po-decision, po-signature, po-acceptance).
    Do not re-derive status from older matrices, ledgers or chat.
-2. [The cut decision](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md), section
+2. [The cut decision](po-decisions-2026-10-12.md), section
    "Cut for the 0.7.0 candidate": only closing steps remain, in this order: one WSL Full
    Verify, one Critic batch, PO acceptance lists in blocks. New implementation only for what
    those steps show as genuinely red. Touch an item only for an `agent` entry released for work.
 
-3. [Handover to the WSL session](../specs/sprint-alfred-epic/plans/HANDOVER-2026-10-17-wsl.md):
+3. [Handover to the WSL session](HANDOVER-2026-10-17-wsl.md):
    the closing steps in order, the Critic scope, and the open Windows findings with their
    measurements, so they are built on and not rediscovered.
 
 **Claude WSL session, 2026-10-20:** the content of the next candidate is being built on
 `feat/sprint-alfred` after `e6fec04a0`. It is not stamped or pushed; that waits for the PO's call
 (D18, D56 (4)). PO decisions D54-D56 and the triage of report 03 are in
-[po-decisions-2026-10-18](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md) and
-[feedback-03-triage](../specs/sprint-alfred-epic/plans/feedback-03-triage.md). PO steps and open
+[po-decisions-2026-10-18](po-decisions-2026-10-18.md) and
+[feedback-03-triage](feedback-03-triage.md). PO steps and open
 questions (Q13 new) are in
-[po-ceremonies-pending](../specs/sprint-alfred-epic/plans/po-ceremonies-pending.md).
+[po-ceremonies-pending](po-ceremonies-pending.md).
 Built, not accepted:
 - the orphaned `registry.lock` (FB3-PF-55/56): it is retired once its owner is gone, and
   `release-lock` and `wait` are added;
@@ -64,7 +64,7 @@ Built, not accepted:
   `e6fec04a0` are fixed (repair-map AC-4, the architecture overview, the close audit lifecycle).
 Ordinal-2 delta Critic over `e6fec04a0..f62b5143a`: FAIL on F-A and F-B (major), with F-C, F-D
 and F-E minor. The report and its disposition are in
-[ord2-f62b5143a](../specs/sprint-alfred-epic/evidence/critic/ord2-f62b5143a/disposition.md). The
+[ord2-f62b5143a](../evidence/critic/ord2-f62b5143a/disposition.md). The
 corrections are Elephant-built, because the Goldfish route needs Spec item rows these items do not
 have. That puts them under the new PO question Q14, together with the D55/D56 commits.
 Corrections built, not accepted:
@@ -75,7 +75,7 @@ Corrections built, not accepted:
 Its writer, guard-git, is ceremony C13. C13 is ready as two whole-file drop-ins (hook and test); a
 clone proof shows guard-git 258/258.
 Ordinal-3 delta Critic over `f62b5143a..254ff0002`: FAIL on F1, F2 and F3 (major), F4 minor
-([ord3-254ff0002](../specs/sprint-alfred-epic/evidence/critic/ord3-254ff0002/disposition.md)).
+([ord3-254ff0002](../evidence/critic/ord3-254ff0002/disposition.md)).
 Corrections built, not accepted: `commit-pipeline-owned.mjs` requires `--agent` or `--human`
 (F4); PUSHSIG-S4c no longer depends on the checkout path length (F3); the ledger helper says it
 is not yet in effect and creates its file owner-only (F1, closed only by C13). F2 (stage-0
@@ -182,8 +182,8 @@ Open:
 stamp `d52de6154`, version `0.7.0+<runner>.20261019205354.d99774b`), pushed to
 `origin/feat/sprint-alfred` with a signed approval. It replaces every candidate named below and
 carries PF-49 to PF-55 (D46-D53 in
-[po-decisions-2026-10-18](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md), E36 in
-[elephant-decisions-2026-10-19](../specs/sprint-alfred-epic/plans/elephant-decisions-2026-10-19.md)).
+[po-decisions-2026-10-18](po-decisions-2026-10-18.md), E36 in
+[elephant-decisions-2026-10-19](elephant-decisions-2026-10-19.md)).
 Implementation complete, not accepted. Open, in this order:
 1. The independent Critic batch on PF-54/PF-55 (D51 (4): after the push): production commits
    `f52d20a12`, `d769449e8`, `e64562c6a`, `cfcd01b6f`, `426e4afbe`, `d99774b17`.
@@ -198,7 +198,7 @@ Implementation complete, not accepted. Open, in this order:
 
 **Claude WSL session, 2026-10-18:** local test candidates are stamped from real greenfield
 findings (PF-14, PF-19, PF-20, PF-23, PF-25). PO decisions D5-D15 are in
-[po-decisions-2026-10-18](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-18.md).
+[po-decisions-2026-10-18](po-decisions-2026-10-18.md).
 Last pushed candidate: `15f9355d3` (PF-25 feature package registration, Antigravity runner
 view). On it, the PO's installer option 2 was refused `ATR-WIRING-OWNERSHIP-UNVERIFIABLE`:
 global hook wiring still pointed into the removed managed copy. Fixed in `c2817beda`.
@@ -217,19 +217,19 @@ commit the new snapshot; it replaces `delivery-status-current` and keeps history
 directories. The sections below are background from 2026-10-12.
 
 **Earlier task: portable Alfred WIP checkpoint, 2026-10-12.**
-Start at [the Claude handover](../specs/sprint-alfred-epic/plans/HANDOVER-2026-10-12.md).
+Start at [the Claude handover](HANDOVER-2026-10-12.md).
 The PO requests all important work and public evidence committed for another PC.
 The checkpoint was pushed: `origin/feat/sprint-alfred` = `6447fcc1a` (observed
 2026-10-12 by the Claude continuation after `git fetch`).
 This is a transfer checkpoint, not release, installation readiness or acceptance.
 Claude continuation ledger (batches, collected patches, PO topics):
-[claude-session-2026-10-12](../specs/sprint-alfred-epic/plans/claude-session-2026-10-12.md).
+[claude-session-2026-10-12](claude-session-2026-10-12.md).
 
 ## Archived history
 
 | Date range | Summary | Archive |
 |---|---|---|
-| 2026-10-24 | Historical October 12 integration and runtime cut; current continuation stays in state | [docs/state-archive/2026-10-24--codex-greenfield-history.md](state-archive/2026-10-24--codex-greenfield-history.md) |
+| 2026-10-24 | Historical October 12 integration and runtime cut; current continuation stays in state | [docs/../../../docs/state-archive/2026-10-24--codex-greenfield-history.md](../../../docs/state-archive/2026-10-24--codex-greenfield-history.md) |
 
 ## Scope and measurable progress
 
@@ -237,9 +237,9 @@ The delivery scope remains 174 original backlog items, 37 ACs and four incident
 criteria. Nightwing, Batman and explicitly deferred work stay excluded.
 Current status (2026-10-18, HEAD `98b6e5ca2`): 7 at 25%, 150 at 50%, 16 at 75%, one
 unknown, zero accepted; index 51.01% — see
-[delivery-status-current](../specs/sprint-alfred-epic/evidence/delivery-status-current.md).
+[delivery-status-current](../evidence/delivery-status-current.md).
 Every 75 still needs Critic confirmation. The figures below are the superseded 2026-10-11 matrix.
-[2026-10-11 matrix](../specs/sprint-alfred-epic/evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.md):
+[2026-10-11 matrix](../evidence/item-owned-egm-delivery-20261011/postinstall-delivery-matrix.md):
 55 at 25%, 75 at 50%, nine at 75%, 35 unknown, zero accepted; 66 assessments.
 JSON SHA256: `bb2ad93f93de1db19a6506908a8a572ac2ea57e8044d1fc48a3178358c4eb03c`.
 The conservative weighted index is 33.33%, versus 32.76% at the frozen baseline;
@@ -248,45 +248,45 @@ noncomparable. Do not restart it or infer a causal cost/speed improvement.
 
 ## Portable working states and evidence
 
-The [prepared Source manifest](../specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/manifest.json)
+The [prepared Source manifest](../implementation/checkpoint-2026-10-12/prepared-source/manifest.json)
 packages 48 inert proposal leaves: 41 v7 selections plus seven review-route leaves.
-The [restore plan](../specs/sprint-alfred-epic/implementation/checkpoint-2026-10-12/prepared-source/restore-plan.md)
+The [restore plan](../implementation/checkpoint-2026-10-12/prepared-source/restore-plan.md)
 defines application boundaries. These proposals are not live Main integration,
 whole-composition qualification, independent review or acceptance.
 
-The [portable evidence manifest](../specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/portable-evidence-manifest.json)
+The [portable evidence manifest](../evidence/checkpoint-2026-10-12/portable-evidence-manifest.json)
 maps 248 named records to 230 new objects, conserves 499 prior custody files and
 resolves all 174 rows through ten assessment bases. Use its canonical maps;
 old scratch/cache paths are provenance, not required filesystem inputs.
 Twelve original-requirement associations remain explicitly unresolved.
 Private runtime authority, keys, host correlation and missing genuine inputs are
 not manufactured or exported. Two older status projections had local Home paths;
-their [amendment](../specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/status-public-projection-amendment-20261012.json)
+their [amendment](../evidence/checkpoint-2026-10-12/status-public-projection-amendment-20261012.json)
 records the public derivatives without rerunning tests or changing outcomes.
 
 Canonical `specs/**/evidence/**` and `backlog/evidence/**` now override generic
 suffix ignores, including log, jsonl and tmp. Root regenerated snapshots and
 private scratch remain local; important records are promoted to canonical paths.
-The [policy note](../specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/ignore-policy/policy.md)
+The [policy note](../evidence/checkpoint-2026-10-12/ignore-policy/policy.md)
 records actual Git checks and the consumer-onboarding follow-up.
 
 Retained Sentinel Epic authority (`governance/spec-retention.json`, archive
 `docs/spec-archive/2026-07-20-sentinel-recovery/`):
-[PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md),
-[Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md),
-[acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md),
-[reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md),
-[recovery](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md),
-[platform support](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md),
-[Windows blockers](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+[PRD](../../2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md),
+[Spec](../../2026-07-19-sprint-sentinel-epic/spec.md),
+[acceptance matrix](../../2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md),
+[reconciliation design](../../2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md),
+[recovery](../../2026-07-19-sprint-sentinel-epic/RECOVERY.md),
+[platform support](../../2026-07-19-sprint-sentinel-epic/platform-support-contract.md),
+[Windows blockers](../../2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
 
 ## Historical detail
 
-[Historical state before rotation](../specs/sprint-alfred-epic/evidence/checkpoint-2026-10-12/docs-state-before-rotation.md)
+[Historical state before rotation](../evidence/checkpoint-2026-10-12/docs-state-before-rotation.md)
 retains earlier inventories, test counts, holds and source references.
 One local Home prefix is normalized; the original digest is retained in the
 checkpoint rotation note. No historical outcomes are changed.
-[Postinstall continuation](../specs/sprint-alfred-epic/plans/handover-2026-10-11-postinstall-delivery.md)
-and [decision intake](../specs/sprint-alfred-epic/plans/po-decisions-2026-10-12.md)
+[Postinstall continuation](handover-2026-10-11-postinstall-delivery.md)
+and [decision intake](po-decisions-2026-10-12.md)
 contain the detailed continuation. Historical PASS statements apply only to their
 recorded candidate/fixture scope, not current Main or final acceptance.
