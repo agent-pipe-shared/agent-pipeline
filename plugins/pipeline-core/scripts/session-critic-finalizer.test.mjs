@@ -256,10 +256,12 @@ test("private task snapshot binds uppercase delivered-v3 bytes without exporting
       recordSha256,
       sourceCandidateCommit: fx.historicalCandidate,
       reviewCandidateCommit: fx.candidate,
+      assurance: null,
       snapshotId: sha256Canonical({
         schema: "pipeline.local-dispatch-evidence.v1", taskId: fx.taskId,
         recordPath: fx.recordPath, recordSha256,
         sourceCandidateCommit: fx.historicalCandidate, reviewCandidateCommit: fx.candidate,
+        assurance: null,
       }),
     });
     assert.equal(JSON.parse(exactRecordBytes).candidateCommit, fx.historicalCandidate);
