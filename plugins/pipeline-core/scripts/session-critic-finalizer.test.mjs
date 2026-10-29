@@ -6,7 +6,7 @@ import { isSafeTaskId } from "../lib/dispatch-record.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { produceCriticDiagnostic } from "../lib/critic-diagnostic-producer.mjs";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, realpathSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, realpathSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1695,6 +1695,51 @@ test("PF94 TAKEOVER (6) the same task is admitted again on the course path after
     const done = takeoverVerb(fx, "supersede-course-takeover", { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round 1 ran under an earlier course key" });
     assert.equal(done.status, 0, JSON.stringify(done.out));
     // The very same task id and delivery target (same authored-delivery record) is admitted again on the course path.
+    assert.equal(admitSessionCriticReview({ ...fx.request, packetId: "9b".repeat(16) }).status, "admitted");
+  } finally { cleanup(fx); }
+});
+
+test("PF95 REPLAY (a) replaying a takeover audited before the origins fix moves the leftover origins entry of the old batch and the next admit succeeds", () => {
+  const fx = featureCourseFixture();
+  try {
+    assert.equal(admitSessionCriticReview(fx.request).status, "admitted");
+    const verdictValue = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "controlled fixture inspected", briefing_violations: [], pass: false };
+    assert.equal(finalizeSessionCriticReview({ ...fx.request, verdict: verdictValue, allowCallerAuthoredFallback: true }).status, "completed");
+    fx.featureId = "held-feature";
+    const inspected = takeoverVerb(fx, "inspect-course-takeover", { schema: TAKEOVER_INSPECT_SCHEMA, featureId: fx.featureId });
+    assert.equal(inspected.out.refusalCode, null, JSON.stringify(inspected.out));
+    const request = { schema: TAKEOVER_SUPERSEDE_SCHEMA, featureId: fx.featureId, digestSha256: inspected.out.digestSha256, reason: "round 1 ran under an earlier course key" };
+    const done = takeoverVerb(fx, "supersede-course-takeover", request);
+    assert.equal(done.status, 0, JSON.stringify(done.out));
+    // Simulate the legacy state: the audit written before the origins fix names only the logical entries and the feature-course origins entry.
+    const store = join(controlRootOf(fx), "generic-batches");
+    const dir = join(store, "superseded", inspected.out.digestSha256);
+    const delivery = inspected.out.originEntries.find((e) => e.kind === "authored-delivery").file;
+    const auditPath = join(dir, "audit.json");
+    const audit = JSON.parse(readFileSync(auditPath, "utf8"));
+    assert.ok(audit.moves.some((m) => m.kind === "origins" && m.file === delivery), "the current writer lists the delivery entry");
+    audit.moves = audit.moves.filter((m) => !(m.kind === "origins" && m.file === delivery));
+    rmSync(auditPath, { force: true });
+    writeFileSync(auditPath, canonicalJson(audit), { mode: 0o600 });
+    const movedBytes = readFileSync(join(dir, "origins", delivery));
+    renameSync(join(dir, "origins", delivery), join(store, "origins", delivery));
+    assert.ok(existsSync(join(store, "origins", delivery)), "legacy state: the delivery entry is live again");
+    // The same request (same digest) is replayed.
+    const replay = takeoverVerb(fx, "supersede-course-takeover", request);
+    assert.equal(replay.status, 0, JSON.stringify(replay.out));
+    assert.equal(replay.out.status, "superseded");
+    assert.equal(replay.out.replay, true);
+    assert.equal(existsSync(join(store, "origins", delivery)), false, "the leftover delivery entry is no longer live");
+    assert.equal(readdirSync(join(store, "origins")).length, 0);
+    assert.ok(existsSync(join(dir, "origins", delivery)), "it is under the superseded directory of that digest");
+    assert.deepEqual(readFileSync(join(dir, "origins", delivery)), movedBytes, "nothing was deleted or rewritten");
+    assert.deepEqual(JSON.parse(readFileSync(auditPath, "utf8")), audit, "the audit record stays append-only");
+    // A second replay is idempotent.
+    const again = takeoverVerb(fx, "supersede-course-takeover", request);
+    assert.equal(again.out.replay, true);
+    assert.equal(readdirSync(join(dir, "origins")).length, 2);
+    assert.equal(readdirSync(join(store, "origins")).length, 0);
+    // The same task is admitted again on the course path.
     assert.equal(admitSessionCriticReview({ ...fx.request, packetId: "9b".repeat(16) }).status, "admitted");
   } finally { cleanup(fx); }
 });

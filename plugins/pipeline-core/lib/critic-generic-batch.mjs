@@ -829,7 +829,9 @@ export function supersedeFeatureCourseTakeover(input) {
         durable(auditPath, audit);
       }
       for (const kind of ["logical", "origins"]) createDirectory(join(dir, kind));
-      for (const m of audit.moves) {
+      // PF-95: a takeover audited before the origins fix names too few moves; on replay also retire every origins entry still owned by the old batch.
+      const leftover = replay ? originEntriesOf(c, audit.batchRef).map(e => ({ kind: "origins", file: e.file })) : [];
+      for (const m of [...audit.moves, ...leftover]) {
         const from = join(c.root, m.kind, m.file);
         if (existsSync(from)) renameSync(from, join(dir, m.kind, m.file));
       }
