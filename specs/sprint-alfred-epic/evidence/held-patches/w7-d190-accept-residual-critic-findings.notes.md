@@ -243,3 +243,25 @@ Status: the whole 40-call budget again went into reading (the prescribed spots p
 Everything in steps 1-4 of the C10 briefing (cases RED, production edit, GREEN runs in clone and clone3, argv-closure and lifecycle suites, regenerated patch), plus catalog entry, drift suite, enumerating suites, multi-suite comparison, revert proof, po-human-approval kind routing, pipeline-state printing, push-prepare closing sentence with its case. Batch Critic, Full Verify and PO acceptance stay pending.
 
 CONTINUATION CARD -- done: all reading needed (facts above are sufficient to write code without further orientation); remaining: all of steps 1-4; next step: write the five cases at the end of the clone's pipeline-state.test.mjs in the FIRST call after a single Read of its last lines, run them RED via the driver, then edit pipeline-state.mjs (three small edits plus the case), run the whole suite in clone and clone3 in background, then `driver patch install` and the C11 notes; budget at least 50 calls and NO exploratory reads.
+
+## C11 slice: five pipeline-state cases written and RED; no production edit
+
+Appended at the end of plugins/pipeline-core/scripts/pipeline-state.test.mjs in the clone (own failure-collecting wrapper c11Case; imports aliased c11*, placed with the block); the cumulative patch was regenerated with `driver patch install` (patch bytes 57792, apply-check clone3 exit 0). Block source: scratch/agent-out/w7ar9/c11-block.txt, appended by scratch/agent-out/w7ar9/c11-append.mjs.
+
+### Cases
+- C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt
+- C11-b signature mode records the acceptance and consumes the proof once
+- C11-c a major finding is refused with RESIDUAL-PROOF-SEVERITY, state bytes unchanged, no prompt consumed
+- C11-d an acceptance recorded for another candidate leaves the lifecycle at CVL-CRITIC-FAILED
+- C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves the state unchanged
+
+### RED run (driver run c11red, exit 0 of the driver; log scratch/agent-out/w7ar9/log-c11red.txt)
+- Baseline: the file ran through to the new block with every pre-existing case passing (18 PASS lines from the AC-264 wrapper cases; the older plain-assert blocks raised nothing).
+- FAIL C11-a, C11-b, C11-c, C11-d: Error: unknown command "approve-residual-acceptance". Allowed: ...
+- FAIL C11-e: Expected values to be strictly equal: 2 !== 0 (the first run exits 2 for the same unknown subcommand)
+- Final: AssertionError: D190 residual acceptance cases failed: C11-a | C11-b | C11-c | C11-d | C11-e
+
+### NOT done
+Production edit in pipeline-state.mjs (command name in PIPELINE_STATE_COMMANDS, switch case, ALWAYS_REQUIRED_KINDS), GREEN runs in clone and clone3, argv-closure and lifecycle suites, catalog entry plus drift suite, multi-suite comparison, revert proof, po-human-approval kind routing, pipeline-state printing, push-prepare sentence with its case. Note: the cases assume deps.gitCommonDir returns {ok, path}, deps.readConsumedCandidateReceiptFn returns {packet, receipt}, flags --by and --critic-packet; fix the case fixtures only with a written justification if the implementation must differ.
+
+CONTINUATION CARD -- done: five cases RED, patch installed; remaining: production edit (three small edits plus the case body, template defaultFeaturePackageReconcileApproval), GREEN in clone and clone3 in background, argv-closure/lifecycle suites, then the remaining items above; next step: edit pipeline-state.mjs in the clone via a scratch script, then run driver run c11green plugins/pipeline-core/scripts/pipeline-state.test.mjs.

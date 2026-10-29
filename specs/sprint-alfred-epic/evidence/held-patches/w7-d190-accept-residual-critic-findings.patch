@@ -617,3 +617,197 @@ index a9052295e..c5b8104ee 100644
  });
  
  /**
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 2daf78f02..262e56403 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3254,3 +3254,189 @@ handoffCase("R6 the inspection fails closed, and the criterion scan is exported
+ 
+ assert.deepEqual(handoffFailures, [], `AC-264 plan-readiness hand-off cases failed: ${handoffFailures.join(" | ")}`);
+ console.log("AC-264 plan-readiness hand-off R1-R6 complete.");
++
++// D190 residual acceptance (C11 test-first): `approve-residual-acceptance` records a PO acceptance of a failed
++// Critic receipt whose open findings are ALL of lowest severity (minor). Chat mode is an attended, attributed
++// confirmation; signature mode consumes an Ed25519 proof of kind accept-residual-critic-findings.
++import { recordCriticVerifyLifecycle as c11Record, residualFindingId as c11FindingId } from "../lib/critic-verify-lifecycle.mjs";
++import { authorizeRecordedChatResidualAcceptance as c11Authorize } from "../lib/critical-action-authorization.mjs";
++import { canonicalJson as c11Canon, sha256 as c11Sha } from "./critic-packet-preflight.mjs";
++
++const c11Failures = [];
++function c11Case(name, body) {
++  try { body(); console.log("PASS " + name); } catch (error) { c11Failures.push(name); console.error("FAIL " + name + ": " + (error?.message ?? error)); }
++}
++const C11_KIND = "accept-residual-critic-findings";
++const c11Oid = (char) => char.repeat(40);
++const c11Finding = (gap, severity) => ({ gap, risk: "r", severity, evidence: "e", spec_ref: "s" });
++
++function c11Receipt(cand, findings) {
++  const receipt = {
++    schema: "pipeline.session-critic-receipt.v1", packetId: "d".repeat(32), packetDigest: "e".repeat(64),
++    session: { id: "review-1", freshContext: true, historyInherited: false, mayDelegate: false },
++    candidate: { base: c11Oid("f"), ...cand }, reviewRange: { base: c11Oid("f"), commit: cand.commit, diffSha256: "1".repeat(64) },
++    rulesetSha: c11Oid("2"), assurance: "functional-equivalent-read-only; OS isolation not asserted", verdictSha256: "3".repeat(64),
++    findingCount: findings.length, reviewPass: false,
++  };
++  const packet = { packetId: receipt.packetId, candidate: { ...receipt.candidate },
++    diff: { base: receipt.reviewRange.base, commit: receipt.reviewRange.commit, sha256: receipt.reviewRange.diffSha256 } };
++  receipt.packetDigest = c11Sha(c11Canon(packet));
++  return { packet, receipt, receiptSha256: c11Sha(c11Canon(receipt)) };
++}
++
++function c11Fixture({ chat, findings, cand = candidate }) {
++  const root = mktempProjectDir();
++  const gitAt = (...args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8" });
++  gitAt("config", "user.email", "po@example.invalid");
++  gitAt("config", "user.name", "PO");
++  mkdirSync(join(root, "project"), { recursive: true });
++  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication", C11_KIND] }));
++  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
++    schema: "pipeline.state.v0", planApproved: true,
++    activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
++    planApproval: { poGateAuthority: { planSha256, specSha256 } },
++  }, null, 2));
++  if (chat) writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\ngates:\n  push_approval: chat\n");
++  gitAt("add", "-A");
++  gitAt("commit", "-q", "-m", "fixture");
++  const common = mkdtempSync(join(tmpdir(), "c11-common-"));
++  const made = c11Receipt(cand, findings);
++  const statePathFile = join(root, "project", "pipeline-state.json");
++  const deps = {
++    dir: root, now: () => now,
++    gitHead: () => ({ ok: true, commit: cand.commit }), gitCandidate: () => ({ ok: true, ...cand }),
++    gitCommonDir: () => ({ ok: true, path: common }),
++    readConsumedCandidateReceiptFn: () => ({ packet: made.packet, receipt: made.receipt }),
++    readOpenFindingsFn: () => findings,
++  };
++  const expectedCode = "ACCEPT-" + made.receiptSha256.slice(0, 8).toUpperCase();
++  const cleanup = () => { rmSync(root, { recursive: true, force: true }); rmSync(common, { recursive: true, force: true }); };
++  return { root, common, deps, made, expectedCode, statePathFile, cleanup };
++}
++
++function c11Findings(list) {
++  return list.map((f) => ({ id: c11FindingId(f), severity: f.severity })).sort((a, b) => a.id.localeCompare(b.id));
++}
++
++function c11Lifecycle(fx, cand, findings) {
++  const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
++  const accepted = state.residualAcceptance?.lastAccepted;
++  const acceptance = accepted === undefined ? undefined : {
++    schema: "pipeline.critic-residual-acceptance.v1", mode: accepted.criticalProofWaiver?.mode,
++    candidate: accepted.candidate, criticReceiptSha256: accepted.criticReceiptSha256, findings: accepted.findings,
++  };
++  const evidence = { schema: "pipeline.verify-evidence.v0", exitCode: 0, candidate: { ...cand }, verifyRun: { terminalSha256: "c".repeat(64) } };
++  return c11Record({ gitCommonDir: fx.common, criticPacketId: fx.made.receipt.packetId, candidate: cand, evidencePath: "evidence/verify.json", evidence }, {
++    readConsumedCandidateReceiptFn: () => ({ packet: fx.made.packet, receipt: fx.made.receipt }),
++    readOpenFindingsFn: () => findings,
++    residualAcceptance: acceptance,
++    verifyResidualAcceptanceFn: (input) => c11Authorize({ projectDir: fx.root, state, candidate: input.candidate ?? cand, criticReceiptSha256: input.criticReceiptSha256 ?? fx.made.receiptSha256, findings: input.findings ?? acceptance?.findings }),
++  });
++}
++
++function c11SignatureFiles(fx, findings, { cand = candidate } = {}) {
++  const external = mktempProjectDir();
++  const subjectSha256 = criticalActionSubjectSha256({ kind: C11_KIND, candidate: cand, subject: { criticReceiptSha256: fx.made.receiptSha256, findings: c11Findings(findings) } });
++  const request = createCriticalActionApprovalRequest({ candidate: cand, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: C11_KIND, subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
++  const keys = generateKeyPairSync("ed25519");
++  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
++  const authority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
++  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") };
++  const paths = { request: join(external, "request.json"), authority: join(external, "authority.json"), proof: join(external, "proof.json") };
++  writeFileSync(paths.request, JSON.stringify(request));
++  writeFileSync(paths.authority, JSON.stringify(authority));
++  writeFileSync(paths.proof, JSON.stringify(proof));
++  return ["--proof-request", paths.request, "--proof-authority", paths.authority, "--proof", paths.proof];
++}
++
++const c11Minor = [c11Finding("gap one", "minor"), c11Finding("gap two", "minor")];
++
++c11Case("C11-a chat mode records an attended residual acceptance and the lifecycle then qualifies the failed all-minor receipt", () => {
++  const fx = c11Fixture({ chat: true, findings: c11Minor });
++  try {
++    const head = spawnSync("git", ["-C", fx.root, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
++    const cand = { commit: head, tree: candidate.tree };
++    const made = c11Receipt(cand, c11Minor);
++    fx.made = made;
++    fx.deps.gitHead = () => ({ ok: true, commit: head });
++    fx.deps.gitCandidate = () => ({ ok: true, ...cand });
++    fx.deps.readConsumedCandidateReceiptFn = () => ({ packet: made.packet, receipt: made.receipt });
++    const code = "ACCEPT-" + made.receiptSha256.slice(0, 8).toUpperCase();
++    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => code };
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", made.receipt.packetId], deps));
++    assert.equal(outcome.result, 0, outcome.lines.join(" "));
++    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
++    const accepted = state.residualAcceptance.lastAccepted;
++    assert.equal(accepted.forCommit, head);
++    assert.equal(accepted.forTree, cand.tree);
++    assert.deepEqual(accepted.candidate, cand);
++    assert.equal(accepted.criticReceiptSha256, made.receiptSha256);
++    assert.deepEqual(accepted.findings, c11Findings(c11Minor));
++    assert.equal(accepted.criticalProof, null);
++    assert.equal(accepted.criticalProofWaiver.mode, "chat-attributed-unattested");
++    const lifecycle = c11Lifecycle(fx, cand, c11Minor);
++    assert.ok(lifecycle.receiptSha256, "the failed all-minor receipt must qualify through the recorded acceptance");
++  } finally { fx.cleanup(); }
++});
++
++c11Case("C11-b signature mode records the acceptance and consumes the proof once", () => {
++  const fx = c11Fixture({ chat: false, findings: c11Minor });
++  try {
++    const flags = c11SignatureFiles(fx, c11Minor);
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags], fx.deps));
++    assert.equal(outcome.result, 0, outcome.lines.join(" "));
++    const state = JSON.parse(readFileSync(fx.statePathFile, "utf8"));
++    const accepted = state.residualAcceptance.lastAccepted;
++    assert.equal(accepted.criticReceiptSha256, fx.made.receiptSha256);
++    assert.deepEqual(accepted.findings, c11Findings(c11Minor));
++    const consumed = (state.criticalProofConsumption ?? []).filter((entry) => entry.kind === C11_KIND);
++    assert.equal(consumed.length, 1, "exactly one ledger entry of the kind");
++  } finally { fx.cleanup(); }
++});
++
++c11Case("C11-c a major finding is refused with RESIDUAL-PROOF-SEVERITY, state bytes unchanged, no prompt consumed", () => {
++  const withMajor = [c11Finding("gap one", "minor"), c11Finding("gap big", "major")];
++  const fx = c11Fixture({ chat: true, findings: withMajor });
++  try {
++    const before = readFileSync(fx.statePathFile);
++    let prompted = 0;
++    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => { prompted += 1; return fx.expectedCode; } };
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId], deps));
++    assert.equal(outcome.result, 2, outcome.lines.join(" "));
++    assert.ok(outcome.lines.some((line) => line.includes("RESIDUAL-PROOF-SEVERITY")), outcome.lines.join(" "));
++    assert.ok(before.equals(readFileSync(fx.statePathFile)), "state bytes must be identical");
++    assert.equal(prompted, 0, "no prompt may be consumed for a refused acceptance");
++  } finally { fx.cleanup(); }
++});
++
++c11Case("C11-d an acceptance recorded for another candidate leaves the lifecycle at CVL-CRITIC-FAILED", () => {
++  const other = { commit: c11Oid("9"), tree: candidate.tree };
++  const fx = c11Fixture({ chat: true, findings: c11Minor, cand: other });
++  try {
++    const code = fx.expectedCode;
++    const deps = { ...fx.deps, isattyFn: () => true, readLineFn: () => code };
++    const outcome = capturedStderr(() => run(["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId], deps));
++    assert.equal(outcome.result, 0, outcome.lines.join(" "));
++    // The lifecycle runs for the ORIGINAL candidate; the receipt it reads belongs to that candidate.
++    const original = c11Receipt(candidate, c11Minor);
++    fx.made = original;
++    assert.throws(() => c11Lifecycle(fx, candidate, c11Minor), (error) => error.code === "CVL-CRITIC-FAILED");
++  } finally { fx.cleanup(); }
++});
++
++c11Case("C11-e replaying the same proof gives CRITICAL-PROOF-REPLAY and leaves the state unchanged", () => {
++  const fx = c11Fixture({ chat: false, findings: c11Minor });
++  try {
++    const flags = c11SignatureFiles(fx, c11Minor);
++    const argv = ["approve-residual-acceptance", "--by", "PO", "--critic-packet", fx.made.receipt.packetId, ...flags];
++    assert.equal(capturedStderr(() => run(argv, fx.deps)).result, 0);
++    const before = readFileSync(fx.statePathFile);
++    const second = capturedStderr(() => run(argv, fx.deps));
++    assert.notEqual(second.result, 0);
++    assert.ok(second.lines.some((line) => line.includes("CRITICAL-PROOF-REPLAY")), second.lines.join(" "));
++    assert.ok(before.equals(readFileSync(fx.statePathFile)), "state bytes must be identical after the replay");
++  } finally { fx.cleanup(); }
++});
++
++assert.deepEqual(c11Failures, [], "D190 residual acceptance cases failed: " + c11Failures.join(" | "));
++console.log("D190 residual acceptance C11-a..e complete.");
