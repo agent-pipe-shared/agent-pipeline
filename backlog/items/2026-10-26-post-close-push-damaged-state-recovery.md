@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.greenfield.g33.post-close-push-continuity
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-26

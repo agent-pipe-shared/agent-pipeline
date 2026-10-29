@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.greenfield.r2.agent-frontmatter-effort-overrides-configured-route
-type: bug
+type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
