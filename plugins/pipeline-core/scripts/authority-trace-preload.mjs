@@ -13,6 +13,9 @@
  *   $env:PIPELINE_AUTHORITY_TRACE = '1'
  *   $env:PIPELINE_AUTHORITY_TRACE_FILE = "$env:TEMP\hook-authority-trace.jsonl"      # optional; default is stderr
  *   $env:NODE_OPTIONS = '--import file:///<plugin root>/scripts/authority-trace-preload.mjs'
+ * Before the plugin that ships this file is installed, copy ONLY this file anywhere and add
+ *   $env:PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT = '<installed plugin root>'      # the directory that holds lib/
+ * and point --import at the copy.
  * Then run one Agent dispatch and read the file: one JSON line per Node process that ended, `pipeline.hook-authority-trace.v1`.
  * Nothing happens unless PIPELINE_AUTHORITY_TRACE is exactly "1". Stderr of a hook that exits 0 is not shown by the runner,
  * which is why the file route exists. The counters are process-local: this file imports the three counter modules by the
@@ -21,15 +24,22 @@
 import { appendFileSync } from "node:fs";
 import { basename } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 if (process.env.PIPELINE_AUTHORITY_TRACE === "1") {
+  // The counter modules come from PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT when it is set (a directory holding lib/), so this one
+  // file can be copied anywhere and still read the counters of an INSTALLED plugin without a new install; otherwise from the
+  // plugin this file sits in. Both must be the root the hooks run from, or the counters belong to another module instance.
+  const rootOverride = process.env.PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT;
+  const base = typeof rootOverride === "string" && rootOverride !== ""
+    ? pathToFileURL(rootOverride.endsWith("/") || rootOverride.endsWith("\\") ? rootOverride : `${rootOverride}/`)
+    : new URL("../", import.meta.url);
   const load = async (relative, name) => {
-    try { return (await import(new URL(relative, import.meta.url).href))[name]; } catch { return null; }
+    try { return (await import(new URL(relative, base).href))[name]; } catch { return null; }
   };
-  const custody = await load("../lib/worktree-lifecycle.mjs", "custodyInspectionStats");
-  const observed = await load("../lib/windows-private-state.mjs", "nativeObservationStats");
-  const authority = await load("../lib/windows-owned-authority-backend.mjs", "nativeAuthorityStats");
+  const custody = await load("lib/worktree-lifecycle.mjs", "custodyInspectionStats");
+  const observed = await load("lib/windows-private-state.mjs", "nativeObservationStats");
+  const authority = await load("lib/windows-owned-authority-backend.mjs", "nativeAuthorityStats");
   const startedAt = performance.now();
   const preloadWorkMs = Math.round(startedAt);
   let written = false;

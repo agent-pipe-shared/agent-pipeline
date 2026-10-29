@@ -6,9 +6,9 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { pathToFileURL } from "node:url";
 
@@ -51,6 +51,20 @@ test("APT2 with the switch and a file, a process that exits 2 leaves one v1 line
   assert.deepEqual(trace.custodyInspections, { count: 0, ms: 0, maxMs: 0 });
   assert.deepEqual(trace.nativeObservations, { count: 0, ms: 0, maxMs: 0, failed: 0, byOperation: {} });
   assert.deepEqual(trace.authorityMemo, { hits: 0, misses: 0, size: 0 });
+});
+
+test("APT4 a COPY of the file elsewhere reads the counters of the plugin named by PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT, and none without it", () => {
+  const copy = join(dir, "copy-of-preload.mjs");
+  copyFileSync(AUTHORITY_TRACE_PRELOAD_PATH, copy);
+  const pluginRoot = dirname(dirname(AUTHORITY_TRACE_PRELOAD_PATH));
+  const withRoot = join(dir, "copy-with-root.jsonl"), withoutRoot = join(dir, "copy-without-root.jsonl");
+  const run = (file, extra) => spawnSync(process.execPath, ["--import", pathToFileURL(copy).href, hook], {
+    encoding: "utf8", env: { ...process.env, NODE_OPTIONS: "", PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: file, ...extra },
+  });
+  assert.equal(run(withRoot, { PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT: pluginRoot }).status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(withRoot, "utf8")).counters, { custody: true, observed: true, authority: true });
+  assert.equal(run(withoutRoot, {}).status, 0, "a copy without the root still exits cleanly");
+  assert.deepEqual(JSON.parse(readFileSync(withoutRoot, "utf8")).counters, { custody: false, observed: false, authority: false }, "no counter module is reachable from the copy's own directory");
 });
 
 test("APT3 several processes append, one line each, and without a file the line goes to stderr", () => {
