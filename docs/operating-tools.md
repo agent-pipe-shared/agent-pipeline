@@ -23,6 +23,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
 | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
 | Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
 | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
+| Collect growing runtime state of a checkout; first collector: old git-hook `runtime-<sha256>` snapshots that no hook names (`plan` prints a digest, `apply --plan-sha256 <digest> --aside <dir outside the repository>` moves them aside, never deletes) | `scripts/housekeeping.mjs plan\|apply` (`node --test scripts/housekeeping.test.mjs`) | `plan` none; `apply` renames snapshots into the aside directory |
 
 ## Candidate stamp
 
