@@ -1,7 +1,7 @@
 # State authority diagnostics and memo, and the Critic route path rule: verification and PO apply blocks (2026-10-29)
 
-Nine patches, applied in this order, in two commits (patch 4, `w7-state-authority-trace-memo-e3`, and patch 9, `w7-critic-path-charset-f4`, were added after the first version of this note). This is a set of HELD PATCHES: nothing in it is applied, stamped, installed, reviewed or accepted until the PO has done so. It supersedes the apply
-blocks of `STATE-AUTHORITY-DIAGNOSTICS-VERIFY-2026-10-28.md` (which covered only the first two patches). All nine apply on HEAD of the working branch in this order; the first patch of each commit must
+Ten patches, applied in this order, in two commits (patch 4, `w7-state-authority-trace-memo-e3`, patch 9, `w7-critic-path-charset-f4`, and patch 10, `w7-critic-range-bindings-operator-text-d2`, were added after the first version of this note). This is a set of HELD PATCHES: nothing in it is applied, stamped, installed, reviewed or accepted until the PO has done so. It supersedes the apply
+blocks of `STATE-AUTHORITY-DIAGNOSTICS-VERIFY-2026-10-28.md` (which covered only the first two patches). All ten apply on HEAD of the working branch in this order; the first patch of each commit must
 never be applied alone (the second corrects it).
 
 | # | Patch | Content |
@@ -15,6 +15,7 @@ never be applied alone (the second corrects it).
 | 7 | `w7-critic-path-charset-f2` | the path patterns of four JSON schemas (lineage, review attempt, course decision, release scope) |
 | 8 | `w7-critic-path-charset-f3` | walk case `CPP18`: a real candidate packet with eight special file names through the route |
 | 9 | `w7-critic-path-charset-f4` | case `PF97 LINEAGE (special file names)`: the real registration route of a consumed course round (preflight, admission, finalize, `addCriticReviewLineage`) with the same eight names; fixture option `extraCandidateFiles`; VCR01 pin 232 to 238 |
+| 10 | `w7-critic-range-bindings-operator-text-d2` | text only: the hints of the diagnostic evidence route, the registration route and the push remedy, and the skill operator note, name the derive step, the preflight flag and the request key `review.correctionInputBindings`; cases `D2 text (1)` to `(4)` |
 
 ## What the Critic path rule is now (PO decision 2026-10-28)
 
@@ -69,6 +70,7 @@ Block 2 (Critic path rule):
 `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-critic-path-charset-f2.patch`
 `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-critic-path-charset-f3.patch`
 `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-critic-path-charset-f4.patch`
+`git apply specs/sprint-alfred-epic/evidence/held-patches/w7-critic-range-bindings-operator-text-d2.patch`
 `git add -A -- plugins/pipeline-core harness/scripts`
 `git commit --no-verify -F scratch/commit-msg-po-apply-critic-paths.txt`
 

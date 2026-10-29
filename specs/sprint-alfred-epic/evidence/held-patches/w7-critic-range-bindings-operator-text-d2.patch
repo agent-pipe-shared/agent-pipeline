@@ -1,0 +1,104 @@
+diff --git a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+index c79517d95..1e02e26b8 100644
+--- a/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
++++ b/plugins/pipeline-core/lib/critic-diagnostic-evidence.test.mjs
+@@ -211,3 +211,41 @@ test("PF88-S2 (iv) a base that is not a commit fails closed with a typed error",
+     assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: `${f.candidate.tree}` })), /CDI-BASE/u);
+   } finally { rmSync(f.root, { recursive: true, force: true }); }
+ });
++
++import { REGISTER_FEATURE_PACKAGE_HELP } from "../scripts/register-feature-package.mjs";
++import { CRITIC_DIAGNOSTIC_EVIDENCE_HELP } from "../scripts/critic-diagnostic-evidence.mjs";
++const D2_PLUGIN = resolve(new URL("..", import.meta.url).pathname);
++function d2RequireBindingsText(text) {
++  assert.match(text, /critic-correction-input-bindings\.mjs derive/u);
++  assert.match(text, /correctionInputBindings/u);
++}
++test("D2 text (1) the diagnostic evidence route names the derive step and the request field and keeps the old step", () => {
++  const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
++  assert.match(text, /Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
++  d2RequireBindingsText(text);
++});
++test("D2 text (2) the registration route names the derive step and the request field and keeps both old steps", () => {
++  const text = REGISTER_FEATURE_PACKAGE_HELP;
++  assert.match(text, /5\. Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
++  assert.match(text, /7\. Rerun critic-dispatch-preflight\.mjs with the arguments the verb prints\./u);
++  d2RequireBindingsText(text);
++  assert.ok((text.match(/critic-correction-input-bindings\.mjs derive/gu) ?? []).length >= 2);
++});
++test("D2 text (3) the push hint names the derive step and the request field and keeps the old hint", () => {
++  const src = readFileSync(join(D2_PLUGIN, "scripts/push-prepare.mjs"), "utf8");
++  const line = src.split("\n").find((l) => l.includes("scripts/critic-dispatch-preflight.mjs --base <merge base"));
++  assert.ok(line, "hint line present");
++  assert.ok(line.includes("then Verify that exact candidate"));
++  d2RequireBindingsText(line);
++});
++test("D2 text (4) the skill operator note names the flag, the request key, the same-value rule and the re-derive rule", () => {
++  const src = readFileSync(join(D2_PLUGIN, "skills/critic-review/SKILL.md"), "utf8");
++  const note = src.split("\n").find((l) => l.startsWith("**Operator note (ranges with state or retained results):**"));
++  assert.ok(note, "operator note present");
++  assert.ok(note.includes("critic-correction-input-bindings.mjs derive"));
++  assert.ok(note.includes("--correction-input-bindings"));
++  assert.ok(note.includes("review.correctionInputBindings"));
++  assert.match(note, /same value/u);
++  assert.match(note, /never null/u);
++  assert.match(note, /derive again/u);
++});
+diff --git a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+index 2ca910934..8aeab0a6d 100644
+--- a/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
++++ b/plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs
+@@ -40,6 +40,7 @@ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
+   "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+   "  4. Commit the manifest the registration names.",
+   "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
++  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
+   "",
+ ].join("\n");
+ if (isDirectInvocation(import.meta.url)) {
+diff --git a/plugins/pipeline-core/scripts/push-prepare.mjs b/plugins/pipeline-core/scripts/push-prepare.mjs
+index e3f2d76bb..04a45b95a 100644
+--- a/plugins/pipeline-core/scripts/push-prepare.mjs
++++ b/plugins/pipeline-core/scripts/push-prepare.mjs
+@@ -749,7 +749,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
+         message: review.ok ? "independent Critic and Verify bind this exact candidate"
+           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
+         ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
+-          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate"
++          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value)."
+           : "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
+       });
+     }
+diff --git a/plugins/pipeline-core/scripts/register-feature-package.mjs b/plugins/pipeline-core/scripts/register-feature-package.mjs
+index 2283872a4..2b47017e6 100644
+--- a/plugins/pipeline-core/scripts/register-feature-package.mjs
++++ b/plugins/pipeline-core/scripts/register-feature-package.mjs
+@@ -59,6 +59,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
+   "  4. Commit the manifest the registration names.",
+   "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
++  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
+   "",
+   "Critic course lineage route (PF-94; register round N BEFORE the next correction commit):",
+   "  1. Finalize the course round (session-critic-finalizer) so the packet is consumed.",
+@@ -79,6 +80,7 @@ export const REGISTER_FEATURE_PACKAGE_HELP = [
+   "  5. Run: register-feature-package.mjs --root <root> --add-delta-request <input.json>",
+   "  6. Commit the manifest and the request file the verb names (evidence-only commit).",
+   "  7. Rerun critic-dispatch-preflight.mjs with the arguments the verb prints.",
++  "  8. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
+   "",
+   "Late lineage: if correction commits already follow a consumed round, its lineage can no longer be registered (CCA-TRANSPORT-SOURCE-DRIFT).",
+   "  Retire the old batch with session-critic-finalizer inspect-course-takeover and supersede-course-takeover, then rerun round 1 on the course path.",
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index d32d00a24..c1ac3afb5 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -289,7 +289,7 @@ tool or mutating command, do not delegate, and report the exposure as a
+ residual host limitation. No staleness check (the dispatch fixed the SHA); no
+ handover, no history — ever.
+ 
+-**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record or retained prior result exclusion, never readable) and pass the file as the Correction input bindings field; never invent a role.
++**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record or retained prior result exclusion, never readable) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic).
+ 
+ **Lifecycle-Guard inspection form (hard):** When the functional-equivalent
+ lane runs under a Lifecycle Guard, perform each repository inspection as one
