@@ -1410,8 +1410,26 @@ const HUMAN_GUARD_HANDOFF_HEADLINES = Object.freeze([
   "No human override route is offered for this exact ",
 ]);
 
+// A Node process warning (`(node:<pid>) ... Warning: ...`) that a guard child printed once to its
+// stderr, plus its `--trace-` hint line, is process noise: the replay does not repeat it.
+const NODE_PROCESS_WARNING_LINE = /^\(node:\d+\) /u;
+const NODE_TRACE_HINT_LINE = /^\(Use `node --trace-.*to show where the warning was created\)$/u;
+
+function dropNodeProcessWarnings(value) {
+  const lines = value.split("\n");
+  const kept = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (NODE_PROCESS_WARNING_LINE.test(lines[index])) {
+      if (index + 1 < lines.length && NODE_TRACE_HINT_LINE.test(lines[index + 1])) index += 1;
+      continue;
+    }
+    kept.push(lines[index]);
+  }
+  return kept.join("\n");
+}
+
 function bindingDenialReason(reason) {
-  const value = String(reason);
+  const value = dropNodeProcessWarnings(String(reason));
   const starts = HUMAN_GUARD_HANDOFF_HEADLINES
     .map((headline) => value.indexOf(`\n${headline}`))
     .filter((index) => index >= 0);
