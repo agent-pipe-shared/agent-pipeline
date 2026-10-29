@@ -1,0 +1,432 @@
+diff --git a/docs/operating-tools.md b/docs/operating-tools.md
+index a158408fe..89cebfa82 100644
+--- a/docs/operating-tools.md
++++ b/docs/operating-tools.md
+@@ -23,6 +23,7 @@ Reusable helper scripts for the Elephant and the operator live in the tracked to
+ | Produce the counted GREEN results the delivery matrix reads, in one serial, resumable pass | `scripts/sitting-count-pass.mjs` (suite list: `specs/sprint-alfred-epic/plans/count-pass-suites.json`) | the evidence markdown and its `.state.jsonl` |
+ | Check the sitting's end state in one pass (ten light checks, one table) | `scripts/post-sitting-checks.mjs [--root <dir>] [--only <name>...] [--json <file>]` | none; `--json` writes one file inside `<root>/scratch/` |
+ | Replay the held post-sitting commits of the build clones into a rehearsal clone | `scripts/rehearse-held.mjs` (uses `scripts/import-held.mjs`, `scripts/in-clone.mjs`) | the rehearsal target |
++| Collect growing runtime state of a checkout; first collector: old git-hook `runtime-<sha256>` snapshots that no hook names (`plan` prints a digest, `apply --plan-sha256 <digest> --aside <dir outside the repository>` moves them aside, never deletes) | `scripts/housekeeping.mjs plan\|apply` (`node --test scripts/housekeeping.test.mjs`) | `plan` none; `apply` renames snapshots into the aside directory |
+ 
+ ## Candidate stamp
+ 
+diff --git a/scripts/housekeeping.mjs b/scripts/housekeeping.mjs
+new file mode 100644
+index 000000000..4b7f9e0e0
+--- /dev/null
++++ b/scripts/housekeeping.mjs
+@@ -0,0 +1,200 @@
++// Purpose: housekeeping for growing runtime state of a git checkout. First collector: `hook-runtime-snapshots` - the
++//          generated git hooks (pre-commit, commit-msg, pre-push) each keep one `runtime-<64 hex>` snapshot directory per
++//          install under `<git common dir>/agent-pipeline/<hook>-hook/`; only the one named in that directory's impl.mjs is live.
++//          The script plans which older snapshots can be moved aside and, on request, moves them. It NEVER deletes anything.
++// Usage:   node scripts/housekeeping.mjs plan  [--root <repo>] [--keep-newest <n>]
++//          node scripts/housekeeping.mjs apply --plan-sha256 <digest> --aside <dir> [--root <repo>] [--keep-newest <n>] [--stamp <name>]
++//          (default root: the current directory; default keep-newest: 1, so the previous snapshot survives a rollback)
++// Inputs:  the repository's git common dir (`git rev-parse --git-common-dir`). Not a git repository: status `unavailable`, nothing planned.
++// Output:  plan -> one JSON document {schema:"pipeline.housekeeping-plan.v1", collectors, planSha256}; paths are relative to the git
++//          common dir, never absolute. apply -> the plan plus per-item moved/failed, also written to <aside>/<stamp>/manifest.json.
++//          Exit 0 ok; 1 when a move failed (the snapshot stays in place); 2 on a refusal or bad usage (code on stderr).
++// Safety:  plan writes nothing. apply recomputes the plan and refuses a different digest (HK-PLAN-DRIFT); refuses a missing aside
++//          directory (HK-ASIDE-MISSING) or one inside the git common dir or the repository root (HK-ASIDE-INSIDE-REPO). It moves
++//          with fs.renameSync into <aside>/<UTC stamp>/<hook dir>/<name>; a rename that fails (for example across file systems) is
++//          reported failed and left in place - never copy-then-delete. Only real directories (lstat) are planned; links are never
++//          followed; impl.mjs, install-marker.json and every other entry are never touched. Hooks and guards never run this.
++// Add a collector: append one { id, owns, plan(context) } entry to COLLECTORS; plan(context) returns { status, hookDirs, count, bytes }
++//          where every hookDir lists planned items as { name, bytes } and the apply step moves them from context.stateDir.
++import { createHash } from "node:crypto";
++import { execFileSync } from "node:child_process";
++import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
++import { dirname, isAbsolute, join, relative, resolve } from "node:path";
++import { pathToFileURL } from "node:url";
++
++const HOOK_DIRS = ["pre-commit-hook", "commit-msg-hook", "pre-push-hook"];
++const SNAPSHOT = /^runtime-[0-9a-f]{64}$/;
++const SNAPSHOT_IN_TEXT = /runtime-[0-9a-f]{64}/g;
++
++function canonical(v) {
++  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
++  if (v && typeof v === "object") return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(",")}}`;
++  return JSON.stringify(v);
++}
++const sha256 = (s) => createHash("sha256").update(s).digest("hex");
++
++// total size of regular files below dir, links counted by their own lstat size, never followed
++function dirBytes(dir) {
++  let total = 0;
++  for (const e of readdirSync(dir, { withFileTypes: true })) {
++    const p = join(dir, e.name);
++    if (e.isDirectory()) total += dirBytes(p);
++    else total += lstatSync(p).size;
++  }
++  return total;
++}
++
++function planHookDir(stateDir, hook, keepNewest) {
++  const dir = join(stateDir, hook);
++  const entry = { dir: hook, live: null, status: "ok", planned: [], retained: [] };
++  let st;
++  try { st = lstatSync(dir); } catch { return { ...entry, status: "absent", reason: "hook directory does not exist" }; }
++  if (!st.isDirectory()) return { ...entry, status: "unreadable", reason: "hook path is not a directory" };
++  const unreadable = (reason) => ({ ...entry, status: "unreadable", reason });
++  let impl;
++  try {
++    const ist = lstatSync(join(dir, "impl.mjs"));
++    if (!ist.isFile()) return unreadable("impl.mjs is not a regular file");
++    impl = readFileSync(join(dir, "impl.mjs"), "utf8");
++  } catch { return unreadable("impl.mjs is missing or unreadable"); }
++  const named = [...new Set(impl.match(SNAPSHOT_IN_TEXT) ?? [])];
++  if (named.length === 0) return unreadable("impl.mjs names no runtime snapshot");
++  if (named.length > 1) return unreadable("impl.mjs names more than one runtime snapshot");
++  const live = named[0];
++  let liveStat;
++  try { liveStat = lstatSync(join(dir, live)); } catch { liveStat = null; }
++  if (!liveStat || !liveStat.isDirectory()) return unreadable("the snapshot impl.mjs names does not exist as a directory");
++  entry.live = live;
++  const others = [];
++  for (const e of readdirSync(dir)) {
++    if (!SNAPSHOT.test(e) || e === live) continue;
++    const s = lstatSync(join(dir, e));
++    if (!s.isDirectory()) continue; // symlink or plain file: never planned
++    others.push({ name: e, mtimeMs: s.mtimeMs });
++  }
++  others.sort((a, b) => b.mtimeMs - a.mtimeMs || a.name.localeCompare(b.name));
++  const kept = others.slice(0, keepNewest);
++  const doomed = others.slice(keepNewest);
++  entry.retained = kept.map((k) => ({ name: k.name })).sort((a, b) => a.name.localeCompare(b.name));
++  entry.planned = doomed.map((d) => ({ name: d.name, bytes: dirBytes(join(dir, d.name)) })).sort((a, b) => a.name.localeCompare(b.name));
++  return entry;
++}
++
++export const COLLECTORS = [
++  {
++    id: "hook-runtime-snapshots",
++    owns: "agent-pipeline/{pre-commit,commit-msg,pre-push}-hook/runtime-<sha256> snapshot directories that no impl.mjs names",
++    plan(context) {
++      if (!context.stateDir) return { status: "unavailable", hookDirs: [], count: 0, bytes: 0 };
++      const hookDirs = HOOK_DIRS.map((h) => planHookDir(context.stateDir, h, context.keepNewest));
++      return {
++        status: "ok",
++        hookDirs,
++        count: hookDirs.reduce((n, h) => n + h.planned.length, 0),
++        bytes: hookDirs.reduce((n, h) => n + h.planned.reduce((m, p) => m + p.bytes, 0), 0),
++      };
++    },
++  },
++];
++
++function gitCommonDir(root) {
++  try {
++    const out = execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
++    return out ? resolve(root, out) : null;
++  } catch { return null; }
++}
++
++export function buildPlan({ root, keepNewest = 1 }) {
++  const commonDir = gitCommonDir(root);
++  const stateDir = commonDir ? join(commonDir, "agent-pipeline") : null;
++  const context = { stateDir, keepNewest };
++  const collectors = COLLECTORS.map((c) => ({ id: c.id, ...c.plan(context) }));
++  const body = { schema: "pipeline.housekeeping-plan.v1", collectors };
++  return { doc: { ...body, planSha256: sha256(canonical(body)) }, commonDir, stateDir };
++}
++
++// real path of the deepest existing ancestor plus the not-yet-existing remainder
++function realish(p) {
++  let cur = resolve(p);
++  const rest = [];
++  while (!existsSync(cur)) { rest.unshift(cur.slice(dirname(cur).length + 1)); const up = dirname(cur); if (up === cur) break; cur = up; }
++  return join(realpathSync(cur), ...rest);
++}
++const inside = (base, p) => { const r = relative(base, p); return r === "" || (!r.startsWith("..") && !isAbsolute(r)); };
++
++class Refusal extends Error { constructor(code, msg) { super(`${code}: ${msg}`); this.code = code; } }
++
++function parse(argv) {
++  const [verb, ...rest] = argv;
++  const opts = { verb, root: ".", keepNewest: 1, planSha256: null, aside: null, stamp: null };
++  for (let i = 0; i < rest.length; i++) {
++    const a = rest[i];
++    const v = () => { if (i + 1 >= rest.length) throw new Refusal("HK-USAGE", `${a} needs a value`); return rest[++i]; };
++    if (a === "--root") opts.root = v();
++    else if (a === "--keep-newest") { const n = v(); if (!/^\d+$/.test(n)) throw new Refusal("HK-USAGE", "--keep-newest needs a non-negative integer"); opts.keepNewest = Number(n); }
++    else if (a === "--plan-sha256") opts.planSha256 = v();
++    else if (a === "--aside") opts.aside = v();
++    else if (a === "--stamp") opts.stamp = v();
++    else throw new Refusal("HK-USAGE", `unknown argument ${a}`);
++  }
++  if (verb !== "plan" && verb !== "apply") throw new Refusal("HK-USAGE", "usage: housekeeping.mjs plan|apply [options] (see the header)");
++  return opts;
++}
++
++function apply(opts) {
++  const root = resolve(opts.root);
++  const { doc, commonDir, stateDir } = buildPlan({ root, keepNewest: opts.keepNewest });
++  if (!opts.planSha256 || opts.planSha256 !== doc.planSha256) throw new Refusal("HK-PLAN-DRIFT", "the plan digest does not match the current plan; run plan again");
++  if (!opts.aside) throw new Refusal("HK-ASIDE-MISSING", "--aside <dir> is required");
++  const aside = realish(opts.aside);
++  const guards = [realish(root), ...(commonDir ? [realish(commonDir)] : [])];
++  if (guards.some((g) => inside(g, aside))) throw new Refusal("HK-ASIDE-INSIDE-REPO", "the aside directory must be outside the repository and its git directory");
++  if (existsSync(aside) && !lstatSync(aside).isDirectory()) throw new Refusal("HK-ASIDE-NOT-DIRECTORY", "the aside path exists and is not a directory");
++  const stamp = opts.stamp ?? new Date().toISOString().replace(/[:.]/g, "-");
++  const stampDir = join(aside, stamp);
++  let stampStat = null;
++  try { stampStat = lstatSync(stampDir); } catch { /* new */ }
++  if (stampStat?.isDirectory()) throw new Refusal("HK-ASIDE-COLLISION", "the stamped directory already exists in the aside directory");
++  const items = [];
++  let stampError = null;
++  try { mkdirSync(stampDir, { recursive: true }); } catch (e) { stampError = e.code ?? String(e.message); }
++  for (const c of doc.collectors) {
++    for (const h of c.hookDirs) {
++      for (const p of h.planned) {
++        const item = { collector: c.id, dir: h.dir, name: p.name, bytes: p.bytes, result: "failed" };
++        try {
++          if (stampError) throw Object.assign(new Error(stampError), { code: stampError });
++          const src = join(stateDir, h.dir, p.name);
++          if (!lstatSync(src).isDirectory()) throw new Error("not a real directory any more");
++          const destParent = join(stampDir, h.dir);
++          mkdirSync(destParent, { recursive: true });
++          renameSync(src, join(destParent, p.name));
++          item.result = "moved";
++        } catch (e) { item.error = e.code ?? String(e.message); }
++        items.push(item);
++      }
++    }
++  }
++  const report = { schema: "pipeline.housekeeping-apply.v1", stamp, plan: doc, items };
++  if (!stampError) {
++    try { writeFileSync(join(stampDir, "manifest.json"), `${JSON.stringify(report, null, 2)}\n`); } catch { report.manifestWritten = false; }
++  }
++  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
++  return items.some((i) => i.result === "failed") ? 1 : 0;
++}
++
++function main(argv) {
++  try {
++    const opts = parse(argv);
++    if (opts.verb === "plan") {
++      process.stdout.write(`${JSON.stringify(buildPlan({ root: resolve(opts.root), keepNewest: opts.keepNewest }).doc, null, 2)}\n`);
++      return 0;
++    }
++    return apply(opts);
++  } catch (e) {
++    if (e instanceof Refusal) { process.stderr.write(`${e.message}\n`); return 2; }
++    throw e;
++  }
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) process.exitCode = main(process.argv.slice(2));
+diff --git a/scripts/housekeeping.test.mjs b/scripts/housekeeping.test.mjs
+new file mode 100644
+index 000000000..d1e639eee
+--- /dev/null
++++ b/scripts/housekeeping.test.mjs
+@@ -0,0 +1,208 @@
++// Purpose: pin scripts/housekeeping.mjs (hook-runtime-snapshots collector): plan is read-only, the live snapshot is never planned,
++// apply only moves aside and never deletes. Every case works in its own temp directory with a real `git init`.
++// Usage:   node --test scripts/housekeeping.test.mjs
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { spawnSync, execFileSync } from "node:child_process";
++import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, readdirSync, existsSync, utimesSync, lstatSync, readFileSync, rmSync } from "node:fs";
++import { join, resolve } from "node:path";
++import { tmpdir } from "node:os";
++
++const SCRIPT = resolve(import.meta.dirname, "housekeeping.mjs");
++const HOOKS = ["pre-commit-hook", "commit-msg-hook", "pre-push-hook"];
++const hex = (i) => String(i).repeat(64);
++const snap = (i) => `runtime-${hex(i)}`;
++
++function mkRepo() {
++  const root = mkdtempSync(join(tmpdir(), "hk-root-"));
++  execFileSync("git", ["init", "-q", root]);
++  return root;
++}
++const stateDir = (root) => join(root, ".git", "agent-pipeline");
++const mkAside = () => mkdtempSync(join(tmpdir(), "hk-aside-"));
++
++// Four snapshots 1..4 (mtime ascending, 1 oldest). `live` is the number named in impl.mjs.
++function mkHook(root, hook, { live = 2, implText } = {}) {
++  const dir = join(stateDir(root), hook);
++  mkdirSync(dir, { recursive: true });
++  const base = Math.floor(Date.now() / 1000) - 100000;
++  for (let i = 1; i <= 4; i++) {
++    const s = join(dir, snap(i));
++    mkdirSync(join(s, "lib"), { recursive: true });
++    writeFileSync(join(s, "lib", "a.txt"), "x".repeat(i * 100));
++    utimesSync(s, base + i * 1000, base + i * 1000);
++  }
++  writeFileSync(join(dir, "impl.mjs"), implText ?? `const LIB = "/some/where/${snap(live)}/lib";\n`);
++  writeFileSync(join(dir, "install-marker.json"), "{}\n");
++  return dir;
++}
++function mkAll(root, opts) { for (const h of HOOKS) mkHook(root, h, opts); }
++
++function tree(dir) {
++  const out = [];
++  const walk = (d, rel) => {
++    for (const e of readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
++      out.push(`${rel}${e.name}${e.isDirectory() ? "/" : ""}`);
++      if (e.isDirectory()) walk(join(d, e.name), `${rel}${e.name}/`);
++    }
++  };
++  walk(dir, "");
++  return out;
++}
++const run = (args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
++const plan = (root, extra = []) => {
++  const r = run(["plan", "--root", root, ...extra]);
++  assert.equal(r.status, 0, r.stderr);
++  return { r, doc: JSON.parse(r.stdout) };
++};
++const hookOf = (doc, dir) => doc.collectors[0].hookDirs.find((h) => h.dir === dir);
++const plannedNames = (h) => h.planned.map((p) => p.name);
++
++test("HK01 plan lists exactly the non-live non-newest snapshots with bytes and changes nothing", () => {
++  const root = mkRepo();
++  mkAll(root);
++  const before = tree(stateDir(root));
++  const { doc } = plan(root);
++  assert.equal(doc.schema, "pipeline.housekeeping-plan.v1");
++  assert.equal(doc.collectors[0].id, "hook-runtime-snapshots");
++  for (const h of HOOKS) {
++    const hd = hookOf(doc, h);
++    assert.equal(hd.status, "ok");
++    assert.equal(hd.live, snap(2));
++    assert.deepEqual(hd.planned, [{ name: snap(1), bytes: 100 }, { name: snap(3), bytes: 300 }]);
++    assert.deepEqual(hd.retained.map((x) => x.name), [snap(4)]);
++  }
++  assert.equal(doc.collectors[0].count, 6);
++  assert.equal(doc.collectors[0].bytes, 1200);
++  assert.match(doc.planSha256, /^[0-9a-f]{64}$/);
++  assert.deepEqual(tree(stateDir(root)), before);
++});
++
++test("HK02 the live snapshot is never planned, even when it is the oldest", () => {
++  const root = mkRepo();
++  mkAll(root, { live: 1 });
++  const { doc } = plan(root, ["--keep-newest", "0"]);
++  for (const h of HOOKS) {
++    const hd = hookOf(doc, h);
++    assert.ok(!plannedNames(hd).includes(snap(1)));
++    assert.deepEqual(plannedNames(hd).sort(), [snap(2), snap(3), snap(4)]);
++  }
++});
++
++test("HK03 missing impl.mjs or an impl.mjs naming a missing snapshot is unreadable and plans nothing there", () => {
++  const root = mkRepo();
++  mkAll(root);
++  rmSync(join(stateDir(root), "pre-commit-hook", "impl.mjs"));
++  writeFileSync(join(stateDir(root), "commit-msg-hook", "impl.mjs"), `const LIB = "/x/${snap(9)}/lib";\n`);
++  const { doc } = plan(root);
++  for (const h of ["pre-commit-hook", "commit-msg-hook"]) {
++    const hd = hookOf(doc, h);
++    assert.equal(hd.status, "unreadable");
++    assert.ok(hd.reason && hd.reason.length > 0);
++    assert.deepEqual(hd.planned, []);
++  }
++  assert.deepEqual(plannedNames(hookOf(doc, "pre-push-hook")), [snap(1), snap(3)]);
++});
++
++test("HK04 a symlink and a plain file named runtime-<hex> are never planned", () => {
++  const root = mkRepo();
++  mkHook(root, "pre-commit-hook");
++  const dir = join(stateDir(root), "pre-commit-hook");
++  const target = mkdtempSync(join(tmpdir(), "hk-target-"));
++  symlinkSync(target, join(dir, snap(7)));
++  writeFileSync(join(dir, snap(8)), "plain file");
++  const { doc } = plan(root, ["--keep-newest", "0"]);
++  const names = plannedNames(hookOf(doc, "pre-commit-hook"));
++  assert.ok(!names.includes(snap(7)));
++  assert.ok(!names.includes(snap(8)));
++  assert.deepEqual(names.sort(), [snap(1), snap(3), snap(4)]);
++  assert.ok(lstatSync(join(dir, snap(7))).isSymbolicLink());
++});
++
++test("HK05 apply with the right digest moves planned snapshots aside with a manifest; a second plan is empty", () => {
++  const root = mkRepo();
++  mkAll(root);
++  const aside = mkAside();
++  const { doc } = plan(root);
++  const r = run(["apply", "--root", root, "--plan-sha256", doc.planSha256, "--aside", aside]);
++  assert.equal(r.status, 0, r.stderr);
++  const stamps = readdirSync(aside);
++  assert.equal(stamps.length, 1);
++  const manifest = JSON.parse(readFileSync(join(aside, stamps[0], "manifest.json"), "utf8"));
++  assert.equal(manifest.plan.planSha256, doc.planSha256);
++  assert.ok(manifest.items.every((i) => i.result === "moved"));
++  assert.equal(manifest.items.length, 6);
++  for (const h of HOOKS) {
++    assert.ok(existsSync(join(aside, stamps[0], h, snap(1), "lib", "a.txt")));
++    assert.ok(existsSync(join(aside, stamps[0], h, snap(3), "lib", "a.txt")));
++    assert.ok(!existsSync(join(stateDir(root), h, snap(1))));
++    assert.ok(existsSync(join(stateDir(root), h, snap(2))));
++    assert.ok(existsSync(join(stateDir(root), h, snap(4))));
++    assert.ok(existsSync(join(stateDir(root), h, "impl.mjs")));
++  }
++  const again = plan(root).doc;
++  assert.equal(again.collectors[0].count, 0);
++});
++
++test("HK06 apply with a wrong digest refuses HK-PLAN-DRIFT and moves nothing", () => {
++  const root = mkRepo();
++  mkAll(root);
++  const aside = mkAside();
++  const before = tree(stateDir(root));
++  const r = run(["apply", "--root", root, "--plan-sha256", "0".repeat(64), "--aside", aside]);
++  assert.notEqual(r.status, 0);
++  assert.match(r.stdout + r.stderr, /HK-PLAN-DRIFT/);
++  assert.deepEqual(tree(stateDir(root)), before);
++  assert.deepEqual(readdirSync(aside), []);
++});
++
++test("HK07 an aside inside the git common dir or inside the root is refused and moves nothing", () => {
++  const root = mkRepo();
++  mkAll(root);
++  const { doc } = plan(root);
++  const before = tree(stateDir(root));
++  for (const aside of [join(root, ".git", "aside"), join(root, "aside"), join(stateDir(root), "x")]) {
++    const r = run(["apply", "--root", root, "--plan-sha256", doc.planSha256, "--aside", aside]);
++    assert.notEqual(r.status, 0, aside);
++    assert.match(r.stdout + r.stderr, /HK-ASIDE/);
++    assert.ok(!existsSync(aside));
++  }
++  const r2 = run(["apply", "--root", root, "--plan-sha256", doc.planSha256]);
++  assert.notEqual(r2.status, 0);
++  assert.deepEqual(tree(stateDir(root)), before);
++});
++
++test("HK08 a rename failure is reported failed, the snapshot stays and nothing is deleted", () => {
++  const root = mkRepo();
++  mkHook(root, "pre-commit-hook");
++  const aside = mkAside();
++  writeFileSync(join(aside, "fixed"), "i am a file, so the destination parent cannot be created");
++  const before = tree(stateDir(root));
++  const { doc } = plan(root);
++  const r = run(["apply", "--root", root, "--plan-sha256", doc.planSha256, "--aside", aside, "--stamp", "fixed"]);
++  assert.equal(r.status, 1, r.stdout + r.stderr);
++  const out = JSON.parse(r.stdout);
++  assert.ok(out.items.length > 0 && out.items.every((i) => i.result === "failed" && i.error));
++  assert.deepEqual(tree(stateDir(root)), before);
++  assert.equal(readFileSync(join(aside, "fixed"), "utf8").startsWith("i am a file"), true);
++});
++
++test("HK09 --keep-newest 0 plans every non-live snapshot and --keep-newest 2 retains two", () => {
++  const root = mkRepo();
++  mkHook(root, "pre-commit-hook");
++  const d0 = hookOf(plan(root, ["--keep-newest", "0"]).doc, "pre-commit-hook");
++  assert.deepEqual(plannedNames(d0).sort(), [snap(1), snap(3), snap(4)]);
++  const d2 = hookOf(plan(root, ["--keep-newest", "2"]).doc, "pre-commit-hook");
++  assert.deepEqual(plannedNames(d2), [snap(1)]);
++  assert.deepEqual(d2.retained.map((x) => x.name).sort(), [snap(3), snap(4)]);
++});
++
++test("HK10 the plan contains no absolute path", () => {
++  const root = mkRepo();
++  mkAll(root);
++  const { r } = plan(root);
++  assert.ok(!r.stdout.includes(root));
++  assert.ok(!r.stdout.includes(tmpdir()));
++  assert.ok(!/"[A-Za-z]:\\/.test(r.stdout));
++  assert.ok(!/"\/[^"]*"/.test(r.stdout.replace(/"\/\//g, "")), "no JSON string value starts with a slash");
++});
