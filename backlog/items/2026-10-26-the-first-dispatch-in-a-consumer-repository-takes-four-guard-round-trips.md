@@ -53,6 +53,10 @@ registry-lock...` and `...briefing-retyping...`.
 - Measure it: a first dispatch in a fresh consumer repository must reach admission in at most one corrective
   round (target), with the round count recorded in the greenfield happy-path evidence.
 
+## Code finding on the `check` rule (2026-10-29, read, not run)
+
+The `.test.mjs|cjs|js` requirement is not only the generator's. Three places enforce the same suffix on the check path: `scripts/dispatch-briefing.mjs` (`DBG-CHECK-NOT-TEST`, and the queue-row rebind hint that picks a `.test` file from the scope), `lib/native-goldfish-host-return.mjs` (the host's validation of the item-delivery check, kernel host state) and `lib/plan-handoff-readiness.mjs` (`CHECK_TOKEN`, the readiness reader). Relaxing only the generator would hand out a binding that the host refuses at return time. The wanted behaviour (a repository's real verify command as the check) therefore needs one contract decision first: what a non-test check is (a registered command id, a script path with a declared runner) and how the host runs and digests it. Until that is decided, the only interim route is a workaround, not a documented one: a repository without a unit runner adds one thin `.test.mjs` that invokes its real verify command, named in the briefing. Not a generator-only patch; held-patch scope is all three files.
+
 ## Why P1
 
 PO, 2026-10-26: this effort "has to be reduced clearly". It is the user-facing cost of the pipeline at the exact
