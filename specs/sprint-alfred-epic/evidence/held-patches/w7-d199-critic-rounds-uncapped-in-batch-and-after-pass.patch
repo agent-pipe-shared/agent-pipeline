@@ -1,0 +1,282 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.mjs b/plugins/pipeline-core/lib/critic-course-admission.mjs
+index 18ebdcece..9bcc0ac91 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.mjs
+@@ -535,7 +535,7 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
+  const source=bound.source,identity=bound.courseIdentity,parent=parentProjection(history.at(-1));
+  const acceptance=acceptedCriterion?.ok?{basis:acceptedCriterion.acceptance.authorityBasis,cryptographicallyAuthenticated:acceptedCriterion.acceptance.cryptographicallyAuthenticated,envelopeSha256:acceptedCriterion.acceptance.envelopeSha256,criterionSourcePath:acceptedCriterion.source.path,criterionSourceSha256:acceptedCriterion.source.sha256,criterionId:acceptedCriterion.locator.criterionId,criterionExcerptSha256:acceptedCriterion.locator.excerptSha256,criterionParserVersion:acceptedCriterion.criterion.parserVersion??'pipeline.critic-criterion-parser.v1',sourceBindingsSha256:acceptedCriterion.acceptance.bindingSha256}:null;
+  const projection={schema:'pipeline.critic-course-admission.v2',courseIdentity:identity,source,parent,acceptance,deltaRequestSha256:deltaRequest?.requestSha256??null,deterministicEvidenceSha256:evidence?.sha256??null,budgets,decision:{status:'refused',mode:null,code:'RE-COURSE-INCOMPLETE',affectedInvariantIds:[]}};
+- const last=history.at(-1);if(last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
++ const last=history.at(-1);if(!deltaRequest && last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
+  const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
+  const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
+ // PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
+@@ -570,6 +570,9 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  if(!exact(input,V2_REQUEST_KEYS)||!MODES.has(input.requestedMode)||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??'')))fail('CCA-RUNTIME-SHAPE');
+  const resolvedResult=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'].map(k=>[k,input[k]])));if(!resolvedResult.ok){if(resolvedResult.status==='unavailable')unavailable(resolvedResult.code);fail(resolvedResult.code);}const resolved=resolvedResult.value,history=consumedHistory(resolved),source=runtimeSource(input,resolved);
+  const last=history.at(-1),pass=last?.consumed.receipt.reviewPass===true&&last.record.coverage.complete&&last.record.findings.every(f=>f.status!=='open');
++ // D199 (Glossover CCA-PARENT): real commits after a consumed PASS continue the course as a diff round whose parent is the passed
++ // record; the base must be that record's candidate. Without such commits (same candidate, evidence-only range) the PASS still ends the course.
++ const continuation=pass&&input.requestedMode==='delta'&&input.baseCommit===last.record.candidate.commit&&input.candidateCommit!==input.baseCommit&&source.correctionCommits.length>0;
+  if(!pass && (history.length?input.requestedMode!=='delta':input.requestedMode!=='full'))fail('CCA-REQUESTED-MODE');
+  if(last && !pass && last.record.candidate.commit!==input.baseCommit)fail('CCA-PARENT');
+  const allCorrections=new Set();
+@@ -581,7 +584,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
+  const previousCount=allCorrections.size;
+  const count=history.length?previousCount+source.correctionCommits.filter(oid=>!allCorrections.has(oid)).length:0;
+  const budgets={reviewRound:history.length+1,correctionCommitCount:count,maxReviewRounds:CRITIC_DISPATCH_LIMITS.criticRounds,maxCorrectionCommits:CRITIC_DISPATCH_LIMITS.correctionCommits,executionBudgetEvidenceSha256:null};
+- if(pass)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
++ if(pass&&!continuation)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
+  // Source-owned immutable consumed history fixes the batch's next round.
+  // An accepted actual-PASS criterion cannot authorize a fifth invocation.
+  // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above.
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 67ad61fb9..6389d128e 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -972,8 +972,8 @@ const pf94WriteInput = (fx, value) => {
+ };
+ const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath });
+ /** Failing round, lineage registered and committed, a correction commit; with diagnostic=true the correction diagnostic is produced and registered the way PF94 LINEAGE (g) does. */
+-function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true } = {}) {
+-  const fx = consumedCourseRoundFixture({ failing: true });
++function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true } = {}) {
++  const fx = consumedCourseRoundFixture({ failing });
+   let lineageAdded = null;
+   if (lineage) { lineageAdded = pf94Lineage(fx); assert.equal(lineageAdded.status, "lineage-added", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
+   let correctionCommit = null, evidenceRegistration = null;
+@@ -1008,6 +1008,19 @@ test("PF94 DELTA (a) after the lineage, the correction and its diagnostic, the v
+   assert.equal(after.decision.code, "RE-DELTA-ADMITTED");
+   assert.deepEqual(after.decision.affectedInvariantIds, ["inv-one"]);
+ });
++test("D199 CONTINUATION a real commit after a consumed PASS is admitted as a diff round on the passed record (Glossover CCA-PARENT)", () => {
++  const fx = pf94DeltaFixture({ failing: false });
++  assert.equal(fx.lineageAdded.status, "lineage-added", JSON.stringify(fx.lineageAdded));
++  pf94WriteInput(fx);
++  const added = pf94Delta(fx);
++  assert.equal(added.status, "delta-request-added", `the delta request verb accepts a passed parent: ${JSON.stringify(added)}`);
++  const registration = pf94CommitPaths(fx.root, added.commitPaths, "register the delta request");
++  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration, requestedMode: "delta", deltaRequestPath: added.deltaRequestPath });
++  assert.equal(after.decision.status, "admitted", JSON.stringify(after.decision));
++  assert.equal(after.decision.mode, "delta");
++  assert.equal(after.budgets.reviewRound, 2);
++  // The unchanged cases stay pinned by "PF94 LINEAGE (a)" and the round 2 flow: no commit after the passed candidate ends the course (RE-CONSUMED-PACKAGE-PASS).
++});
+ test("PF94 ROUND2 (a) the real route continues after the admitted delta: round 2 is preflighted, admitted on the course path, finalized and registered as lineage round 2", () => {
+   const fx = pf94DeltaFixture();
+   const round1Lineage = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 8d7f80385..34f7fc24b 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -438,12 +438,15 @@ function reservationAt(dir, mode, ordinal = mode === "full" ? 1 : 2) {
+     || !SHA.test(r.sourceSha256) || !SHA.test(r.decisionSha256)) fail("CGB-RESERVATION");
+   return r;
+ }
++// D190: the PO decision removed the round cap for diff rounds; this bound only protects against a corrupt directory.
++const MAX_BATCH_DELTA_ORDINAL = 4096;
+ function reservations(dir) {
+-  if (readdirSync(dir).some(name => /^delta-[0-9]+-admission\.json$/u.test(name)
+-    && Number(name.split("-")[1]) > CRITIC_DISPATCH_LIMITS.criticRounds)) fail("CGB-BUDGET");
++  // Round 2 is stored as delta-admission.json (reservationFile); later rounds carry their number.
++  const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^delta-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
++  if (ordinals.some(ordinal => ordinal > MAX_BATCH_DELTA_ORDINAL)) fail("CGB-BUDGET");
+   const full = reservationAt(dir, "full");
+   const rows = full ? [full] : [];
+-  for (let ordinal = 2; ordinal <= CRITIC_DISPATCH_LIMITS.criticRounds; ordinal++) {
++  for (let ordinal = 2; ordinal <= Math.max(1, ...ordinals); ordinal++) {
+     const r = reservationAt(dir, "delta", ordinal);
+     if (r) { if (rows.length !== ordinal - 1) fail("CGB-HELD"); rows.push(r); }
+   }
+@@ -469,7 +472,7 @@ function deltaSource(root, s, correction, parent, round) {
+   git(root, ["merge-base", "--is-ancestor", s.range.base, s.range.commit]);
+   const changedPaths = git(root, ["diff", "--name-only", "-z", s.range.base, s.range.commit, "--"]).split("\0").filter(Boolean).map(normalizePacketPath).sort(compare);
+   const commits = git(root, ["rev-list", "--reverse", `${s.range.base}..${s.range.commit}`]).trim().split("\n").filter(Boolean);
+-  if (commits.length > CRITIC_DISPATCH_LIMITS.correctionCommits) fail("CGB-BUDGET");
++  // D190: no correction-commit count refuses a diff round.
+   const attempt = { round, correctionCommits: commits.length, requestedMode: "delta", base: s.range.base, head: s.range.commit, tree: s.range.tree,
+     changedPaths, changedBehaviorClaims: correction.changedBehaviorClaims, priorReceipt: { id: `critic-${parent.parent.packetId}`, sha256: parent.parent.receiptSha256 },
+     pathInvariantMap: correction.pathInvariantMap, pathInvariantMapSha256: sha256Canonical(correction.pathInvariantMap),
+@@ -495,10 +498,11 @@ function appendCorrection(input) {
+       || s.scope.reviewUnit.reference.blobOid !== r.value.declaredScope.reviewUnit.reference.blobOid
+       || !eq(s.scope.guardrails.map(x => x.path), r.value.declaredScope.guardrails.map(x => x.path))) fail("CGB-CONFLICT");
+     const retained = reservations(r.dir);
+-    if (!retained.length || retained.length >= CRITIC_DISPATCH_LIMITS.criticRounds) fail("CGB-BUDGET");
++    if (!retained.length) fail("CGB-BUDGET");
+     const prior = retained.at(-1);
+     const parent = consumedParent(c, prior, input.parent);
+-    if (parent.result.verdict.pass) fail("CGB-PASS-STOPS");
++    // D199: a PASS ends the batch only for the same candidate; real commits after it continue as a diff round.
++    if (parent.result.verdict.pass && s.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
+     // Delivery owner ends at integration; one fresh fix owner carries this same batch.
+     if (s.target.kind !== "authored-delivery" && s.target.kind !== "orchestrator-attested-delivery") fail("CGB-CORRECTION-OWNER");
+     if (prior.ordinal === 1) {
+@@ -543,8 +547,7 @@ function admission(c, input, packet) {
+   let parent = null, ordinal = 1, mode = "full", code = "CGB-FULL-ADMITTED";
+   if (full) {
+     parent = consumedParent(c, retained.at(-1));
+-    if (parent.result.verdict.pass) fail("CGB-PASS-STOPS");
+-    if (retained.length >= CRITIC_DISPATCH_LIMITS.criticRounds) fail("CGB-BUDGET");
++    if (parent.result.verdict.pass && m.value.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
+     if (m.value.kind !== "correction" || !eq(m.value.parent, parent.parent) || !m.value.delta
+       || !eq(m.value.delta.diagnosticBundle, packet.diagnostics)) fail("CGB-DELTA");
+     const attempt = admitReviewAttempt(m.value.delta.attempt);
+@@ -581,7 +584,7 @@ function retainedReservation(c, input, observed) {
+     const parent = mode === "delta" && full ? consumedParent(c, retained[r.ordinal - 2]) : null;
+     const subject = { registration: m.registration, member: m.value, full, parent: parent?.parent ?? null, packetDigest: packetDigest(observed.packet) };
+     const decision = { status: "admitted", mode, code: mode === "full" ? "CGB-FULL-ADMITTED" : "CGB-DELTA-ADMITTED" };
+-    if ((mode === "full" ? m.value.kind !== "origin" : m.value.kind !== "correction" || parent === null || parent.result.verdict.pass)
++    if ((mode === "full" ? m.value.kind !== "origin" : m.value.kind !== "correction" || parent === null)
+       || r.sourceSha256 !== sha256Canonical(subject) || r.decisionSha256 !== sha256Canonical(decision)
+       || !eq(r.parent, parent?.parent ?? null)
+       || r.deltaEvidenceSha256 !== (m.value.delta === null ? null : sha256Canonical(m.value.delta))) fail("CGB-RESERVATION");
+@@ -907,9 +910,9 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+           || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET");
+         return {reservation:retained,replay:true};
+       }
+-      if(prior.length!==ordinal-1 || ordinal>CRITIC_DISPATCH_LIMITS.criticRounds)fail("CGB-BUDGET");
++      if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET");
+       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
+-      if(parent?.result.verdict.pass)fail("CGB-PASS-STOPS");
++      if(parent?.result.verdict.pass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
+       if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
+       const member=writeMember(c,owned.batchRef,{schema:GENERIC_CRITIC_MEMBER_SCHEMA,...owned.batchRef,kind:ordinal===1?"origin":"correction",logicalWorkIds:work,
+         target:targetForPacket(packet),parent:parent?.parent??null,range:packet.candidate,delta:ordinal===1?null:projection});
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+index b55b9e527..c0ee5aff7 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.test.mjs
+@@ -65,15 +65,27 @@ test("one full and shared-limit changed diff corrections use consumed immediate
+       rejected(()=>register(fx,declaration(fx)),"CGB-CONFLICT");
+     }
+     assert.equal(CRITIC_DISPATCH_LIMITS.criticRounds,4);
+-    const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),"over budget\n");git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","over budget"]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);
+-    const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
+-    rejected(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction}),"CGB-BUDGET");
++    // D190: the cap gates a full request only; diff rounds continue past it until a consumed PASS (Toolbox CGB-BUDGET at round 3).
++    for(const round of [5,6]){
++      const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),`correction ${round}\n`);git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm",`repair ${round}`]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);fx.reviewBase=prior;
++      writeFileSync(join(fx.root,"evidence/verify.json"),JSON.stringify(produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],command:[process.execPath,"-e","console.log(\"targeted pass\")"],logPath:`evidence/targeted-${round}.log`})));
++      const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
++      member=appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction});
++      parent=review(fx,member,round,round===6);
++    }
++    // Round 6 passed; what a PASS does to later commits is pinned in the next case (D199).
+   }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
+-test("genuinely consumed PASS stops corrections before the remaining budget",()=>{
+- const fx=fixture();try{const member=register(fx),parent=review(fx,member,1,true);const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),"unneeded change\n");fx.candidate=commit(fx.root,"after pass");
++test("a consumed PASS stops a re-review of the same candidate and continues as a diff round on real commits after it (D199)",()=>{
++ const fx=fixture();try{const member=register(fx),parent=review(fx,member,1,true);const prior=fx.candidate;
++ const same={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
++ rejected(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction:same}),"CGB-PASS-STOPS");
++ writeFileSync(join(fx.root,"repair.txt"),"real change after pass\n");git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","after pass"]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);fx.reviewBase=prior;fx.taskId="correction-owner";
++ writeFileSync(join(fx.root,"evidence/verify.json"),JSON.stringify(produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],command:[process.execPath,"-e","console.log(\"targeted pass\")"],logPath:"evidence/targeted-after-pass.log"})));
+  const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
+- rejected(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction}),"CGB-PASS-STOPS");
++ const next=appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction});
++ const round2=review(fx,next,2,false);
++ assert.ok(round2.packetId,"the diff round after a PASS is admitted and finalized");
+  }finally{rmSync(fx.root,{recursive:true,force:true});}
+ });
+ function declaration(fx, overrides={}) {
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+index 258982d48..1667b58ed 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage-core.mjs
+@@ -493,13 +493,14 @@ export function validateCriticReviewHistory(records) {
+ }
+ 
+ const COURSE_BINDING_KEYS=['courseKey','originalFeatureId','originalManifestSha256','genesisCandidate','submissionSha256','envelopeSha256','criterionSha256','deltaRequestSha256','deterministicEvidenceSha256','courseSourceSha256','courseDecisionSha256'];
+-function v2BindingCode(record){
++export function v2BindingCode(record){
+  const b=record.courseBinding,c=record.consumedResult;
+  if(!exact(b,COURSE_BINDING_KEYS)||!identifier(b.originalFeatureId)||!digest(b.courseKey)||!digest(b.originalManifestSha256)
+   ||!exact(b.genesisCandidate,['base','commit','tree'])||!Object.values(b.genesisCandidate).every(v=>OID.test(v??''))
+   ||!['submissionSha256','envelopeSha256','criterionSha256','deltaRequestSha256'].every(k=>b[k]===null||digest(b[k]))
+   ||!['deterministicEvidenceSha256','courseSourceSha256','courseDecisionSha256'].every(k=>digest(b[k])))return 'CRL-V2-COURSE-BINDING';
+- if(record.course.reviewRound>2 && (!digest(b.submissionSha256)||!digest(b.envelopeSha256)||!digest(b.criterionSha256)))return 'CRL-V2-EXCEPTION-BINDING';
++ // D190 (PF-102): a diff round past round 2 is an ordinary round, not a PO exception; submission, envelope and criterion
++ // stay null or a digest (checked above) and the criterion is bound only when an accepted exception was actually read.
+  if(record.course.reviewRound===1 ? b.deltaRequestSha256!==null : !digest(b.deltaRequestSha256))return 'CRL-V2-DELTA-BINDING';
+  if(record.verdict.status==='pending')return c===null?null:'CRL-V2-PENDING-CONSUMED';
+  if(!exact(c,['packetId','packetDigest','receiptSha256','resultSha256','verdictSha256','findingBindings'])||c.packetId!==record.request.packetId
+diff --git a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+index f4f7355e6..6d7b5eb42 100644
+--- a/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
++++ b/plugins/pipeline-core/lib/critic-review-lineage.test.mjs
+@@ -12,7 +12,7 @@ import {
+   validateReleaseCriticScopeAdmission,
+ } from "./critic-review-lineage.mjs";
+ import { projectCriticReviewEconomy, sha256Canonical } from "./review-economy.mjs";
+-import { safePath } from "./critic-review-lineage-core.mjs";
++import { safePath, v2BindingCode } from "./critic-review-lineage-core.mjs";
+ 
+ const H = (character) => character.repeat(64);
+ const O = (character) => character.repeat(40);
+@@ -857,5 +857,21 @@ check("D190 step rule: a delta round may step the correction count by more than
+   assert.equal(refused(() => [...records, next(records.at(-1), packet5, 6, 11)]), true);
+ });
+ 
+-assert.equal(passed, 18);
+-console.log(`${passed}/18 checks passed.`);
++check("PF-102 a diff round past round 2 needs no exception binding; malformed bindings and the round-1 delta rule stay refused", () => {
++  const binding = (over = {}) => ({
++    courseKey: H("a"), originalFeatureId: "feature-one", originalManifestSha256: H("b"),
++    genesisCandidate: { base: O("1"), commit: O("2"), tree: O("3") },
++    submissionSha256: H("c"), envelopeSha256: H("d"), criterionSha256: null, deltaRequestSha256: H("e"),
++    deterministicEvidenceSha256: H("f"), courseSourceSha256: H("1"), courseDecisionSha256: H("2"), ...over,
++  });
++  const record = (round, over) => ({ course: { reviewRound: round }, courseBinding: binding(over), consumedResult: null, verdict: { status: "pending" } });
++  // Before D190 every round past 2 demanded a digest criterion and answered CRL-V2-EXCEPTION-BINDING (Glossover round 3).
++  for (const round of [2, 3, 4, 5, 9]) assert.equal(v2BindingCode(record(round)), null, `round ${round}`);
++  assert.equal(v2BindingCode(record(3, { criterionSha256: H("9") })), null, "an accepted exception criterion is still allowed");
++  assert.equal(v2BindingCode(record(3, { criterionSha256: "not-a-digest" })), "CRL-V2-COURSE-BINDING");
++  assert.equal(v2BindingCode(record(1)), "CRL-V2-DELTA-BINDING", "round 1 must not carry a delta request");
++  assert.equal(v2BindingCode(record(4, { deltaRequestSha256: null })), "CRL-V2-DELTA-BINDING", "a diff round must carry its delta request");
++});
++
++assert.equal(passed, 19);
++console.log(`${passed}/19 checks passed.`);
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 9e0f34bf9..7ae1503f2 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -406,7 +406,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     // policy can produce a packet-ready result for this registered batch.
+     const round = admission.budgets?.reviewRound;
+     const expectedMode = round === 1 ? "full" : Number.isSafeInteger(round) && round > 1 ? "delta" : null;
+-    if (expectedMode === null || round > CRITIC_DISPATCH_LIMITS.criticRounds
++    // D190: no round count refuses a diff round; the mode must still match the round.
++    if (expectedMode === null
+       || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
+       || admission.decision.mode !== expectedMode
+       || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index e172069e2..523dc21cc 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -156,6 +156,23 @@ under `scratch/`, `evidence/` or `specs/`. Every path the commits changed must l
+ `allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. Use the task id of
+ that record for every round (next section).
+ 
++## Real commits after a consumed PASS (D199)
++
++A consumed PASS ends the course only for the same candidate. Real (non-evidence) commits after the passed
++candidate are reviewed as one more diff round whose parent is the passed record; no round or
++correction-commit count refuses it (D190), and the rounds repeat until a PASS. Order:
++
++1. The passed round's lineage must be registered. If it is missing, run
++   `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` and commit the
++   manifest and the lineage file it names (a round past 2 needs no exception binding).
++2. The base is the passed round's candidate, never a later commit; evidence-only commits inside the range
++   carry forward. A request whose base is another commit is refused `CCA-PARENT`.
++3. Continue as in the next section: `--add-delta-request <input.json>`, preflight with the registered delta
++   request path, `session-critic-finalizer.mjs admit`, finalize, then register that round's lineage.
++
++A re-review of the same candidate, or a range with no real commit after the passed candidate, still ends
++with `RE-CONSUMED-PACKAGE-PASS` / `CGB-PASS-STOPS`.
++
+ ## Continuing a Critic course after the first round (PF-94)
+ 
+ Script paths resolve under the plugin root the bootstrap prints. **Every later round carries the `taskId`
