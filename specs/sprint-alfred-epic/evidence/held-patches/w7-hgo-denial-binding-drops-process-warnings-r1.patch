@@ -1,0 +1,110 @@
+diff --git a/plugins/pipeline-core/lib/human-guard-override.mjs b/plugins/pipeline-core/lib/human-guard-override.mjs
+index d81cac69c..2c2555145 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.mjs
+@@ -1410,8 +1410,26 @@ const HUMAN_GUARD_HANDOFF_HEADLINES = Object.freeze([
+   "No human override route is offered for this exact ",
+ ]);
+ 
++// A Node process warning (`(node:<pid>) ... Warning: ...`) that a guard child printed once to its
++// stderr, plus its `--trace-` hint line, is process noise: the replay does not repeat it.
++const NODE_PROCESS_WARNING_LINE = /^\(node:\d+\) /u;
++const NODE_TRACE_HINT_LINE = /^\(Use `node --trace-.*to show where the warning was created\)$/u;
++
++function dropNodeProcessWarnings(value) {
++  const lines = value.split("\n");
++  const kept = [];
++  for (let index = 0; index < lines.length; index += 1) {
++    if (NODE_PROCESS_WARNING_LINE.test(lines[index])) {
++      if (index + 1 < lines.length && NODE_TRACE_HINT_LINE.test(lines[index + 1])) index += 1;
++      continue;
++    }
++    kept.push(lines[index]);
++  }
++  return kept.join("\n");
++}
++
+ function bindingDenialReason(reason) {
+-  const value = String(reason);
++  const value = dropNodeProcessWarnings(String(reason));
+   const starts = HUMAN_GUARD_HANDOFF_HEADLINES
+     .map((headline) => value.indexOf(`\n${headline}`))
+     .filter((index) => index >= 0);
+diff --git a/plugins/pipeline-core/lib/human-guard-override.test.mjs b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+index c54a911fc..65e721dae 100644
+--- a/plugins/pipeline-core/lib/human-guard-override.test.mjs
++++ b/plugins/pipeline-core/lib/human-guard-override.test.mjs
+@@ -629,6 +629,73 @@ test("an exact retry ignores only regenerated human-override handoff text in a n
+   }
+ });
+ 
++// AC-160: a one-off Node process warning a guard child printed once to its stderr is part of the
++// first denial reason but absent from the replay. It must not change the bound denial digest.
++// Seam: recordHumanGuardDenial() (bindingDenialReason/denialDigests are not exported); the request
++// digest binds the denial digests, so equal requestSha256 means equal bound denial text.
++const PROCESS_WARNING_LINES = "(node:12345) [PB-ROOT-REPAIRED] Warning: private-state directory agent-pipeline was repaired in place: mode 0o755 was reset to 0o700.\n(Use `node --trace-warnings ...` to show where the warning was created)";
++
++test("HGO denial binding (a) a process warning line in the first denial reason does not change the denial digest", () => {
++  const root = fixtureSignature();
++  try {
++    const toolInput = { file_path: "notes.md", content: "warning digest\n" };
++    const stable = "BLOCKED (guard-testpath): TP-3 exact protected-path refusal";
++    const withWarning = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput,
++      denials: [{ guard: "guard-testpath.mjs", reason: `${stable}\n${PROCESS_WARNING_LINES}` }], nowMs: 1000 });
++    const middle = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput,
++      denials: [{ guard: "guard-testpath.mjs", reason: `${PROCESS_WARNING_LINES}\n${stable}` }], nowMs: 1000 });
++    const clean = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput,
++      denials: [{ guard: "guard-testpath.mjs", reason: stable }], nowMs: 1000 });
++    assert.equal(withWarning.requestSha256, clean.requestSha256);
++    assert.equal(middle.requestSha256, clean.requestSha256);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("HGO denial binding (b) a line that merely contains the text node: in the middle of the guard message is NOT dropped", () => {
++  const root = fixtureSignature();
++  try {
++    const toolInput = { file_path: "notes.md", content: "warning digest b\n" };
++    const stable = "BLOCKED (guard-testpath): TP-3 exact protected-path refusal";
++    const mention = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput,
++      denials: [{ guard: "guard-testpath.mjs", reason: `${stable}\nsee (node:12345) in the middle of this line\n(use node:99) not a warning` }], nowMs: 1000 });
++    const clean = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput,
++      denials: [{ guard: "guard-testpath.mjs", reason: stable }], nowMs: 1000 });
++    assert.notEqual(mention.requestSha256, clean.requestSha256);
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
++test("HGO denial binding (c) an armed capability recorded from a denial that carried the warning lines is consumed by the replay that does not carry them", { skip: PTY_HOST_LIMIT }, () => {
++  const root = fixture();
++  try {
++    const toolInput = { file_path: "notes.md", content: "warning replay\n" };
++    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
++    const stable = "GUARD-DEVPLAN-SHELL";
++    const firstDenials = [{ guard: "guard-lifecycle-ready.mjs", reason: `${stable}\n${PROCESS_WARNING_LINES}` }];
++    const replayDenials = [{ guard: "guard-lifecycle-ready.mjs", reason: stable }];
++    const request = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: firstDenials, nowMs: 1000 });
++    const plan = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 1500, scriptPath });
++    const reason = "Exact attended retry";
++    const prepared = prepareHumanGuardOverrideAuthorization({
++      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256, reason, nowMs: 1800, scriptPath,
++    });
++    const armed = armUnderPty({
++      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
++      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
++      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
++      nowMs: 1900, scriptPath,
++    });
++    assert.equal(armed.status, "armed");
++    const consumed = consumeHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: replayDenials, nowMs: 2000 });
++    assert.equal(consumed.status, "consumed");
++  } finally {
++    rmSync(root, { recursive: true, force: true });
++  }
++});
++
+ // NVA-SIGENTRY-1 DoD check 1: the extracted buildHumanGuardOverrideSignatureIntent()
+ // helper must produce the IDENTICAL digest this already-passing test's own,
+ // independently-reconstructed intent (prepareSignedArming() above builds it without

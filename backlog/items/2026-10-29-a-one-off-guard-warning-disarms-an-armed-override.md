@@ -27,6 +27,10 @@ Any once-per-process or once-per-state warning with a pid (a Node deprecation, t
 - The bound denial reason excludes process-warning lines (`(node:<pid>) ...` and the `(Use \`node --trace-warnings ...\`)` hint), or the digest binds only the guard's own `BLOCKED (...)` block. Design latitude: which lines are noise; a RED case where the first call carries a warning and the replay does not must pass.
 - Or the consume path names the denial-digest mismatch as `HGO-DRIFT` with `driftedChecks: ["denials"]` instead of skipping silently (the `denials` check exists in `driftChecks`, but the earlier filter drops the capability before it is evaluated).
 
+## Status 2026-10-29
+
+Held patch `specs/sprint-alfred-epic/evidence/held-patches/w7-hgo-denial-binding-drops-process-warnings-r1.patch` (first wish: lines that start with `(node:<digits>) `, and their `--trace-` hint line, stay out of the bound denial text). RED without the production edit, GREEN with it, over-stripping guarded; `lib/human-guard-override.mjs` is a never-liftable kernel path, so the PO applies it under a Guard Maintenance Window. Not applied; the second wish (name the digest mismatch as `HGO-DRIFT` instead of skipping) is not built.
+
 ## Not covered here
 
 The test fixture side is held patch q1 (keeps the fixture directory at 0o700 so the case is deterministic); it does not touch production.
