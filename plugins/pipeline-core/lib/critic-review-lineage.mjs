@@ -66,10 +66,8 @@ function reviewAttemptCode(attempt) {
     || !Object.hasOwn(attempt, "requestedMode")
     || !Number.isSafeInteger(attempt.round)
     || attempt.round < 1
-    || attempt.round > REVIEW_LIMITS.criticRounds + 1
     || !Number.isSafeInteger(attempt.correctionCommits)
     || attempt.correctionCommits < 0
-    || attempt.correctionCommits > REVIEW_LIMITS.correctionCommits + 1
     || !["full", "delta"].includes(attempt.requestedMode)) {
     return "CRL-REVIEW-ATTEMPT";
   }

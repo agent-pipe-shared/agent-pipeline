@@ -296,6 +296,9 @@ export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, base
   });
 }
 
+// The PO decision removed the round cap; this bound only protects against a corrupt file.
+const MAX_COURSE_HISTORY_RECORDS = 4096;
+
 /**
  * This is deliberately a pure derivation, not dispatch authority. The caller
  * must load `history` from immutable feature-package evidence and independently
@@ -304,7 +307,7 @@ export function deriveRegisteredCriticCourseDecision({ repoRoot, featureId, base
  */
 export function deriveCriticCourseAdmission(input) {
   if (!exact(input, ["history", "candidate", "correctionCommitsInRange", "requestedMode", "delta"])
-    || !Array.isArray(input.history) || input.history.length > 4
+    || !Array.isArray(input.history) || input.history.length > MAX_COURSE_HISTORY_RECORDS
     || !exact(input.candidate, ["base", "commit", "tree"])
     || ![input.candidate.base, input.candidate.commit, input.candidate.tree].every((oid) => typeof oid === "string" && OID.test(oid))
     || !Number.isSafeInteger(input.correctionCommitsInRange) || input.correctionCommitsInRange < 0
@@ -581,8 +584,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
  if(pass)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
  // Source-owned immutable consumed history fixes the batch's next round.
  // An accepted actual-PASS criterion cannot authorize a fifth invocation.
- if(budgets.reviewRound>CRITIC_DISPATCH_LIMITS.criticRounds || budgets.correctionCommitCount>CRITIC_DISPATCH_LIMITS.correctionCommits)
-  return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
+ // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above.
  if(history.length && source.correctionCommits.length===0)fail('CCA-CORRECTION-RANGE');
  source.reviewUnit=featureReviewUnit(input,resolved);
  const evidence=deterministic(resolved.resolvedRepository.repoRoot,input.registrationCommit,resolved.courseIdentity.originalFeatureId,source.candidate,evidencePaths);
@@ -595,7 +597,7 @@ export function readCriticCourseAdmission(input){try{const c=runtimeCompose(inpu
 function artifact(path,descriptor){const bytes=Buffer.from(canonicalJson(descriptor)),sha256=digest(bytes);return {path:path.replace('<digest>',sha256),sha256,bytes,registration:{class:'candidate-evidence',path:path.replace('<digest>',sha256),sha256,authority:false,mutability:'immutable',retention:'retain'}};}
 export function prepareRegisteredCriticDeltaRequest(input){try{
  if(!exact(input,['courseRequest','changedBehaviorClaims','pathInvariantMap','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidencePaths'])||!exact(input.courseRequest,V2_REQUEST_KEYS.filter(k=>k!=='deltaRequestPath')))fail('CCA-DELTA-PREPARE-SHAPE');
- const request={...input.courseRequest,deltaRequestPath:null},c=runtimeCompose(request,{preparing:true,evidencePaths:input.deterministicEvidencePaths});if(!c.history.length)fail('CCA-DELTA-PARENT');if(c.budgets.reviewRound>CRITIC_DISPATCH_LIMITS.criticRounds || c.budgets.correctionCommitCount>CRITIC_DISPATCH_LIMITS.correctionCommits)fail('CCA-REVIEW-BUDGET-EXHAUSTED');
+ const request={...input.courseRequest,deltaRequestPath:null},c=runtimeCompose(request,{preparing:true,evidencePaths:input.deterministicEvidencePaths});if(!c.history.length)fail('CCA-DELTA-PARENT');
  const i=c.resolved.courseIdentity,descriptor={schema:'pipeline.critic-delta-request.v1',featureId:i.originalFeatureId,manifestPath:i.manifestPath,courseKey:i.courseKey,acceptedEnvelopeSha256:i.envelopeSha256,genesisRecordSha256:i.genesisRecordSha256,historySha256:c.source.historySha256,parent:parentProjection(c.history.at(-1)),candidate:c.source.candidate,changedPaths:c.source.changedPaths,changedBehaviorClaims:input.changedBehaviorClaims,pathInvariantMap:input.pathInvariantMap,pathInvariantMapSha256:sha256Canonical(input.pathInvariantMap),coordinatorImpactConfirmed:input.coordinatorImpactConfirmed,trustBoundaryChanged:input.trustBoundaryChanged,impactAmbiguous:input.impactAmbiguous,deterministicEvidence:c.evidence.entries};
  return ok({descriptor,artifact:artifact(`specs/${i.originalFeatureId}/evidence/critic-delta-request-<digest>.json`,descriptor)});
  }catch(error){return refused(error);}}

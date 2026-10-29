@@ -11,7 +11,7 @@ import {
   validateCriticReviewLineage,
   validateReleaseCriticScopeAdmission,
 } from "./critic-review-lineage.mjs";
-import { sha256Canonical } from "./review-economy.mjs";
+import { projectCriticReviewEconomy, sha256Canonical } from "./review-economy.mjs";
 import { safePath } from "./critic-review-lineage-core.mjs";
 
 const H = (character) => character.repeat(64);
@@ -577,7 +577,8 @@ check("accepts a correction-budget crossing even when the exact Git range adds t
     parent,
     findings: structuredClone(parent.findings),
     invalidation: none,
-    reviewAttempt: { round: 4, correctionCommits: 4, requestedMode: "delta" },
+    // D190: the old correction cap gates a FULL request only (a diff round is admitted), so the gate record is built from a full request.
+    reviewAttempt: { round: 4, correctionCommits: 4, requestedMode: "full" },
     lane: { laneId: "correction-gate-lane", contextSha256: H("6"), evidenceSha256: H("7") },
   });
   assert.equal(gate.course.status, "po-course-gate");
@@ -805,5 +806,56 @@ check("compiles and validates a lineage record whose packet diff path carries br
   assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: ["src/a\nb.ts"] }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
 });
 
-assert.equal(passed, 17);
-console.log(`${passed}/17 checks passed.`);
+check("D190 step rule: a delta round may step the correction count by more than one and still chain; full mode, a falling count and a skipped round stay refused", () => {
+  const records = fourRoundHistory();
+  const next = (parent, packet, round, count, mode = "delta") => {
+    const record = compile({
+      packet,
+      reviewId: `review-step-${round}-${count}`,
+      parent,
+      coverage: completeCoverage(packet),
+      verdict: findingsVerdict,
+      findings: [{ ...findingOpen, priorFindingId: findingOpen.id, evidenceSha256: H("a") }],
+      correction: correction(packet),
+      invalidation: none,
+      reviewAttempt: deltaAttempt(round, count, packet),
+      lane: { laneId: `critic-lane-step-${round}-${count}`, contextSha256: H("e"), evidenceSha256: H("d") },
+    });
+    return mode === "delta" ? record : historicalBroad(record, explicitFull);
+  };
+  const packet5 = {
+    ...packet2,
+    packetId: "7".repeat(32),
+    candidate: { base: O("8"), commit: O("a"), tree: O("b") },
+    diff: { ...packet2.diff, base: O("8"), commit: O("a"), sha256: H("9") },
+    bindings: { requestSha256: H("a"), diffPathsSha256: H("b"), governanceSha256: H("c") },
+  };
+  const chained = (history) => ({
+    lineage: validateCriticReviewHistory(history),
+    economy: projectCriticReviewEconomy(history),
+  });
+  // (a) parent round 1 / count 0, child delta round 2 / count 7
+  const a = [records[0], next(records[0], packet2, 2, 7)];
+  assert.equal(a[1].course.correctionCommitCount, 7);
+  assert.equal(chained(a).lineage.ok, true);
+  assert.equal(chained(a).economy.ok, true);
+  // (b) parent at the old limits (round 4 / count 3), child delta round 5 / count 11
+  const b = [...records, next(records.at(-1), packet5, 5, 11)];
+  assert.equal(chained(b).lineage.ok, true);
+  assert.equal(chained(b).economy.ok, true);
+  // (c) a full-mode child with a step larger than one is refused
+  const c = [records[0], next(records[0], packet2, 2, 7, "full")];
+  assert.equal(chained(c).economy.ok, false);
+  // (d) a falling count and a skipped round are refused (at composition or in the chain)
+  const refused = (build) => {
+    let history;
+    try { history = build(); } catch { return true; }
+    const r = chained(history);
+    return r.lineage.ok === false && r.economy.ok === false;
+  };
+  assert.equal(refused(() => [...records, next(records.at(-1), packet5, 5, 2)]), true);
+  assert.equal(refused(() => [...records, next(records.at(-1), packet5, 6, 11)]), true);
+});
+
+assert.equal(passed, 18);
+console.log(`${passed}/18 checks passed.`);

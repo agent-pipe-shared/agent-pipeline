@@ -18,7 +18,7 @@ const H = (c) => c.repeat(64);
 const O = (c) => c.repeat(40);
 const path = "src/example.mjs";
 const packet = (index) => {
-  const chars = ["1", "2", "3", "4", "5", "6"];
+  const chars = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c"];
   const base = O(chars[index]);
   const commit = O(chars[index + 1]);
   return {
@@ -98,9 +98,9 @@ function fourRoundHistory(roundCount = 4) {
       parent: rows.at(-1),
       packages: [{ id: "package", subjectSha256: H("d"), changedPaths: [path], integrationEdges: ["edge"] }],
       coverage: { changedPaths: [path], acceptanceIds: ["AC-1"], integrationEdges: ["edge"], complete: true, receiptSha256: H("e") },
-      lane: { laneId: `lane-${index + 1}`, contextSha256: H(String(index + 3)), evidenceSha256: H(String(index + 6)) },
+      lane: { laneId: `lane-${index + 1}`, contextSha256: H((index + 3).toString(16)), evidenceSha256: H((index + 6).toString(16)) },
       verdict: { status: "findings", schemaValid: true, resultSha256: H("2"), failure: null },
-      findings: [{ id: "finding-1", priorFindingId: "finding-1", severity: "high", status: "open", evidenceSha256: H(String(index + 2)) }],
+      findings: [{ id: "finding-1", priorFindingId: "finding-1", severity: "high", status: "open", evidenceSha256: H((index + 2).toString(16)) }],
       correction: { commit: currentPacket.candidate.commit, deltaSha256: currentPacket.diff.sha256, impactSha256: sha256Canonical(["edge"]) },
       invalidation: { kind: "none", reason: null, evidenceSha256: null },
       reviewAttempt: {
@@ -370,6 +370,43 @@ test("CCA15 a new full review cannot be admitted after retained findings", () =>
   const decision = deriveCriticCourseAdmission({ ...correction(), requestedMode: "full", delta: {} });
   assert.equal(decision.admission.ok, false);
   assert.equal(decision.admission.code, "RE-FOLLOWUP-DELTA-REQUIRED");
+});
+
+test("D190 (a) a course at the old round limit admits a DIFF round, and the round after it", () => {
+  for (const retainedCount of [4, 5]) {
+    const rows = fourRoundHistory(retainedCount);
+    const next = packet(retainedCount);
+    const decision = deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 1, requestedMode: "delta", delta });
+    assert.equal(decision.attempt.round, retainedCount + 1);
+    assert.equal(decision.admission.ok, true);
+    assert.equal(decision.admission.mode, "delta");
+    assert.equal(decision.parentRecordSha256, rows.at(-1).recordSha256);
+  }
+});
+
+test("D190 (a2) a course past the old correction-commit limit admits a DIFF round", () => {
+  const rows = fourRoundHistory(2);
+  const next = packet(2);
+  const decision = deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 5, requestedMode: "delta", delta });
+  assert.equal(decision.attempt.correctionCommits, 6);
+  assert.equal(decision.admission.ok, true);
+  assert.equal(decision.admission.mode, "delta");
+});
+
+test("D190 (b) a FULL request after a consumed round is still refused, also past the old limits", () => {
+  const rows = fourRoundHistory(4);
+  const decision = deriveCriticCourseAdmission({ history: rows, candidate: { base: rows.at(-1).candidate.commit, commit: O("6"), tree: O("7") }, correctionCommitsInRange: 1, requestedMode: "full", delta: {} });
+  assert.equal(decision.admission.ok, false);
+  assert.equal(decision.admission.code, "RE-CRITIC-ROUND-LIMIT");
+  const early = deriveCriticCourseAdmission({ ...correction(), requestedMode: "full", delta: {} });
+  assert.equal(early.admission.ok, false);
+  assert.equal(early.admission.code, "RE-FOLLOWUP-DELTA-REQUIRED");
+});
+
+test("D190 (c) a DIFF round past the old limits whose range has no correction commit is still refused", () => {
+  const rows = fourRoundHistory(4);
+  const next = packet(4);
+  assert.throws(() => deriveCriticCourseAdmission({ history: rows, candidate: next.candidate, correctionCommitsInRange: 0, requestedMode: "delta", delta }), rejects("CCA-CORRECTION-RANGE"));
 });
 
 function runtimeRequest(fx, overrides = {}) {

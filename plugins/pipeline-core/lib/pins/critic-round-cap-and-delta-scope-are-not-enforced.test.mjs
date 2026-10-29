@@ -40,18 +40,21 @@ test("AC1 round counter: round beyond the cap is refused with a typed course-gat
   const max = CRITIC_DISPATCH_LIMITS.criticRounds;
   assert.equal(max, 4);
   assert.equal(admitReviewAttempt(delta({ round: max })).ok, true);
-  const refused = admitReviewAttempt(delta({ round: max + 1 }));
+  // D190: the cap gates a FULL request only; a diff round past it is admitted.
+  assert.equal(admitReviewAttempt(delta({ round: max + 1 })).ok, true);
+  const refused = admitReviewAttempt(delta({ round: max + 1, requestedMode: "full" }));
   assert.equal(refused.ok, false);
   assert.equal(refused.code, "RE-CRITIC-ROUND-LIMIT");
   assert.equal(refused.courseGateRequired, true);
-  const corr = admitReviewAttempt(delta({ correctionCommits: 4 }));
+  assert.equal(admitReviewAttempt(delta({ correctionCommits: 4 })).ok, true);
+  const corr = admitReviewAttempt(delta({ correctionCommits: 4, requestedMode: "full" }));
   assert.equal(corr.code, "RE-CORRECTION-LIMIT");
   assert.equal(corr.courseGateRequired, true);
 });
 
 test("AC1 RED: a mirror without the cap admits the over-cap round, so the pin is meaningful", () => {
   assert.equal(mirrorNoCap(delta({ round: 5 })).ok, true);
-  assert.notEqual(admitReviewAttempt(delta({ round: 5 })).ok, mirrorNoCap(delta({ round: 5 })).ok);
+  assert.notEqual(admitReviewAttempt(delta({ round: 5, requestedMode: "full" })).ok, mirrorNoCap(delta({ round: 5 })).ok);
 });
 
 test("AC1 course derivation computes round from history, never from invented counters", () => {

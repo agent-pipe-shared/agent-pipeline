@@ -210,10 +210,8 @@ function courseCode(course) {
   if (!exact(course, ["reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status"])
     || !Number.isSafeInteger(course.reviewRound)
     || course.reviewRound < 1
-    || course.reviewRound > REVIEW_LIMITS.criticRounds + 1
     || !Number.isSafeInteger(course.correctionCommitCount)
     || course.correctionCommitCount < 0
-    || course.correctionCommitCount > REVIEW_LIMITS.correctionCommits + 1
     || course.maxReviewRounds !== REVIEW_LIMITS.criticRounds
     || course.maxCorrectionCommits !== REVIEW_LIMITS.correctionCommits
     || !COURSE_STATUSES.has(course.status)) {
@@ -221,7 +219,8 @@ function courseCode(course) {
   }
   const exhausted = course.reviewRound > REVIEW_LIMITS.criticRounds
     || course.correctionCommitCount > REVIEW_LIMITS.correctionCommits;
-  return exhausted === (course.status === "po-course-gate") ? null : "CRL-COURSE-GATE";
+  // D190: a po-course-gate record must be exhausted; an admitted (diff) record may exceed the old limits.
+  return course.status === "po-course-gate" && !exhausted ? "CRL-COURSE-GATE" : null;
 }
 
 export function compiledRequest(record) {
@@ -457,8 +456,11 @@ export function validateCriticReviewLineage(record) {
 }
 
 /** Validate a complete oldest-to-newest synthetic or retained review course. */
+// The PO decision removed the round cap; this bound only protects against a corrupt file.
+const MAX_COURSE_HISTORY_RECORDS = 4096;
+
 export function validateCriticReviewHistory(records) {
-  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
+  if (!Array.isArray(records) || records.length < 1 || records.length > MAX_COURSE_HISTORY_RECORDS) {
     return { ok: false, code: "CRL-HISTORY-SHAPE" };
   }
   const reviewIds = new Set();

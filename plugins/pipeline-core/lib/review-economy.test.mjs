@@ -139,16 +139,19 @@ ok("RE20 prior receipt omission refuses fallback full", admitReviewAttempt({ ...
 ok("RE21 new trust boundary refuses fallback full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === null);
 ok("RE22 ambiguous impact refuses fallback full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === null);
 ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
-ok("RE24 fourth Critic round creates course gate", admitReviewAttempt({ ...delta, round: 5 }).courseGateRequired === true);
+// D190: the old cap now gates only a FULL request; a diff round past it is admitted.
+ok("RE24 fourth Critic round creates course gate for a full request", admitReviewAttempt({ ...delta, round: 5, requestedMode: "full" }).courseGateRequired === true);
+ok("RE24d D190 a diff round past the old round cap is admitted", admitReviewAttempt({ ...delta, round: 5 }).mode === "delta" && admitReviewAttempt({ ...delta, round: 9 }).ok === true);
 ok("RE25 third correction commit remains within the approved budget", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
-ok("RE26 fourth correction commit creates course gate", admitReviewAttempt({ ...delta, correctionCommits: 4 }).courseGateRequired === true);
+ok("RE26 fourth correction commit creates course gate for a full request", admitReviewAttempt({ ...delta, correctionCommits: 4, requestedMode: "full" }).courseGateRequired === true);
+ok("RE26d2 D190 a diff round past the old correction-commit cap is admitted", admitReviewAttempt({ ...delta, correctionCommits: 4 }).mode === "delta");
 
 for (const round of [2, 3, 4]) {
   ok(`RE26a round ${round} admits only a bound correction DIFF`, admitReviewAttempt({ ...delta, round, correctionCommits: round - 1 }).mode === "delta");
   ok(`RE26b round ${round} refuses another full review`, admitReviewAttempt({ ...delta, round, requestedMode: "full" }).ok === false);
   ok(`RE26c round ${round} refuses empty DIFF`, admitReviewAttempt({ ...delta, round, changedPaths: [] }).ok === false);
 }
-ok("RE26d accepted actual PASS criterion cannot extend the four-review budget", admitAuthenticatedReviewAttempt({ attempt: { ...delta, round: 5 }, acceptedCriterion: { ok: true } }).code === "RE-CRITIC-ROUND-LIMIT");
+ok("RE26d accepted actual PASS criterion cannot extend the four-review budget", admitAuthenticatedReviewAttempt({ attempt: { ...delta, round: 5, requestedMode: "full" }, acceptedCriterion: { ok: true } }).code === "RE-CRITIC-ROUND-LIMIT");
 
 const criticPath = "plugins/pipeline-core/lib/critic-review-lineage.mjs";
 const criticEdge = "critic-packet-claim";

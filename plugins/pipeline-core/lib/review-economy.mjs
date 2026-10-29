@@ -185,10 +185,12 @@ function validPathInvariantMap(map) {
 
 export function admitReviewAttempt(input) {
   if (!isObject(input)) return { ok: false, mode: null, code: "RE-REVIEW-SHAPE" };
-  if (!safeInteger(input.round) || input.round < 1 || input.round > CRITIC_DISPATCH_LIMITS.criticRounds) {
+  // D190: the course is one full round, then diff rounds until PASS; no count refuses a diff round.
+  const deltaFollowUp = safeInteger(input.round) && input.round > 1 && input.requestedMode === "delta";
+  if (!safeInteger(input.round) || input.round < 1 || (!deltaFollowUp && input.round > CRITIC_DISPATCH_LIMITS.criticRounds)) {
     return { ok: false, mode: null, code: "RE-CRITIC-ROUND-LIMIT", courseGateRequired: true };
   }
-  if (!safeInteger(input.correctionCommits) || input.correctionCommits > REVIEW_LIMITS.correctionCommits) {
+  if (!safeInteger(input.correctionCommits) || (!deltaFollowUp && input.correctionCommits > REVIEW_LIMITS.correctionCommits)) {
     return { ok: false, mode: null, code: "RE-CORRECTION-LIMIT", courseGateRequired: true };
   }
   if (input.round === 1) {
@@ -384,9 +386,9 @@ function criticProjectionRecordCode(record) {
     || !exactKeys(record.course, ["reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status"])
     || record.course.maxReviewRounds !== REVIEW_LIMITS.criticRounds
     || record.course.maxCorrectionCommits !== REVIEW_LIMITS.correctionCommits
-    || !safeInteger(record.course.reviewRound, REVIEW_LIMITS.criticRounds + 1)
+    || !safeInteger(record.course.reviewRound)
     || record.course.reviewRound < 1
-    || !safeInteger(record.course.correctionCommitCount, REVIEW_LIMITS.correctionCommits + 1)
+    || !safeInteger(record.course.correctionCommitCount)
     || !new Set(["admitted", "po-course-gate"]).has(record.course.status)
     || !(record.previousSha256 === null || SHA256.test(record.previousSha256))
     || !SHA256.test(record.recordSha256 ?? "")
@@ -407,7 +409,8 @@ function criticProjectionRecordCode(record) {
   if (!criticSame(record.diff.changedPaths, record.coverage.changedPaths)
     || record.request.requestSha256 !== record.references.requestSha256
     || record.request.compiledSha256 !== sha256Canonical(criticCompiledRequest(record))
-    || admitted === exhausted
+    || (!admitted && !exhausted)
+    || (admitted && exhausted && record.request.mode !== "delta")
     || admitted === (record.request.mode === "none")
     || record.parentReviewId === null
       && (record.previousSha256 !== null || record.lane.freshFromReviewId !== null || record.correction !== null)
@@ -494,8 +497,12 @@ function criticProjectionTransitionCode(parent, current) {
     return "RE-CRITIC-PROJECTION-COUNTERS";
   }
   const correctionStep = current.course.correctionCommitCount - parent.course.correctionCommitCount;
-  if (![0, 1].includes(correctionStep)) return "RE-CRITIC-PROJECTION-COUNTERS";
-  if (correctionStep === 1) {
+  // D190: a diff round may follow any number of correction commits; full-mode and old-record steps stay 0 or 1.
+  const stepAllowed = current.request.mode === "delta"
+    ? Number.isSafeInteger(correctionStep) && correctionStep >= 0
+    : [0, 1].includes(correctionStep);
+  if (!stepAllowed) return "RE-CRITIC-PROJECTION-COUNTERS";
+  if (correctionStep >= 1) {
     if (current.correction === null
       || current.diff.base !== parent.candidate.commit
       || current.correction.commit !== current.candidate.commit) {
@@ -541,8 +548,11 @@ function criticProjectionTransitionCode(parent, current) {
  * is counted as occurrence only; the terminal status derives from the typed
  * verdict and never uses a generic PASS value.
  */
+// The PO decision removed the round cap; this bound only protects against a corrupt file.
+const MAX_COURSE_HISTORY_RECORDS = 4096;
+
 export function projectCriticReviewEconomy(records) {
-  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
+  if (!Array.isArray(records) || records.length < 1 || records.length > MAX_COURSE_HISTORY_RECORDS) {
     return { ok: false, code: "RE-CRITIC-PROJECTION-INPUT" };
   }
   const reviewIds = new Set();
