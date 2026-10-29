@@ -35,6 +35,8 @@ import { recordConsentGiven } from "../lib/onboarding-consent-marker.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE, parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
+import { nativeContractFixtureParent, prepareApprovedItemCourseFixture } from "../lib/test-item-approved-course-fixture.mjs";
+import { runDispatchBriefing } from "../scripts/dispatch-briefing.mjs";
 
 // NOTE, deliberately absent: no module-scope `import { extractWorkflowDispatches } from
 // "./guard-dispatch.mjs"` here. That shape was tried and removed (NVA-B-GD16HARDEN-1): if the
@@ -868,48 +870,99 @@ function pendingNativeStates(root) {
 }
 const FOREGROUND_WARNING = `WARNING (guard-dispatch): native host-commit preparation failed (${FOREGROUND_CODE}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.`;
 
+// D185 (2026-10-29): a productive Goldfish dispatch is admitted only with a briefing from the generator, and a generated one
+// carries an item-delivery binding that the guard resolves against an approved course. The item-governed cases below therefore
+// use the production fixture of an approved course (test-item-approved-course-fixture.mjs: real commit, real plan approval) and
+// the real generator, run in process with an injected ruleset identity and route (no real plugin registry). A dispatch that is
+// ADMITTED reserves the slice and its write scope, so every admitted case builds its own fixture; a refused one releases its
+// reservation and may share one.
+const generatedFixtureRoots = [];
+process.once("exit", () => { for (const root of generatedFixtureRoots) rmSync(root, { recursive: true, force: true }); });
+function generatedItemFixture() {
+  const root = realpathSync(mkdtempSync(join(nativeContractFixtureParent(), "guard-dispatch-generated-")));
+  generatedFixtureRoots.push(root);
+  prepareApprovedItemCourseFixture({ root, calibrationExtra: { handover: "docs/state.md" } });
+  recordConsentGiven({ rootDir: root });
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  writeFileSync(join(root, "scratch", "pkg.json"), JSON.stringify({
+    id: ITEM_BACKGROUND_SLICE, item: "unit-item", criterion: "AC-1", agentType: "goldfish-implementor", modelId: "claude-sonnet-5-5", modelWhy: "role default",
+    check: "src/change.test.mjs", paths: ["src/change.mjs"], spec: "specs/unit/spec.md", title: "Fixture title", ac: "AC-1", goal: "Fixture goal text.",
+    context: ["`src/change.mjs` -- the module."], targeted: ["`node --test src/change.test.mjs` (green)"], forbidden: ["Fixture forbidden rule."], stops: ["Fixture stop rule."],
+  }));
+  const built = runDispatchBriefing(["build", "--root", root, "--package", "scratch/pkg.json"], {
+    observePreflight: () => ({ rulesetSource: { selectedPlugin: { id: "pipeline-core", version: "9.9.9+test" }, loadedIdentity: { status: "available", algorithm: "content-sha256", value: "c".repeat(64) } } }),
+    resolveBaseline: () => ({ status: "ready", entries: [] }),
+    claudeRoute: (taskRoute) => ({ taskRoute, runner: "claude", role: "worker", state: "default", selector: { kind: "alias", value: "sonnet" }, effort: "medium" }),
+  });
+  assert.equal(built.ok, true, `the generator must build the fixture briefing, or the cases never reach the background branch -- ${JSON.stringify(built).slice(0, 300)}`);
+  assert.equal(parseNativeGoldfishBriefing(built.text).ok, true, "the generated briefing must parse");
+  return { root, text: built.text };
+}
+// `background` is spread into tool_input: `{}` carries no run_in_background key at all.
+function generatedDispatch({ root, text }, toolUseId, background) {
+  return { cwd: root, session_id: "gd-item-session", tool_name: "Agent", tool_use_id: toolUseId,
+    tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: text, ...background } };
+}
+let refusalFixture = null; // shared by the cases that are all refused, which leave no reservation behind
+const sharedRefusalFixture = () => (refusalFixture ??= generatedItemFixture());
+
 // D19 (PF-26) re-pin of the ALF-G2C2A keyless refusal: with the SubagentStop route REGISTERED (the shipped hooks.json this
-// real guard reads) a keyless item-governed dispatch takes the SubagentStop route like an explicit true and stops only at
-// the next preparation step (the candidate check); with the route UNREGISTERED it keeps the WARNING and claims no authorship.
-manualCheck("GD57 block  D19: an item-governed marked Claude dispatch with NO run_in_background key passes the foreground check while the route is registered (stops at the candidate check); UNREGISTERED it continues with the WARNING and claims no authorship", () => {
-  const { root, parent } = itemBackgroundRepo();
-  const registered = runAt(markedGoldfishDispatch(root, "gd57", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+// real guard reads) a keyless item-governed dispatch takes the SubagentStop route like an explicit true and is ADMITTED with a
+// pending native state; with the route UNREGISTERED it keeps the WARNING and claims no authorship. (D185: the dispatch used to
+// stop at the candidate check because its hand-assembled fixture had no commit; a generated briefing on an approved course
+// passes every later check, so admission is now the observable next step.)
+manualCheck("GD57 allow  D19: an item-governed generated Claude dispatch with NO run_in_background key passes the foreground check and is admitted with a pending state while the route is registered; UNREGISTERED it continues with the WARNING and claims no authorship", () => {
+  const governed = generatedItemFixture();
+  const registered = runAt(generatedDispatch(governed, "gd57", {}), governed.root);
   assert.ok(!registered.stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the keyless launch -- got ${JSON.stringify(registered.stderr.slice(0, 300))}`);
-  assert.equal(registered.code, BLOCK, `exit ${registered.code} (expected ${BLOCK}) -- ${registered.stderr.trim().slice(0, 300)}`);
-  assert.ok(registered.stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(registered.stderr.slice(0, 300))}`);
-  const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), markedGoldfishDispatch(root, "gd57-unregistered", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.equal(registered.code, ALLOW, `exit ${registered.code} (expected ${ALLOW}) -- ${registered.stderr.trim().slice(0, 300)}`);
+  assert.equal(pendingNativeStates(governed.root).length, 1, "a registered keyless dispatch must leave exactly one native host pending state");
+  const other = generatedItemFixture();
+  const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), generatedDispatch(other, "gd57-unregistered", {}), other.root);
   assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
   assert.ok(stderr.includes(FOREGROUND_WARNING), `stderr missing the background-only WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
   assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
-  assert.deepEqual(pendingNativeStates(root), [], "a continued background-only dispatch must leave no native host pending state (no authorship claim)");
+  assert.deepEqual(pendingNativeStates(other.root), [], "a continued background-only dispatch must leave no native host pending state (no authorship claim)");
 });
 
-manualCheck("GD58 block  an item-governed marked Claude dispatch with an EXPLICIT run_in_background: true stays blocked (typed, no WARNING fallback)", () => {
-  const { root, parent } = itemBackgroundRepo();
-  const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), markedGoldfishDispatch(root, "gd58", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
-  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
-  assert.ok(stderr.includes(`BLOCKED (guard-dispatch): ${FOREGROUND_CODE}`), `stderr missing the typed BLOCKED code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.ok(!stderr.includes("WARNING (guard-dispatch): native host-commit preparation failed"), stderr.slice(0, 300));
-  assert.deepEqual(pendingNativeStates(root), []);
+manualCheck("GD58 block  an item-governed generated Claude dispatch with an EXPLICIT run_in_background: true stays blocked while the route is unregistered (typed, no WARNING fallback), and the earlier route record is restored", () => {
+  const governed = sharedRefusalFixture();
+  // Critic F4: an earlier admission's route record, which this briefing supersedes, is written over before the native
+  // preparation and restored byte for byte when that preparation refuses.
+  const routeFile = join(governed.root, "evidence", `dispatch-route-${ITEM_BACKGROUND_SLICE}.json`);
+  const routeBefore = existsSync(routeFile) ? readFileSync(routeFile) : null;
+  const earlier = `${JSON.stringify({ schema: "pipeline.dispatch-briefing-route.v1", sliceId: ITEM_BACKGROUND_SLICE, briefingSha256: "0".repeat(64), origin: "admission" })}\n`;
+  mkdirSync(join(governed.root, "evidence"), { recursive: true }); writeFileSync(routeFile, earlier);
+  try {
+    const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), generatedDispatch(governed, "gd58", { run_in_background: true }), governed.root);
+    assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
+    assert.ok(stderr.includes(`BLOCKED (guard-dispatch): ${FOREGROUND_CODE}`), `stderr missing the typed BLOCKED code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+    assert.ok(!stderr.includes("WARNING (guard-dispatch): native host-commit preparation failed"), stderr.slice(0, 300));
+    assert.deepEqual(pendingNativeStates(governed.root), []);
+    assert.equal(readFileSync(routeFile, "utf8"), earlier, "the refused dispatch leaves the earlier route record as it was");
+  } finally {
+    if (routeBefore === null) rmSync(routeFile, { force: true }); else writeFileSync(routeFile, routeBefore);
+  }
 });
 
-manualCheck("GD59 an item-governed marked Claude dispatch with an explicit run_in_background: false does not fail with NGHS-CLAUDE-FOREGROUND-REQUIRED", () => {
-  const { root, parent } = itemBackgroundRepo();
-  const { code, stderr } = runAt(markedGoldfishDispatch(root, "gd59", { run_in_background: false }), root, { GIT_CEILING_DIRECTORIES: parent });
+manualCheck("GD59 allow  an item-governed generated Claude dispatch with an explicit run_in_background: false does not fail with NGHS-CLAUDE-FOREGROUND-REQUIRED and is admitted", () => {
+  const governed = generatedItemFixture();
+  const { code, stderr } = runAt(generatedDispatch(governed, "gd59", { run_in_background: false }), governed.root);
   assert.ok(!stderr.includes(FOREGROUND_CODE), `the foreground launch must not be refused as background -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  // The fixture repository has no commit, so preparation proceeds past the foreground gate and the whole item-queue
-  // admission and stops at the candidate check: that proves the explicit-false dispatch reached the next preparation step.
-  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
-  assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.equal(code, ALLOW, `exit ${code} (expected ${ALLOW}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.equal(pendingNativeStates(governed.root).length, 1, "the admitted foreground dispatch must leave exactly one native host pending state");
 });
 
-manualCheck("GD60 allow  a marked Claude dispatch that is NOT item-governed is unchanged: key absent and explicit true both continue with the WARNING", () => {
+// D185: the "marked Claude dispatch that is NOT item-governed" of GD60/GD62/GD64 no longer exists as an admitted shape -- every
+// productive Goldfish dispatch needs the generator, whose briefing always carries an item-delivery binding -- so these cases pin
+// what the guard does with the old shape: a hand-assembled marked briefing in a project that is not item-governed is refused
+// DBG-GENERATED-BRIEFING-REQUIRED, with the route unregistered or registered, key absent or explicit true.
+manualCheck("GD60 block  a hand-assembled marked Claude dispatch in a project that is NOT item-governed is refused DBG-GENERATED-BRIEFING-REQUIRED (route unregistered): key absent and explicit true", () => {
   const { root, parent } = itemBackgroundRepo(false);
   for (const [label, background] of [["key absent", {}], ["explicit true", { run_in_background: true }]]) {
     const { code, stderr } = runAtGuard(guardCopyWithHooks("unregistered-pinned", UNREGISTERED_HOOKS), markedGoldfishDispatch(root, `gd60-${label.replace(/\W+/gu, "-")}`, background), root, { GIT_CEILING_DIRECTORIES: parent });
-    assert.equal(code, ALLOW, `${label}: ${stderr.trim().slice(0, 300)}`);
-    assert.ok(stderr.includes(FOREGROUND_WARNING), `${label}: stderr missing the WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-    assert.ok(!stderr.includes("BLOCKED"), `${label}: ${stderr.slice(0, 300)}`);
+    assert.equal(code, BLOCK, `${label}: ${stderr.trim().slice(0, 300)}`);
+    assert.ok(stderr.includes("BLOCKED (guard-dispatch): DBG-GENERATED-BRIEFING-REQUIRED"), `${label}: stderr missing the typed BLOCKED code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
   }
 });
 
@@ -950,47 +1003,29 @@ function runAtGuard(guard, payload, root, env = {}) {
   });
   return { code: res.status, stderr: res.stderr ?? "" };
 }
-const CANDIDATE_WARNING = "WARNING (guard-dispatch): native host-commit preparation failed (NGHS-CANDIDATE-MISMATCH);";
 
-manualCheck("GD61 block  REGISTERED: an item-governed marked Claude dispatch with an explicit run_in_background: true passes the foreground check and stops at the candidate check", () => {
-  const { root, parent } = itemBackgroundRepo();
-  const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
-  // Critic F4: an earlier admission's route record, which this briefing supersedes, is written over before the native
-  // preparation and restored byte for byte when that preparation refuses.
-  const routeFile = join(root, "evidence", `dispatch-route-${ITEM_BACKGROUND_SLICE}.json`);
-  const routeBefore = existsSync(routeFile) ? readFileSync(routeFile) : null;
-  const earlier = `${JSON.stringify({ schema: "pipeline.dispatch-briefing-route.v1", sliceId: ITEM_BACKGROUND_SLICE, briefingSha256: "0".repeat(64), origin: "admission" })}\n`;
-  mkdirSync(join(root, "evidence"), { recursive: true }); writeFileSync(routeFile, earlier);
-  try {
-    const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd61", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
-    assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the background launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-    assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
-    assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-    assert.deepEqual(pendingNativeStates(root), []);
-    assert.equal(readFileSync(routeFile, "utf8"), earlier, "the refused dispatch leaves the earlier route record as it was");
-  } finally {
-    if (routeBefore === null) rmSync(routeFile, { force: true }); else writeFileSync(routeFile, routeBefore);
-  }
+manualCheck("GD61 allow  REGISTERED: an item-governed generated Claude dispatch with an explicit run_in_background: true passes the foreground check and is admitted with a pending state", () => {
+  const governed = generatedItemFixture();
+  const { code, stderr } = runAtGuard(guardCopyWithHooks("registered", REGISTERED_HOOKS), generatedDispatch(governed, "gd61", { run_in_background: true }), governed.root);
+  assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the background launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
+  assert.equal(code, ALLOW, `exit ${code} (expected ${ALLOW}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.equal(pendingNativeStates(governed.root).length, 1);
 });
 
-manualCheck("GD62 allow  REGISTERED: a marked Claude dispatch that is NOT item-governed no longer warns with the foreground code for an explicit run_in_background: true", () => {
+manualCheck("GD62 block  REGISTERED: a hand-assembled marked Claude dispatch in a project that is NOT item-governed is still refused DBG-GENERATED-BRIEFING-REQUIRED for an explicit run_in_background: true", () => {
   const { root, parent } = itemBackgroundRepo(false);
-  const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
-  const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd62", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
-  assert.equal(code, ALLOW, stderr.trim().slice(0, 300));
+  const { code, stderr } = runAtGuard(guardCopyWithHooks("registered", REGISTERED_HOOKS), markedGoldfishDispatch(root, "gd62", { run_in_background: true }), root, { GIT_CEILING_DIRECTORIES: parent });
+  assert.equal(code, BLOCK, stderr.trim().slice(0, 300));
+  assert.ok(stderr.includes("BLOCKED (guard-dispatch): DBG-GENERATED-BRIEFING-REQUIRED"), `stderr missing the typed BLOCKED code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
   assert.ok(!stderr.includes(FOREGROUND_CODE), `stderr must not carry the foreground code -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.ok(stderr.includes(CANDIDATE_WARNING), `stderr missing the next-step WARNING -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.ok(!stderr.includes("BLOCKED"), stderr.slice(0, 300));
 });
 
-manualCheck("GD63 block  D19 REGISTERED: a MISSING run_in_background key takes the same route as an explicit true (passes the foreground check, stops at the candidate check)", () => {
-  const { root, parent } = itemBackgroundRepo();
-  const guard = guardCopyWithHooks("registered", REGISTERED_HOOKS);
-  const { code, stderr } = runAtGuard(guard, markedGoldfishDispatch(root, "gd63", {}), root, { GIT_CEILING_DIRECTORIES: parent });
+manualCheck("GD63 allow  D19 REGISTERED: a MISSING run_in_background key takes the same route as an explicit true (passes the foreground check and is admitted with a pending state)", () => {
+  const governed = generatedItemFixture();
+  const { code, stderr } = runAtGuard(guardCopyWithHooks("registered", REGISTERED_HOOKS), generatedDispatch(governed, "gd63", {}), governed.root);
   assert.ok(!stderr.includes(FOREGROUND_CODE), `a registered completion route must not refuse the keyless launch -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.equal(code, BLOCK, `exit ${code} (expected ${BLOCK}) -- ${stderr.trim().slice(0, 300)}`);
-  assert.ok(stderr.includes("BLOCKED (guard-dispatch): NGHS-CANDIDATE-MISMATCH"), `stderr missing NGHS-CANDIDATE-MISMATCH -- got ${JSON.stringify(stderr.slice(0, 300))}`);
-  assert.deepEqual(pendingNativeStates(root), []);
+  assert.equal(code, ALLOW, `exit ${code} (expected ${ALLOW}) -- ${stderr.trim().slice(0, 300)}`);
+  assert.equal(pendingNativeStates(governed.root).length, 1);
 });
 
 manualCheck("GD64 an unreadable, malformed or non-matching hooks.json fails closed to today's behaviour for an explicit run_in_background: true", () => {
@@ -1002,14 +1037,10 @@ manualCheck("GD64 an unreadable, malformed or non-matching hooks.json fails clos
   ];
   for (const [label, text] of variants) {
     const guard = guardCopyWithHooks(`unregistered-${label}`, text);
-    const governed = itemBackgroundRepo();
-    const blocked = runAtGuard(guard, markedGoldfishDispatch(governed.root, `gd64-item-${label.replace(/\W+/gu, "-")}`, { run_in_background: true }), governed.root, { GIT_CEILING_DIRECTORIES: governed.parent });
+    const governed = sharedRefusalFixture();
+    const blocked = runAtGuard(guard, generatedDispatch(governed, `gd64-item-${label.replace(/\W+/gu, "-")}`, { run_in_background: true }), governed.root);
     assert.equal(blocked.code, BLOCK, `${label} (item-governed): ${blocked.stderr.trim().slice(0, 300)}`);
     assert.ok(blocked.stderr.includes(`BLOCKED (guard-dispatch): ${FOREGROUND_CODE}`), `${label} (item-governed): stderr missing the typed BLOCKED code -- got ${JSON.stringify(blocked.stderr.slice(0, 300))}`);
-    const loose = itemBackgroundRepo(false);
-    const warned = runAtGuard(guard, markedGoldfishDispatch(loose.root, `gd64-plain-${label.replace(/\W+/gu, "-")}`, { run_in_background: true }), loose.root, { GIT_CEILING_DIRECTORIES: loose.parent });
-    assert.equal(warned.code, ALLOW, `${label} (not item-governed): ${warned.stderr.trim().slice(0, 300)}`);
-    assert.ok(warned.stderr.includes(FOREGROUND_WARNING), `${label} (not item-governed): stderr missing the WARNING -- got ${JSON.stringify(warned.stderr.slice(0, 300))}`);
   }
 });
 

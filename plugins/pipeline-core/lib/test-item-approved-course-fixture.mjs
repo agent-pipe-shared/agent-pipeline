@@ -61,7 +61,8 @@ export function prepareSessionAuthorityRegistryFixture({root=null,prefix='sessio
  assert.equal(initialized.status,'initialized',JSON.stringify(initialized));
  return {repoDir,repository,root:authorityRoot};
 }
-export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null,initialPlanSurfacePath=null}={}) {
+// `calibrationExtra` adds calibration keys (for example `handover`, which the briefing generator reads) to the committed calibration.
+export function prepareApprovedItemCourseFixture({root,additionalCriteria=[],pipelineUserSource=null,initialPlanSurfacePath=null,calibrationExtra={}}={}) {
 if(initialPlanSurfacePath!==null && (typeof initialPlanSurfacePath!=='string' || !/^src\/[A-Za-z0-9._/-]+$/u.test(initialPlanSurfacePath)
   || initialPlanSurfacePath.split('/').some(part=>part==='.'||part==='..')))throw Error('fixture initial plan surface path');
 const write=(path,bytes)=>{const target=join(root,path);mkdirSync(join(target,'..'),{recursive:true});writeFileSync(target,bytes);};
@@ -73,7 +74,7 @@ const spec='# Spec\n\n## Acceptance criteria\n\n| # | Criterion | Evidence |\n| 
 const preprd=`<!-- po-language: en -->\n<!-- technical-spec-sha256: ${nativeManagedDigest(spec)} -->\n# PRD\n\nProvide the expected dependency behavior.\n${initialPlanSurfacePath===null?'':`\nImplement ${initialPlanSurfacePath}.\n`}`;
 // AC-264 (ALF-B10): '/evidence/' mirrors the onboarding seed (PROJECT_IGNORE_SEED in lib/project-onboarding-v3.mjs, PF-26D fix 2), so the dispatch guard's evidence/dispatch-route-<slice>.json, written after the baseline capture, is not a new unowned untracked path.
 write('pipeline.user.yaml',source);write('.claude/pipeline.yaml',manifest);write('.gitignore','.claude/pipeline-state.json\nscratch/\n/evidence/\n');write('specs/unit/spec.md',spec);write('specs/unit/prd_unit.md',preprd+'\n\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n');
-write('.claude/pipeline.json',JSON.stringify({project:'fixture',verify:'node --test unit.test.cjs',autonomy:'bounded',branchModel:'local',worktree:'supported',stakes:'medium',constraints:[]}));
+write('.claude/pipeline.json',JSON.stringify({project:'fixture',verify:'node --test unit.test.cjs',autonomy:'bounded',branchModel:'local',worktree:'supported',stakes:'medium',constraints:[],...calibrationExtra}));
 const ref=path=>({path,sha256:nativeManagedDigest(readFileSync(join(root,path)))});
 const continuity={schema:'pipeline.continuity.v0',featureId:'unit',revision:0,runtime:{humanFacingLanguage:'en',activeDuty:'Coordinator',sessionCleanup:null},authority:{prd:ref('specs/unit/prd_unit.md'),spec:ref('specs/unit/spec.md'),result:null},queueHead:{packageId:'unit-package',actionId:'approve-original',nextAction:'review',productRetryCount:0,environmentRerouteCount:0,dispatch:null},blocker:null,acknowledgedFinal:null,resume:{mode:'immediate',sourceRevision:0,reasonCode:'active-turn'},recovery:null,decisionTxn:null,closeTransition:null,capacity:{concurrencyLimit:3,reservedCriticSlots:1,reservedRecoverySlots:1,fallbackPolicy:'defer'}};
 write('.claude/pipeline-state.json',JSON.stringify({schema:'pipeline.state.v0',activeFeature:{id:'unit',planPath:'specs/unit/prd_unit.md',phase:'design'},planApproved:false,continuity}));chmodSync(join(root,'.claude/pipeline-state.json'),0o600);
