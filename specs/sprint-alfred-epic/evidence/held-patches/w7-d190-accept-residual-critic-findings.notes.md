@@ -265,3 +265,28 @@ Appended at the end of plugins/pipeline-core/scripts/pipeline-state.test.mjs in 
 Production edit in pipeline-state.mjs (command name in PIPELINE_STATE_COMMANDS, switch case, ALWAYS_REQUIRED_KINDS), GREEN runs in clone and clone3, argv-closure and lifecycle suites, catalog entry plus drift suite, multi-suite comparison, revert proof, po-human-approval kind routing, pipeline-state printing, push-prepare sentence with its case. Note: the cases assume deps.gitCommonDir returns {ok, path}, deps.readConsumedCandidateReceiptFn returns {packet, receipt}, flags --by and --critic-packet; fix the case fixtures only with a written justification if the implementation must differ.
 
 CONTINUATION CARD -- done: five cases RED, patch installed; remaining: production edit (three small edits plus the case body, template defaultFeaturePackageReconcileApproval), GREEN in clone and clone3 in background, argv-closure/lifecycle suites, then the remaining items above; next step: edit pipeline-state.mjs in the clone via a scratch script, then run driver run c11green plugins/pipeline-core/scripts/pipeline-state.test.mjs.
+
+## C12 slice: approve-residual-acceptance implemented in pipeline-state.mjs (clone); C11-a..e GREEN
+
+### Changed lines of plugins/pipeline-core/scripts/pipeline-state.mjs (clone; edit scripts scratch/agent-out/w7ar9/c12-edit.mjs and c12-fix1.mjs)
+- import line 536 extended with residualFindingId, plus a new import of canonicalJson/sha256 (aliased residualCanonicalJson/residualSha256), readConsumedCandidateReceipt and readConsumedCandidateResult from ./critic-packet-preflight.mjs.
+- PIPELINE_STATE_COMMANDS gains "approve-residual-acceptance"; ALWAYS_REQUIRED_KINDS gains "accept-residual-critic-findings".
+- New function runApproveResidualAcceptance (placed before runFeaturePackageWriteCommand) and a new switch case "approve-residual-acceptance" next to "approve-deploy" in the legacy route.
+- Flags: --by, --critic-packet, and when not waived --proof-request/--proof-authority/--proof (exact flag set via parseExactFlags). Deps: gitCandidate, gitCommonDir (default defaultGitCommonDir), readConsumedCandidateReceiptFn, readOpenFindingsFn, now, isattyFn/readLineFn through requireAttendedChatGateConfirmation (code ACCEPT- plus first 8 hex of criticReceiptSha256, upper case).
+- Order: waiver/flags -> candidate -> packet read -> finding list computed (sorted by id) -> any non-minor refuses exit 2 RESIDUAL-PROOF-SEVERITY before any prompt or write -> chat confirmation or signature verifyCriticalHumanProof -> replay/consumption ledger check -> writeState (stateWriteSucceeded).
+- Record: state.residualAcceptance.lastAccepted with schema pipeline.critic-residual-acceptance.v1, mode, forCommit, forTree, candidate, criticReceiptSha256, findings, approvedBy, approvedAt, criticalProof, criticalProofWaiver (chat normalised to chat-attributed-unattested with the live waiver source), humanApproval in chat.
+
+### Correction round 1
+First run: C11-b..e PASS, C11-a FAIL (waiver mode was "chat", case expects chat-attributed-unattested). Fixed in the code (normalisation above); no case was changed.
+
+### Runs (finished logs in scratch/agent-out/w7ar9)
+- log-c12.txt (first run, before fix): C11-b..e PASS, C11-a FAIL.
+- log-c12b.txt: see result lines recorded in the dispatch report.
+- log-c12arg.txt, log-c12barg.txt (argv-closure suite): driver exit 0 both times.
+- log-c12life.txt (critic-verify-lifecycle suite): driver exit 0.
+- log-c12base3.txt (clone3 baseline pipeline-state.test.mjs): driver exit 0.
+
+### NOT done
+Catalog entry plus drift suite, multi-suite comparison, revert proof, po-human-approval kind routing for prepare-critical and authorize-critical, pipeline-state printing, push-prepare closing sentence with its case. Batch Critic, Full Verify and PO acceptance stay pending.
+
+CONTINUATION CARD -- done: production edit and correction round 1; remaining: items under NOT done; next step: catalog entry plus drift suite.

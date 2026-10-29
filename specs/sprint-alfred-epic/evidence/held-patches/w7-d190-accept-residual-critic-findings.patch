@@ -617,6 +617,190 @@ index a9052295e..c5b8104ee 100644
  });
  
  /**
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index c14dd36bb..113ea6d45 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -533,7 +533,8 @@ import {
+   readCloseCoordinator,
+ } from "./publication-close-journal.mjs";
+ import { physicalAuditPath, validateFeatureCloseAuditReceipt } from "../lib/feature-close-audit-receipt.mjs";
+-import { readCriticVerifyLifecycle } from "../lib/critic-verify-lifecycle.mjs";
++import { readCriticVerifyLifecycle, residualFindingId } from "../lib/critic-verify-lifecycle.mjs";
++import { canonicalJson as residualCanonicalJson, sha256 as residualSha256, readConsumedCandidateReceipt, readConsumedCandidateResult } from "./critic-packet-preflight.mjs";
+ import { assertPrivateRegularFile } from "../lib/private-boundary.mjs";
+ import { isDirectInvocation } from "../lib/entrypoint.mjs";
+ import {
+@@ -742,7 +743,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
+   "inspect", "update-public-handover", "rebind-approval",
+   "set-feature", "submit-plan", "cancel-submitted-plan", "cancel-mixed-plan-state", "present-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+   "retire-enrollment", "activate-enrollment", "inspect-enrollment-retirement",
+-  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
++  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push", "approve-residual-acceptance",
+   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
+   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
+   "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
+@@ -4747,7 +4748,7 @@ function localPushScratchArtifacts(dir, flags) {
+  * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
+  * behaviour is byte-identical to before this addition.
+  */
+-const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile"]);
++const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile", "accept-residual-critic-findings"]);
+ 
+ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
+   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
+@@ -9290,6 +9291,141 @@ function defaultFeaturePackageReconcileApproval(argv, deps) {
+   };
+ }
+ 
++// D190: record a PO acceptance of a failed Critic receipt whose open findings are ALL minor.
++// The finding list is computed from the consumed Critic packet, never typed by the operator.
++function runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps }) {
++  const kind = "accept-residual-critic-findings";
++  const configured = criticalProofWaiverFor(dir, kind);
++  if (configured.code !== null && configured.code !== undefined) {
++    console.error(`Error: approve-residual-acceptance refused (${configured.code}).`);
++    return 2;
++  }
++  const waived = configured.waived === true;
++  const names = waived ? ["by", "critic-packet"] : ["by", "critic-packet", "proof-request", "proof-authority", "proof"];
++  const parsed = parseExactFlags(rest, new Set(names));
++  const flags = parsed.value ?? {};
++  if (!parsed.ok || isBlank(flags.by) || isBlank(flags["critic-packet"])) {
++    console.error("Error: approve-residual-acceptance requires --by and --critic-packet and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.");
++    return 2;
++  }
++  if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
++    console.error("Error: approve-residual-acceptance refused (CRITICAL-PROOF-FLAGS-PROOF-REQUIRED).");
++    return 2;
++  }
++  const observed = gitCandidate(dir);
++  if (!observed.ok) {
++    console.error("Error: approve-residual-acceptance refused; the current candidate commit/tree could not be determined.");
++    return 2;
++  }
++  const candidate = { commit: observed.commit, tree: observed.tree };
++  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
++  if (!common?.ok || typeof common.path !== "string") {
++    console.error("Error: approve-residual-acceptance refused (git common directory unavailable).");
++    return 2;
++  }
++  const controlRoot = join(common.path, "agent-pipeline", "critic-packets");
++  const packetId = flags["critic-packet"];
++  let receipt;
++  let rawFindings;
++  try {
++    const consumed = (deps.readConsumedCandidateReceiptFn ?? readConsumedCandidateReceipt)({ controlRoot, packetId });
++    receipt = consumed.receipt;
++    rawFindings = (deps.readOpenFindingsFn ?? (({ controlRoot: root, packetId: id }) => readConsumedCandidateResult({ controlRoot: root, packetId: id }).result.verdict.findings))({ controlRoot, packetId });
++  } catch (error) {
++    console.error(`Error: approve-residual-acceptance refused (${typeof error?.code === "string" ? error.code : "CRITIC-PACKET-UNREADABLE"}).`);
++    return 2;
++  }
++  if (!receipt || !Array.isArray(rawFindings)) {
++    console.error("Error: approve-residual-acceptance refused (CRITIC-PACKET-UNREADABLE).");
++    return 2;
++  }
++  const criticReceiptSha256 = residualSha256(residualCanonicalJson(receipt));
++  const findings = rawFindings.map((finding) => ({ id: residualFindingId(finding), severity: finding.severity }))
++    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
++  if (findings.length === 0 || findings.some((finding) => finding.severity !== "minor")) {
++    console.error("Error: approve-residual-acceptance refused (RESIDUAL-PROOF-SEVERITY); only findings of the lowest severity (minor) can be accepted, a blocker or major finding never.");
++    return 2;
++  }
++  const summaryLines = [
++    "PO RESIDUAL CRITIC FINDINGS ACCEPTANCE -- these findings are accepted as residual:",
++    `  candidate: ${candidate.commit}`,
++    `  critic receipt: ${criticReceiptSha256}`,
++    ...findings.map((finding) => `  ${finding.severity} ${finding.id}`),
++  ];
++  const approvedAt = now();
++  if (waived) {
++    const code = `ACCEPT-${criticReceiptSha256.slice(0, 8).toUpperCase()}`;
++    const confirmation = requireAttendedChatGateConfirmation({
++      summaryLines: [...summaryLines, `  code: ${code}`],
++      expected: code,
++      dependencies: deps,
++    });
++    if (!confirmation.ok) {
++      console.error(confirmation.code === "CHAT-GATE-NOT-ATTENDED"
++        ? "Error: approve-residual-acceptance refused (CHAT-GATE-NOT-ATTENDED); this command must be run by the PO directly in their own attended terminal."
++        : "Error: approve-residual-acceptance refused (CHAT-GATE-CONFIRMATION-MISMATCH); the typed value did not match the confirmation code.");
++      return 1;
++    }
++  } else {
++    for (const line of summaryLines) console.error(line);
++  }
++  const verified = verifyCriticalHumanProof({
++    dir, state: base, kind, candidate,
++    subject: { criticReceiptSha256, findings },
++    flags, now: approvedAt, required: true,
++  });
++  if (!verified.ok) {
++    console.error(`Error: approve-residual-acceptance refused (${verified.code}).`);
++    return 2;
++  }
++  const priorConsumption = base.criticalProofConsumption;
++  if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
++    || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
++    console.error("Error: approve-residual-acceptance refused (CRITICAL-PROOF-CONSUMPTION-INVALID).");
++    return 2;
++  }
++  const consumed = Array.isArray(priorConsumption) ? priorConsumption : [];
++  if (verified.proof !== null && consumed.some((entry) => entry.proofSha256 === verified.proof.proofSha256)) {
++    console.error("Error: approve-residual-acceptance refused (CRITICAL-PROOF-REPLAY).");
++    return 2;
++  }
++  const record = {
++    schema: "pipeline.critic-residual-acceptance.v1",
++    mode: waived ? "chat" : "signature",
++    forCommit: candidate.commit,
++    forTree: candidate.tree,
++    candidate,
++    criticReceiptSha256,
++    findings,
++    approvedBy: flags.by,
++    approvedAt,
++    criticalProof: verified.proof,
++  };
++  if (waived) {
++    // Chat mode is always recorded as an attributed, unattested approval carrying the live waiver source.
++    record.criticalProofWaiver = { ...(verified.waived ?? {}), kind, mode: "chat-attributed-unattested" };
++    record.humanApproval = chatAttributionRecord({ kind, by: flags.by });
++  } else if (verified.waived !== undefined) {
++    record.criticalProofWaiver = verified.waived;
++  }
++  const next = {
++    ...base,
++    schema: SCHEMA_ID,
++    residualAcceptance: { lastAccepted: record },
++    criticalProofConsumption: verified.proof === null
++      ? consumed
++      : [...consumed, { proofSha256: verified.proof.proofSha256, kind, consumedAt: approvedAt }],
++    updatedAt: approvedAt,
++  };
++  const writeResult = writeState(dir, next, base);
++  if (!stateWriteSucceeded(writeResult)) {
++    console.error(`Error: approve-residual-acceptance refused (${writeResult.code}).`);
++    return 2;
++  }
++  console.log(`Residual acceptance recorded by "${flags.by}" for commit ${candidate.commit}: ${findings.length} minor finding(s) on critic receipt ${criticReceiptSha256}.`);
++  return 0;
++}
++
+ function runFeaturePackageWriteCommand(sub, argv, deps) {
+   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
+   if (sub === "feature-package-reconcile") {
+@@ -13090,6 +13226,9 @@ function runStateSource(argv = process.argv.slice(2), deps = {}) {
+       return 0;
+     }
+ 
++    case "approve-residual-acceptance":
++      return runApproveResidualAcceptance({ dir, rest, base, now, gitCandidate, deps });
++
+     case "approve-deploy": {
+       // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the
+       // question — "is the proof still demanded" is. Keying off requiredKinds alone
 diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
 index 2daf78f02..262e56403 100644
 --- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
