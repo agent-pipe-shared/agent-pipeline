@@ -1,0 +1,259 @@
+diff --git a/plugins/pipeline-core/lib/guard/find-or-operator-read.test.mjs b/plugins/pipeline-core/lib/guard/find-or-operator-read.test.mjs
+new file mode 100644
+index 000000000..640b16233
+--- /dev/null
++++ b/plugins/pipeline-core/lib/guard/find-or-operator-read.test.mjs
+@@ -0,0 +1,54 @@
++// SPDX-License-Identifier: SUL-1.0
++// PF-60 (report 05): a bounded find read may combine its closed predicates with -o/-a, and a
++// quoted path with parentheses (framework route groups) is a plain passive read.
++import assert from "node:assert/strict";
++import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import test from "node:test";
++import { isReadOnlyDiagnosticCommand } from "./shell-grammar.mjs";
++
++test("FOR01 find admits -o/-a between closed predicates and keeps every writer or runner closed", () => {
++  const base = mkdtempSync(join(tmpdir(), "pf60-find-"));
++  const root = join(base, "project");
++  try {
++    mkdirSync(root);
++    mkdirSync(join(root, "src", "(app)", "x"), { recursive: true });
++    writeFileSync(join(root, "a.txt"), "x\n");
++    writeFileSync(join(root, "src", "(app)", "x", "page.tsx"), "x\n");
++    const admitted = (command) => isReadOnlyDiagnosticCommand(command, root);
++    assert.equal(admitted("find src -name a.txt"), true);
++    assert.equal(admitted("find src -name a.txt -o -name b.txt"), true);
++    assert.equal(admitted("find src -type f -name a.txt -o -type f -name b.txt"), true);
++    assert.equal(admitted("find src -name a.txt -or -name b.txt"), true);
++    assert.equal(admitted("find src -type f -a -name a.txt"), true);
++    assert.equal(admitted("find src -type f -and -name a.txt -print"), true);
++    // An operator must sit between two predicates.
++    assert.equal(admitted("find src -o -name a.txt"), false);
++    assert.equal(admitted("find src -name a.txt -o"), false);
++    assert.equal(admitted("find src -name a.txt -o -o -name b.txt"), false);
++    // Writers and runners stay closed, also behind an operator.
++    assert.equal(admitted("find src -name a.txt -o -delete"), false);
++    assert.equal(admitted("find src -name a.txt -o -exec rm {} ;"), false);
++    assert.equal(admitted("find src -name a.txt -o -fprint out.txt"), false);
++    assert.equal(admitted("find src -name a.txt -o -ok rm {} ;"), false);
++    assert.equal(admitted("find /etc -name a.txt -o -name b.txt"), false);
++    assert.equal(admitted("find src -name a.txt -o -name b.txt > out.txt"), false);
++  } finally { rmSync(base, { recursive: true, force: true }); }
++});
++
++test("FOR02 quoted or escaped route-group paths are admitted, an unquoted parenthesis stays refused", () => {
++  const base = mkdtempSync(join(tmpdir(), "pf60-paren-"));
++  const root = join(base, "project");
++  try {
++    mkdirSync(join(root, "src", "(app)", "x"), { recursive: true });
++    writeFileSync(join(root, "src", "(app)", "x", "page.tsx"), "x\n");
++    const admitted = (command) => isReadOnlyDiagnosticCommand(command, root);
++    assert.equal(admitted("cat 'src/(app)/x/page.tsx'"), true);
++    assert.equal(admitted("cat \"src/(app)/x/page.tsx\""), true);
++    assert.equal(admitted("cat src/\\(app\\)/x/page.tsx"), true);
++    assert.equal(admitted("find 'src/(app)' -name page.tsx -o -name layout.tsx"), true);
++    assert.equal(admitted("rg -n x 'src/(app)/x/page.tsx'"), true);
++    assert.equal(admitted("cat src/(app)/x/page.tsx"), false);
++  } finally { rmSync(base, { recursive: true, force: true }); }
++});
+diff --git a/plugins/pipeline-core/lib/guard/shell-grammar.mjs b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+index b5906b58d..7fcb622a5 100644
+--- a/plugins/pipeline-core/lib/guard/shell-grammar.mjs
++++ b/plugins/pipeline-core/lib/guard/shell-grammar.mjs
+@@ -1266,8 +1266,18 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+       index += 1;
+     }
+     if (index === 0) return false;
++    // PF-60: -o/-or/-a/-and join two closed predicates; one must sit between two of them.
++    let afterOperator = false;
++    let sawPredicate = false;
+     while (index < args.length) {
+       const option = args[index++];
++      if (["-o", "-or", "-a", "-and"].includes(option)) {
++        if (!sawPredicate || afterOperator) return false;
++        afterOperator = true;
++        continue;
++      }
++      sawPredicate = true;
++      afterOperator = false;
+       if (option === "-print") continue;
+       if (["-maxdepth", "-mindepth"].includes(option)) {
+         if (!/^(?:0|[1-9][0-9]*)$/u.test(args[index++] ?? "")) return false;
+@@ -1278,7 +1288,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
+         index += 1;
+       } else return false;
+     }
+-    return true;
++    return !afterOperator;
+   }
+   if (executable !== "git") return false;
+   const applyCheck = readOnlyGitApplyCheckArguments(args);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 884a415a3..1cec17c5d 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -787,7 +787,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+       for(const entry of [...latest.values()].filter(row=>!agyReleased.has(row.value.bindingSha256)&&!settled.has(row.value.basis.itemDelivery.sliceId))) {
+         const pending=entry.value.basis.itemDelivery;
+         if(pending.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.sliceId);
+-        if(state.binding.itemDelivery&&entry.value.basis?.itemBriefing?.criterionLocator&&nativeManagedDigest(entry.value.basis.itemBriefing.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw reservationFault('item-delivery-criterion-owner-collision',pending.sliceId);
++        if(state.binding.itemDelivery&&entry.value.basis?.itemBriefing?.criterionLocator&&nativeManagedDigest(entry.value.basis.itemBriefing.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw criterionOwnerCollisionFault(pending.sliceId);
+         if(scopesOverlap(pending.writeScope,state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.sliceId);
+       }
+       const inventory=nativeAuthorityScan(owner);
+@@ -798,7 +798,7 @@ function publishNativeAuthorityState(commonDir,name,state,admissionDeadline=null
+         // integration by commit evidence, or its cancellation does (D51 (2)).
+         if(settled.has(pending.delivery?.sliceId))continue;
+         if(pending.delivery?.itemId===state.delivery.itemId)throw reservationFault('item-delivery-owner-collision',pending.delivery?.sliceId);
+-        if(state.binding.itemDelivery&&pending.binding?.itemDelivery&&nativeManagedDigest(pending.binding.itemDelivery.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw reservationFault('item-delivery-criterion-owner-collision',pending.delivery?.sliceId);
++        if(state.binding.itemDelivery&&pending.binding?.itemDelivery&&nativeManagedDigest(pending.binding.itemDelivery.criterionLocator)===nativeManagedDigest(state.binding.itemDelivery.criterionLocator))throw criterionOwnerCollisionFault(pending.delivery?.sliceId);
+         if(scopesOverlap(pending.delivery?.writeScope??pending.binding?.allowedPaths??[],state.delivery.writeScope))throw reservationFault('item-delivery-scope-collision',pending.delivery?.sliceId);
+       }
+     }
+@@ -1675,6 +1675,9 @@ export function itemReservationRepair(sliceId) {
+     :'a reservation that names no slice holds this item; report it to the PO with the refusal';
+ }
+ function reservationFault(reason,sliceId){return Object.assign(nativeManagedFault(reason),{repair:itemReservationRepair(sliceId)});}
++/** PF-66: one criterion has one owner at a time, also for slices whose write scopes are disjoint; the repair says so and names the way out. */
++export const CRITERION_OWNER_COLLISION_TEACHING='Two slices that bind the same item criterion cannot run at the same time, even with disjoint write scopes: the criterion has one owner. Serialise them (add a dependency so the second starts after the first is integrated), or bind each slice to its own criterion in its package.';
++function criterionOwnerCollisionFault(sliceId){const fault=reservationFault('item-delivery-criterion-owner-collision',sliceId);fault.repair=`${CRITERION_OWNER_COLLISION_TEACHING} ${fault.repair}`;return fault;}
+ /** D52 (2): a dirty host baseline names its paths and the repair, not only its code. */
+ function baselineFault(captured) {
+   const fault=nativeManagedFault(captured.code);
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 85267949b..6d2ea3768 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -562,7 +562,7 @@ const cases = [
+     initializeSessionAuthorityRegistry({repository},createSessionAuthorityParticipantPorts({repository}));
+     const launch=(id,itemId,locator,path,correlation)=>{const itemDelivery={schema:'pipeline.item-delivery-briefing.v1',sliceId:id,itemId,criterionLocator:locator,checks:[{id:'original-criterion',path:`src/${path}.test.mjs`,dependencies:[`src/${path}.mjs`,`src/${path}.test.mjs`]}]};const binding={...makeBinding({dispatchId:id,commit:original.candidate.commit,tree:original.candidate.tree}),allowedPaths:[`src/${path}.mjs`],schema:'pipeline.native-goldfish-host-briefing.v3',model:'sonnet',effort:'medium',itemDelivery};const input=toolInput('claude',{root,session:`session-${id}`,toolUseId:correlation,binding});input.tool_input.prompt=input.tool_input.prompt.replace('host-commit:v1','host-commit:v3')+`\nSlice: ${id}\nWrite scope: src/${path}.mjs\n`;return {input,binding,prepared:runtime.run(()=>prepareNativeGoldfishHostState({root,runner:'claude',input}))};};
+     const first=launch('FIRST','AC-1',original.criterionLocator,'change','first-tool');assert.equal(first.prepared.ok,true,JSON.stringify(first.prepared));
+-    const alias=launch('ALIAS','ALIAS-LABEL',original.criterionLocator,'alias','alias-tool');assert.equal(alias.prepared.ok,false);assert.equal(alias.prepared.reason,'item-delivery-criterion-owner-collision',JSON.stringify(alias.prepared));
++    const alias=launch('ALIAS','ALIAS-LABEL',original.criterionLocator,'alias','alias-tool');assert.equal(alias.prepared.ok,false);assert.equal(alias.prepared.reason,'item-delivery-criterion-owner-collision',JSON.stringify(alias.prepared));assert.match(JSON.stringify(alias.prepared),/bind the same item criterion cannot run at the same time/u,'PF-66: the refusal teaches why two disjoint-scope slices collide and how to serialise them');
+     const second=launch('SECOND','AC-2',original.criterionLocators['AC-2'],'second','second-tool');assert.equal(second.prepared.ok,true,JSON.stringify(second.prepared));
+     const readback=runtime.run(()=>readNativeGoldfishPending({commonDir:repository.commonDir,runner:'claude',sessionId:'session-FIRST',correlationId:'first-tool'}));assert.equal(readback.ok,true,JSON.stringify(readback));assert.equal(readback.sha256,first.prepared.sha256);
+     // Only runtime metadata gained rows; the first item's original approved
+diff --git a/plugins/pipeline-core/scripts/slice-queue.mjs b/plugins/pipeline-core/scripts/slice-queue.mjs
+index f925c097c..bc5c338c2 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.mjs
+@@ -63,7 +63,12 @@ const usage = (message) => new CliError("SQ-USAGE", EXIT.USAGE, message);
+ 
+ // ------------------------------------------------------------------ arguments
+ 
+-const COMMON = ["queue", "now"];
++const COMMON = ["queue", "now", "root"];
++
++// PF-66: every verb accepts --root <dir>, the repository the queue and its governed course live in. Without it the
++// current directory is the root, as before. The value is held for the one invocation (parseArguments sets it).
++let invocationRoot = null;
++function queueRoot() { return invocationRoot ?? process.cwd(); }
+ const LEDGER = ["session", "runner", "common-dir"];
+ const VERBS = {
+   validate: { positional: 0, flags: [...COMMON], repeatable: [] },
+@@ -119,8 +124,17 @@ export function parseArguments(argv) {
+     else if (Object.hasOwn(flags, name)) throw usage(`${verb}: --${name} given twice`);
+     else flags[name] = value;
+   }
++  invocationRoot = null;
++  if (flags.root !== undefined) {
++    const requested = resolve(flags.root);
++    let isDirectory = false;
++    try { isDirectory = statSync(requested).isDirectory(); } catch { isDirectory = false; }
++    if (!isDirectory) throw usage(`${verb}: --root must name an existing directory`);
++    invocationRoot = requested;
++    if (flags.queue !== undefined) flags.queue = resolve(requested, flags.queue);
++  }
+   if (positional.length !== spec.positional) throw usage(`${verb}: expected ${spec.positional} positional argument(s), got ${positional.length}`);
+-  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:process.cwd()});if(governed.status==='required')flags.queue=resolve(process.cwd(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
++  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:queueRoot()});if(governed.status==='required')flags.queue=resolve(queueRoot(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
+   return { verb, positional, flags };
+ }
+ 
+@@ -157,9 +171,9 @@ function invalidQueue(loaded) {
+ /** Temp file + rename in the same directory. A failure removes the temp file. */
+ export function writeQueueAtomic(path,queue) {
+   if(queue.schema!=='pipeline.slice-queue.v2')return writeQueueAtomicBytes(path,queue);
+-  const governed=resolveGovernedItemQueue({root:process.cwd()});
+-  if(governed.status!=='required'||resolve(process.cwd(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
+-  const repository=inspectSignedDescriptorCustodyRepository(process.cwd());
++  const governed=resolveGovernedItemQueue({root:queueRoot()});
++  if(governed.status!=='required'||resolve(queueRoot(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
++  const repository=inspectSignedDescriptorCustodyRepository(queueRoot());
+   return withSessionAuthorityBoundary({repository},()=>{
+     if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw new CliError('SQ-ITEM-OWNER-REQUIRED',EXIT.INVALID,'An actual Source requester is required.');
+     const expected=queuePreimages.get(resolve(path)),info=lstatSync(path);
+@@ -263,7 +277,7 @@ function deriveStatus(flags, loaded) {
+     ? []
+     : ledgerCall(() => liveSlices({ ...target, evidenceDir, sliceIds, now, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) }));
+   let integrationReadiness;
+-  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:process.cwd()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
++  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:queueRoot()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
+   const status = readyAndLive({ queue: loaded.raw, records, live, now, integrationReadiness }, { platform: process.platform, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) });
+   return { status, target, now };
+ }
+@@ -386,9 +400,9 @@ function verbCancel({ positional, flags }) {
+   const loaded = loadRaw(path);
+   if (loaded.status !== "valid") throw invalidQueue(loaded);
+   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
+-    const governed = resolveGovernedItemQueue({ root: process.cwd() });
+-    if (governed.status !== "required" || resolve(process.cwd(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+-    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
++    const governed = resolveGovernedItemQueue({ root: queueRoot() });
++    if (governed.status !== "required" || resolve(queueRoot(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
++    const result = cancelUnstartedGovernedItemSlice({ root: queueRoot(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
+     if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
+     return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
+   }
+@@ -496,7 +510,7 @@ export function runCli(argv) {
+   } catch (error) {
+     // D52 (2): a session-authority refusal names its typed code and the general repair, never only SQ-IO.
+     const authority = typeof error?.code === "string" && error.code.startsWith("SDC-");
+-    const repair = authority && !(error instanceof CliError && error.extra?.repair) ? { repair: `${sessionAuthorityRepairCommand(process.cwd())} names the cause and the command that clears it` } : {};
++    const repair = authority && !(error instanceof CliError && error.extra?.repair) ? { repair: `${sessionAuthorityRepairCommand(queueRoot())} names the cause and the command that clears it` } : {};
+     if (error instanceof CliError) return { exit: error.exit, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: error.message, ...error.extra, ...repair } };
+     if (authority) return { exit: EXIT.INVALID, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: String(error.reason ?? error.message).slice(0, 240), ...repair } };
+     return { exit: EXIT.IO, output: { schema: CLI_SCHEMA, verb, ok: false, code: "SQ-IO", message: `unexpected failure (${error?.code ?? error?.name ?? "error"})` } };
+@@ -512,7 +526,9 @@ export function enterSessionOwnerFromEnvironment(env = process.env, root = proce
+ }
+ 
+ if (isDirectInvocation(import.meta.url)) {
+-  enterSessionOwnerFromEnvironment();
++  const rootFlag = process.argv.findIndex((token) => token === "--root" || token.startsWith("--root="));
++  const rootValue = rootFlag === -1 ? undefined : (process.argv[rootFlag].split("=")[1] ?? process.argv[rootFlag + 1]);
++  enterSessionOwnerFromEnvironment(process.env, rootValue !== undefined && !rootValue.startsWith("--") ? resolve(rootValue) : process.cwd());
+   const { exit, output } = runCli(process.argv.slice(2));
+   process.stdout.write(`${JSON.stringify(output)}\n`);
+   process.exitCode = exit;
+diff --git a/plugins/pipeline-core/scripts/slice-queue.test.mjs b/plugins/pipeline-core/scripts/slice-queue.test.mjs
+index 956fc985a..806121f8b 100644
+--- a/plugins/pipeline-core/scripts/slice-queue.test.mjs
++++ b/plugins/pipeline-core/scripts/slice-queue.test.mjs
+@@ -341,7 +341,24 @@ check("report: queue.cancelClasses counts cancelled slices per class and counts
+   assert.deepEqual(counted.json.queue.cancelClasses, { budget: 2, "wrong-premise": 0, "review-defect": 0, "integrated-elsewhere": 0, superseded: 1, unclassified: 1 });
+ });
+ 
+-assert.equal(cases.length, 19, "the complete CLI corpus must be registered before execution begins");
++// PF-66 (report 05): every verb names its repository with --root, so a cancel needs no `cd`.
++check("root: --root points every verb at another repository and a relative --queue is read from it", () => {
++  const dir = sandbox();
++  const elsewhere = sandbox();
++  const path = writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"])]);
++  const validated = cli(elsewhere, ["validate", "--root", dir, "--queue", REL]);
++  assert.equal(validated.status, 0, validated.stdout + validated.stderr);
++  const cancelled = cli(elsewhere, ["cancel", "A", "--root", dir, "--queue", REL, "--reason", "ends elsewhere", "--class", "integrated-elsewhere"]);
++  assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
++  assert.equal(JSON.parse(readFileSync(path, "utf8")).slices[0].state, "cancelled");
++  assert.equal(cli(elsewhere, ["report", "--root", dir, "--queue", REL, "--now", NOW]).json.queue.cancelClasses["integrated-elsewhere"], 1);
++  const missing = cli(elsewhere, ["validate", "--root", join(dir, "absent"), "--queue", REL]);
++  assert.equal(missing.status, 2);
++  assert.equal(missing.json.code, "SQ-USAGE");
++  assert.equal(cli(elsewhere, ["validate", "--root", dir, "--root", dir, "--queue", REL]).json.code, "SQ-USAGE", "--root given twice is a usage error");
++});
++
++assert.equal(cases.length, 20,"the complete CLI corpus must be registered before execution begins");
+ process.on("exit", () => {
+   for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true });
+ });
