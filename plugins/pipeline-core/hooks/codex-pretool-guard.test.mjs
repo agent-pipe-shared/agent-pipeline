@@ -398,6 +398,12 @@ function readyLifecycleFixture(mode = "chat") {
   const parent = mkdtempSync(join(tmpdir(), "codex-ready-clone-"));
   const root = join(parent, "project");
   cpSync(template, root, { recursive: true, dereference: false });
+  // cpSync does not keep the 0o700 private-state mode. The first guard child to touch it would repair it
+  // in place and print a pid-bearing PB-ROOT-REPAIRED warning into its own denial reason; the replay
+  // after authorization carries no such line, so the armed capability's denial digest never matches.
+  if (process.platform !== "win32") {
+    try { chmodSync(join(root, ".git", "agent-pipeline"), 0o700); } catch { /* the template made no private state */ }
+  }
   readyLifecycleEnvByRoot.set(root, readyLifecycleEnvByRoot.get(template));
   readyLifecycleCloneParents.add(parent);
   return root;
