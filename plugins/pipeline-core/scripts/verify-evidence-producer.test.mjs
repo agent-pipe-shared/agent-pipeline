@@ -124,7 +124,9 @@ async function completedCriticPacket(root, { packetId = "a".repeat(32), verdict 
     specPath: "specs/spec.md", guardrailPaths: [".claude/pipeline.yaml"], signedQualityImportAnchor: null, reviewUnitPath: "specs/review-unit.json" } });
   review.genericBatchRef = { ...batch.batchRef, memberSha256: batch.memberSha256 };
   admitSessionCriticReview(review);
-  const final = finalizeSessionCriticReview(review);
+  // No runner issues a Source return record yet (SCF-ORIGINAL-SOURCE-UNAVAILABLE); this fixture asks for the
+  // visibly weaker caller-authored classification explicitly, as the finalizer's own option allows.
+  const final = finalizeSessionCriticReview({ ...review, allowCallerAuthoredFallback: true });
   const observed = readConsumedCandidateReceipt({ controlRoot: join(root, ".git", "agent-pipeline", "critic-packets"), packetId });
   assert.equal(observed.receipt.packetId, packetId);
   return { packetId, candidate, final };
