@@ -331,6 +331,9 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/critic-required-guardrails.mjs`, which are protected for the same reason.
   The dispatch guard also imports `lib/briefing-file-reference.mjs` (the briefing file pointer of D183,
   which decides the exact prompt bytes a dispatched Goldfish receives), protected for the same reason.
+  The lifecycle, dispatch and dispatch-budget hooks also load `lib/authority-trace-hook.mjs`
+  (the opt-in authority trace writer, active only when `PIPELINE_AUTHORITY_TRACE=1`), which runs inside those
+  kernel hook processes and is protected for the same reason.
   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
 - The 2026-09-27 design-workflow, model-role and readiness closure adds:
   `lib/design-workflow-package.mjs`, `lib/design-workflow-approval.mjs`,

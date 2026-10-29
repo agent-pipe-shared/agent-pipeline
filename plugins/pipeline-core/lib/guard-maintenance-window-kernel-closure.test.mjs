@@ -192,6 +192,15 @@ function stripCodeComments(source) {
 // below), so an edge added or removed in the source without updating this table fails
 // rather than silently stops being covered.
 const DYNAMIC_IMPORT_EDGES = {
+  // The opt-in authority trace (PIPELINE_AUTHORITY_TRACE=1): three kernel hooks load the trace writer with one literal
+  // dynamic import each (the worktree-isolation hook does too, but is not a kernel file), and the writer loads its three counter modules through ONE computed site.
+  "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": ["../lib/authority-trace-hook.mjs"],
+  "plugins/pipeline-core/hooks/guard-dispatch.mjs": ["../lib/authority-trace-hook.mjs"],
+  "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs": ["../lib/authority-trace-hook.mjs"],
+  "plugins/pipeline-core/lib/authority-trace-hook.mjs": [{
+    computed: "new URL(relative, base).href",
+    alternatives: ["./worktree-lifecycle.mjs", "./windows-private-state.mjs", "./windows-owned-authority-backend.mjs"],
+  }],
   // The generated Git hook admission contains four dynamic calls. Builtins count
   // toward call-site parity but only the snapshot observer is a first-party edge.
   "plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs": [

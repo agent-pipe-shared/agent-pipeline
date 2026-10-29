@@ -538,6 +538,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // The dispatch guard hands a Goldfish exactly the verified bytes of a generated briefing file through
   // this module (D183): changing it could alter the prompt a dispatched agent receives.
   "plugins/pipeline-core/lib/briefing-file-reference.mjs",
+  // The dispatch and lifecycle hooks load the opt-in authority trace writer through this module when
+  // PIPELINE_AUTHORITY_TRACE=1 (Toolbox diagnosis): it runs inside kernel hook processes, so a window cannot change it.
+  "plugins/pipeline-core/lib/authority-trace-hook.mjs",
   // The session Critic finalizer selects its admitted model through this
   // route resolver. Keep both the resolver and its dynamically loaded
   // host-managed bootstrap in the kernel: changing either could alter the
