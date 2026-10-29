@@ -196,3 +196,174 @@ index e11b5e46e..1d3c80c2f 100644
  test("readback refuses missing consumed review and forged private lifecycle fields", t => {
    const common = fixture(t);
    const source = critic();
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
+index a561598e8..43faf2156 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
+@@ -14,7 +14,11 @@ import { join } from "node:path";
+ 
+ import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
+ import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+-import { authorizeRecordedDeploy, authorizeRecordedPush } from "./critical-action-authorization.mjs";
++import { execFileSync } from "node:child_process";
++import {
++  authorizeRecordedChatResidualAcceptance, authorizeRecordedDeploy, authorizeRecordedPush,
++  authorizeRecordedResidualAcceptance, authorizeRecordedResidualAcceptanceByMode,
++} from "./critical-action-authorization.mjs";
+ 
+ const roots = [];
+ let checks = 0;
+@@ -661,6 +665,153 @@ try {
+     assert.equal(deployResult.code, "DEPLOY-PROOF-TRUST-MISMATCH");
+   });
+ 
++  // RA -- D190/D187 residual-finding acceptance: the new kind "accept-residual-critic-findings"
++  // binds {candidate commit, tree, Critic receipt sha256, sorted [{id, severity}]}. Signature mode
++  // verifies a detached proof; chat mode follows gates.push_approval alone (no per-kind project edit).
++  const RA_KIND = "accept-residual-critic-findings";
++  const RA_RECEIPT = "e".repeat(64);
++  const RA_FINDINGS = [{ id: "1".repeat(64), severity: "minor" }, { id: "2".repeat(64), severity: "minor" }];
++  const raRecord = ({ key, findings = RA_FINDINGS, receipt = RA_RECEIPT, candidate = { commit: COMMIT, tree: TREE }, signWith = key.privateKey }) => {
++    const action = {
++      kind: RA_KIND,
++      subjectSha256: criticalActionSubjectSha256({ kind: RA_KIND, candidate, subject: { criticReceiptSha256: receipt, findings } }),
++      expiresAt: EXPIRES,
++    };
++    const intent = createPoApprovalIntent({
++      kind: "critical-action", featureId: "demo-feature", planSha256: PLAN_SHA, specSha256: SPEC_SHA, candidate,
++      policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
++    });
++    const proof = {
++      schema: "pipeline.po-approval-proof.v1", intentSha256: intent.sha256, keyReference: "po-key-1",
++      publicKey: key.publicPem, signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), signWith).toString("base64"),
++    };
++    const canon = (v) => Array.isArray(v) ? `[${v.map(canon).join(",")}]`
++      : v !== null && typeof v === "object" ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(",")}}` : JSON.stringify(v);
++    const proofSha256 = createHash("sha256").update(canon(proof)).digest("hex");
++    return {
++      approvedBy: "Human", approvedAt: NOW, forCommit: candidate.commit, forTree: candidate.tree,
++      criticReceiptSha256: receipt, findings, criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
++    };
++  };
++  const raState = (record) => ({
++    activeFeature: { id: "demo-feature" },
++    planApproval: { poGateAuthority: { planSha256: PLAN_SHA, specSha256: SPEC_SHA } },
++    residualAcceptance: { lastAccepted: record },
++    criticalProofConsumption: record.criticalProof === null ? [] : [{ proofSha256: record.criticalProof.proofSha256, kind: RA_KIND, consumedAt: NOW }],
++  });
++  const raCall = (fn, root, state, overrides = {}) => fn({
++    projectDir: root, state, candidate: { commit: COMMIT, tree: TREE }, criticReceiptSha256: RA_RECEIPT,
++    findings: RA_FINDINGS, now: NOW, ...overrides,
++  });
++  const raChatRoot = (mode = "chat") => {
++    const { root } = fixture({ anchor: null });
++    writeFileSync(join(root, "pipeline.user.yaml"), `gates:\n  push_approval: ${mode}\n`);
++    const git = (...a) => execFileSync("git", ["-C", root, "-c", "user.email=t@example.invalid", "-c", "user.name=t", ...a], { stdio: "ignore" });
++    git("init", "-q"); git("add", "-A"); git("commit", "-q", "-m", "fixture");
++    return root;
++  };
++  const raChatRecord = (overrides = {}) => ({
++    approvedBy: "Human", approvedAt: NOW, forCommit: COMMIT, forTree: TREE, criticReceiptSha256: RA_RECEIPT, findings: RA_FINDINGS,
++    criticalProof: null,
++    criticalProofWaiver: { kind: RA_KIND, mode: "chat-attributed-unattested", source: "pipeline.user.yaml" },
++    humanApproval: { kind: RA_KIND, mode: "chat-attributed-unattested" },
++    ...overrides,
++  });
++
++  check("RA1 signature mode: an exact binding with a verifying proof authorizes the acceptance", () => {
++    const key = keypair();
++    const { root } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    const result = raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key })));
++    assert.equal(result.authorized, true);
++    assert.equal(result.code, "RESIDUAL-PROOF-VERIFIED");
++    assert.equal(result.mode, "signature");
++  });
++
++  check("RA2 signature mode: another commit, tree, receipt or a finding list differing by one id is refused", () => {
++    const key = keypair();
++    const { root } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    const state = raState(raRecord({ key }));
++    for (const overrides of [
++      { candidate: { commit: "c".repeat(40), tree: TREE } },
++      { candidate: { commit: COMMIT, tree: "d".repeat(40) } },
++      { criticReceiptSha256: "f".repeat(64) },
++      { findings: [RA_FINDINGS[0], { id: "3".repeat(64), severity: "minor" }] },
++      { findings: [RA_FINDINGS[0]] },
++    ]) {
++      const result = raCall(authorizeRecordedResidualAcceptance, root, state, overrides);
++      assert.equal(result.authorized, false, JSON.stringify(overrides));
++    }
++  });
++
++  check("RA3 signature mode: a tampered or missing proof is refused", () => {
++    const key = keypair();
++    const other = keypair();
++    const { root } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, signWith: other.privateKey }))).authorized, false);
++    const tampered = raRecord({ key });
++    tampered.criticalProof.proof.signatureBase64 = Buffer.from("x".repeat(64)).toString("base64");
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, raState(tampered)).authorized, false);
++    const missing = raRecord({ key });
++    delete missing.criticalProof;
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, { ...raState(raRecord({ key })), residualAcceptance: { lastAccepted: missing } }).authorized, false);
++    const unconsumed = raState(raRecord({ key }));
++    unconsumed.criticalProofConsumption = [];
++    assert.equal(raCall(authorizeRecordedResidualAcceptance, root, unconsumed).code, "RESIDUAL-PROOF-NOT-CONSUMED");
++  });
++
++  check("RA4 a major or blocker severity is refused at authorization time in both modes", () => {
++    const key = keypair();
++    const { root } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    for (const severity of ["major", "blocker"]) {
++      const findings = [RA_FINDINGS[0], { id: "2".repeat(64), severity }];
++      const result = raCall(authorizeRecordedResidualAcceptance, root, raState(raRecord({ key, findings })), { findings });
++      assert.equal(result.authorized, false);
++      assert.equal(result.code, "RESIDUAL-PROOF-SEVERITY");
++      const chatRoot = raChatRoot();
++      const chat = raCall(authorizeRecordedChatResidualAcceptance, chatRoot, raState(raChatRecord({ findings })), { findings });
++      assert.equal(chat.authorized, false);
++      assert.equal(chat.code, "RESIDUAL-PROOF-SEVERITY");
++    }
++  });
++
++  check("RA5 chat mode follows gates.push_approval alone: authorized with no per-kind project configuration", () => {
++    const root = raChatRoot("chat");
++    const result = raCall(authorizeRecordedChatResidualAcceptance, root, raState(raChatRecord()));
++    assert.equal(result.authorized, true);
++    assert.equal(result.code, "RESIDUAL-PROOF-WAIVED");
++    assert.equal(result.mode, "chat-attributed-unattested");
++    const byMode = raCall(authorizeRecordedResidualAcceptanceByMode, root, raState(raChatRecord()));
++    assert.equal(byMode.authorized, true);
++    assert.equal(byMode.mode, "chat-attributed-unattested");
++  });
++
++  check("RA6 chat mode: another commit, tree, receipt or finding list, or a missing attribution, is refused", () => {
++    const root = raChatRoot("chat");
++    const state = raState(raChatRecord());
++    for (const overrides of [
++      { candidate: { commit: "c".repeat(40), tree: TREE } },
++      { candidate: { commit: COMMIT, tree: "d".repeat(40) } },
++      { criticReceiptSha256: "f".repeat(64) },
++      { findings: [RA_FINDINGS[0], { id: "3".repeat(64), severity: "minor" }] },
++    ]) {
++      assert.equal(raCall(authorizeRecordedChatResidualAcceptance, root, state, overrides).authorized, false, JSON.stringify(overrides));
++    }
++    assert.equal(raCall(authorizeRecordedChatResidualAcceptance, root, raState(raChatRecord({ humanApproval: undefined }))).authorized, false);
++  });
++
++  check("RA7 signature configuration never authorizes through the chat route; chat configuration needs no proof", () => {
++    const sigRoot = raChatRoot("signature");
++    const chat = raCall(authorizeRecordedChatResidualAcceptance, sigRoot, raState(raChatRecord()));
++    assert.equal(chat.authorized, false);
++    assert.equal(raCall(authorizeRecordedResidualAcceptanceByMode, sigRoot, raState(raChatRecord())).authorized, false);
++  });
++
++  check("RA8 the existing kinds behave as before (push still authorizes; kind list is a superset)", () => {
++    const key = keypair();
++    const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
++    assert.equal(call(root, stateFor(approvalRecord({ key, threatModel }))).code, "PUSH-PROOF-VERIFIED");
++  });
++
+   process.stdout.write(`\n${checks}/${checks} critical-action authorization checks passed\n`);
+ } finally {
+   for (const root of roots) rmSync(root, { recursive: true, force: true });
