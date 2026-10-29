@@ -1,0 +1,202 @@
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+index 2f763feef..6cd6c2e4c 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.mjs
+@@ -808,6 +808,18 @@ export function evaluateReviewAdmission(options = {}) {
+     historicalDebtCount: historical?.entries.length ?? 0,
+     ...(historical ? { historicalFreshReview: historicalFreshReviewPacketBinding({repository:root,currentTarget:{kind:"admitted-dispatch",taskId:options.taskId,baseCommit:options.baseCommit,candidateCommit:options.candidateCommit}}) } : {}) };
+ }
++// N13 (Toolbox, 2026-10-29): admission has two routes, and the refusal named only the first. A later Critic round carries the
++// task id of the first delivery; a candidate that descends from that delivered record is admitted without any new record.
++const DESCENDANT_ROUTE_HINT = "a later Critic round carries the task id of its first delivery: a review candidate that descends from a delivered Goldfish record (authored-commit or orchestrator-attested) with the SAME task id is admitted without a new record, so do not invent a task id per round.";
++const DESCENDANT_TASK_ID_SEARCH_LIMIT = 25;
++function descendantTaskIdsOfDeliveredRecords(root, records, candidateCommit, options) {
++  const found = new Set();
++  for (const record of records.slice(-DESCENDANT_TASK_ID_SEARCH_LIMIT)) {
++    try { if (verifyCandidateDescendsFromRecord(root, record.candidateCommit, candidateCommit, options).ok) found.add(record.taskId); }
++    catch { /* a record whose ancestry cannot be read names no suggestion */ }
++  }
++  return [...found].sort();
++}
+ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signedImportAnchor = null) {
+   const root = options.root ?? DEFAULT_ROOT;
+   const taskId = options.taskId;
+@@ -828,6 +840,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+   let targetRecordCandidateCommit = null;
+   let admittedByDescendant = false;
+   let admittedRecordKind = null;
++  const pendingDeliveredRecords = [];
+   if (typeof taskId !== "string" || taskId.trim() === "") findings.push("review admission taskId is required");
+   if (typeof candidateCommit !== "string" || !/^[a-f0-9]{40}$/u.test(candidateCommit)) findings.push("review admission candidateCommit must be a full lowercase Git SHA");
+ 
+@@ -896,6 +909,7 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+       } else {
+         pendingRecordCount += 1;
+         pendingRecordPaths.push(path);
++        if (terminalAuthoredDelivery(record)) pendingDeliveredRecords.push(record);
+       }
+       continue;
+     }
+@@ -918,8 +932,9 @@ function evaluateReviewAdmissionCore(options = {}, historicalEntries = [], signe
+   for (const [path, addendum] of addenda.entriesByPath) if (!usedAddenda.has(path)) findings.push(`${addendum.path}: orphan critic addendum has no applicable pending record`);
+   if (signedImportAnchor !== null) admittedCount = 1;
+   if (admittedCount !== 1) {
++    const descendantTaskIds = admittedCount === 0 ? descendantTaskIdsOfDeliveredRecords(root, pendingDeliveredRecords, candidateCommit, options) : [];
+     const missingRecordHint = admittedCount === 0
+-      ? `; the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
++      ? `; ${DESCENDANT_ROUTE_HINT}${descendantTaskIds.length === 0 ? "" : ` This candidate descends from the delivered record of task id ${descendantTaskIds.join(", ")}: use that task id for this round.`} Otherwise the expected record is evidence/dispatch-record-${taskId}.json, which the host writes at the end of a foreground goldfish dispatch (host commit) and which cannot be authored by hand; a background dispatch leaves none of that kind, and its sanctioned route is the Git-verified orchestrator-attested record written by node plugins/pipeline-core/scripts/dispatch-record-write.mjs --repo-root . --attested-request <request.json>, admitted as weaker assurance than a host-observed record; a range with no dispatch history is reconstructed from the briefing, the hand-back and the Dispatch-trailered commits through that request (item pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have)`
+       : "";
+     findings.push(`review admission requires exactly one matching target for ${taskId}@${candidateCommit}; found ${admittedCount}${missingRecordHint}`);
+   }
+diff --git a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+index 7a386cee4..23897e921 100644
+--- a/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
++++ b/plugins/pipeline-core/scripts/check-critic-skip-coverage.test.mjs
+@@ -1090,6 +1090,34 @@ test("CSC-A7a delivered v3 record still admits with no label (documents D-2, no
+   assert.equal(later.admittedByDescendant, true);
+ });
+ 
++// N13 (Toolbox, 2026-10-29): the refusal must teach the descendant route, and name the task id that would be admitted.
++test("CSC-N13a the zero-target refusal names the descendant route and the first delivery's task id rule", () => {
++  const result = evaluateReviewAdmission({ root: fixture({ "evidence/.keep": "" }), taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
++  const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`));
++  assert.ok(text, result.readFindings.join("\n"));
++  assert.match(text, /later Critic round carries the task id of its first delivery/u);
++  assert.match(text, /descends from a delivered Goldfish record/u);
++  assert.match(text, /do not invent a task id per round/u);
++  assert.doesNotMatch(text, /descends from the delivered record of task id/u, "no suggestion without a delivered ancestor record");
++});
++
++test("CSC-N13b a fresh task id for round two is refused and the delivered record's task id is named", () => {
++  const delivered = deliveredV4("FIRST", "orchestrator-attested");
++  const result = evaluateReviewAdmission({
++    root: fixture({ "evidence/dispatch-record-FIRST.json": json(delivered) }),
++    taskId: "FIRST-critic-r2", candidateCommit: DESCENDANT, readChangedPaths: () => [], gitRead: ancestryOk });
++  assert.equal(result.ok, false);
++  assert.equal(result.admittedCount, 0);
++  const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for FIRST-critic-r2@${DESCENDANT}; found 0`));
++  assert.ok(text, result.readFindings.join("\n"));
++  assert.match(text, /descends from the delivered record of task id FIRST: use that task id for this round/u);
++  const reused = evaluateReviewAdmission({
++    root: fixture({ "evidence/dispatch-record-FIRST.json": json(delivered) }),
++    taskId: "FIRST", candidateCommit: DESCENDANT, readChangedPaths: () => [], gitRead: ancestryOk });
++  assert.equal(reused.ok, true, reused.readFindings.join("\n"));
++  assert.equal(reused.admittedByDescendant, true);
++});
++
+ test("CSC-A8 the zero-target refusal names the attested-request CLI and no longer defers a no-history range to a PO decision", () => {
+   const result = evaluateReviewAdmission({ root: fixture({ "evidence/.keep": "" }), taskId: "NEXT", candidateCommit: SHA, readChangedPaths: () => [] });
+   const text = result.readFindings.find((f) => f.startsWith(`review admission requires exactly one matching target for NEXT@${SHA}; found 0`));
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+index 60b0ad58a..9e0f34bf9 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs
+@@ -20,6 +20,8 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
+ import { spawnSync } from "node:child_process";
+ 
+ import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
++import { isSafeTaskId } from "../lib/dispatch-record.mjs";
++import { evaluateReviewAdmission } from "./check-critic-skip-coverage.mjs";
+ import {
+   CriticGuardrailDerivationError,
+   deriveRequiredCriticGuardrails,
+@@ -288,7 +290,7 @@ function requiredCandidateReadback(root, candidate, byPath, paths, label) {
+  * state. Evidence is a local, bounded JSON observation that binds the frozen
+  * candidate; Spec and guardrails are always read from that candidate tree.
+  */
+-export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, correctionInputBindings = null }, observer = null) {
++export function preflightCriticDispatch({ root, base = null, candidate, specPath, guardrailPaths, evidencePaths, priorCriticEvidencePath = null, reviewScope = null, courseContext = null, correctionInputBindings = null, taskId = null }, observer = null) {
+   let stage = "request", sourceCandidate = null, sourceSpecSha256 = null;
+   try {
+   if (typeof root !== "string" || root.length === 0 || typeof candidate !== "string") {
+@@ -426,6 +428,18 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+ 
+   if (courseContext !== null && courseAdmission === null) fail("CDP-COURSE-CONTEXT", "Course context requires a registered feature package.");
+ 
++  // N13: the dispatch record admission `session-critic-finalizer admit` applies later, asked now, so this tool no longer
++  // says packet-ready for a task id that admit will refuse. Optional: without --task-id nothing changes.
++  let reviewAdmission = null;
++  if (taskId !== null) {
++    if (scope !== null) fail("CDP-ARGUMENT", "--task-id needs an exact base-to-candidate range, not a review scope.");
++    const admission = evaluateReviewAdmission({ root: realRoot, taskId, baseCommit, candidateCommit });
++    if (!admission.ok) {
++      fail("CDP-REVIEW-ADMISSION", `Critic review admission would refuse task id ${taskId}: ${(admission.readFindings ?? []).join("; ")}`);
++    }
++    reviewAdmission = { taskId, mode: admission.admittedByDescendant ? "descendant" : "exact" };
++  }
++
+   const result = {
+     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
+     // This remains read-only. The ordinary session orchestrator is the next
+@@ -434,6 +448,7 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
+     status: "packet-ready",
+     ...(scope === null ? { base: { commit: baseCommit, tree: baseTree } } : { reviewScope: scope, sourceCoverage }),
+     candidate: { commit: candidateCommit, tree: candidateTree },
++    ...(reviewAdmission === null ? {} : { reviewAdmission }),
+     ...(correctionInputEcho === null ? {} : { correctionInputBindings: correctionInputEcho }),
+     spec: specReadback,
+     guardrails: guardrailReadback,
+@@ -520,8 +535,13 @@ export function parseCriticDispatchPreflightArgs(argv) {
+   for (let index = 0; index < argv.length; index += 1) {
+     const flag = argv[index];
+     const value = argv[index + 1];
+-    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
++    if (["--root", "--base", "--candidate", "--spec", "--guardrail", "--evidence", "--prior-critic", "--sweep-evidence", "--registration-commit", "--accepted-contract", "--criterion-locator", "--delta-request", "--correction-input-bindings", "--task-id"].includes(flag) && value === undefined) fail("CDP-ARGUMENT", `${flag} requires a value.`);
+     if (flag === "--correction-input-bindings") values.correctionInputBindings = value;
++    else if (flag === "--task-id") {
++      if (Object.hasOwn(values, "taskId")) fail("CDP-ARGUMENT", "Duplicate --task-id.");
++      if (!isSafeTaskId(value)) fail("CDP-ARGUMENT", "--task-id is not a safe task id.");
++      values.taskId = value;
++    }
+     else if (flag === "--root") values.root = value;
+     else if (flag === "--base") values.base = value;
+     else if (flag === "--candidate") values.candidate = value;
+diff --git a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+index 918ed36f0..2dc2bf830 100644
+--- a/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs
+@@ -269,6 +269,26 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
+   assert.equal(result.dispatch.requiredNextGate, "session-critic-dispatch");
+ });
+ 
++// N13 (Toolbox, 2026-10-29): the preflight asks the dispatch record admission when it is given the task id.
++test("N13 preflight with --task-id refuses a task id no delivered record admits and says why; without it nothing changes", () => {
++  const fx = fixture();
++  const refusal = cdpRefusal(() => preflightCriticDispatch({ ...input(fx), taskId: "FRESH-critic-r2" }), "CDP-REVIEW-ADMISSION");
++  assert.match(refusal.message, /Critic review admission would refuse task id FRESH-critic-r2/u);
++  assert.match(refusal.message, /later Critic round carries the task id of its first delivery/u);
++  const plain = preflightCriticDispatch(input(fx));
++  assert.equal(plain.status, "packet-ready");
++  assert.equal(Object.hasOwn(plain, "reviewAdmission"), false);
++});
++
++test("N13 the argument parser takes one safe --task-id and refuses a repeated or unsafe one", () => {
++  const base = ["--root", ".", "--base", "a".repeat(40), "--candidate", "b".repeat(40), "--spec", "specs/spec.md"];
++  assert.equal(parseCriticDispatchPreflightArgs([...base, "--task-id", "FIRST-1"]).taskId, "FIRST-1");
++  assert.equal(Object.hasOwn(parseCriticDispatchPreflightArgs(base), "taskId"), false);
++  cdpRefusal(() => parseCriticDispatchPreflightArgs([...base, "--task-id", "A", "--task-id", "B"]), "CDP-ARGUMENT");
++  cdpRefusal(() => parseCriticDispatchPreflightArgs([...base, "--task-id", "../x"]), "CDP-ARGUMENT");
++  cdpRefusal(() => parseCriticDispatchPreflightArgs([...base, "--task-id"]), "CDP-ARGUMENT");
++});
++
+ test("reviewer input uses an empty governance-directory list when the manifest declares no governance block", () => {
+   const fx = fixture();
+   writeFileSync(join(fx.root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+diff --git a/plugins/pipeline-core/skills/critic-review/SKILL.md b/plugins/pipeline-core/skills/critic-review/SKILL.md
+index c1ac3afb5..aa7fb289c 100644
+--- a/plugins/pipeline-core/skills/critic-review/SKILL.md
++++ b/plugins/pipeline-core/skills/critic-review/SKILL.md
+@@ -141,7 +141,12 @@ bootstrap. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
+ 
+ ## Continuing a Critic course after the first round (PF-94)
+ 
+-Script paths resolve under the plugin root the bootstrap prints. Order:
++Script paths resolve under the plugin root the bootstrap prints. **Every later round carries the `taskId`
++of the first delivery** (the Goldfish dispatch record the first review was admitted on), never a new one:
++`session-critic-finalizer.mjs admit` accepts a review candidate that descends from that delivered record,
++whoever wrote the commits in between, and a new `taskId` has no record, so it is refused
++(`CPP-REVIEW-ADMISSION`). Pass the same `--task-id` to `critic-dispatch-preflight.mjs` to see the
++refusal before a packet is reserved. Order:
+ 
+ 1. `session-critic-finalizer.mjs inspect-course-takeover --root <root> --request <scratch request.json>`,
+    then `supersede-course-takeover` with the printed digest and a reason. Only when the old batch
