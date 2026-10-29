@@ -492,7 +492,7 @@ import { collectRigorJournalEntry, rigorVerifyRows, closeArchitectureFitnessDisp
 import { inspectPublicHandoverDuty, updatePublicHandoverDuty } from "../lib/onboarding-continuity.mjs";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
-import { discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
+import { custodyInspectionStats, discoverRepository, inspectSessionClosure, inspectSignedDescriptorCustodyRepository } from "../lib/worktree-lifecycle.mjs";
 import { withSessionAuthorityBoundary, isActiveSourceOwnedSessionAuthorityBoundary, executeSourceOwnedSessionAuthorityStateWrite, executeSourceOwnedSessionAuthorityCompanionWrite, executeSourceOwnedRetiredSessionAuthorityCloseWrite, inspectSourceOwnedSessionAuthorityCompanionRefresh, reserveSessionAuthorityMember, recoverSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMember, inspectSourceOwnedSessionAuthorityMemberRecord, inspectSourceOwnedSessionAuthorityProducerRecord, inspectSourceOwnedSessionAuthorityStateRefresh } from "../lib/session-authority-registry.mjs";
 import { readSourceOwnedAuthorityContext, inspectSourceOwnedCurrentAuthorityContext, createSignedCleanupRequesterObserver } from "../lib/session-requester-bridge.mjs";
 import {
@@ -556,8 +556,8 @@ import {
   observeSourceOwnedControlledMethodAfkStateRename,
   syncStateMdNextAction,
 } from "../lib/onboarding-continuity.mjs";
-import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
-import { inspectWindowsOwnedAuthorityPath } from "../lib/windows-owned-authority-backend.mjs";
+import { assessWindowsPrivatePath, nativeObservationStats } from "../lib/windows-private-state.mjs";
+import { inspectWindowsOwnedAuthorityPath, nativeAuthorityStats } from "../lib/windows-owned-authority-backend.mjs";
 import { windowsAuthorityCause } from "../lib/windows-authority-readiness.mjs";
 import { refusePlanAuthorityStagingPath } from "../lib/plan-authority-staging-guard.mjs";
 import { reopenDesignNextActionText } from "../lib/authority-restore.mjs";
@@ -13562,8 +13562,49 @@ export function observeStateAuthorityWriteTerminal(handle) {
   }
   return data.terminal;
 }
+// The refusal line of the state authority route. A typed error (string reason) prints exactly as before; an error
+// without one names its class, message and at most two bare frames instead of hiding behind the default code.
+// Diagnostics only: the elapsed time is appended after the repair sentence.
+function authorityRefusalFrames(error) {
+  const frames = [];
+  for (const line of String(error?.stack ?? "").split("\n")) {
+    const match = /^\s*at (?:(.+?) \()?(.+?):(\d+):\d+\)?\s*$/u.exec(line);
+    if (!match) continue;
+    const file = match[2].replace(/^file:\/\/\/?/u, "").split(/[\\/]/u).pop();
+    const fn = (match[1] ?? "<anonymous>").replace(/[\\/]/gu, "_");
+    frames.push(`${fn} (${file}:${match[3]})`);
+    if (frames.length === 2) break;
+  }
+  return frames;
+}
+export function describeStateAuthorityRefusal(error, { elapsedMs = 0, dir = ".", sub } = {}) {
+  const repairInspect = `node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir}`;
+  const code = typeof error?.code === "string" ? error.code : "SDC-AUTHORITY-UNAVAILABLE";
+  const elapsedText = ` Elapsed: ${Math.max(0, Math.trunc(Number(elapsedMs) || 0))} ms.`;
+  let reasonText = "";
+  let causeText = "";
+  if (typeof error?.reason === "string") reasonText = `: ${error.reason.slice(0, 240)}`;
+  else if (error instanceof Error) {
+    const message = String(error.message ?? "").replace(/\r\n|\r|\n/gu, " ").slice(0, 240);
+    const frames = authorityRefusalFrames(error);
+    causeText = `; cause: untyped ${String(error.name ?? "Error")}: ${message}${frames.length > 0 ? `; at ${frames.join(", ")}` : ""}`;
+  } else causeText = `; cause: untyped ${typeof error}`;
+  if (sub === "approve-push" && error?.reason === "state-push-source-requester") {
+    // K103 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74): `inspect` reports a healthy registry for this cause, so the
+    // general sentence below would point at a command that clears nothing. Name the cause and the step that can be run.
+    return `Error: State authority route unavailable (${code}${reasonText}); no success is reported, no approval was recorded. ` +
+      "Cause: in chat mode (gates.push_approval is \"chat\") with the session-authority catalogue present in this repository, so a push approval must run through the State push producer route, which needs a requester bound by the host runner; a plain shell binds none. " +
+      "Repair: approve through the signature route, which stays commit-bound while a catalogue exists: set gates.push_approval to \"signature\" in pipeline.user.yaml, then run " +
+      "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
+      `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}${elapsedText}`;
+  }
+  return `Error: State authority route unavailable (${code}${reasonText})${causeText}; no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.${elapsedText}`;
+}
+
 export function run(argv = process.argv.slice(2), deps = {}) {
   const sub = argv[0];
+  const runStartedAt = Date.now();
+  let traceOutcome = "ok";
   // This read-only command owns its exact explicit root; ambient projectDir
   // discovery must not replace the target before its existing journal checks.
   if (sub === "inspect-enrollment-retirement") {
@@ -13672,28 +13713,49 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return runStateSource(argv,deps);
     });
   } catch (error) {
+    traceOutcome = "refused";
     if(owningFailureFrame!==null&&stateAuthorityInvocation===owningFailureFrame
         &&stateOwnedCompanionFailureFrames.has(owningFailureFrame)
         &&(error?.name==="SessionAuthorityError"||error instanceof OnboardingContinuityKickoffError))throw error;
     // D52 (2): the refusal names its reason and the general repair, never only a code.
-    const repairInspect = `node ${fileURLToPath(new URL("./session-authority-repair.mjs", import.meta.url))} inspect --root ${dir}`;
-    const reasonText = typeof error?.reason === "string" ? `: ${error.reason.slice(0, 240)}` : "";
-    if (sub === "approve-push" && error?.reason === "state-push-source-requester") {
-      // K103 (PO decision 2026-10-23, tiles batch 7 rows 1 and 2; D74): `inspect` reports a healthy registry for this cause, so the
-      // general sentence below would point at a command that clears nothing. Name the cause and the step that can be run.
-      console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${reasonText}); no success is reported, no approval was recorded. ` +
-        "Cause: in chat mode (gates.push_approval is \"chat\") with the session-authority catalogue present in this repository, so a push approval must run through the State push producer route, which needs a requester bound by the host runner; a plain shell binds none. " +
-        "Repair: approve through the signature route, which stays commit-bound while a catalogue exists: set gates.push_approval to \"signature\" in pipeline.user.yaml, then run " +
-        "`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <ref> --proof-request <file> --proof-authority <file> --proof <file>` " +
-        `from ${dir}; the step-by-step flow is docs/push-release-flow.md. To check that the registry itself is healthy: ${repairInspect}`);
-      return 2;
-    }
-    console.error(`Error: State authority route unavailable (${error?.code ?? "SDC-AUTHORITY-UNAVAILABLE"}${reasonText}); no success is reported. Repair: ${repairInspect} names the cause and the command that clears it.`);
+    console.error(describeStateAuthorityRefusal(error, { elapsedMs: Date.now() - runStartedAt, dir, sub }));
     return 2;
   } finally {
     if(owningFailureFrame!==null)stateOwnedCompanionFailureFrames.delete(owningFailureFrame);
     stateAuthorityInvocation = previous;
+    if (process.env.PIPELINE_AUTHORITY_TRACE === "1") writeAuthorityTrace(Date.now() - runStartedAt, traceOutcome);
   }
+}
+
+// Opt-in (PIPELINE_AUTHORITY_TRACE=1) one-line trace on stderr: counts and milliseconds of git reads (custody
+// inspections) and of native Windows spawns. Diagnostics only; nothing is printed when the variable is unset.
+function writeAuthorityTrace(elapsedMs, outcome) {
+  console.error(`AUTHORITY-TRACE ${JSON.stringify(buildAuthorityTrace(elapsedMs, outcome))}`);
+}
+
+// Pure builder of the trace object (exported for the memo-counter case). `authorityMemo` was added to
+// pipeline.authority-trace.v1 as a compatible extra key; every existing key keeps its meaning.
+export function buildAuthorityTrace(elapsedMs, outcome) {
+  const custody = custodyInspectionStats(), observed = nativeObservationStats(), authority = nativeAuthorityStats();
+  const trace = {
+    schema: "pipeline.authority-trace.v1",
+    elapsedMs,
+    custodyInspections: { count: custody.count, ms: custody.ms, maxMs: custody.maxMs },
+    nativeObservations: {
+      count: observed.count + authority.count,
+      ms: observed.ms + authority.ms,
+      maxMs: Math.max(observed.maxMs, authority.maxMs),
+      failed: observed.failed + authority.failed,
+      byOperation: authority.byOperation,
+    },
+    authorityMemo: {
+      hits: Number.isInteger(authority.authorityMemoHits) ? authority.authorityMemoHits : 0,
+      misses: Number.isInteger(authority.authorityMemoMisses) ? authority.authorityMemoMisses : 0,
+      size: Number.isInteger(authority.authorityMemoSize) ? authority.authorityMemoSize : 0,
+    },
+    outcome,
+  };
+  return trace;
 }
 
 // Source-owned State push lifetime. The opaque handles below are minted only

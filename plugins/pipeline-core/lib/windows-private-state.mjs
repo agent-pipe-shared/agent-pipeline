@@ -189,9 +189,21 @@ function childFailureReason(operation, result) {
   return `native Windows DACL ${operation} failed${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
 }
 
+// Opt-in authority trace (diagnostics only): plain module-level counters of every native PowerShell spawn made here.
+const nativeObservationCounters = { count: 0, ms: 0, maxMs: 0, failed: 0 };
+export function nativeObservationStats() { return { ...nativeObservationCounters }; }
+function recordNativeObservation(startedAt, succeeded) {
+  const elapsed = Date.now() - startedAt;
+  nativeObservationCounters.count += 1;
+  nativeObservationCounters.ms += elapsed;
+  if (elapsed > nativeObservationCounters.maxMs) nativeObservationCounters.maxMs = elapsed;
+  if (!succeeded) nativeObservationCounters.failed += 1;
+}
+
 function invoke(path, script, { run = spawnSync, environment = process.env } = {}, operation = "observation") {
   const executable = fixedPowerShell();
   if (executable === null) return unavailable("fixed Windows PowerShell is unavailable");
+  const startedAt = Date.now();
   const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], {
     encoding: "utf8",
     timeout: 7_000,
@@ -199,6 +211,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
     windowsHide: true,
     env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
   });
+  recordNativeObservation(startedAt, isSuccessfulSpawn(result));
   if (!isSuccessfulSpawn(result)) return unavailable(childFailureReason(operation, result));
   return result;
 }
@@ -324,6 +337,7 @@ function prefetchPrivateTree(path, identity, root) {
   const batch = [...identities.keys()];
   const executable = fixedPowerShell();
   if (executable === null) return null;
+  const batchStartedAt = Date.now();
   const native = spawnSync(executable, [
     "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", OBSERVE_BATCH_SCRIPT,
   ], {
@@ -335,6 +349,7 @@ function prefetchPrivateTree(path, identity, root) {
     windowsHide: true,
     env: sanitizeChildEnvironment(process.env),
   });
+  recordNativeObservation(batchStartedAt, isSuccessfulSpawn(native));
   if (!isSuccessfulSpawn(native)) return null;
   let rows;
   try {

@@ -2222,9 +2222,21 @@ function custodyTopology(startPath) {
   return repo;
 }
 
+// Opt-in authority trace (diagnostics only): plain module-level counters, never printed from here.
+const custodyInspectionCounters = { count: 0, ms: 0, maxMs: 0 };
+export function custodyInspectionStats() { return { ...custodyInspectionCounters }; }
+
 export function inspectSignedDescriptorCustodyRepository(startPath) {
-  const repo = custodyTopology(startPath);
-  return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) };
+  const startedAt = Date.now();
+  try {
+    const repo = custodyTopology(startPath);
+    return { primaryRoot: repo.primaryRoot, commonDir: repo.commonDir, candidate: custodyCandidate(repo) };
+  } finally {
+    const elapsed = Date.now() - startedAt;
+    custodyInspectionCounters.count += 1;
+    custodyInspectionCounters.ms += elapsed;
+    if (elapsed > custodyInspectionCounters.maxMs) custodyInspectionCounters.maxMs = elapsed;
+  }
 }
 
 /** The exact registration lock namespace, with preexisting locks never reclaimed. */

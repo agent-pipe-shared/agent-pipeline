@@ -3,16 +3,19 @@
 // and the last resort leaves no state that blocks the next dispatch.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { devNull, hostname } from "node:os";
+import { devNull, hostname, tmpdir } from "node:os";
 import { observeLinuxProcess } from "../lib/native-platform-process-observer.mjs";
 import { join, resolve } from "node:path";
 import { registerTestCaseCompletion } from "../lib/test-case-completion.mjs";
 import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
 import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
 import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
-import { run as runState } from "./pipeline-state.mjs";
+import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
+import * as pipelineState from "./pipeline-state.mjs";
+import { fileURLToPath } from "node:url";
+import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
 import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { NATIVE_GOLDFISH_HOST_DIRECTIVE } from "../lib/native-goldfish-host-return.mjs";
 import { createGovernanceScopeController } from "../lib/governance-scope.mjs";
@@ -22,6 +25,25 @@ import { inspectSignedDescriptorCustodyRepository, loadSessionDescriptor } from 
 import { createControlledMethodRuntimeFixture } from "../lib/session-requester-bridge.mjs";
 import { prepareApprovedItemCourseFixture, nativeContractFixtureParent } from "../lib/test-item-approved-course-fixture.mjs";
 import { CANCEL_CLASS_HELP, CANCEL_CLASSES } from "../lib/slice-queue.mjs";
+
+// Memo cases (SAS09..SAS17): a fake native spawn on a real temp file; the real PowerShell exists only on Windows.
+const MEMO_FACTS = `1:1:1:1:1:directory:1:1:directory:${"a".repeat(64)}`;
+function memoFixture(run, { hook, refuse = false, bytes = "hello" } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "authority-memo-"));
+  const calls = [];
+  const spawn = (_executable, _args, options) => {
+    const request = JSON.parse(options.input);
+    calls.push(request.operation);
+    if (hook) hook(request);
+    const body = refuse ? { ok: false, code: "WIN-AUTH-ACL", committed: false }
+      : { ok: true, facts: request.operation === "remove" ? "removed" : MEMO_FACTS, bytes: Buffer.from(bytes).toString("base64"), committed: request.operation === "publish" || request.operation === "remove" };
+    return { status: 0, signal: null, stderr: "", stdout: JSON.stringify(body) };
+  };
+  setWindowsOwnedAuthorityBackendTestSeam({ platform: "win32", spawn });
+  resetWindowsOwnedAuthorityBackendMemo();
+  try { return run({ dir, calls, file: join(dir, "a.txt") }); }
+  finally { setWindowsOwnedAuthorityBackendTestSeam(undefined); resetWindowsOwnedAuthorityBackendMemo(); delete process.env.PIPELINE_AUTHORITY_NO_MEMO; rmSync(dir, { recursive: true, force: true }); }
+}
 
 function fixture(run) {
   const parent = nativeContractFixtureParent();
@@ -571,6 +593,176 @@ const cases = [
     const aside = found.next.find((row) => / move-aside --root /u.test(row.command));
     assert.ok(aside, JSON.stringify(found.next));
     assert.match(aside.why, /does not clear a finalizer stop-failure record/u, aside.why);
+  }) },
+  // ---- SAD diag: the state authority refusal names an untyped cause after the code parenthesis, its elapsed time, and an opt-in trace ----
+  { id: "SAS01", name: "SAD diag (1) a typed refusal keeps its text and ends with the elapsed time", run: () => {
+    const typed = describeStateAuthorityRefusal({ code: "SDC-AUTHORITY-HELD", reason: "state-operation-in-flight" }, { elapsedMs: 12 });
+    assert.ok(typed.includes("State authority route unavailable (SDC-AUTHORITY-HELD: state-operation-in-flight); no success is reported."), typed);
+    assert.ok(typed.endsWith(" Elapsed: 12 ms."), typed);
+  } },
+  { id: "SAS02", name: "SAD diag (2) an error without code and reason keeps the default code alone in the parenthesis and names its class, message and at most two bare frames after it", run: () => {
+    const untyped = describeStateAuthorityRefusal(new TypeError("boom"), { elapsedMs: 5 });
+    assert.ok(untyped.includes("(SDC-AUTHORITY-UNAVAILABLE); cause: untyped TypeError: boom; at "), untyped);
+    const afterAt = untyped.split("; at ")[1] ?? "";
+    const framesPart = afterAt.slice(0, afterAt.indexOf("; no success"));
+    const frameCount = framesPart.length === 0 ? 0 : framesPart.split(", ").length;
+    assert.ok(frameCount >= 1 && frameCount <= 2, untyped);
+    assert.doesNotMatch(framesPart, /[\\/]/u, framesPart);
+  } },
+  { id: "SAS03", name: "SAD diag (3) an error with a code but no reason keeps the code alone in the parenthesis, a long message is cut to 240 and a multi-line one is one line", run: () => {
+    const coded = describeStateAuthorityRefusal(Object.assign(new Error("a\nb\r\nc"), { code: "WT-PATH-TYPE" }), { elapsedMs: 1 });
+    assert.ok(coded.includes("(WT-PATH-TYPE); cause: untyped Error: a b c;"), coded);
+    const longText = describeStateAuthorityRefusal(new Error("x".repeat(1000)), { elapsedMs: 1 });
+    assert.equal((/x+/u.exec(longText)?.[0] ?? "").length, 240);
+  } },
+  { id: "SAS04", name: "SAD diag (4) a non-Error throw prints its type as the cause", run: () => {
+    const stringThrow = describeStateAuthorityRefusal("plain text", { elapsedMs: 3 });
+    assert.ok(stringThrow.includes("(SDC-AUTHORITY-UNAVAILABLE); cause: untyped string;"), stringThrow);
+    assert.ok(stringThrow.endsWith(" Elapsed: 3 ms."), stringThrow);
+  } },
+  { id: "SAS05", name: "SAD diag (5) PIPELINE_AUTHORITY_TRACE=1 prints exactly one parseable trace line on stderr for a spawned state verb", run: () => fixture(({ root }) => {
+    const cli = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+    const traced = spawnSync(process.execPath, [cli, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root, PIPELINE_AUTHORITY_TRACE: "1" } });
+    const traceLines = String(traced.stderr).split("\n").filter((line) => line.startsWith("AUTHORITY-TRACE "));
+    assert.equal(traceLines.length, 1, String(traced.stderr).slice(-600));
+    const traceJson = JSON.parse(traceLines[0].slice("AUTHORITY-TRACE ".length));
+    assert.equal(traceJson.schema, "pipeline.authority-trace.v1");
+    assert.ok(traceJson.custodyInspections.count >= 1, JSON.stringify(traceJson));
+    assert.equal(typeof traceJson.elapsedMs, "number");
+    assert.ok(["ok", "refused"].includes(traceJson.outcome), JSON.stringify(traceJson));
+  }) },
+  { id: "SAS06", name: "SAD diag (6) without the variable no trace text appears", run: () => fixture(({ root }) => {
+    const cli = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+    const quiet = spawnSync(process.execPath, [cli, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root, PIPELINE_AUTHORITY_TRACE: "" } });
+    assert.ok(!String(quiet.stderr).includes("AUTHORITY-TRACE") && !String(quiet.stdout).includes("AUTHORITY-TRACE"), String(quiet.stderr).slice(-300));
+  }) },
+  { id: "SAS07", name: "SAD diag (7) the backend spawn counters report count, ms, maxMs, failed and byOperation", run: () => {
+    const before = nativeAuthorityStats();
+    recordNativeAuthoritySpawn("inspect", 10, true); recordNativeAuthoritySpawn("read", 30, false);
+    const after = nativeAuthorityStats();
+    assert.equal(after.count - before.count, 2); assert.equal(after.ms - before.ms, 40); assert.equal(after.failed - before.failed, 1);
+    assert.ok(after.maxMs >= 30, JSON.stringify(after));
+    assert.equal((after.byOperation.inspect ?? 0) - (before.byOperation.inspect ?? 0), 1);
+    assert.equal((after.byOperation.read ?? 0) - (before.byOperation.read ?? 0), 1);
+  } },
+  { id: "SAS08", name: "SAD diag (8) the line for an error coded WT-GIT-FAILED without a reason matches the PSXL05 pin", run: () => {
+    const text = describeStateAuthorityRefusal(Object.assign(new Error("git failed"), { code: "WT-GIT-FAILED" }), { elapsedMs: 1 });
+    assert.match(text, /State authority route unavailable \(WT-GIT-FAILED\)/u, text);
+  } },
+  // ---- authority memo: repeated read-only native observations of an unchanged object are answered process-locally ----
+  { id: "SAS09", name: "authority memo (1) two identical inspections spawn once and count one hit", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    const before = nativeAuthorityStats();
+    const first = inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    const second = inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 1, JSON.stringify(calls));
+    assert.equal(second.nativeFacts, first.nativeFacts);
+    assert.equal(nativeAuthorityStats().authorityMemoHits - before.authorityMemoHits, 1);
+    assert.equal(nativeAuthorityStats().authorityMemoMisses - before.authorityMemoMisses, 1);
+  }) },
+  { id: "SAS10", name: "authority memo (2) a different size or a touched mtime is a miss and spawns again", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    writeFileSync(file, "longer content");
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 2, JSON.stringify(calls));
+    utimesSync(file, new Date(1_000_000_000_000), new Date(1_000_000_000_000));
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 3, JSON.stringify(calls));
+  }) },
+  { id: "SAS11", name: "authority memo (3) a publish or a remove between two reads clears the memo", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    const read = () => readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    read(); read();
+    assert.deepEqual(calls, ["read"]);
+    publishWindowsOwnedAuthorityFile({ path: file, bytes: Buffer.from("x"), expectedSha256: null, expectedFacts: null });
+    read();
+    assert.deepEqual(calls, ["read", "publish", "read"]);
+    read();
+    assert.equal(calls.length, 3, JSON.stringify(calls));
+    removeWindowsOwnedAuthorityFile({ path: file, expectedSha256: "b".repeat(64), expectedFacts: MEMO_FACTS });
+    read();
+    assert.deepEqual(calls, ["read", "publish", "read", "remove", "read"]);
+  }) },
+  { id: "SAS12", name: "authority memo (4) a read hit returns equal bytes in a fresh Buffer that a caller cannot corrupt", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    const first = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    const second = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(second.bytes, first.bytes);
+    assert.notEqual(second.bytes, first.bytes);
+    first.bytes[0] = 0x7a;
+    const third = readWindowsOwnedAuthorityFile({ path: file, maxBytes: 100 });
+    assert.equal(third.bytes.toString("utf8"), "hello");
+  }) },
+  { id: "SAS13", name: "authority memo (5) a refusal is never memoized", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    for (let attempt = 0; attempt < 2; attempt += 1) assert.throws(() => inspectWindowsOwnedAuthorityPath({ path: file, directory: false }), /WIN-AUTH-ACL/u);
+    assert.equal(calls.length, 2, JSON.stringify(calls));
+  }, { refuse: true }) },
+  { id: "SAS14", name: "authority memo (6) another maxBytes or directory flag is another key", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 10 });
+    readWindowsOwnedAuthorityFile({ path: file, maxBytes: 20 });
+    assert.equal(calls.length, 2, JSON.stringify(calls));
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: true });
+    assert.equal(calls.length, 4, JSON.stringify(calls));
+  }) },
+  { id: "SAS15", name: "authority memo (7) PIPELINE_AUTHORITY_NO_MEMO=1 disables the memo", run: () => memoFixture(({ calls, file }) => {
+    writeFileSync(file, "one");
+    process.env.PIPELINE_AUTHORITY_NO_MEMO = "1";
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    assert.equal(calls.length, 2, JSON.stringify(calls));
+  }) },
+  { id: "SAS16", name: "authority memo (8) an object that changes while it is observed is returned but not stored", run: () => {
+    let armed = true;
+    return memoFixture(({ calls, file }) => {
+      writeFileSync(file, "one");
+      const result = inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+      assert.equal(result.nativeFacts, MEMO_FACTS);
+      assert.equal(armed, false);
+      inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+      inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+      assert.equal(calls.length, 2, JSON.stringify(calls));
+    }, { hook: (request) => { if (armed) { armed = false; writeFileSync(request.path, "rewritten while the native call runs"); } } });
+  } },
+  { id: "SAS17", name: "authority memo (9) the memo is bounded at 512 entries", run: () => memoFixture(({ dir, calls }) => {
+    for (let index = 0; index < 600; index += 1) {
+      const file = join(dir, `f${index}.txt`);
+      writeFileSync(file, String(index));
+      inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    }
+    assert.equal(calls.length, 600);
+    assert.ok(nativeAuthorityStats().authorityMemoSize <= 512, String(nativeAuthorityStats().authorityMemoSize));
+    assert.ok(nativeAuthorityStats().authorityMemoSize > 0);
+  }) },
+  // ---- the one-line authority trace carries the memo counters (schema stays pipeline.authority-trace.v1) ----
+  { id: "SAS18", name: "authority trace (1) the CLI trace line carries an authorityMemo object with three integer keys and keeps every existing key", run: () => fixture(({ root }) => {
+    const cli = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+    const traced = spawnSync(process.execPath, [cli, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root, PIPELINE_AUTHORITY_TRACE: "1" } });
+    const traceLines = String(traced.stderr).split("\n").filter((line) => line.startsWith("AUTHORITY-TRACE "));
+    assert.equal(traceLines.length, 1, String(traced.stderr).slice(-600));
+    const traceJson = JSON.parse(traceLines[0].slice("AUTHORITY-TRACE ".length));
+    assert.equal(traceJson.schema, "pipeline.authority-trace.v1");
+    for (const key of ["elapsedMs", "custodyInspections", "nativeObservations", "outcome"]) assert.ok(key in traceJson, `${key} missing: ${JSON.stringify(traceJson)}`);
+    assert.deepEqual(Object.keys(traceJson.authorityMemo ?? {}).sort(), ["hits", "misses", "size"], JSON.stringify(traceJson));
+    for (const key of ["hits", "misses", "size"]) assert.ok(Number.isInteger(traceJson.authorityMemo[key]), JSON.stringify(traceJson));
+    if (process.platform !== "win32") assert.deepEqual(traceJson.authorityMemo, { hits: 0, misses: 0, size: 0 }, JSON.stringify(traceJson));
+  }) },
+  { id: "SAS19", name: "authority trace (2) one memo hit and one miss driven through the backend seam show as hits 1 and misses 1 in the built trace", run: () => memoFixture(({ file }) => {
+    assert.equal(typeof pipelineState.buildAuthorityTrace, "function");
+    writeFileSync(file, "one");
+    const before = pipelineState.buildAuthorityTrace(0, "ok").authorityMemo;
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
+    const trace = pipelineState.buildAuthorityTrace(5, "ok");
+    assert.equal(trace.schema, "pipeline.authority-trace.v1");
+    assert.equal(trace.authorityMemo.hits - before.hits, 1, JSON.stringify(trace));
+    assert.equal(trace.authorityMemo.misses - before.misses, 1, JSON.stringify(trace));
+    assert.equal(trace.authorityMemo.size, 1, JSON.stringify(trace));
+    assert.equal(trace.elapsedMs, 5);
   }) },
 ];
 
