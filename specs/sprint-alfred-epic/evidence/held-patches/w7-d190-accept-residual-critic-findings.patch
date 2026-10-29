@@ -1,5 +1,5 @@
 diff --git a/docs/human-authorization-inventory.md b/docs/human-authorization-inventory.md
-index ee351a530..1f8cc6175 100644
+index ee351a530..f1c4b7da6 100644
 --- a/docs/human-authorization-inventory.md
 +++ b/docs/human-authorization-inventory.md
 @@ -43,7 +43,8 @@ exact candidate commit+tree.
@@ -7,7 +7,7 @@ index ee351a530..1f8cc6175 100644
  | Governance fork disposition <!-- inventory-id: governance-fork-disposition --> | Disposing of a forked-subagent scope-creep finding | `governance-fork-disposition` | Same shared contract | `plugins/pipeline-core/scripts/po-human-approval.mjs` (`runForkDispositionApproval`, ~L426-484) |
  | Interruption promotion <!-- inventory-id: interruption-promotion --> | Approving the promotion of an interruption-telemetry candidate; the signed subject binds the candidate and the promotion subject digest | `interruption-promotion` | Same shared contract; reachable via the direct `prepare-critical`/`approve-critical`/`verify-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`) | `plugins/pipeline-core/lib/interruption-promotion.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs` |
 -| Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`, `interruption-promotion`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
-+| Residual Critic findings acceptance <!-- inventory-id: accept-residual-critic-findings --> | Accepting the minor findings left open after a failed Critic round; the finding list and severities are computed by the Pipeline from the consumed Critic receipt, the signed or attributed record binds the candidate commit, tree, receipt and that list, and a blocker or major finding can never be accepted | `accept-residual-critic-findings` | Same shared contract; reachable via the direct `prepare-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), in the configured `gates.push_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs` |
++| Residual Critic findings acceptance <!-- inventory-id: accept-residual-critic-findings --> | Accepting the minor findings left open after a failed Critic round; the finding list and severities are computed by the Pipeline from the consumed Critic receipt, the signed or attributed record binds the candidate commit, tree, receipt and that list, and a blocker or major finding can never be accepted | `accept-residual-critic-findings` | Same shared contract; reachable via the direct `prepare-critical`/`authorize-critical` command family (`CRITICAL_COMMAND_KINDS`), in the configured `gates.push_approval` mode | `plugins/pipeline-core/lib/critical-action-authorization.mjs`, `plugins/pipeline-core/lib/critical-action-approval-request.mjs` (`CRITICAL_ACTION_KINDS`), `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-residual-acceptance`) |
 +| Critical action (generic H-AC ceremony) <!-- inventory-id: critical-action-family --> | The ADR-0061-ported "authorize-critical" flow: an agent-prepared request over one of the `CRITICAL_ACTION_KINDS` (`push`, `deploy`, `publication`, `release-preflight`, `governance-fork-disposition`, `feature-package-reconcile`, `interruption-promotion`, `accept-residual-critic-findings`), authorized externally | `critical-action` (outer intent) wrapping the actual action `kind` + `subjectSha256` in the signed subject | Same shared contract | `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, `plugins/pipeline-core/scripts/po-human-approval.mjs` (`criticalApprovalRequest`, ~L223-249) |
  | Guard Maintenance Window (GMW) install/lift <!-- inventory-id: guard-maintenance-window --> | Time-boxed PO-signed exception letting a self-protecting guard rule (GS-6, protected test paths) honor an additional allow-path | `guard-lift` | Same shared contract, trust-anchor default `project/critical-human-proof.json`; signed via `po-human-approval.mjs sign-intent` against a bare intent digest | `plugins/pipeline-core/lib/guard-maintenance-window.mjs`, `guard-maintenance-window.mjs install`; ADR-0058; `docs/guard-maintenance-window-threat-model.md`, `docs/po-human-approval.md` §"Signing a bare intent digest" |
  | Human Guard Override (HGO), signed route <!-- inventory-id: human-guard-override-signature --> | Signed admission past a PreToolUse guard denial for one exact request/plan pair, via `guard-human-override.mjs plan`/`prepare-authorization`/`emit-signature-digest`/`authorize-by-signature` | `guard-override` | Same shared contract (default trust anchor same file); the `activate`/chat route also exists alongside this signed one (ADR-0059 Decision 1) | `plugins/pipeline-core/lib/human-guard-override.mjs` (~L1796-1825), `plugins/pipeline-core/scripts/guard-human-override.mjs` |
@@ -20,6 +20,19 @@ index ee351a530..1f8cc6175 100644
  | `critical-action-family` | `abstract-family` | — |
  | `guard-maintenance-window` | `legacy-renderer` | — |
  | `human-guard-override-signature` | `legacy-renderer` | — |
+diff --git a/harness/scripts/check-auth-gate-inventory-drift.test.mjs b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+index 9c0f32d78..46b243dce 100644
+--- a/harness/scripts/check-auth-gate-inventory-drift.test.mjs
++++ b/harness/scripts/check-auth-gate-inventory-drift.test.mjs
+@@ -278,7 +278,7 @@ test("shipped terminal catalog is immutable and covers unique inventory disposit
+   const catalog = loadHumanTerminalActionCatalog();
+   assert.equal(Object.isFrozen(catalog), true);
+   assert.equal(Object.isFrozen(catalog.entries), true);
+-  assert.equal(catalog.entries.length, 20);
++  assert.equal(catalog.entries.length, 21);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.id)).size, catalog.entries.length);
+   assert.equal(new Set(catalog.entries.map((entry) => entry.inventoryId)).size, catalog.entries.length);
+   assert.deepEqual(registeredHumanTerminalActionBuilderIds(), [
 diff --git a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs b/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs
 index 281878aa5..2f0b6defb 100644
 --- a/plugins/pipeline-core/lib/critic-verify-lifecycle.mjs

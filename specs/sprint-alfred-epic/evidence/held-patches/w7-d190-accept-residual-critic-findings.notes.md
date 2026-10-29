@@ -313,3 +313,20 @@ Docs/inventory and drift-test count edits above (need an allowed-list extension)
 Patch installed (driver patch install, apply-check against the budget state exit 0).
 
 CONTINUATION CARD -- done: catalog entry; remaining: extend allowed list by docs/human-authorization-inventory.md and harness/scripts/check-auth-gate-inventory-drift.test.mjs, make drift green, then the log comparison, lifecycle re-run and revert proof; next step: apply those two edits in the clone.
+
+## C14 slice: both drift gaps closed, drift GREEN, revert proof done
+
+### The two edits (clone; script scratch/agent-out/w7ar9/c14-edits.mjs, anchored, fail-loud)
+- docs/human-authorization-inventory.md, row "Residual Critic findings acceptance": the last cell now ends with `plugins/pipeline-core/scripts/po-human-approval.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs` (`approve-residual-acceptance`) (the same way the deploy row names approve-deploy).
+- harness/scripts/check-auth-gate-inventory-drift.test.mjs line 281: assert.equal(catalog.entries.length, 20) became 21 (counted pin, the catalog gains exactly the one required entry). The file is not on the protected list (TP-5 matches only guard-push tests and harness/scripts/pipeline-state.test.mjs).
+
+### Evidence
+- clone drift suite (log-c14drift.txt): exit 0, pass 35, fail 0. clone3 (log-c14drift3.txt): exit 0, pass 35, fail 0.
+- pipeline-state.test.mjs (finished logs): clone log-c12b.txt exit 0, 23 PASS lines, no real FAIL line (the one text match of FAIL is inside the passing case name C11-d, CVL-CRITIC-FAILED); clone3 log-c12base3.txt exit 0, 18 PASS lines, 0 FAIL. Failing-name sets: both empty. The 5 extra PASS lines in the clone are exactly C11-a..e. Argv-closure log-c12barg.txt: exit 0.
+- Lifecycle suite in the clone (log-c14life.txt): exit 0, tests 12, pass 12, fail 0.
+- Revert proof (script c14-revert.mjs, aside copy of pipeline-state.mjs, base version restored by git checkout of that one file): log-c14rev.txt exit 1, 18 PASS, FAIL lines for C11-a..d (unknown command "approve-residual-acceptance") and C11-e (assertion), all other cases PASS. Restore by copy of the aside file: sha256 equal (a95d6d96...caca), log-c14restored.txt exit 0, 23 PASS, 0 FAIL, C11-a..e green.
+
+### NOT done
+po-human-approval kind routing for prepare-critical and authorize-critical, pipeline-state printing, push-prepare closing sentence with its case, the multi-suite comparison (critical-action-authorization, critical-action-approval-request, push-prepare, po-human-approval, session-critic-finalizer, guard-maintenance-window-kernel-closure, generate-architecture-overview --check). Batch Critic, Full Verify and PO acceptance stay pending.
+
+CONTINUATION CARD -- done: catalog entry, docs row, count pin, drift green, log comparison, lifecycle, revert proof; remaining: the NOT done list above; next step: po-human-approval kind routing for prepare-critical and authorize-critical.
