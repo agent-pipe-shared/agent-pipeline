@@ -1,0 +1,91 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index cf06584a8..481672a08 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -235,7 +235,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["runtime-handover-writer-tests","plugins/pipeline-core/scripts/runtime-handover-writer.test.mjs","top-level-assertions",14],
+     ["schema-lite-alternatives-tests","plugins/pipeline-core/lib/schema-lite-alternatives.test.mjs","top-level-assertions",49],
+     ["scratch-package-staging-tests","plugins/pipeline-core/lib/scratch-package-staging.test.mjs","top-level-assertions",42],
+-    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",276],
++    ["session-authority-repair-tests","plugins/pipeline-core/scripts/session-authority-repair.test.mjs","top-level-assertions",288],
+     ["shared-pool-bounds-tests","plugins/pipeline-core/lib/shared-pool-bounds.test.mjs","top-level-assertions",4],
+     ["shared-pool-occupancy-tests","plugins/pipeline-core/lib/shared-pool-occupancy.test.mjs","top-level-assertions",19],
+     ["shell-grammar-capability-placement-tests","harness/scripts/shell-grammar-capability-placement.test.mjs","top-level-assertions",21],
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.mjs b/plugins/pipeline-core/scripts/pipeline-state.mjs
+index 2c60db988..c14dd36bb 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.mjs
+@@ -13730,6 +13730,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
+ // Opt-in (PIPELINE_AUTHORITY_TRACE=1) one-line trace on stderr: counts and milliseconds of git reads (custody
+ // inspections) and of native Windows spawns. Diagnostics only; nothing is printed when the variable is unset.
+ function writeAuthorityTrace(elapsedMs, outcome) {
++  console.error(`AUTHORITY-TRACE ${JSON.stringify(buildAuthorityTrace(elapsedMs, outcome))}`);
++}
++
++// Pure builder of the trace object (exported for the memo-counter case). `authorityMemo` was added to
++// pipeline.authority-trace.v1 as a compatible extra key; every existing key keeps its meaning.
++export function buildAuthorityTrace(elapsedMs, outcome) {
+   const custody = custodyInspectionStats(), observed = nativeObservationStats(), authority = nativeAuthorityStats();
+   const trace = {
+     schema: "pipeline.authority-trace.v1",
+@@ -13742,9 +13748,14 @@ function writeAuthorityTrace(elapsedMs, outcome) {
+       failed: observed.failed + authority.failed,
+       byOperation: authority.byOperation,
+     },
++    authorityMemo: {
++      hits: Number.isInteger(authority.authorityMemoHits) ? authority.authorityMemoHits : 0,
++      misses: Number.isInteger(authority.authorityMemoMisses) ? authority.authorityMemoMisses : 0,
++      size: Number.isInteger(authority.authorityMemoSize) ? authority.authorityMemoSize : 0,
++    },
+     outcome,
+   };
+-  console.error(`AUTHORITY-TRACE ${JSON.stringify(trace)}`);
++  return trace;
+ }
+ 
+ // Source-owned State push lifetime. The opaque handles below are minted only
+diff --git a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+index 8f9fa0f5e..7ea455d7a 100644
+--- a/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
++++ b/plugins/pipeline-core/scripts/session-authority-repair.test.mjs
+@@ -13,6 +13,7 @@ import { runSessionAuthorityRepair } from "./session-authority-repair.mjs";
+ import { cancelUnstartedGovernedItemSlice, checkpointNativeGoldfishItemDelivery, prepareGovernedItemQueue, prepareNativeGoldfishHostState, resolveGovernedItemQueue } from "../lib/native-goldfish-host-state.mjs";
+ import { enterSessionOwnerFromEnvironment, runCli } from "./slice-queue.mjs";
+ import { run as runState, describeStateAuthorityRefusal } from "./pipeline-state.mjs";
++import * as pipelineState from "./pipeline-state.mjs";
+ import { fileURLToPath } from "node:url";
+ import { nativeAuthorityStats, recordNativeAuthoritySpawn, inspectWindowsOwnedAuthorityPath, readWindowsOwnedAuthorityFile, publishWindowsOwnedAuthorityFile, removeWindowsOwnedAuthorityFile, setWindowsOwnedAuthorityBackendTestSeam, resetWindowsOwnedAuthorityBackendMemo } from "../lib/windows-owned-authority-backend.mjs";
+ import { enterClaudeHookSessionOwner, leaveClaudeHookSessionOwner, readClaudeHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
+@@ -737,6 +738,32 @@ const cases = [
+     assert.ok(nativeAuthorityStats().authorityMemoSize <= 512, String(nativeAuthorityStats().authorityMemoSize));
+     assert.ok(nativeAuthorityStats().authorityMemoSize > 0);
+   }) },
++  // ---- the one-line authority trace carries the memo counters (schema stays pipeline.authority-trace.v1) ----
++  { id: "SAS18", name: "authority trace (1) the CLI trace line carries an authorityMemo object with three integer keys and keeps every existing key", run: () => fixture(({ root }) => {
++    const cli = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
++    const traced = spawnSync(process.execPath, [cli, "set-feature", "--id", "trace", "--plan-path", "specs/trace/prd_trace.md"], { encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root, PIPELINE_AUTHORITY_TRACE: "1" } });
++    const traceLines = String(traced.stderr).split("\n").filter((line) => line.startsWith("AUTHORITY-TRACE "));
++    assert.equal(traceLines.length, 1, String(traced.stderr).slice(-600));
++    const traceJson = JSON.parse(traceLines[0].slice("AUTHORITY-TRACE ".length));
++    assert.equal(traceJson.schema, "pipeline.authority-trace.v1");
++    for (const key of ["elapsedMs", "custodyInspections", "nativeObservations", "outcome"]) assert.ok(key in traceJson, `${key} missing: ${JSON.stringify(traceJson)}`);
++    assert.deepEqual(Object.keys(traceJson.authorityMemo ?? {}).sort(), ["hits", "misses", "size"], JSON.stringify(traceJson));
++    for (const key of ["hits", "misses", "size"]) assert.ok(Number.isInteger(traceJson.authorityMemo[key]), JSON.stringify(traceJson));
++    if (process.platform !== "win32") assert.deepEqual(traceJson.authorityMemo, { hits: 0, misses: 0, size: 0 }, JSON.stringify(traceJson));
++  }) },
++  { id: "SAS19", name: "authority trace (2) one memo hit and one miss driven through the backend seam show as hits 1 and misses 1 in the built trace", run: () => memoFixture(({ file }) => {
++    assert.equal(typeof pipelineState.buildAuthorityTrace, "function");
++    writeFileSync(file, "one");
++    const before = pipelineState.buildAuthorityTrace(0, "ok").authorityMemo;
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    inspectWindowsOwnedAuthorityPath({ path: file, directory: false });
++    const trace = pipelineState.buildAuthorityTrace(5, "ok");
++    assert.equal(trace.schema, "pipeline.authority-trace.v1");
++    assert.equal(trace.authorityMemo.hits - before.hits, 1, JSON.stringify(trace));
++    assert.equal(trace.authorityMemo.misses - before.misses, 1, JSON.stringify(trace));
++    assert.equal(trace.authorityMemo.size, 1, JSON.stringify(trace));
++    assert.equal(trace.elapsedMs, 5);
++  }) },
+ ];
+ 
+ const fd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
