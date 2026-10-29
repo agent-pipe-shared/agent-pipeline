@@ -24,12 +24,12 @@
   "current": {
     "counts": {
       "25": 7,
-      "50": 4,
-      "75": 243,
+      "50": 3,
+      "75": 244,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 73.23
+    "index": 73.33
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -373,8 +373,8 @@
     "critic": 255,
     "po-acceptance": 254,
     "native-host": 146,
-    "agent": 51,
-    "po-decision": 11,
+    "agent": 50,
+    "po-decision": 10,
     "verify-wsl": 113,
     "historical-evidence": 1
   },
@@ -8836,23 +8836,15 @@
     {
       "itemId": "pipeline.greenfield.r2.agent-frontmatter-effort-overrides-configured-route",
       "title": "Agent-Frontmatter-Effort übersteuert die konfigurierte Route",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Dispatch half committed and tested in 9ce6c2361 (r2-route-effort): dispatch-briefing.mjs refuses DBG-EFFORT-ROUTE-CONTRADICTION unless an MP-05 or MP-07 escalation is passed (code and test names spot-checked). Open: goldfish-deep.md still pins xhigh, and the policy table (Elephant execution effort high) disagrees with pipeline.user.yaml (medium).",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Dispatch half committed and tested in 9ce6c2361 (r2-route-effort): dispatch-briefing.mjs refuses DBG-EFFORT-ROUTE-CONTRADICTION unless an MP-05 or MP-07 escalation is passed. Policy and agent half delivered in source by PO decision D184 (2026-10-29), commit d54ec2e71: goldfish-deep runs at effort high in routing-authority.json, its agent frontmatter and the English model policy, the Elephant may run at high or medium at the PO's choice, the normal Goldfish stays at medium; routing projections, agent-model-registry and finalizer suites green. Source only: unstamped, and goldfish-deep stays locked until the PO installs the next candidate. The goldfish-mechanic and goldfish-implementor description texts still say deep xhigh and the German half of the policy is not updated. No Full Verify, Critic, native or acceptance claim.",
       "evidence": [
         "backlog/items/2026-10-26-agent-frontmatter-effort-overrides-configured-route.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Align policies/model-policy.md and the shipped agent frontmatter with the configured route."
-        },
-        {
-          "owner": "po-decision",
-          "what": "Which side wins when the policy table and pipeline.user.yaml disagree on the Elephant effort."
-        },
         {
           "owner": "verify-wsl",
           "what": "Candidate-bound integrated Verify/Security remains pending."
