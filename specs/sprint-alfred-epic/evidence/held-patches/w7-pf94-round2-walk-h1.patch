@@ -1,0 +1,61 @@
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index 12c35f16c..fc258c355 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -962,6 +962,43 @@ test("PF94 DELTA (a) after the lineage, the correction and its diagnostic, the v
+   assert.equal(after.decision.code, "RE-DELTA-ADMITTED");
+   assert.deepEqual(after.decision.affectedInvariantIds, ["inv-one"]);
+ });
++test("PF94 ROUND2 (a) the real route continues after the admitted delta: round 2 is preflighted, admitted on the course path, finalized and registered as lineage round 2", () => {
++  const fx = pf94DeltaFixture();
++  const round1Lineage = JSON.parse(readFileSync(join(fx.root, fx.lineageAdded.lineagePath), "utf8"));
++  pf94WriteInput(fx);
++  const delta = pf94Delta(fx);
++  assert.equal(delta.status, "delta-request-added", `step delta request: ${JSON.stringify(delta)}`);
++  const registration = pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request");
++  const specPath = `specs/${fx.featureId}/spec.md`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
++  const taskId = "feature-held-task-round2", packetId = "9b".repeat(16);
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
++  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath } };
++  const preflight = preflightCriticDispatch(preflightInput);
++  assert.equal(preflight.status, "packet-ready", `step round 2 preflight is ready: ${JSON.stringify(preflight)}`);
++  // The preflight exposes no mode field: delta mode is selected by the registered delta request path (preflight derives requestedMode from it) and the course admission carries the round counter.
++  assert.equal(preflightInput.courseContext.deltaRequestPath, delta.deltaRequestPath, "step round 2 preflight is called in delta mode with the registered delta request path");
++  assert.equal(preflight.coordinatorOnly.courseAdmission.round, 2, `step round 2 preflight carries course round 2: ${JSON.stringify(preflight.coordinatorOnly.courseAdmission)}`);
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review-2", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
++  let admitted;
++  assert.doesNotThrow(() => { admitted = admitSessionCriticReview(request, {}); }, "step round 2 course admit (writes the claim) does not refuse");
++  let finalized;
++  assert.doesNotThrow(() => { finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin }); }, "step round 2 finalize does not refuse");
++  assert.equal(finalized.status, "completed", `step round 2 finalize completes: ${JSON.stringify(finalized)}`);
++  const lineageAdded = addCriticReviewLineage({ root: fx.root, packetId });
++  assert.equal(lineageAdded.status, "lineage-added", `step addCriticReviewLineage of round 2: ${JSON.stringify(lineageAdded)}`);
++  const lineage = JSON.parse(readFileSync(join(fx.root, lineageAdded.lineagePath), "utf8"));
++  assert.equal(lineage.course.reviewRound, 2, "step lineage record is round 2");
++  assert.equal(lineage.parentReviewId, round1Lineage.reviewId, "step lineage parent is the review id of round 1");
++  assert.notEqual(lineage.correction, null, "step lineage correction block is non-null");
++  assert.equal(lineage.candidate.commit, fx.correctionCommit, "step lineage candidate is the round 2 candidate");
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  assert.ok(manifest.artifacts.some((a) => a.path === lineageAdded.lineagePath), "step round 2 lineage file is in the manifest");
++  const registration2 = pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage of round 2");
++  const next = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration2, requestedMode: "delta", deltaRequestPath: delta.deltaRequestPath });
++  console.log("PF94 ROUND2 (a) next admission:", JSON.stringify(next.decision));
++  assert.equal(next.decision.code, "RE-CONSUMED-PACKAGE-PASS", `step next admission decision: ${JSON.stringify(next.decision)}`);
++});
+ test("PF94 DELTA (b) replay is idempotent, before and after the operator commit", () => {
+   const fx = pf94DeltaFixture();
+   pf94WriteInput(fx);
+diff --git a/plugins/pipeline-core/lib/critic-generic-batch.mjs b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+index 804ebffea..6bbf94d97 100644
+--- a/plugins/pipeline-core/lib/critic-generic-batch.mjs
++++ b/plugins/pipeline-core/lib/critic-generic-batch.mjs
+@@ -908,7 +908,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
+       if(prior.length!==ordinal-1 || ordinal>CRITIC_DISPATCH_LIMITS.criticRounds)fail("CGB-BUDGET");
+       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
+       if(parent?.result.verdict.pass)fail("CGB-PASS-STOPS");
+-      if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==parent.parent.receiptSha256))fail("CGB-PARENT");
++      if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
+       const member=writeMember(c,owned.batchRef,{schema:GENERIC_CRITIC_MEMBER_SCHEMA,...owned.batchRef,kind:ordinal===1?"origin":"correction",logicalWorkIds:work,
+         target:targetForPacket(packet),parent:parent?.parent??null,range:packet.candidate,delta:ordinal===1?null:projection});
+       const reservation={schema:GENERIC_CRITIC_RESERVATION_SCHEMA,...owned.batchRef,ordinal,mode,packetId:input.packetId,packetDigest:packetDigest(packet),claimSha256:packetDigest(observed.claim),
