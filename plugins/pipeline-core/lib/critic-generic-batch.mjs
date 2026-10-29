@@ -908,7 +908,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       if(prior.length!==ordinal-1 || ordinal>CRITIC_DISPATCH_LIMITS.criticRounds)fail("CGB-BUDGET");
       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
       if(parent?.result.verdict.pass)fail("CGB-PASS-STOPS");
-      if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==parent.parent.receiptSha256))fail("CGB-PARENT");
+      if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
       const member=writeMember(c,owned.batchRef,{schema:GENERIC_CRITIC_MEMBER_SCHEMA,...owned.batchRef,kind:ordinal===1?"origin":"correction",logicalWorkIds:work,
         target:targetForPacket(packet),parent:parent?.parent??null,range:packet.candidate,delta:ordinal===1?null:projection});
       const reservation={schema:GENERIC_CRITIC_RESERVATION_SCHEMA,...owned.batchRef,ordinal,mode,packetId:input.packetId,packetDigest:packetDigest(packet),claimSha256:packetDigest(observed.claim),

@@ -491,6 +491,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
  * non-authority candidate-evidence. Nothing is committed.
  */
 const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
+const DELTA_REQUEST_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-delta-request-[a-f0-9]{64}\.json$/u;
 export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract } = {}) {
   if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
   let root;
@@ -536,8 +537,20 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
   const range = consumed.receipt.reviewRange;
   if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
   const edges = ["feature-delivery"];
+  // Round N > 1 names the delta request that was registered for exactly this round candidate (base and commit of the packet).
+  let deltaRequestPath = null;
+  if (history.length > 0) {
+    for (const entry of manifest.artifacts) {
+      if (entry.class !== "candidate-evidence" || !DELTA_REQUEST_FILE.test(entry.path)) continue;
+      const present = inspect(root, entry.path);
+      let record = null;
+      try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
+      if (record?.schema === "pipeline.critic-delta-request.v1" && record.candidate?.commit === packet.candidate.commit && record.candidate?.base === packet.candidate.base) { deltaRequestPath = entry.path; break; }
+    }
+    if (deltaRequestPath === null) return refused("FPR-LINEAGE-COMPILE", `no delta request is registered for the round candidate ${packet.candidate.commit} (base ${packet.candidate.base}), so the lineage of round ${round} cannot compile (CCA-DELTA-REQUIRED); round 2 and later need the delta request first (register-feature-package.mjs --add-delta-request)`, { compileCode: "CCA-DELTA-REQUIRED", packetId });
+  }
   const compiled = compileRegisteredCriticReviewLineage({
-    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath: null },
+    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath },
     packetId, reviewId: `review-${round}`, parentReviewId: history.at(-1)?.record?.reviewId ?? null,
     packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
     coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
