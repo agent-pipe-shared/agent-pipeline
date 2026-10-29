@@ -220,3 +220,48 @@ index 000000000..6212cd728
 +  const marker = text.split("\n").find((line) => MARKER_LINE.test(line));
 +  return `${marker}\n${BRIEFING_FILE_POINTER_PREFIX} ${path} sha256=${createHash("sha256").update(text, "utf8").digest("hex")}\n`;
 +}
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 2b8d211fe..e50dfc54f 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -46,6 +46,7 @@ import { execFileSync } from "node:child_process";
+ import { closeSync, constants as fsConstants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+ import { dirname, resolve, relative } from "node:path";
+ import { fileURLToPath } from "node:url";
++import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
+ 
+ const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+ const cliArguments = process.argv.slice(2);
+@@ -988,6 +989,8 @@ export function buildDispatchBriefing(options, deps = {}) {
+     subagent_type: `pipeline-core:${boundTier}`,
+     model: family,
+     prompt: options.out === undefined ? "the `text` field of this result, verbatim" : `the file ${options.out}, verbatim including its final newline`,
++    // D183: a Claude Agent dispatch may carry this two-line pointer prompt instead of the full text; guard-dispatch hands the child the verified file bytes.
++    ...(options.out === undefined || boundTier === undefined ? {} : { promptPointer: renderPointerPrompt({ text: rendered.text, path: options.out }) }),
+   };
+   return {
+     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 2dae95d8c..07bd7ca81 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -677,6 +677,19 @@ test("build --out writes the verified briefing under scratch/ and refuses any ot
+   assert.equal(outside.code, "DBG-PATH-INVALID");
+ });
+ 
++test("build --out also prints the D183 pointer prompt: the marker line plus a file pointer whose digest is the digest of the whole file", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture();
++  const withFile = runDispatchBriefing([...argv, "--out", "scratch/briefing-ALF-T1.md"], depsOf(fx));
++  assert.equal(withFile.ok, true, JSON.stringify(withFile));
++  const written = readFileSync(join(fx.root, "scratch/briefing-ALF-T1.md"), "utf8");
++  const marker = written.split("\n").find((line) => line.startsWith("<!-- pipeline-briefing-generator:v1 sha256="));
++  assert.equal(withFile.dispatchCall.promptPointer, `${marker}\npipeline-briefing-file: scratch/briefing-ALF-T1.md sha256=${withFile.sha256}\n`);
++  assert.match(withFile.dispatchCall.prompt, /verbatim/u, "the full-text route stays for every non-pointer carrier");
++  const inline = runDispatchBriefing(argv, depsOf(fx));
++  assert.equal(inline.dispatchCall.promptPointer, undefined, "without --out there is no file to point at");
++});
++
+ test("the generated briefing prescribes the test-first order in one dispatch (AC-186, PO 2026-10-21)", async () => {
+   const { runDispatchBriefing } = await lib();
+   const { fx, argv } = packageFixture();

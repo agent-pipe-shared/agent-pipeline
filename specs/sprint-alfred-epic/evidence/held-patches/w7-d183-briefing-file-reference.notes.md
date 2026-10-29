@@ -56,3 +56,13 @@ Patch regenerated with driver `patch` (3 files, 171 insertions, 2 deletions, 159
 NOT done: generator `promptPointer` and its case in `dispatch-briefing.test.mjs`; `generate-architecture-overview.mjs --check` and any map entry the new module demands; the revert proof; driver `cleanup`; the live PO check of updatedInput merging (see above).
 
 Continuation card: done = pure module, six cases GD75..GD80, guard seam, output; remaining = generator slice, architecture check, revert proof (`driver revert`), cleanup; next step = slice 2b in the same clones, starting with `scripts/dispatch-briefing.mjs` (`buildDispatchBriefing`) plus a case in `dispatch-briefing.test.mjs` (the driver PROD list and the allowed-files list in the patch need those two files then).
+
+## Slice 2b (Elephant, exception of 2026-10-29, built in the scratch clone)
+
+- `scripts/dispatch-briefing.mjs`: imports `renderPointerPrompt`; the returned `dispatchCall` gains `promptPointer` (marker line plus `pipeline-briefing-file: <out> sha256=<digest of the whole file>`) when `--out` was given. `prompt` (full text) stays for Codex, Antigravity and Workflow. Three lines.
+- `scripts/dispatch-briefing.test.mjs`: one new case, "build --out also prints the D183 pointer prompt ...": the pointer equals marker line plus path plus `result.sha256`, the `/verbatim/` assertion still holds, no `--out` gives no pointer. Log `gen1.dispatch-briefing.test.mjs.log`: `ℹ tests 102 / ℹ pass 102 / ℹ fail 0`.
+- Revert proof (driver `revert`, production files back to the candidate, new module kept): without the production edits GD76, GD77, GD78, GD79 and GD81 (printed ids, source ids GD75..GD79 and GD80's carrier case) fail in `guard-dispatch.test.mjs` and the new pointer case fails in `dispatch-briefing.test.mjs`; production files restored byte-equal (`restored byte-equal: true`).
+- Patch regenerated with driver `patch`: 5 files, 187 insertions, 2 deletions, 19176 bytes; `apply-check exit 0` on the plain candidate.
+- `generate-architecture-overview.mjs` in the clone prints `Architecture overview current`; no map entry was demanded. The boundary check script was not located, so a boundary finding for `lib/briefing-file-reference.mjs` is NOT excluded (the Goldfish dispatch briefings already say "no single module owns" for new files until the map assigns them).
+
+NOT done: the live PO check that the runtime merges `updatedInput` with other hooks' output and that the host-commit hook sees the expanded prompt; driver `cleanup` (clones stay until the PO has applied the patch); the usage change for the Elephant (use `promptPointer` instead of retyping the file once the patch is applied and stamped).
