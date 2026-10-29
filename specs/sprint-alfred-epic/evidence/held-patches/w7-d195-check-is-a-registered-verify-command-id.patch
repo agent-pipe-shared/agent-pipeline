@@ -1,0 +1,467 @@
+diff --git a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+index 0c8bfe1eb..e16dcd90a 100644
+--- a/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
++++ b/plugins/pipeline-core/lib/dispatch-briefing-build.mjs
+@@ -144,7 +144,9 @@ export function budgetDecision(pkg, budget) {
+ /** Every path the package names: the write scope, the binding check and each file named in a targeted command. */
+ export function namedPackagePaths(pkg) {
+   const fromTargeted = pkg.targeted.flatMap((command) => [...command.matchAll(NAMED_PATH)].map((match) => match[1]));
+-  return [...new Set([...pkg.paths, pkg.check, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
++  // D195: a `command:<id>` check names a registered command, not a file, so it is not a path that must exist.
++  const checkPath = typeof pkg.check === "string" && pkg.check.startsWith("command:") ? [] : [pkg.check];
++  return [...new Set([...pkg.paths, ...checkPath, ...fromTargeted, ...(pkg.reconNote === undefined ? [] : [pkg.reconNote])])];
+ }
+ 
+ /** A named path must exist unless the package declares it new; a wrong briefed path costs a whole dispatch. */
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+index d75a772ce..b65e0825b 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.mjs
+@@ -166,6 +166,14 @@ export function observeCodexGoldfishReturn(input, pending) {
+   return final.ok ? { ...final, runner: "codex", assurance: "host-observed-subagent-start-stop-and-session-route" } : final;
+ }
+ 
++const COMMAND_ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
++/** D195: a check is either the 3-key .test form or the additive 4-key command form (path = the calibration that registers the command). */
++function validCheckForm(check){
++  if(check!==null&&typeof check==='object'&&Object.hasOwn(check,'command'))
++    return exact(check,['id','path','command','dependencies'])&&typeof check.command==='string'&&COMMAND_ID.test(check.command)&&normalizedPath(check.path)
++      &&Array.isArray(check.dependencies)&&check.dependencies.includes(check.path);
++  return exact(check,['id','path','dependencies'])&&/\.test\.(?:mjs|cjs|js)$/u.test(check.path);
++}
+ /** Typed selection data; original approval and actual source bytes are checked
+  * independently by the authenticated continuation writer. */
+ export function validateItemDeliveryBriefing(value) {
+@@ -180,8 +188,8 @@ export function validateItemDeliveryBriefing(value) {
+     ||!Number.isSafeInteger(locator.startByte)||!Number.isSafeInteger(locator.endByte)||locator.startByte<0||locator.endByte<=locator.startByte||locator.endByte-locator.startByte>4096
+     ||!Array.isArray(value.checks)||value.checks.length<1||value.checks.length>16
+     ||new Set(value.checks.map(check=>check.id)).size!==value.checks.length
+-    ||value.checks.some(check=>!exact(check,['id','path','dependencies'])||!ID.test(check.id??'')||!normalizedPath(check.path)
+-      ||!/\.test\.(?:mjs|cjs|js)$/u.test(check.path)||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
++    ||value.checks.some(check=>!validCheckForm(check)||!ID.test(check.id??'')||!normalizedPath(check.path)
++      ||!Array.isArray(check.dependencies)||check.dependencies.length<1||check.dependencies.length>64
+       ||!check.dependencies.every(normalizedPath)||new Set(check.dependencies).size!==check.dependencies.length))return fail('NGHR-ITEM-DELIVERY-SHAPE');
+   return {ok:true,code:'NGHR-ITEM-DELIVERY-VALID'};
+ }
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+index 372f0741b..0fc3f1285 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-return.test.mjs
+@@ -111,6 +111,20 @@ const cases = [
+       assert.equal(validateNativeGoldfishFinal(JSON.stringify({ ...final, outcome }), { binding, allowCheckpoint: true }).code, "NGHR-FINAL-SHAPE", outcome);
+     assert.equal(validateNativeGoldfishFinal(finalText, { binding, allowCheckpoint: true }).final.outcome, "succeeded");
+   }],
++  ["NGHR09 D195: the item delivery briefing admits the additive command form {id,path,command,dependencies}; the .test form is unchanged", () => {
++    const locator = { schema: "pipeline.critic-criterion-locator.v1", sourcePath: "specs/unit/spec.md", sourceSha256: "a".repeat(64),
++      criterionId: "AC-1", startByte: 10, endByte: 20, excerptSha256: "b".repeat(64) };
++    const briefing = check => ({ schema: "pipeline.item-delivery-briefing.v1", sliceId: "ITEM-AC-1", itemId: "AC-1", criterionLocator: locator, checks: [check] });
++    const good = { id: "check-one", path: "project/pipeline.json", command: "make-check", dependencies: ["src/change.js", "project/pipeline.json"] };
++    assert.equal(validateItemDeliveryBriefing(briefing(good)).ok, true);
++    for (const bad of [{ ...good, command: "bad id" }, { ...good, command: "" }, { ...good, command: "-x" }, { ...good, command: 7 },
++      { id: good.id, command: good.command, dependencies: good.dependencies }, { ...good, path: "/abs/project/pipeline.json" },
++      { ...good, dependencies: ["src/change.js"] }, { ...good, extra: true }])
++      assert.equal(validateItemDeliveryBriefing(briefing(bad)).code, "NGHR-ITEM-DELIVERY-SHAPE", JSON.stringify(bad));
++    // The 3-key form still demands a .test file, with or without a command-looking path.
++    assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "project/pipeline.json", dependencies: ["project/pipeline.json"] })).code, "NGHR-ITEM-DELIVERY-SHAPE");
++    assert.equal(validateItemDeliveryBriefing(briefing({ id: "check-one", path: "src/change.test.mjs", dependencies: ["src/change.test.mjs"] })).ok, true);
++  }],
+ 
+ ];
+ 
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+index 6d22e743c..cea4dccbe 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.mjs
+@@ -25,6 +25,7 @@ import { createModelFamilyRuntimeHost } from "./model-family-runtime-host.mjs";
+ import { parseAcceptedCriticCriterion } from "./critic-accepted-contract.mjs";
+ import { parseNativeGoldfishBriefing, validateItemDeliveryBriefing } from "./native-goldfish-host-return.mjs";
+ import { parseDispatchSlice } from "./dispatch-policy.mjs";
++import { readConsumerVerifyConfiguration } from "./consumer-verify.mjs";
+ import { ITEM_QUEUE_SCHEMA, SLICE_QUEUE_MAX_BYTES, CANCEL_CLASSES, CANCEL_CLASS_HELP, checkCancelClass, validateSliceQueue, normalizeScope, scopesOverlap, DEFAULT_CRITICAL_PATH_PATTERNS } from "./slice-queue.mjs";
+ import { isSafeTaskId } from "./dispatch-record.mjs";
+ import { fileURLToPath } from "node:url";
+@@ -870,7 +871,7 @@ export function completeNativeGoldfishAuthority({repository,terminalHandle}){
+   if(completed.status!=='integration-pending')return completed;
+   const inventory=nativeAuthorityScan(owner),pending=inventory.entries.find(row=>row.sourceFact.sha256===terminal.pendingSha256)?.value;
+   if(!pending?.binding.itemDelivery)return completed;
+-  const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate:repository.candidate});
++  const checks=executeGovernedItemDeliveryChecks({root:repository.primaryRoot,itemDelivery:pending.binding.itemDelivery,candidate:repository.candidate,baseCommit:pending.binding.candidateCommit});
+   if(checks.status!=='observed')return {...completed,checkStatus:checks};
+   return withSessionAuthorityBoundary({repository},boundary=>{
+     const current=nativeManagedCurrentOwner(repository);
+@@ -1278,9 +1279,19 @@ function itemCheckSnapshot(root,itemDelivery,candidate) {
+ }
+ /** Actual bounded targeted execution. Raw caller results cannot construct the
+  * opaque observation handle consumed by either real delivery adapter. */
+-export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate}={}) {
++export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate,baseCommit}={}) {
+   try {
+     const before=itemCheckSnapshot(root,itemDelivery,candidate),results=[];
++    // D195: a command check is registered in the calibration (its path). First delivery (baseCommit given) refuses a delivery that changed it,
++    // the recheck route refuses the same through native-item-check-source-amendment-required; the registry is re-read at execution time.
++    const commandChecks=itemDelivery.checks.filter(check=>check.command!==undefined);
++    if(commandChecks.length&&baseCommit!==undefined) {
++      const diff=spawnSync('git',['-C',before.repository.primaryRoot,'diff','--name-only','-z',baseCommit,candidate.commit],{env:agyHostGitEnvironment(),shell:false,timeout:10000,maxBuffer:4*1024*1024});
++      if(diff.error||diff.status!==0)throw nativeManagedFault('item-check-delivery-diff-unavailable');
++      const delivered=String(diff.stdout).split('\0');
++      if(commandChecks.some(check=>delivered.includes(check.path)))throw nativeManagedFault('native-item-check-source-amendment-required');
++    }
++    const registry=commandChecks.length?readConsumerVerifyConfiguration(before.repository.primaryRoot):null;
+     const checkEnv=agyHostGitEnvironment();
+     // The outer Verify recorder fd belongs to its direct suite, not a nested
+     // child. No inherited descriptor is advertised when it is not passed.
+@@ -1290,6 +1301,14 @@ export function executeGovernedItemDeliveryChecks({root,itemDelivery,candidate}=
+     // test fails; the verdict of a check must not depend on the runner that happens to host this process.
+     delete checkEnv.NODE_TEST_CONTEXT;
+     for(const check of itemDelivery.checks) {
++      if(check.command!==undefined) {
++        const entry=[...registry.baseline,...registry.areas.flatMap(area=>area.commands)].find(row=>row.id===check.command);
++        if(!entry)throw nativeManagedFault('item-check-command-unregistered');
++        const ran=spawnSync(entry.command,{cwd:before.repository.primaryRoot,env:checkEnv,shell:true,timeout:60000,maxBuffer:1024*1024});
++        results.push({id:check.id,path:check.path,commandId:check.command,command:entry.command,status:ran.status,signal:ran.signal,error:ran.error?.code??null,
++          stdoutSha256:digest(ran.stdout??Buffer.alloc(0)),stderrSha256:digest(ran.stderr??Buffer.alloc(0))});
++        continue;
++      }
+       const run=spawnSync(process.execPath,['--test',resolve(root,check.path)],{cwd:before.repository.primaryRoot,env:checkEnv,shell:false,timeout:60000,maxBuffer:1024*1024});
+       results.push({id:check.id,path:check.path,executable:process.execPath,args:['--test',check.path],status:run.status,signal:run.signal,error:run.error?.code??null,
+         stdoutSha256:digest(run.stdout??Buffer.alloc(0)),stderrSha256:digest(run.stderr??Buffer.alloc(0))});
+diff --git a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+index 6d2ea3768..10754f1df 100644
+--- a/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
++++ b/plugins/pipeline-core/lib/native-goldfish-host-state.test.mjs
+@@ -1449,8 +1449,54 @@ const cases = [
+     }
+   }},
+ 
++  { id: "NGHS54", name: "D195: a command check runs exactly the registered command; the row records the command id and the exact command string", run: () => fixture(({root})=>{
++    const h=commandCheckHarness(root),candidate=h.calibrate([{id:'make-check',command:'node check.mjs'}],0);
++    const observed=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate});
++    assert.equal(observed.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(observed));
++    const [row]=observed.evidence.results;
++    assert.equal(row.commandId,'make-check');assert.equal(row.command,'node check.mjs');assert.equal(row.status,0);assert.equal(row.args,undefined);assert.equal(row.path,'project/pipeline.json');
++    assert.ok(observed.evidence.files.some(file=>file.path==='project/pipeline.json'),'the calibration digest binds the run');
++    assert.equal(inspectGovernedItemDeliveryChecks({root,handle:observed.handle,candidate,itemDelivery:h.delivery('make-check')}).verdict,'passed');
++  })},
++  { id: "NGHS55", name: "D195: a failing registered command fails the check", run: () => fixture(({root})=>{
++    const h=commandCheckHarness(root),candidate=h.calibrate([{id:'make-check',command:'node check.mjs'}],3);
++    const observed=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate});
++    assert.equal(observed.code,'SQ-TARGETED-CHECKS-FAILED',JSON.stringify(observed));
++    assert.equal(observed.evidence.results[0].status,3);assert.equal(observed.evidence.verdict,'failed');
++  })},
++  { id: "NGHS56", name: "D195: a command id that is no longer registered is refused item-check-command-unregistered", run: () => fixture(({root})=>{
++    const h=commandCheckHarness(root);h.calibrate([{id:'make-check',command:'node check.mjs'}],0);
++    const candidate=h.calibrate([{id:'other-check',command:'node check.mjs'}],0);
++    const refused=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate});
++    assert.equal(refused.status,'refused',JSON.stringify(refused));assert.match(refused.reason,/item-check-command-unregistered/);
++  })},
++  { id: "NGHS57", name: "D195: a delivery that changes the calibration path of a command check is refused at first delivery; the .test form is not asked", run: () => fixture(({root})=>{
++    const h=commandCheckHarness(root),base=h.calibrate([{id:'make-check',command:'node check.mjs'}],0);
++    const candidate=h.calibrate([{id:'make-check',command:'node check.mjs'},{id:'weaker',command:'node -e 0'}],0);
++    const refused=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate,baseCommit:base.commit});
++    assert.equal(refused.status,'refused',JSON.stringify(refused));assert.match(refused.reason,/native-item-check-source-amendment-required/);
++    const untouched=executeGovernedItemDeliveryChecks({root,itemDelivery:h.delivery('make-check'),candidate,baseCommit:candidate.commit});
++    assert.equal(untouched.code,'SQ-TARGETED-CHECKS-PASSED',JSON.stringify(untouched));
++  })},
++
+ ];
+ 
++/** D195 fixture: a real calibration (project name = root basename) registering verifyImpact commands over a committed check script. */
++function commandCheckHarness(root){
++  const name=root.split('/').pop();
++  const git=(...args)=>assert.equal(spawnSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','-c',`core.hooksPath=${devNull}`,'-c','commit.gpgsign=false',...args]).status,0,args.join(' '));
++  const calibrate=(baseline,exitCode)=>{
++    mkdirSync(join(root,'project'),{recursive:true});
++    writeFileSync(join(root,'project/pipeline.json'),JSON.stringify({project:name,verify:'node check.mjs',verifyImpact:{schema:'pipeline.project-verify-impact.v1',baseline,areas:[]}}));
++    writeFileSync(join(root,'check.mjs'),`process.exit(${exitCode});\n`);writeFileSync(join(root,'dependency.txt'),'dependency\n');
++    git('add','project/pipeline.json','check.mjs','dependency.txt');git('commit','-q','-m','calibrate');
++    return inspectSignedDescriptorCustodyRepository(root).candidate;
++  };
++  const delivery=id=>({schema:'pipeline.item-delivery-briefing.v1',sliceId:'ITEM-A',itemId:'AC-1',criterionLocator:{schema:'pipeline.critic-criterion-locator.v1',sourcePath:'specs/unit/spec.md',sourceSha256:'a'.repeat(64),criterionId:'AC-1',startByte:1,endByte:20,excerptSha256:'b'.repeat(64)},
++    checks:[{id:'unit',path:'project/pipeline.json',command:id,dependencies:['check.mjs','dependency.txt','project/pipeline.json']}]});
++  return {calibrate,delivery};
++}
++
+ function governedRegistryFixture({root,commit}){
+   const controller=createGovernanceScopeController({hostStateRoot:join(root,"fixture-host")});
+   const plan=controller.planDecision({rootDir:root,decision:"enroll",by:"fixture explicit selection"});
+diff --git a/plugins/pipeline-core/lib/plan-handoff-readiness.mjs b/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
+index 5af738df6..e65bf082e 100644
+--- a/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
++++ b/plugins/pipeline-core/lib/plan-handoff-readiness.mjs
+@@ -31,10 +31,11 @@ import { spawnSync } from 'node:child_process';
+ import { observeGovernanceScope } from './governance-scope.mjs';
+ import { parseAcceptedCriticCriterion, scanAcceptedCriterionRows } from './critic-accepted-contract.mjs';
+ import { validateItemDeliveryBriefing } from './native-goldfish-host-return.mjs';
++import { readConsumerVerifyConfiguration } from './consumer-verify.mjs';
+ 
+ export const PLAN_HANDOFF_CODES = Object.freeze([
+   'PLR-NO-GOVERNANCE', 'PLR-HANDOFF-READY', 'PLR-HANDOFF-NO-CRITERION', 'PLR-HANDOFF-SPEC-UNREADABLE',
+-  'PLR-HANDOFF-CHECK-UNADMITTED', 'PLR-HANDOFF-CHECK-NOT-TRACKABLE', 'PLR-HANDOFF-UNAVAILABLE',
++  'PLR-HANDOFF-CHECK-UNADMITTED', 'PLR-HANDOFF-CHECK-NOT-TRACKABLE', 'PLR-HANDOFF-CHECK-UNREGISTERED', 'PLR-HANDOFF-UNAVAILABLE',
+ ]);
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+@@ -45,6 +46,8 @@ const ADMITTED_CRITERION_STATUSES = Object.freeze(['explicit-actual-independent-
+ // A path-like token ending in a test-file suffix. The class includes `.` so `tests/../x.test.js` is captured whole
+ // (and then refused by the shape rule) instead of being truncated to a harmless-looking tail.
+ const CHECK_TOKEN = /[A-Za-z0-9_./-]+\.test\.(?:mjs|cjs|js)(?![A-Za-z0-9_-]|\.[A-Za-z0-9_])/gu;
++// D195: `command:<id>` names a command the project calibration registers under verifyImpact (the additive check form).
++const COMMAND_TOKEN = /(?<![A-Za-z0-9_./:-])command:([A-Za-z0-9][A-Za-z0-9._:-]{0,127})/gu;
+ 
+ const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+ const refuse = (code, message, extra = {}) => ({ ok: false, code, message, ...extra });
+@@ -94,6 +97,7 @@ const HANDOFF_REPAIRS = Object.freeze({
+   'PLR-HANDOFF-SPEC-UNREADABLE': 'restore the Spec as a regular, non-symlink UTF-8 file at its recorded path under specs/<feature>/ with the bytes the plan was bound to (check `git status` for an uncommitted edit), commit it',
+   'PLR-HANDOFF-CHECK-UNADMITTED': 'correct the named test path in the Spec to a normalized repository-relative .test.mjs/.test.cjs/.test.js path, or remove the mention if it is not a deliverable test of this project, commit it',
+   'PLR-HANDOFF-CHECK-NOT-TRACKABLE': 'move the named test path to a location git does not ignore (`git check-ignore -v <path>` names the rule), or edit the Spec to name a trackable path, commit it',
++  'PLR-HANDOFF-CHECK-UNREGISTERED': 'register the named command id in the project calibration under verifyImpact.baseline (or an area) as {"id": "<id>", "command": "<the real verify command>"} and commit it, or edit the Spec to name a registered command id or a .test file, commit it',
+   'PLR-HANDOFF-UNAVAILABLE': 'confirm `git --version` and `git status` succeed in the project root and the governance observation is readable, then retry; this check fails closed on any fault',
+ });
+ 
+@@ -119,7 +123,7 @@ export function planHandoffRefusal(verb, verdict) {
+ 
+ /**
+  * @param {{rootDir: string, specPath: string, expectedSpecSha256: string}} input
+- * @param {{observeScope?: (options: {rootDir: string}) => {requiresEnforcement: boolean}}} [deps]
++ * @param {{observeScope?: (options: {rootDir: string}) => {requiresEnforcement: boolean}, readConsumerVerify?: (rootDir: string) => {baseline: {id: string}[], areas: {commands: {id: string}[]}[]}}} [deps]
+  * @returns {{ok: true, skipped: true, code: 'PLR-NO-GOVERNANCE'}
+  *   | {ok: true, code: 'PLR-HANDOFF-READY', admittedCriteria: string[], checks: {path: string, state: 'present'|'absent'}[]}
+  *   | {ok: false, code: string, message: string, path?: string}}
+@@ -171,6 +175,18 @@ export function inspectPlanDeliveryHandoff(input, deps = {}) {
+       if (state === null) return refuse('PLR-HANDOFF-CHECK-UNADMITTED', 'a test path named in the Spec is a symlink or has a non-file or non-directory component', { path });
+       checks.push({ path, state });
+     }
++    const commandIds = [...new Set([...source.matchAll(COMMAND_TOKEN)].map((match) => match[1].replace(/[.:]+$/u, '')).filter((id) => id !== ''))].sort();
++    if (commandIds.length > 0) {
++      let registered;
++      try {
++        const configuration = (deps?.readConsumerVerify ?? readConsumerVerifyConfiguration)(root);
++        registered = new Set([...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)].map((entry) => entry.id));
++      } catch { return refuse('PLR-HANDOFF-CHECK-UNREGISTERED', 'the Spec names a command:<id> check but the project calibration verifyImpact cannot be read', { path: `command:${commandIds[0]}` }); }
++      for (const id of commandIds) {
++        if (!registered.has(id)) return refuse('PLR-HANDOFF-CHECK-UNREGISTERED', 'a command:<id> check named in the Spec is not registered in the project calibration verifyImpact', { path: `command:${id}` });
++      }
++      for (const id of commandIds) checks.push({ command: id, state: 'registered' });
++    }
+     return { ok: true, code: 'PLR-HANDOFF-READY', admittedCriteria: admitted.map((entry) => entry.id), checks };
+   } catch { return unavailable('unexpected fault'); }
+ }
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+index 8e3fd147d..2451de6c5 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.mjs
+@@ -63,6 +63,8 @@ binding prints a native dispatch binding and briefing skeleton as JSON; it write
+   --runner claude|codex defaults to claude; the selected model must match its role route.
+   --effort-escalation MP-05|MP-07 admits an agent definition effort ABOVE its Claude route effort (otherwise a contradiction is refused).
+   --check is included in the write scope. Paths are repository-relative.
++  --check command:<id> (D195) names a command the project calibration registers under verifyImpact (baseline or an area) instead of a
++    .test file; the calibration becomes a dependency of the check and is not writable by the dispatch.
+   --criterion selects a consumer Spec criterion (AC-<n> or AC-E<epic>-<story>-<nn>).
+ 
+ build reads one closed pipeline.dispatch-briefing-package.v1 JSON object.
+@@ -114,7 +116,8 @@ const { CRITERION_ID_SOURCE, isCriterionId, parseAcceptedCriticCriterion } = cli
+ const { dispatchBudgetLineForRole, parseDispatchSlice } = cliHelp ? {} : await import("../lib/dispatch-policy.mjs");
+ const { snapshotPhysicalPluginRoot } = cliHelp ? {} : await import("../lib/public-core-observation.mjs");
+ const { protectedBaselineRuleFor, resolveProtectedBaseline } = cliHelp ? {} : await import("../lib/protected-baseline.mjs");
+-const { resolveProjectAuthorityPaths } = cliHelp ? {} : await import("../lib/project-authority.mjs");
++const { resolveProjectAuthorityPaths, resolveAuthorityArtifactPath } = cliHelp ? {} : await import("../lib/project-authority.mjs");
++const { readConsumerVerifyConfiguration } = cliHelp ? {} : await import("../lib/consumer-verify.mjs");
+ const { observeGovernedItemIntegrationReadiness, resolveGovernedItemQueue } = cliHelp ? {} : await import("../lib/native-goldfish-host-state.mjs");
+ // D76 / K93: "running dispatch" has one reading, shared with guard-dispatch (open record, owner not provably gone, its write scope).
+ const { resolveGitCommonDir } = cliHelp ? {} : await import("../lib/po-key-directory.mjs");
+@@ -156,6 +159,9 @@ const OID = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u;
+ const SHA = /^[a-f0-9]{64}$/u;
+ const ITEM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+ const MAX_CRITERION_BYTES = 4096;
++// D195: the additive check spelling `command:<id>`; <id> is a command id registered in the project calibration (consumer-verify VERIFY_ID).
++const COMMAND_CHECK_PREFIX = "command:";
++const VERIFY_COMMAND_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+ const CRITERION_ID_FORMS = "AC-<n> or AC-E<epic>-<story>-<nn>";
+ // The bold bullet item (`- **<id>:** text`, marker `-`, `+` or `*`, at column 0) and the indented lines that continue it;
+ // both mirror the host parser's `markdown-acceptance-bullet-item.v1` rendering exactly.
+@@ -533,7 +539,11 @@ export function assertBindingInvariants(binding) {
+   const checks = binding?.itemDelivery?.checks;
+   if (!Array.isArray(checks) || checks.length !== 1 || !Array.isArray(binding.allowedPaths)) refuse("DBG-BINDING-INVALID", "the binding must carry exactly one item-delivery check");
+   const [check] = checks;
+-  if (!binding.allowedPaths.includes(check.path) || !check.dependencies.includes(check.path)) {
++  if (check.command !== undefined) {
++    // D195: the calibration the command is registered in is a dependency, never a write path (the command stays human-approved).
++    if (binding.allowedPaths.includes(check.path)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${check.path} that registers command ${check.command} must not be among the allowed paths`);
++    if (!check.dependencies.includes(check.path)) refuse("DBG-BINDING-INVALID", `the calibration ${check.path} must be a dependency of command check ${check.command}`);
++  } else if (!binding.allowedPaths.includes(check.path) || !check.dependencies.includes(check.path)) {
+     refuse("DBG-CHECK-NOT-IN-PATHS", `check ${check.path} is not among the allowed paths`);
+   }
+   if (!binding.allowedPaths.every((path) => check.dependencies.includes(path))) refuse("DBG-BINDING-INVALID", "every allowed path must be a dependency of the check");
+@@ -586,18 +596,36 @@ export function generateDispatchBinding(options, deps = {}) {
+   if (options.criterion !== undefined && !isCriterionId(options.criterion)) refuse("DBG-CRITERION-ID", `criterion ${JSON.stringify(options.criterion)} must be ${CRITERION_ID_FORMS}`);
+   if (!AGENT_TYPES.includes(agentType)) refuse("DBG-AGENT-TYPE-UNKNOWN", `unknown agent type ${JSON.stringify(agentType)}; expected one of ${AGENT_TYPES.join(", ")}`);
+   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(modelId)) refuse("DBG-MODEL-ID", `model id ${JSON.stringify(modelId)} is not a model identifier`);
+-  for (const path of [check, ...options.paths]) {
++  const commandId = check.startsWith(COMMAND_CHECK_PREFIX) ? check.slice(COMMAND_CHECK_PREFIX.length) : null;
++  for (const path of [...(commandId === null ? [check] : []), ...options.paths]) {
+     if (!validRepoPath(path)) refuse("DBG-PATH-INVALID", `path ${JSON.stringify(path)} must be repository-relative without .., ., .git or backslash segments`);
+   }
+   if (options.reconNote !== undefined && !isReconNotePath(options.reconNote)) {
+     refuse("DBG-PATH-INVALID", `recon note ${JSON.stringify(options.reconNote)} must be a repository-relative file path under ${RECON_NOTE_PREFIXES.join(" or ")} without .., ., .git or backslash segments`);
+   }
+-  if (!/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file`);
+-  const allowedPaths = [...new Set([check, ...options.paths])].sort();
++  if (commandId === null && !/\.test\.(?:mjs|cjs|js)$/u.test(check)) refuse("DBG-CHECK-NOT-TEST", `check ${check} must be a .test.mjs, .test.cjs or .test.js file (or command:<id> of a command the project calibration registers under verifyImpact)`);
++  if (commandId !== null && !VERIFY_COMMAND_ID.test(commandId)) refuse("DBG-CHECK-COMMAND-UNKNOWN", `check ${check} does not carry a command id of the shape ${VERIFY_COMMAND_ID}`);
++  const allowedPaths = [...new Set([...(commandId === null ? [check] : []), ...options.paths])].sort();
+ 
+   let root;
+   try { root = realpathSync(resolve(options.root ?? process.cwd())); } catch { refuse("DBG-ROOT-UNREADABLE", "--root cannot be resolved to a directory"); }
+ 
++  // D195: a command check is bound to the calibration file that registers it; the id must be registered at this commit.
++  let commandCheckPath = null;
++  if (commandId !== null) {
++    commandCheckPath = (deps.calibrationRelPath ?? ((rootDir) => resolveAuthorityArtifactPath("calibration", { rootDir }).relPath))(root);
++    let registered = null;
++    let why = "";
++    try {
++      const configuration = (deps.readConsumerVerify ?? readConsumerVerifyConfiguration)(root);
++      registered = [...configuration.baseline, ...configuration.areas.flatMap((area) => area.commands)].map((entry) => entry.id);
++    } catch (error) { why = ` (${String(error?.message ?? error).slice(0, 160)})`; }
++    if (registered === null || !registered.includes(commandId)) {
++      refuse("DBG-CHECK-COMMAND-UNKNOWN", `command ${commandId} is not registered in the project calibration ${commandCheckPath}${why}. repair: register it as {"id": "${commandId}", "command": "<the real verify command>"} under verifyImpact.baseline in ${commandCheckPath} (schema pipeline.project-verify-impact.v1), commit that calibration so the candidate commit of this briefing carries it, and run this command again`);
++    }
++    if (allowedPaths.includes(commandCheckPath)) refuse("DBG-CHECK-COMMAND-PATH-WRITABLE", `the calibration ${commandCheckPath} that registers command ${commandId} must not be a --path of the same dispatch (the command stays human-approved)`);
++  }
++
+   // Original acceptance: the criterion, its byte span, and (Alfred route only) the backlog item it names.
+   const specPath = options.spec ?? defaultSpecPath(root);
+   if (typeof specPath !== "string" || specPath === "") refuse("DBG-SPEC-UNRESOLVED", "no --spec was given and the project authority state names no plan spec; pass --spec");
+@@ -667,7 +695,7 @@ export function generateDispatchBinding(options, deps = {}) {
+     const scope = [...(row.writeScope ?? [])].sort();
+     if (JSON.stringify(scope) !== JSON.stringify(allowedPaths)) {
+       const checks = scope.filter((path) => /\.test\.(?:mjs|cjs|js)$/u.test(path));
+-      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
++      refuse("DBG-QUEUE-ROW-DRIFT", `slice ${dispatchId} has the write scope ${scope.join(", ")} in the governed queue; this call gives ${allowedPaths.join(", ")}. Rebind with exactly that scope: --check ${commandId !== null || checks.includes(check) ? check : checks[0] ?? "<one .test file of it>"} (or --check command:<registered id> for a repository without a unit-test runner) and one --path for each other path, or choose a new --dispatch-id (slice-queue.mjs cancel ${dispatchId} --reason "<why>" --class <${CANCEL_CLASSES.join("|")}> first when it still holds a successor; pick the class that says why it ends: ${CANCEL_CLASSES.map((name) => `${name} = ${CANCEL_CLASS_HELP[name]}`).join("; ")})`);
+     }
+   }
+ 
+@@ -876,7 +904,9 @@ export function generateDispatchBinding(options, deps = {}) {
+       sliceId: dispatchId,
+       itemId,
+       criterionLocator: locator,
+-      checks: [{ id: `${dispatchId.toLowerCase()}-check`, path: check, dependencies: [...allowedPaths] }],
++      checks: [commandId === null
++        ? { id: `${dispatchId.toLowerCase()}-check`, path: check, dependencies: [...allowedPaths] }
++        : { id: `${dispatchId.toLowerCase()}-check`, path: commandCheckPath, command: commandId, dependencies: [...new Set([...allowedPaths, commandCheckPath])].sort() }],
+     },
+   };
+   assertBindingInvariants(binding);
+diff --git a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+index 82991fb83..c3aed3cf5 100644
+--- a/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
++++ b/plugins/pipeline-core/scripts/dispatch-briefing.test.mjs
+@@ -1560,3 +1560,74 @@ test("D180b PF-61 reader does not double-count the same file name present in bot
+   const found = stopWarnings(runDispatchBriefing(argvOf(fx), real));
+   assert.deepEqual(found.map((entry) => entry.dispatchId), ["ALF-SAME"], JSON.stringify(found));
+ });
++
++// D195: a check may name a registered consumer Verify command id (additive form); the .test form is unchanged.
++const REGISTERED = () => ({ baseline: [{ id: "make-check", command: "make check" }], areas: [{ id: "docs", paths: ["docs"], commands: [{ id: "docs-lint", command: "make docs" }] }] });
++test("D195 command:<id> of a registered command builds the 4-key check; the calibration is a dependency and not a write path", async () => {
++  const { runDispatchBriefing, assertBindingInvariants } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx, { "--check": "command:make-check" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++  const [check] = result.binding.itemDelivery.checks;
++  assert.deepEqual(Object.keys(check).sort(), ["command", "dependencies", "id", "path"]);
++  assert.equal(check.command, "make-check");
++  assert.ok(check.dependencies.includes(check.path), "the calibration path is a dependency");
++  assert.ok(!result.binding.allowedPaths.includes(check.path), "the calibration path is not writable by the Goldfish");
++  assert.deepEqual(result.binding.allowedPaths, [PATH_A]);
++  assert.ok(result.binding.allowedPaths.every((path) => check.dependencies.includes(path)), "every allowed path is a dependency");
++  assert.doesNotThrow(() => assertBindingInvariants(result.binding));
++  const area = runDispatchBriefing(argvOf(fx, { "--check": "command:docs-lint" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
++  assert.equal(area.ok, true, "a command registered under an area is registered too");
++  const broken = structuredClone(result.binding);
++  broken.allowedPaths = [...broken.allowedPaths, broken.itemDelivery.checks[0].path].sort();
++  assert.throws(() => assertBindingInvariants(broken), (error) => error.code === "DBG-CHECK-COMMAND-PATH-WRITABLE");
++});
++test("D195 an unregistered command id is refused DBG-CHECK-COMMAND-UNKNOWN with a runnable repair naming verifyImpact.baseline", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx, { "--check": "command:absent-id" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "DBG-CHECK-COMMAND-UNKNOWN", result.message);
++  assert.match(result.message, /absent-id/u);
++  assert.match(result.message, /verifyImpact\.baseline/u);
++  const bad = runDispatchBriefing(argvOf(fx, { "--check": "command:-bad id" }), depsOf(fx, { readConsumerVerify: REGISTERED }));
++  assert.equal(bad.ok, false);
++  assert.ok(["DBG-CHECK-COMMAND-UNKNOWN", "DBG-PATH-INVALID"].includes(bad.code), bad.code);
++  const unreadable = runDispatchBriefing(argvOf(fx, { "--check": "command:make-check" }), depsOf(fx, { readConsumerVerify: () => { throw new Error("VEP-NO-CALIBRATION: no project calibration found."); } }));
++  assert.equal(unreadable.code, "DBG-CHECK-COMMAND-UNKNOWN");
++});
++test("D195 the calibration cannot be named as a write path of a command check", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx, { "--check": "command:make-check" }, ["--path", "project/pipeline.json"]), depsOf(fx, { readConsumerVerify: REGISTERED, calibrationRelPath: () => "project/pipeline.json" }));
++  assert.equal(result.ok, false);
++  assert.equal(result.code, "DBG-CHECK-COMMAND-PATH-WRITABLE", result.message);
++});
++test("D195 the .test form is unchanged: 3 keys, the check is a write path, a non-test check is still refused", async () => {
++  const { runDispatchBriefing } = await lib();
++  const fx = makeFixture();
++  const result = runDispatchBriefing(argvOf(fx), depsOf(fx, { readConsumerVerify: () => { throw new Error("must not be read for the .test form"); } }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 300));
++  const [check] = result.binding.itemDelivery.checks;
++  assert.deepEqual(Object.keys(check).sort(), ["dependencies", "id", "path"]);
++  assert.equal(check.path, CHECK);
++  assert.ok(result.binding.allowedPaths.includes(CHECK));
++  const notTest = runDispatchBriefing(argvOf(fx, { "--check": PATH_A }), depsOf(fx));
++  assert.equal(notTest.code, "DBG-CHECK-NOT-TEST");
++});
++
++test("D195 the package route admits check command:<id> to the same admission as the --check flag form", async () => {
++  const { runDispatchBriefing } = await lib();
++  const { fx, argv } = packageFixture({ check: "command:make-check", targeted: ["`make check` (green)"] });
++  const result = runDispatchBriefing(argv, depsOf(fx, { readConsumerVerify: REGISTERED }));
++  assert.equal(result.ok, true, JSON.stringify(result).slice(0, 400));
++  const parsed = parseNativeGoldfishBriefing(result.text);
++  assert.equal(parsed.ok, true, parsed.code);
++  const [check] = parsed.binding.itemDelivery.checks;
++  assert.equal(check.command, "make-check");
++  assert.deepEqual(parsed.binding.allowedPaths, [PATH_A]);
++  const unknown = packageFixture({ check: "command:absent-id", targeted: ["`make check` (green)"] });
++  const refused = runDispatchBriefing(unknown.argv, depsOf(unknown.fx, { readConsumerVerify: REGISTERED }));
++  assert.equal(refused.ok, false);
++  assert.equal(refused.code, "DBG-CHECK-COMMAND-UNKNOWN", refused.message);
++});
+diff --git a/plugins/pipeline-core/scripts/pipeline-state.test.mjs b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+index 262e56403..120343f96 100644
+--- a/plugins/pipeline-core/scripts/pipeline-state.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-state.test.mjs
+@@ -3252,6 +3252,29 @@ handoffCase("R6 the inspection fails closed, and the criterion scan is exported
+   assert.equal(parsed.status, "no-explicit-criterion", JSON.stringify(parsed));
+ });
+ 
++handoffCase("R7 D195: a command:<id> token must be registered in the calibration (PLR-HANDOFF-CHECK-UNREGISTERED); a registered one is ready with a command entry", () => {
++  const registered = { readConsumerVerify: () => ({ baseline: [{ id: "make-check", command: "make check" }], areas: [] }) };
++  withHandoffFixture({ specText: handoffSpec("- check: command:make-check") }, (fixture) => {
++    const result = fixture.inspect({}, registered);
++    assert.equal(result.ok, true, JSON.stringify(result));
++    assert.equal(result.code, "PLR-HANDOFF-READY");
++    assert.deepEqual(result.checks, [{ command: "make-check", state: "registered" }]);
++  });
++  withHandoffFixture({ specText: handoffSpec("- check: command:absent-id") }, (fixture) => {
++    const result = fixture.inspect({}, registered);
++    assert.equal(result.ok, false, JSON.stringify(result));
++    assert.equal(result.code, "PLR-HANDOFF-CHECK-UNREGISTERED");
++    assert.ok(handoff.PLAN_HANDOFF_CODES.includes("PLR-HANDOFF-CHECK-UNREGISTERED"));
++    assert.match(handoff.planHandoffRefusal("submit-plan", result), /verifyImpact/u);
++    const unreadable = fixture.inspect({}, { readConsumerVerify: () => { throw new Error("VEP-NO-CALIBRATION"); } });
++    assert.equal(unreadable.code, "PLR-HANDOFF-CHECK-UNREGISTERED");
++  });
++  withHandoffFixture({ specText: handoffSpec("- tests/orders.test.js", "- check: command:make-check") }, (fixture) => {
++    const result = fixture.inspect({}, registered);
++    assert.deepEqual(result.checks.map((entry) => entry.path ?? entry.command), ["tests/orders.test.js", "make-check"]);
++  });
++});
++
+ assert.deepEqual(handoffFailures, [], `AC-264 plan-readiness hand-off cases failed: ${handoffFailures.join(" | ")}`);
+ console.log("AC-264 plan-readiness hand-off R1-R6 complete.");
+ 
