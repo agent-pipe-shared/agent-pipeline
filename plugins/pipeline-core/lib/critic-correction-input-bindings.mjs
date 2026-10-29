@@ -15,7 +15,9 @@ const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const ZERO_ID = /^0+$/u;
 const CHANGE_NAMES = { A: "added", M: "modified", D: "deleted", T: "type-changed", R: "renamed", C: "copied" };
 // The layout session-critic-finalizer.mjs writes: specs/<segment>/evidence/critic/<packetId>/..., and the root form evidence/critic/....
-const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/critic\/[^/]+(?:\/[^/]+)*$/u;
+// Also the two immutable files the course registration (register-feature-package.mjs) writes beside that directory,
+// `critic-lineage-<sha256>.json` and `critic-delta-request-<sha256>.json`: they carry the prior round's verdict metadata (PF-98).
+const RETAINED_PATTERN = /^(?:specs\/[^/]+\/)?evidence\/(?:critic\/[^/]+(?:\/[^/]+)*|critic-(?:lineage|delta-request)-[0-9a-f]{64}\.json)$/u;
 
 export class CriticCorrectionInputBindingsError extends Error {
   constructor(code, detail) {

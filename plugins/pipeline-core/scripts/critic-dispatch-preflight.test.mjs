@@ -1081,6 +1081,30 @@ test("CCI (2) a retained prior result under the evidence/critic layout is exclud
   } finally { rmSync(fx.root, { recursive: true, force: true }); }
 });
 
+test("CCI (2b) the lineage and delta-request files the course registration writes beside the evidence directory are retained prior results (PF-98)", () => {
+  const fx = cciFixture();
+  const digest = "a".repeat(64);
+  const lineage = `specs/feat-x/evidence/critic-lineage-${digest}.json`;
+  const delta = `specs/feat-x/evidence/critic-delta-request-${digest}.json`;
+  const lookalikes = [
+    `specs/feat-x/evidence/critic-lineage-${"a".repeat(63)}.json`,
+    `specs/feat-x/evidence/critic-lineage-${digest}.json.bak`,
+    `specs/feat-x/notes/critic-delta-request-${digest}.json`,
+    `specs/feat-x/evidence/sub/critic-lineage-${digest}.json`,
+  ];
+  try {
+    cciWrite(fx.root, lineage, '{"verdict":"FAIL","findings":[]}\n');
+    cciWrite(fx.root, delta, '{"schema":"pipeline.critic-delta-request.v1"}\n');
+    for (const path of lookalikes) cciWrite(fx.root, path, "not a registration artifact\n");
+    cciWrite(fx.root, "src/a.txt", "changed\n");
+    const head = commit(fx.root, "course registration evidence");
+    const doc = deriveCriticCorrectionInputBindings({ repoRoot: fx.root, base: fx.base, head });
+    assert.deepEqual(doc.exclusions.map((e) => e.path), [delta, lineage]);
+    for (const entry of doc.exclusions) assert.equal(entry.role, "retained prior result");
+    assert.deepEqual(doc.sourcePaths, [...lookalikes, "src/a.txt"].sort());
+  } finally { rmSync(fx.root, { recursive: true, force: true }); }
+});
+
 test("CCI (3) a state file changed in three commits gives three versions with chained blob and mode transitions", () => {
   const fx = cciFixture();
   try {

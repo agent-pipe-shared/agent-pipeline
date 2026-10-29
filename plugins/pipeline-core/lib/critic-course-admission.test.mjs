@@ -731,6 +731,15 @@ import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.
 const pf94Commit = (root, message) => { git(root, ["add", "."]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
 const pf94Guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
 const pf94Verdict = { findings: [], deliberately_not_flagged: ["scope"], trajectory_verdict: "consistent", trajectory_evidence: "candidate evidence inspected", briefing_violations: [], pass: true };
+// PF-98: a Delta range always contains the registered lineage and delta-request files, so the real route derives the
+// correction input bindings for it and passes the file; this writes that file under scratch/ and returns its path.
+import { deriveCriticCorrectionInputBindings } from "./critic-correction-input-bindings.mjs";
+const pf94Bindings = (root, base, head) => {
+  const path = `scratch/correction-input-bindings-${head.slice(0, 12)}.json`;
+  mkdirSync(join(root, "scratch"), { recursive: true });
+  writeFileSync(join(root, path), `${JSON.stringify(deriveCriticCorrectionInputBindings({ repoRoot: root, base, head, projectStateOptional: true }), null, 2)}\n`);
+  return path;
+};
 const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
 /** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
 // Options: course (true: course path with claim; false: generic batch + caller-authored fallback, no claim), failing (true: the round did NOT pass and carries one open major finding), featureId, logicalWorkIds, taskId.
@@ -973,7 +982,7 @@ test("PF94 ROUND2 (a) the real route continues after the admitted delta: round 2
   const taskId = "feature-held-task-round2", packetId = "9b".repeat(16);
   const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
   writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
-  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath } };
+  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, fx.candidate, fx.correctionCommit) };
   const preflight = preflightCriticDispatch(preflightInput);
   assert.equal(preflight.status, "packet-ready", `step round 2 preflight is ready: ${JSON.stringify(preflight)}`);
   // The preflight exposes no mode field: delta mode is selected by the registered delta request path (preflight derives requestedMode from it) and the course admission carries the round counter.
@@ -1008,7 +1017,7 @@ test("PF94 ROUND2 (b) the lineage of round 2 without a registered delta request 
   const taskId = "feature-held-task-round2b", packetId = "9c".repeat(16);
   const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
   writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
-  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath } };
+  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath }, correctionInputBindings: pf94Bindings(fx.root, fx.candidate, fx.correctionCommit) };
   const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review-2b", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
   admitSessionCriticReview(request, {});
   const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
