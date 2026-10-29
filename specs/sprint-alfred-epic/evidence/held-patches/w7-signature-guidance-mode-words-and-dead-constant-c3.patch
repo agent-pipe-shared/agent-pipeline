@@ -1,0 +1,95 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 8374489e4..72b3bb40c 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -53,7 +53,6 @@ const { commandDisclosureFields } = humanGuardOverrideInternals;
+ 
+ const DEBUG_PREFIX = "[pipeline.agy-pretool.v1]";
+ const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+-const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
+ const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
+ const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
+ const AGY_NATIVE_DISPATCH_PREPARE = join(PLUGIN_ROOT, "scripts", "antigravity-native-dispatch-prepare.mjs");
+@@ -976,7 +975,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
+               ),
+             ].join("\n")
+             : [
+-              `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
++              `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1; gates.human_approval is "${approvalMode}"); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
+               ceremonyCommand("prepare-for-signature"),
+             ].join("\n");
+           overrideGuidance = [
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+index 68003170b..12deeaf12 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.test.mjs
+@@ -980,6 +980,24 @@ check("Antigravity signature guidance assigns only sign-intent to the external P
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++check("Antigravity signature continuation names the configured mode inside the one-command sentence (slice A2-c3)", () => {
++  const root = readyLifecycleFixture("signature");
++  try {
++    const res = decision(run({
++      toolCall: {
++        name: "replace_file_content",
++        args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "signature", ReplacementContent: "chat" },
++      },
++    }, root));
++    assert.equal(res.decision, "deny");
++    assert.match(
++      res.reason,
++      /Then, in this session, the agent runs prepare-for-signature[^\n]*gates\.human_approval is "signature"[^\n]*exactly one sign-intent command[^\n]*authorize-by-signature by the full path that command writes:\n[^\n]*prepare-for-signature --repo/u,
++      "the one-command continuation must name the configured approval mode",
++    );
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
+ // PO decision 2026-10-23 (row 29): the signed-override route for pipeline.user.yaml must not become
+ // an admission. Without an armed capability an agent widening (signature -> chat) is still denied
+ // and nothing is written; the route only names the human ceremony that could authorize it.
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+index 83fe51895..1e34fce06 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+@@ -49,7 +49,6 @@ const { commandDisclosureFields } = humanGuardOverrideInternals;
+ 
+ const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
+ const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+-const PO_HUMAN_APPROVAL_SCRIPT = join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs");
+ const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
+ const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
+ const HOOK_STARTED_AT = Date.now();
+@@ -605,7 +604,7 @@ if (denials.length > 0) {
+             ]),
+           ].join("\n")
+           : [
+-            `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
++            `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1; gates.human_approval is "${approvalMode}"); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
+             renderOverrideCommand(script, [
+               "prepare-for-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
+             ]),
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+index 5400a44ac..cd67fd302 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
+@@ -937,10 +937,16 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
+     }
+     if (committed === "signature") {
+       // The explicit `gates.human_approval is "signature"` clause lived in the removed
+-      // sign-intent sentence (A2, PO decision 2026-10-27). The guidance is still bound to
+-      // the live configuration: prepare-for-signature is printed in signature mode only
+-      // (the chat-mode branch below refuses it), so the printed command carries the mode.
++      // sign-intent sentence (A2, PO decision 2026-10-27). Slice A2-c3 puts the clause back
++      // inside the single continuation sentence, so the printed mode is asserted again here
++      // (the committed mode, not the loop variable), in addition to the fact that
++      // prepare-for-signature is printed in signature mode only (the chat-mode branch below
++      // refuses it).
+       assert.match(reason, /prepare-for-signature --repo/u, `mode=${committed}`);
++      assert.ok(
++        reason.includes(`gates.human_approval is "${committed}"`),
++        `the continuation must name the configured mode again (mode=${committed})`,
++      );
+     }
+     if (committed === "chat") {
+       assert.doesNotMatch(reason, /prepare-for-signature/u,
