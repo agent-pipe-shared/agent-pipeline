@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P0
 release: 0.7.0
 source: "PO relay of a consumer handover (push block), 2026-10-26, plugin 0.7.0+claude.20261026134650.9ce6c23 local-development; preflight and onboarding ready, hooks refreshed"

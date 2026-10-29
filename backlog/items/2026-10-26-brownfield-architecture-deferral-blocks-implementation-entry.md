@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "PO observation in a consumer repository, relayed in chat 2026-10-26: a brownfield project could defer architecture adoption at onboarding, but the switch to implementation then demanded it and forced reopen-design; PO direction D162"

@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "PO remarks during the D165 fix wave, 2026-10-26: the briefing generator is used permanently and must work reliably; later the same day a consumer repository session hit the same refusal on its first dispatch (CMS-ADMIN-ACCESS-01) and the PO noted that user repositories can never dispatch without an error"

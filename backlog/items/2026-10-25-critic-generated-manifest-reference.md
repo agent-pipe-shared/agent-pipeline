@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-25
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "PO-supplied second Greenfield reports, consolidated under D152"

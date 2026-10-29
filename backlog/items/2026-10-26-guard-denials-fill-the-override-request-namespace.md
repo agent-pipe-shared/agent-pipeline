@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "Live WSL PC re-entry 2026-10-26; PO decision Q17 (a)"

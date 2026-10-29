@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "PO consumer run 2026-10-26: about eight minutes and two dozen tool calls for a first native dispatch that was still not admitted"

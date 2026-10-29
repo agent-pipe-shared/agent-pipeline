@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "PO paste of a consumer session (Windows terminal), 2026-10-26: the Agent call shows 'running PreToolUse hooks 3/4 · 4m 40s'"

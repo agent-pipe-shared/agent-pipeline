@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P0
 release: 0.7.0
 source: "Live Claude Elephant session on the WSL PC, 2026-10-26"

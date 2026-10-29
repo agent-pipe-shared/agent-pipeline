@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "PO consumer report pipeline-feedback-05 (findings PF-58 to PF-70, plugin 0.7.0+claude.20261025134513.977dad8), relayed 2026-10-26"

@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P2
 release: 0.7.0
 source: "Elephant session on the D163 hotfix candidate 0.7.0+claude.20261026134650.9ce6c23, 2026-10-26"

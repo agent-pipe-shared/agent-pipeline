@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "Elephant session 2026-10-26 on the WSL PC: two consecutive Agent dispatches, the second refused with SDC-LOCK-HELD; plus the PO's consumer reports that user repositories cannot dispatch without an error"

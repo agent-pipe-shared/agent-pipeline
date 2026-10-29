@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-10-26
 source: "WSL PC session 2026-10-26: eleven goldfish-implementor dispatches building held kernel patches; follow-up of the closed item 2026-09-06-briefed-tool-budgets-are-estimated-too-low-and-nothing-enforces-them"
-sprint: sprint-alfred-epic
+sprint: alfred
 done_when: manual
 ---
 

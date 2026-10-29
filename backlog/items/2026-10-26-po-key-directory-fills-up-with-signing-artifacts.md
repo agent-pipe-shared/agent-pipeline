@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P2
 release: 0.7.1
 source: "PO remark 2026-10-26 with a directory listing of the PO key directory on a Windows consumer machine"

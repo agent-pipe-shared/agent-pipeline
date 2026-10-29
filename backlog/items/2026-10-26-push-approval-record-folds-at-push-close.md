@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "Re-entry handover on the WSL PC, 2026-10-26, reproduced the trailing push-approval write after the closed item pipeline.push-approval-record-always-trails-the-signed-commit; PO decision D161 (Q21 (a))"

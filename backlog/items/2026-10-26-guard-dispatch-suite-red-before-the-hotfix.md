@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P1
 release: 0.7.0
 source: "D165 fix wave, 2026-10-26: baseline measurement of hooks/guard-dispatch.test.mjs in fresh clones"

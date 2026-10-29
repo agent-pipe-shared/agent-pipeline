@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-10-26
+sprint: alfred
 priority: P0
 release: 0.7.0
 source: "PO relay of a consumer handover (Critic blocker on the signed-push path), 2026-10-26; the consumer's anonymised handover note is not in this repository"
