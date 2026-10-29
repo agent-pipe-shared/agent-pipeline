@@ -95,3 +95,20 @@ paths = [
   '''.*/backlog/transitions-alfred-history\.ndjson$''',
   '''.*/backlog/transitions-alfred-history\.pre-rebase\.ndjson$'''
 ]
+
+# PF-99 (PO decision 2026-10-29): the course registration writes `critic-lineage-<sha256>.json` and
+# `critic-delta-request-<sha256>.json` under specs/<feature>/evidence/, and both carry the course key,
+# a bare SHA-256 that `generic-api-key` reads as a secret in every such file. Exempted ONLY when the
+# path is one of those two file shapes AND the matched text is exactly `courseKey":"<64 hex>"`
+# (condition = "AND"): any other finding in the same file, the same match in any other file, and every
+# other rule stay fully armed. Further exceptions are a separate decision (0.7.1).
+[[rules.allowlists]]
+description = "course key of the tool-written critic lineage and delta-request files"
+condition = "AND"
+regexTarget = "match"
+paths = [
+  '''.*/specs/[^/]+/evidence/critic-(?:lineage|delta-request)-[0-9a-f]{64}\.json$'''
+]
+regexes = [
+  '''courseKey"\s*:\s*"[0-9a-f]{64}"'''
+]

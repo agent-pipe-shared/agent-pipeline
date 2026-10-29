@@ -130,7 +130,31 @@ test("C: shipped scanner config has no secret-prefix whitelist, stopwords, globa
     // sanctioned global allowlist is the exact `scratch/clones` path exclusion below. It is removed byte-for-byte before the checks, so any
     // other or any widened global allowlist still fails exactly as before.
     const K98_ALLOWLIST = "[allowlist]\ndescription = \"scratch/clones working clones are not part of the scanned source\"\npaths = [\n  '''.*/scratch/clones/.*''',\n]\n";
-    const text = readFileSync(p, "utf8").replace(K98_ALLOWLIST, "");
+    // PF-99 (PO decision 2026-10-29): the one further sanctioned stanza is the rule-scoped course-key exemption, path AND exact
+    // match (condition = "AND"), for the two tool-written lineage/delta-request file shapes. It must be present byte-for-byte in
+    // both shipped files and is removed before the checks, so any other or any widened allowlist still fails exactly as before.
+    const PF99_ALLOWLIST = [
+      "# PF-99 (PO decision 2026-10-29): the course registration writes `critic-lineage-<sha256>.json` and",
+      "# `critic-delta-request-<sha256>.json` under specs/<feature>/evidence/, and both carry the course key,",
+      "# a bare SHA-256 that `generic-api-key` reads as a secret in every such file. Exempted ONLY when the",
+      "# path is one of those two file shapes AND the matched text is exactly `courseKey\":\"<64 hex>\"`",
+      "# (condition = \"AND\"): any other finding in the same file, the same match in any other file, and every",
+      "# other rule stay fully armed. Further exceptions are a separate decision (0.7.1).",
+      "[[rules.allowlists]]",
+      "description = \"course key of the tool-written critic lineage and delta-request files\"",
+      "condition = \"AND\"",
+      "regexTarget = \"match\"",
+      "paths = [",
+      "  '''.*/specs/[^/]+/evidence/critic-(?:lineage|delta-request)-[0-9a-f]{64}\\.json$'''",
+      "]",
+      "regexes = [",
+      "  '''courseKey\"\\s*:\\s*\"[0-9a-f]{64}\"'''",
+      "]",
+      "",
+    ].join("\n");
+    const raw = readFileSync(p, "utf8");
+    assert.equal(raw.split(PF99_ALLOWLIST).length, 2, `the course-key exemption is present exactly once, byte-for-byte: ${p}`);
+    const text = raw.replace(K98_ALLOWLIST, "").replace(PF99_ALLOWLIST, "");
     assert.doesNotMatch(text, /^\s*(regexes|stopwords|entropy|tags|commits)\s*=/mu);
     assert.doesNotMatch(text, /^\s*\[(\[?)allowlists?\]/mu);
     assert.deepEqual([...text.matchAll(/^id = "([^"]+)"/gmu)].map((m) => m[1]), ["sentry-access-token", "generic-api-key"]);

@@ -523,6 +523,39 @@ test(
 );
 
 test(
+  "run() wires the repo's .gitleaks.toml: the course key of the tool-written lineage and delta-request files is exempt, every other finding stays (PF-99, real gitleaks binary)",
+  { skip: gitleaksOnlySkip },
+  async () => {
+    const courseKey = "385cb38d0123456789abcdef0123456789abcdef0123456789abcdef01238c64";
+    const courseLine = `${JSON.stringify({ course: { courseKey, reviewRound: 1 }, verdict: "FAIL" })}\n`;
+    const tokenLine = `${JSON.stringify({ course: { courseKey }, token: "ghp_aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5" })}\n`;
+    const lineageName = `critic-lineage-${"a".repeat(64)}.json`;
+    const deltaName = `critic-delta-request-${"b".repeat(64)}.json`;
+    const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-course-key-"));
+    try {
+      const evidence = join(rootDir, "specs", "feat-x", "evidence");
+      mkdirSync(evidence, { recursive: true });
+      mkdirSync(join(rootDir, "other"), { recursive: true });
+      writeFileSync(join(evidence, lineageName), courseLine);
+      writeFileSync(join(evidence, deltaName), courseLine);
+      writeFileSync(join(evidence, `critic-lineage-${"c".repeat(64)}.json`), tokenLine);
+      writeFileSync(join(evidence, "notes.json"), courseLine);
+      writeFileSync(join(rootDir, "other", lineageName), courseLine);
+
+      const result = await run({ rootDir, config: { binaryPath: gitleaksProbe.path }, timeoutMs: 20000 });
+      const seen = result.findings.map((f) => `${f.path} [${f.rule}]`).sort();
+      assert.deepEqual(seen, [
+        `other/${lineageName} [generic-api-key]`,
+        `specs/feat-x/evidence/critic-lineage-${"c".repeat(64)}.json [github-pat]`,
+        "specs/feat-x/evidence/notes.json [generic-api-key]",
+      ], "only the course key in the two tool-written file shapes is exempt: a token in the same file, the same line in another file and the same line in a look-alike name keep their findings");
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
   "reproduction: bare `detect` leaks a sibling branch's secret from a detached worktree; --no-git closes it (real gitleaks + git, env-gated)",
   { skip: reproSkip },
   async () => {
