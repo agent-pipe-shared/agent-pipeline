@@ -359,7 +359,10 @@ check("GD3 block  the camelCase subagentType field is read too", {
 check("GD4 block  an incomplete Goldfish briefing", {
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: "Please fix the thing. Model: claude-sonnet-5." },
-}, BLOCK, { stderrIncludes: ["DISPATCH-INCOMPLETE-BRIEFING", "GOAL"] });
+}, BLOCK, { stderrIncludes: ["DBG-GENERATED-BRIEFING-REQUIRED"] });
+// QG-04 justification (PO decision D185, 2026-10-29: the guard order stays, the tests follow): a Goldfish briefing assembled by
+// hand is refused DBG-GENERATED-BRIEFING-REQUIRED before its completeness is judged, so GD4 pins that refusal; the
+// DISPATCH-INCOMPLETE-BRIEFING code with its missing-field list stays pinned in lib/dispatch-policy.test.mjs.
 
 // GD5 -- roles with no template contract are not this hook's business.
 // QG-04 justification: general-purpose can write and is refused by the carrier policy (GD72/GD73 pin it for Plan). This case
@@ -383,11 +386,14 @@ check("GD8 the real critic-review.md template, filled, is dispatchable", {
   tool_input: { subagent_type: "pipeline-core:critic", model: "opus", prompt: filledTemplateBody("templates/prompts/critic-review.md", { modelId: "claude-sonnet-5", effort: "max" }) },
 }, ALLOW);
 
-check("GD9 the real goldfish-task.md template, filled, is dispatchable", {
+// QG-04 justification (D185): the template filled BY HAND is no longer dispatchable -- the briefing generator is the only
+// admitted route -- so the case that proved "the real template is dispatchable" now pins the refusal of the hand-filled one.
+// The positive case, a generator-built briefing admitted at this boundary, is pinned by the generated-briefing cases below.
+check("GD9 block  the real goldfish-task.md template, filled by hand, is refused: the briefing must come from the generator", {
   tool_use_id: "gd9",
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:goldfish-implementor", model: "sonnet", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") },
-}, ALLOW);
+}, BLOCK, { stderrIncludes: ["DBG-GENERATED-BRIEFING-REQUIRED"] });
 
 // GD10/GD11 -- Workflow-tool awareness (backlog 2026-08-18-guard-dispatch-has-no-workflow-tool-awareness):
 // an `agent()` call embedded in a Workflow `script` string is checked the same way a direct
@@ -453,10 +459,14 @@ check("GD15 block  an Antigravity dispatch of a write-capable general-purpose su
   tool_input: { Subagents: [{ TypeName: "general-purpose", Prompt: "find where X is defined" }] },
 }, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
 
+// QG-04 justification (PO decision D185, 2026-10-29: the guard order stays, the tests follow): the write-carrier check runs
+// before the role and prompt packet checks, so a packet with no role, an unknown role, a malformed or empty Antigravity entry
+// or a Codex worker without a message is refused DISPATCH-WRITE-CARRIER-REQUIRED -- still before any model call. The role and
+// prompt codes themselves stay pinned in lib/dispatch-policy.test.mjs and in GD15b/GD15d.
 check("GD15a block a direct Agent packet with no role before launch", {
   tool_name: "Agent",
   tool_input: { model: "sonnet", prompt: "do work" },
-}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
+}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] });
 
 check("GD15b block a shipped direct role with no prompt before launch", {
   tool_name: "Agent",
@@ -466,7 +476,7 @@ check("GD15b block a shipped direct role with no prompt before launch", {
 check("GD15c block an unknown namespaced role before launch", {
   tool_name: "Task",
   tool_input: { subagent_type: "pipeline-core:critic-typo", model: "sonnet", prompt: CLEAN_CRITIC },
-}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-UNKNOWN", '"status":"rejected"'] });
+}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] }); // QG-04: see GD15a (D185)
 
 check("GD15d block a statically visible Workflow role without the plugin prefix", {
   tool_name: "Workflow",
@@ -476,12 +486,12 @@ check("GD15d block a statically visible Workflow role without the plugin prefix"
 check("GD15e block malformed Antigravity entries before launch", {
   tool_name: "invoke_subagent",
   tool_input: { Subagents: [{ TypeName: "critic" }] },
-}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
+}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] }); // QG-04: see GD15a (D185)
 
 check("GD15f block an empty Antigravity batch before launch", {
   tool_name: "invoke_subagent",
   tool_input: { Subagents: [] },
-}, BLOCK, { stderrIncludes: ["DISPATCH-ROLE-REQUIRED", '"modelCalls":0'] });
+}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] }); // QG-04: see GD15a (D185)
 
 check("GD15g block a Codex critic packet carrying a claims list", {
   tool_name: "spawn_agent",
@@ -502,7 +512,7 @@ check("GD15i block Codex default role when agent_type is omitted (write-capable 
 check("GD15j block a Codex packet with no message before launch", {
   tool_name: "spawn_agent",
   tool_input: { agent_type: "worker", task_name: "missing-message" },
-}, BLOCK, { stderrIncludes: ["DISPATCH-PROMPT-REQUIRED", '"phase":"packet"'] });
+}, BLOCK, { stderrIncludes: ["DISPATCH-WRITE-CARRIER-REQUIRED"] }); // QG-04: see GD15a (D185)
 
 // GD16-GD19 -- NVA-B-DISPATCHEXPORT-1: extractWorkflowDispatches is now exported and the hook
 // body only runs when this module is the process entrypoint (isDirectInvocation, matching
