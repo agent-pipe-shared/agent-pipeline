@@ -1,0 +1,98 @@
+diff --git a/harness/scripts/check-verify-case-completion.test.mjs b/harness/scripts/check-verify-case-completion.test.mjs
+index a73166554..5e0155be9 100644
+--- a/harness/scripts/check-verify-case-completion.test.mjs
++++ b/harness/scripts/check-verify-case-completion.test.mjs
+@@ -167,7 +167,7 @@ check("VCR01", "the repository registry covers all arrays and pins the observed
+     ["codex-critic-actual-baseline-tests","plugins/pipeline-core/scripts/codex-critic-actual-baseline.test.mjs","top-level-assertions",31],
+     ["codex-critic-baseline-tests","plugins/pipeline-core/scripts/codex-critic-baseline.test.mjs","top-level-assertions",4],
+     ["commit-message-policy-administrative-refusal-tests","plugins/pipeline-core/lib/commit-message-policy-administrative-refusal.test.mjs","node-test-single",3],
+-    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",238],
++    ["critic-course-admission-tests","plugins/pipeline-core/lib/critic-course-admission.test.mjs","top-level-assertions",259],
+     ["critic-dispatch-preflight-tests","plugins/pipeline-core/scripts/critic-dispatch-preflight.test.mjs","top-level-assertions",246],
+     ["critic-generic-batch-tests","plugins/pipeline-core/lib/critic-generic-batch.test.mjs","top-level-assertions",79],
+     ["critic-packet-release-tests","plugins/pipeline-core/lib/critic-packet-release.test.mjs","top-level-assertions",17],
+diff --git a/plugins/pipeline-core/lib/critic-course-admission.test.mjs b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+index fc258c355..2ed750f7c 100644
+--- a/plugins/pipeline-core/lib/critic-course-admission.test.mjs
++++ b/plugins/pipeline-core/lib/critic-course-admission.test.mjs
+@@ -726,7 +726,7 @@ import { admitSessionCriticReview, finalizeSessionCriticReview } from "../script
+ import { preflightCriticDispatch } from "../scripts/critic-dispatch-preflight.mjs";
+ import { registerGenericCriticBatch } from "./critic-generic-batch.mjs";
+ import { addCriticReviewLineage } from "./feature-package-registration.mjs";
+-import { chmodSync, existsSync } from "node:fs";
++import { chmodSync, existsSync, readdirSync } from "node:fs";
+ import { readConsumedCandidateResult } from "../scripts/critic-packet-preflight.mjs";
+ const pf94Commit = (root, message) => { git(root, ["add", "."]); git(root, ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", message]); return git(root, ["rev-parse", "HEAD"]); };
+ const pf94Guardrails = [".claude/pipeline.yaml", "governance/guidelines/review.md", "governance/policies/checklist.md"];
+@@ -996,9 +996,36 @@ test("PF94 ROUND2 (a) the real route continues after the admitted delta: round 2
+   assert.ok(manifest.artifacts.some((a) => a.path === lineageAdded.lineagePath), "step round 2 lineage file is in the manifest");
+   const registration2 = pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage of round 2");
+   const next = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration2, requestedMode: "delta", deltaRequestPath: delta.deltaRequestPath });
+-  console.log("PF94 ROUND2 (a) next admission:", JSON.stringify(next.decision));
+   assert.equal(next.decision.code, "RE-CONSUMED-PACKAGE-PASS", `step next admission decision: ${JSON.stringify(next.decision)}`);
+ });
++test("PF94 ROUND2 (b) the lineage of round 2 without a registered delta request for its candidate is refused and registers nothing", () => {
++  const fx = pf94DeltaFixture();
++  pf94WriteInput(fx);
++  const delta = pf94Delta(fx);
++  assert.equal(delta.status, "delta-request-added", `step delta request: ${JSON.stringify(delta)}`);
++  const registration = pf94CommitPaths(fx.root, delta.commitPaths, "register the delta request");
++  const specPath = `specs/${fx.featureId}/spec.md`, diagnosticPath = `specs/${fx.featureId}/evidence/diagnostic-correction.json`;
++  const taskId = "feature-held-task-round2b", packetId = "9c".repeat(16);
++  const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [fx.correctionCommit], candidateCommit: fx.correctionCommit, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: ["src/fix.mjs"] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
++  writeFileSync(join(fx.root, `evidence/dispatch-record-${taskId}.json`), JSON.stringify(record));
++  const preflightInput = { root: fx.root, base: fx.candidate, candidate: fx.correctionCommit, specPath, guardrailPaths: [], evidencePaths: [diagnosticPath], priorCriticEvidencePath: null, courseContext: { featureId: fx.featureId, registrationCommit: registration, acceptedReference: null, criterionLocator: null, deltaRequestPath: delta.deltaRequestPath } };
++  const request = { preflightInput, taskId, projectId: "pipeline", sessionId: "feature-held-review-2b", packetId, route: { routeId: "session-critic", runner: "codex", adapter: "session-functional-equivalent", provider: "openai", modelTier: "higher-capability", effortTier: "xhigh" }, verdict: pf94Verdict };
++  admitSessionCriticReview(request, {});
++  const finalized = finalizeSessionCriticReview(request, { readOriginalSourceReturnFn: pf94Origin });
++  assert.equal(finalized.status, "completed", `step round 2 finalize completes: ${JSON.stringify(finalized)}`);
++  // The delta request leaves the manifest (working tree only): the lineage must not guess one.
++  const manifest = JSON.parse(readFileSync(join(fx.root, fx.manifestPath), "utf8"));
++  manifest.artifacts = manifest.artifacts.filter((a) => a.path !== delta.deltaRequestPath);
++  writeFileSync(join(fx.root, fx.manifestPath), `${JSON.stringify(manifest, null, 2)}\n`);
++  const before = readFileSync(join(fx.root, fx.manifestPath));
++  const lineageFilesBefore = readdirSync(join(fx.root, "specs", fx.featureId, "evidence")).filter((n) => n.startsWith("critic-lineage-")).sort();
++  const refused = addCriticReviewLineage({ root: fx.root, packetId });
++  assert.equal(refused.status, "refused", JSON.stringify(refused));
++  assert.equal(refused.code, "FPR-LINEAGE-COMPILE", JSON.stringify(refused));
++  assert.equal(refused.compileCode, "CCA-DELTA-REQUIRED", JSON.stringify(refused));
++  assert.ok(readFileSync(join(fx.root, fx.manifestPath)).equals(before), "step manifest is byte-identical");
++  assert.deepEqual(readdirSync(join(fx.root, "specs", fx.featureId, "evidence")).filter((n) => n.startsWith("critic-lineage-")).sort(), lineageFilesBefore, "step no round 2 lineage file was written");
++});
+ test("PF94 DELTA (b) replay is idempotent, before and after the operator commit", () => {
+   const fx = pf94DeltaFixture();
+   pf94WriteInput(fx);
+diff --git a/plugins/pipeline-core/lib/feature-package-registration.mjs b/plugins/pipeline-core/lib/feature-package-registration.mjs
+index d16f97d8c..1bf6f11f2 100644
+--- a/plugins/pipeline-core/lib/feature-package-registration.mjs
++++ b/plugins/pipeline-core/lib/feature-package-registration.mjs
+@@ -491,6 +491,7 @@ export function addCriticDiagnosticEvidence({ root: rootInput, state, path: diag
+  * non-authority candidate-evidence. Nothing is committed.
+  */
+ const LINEAGE_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-lineage-[a-f0-9]{64}\.json$/u;
++const DELTA_REQUEST_FILE = /^specs\/[a-z0-9-]+\/evidence\/critic-delta-request-[a-f0-9]{64}\.json$/u;
+ export function addCriticReviewLineage({ root: rootInput, packetId, readAcceptedDeliveryContract } = {}) {
+   if (typeof packetId !== "string" || !/^[a-f0-9]{32}$/u.test(packetId)) return refused("FPR-ARGS", "--packet needs the 32-hex packet id of a consumed Critic round");
+   let root;
+@@ -536,8 +537,20 @@ export function addCriticReviewLineage({ root: rootInput, packetId, readAccepted
+   const range = consumed.receipt.reviewRange;
+   if (!range || range.base !== packet.candidate.base || range.commit !== packet.candidate.commit || range.diffSha256 !== packet.diff.sha256) return refused("FPR-LINEAGE-COVERAGE-CLAIM", `the consumed receipt of packet ${packetId} does not say it reviewed the packet diff (reviewRange differs from the packet candidate range), so the synthesized complete coverage would contradict it; rerun the round on the course path so the receipt covers the whole diff`, { packetId });
+   const edges = ["feature-delivery"];
++  // Round N > 1 names the delta request that was registered for exactly this round candidate (base and commit of the packet).
++  let deltaRequestPath = null;
++  if (history.length > 0) {
++    for (const entry of manifest.artifacts) {
++      if (entry.class !== "candidate-evidence" || !DELTA_REQUEST_FILE.test(entry.path)) continue;
++      const present = inspect(root, entry.path);
++      let record = null;
++      try { record = present.kind === "file" ? JSON.parse(present.bytes.toString("utf8")) : null; } catch { record = null; }
++      if (record?.schema === "pipeline.critic-delta-request.v1" && record.candidate?.commit === packet.candidate.commit && record.candidate?.base === packet.candidate.base) { deltaRequestPath = entry.path; break; }
++    }
++    if (deltaRequestPath === null) return refused("FPR-LINEAGE-COMPILE", `no delta request is registered for the round candidate ${packet.candidate.commit} (base ${packet.candidate.base}), so the lineage of round ${round} cannot compile (CCA-DELTA-REQUIRED); round 2 and later need the delta request first (register-feature-package.mjs --add-delta-request)`, { compileCode: "CCA-DELTA-REQUIRED", packetId });
++  }
+   const compiled = compileRegisteredCriticReviewLineage({
+-    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath: null },
++    courseRequest: { ...identityInput, requestedMode: history.length === 0 ? "full" : "delta", criterionLocator: null, deltaRequestPath },
+     packetId, reviewId: `review-${round}`, parentReviewId: history.at(-1)?.record?.reviewId ?? null,
+     packages: [{ id: "feature-package", subjectSha256: packet.diff.sha256, changedPaths: [...packet.diffPaths], integrationEdges: edges }],
+     coverage: { changedPaths: [...packet.diffPaths], acceptanceIds: [...unit.criterionIds].sort(), integrationEdges: edges, complete: true, receiptSha256: sha256Canonical(consumed.receipt) },
