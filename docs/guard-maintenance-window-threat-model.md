@@ -329,6 +329,8 @@ below assumes it holds and is written to catch a change that would break it.
   The Critic preflight, the session finalizer and the diagnostic producer also import
   `lib/critic-correction-input-bindings.mjs`, `lib/critic-packet-release.mjs`, and
   `lib/critic-required-guardrails.mjs`, which are protected for the same reason.
+  The dispatch guard also imports `lib/briefing-file-reference.mjs` (the briefing file pointer of D183,
+  which decides the exact prompt bytes a dispatched Goldfish receives), protected for the same reason.
   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
 - The 2026-09-27 design-workflow, model-role and readiness closure adds:
   `lib/design-workflow-package.mjs`, `lib/design-workflow-approval.mjs`,

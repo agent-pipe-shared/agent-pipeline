@@ -535,6 +535,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/critic-correction-input-bindings.mjs",
   "plugins/pipeline-core/lib/critic-packet-release.mjs",
   "plugins/pipeline-core/lib/critic-required-guardrails.mjs",
+  // The dispatch guard hands a Goldfish exactly the verified bytes of a generated briefing file through
+  // this module (D183): changing it could alter the prompt a dispatched agent receives.
+  "plugins/pipeline-core/lib/briefing-file-reference.mjs",
   // The session Critic finalizer selects its admitted model through this
   // route resolver. Keep both the resolver and its dynamically loaded
   // host-managed bootstrap in the kernel: changing either could alter the
