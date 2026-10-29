@@ -182,6 +182,10 @@ what's done vs. remaining, and end the turn with that as the report. A
 clean checkpoint at 80% beats a silent cutoff at 100% with zero report —
 state this priority explicitly in the briefing, not just the number.
 
+## A budget checkpoint is resumed with a grant, not re-dispatched
+
+A returned `outcome: checkpoint` keeps the reservation live and the agent resumable. The cheap move is always the same: read the report and the actual diff, run `dispatch-budget-grant.mjs --agent-id <id> --extra 30 --reason "<why>"`, then `SendMessage` to the SAME agent id with a procedural continuation (make one read-only call first; continue only after the `DISPATCH-BUDGET-GRANT` notice names the digest). Grants are repeatable and each is a recorded decision. A fresh dispatch for the same outcome is the exception, named by a typed reason (`elephant-restart`, `owner-lost`, `context-poisoned`, `new-vertical-outcome`) and by the checkpointed outcome it does not continue. When the estimate already exceeds the base cap, plan the grant in the package (`budgetRationale`) instead of discovering it at the checkpoint. The rule text is `roles/elephant.md` EL-25a and EL-13b.
+
 ## The dispatch-record artifact is not automatic — verify the prompt actually carries it
 
 An `agent()` call is an ordinary subagent invocation: nothing about the
