@@ -24,12 +24,12 @@
   "current": {
     "counts": {
       "25": 6,
-      "50": 3,
-      "75": 245,
+      "50": 2,
+      "75": 246,
       "100": 0,
       "UNKNOWN": 0
     },
-    "index": 73.52
+    "index": 73.62
   },
   "scope": {
     "schema": "pipeline.release-scope-decision.v1",
@@ -373,7 +373,7 @@
     "critic": 255,
     "po-acceptance": 254,
     "native-host": 146,
-    "agent": 49,
+    "agent": 48,
     "po-decision": 8,
     "verify-wsl": 113,
     "historical-evidence": 1
@@ -8759,20 +8759,16 @@
     {
       "itemId": "pipeline.critic-bound-verify-gate-stops-every-windows-project-with-cbv-root",
       "title": "The Critic-bound Verify gate stops the push of every Windows project with CBV-ROOT before it reads any Critic state (N11)",
-      "stage": "50",
+      "stage": "75",
       "baselineStage": "UNKNOWN",
       "priority": "P0",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 with its fix. Commit 6c72f7408 compares the checkout root as a path (pure sameCheckoutRoot, separator, trailing separator and letter case ignored on win32 only); six cases in check-critic-bound-verify.test.mjs pass on Linux with an injected platform. Source only: committed after the 0b10cc602 stamp, not stamped, not installed, so the row stays at 50 until the next stamp. The Windows run of the gate is open, and the consumer expects a second blocker behind it. No Full Verify, Critic, native or acceptance claim.",
+      "reason": "Joined 2026-10-29 with its fix. Commit 6c72f7408 compares the checkout root as a path (pure sameCheckoutRoot, separator, trailing separator and letter case ignored on win32 only); six cases in check-critic-bound-verify.test.mjs pass on Linux with an injected platform. Source only: committed after the 0b10cc602 stamp, not stamped, not installed, so the row stays at 50 until the next stamp. The Windows run of the gate is open, and the consumer expects a second blocker behind it. No Full Verify, Critic, native or acceptance claim. Stamped in 192703ba5 (0.7.0+claude.20261029133549.c206f33) and installed 2026-10-29 (the preflight read installedVersion equal to version). The Windows run of the gate is still open, and a second blocker behind it is expected for the consumer's real Critic state.",
       "evidence": [
         "backlog/items/2026-10-29-critic-bound-verify-gate-stops-every-windows-project-with-cbv-root.md",
         "specs/sprint-alfred-epic/evidence/held-patches/STATE-AUTHORITY-AND-CRITIC-PATHS-VERIFY-2026-10-29.md"
       ],
       "open": [
-        {
-          "owner": "agent",
-          "what": "Stamp the candidate that carries 6c72f7408 (together with held patch 28)."
-        },
         {
           "owner": "native-host",
           "what": "Windows run of the push gate; check the other sites that compare a Git-reported root with a Node root (listed in the verify evidence document)."
@@ -8802,14 +8798,14 @@
       "baselineStage": "UNKNOWN",
       "priority": "P1",
       "release": "0.7.0",
-      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Analysed only: the probe scripts/time-agent-hooks.mjs is committed (adf52ff77) but the consumer symptom was never reproduced and no timing diagnostic exists in guard-dispatch-budget.mjs. First Toolbox trace 2026-10-29 (evidence windows-authority-trace-toolbox-2026-10-29.md): a state command takes about 3 s, 88 % in native PowerShell observations at roughly 0.4 to 0.5 s each; the memo as built saves nothing measurable; the dispatch hooks do not emit the trace yet, so the minutes themselves are still unmeasured.",
+      "reason": "Joined 2026-10-29 (PO: the items of the last days are 0.7.0 fixes because the code does not run in user repositories). Stage from a read-only reader's reading of the item, the matrix and the tree, not from a run; the Elephant spot-checked the cited code and test names where this reason says so. No Full Verify, Critic, native or acceptance claim. Analysed only: the probe scripts/time-agent-hooks.mjs is committed (adf52ff77) but the consumer symptom was never reproduced and no timing diagnostic exists in guard-dispatch-budget.mjs. First Toolbox trace 2026-10-29 (evidence windows-authority-trace-toolbox-2026-10-29.md): a state command takes about 3 s, 88 % in native PowerShell observations at roughly 0.4 to 0.5 s each; the memo as built saves nothing measurable; the dispatch hooks do not emit the trace yet, so the minutes themselves are still unmeasured. Hook trace delivered as a Node preload (NODE_OPTIONS=--import) without touching any protected hook file: 8ceb0a351, 3 cases green, source only.",
       "evidence": [
         "backlog/items/2026-10-26-agent-dispatch-pretooluse-step-takes-minutes-in-a-consumer.md"
       ],
       "open": [
         {
           "owner": "agent",
-          "what": "Let the dispatch hooks emit the authority trace, measure one real dispatch in the consumer, then cut the native spawns (batching or no write probe in read-only paths)."
+          "what": "The opt-in hook trace (authority-trace-preload.mjs, 8ceb0a351) is delivered and not yet installed; after the next install the PO measures one real dispatch in the consumer, then cut the native spawns (batching or no write probe in read-only paths)."
         },
         {
           "owner": "native-host",
