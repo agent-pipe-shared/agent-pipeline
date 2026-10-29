@@ -965,15 +965,10 @@ export function buildDispatchBriefing(options, deps = {}) {
     // PF-68 (PO decision 2026-10-29): a file the dispatch creates and declares under newFiles is part of the write scope.
     check: pkg.check, paths: [...new Set([...pkg.paths, ...(pkg.newFiles ?? [])])], spec: pkg.spec, criterion: pkg.criterion, reconNote: pkg.reconNote, runner: pkg.runner,
   }, deps);
-  // Test-first budget (PO 2026-10-21): an estimate above the tier cap moves the dispatch to the deep tier.
-  let generated = bind(pkg.agentType);
+  // Test-first budget (D193, PO 2026-10-29): an estimate above the tier cap is refused unless the package plans a grant; the tier is never raised silently.
+  const generated = bind(pkg.agentType);
   const budget = skeletonToolBudget(generated.skeleton);
-  let deep = null;
-  if (pkg.estimatedToolCalls !== undefined && budget !== null && pkg.estimatedToolCalls > budget && pkg.agentType !== "goldfish-deep") deep = bind("goldfish-deep");
-  const decision = budgetDecision(pkg, budget, deep === null ? null : skeletonToolBudget(deep.skeleton));
-  if (decision.raised) {
-    generated = { ...deep, warnings: [...deep.warnings, { code: "DBG-PACKAGE-TIER-RAISED", message: `estimatedToolCalls ${pkg.estimatedToolCalls} exceeds the ${pkg.agentType} cap ${budget}; bound to goldfish-deep` }] };
-  }
+  const decision = budgetDecision(pkg, budget);
   const rendered = renderGoldfishBriefing(pkg, generated, calibration, decision);
   if (options.out !== undefined) {
     const target = resolve(root, options.out);

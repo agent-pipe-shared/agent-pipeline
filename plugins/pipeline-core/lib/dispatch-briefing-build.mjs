@@ -129,14 +129,16 @@ export function skeletonToolBudget(skeleton) {
  * step is the deep tier; past the deep cap the package must carry a grant rationale. Returns the agent type to bind
  * with and whether the estimate still exceeds the cap (then the rationale is rendered for the grant).
  */
-export function budgetDecision(pkg, budget, deepBudget = null) {
+export function budgetDecision(pkg, budget) {
   const estimate = pkg.estimatedToolCalls;
   if (estimate === undefined || budget === null || estimate <= budget) return { agentType: pkg.agentType, raised: false, exceeds: false };
-  if (pkg.agentType !== "goldfish-deep" && deepBudget !== null && estimate <= deepBudget) return { agentType: "goldfish-deep", raised: true, exceeds: false };
+  // D193 (PO, 2026-10-29): the tier is never raised silently. An estimate above the cap is refused with the way out named:
+  // a grant planned in the package (the dispatcher continues the same agent at the checkpoint, D191), the deep tier chosen
+  // on purpose, or a split.
   if (!nonEmpty(pkg.budgetRationale)) {
-    refuse("DBG-PACKAGE-BUDGET-EXCEEDED", `estimatedToolCalls ${estimate} exceeds the ${pkg.agentType === "goldfish-deep" || deepBudget === null ? "" : "deep "}tier cap ${deepBudget ?? budget}; repair: split the outcome, or add "budgetRationale" so the dispatcher records a budget grant (D75) at the checkpoint`);
+    refuse("DBG-PACKAGE-BUDGET-EXCEEDED", `estimatedToolCalls ${estimate} exceeds the ${pkg.agentType} cap ${budget}; the tier is not raised silently; repair: add "budgetRationale" (why the outcome needs more calls) so the dispatcher plans a budget grant and continues the same agent at the checkpoint (D191), or set "agentType" to goldfish-deep together with that rationale, or split the outcome into slices with disjoint scopes`);
   }
-  return { agentType: pkg.agentType === "goldfish-deep" || deepBudget === null ? pkg.agentType : "goldfish-deep", raised: pkg.agentType !== "goldfish-deep" && deepBudget !== null, exceeds: true };
+  return { agentType: pkg.agentType, raised: false, exceeds: true };
 }
 
 /** Every path the package names: the write scope, the binding check and each file named in a targeted command. */

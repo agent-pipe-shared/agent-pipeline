@@ -763,15 +763,23 @@ test("a project that calibrates no Verify command still gets targeted -> quick -
   assert.deepEqual(checkRouteProblems(result.text, { verifyCommand: null }), []);
 });
 
-test("an estimate above the tier cap binds the deep tier; above the deep cap it needs a grant rationale", async () => {
+test("D193: an estimate above the tier cap is refused with the grant route named, never raised to the deep tier silently; a rationale plans the grant", async () => {
   const { runDispatchBriefing } = await lib();
   const base = packageFixture();
   const cap = budgetOf(runDispatchBriefing(argvOf(base.fx), depsOf(base.fx)).skeleton);
-  const raised = packageFixture({ estimatedToolCalls: cap + 1 });
-  const raisedResult = runDispatchBriefing(raised.argv, depsOf(raised.fx));
-  assert.equal(raisedResult.ok, true, JSON.stringify(raisedResult));
-  assert.equal(parseNativeGoldfishBriefing(raisedResult.text).binding.agentType, "goldfish-deep");
-  assert.ok(raisedResult.warnings.some((entry) => entry.code === "DBG-PACKAGE-TIER-RAISED"));
+  const over = packageFixture({ estimatedToolCalls: cap + 1 });
+  const overResult = runDispatchBriefing(over.argv, depsOf(over.fx));
+  assert.equal(overResult.ok, false, JSON.stringify(overResult));
+  assert.equal(overResult.code, "DBG-PACKAGE-BUDGET-EXCEEDED");
+  assert.match(overResult.message, /the tier is not raised silently/u);
+  assert.match(overResult.message, /budgetRationale/u);
+  assert.match(overResult.message, /goldfish-deep/u);
+  const planned = packageFixture({ estimatedToolCalls: cap + 1, budgetRationale: "one test-first cycle that needs a few calls more than the base cap" });
+  const plannedResult = runDispatchBriefing(planned.argv, depsOf(planned.fx));
+  assert.equal(plannedResult.ok, true, JSON.stringify(plannedResult));
+  assert.notEqual(parseNativeGoldfishBriefing(plannedResult.text).binding.agentType, "goldfish-deep", "the tier stays the one the package named");
+  assert.ok(!plannedResult.warnings.some((entry) => entry.code === "DBG-PACKAGE-TIER-RAISED"));
+  assert.match(plannedResult.text, /Budget grant expected at the 80 % checkpoint: one test-first cycle/u);
   const tooMany = packageFixture({ estimatedToolCalls: 100000 });
   const refused = runDispatchBriefing(tooMany.argv, depsOf(tooMany.fx));
   assert.equal(refused.code, "DBG-PACKAGE-BUDGET-EXCEEDED");
