@@ -37,3 +37,22 @@ Exit 1. Failing: pointer admitted+expanded; wrong digest / modified file; path o
 Proposed commit message: "feat(dispatch): accept a pointer to the generated briefing file and hand the Goldfish exactly the verified file bytes"
 
 Driver: `scratch/agent-out/w7d183/driver.mjs` (modes setup, run, patch, check, revert, cleanup); the clones `clone` and `clone2` still exist there for slice 2 and must be deleted with `cleanup` at the end.
+
+## Slice 2a (production seam in the dispatch guard)
+
+Changed in `plugins/pipeline-core/hooks/guard-dispatch.mjs` (clone, via anchored scratch script; +29/-2 lines):
+- import line: `writeSync` added to the `node:fs` import; new import of `carriesBriefingFilePointer`, `loadReferencedBriefing` from `../lib/briefing-file-reference.mjs`.
+- Seam right before `const codexV2Marker`: for each dispatch whose prompt carries a pointer (or when a Workflow script carries a `pipeline-briefing-file: <path> sha256=` text), refuse `DBG-REF-CARRIER` (stderr `BLOCKED (guard-dispatch): DBG-REF-CARRIER: ...`, exit 2) when transport is not `direct`, the tool is not Task/Agent, or the Workflow script carries a pointer; else `loadReferencedBriefing` with the same root expression the guard uses for `routeRoot`; refuse with the module code on `ok:false`; on success set `dispatch.prompt` and `toolInput.prompt` to the file text and keep `expandedInput = { ...toolInput }`.
+- Output: before the final `process.exit(0)` of the admitted path, `writeSync(1, JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: expandedInput } }))` when a pointer was expanded.
+
+Deviation from the design text: the Workflow check matches `pipeline-briefing-file: \S+ sha256=` anywhere in the raw script, not only at a line start, because a pointer inside a JS string literal is written with an escaped newline and never sits at a real line start in the script text.
+
+Test change (justified, D183): GD80 Antigravity payload `Model: "sonnet"` changed to `Model: "flash"`. The Antigravity model check (DISPATCH-MODEL-UNROUTED) runs before the seam, so the case was refused for the model, not for the carrier; the payload now reaches the seam. The assertion (exit 2, DBG-REF-CARRIER) is unchanged, nothing weakened.
+
+RED to GREEN: log `g1.guard-dispatch.test.mjs.log` (first run after the seam): 80 of 81 green, only GD80 red for the model reason above; log `g2.guard-dispatch.test.mjs.log`: `ℹ tests 81 / ℹ pass 81 / ℹ fail 0`, exit 0. GD75..GD79 green in g1 already (the reporter prints ids shifted by one).
+Baseline clone2 (plain candidate), log `base2.guard-dispatch.test.mjs.log`: `ℹ tests 75 / ℹ pass 75 / ℹ fail 0`, exit 0. Failing-name sets: clone none, clone2 none.
+Patch regenerated with driver `patch` (3 files, 171 insertions, 2 deletions, 15902 bytes); driver `check` (apply on the plain candidate): `apply-check exit 0`. The patch is written directly into the held-patch path by the driver (no separate install step).
+
+NOT done: generator `promptPointer` and its case in `dispatch-briefing.test.mjs`; `generate-architecture-overview.mjs --check` and any map entry the new module demands; the revert proof; driver `cleanup`; the live PO check of updatedInput merging (see above).
+
+Continuation card: done = pure module, six cases GD75..GD80, guard seam, output; remaining = generator slice, architecture check, revert proof (`driver revert`), cleanup; next step = slice 2b in the same clones, starting with `scripts/dispatch-briefing.mjs` (`buildDispatchBriefing`) plus a case in `dispatch-briefing.test.mjs` (the driver PROD list and the allowed-files list in the patch need those two files then).
