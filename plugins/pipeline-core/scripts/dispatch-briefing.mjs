@@ -46,6 +46,7 @@ import { execFileSync } from "node:child_process";
 import { closeSync, constants as fsConstants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { renderPointerPrompt } from "../lib/briefing-file-reference.mjs";
 
 const directInvocation = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const cliArguments = process.argv.slice(2);
@@ -988,6 +989,8 @@ export function buildDispatchBriefing(options, deps = {}) {
     subagent_type: `pipeline-core:${boundTier}`,
     model: family,
     prompt: options.out === undefined ? "the `text` field of this result, verbatim" : `the file ${options.out}, verbatim including its final newline`,
+    // D183: a Claude Agent dispatch may carry this two-line pointer prompt instead of the full text; guard-dispatch hands the child the verified file bytes.
+    ...(options.out === undefined || boundTier === undefined ? {} : { promptPointer: renderPointerPrompt({ text: rendered.text, path: options.out }) }),
   };
   return {
     schema: BRIEFING_BUILD_SCHEMA, ok: true, dispatchId: pkg.id, path: options.out ?? null,

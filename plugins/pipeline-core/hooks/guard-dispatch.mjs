@@ -68,7 +68,7 @@
  * sides cannot drift. Canonical form: CRLF normalised to LF, nothing else stripped or altered.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -90,6 +90,7 @@ import { prepareNativeGoldfishHostState, recordNativeGoldfishPrepareFailure, res
 const HOOK_ENTRY_MS = Date.now();
 import { parseNativeGoldfishBriefing } from "../lib/native-goldfish-host-return.mjs";
 import { generatedBriefingAdmission } from "../lib/dispatch-briefing-build.mjs";
+import { carriesBriefingFilePointer, loadReferencedBriefing } from "../lib/briefing-file-reference.mjs";
 import { dispatchModelRefusalText, dispatchModelWarningText, evaluateDispatchModel } from "../lib/dispatch-model-enforcement.mjs";
 import { enterClaudeHookSessionOwner, enterCodexHookSessionOwner } from "../lib/claude-hook-session-owner.mjs";
 import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
@@ -820,6 +821,31 @@ if (isDirectInvocation(import.meta.url)) {
     process.exit(0);
   }
 
+  // D183: a Claude Agent/Task prompt may be the generator marker line plus one pipeline-briefing-file pointer.
+  // Expand it here, before every later consumer, so they judge the real briefing; the child receives the verified file bytes.
+  let expandedInput = null;
+  {
+    const pointerRoot = resolve(process.env.CLAUDE_PROJECT_DIR || (typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd()));
+    const directTool = ["Task", "Agent"].includes(input?.tool_name);
+    const workflowCarries = typeof toolInput.script === "string" && /pipeline-briefing-file: \S+ sha256=/u.test(toolInput.script);
+    for (const dispatch of dispatches) {
+      if (!carriesBriefingFilePointer(dispatch.prompt) && !workflowCarries) continue;
+      if (dispatch.transport !== "direct" || !directTool || workflowCarries) {
+        process.stderr.write("BLOCKED (guard-dispatch): DBG-REF-CARRIER: a pipeline-briefing-file pointer is admitted only in the prompt of a direct Claude Task/Agent call; Workflow, Codex and Antigravity dispatches must carry the full generated briefing text.\n");
+        process.exit(2);
+      }
+      const loaded = loadReferencedBriefing({ root: pointerRoot, prompt: dispatch.prompt });
+      if (loaded === null) continue;
+      if (!loaded.ok) {
+        process.stderr.write(`BLOCKED (guard-dispatch): ${loaded.code}: ${loaded.message}\n`);
+        process.exit(2);
+      }
+      dispatch.prompt = loaded.text;
+      toolInput.prompt = loaded.text;
+      expandedInput = { ...toolInput };
+    }
+  }
+
   const codexV2Marker = "<!-- pipeline-native-goldfish-host-commit:v2";
   const itemV3Marker = "<!-- pipeline-native-goldfish-host-commit:v3";
   const markedV2 = dispatches.filter((dispatch) => dispatch.prompt.includes(codexV2Marker) || input?.tool_name === "spawn_agent" && dispatch.prompt.includes(itemV3Marker));
@@ -1098,6 +1124,9 @@ if (isDirectInvocation(import.meta.url)) {
           process.stderr.write(`WARNING (guard-dispatch): native host-commit preparation failed (${prepared.code}); dispatch continues, the child must leave changes uncommitted, and no authorship record will be claimed.\n`);
         }
       }
+    }
+    if (expandedInput !== null) {
+      writeSync(1, JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: expandedInput } }));
     }
     process.exit(0);
   }

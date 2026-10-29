@@ -1174,7 +1174,82 @@ manualCheck("GD74 the shipped hooks.json timeout of the dispatch guard is at lea
   assert.ok(entries[0].timeout >= ADMISSION_BUDGET_MS / 1000 + 20, `hook timeout ${entries[0].timeout}s is below the admission budget plus 20 s`);
 });
 
-assert.equal(cases.length, 75, "the complete dispatch guard corpus must register before execution");
+// D183 (PO 2026-10-29, option a): a Claude Agent prompt may carry the generator marker line and ONE pointer line to the generated
+// briefing file; the guard verifies the file and answers the PreToolUse event with updatedInput.prompt = the file text.
+// Briefings come from the real generator (generatedItemFixture); no test forges a marker.
+function runAtOut(payload, root) {
+  const res = spawnSync(process.execPath, [GUARD], { input: JSON.stringify(payload), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+  return { code: res.status, stderr: res.stderr ?? "", stdout: res.stdout ?? "" };
+}
+const sha256Of = (text) => createHash("sha256").update(text, "utf8").digest("hex");
+const markerLineOf = (text) => text.split("\n").find((line) => line.startsWith("<!-- pipeline-briefing-generator:v1 sha256="));
+function pointerFixture(governed, { path = "scratch/briefing-d183.md", digest } = {}) {
+  writeFileSync(join(governed.root, "scratch", "briefing-d183.md"), governed.text);
+  return `${markerLineOf(governed.text)}\npipeline-briefing-file: ${path} sha256=${digest ?? sha256Of(governed.text)}\n`;
+}
+const pointerDispatch = (governed, prompt, toolUseId) => { const dispatch = generatedDispatch(governed, toolUseId, {}); dispatch.tool_input.prompt = prompt; return dispatch; };
+
+manualCheck("GD75 allow  D183: a pointer prompt (marker line + pipeline-briefing-file line) is admitted and the PreToolUse answer carries updatedInput.prompt equal to the verified file text, every other tool input field kept", () => {
+  const governed = generatedItemFixture();
+  const payload = pointerDispatch(governed, pointerFixture(governed), "gd75");
+  const { code, stderr, stdout } = runAtOut(payload, governed.root);
+  assert.equal(code, ALLOW, `exit ${code} -- ${stderr.trim().slice(0, 300)}`);
+  const answer = JSON.parse(stdout);
+  assert.equal(answer.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.equal(answer.hookSpecificOutput.permissionDecision, "allow");
+  assert.equal(answer.hookSpecificOutput.updatedInput.prompt, governed.text, "the child must receive exactly the file bytes");
+  assert.equal(answer.hookSpecificOutput.updatedInput.subagent_type, "pipeline-core:goldfish-implementor");
+  assert.equal(answer.hookSpecificOutput.updatedInput.model, "sonnet");
+});
+
+manualCheck("GD76 block  D183: a pointer with a wrong digest is refused DBG-REF-DIGEST, and a file modified after generation is refused DBG-REF-DIGEST", () => {
+  const governed = sharedRefusalFixture();
+  const wrong = runAtOut(pointerDispatch(governed, pointerFixture(governed, { digest: "0".repeat(64) }), "gd76a"), governed.root);
+  assert.equal(wrong.code, BLOCK, wrong.stderr.slice(0, 300));
+  assert.ok(wrong.stderr.includes("DBG-REF-DIGEST"), wrong.stderr.slice(0, 300));
+  const prompt = pointerFixture(governed);
+  writeFileSync(join(governed.root, "scratch", "briefing-d183.md"), `${governed.text}\nAn extra line added after generation.\n`);
+  const changed = runAtOut(pointerDispatch(governed, prompt, "gd76b"), governed.root);
+  assert.equal(changed.code, BLOCK, changed.stderr.slice(0, 300));
+  assert.ok(changed.stderr.includes("DBG-REF-DIGEST"), changed.stderr.slice(0, 300));
+});
+
+manualCheck("GD77 block  D183: a pointer path outside scratch/ or with a .. segment, or a missing file, is refused DBG-REF-PATH", () => {
+  const governed = sharedRefusalFixture();
+  for (const path of ["docs/briefing-d183.md", "scratch/../docs/briefing-d183.md", "/etc/hosts", "scratch/missing-d183.md"]) {
+    const { code, stderr } = runAtOut(pointerDispatch(governed, pointerFixture(governed, { path }), "gd77"), governed.root);
+    assert.equal(code, BLOCK, `${path}: ${stderr.slice(0, 300)}`);
+    assert.ok(stderr.includes("DBG-REF-PATH"), `${path}: ${stderr.slice(0, 300)}`);
+  }
+});
+
+manualCheck("GD78 block  D183: a pointer plus inline briefing text in one prompt is refused DBG-REF-AMBIGUOUS", () => {
+  const governed = sharedRefusalFixture();
+  const { code, stderr } = runAtOut(pointerDispatch(governed, `${pointerFixture(governed)}${governed.text}`, "gd78"), governed.root);
+  assert.equal(code, BLOCK, stderr.slice(0, 300));
+  assert.ok(stderr.includes("DBG-REF-AMBIGUOUS"), stderr.slice(0, 300));
+});
+
+manualCheck("GD79 allow  D183: an inline full-text generated prompt behaves as before (admitted, no updatedInput answer)", () => {
+  const governed = generatedItemFixture();
+  const { code, stderr, stdout } = runAtOut(generatedDispatch(governed, "gd79", {}), governed.root);
+  assert.equal(code, ALLOW, stderr.slice(0, 300));
+  assert.equal(stdout, "", "an inline prompt gets no PreToolUse answer");
+});
+
+manualCheck("GD80 block  D183: a pointer carried by a Workflow script, a Codex spawn_agent message or an Antigravity Subagents prompt is refused DBG-REF-CARRIER", () => {
+  const governed = sharedRefusalFixture();
+  const pointer = pointerFixture(governed);
+  const workflow = runAtOut({ cwd: governed.root, session_id: "gd80", tool_name: "Workflow", tool_input: { script: `agent({ agentType: "pipeline-core:goldfish-implementor", prompt: ${JSON.stringify(pointer)} })` } }, governed.root);
+  const codex = runAtOut({ cwd: governed.root, session_id: "gd80", tool_name: "spawn_agent", tool_input: { agent_type: "pipeline-core:goldfish-implementor", message: pointer } }, governed.root);
+  const anti = runAtOut({ cwd: governed.root, session_id: "gd80", tool_name: "Agent", tool_input: { Subagents: [{ TypeName: "pipeline-core:goldfish-implementor", Model: "flash", Prompt: pointer }] } }, governed.root);
+  for (const [name, result] of [["workflow", workflow], ["codex", codex], ["antigravity", anti]]) {
+    assert.equal(result.code, BLOCK, `${name}: ${result.stderr.slice(0, 300)}`);
+    assert.ok(result.stderr.includes("DBG-REF-CARRIER"), `${name}: ${result.stderr.slice(0, 300)}`);
+  }
+});
+
+assert.equal(cases.length, 81, "the complete dispatch guard corpus must register before execution");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

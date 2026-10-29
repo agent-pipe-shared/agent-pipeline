@@ -677,6 +677,19 @@ test("build --out writes the verified briefing under scratch/ and refuses any ot
   assert.equal(outside.code, "DBG-PATH-INVALID");
 });
 
+test("build --out also prints the D183 pointer prompt: the marker line plus a file pointer whose digest is the digest of the whole file", async () => {
+  const { runDispatchBriefing } = await lib();
+  const { fx, argv } = packageFixture();
+  const withFile = runDispatchBriefing([...argv, "--out", "scratch/briefing-ALF-T1.md"], depsOf(fx));
+  assert.equal(withFile.ok, true, JSON.stringify(withFile));
+  const written = readFileSync(join(fx.root, "scratch/briefing-ALF-T1.md"), "utf8");
+  const marker = written.split("\n").find((line) => line.startsWith("<!-- pipeline-briefing-generator:v1 sha256="));
+  assert.equal(withFile.dispatchCall.promptPointer, `${marker}\npipeline-briefing-file: scratch/briefing-ALF-T1.md sha256=${withFile.sha256}\n`);
+  assert.match(withFile.dispatchCall.prompt, /verbatim/u, "the full-text route stays for every non-pointer carrier");
+  const inline = runDispatchBriefing(argv, depsOf(fx));
+  assert.equal(inline.dispatchCall.promptPointer, undefined, "without --out there is no file to point at");
+});
+
 test("the generated briefing prescribes the test-first order in one dispatch (AC-186, PO 2026-10-21)", async () => {
   const { runDispatchBriefing } = await lib();
   const { fx, argv } = packageFixture();
