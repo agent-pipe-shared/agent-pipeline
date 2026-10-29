@@ -629,7 +629,7 @@ export function extractMarkdownLinks(markdown) {
 }
 
 function gitList(root, patterns = []) {
-  const result = spawnSync("git", ["ls-files", "-z", "--", ...patterns], { cwd: root, encoding: "buffer" });
+  const result = spawnSync("git", ["ls-files", "-z", "--", ...patterns], { cwd: root, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ls-files failed with exit ${result.status ?? "unknown"}`);
   const output = decoder.decode(result.stdout);
   return output.split("\0").filter(Boolean).map(posixPath);
