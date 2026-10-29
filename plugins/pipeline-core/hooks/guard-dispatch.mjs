@@ -97,6 +97,9 @@ import { resolveGitCommonDir } from "./guard-dispatch-budget.mjs";
 import { observeGovernanceScope } from "../lib/governance-scope.mjs";
 import { isDirectInvocation as isGovernanceHookEntry } from "../lib/entrypoint.mjs";
 
+// Opt-in diagnostic: nothing is imported or written unless PIPELINE_AUTHORITY_TRACE is exactly "1".
+if (process.env.PIPELINE_AUTHORITY_TRACE === "1") await (await import("../lib/authority-trace-hook.mjs")).installHookAuthorityTrace();
+
 // W7 A: the template markers a shipped Goldfish or Critic briefing carries (templates/prompts/goldfish-task.md, critic-review.md).
 const GOLDFISH_SHAPE_MARKERS = ["### 1. Goal", "### 2. Context files", "### 3. DoD checks", "### 4. Forbidden", "### 5. Stop conditions", "### 6. Dispatch metadata"];
 const CRITIC_SHAPE_MARKERS = ["Fail-closed reference boundary", "## Phase A", "## Phase B"];

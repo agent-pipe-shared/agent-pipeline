@@ -75,3 +75,73 @@ test("APT3 several processes append, one line each, and without a file the line 
   assert.equal(res.status, 0);
   assert.match(res.stderr, /^AUTHORITY-TRACE \{"schema":"pipeline\.hook-authority-trace\.v1"/u);
 });
+
+// ---- hook-side installer (lib/authority-trace-hook.mjs): the hooks of an Agent dispatch emit the trace themselves ----
+const installerUrl = pathToFileURL(join(dirname(dirname(AUTHORITY_TRACE_PRELOAD_PATH)), "lib", "authority-trace-hook.mjs")).href;
+const hooksDir = join(dirname(dirname(AUTHORITY_TRACE_PRELOAD_PATH)), "hooks");
+const installerChild = join(dir, "installer-child.mjs");
+writeFileSync(installerChild, `const { installHookAuthorityTrace } = await import(${JSON.stringify(installerUrl)});\nawait installHookAuthorityTrace({ hook: "child-hook" });\nawait installHookAuthorityTrace({ hook: "child-hook" });\nprocess.exit(Number(process.env.FAKE_EXIT ?? 0));\n`);
+
+function envFor(extra) {
+  const clean = { ...process.env };
+  delete clean.PIPELINE_AUTHORITY_TRACE; delete clean.PIPELINE_AUTHORITY_TRACE_FILE; delete clean.NODE_OPTIONS;
+  return { ...clean, ...extra };
+}
+
+test("APT5 variable unset: the installer registers nothing and a child writes nothing", () => {
+  const file = join(dir, "inst-off.jsonl");
+  for (const value of [undefined, "0", "true"]) {
+    const res = spawnSync(process.execPath, [installerChild], { encoding: "utf8", env: envFor({ PIPELINE_AUTHORITY_TRACE_FILE: file, ...(value === undefined ? {} : { PIPELINE_AUTHORITY_TRACE: value }) }) });
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(res.stderr, "");
+  }
+  assert.equal(existsSync(file), false);
+});
+
+test("APT6 variable 1 with a file: a child importing the installer (called twice) writes exactly one valid line naming the hook", () => {
+  const file = join(dir, "inst-on.jsonl");
+  const res = spawnSync(process.execPath, [installerChild], { encoding: "utf8", env: envFor({ PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: file, FAKE_EXIT: "3" }) });
+  assert.equal(res.status, 3, "exit code unchanged");
+  const lines = readFileSync(file, "utf8").trim().split("\n");
+  assert.equal(lines.length, 1);
+  const trace = JSON.parse(lines[0]);
+  assert.equal(trace.schema, "pipeline.hook-authority-trace.v1");
+  assert.equal(trace.hook, "child-hook");
+  assert.equal(trace.exitCode, 3);
+  assert.equal(typeof trace.wallMs, "number");
+  assert.deepEqual(trace.counters, { custody: true, observed: true, authority: true });
+});
+
+test("APT7 the preload plus an installer call in one process writes ONE line", () => {
+  const file = join(dir, "both.jsonl");
+  const res = spawnSync(process.execPath, ["--import", preload, installerChild], { encoding: "utf8", env: envFor({ PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: file }) });
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(readFileSync(file, "utf8").trim().split("\n").length, 1);
+});
+
+test("APT8 each Agent PreToolUse hook script appends a trace line when the variable is set, even on empty input", () => {
+  const project = mkdtempSync(join(tmpdir(), "authority-trace-hook-project-"));
+  try {
+    for (const name of ["guard-lifecycle-ready", "guard-dispatch", "guard-dispatch-budget", "guard-worktree-isolation"]) {
+      const file = join(dir, `hook-${name}.jsonl`);
+      spawnSync(process.execPath, [join(hooksDir, `${name}.mjs`)], {
+        encoding: "utf8", input: "", cwd: project,
+        env: envFor({ PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: file, CLAUDE_PROJECT_DIR: project }),
+      });
+      assert.equal(existsSync(file), true, `${name} wrote no trace`);
+      const lines = readFileSync(file, "utf8").trim().split("\n");
+      assert.equal(lines.length, 1, `${name} wrote ${lines.length} lines`);
+      assert.equal(JSON.parse(lines[0]).hook, `${name}.mjs`);
+      const off = join(dir, `hook-off-${name}.jsonl`);
+      const res = spawnSync(process.execPath, [join(hooksDir, `${name}.mjs`)], { encoding: "utf8", input: "", cwd: project, env: envFor({ PIPELINE_AUTHORITY_TRACE_FILE: off, CLAUDE_PROJECT_DIR: project }) });
+      assert.equal(existsSync(off), false, `${name} wrote with the variable unset`);
+      assert.equal(res.stderr.includes("AUTHORITY-TRACE"), false);
+    }
+  } finally { rmSync(project, { recursive: true, force: true }); }
+});
+
+test("APT9 an unwritable trace file is swallowed and the exit code is unchanged", () => {
+  const res = spawnSync(process.execPath, [installerChild], { encoding: "utf8", env: envFor({ PIPELINE_AUTHORITY_TRACE: "1", PIPELINE_AUTHORITY_TRACE_FILE: join(dir, "no-such-dir", "x.jsonl"), FAKE_EXIT: "4" }) });
+  assert.equal(res.status, 4);
+  assert.equal(res.stderr, "");
+});

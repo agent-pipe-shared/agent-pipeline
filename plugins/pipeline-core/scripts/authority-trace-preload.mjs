@@ -4,22 +4,19 @@
  * authority-trace-preload.mjs -- opt-in diagnostic that makes ANY Node process of this plugin (a PreToolUse hook, a script)
  * report the same authority counters `pipeline-state.mjs` prints with PIPELINE_AUTHORITY_TRACE=1, without editing the process.
  *
- * Why: the trace of `pipeline-state.mjs` showed that a state command spends about 88 percent of its time in native Windows
- * observations (one PowerShell per call). The minutes of the PreToolUse step of an Agent dispatch belong to hook processes,
- * which never printed that trace, and a real `guard-dispatch` run reserves a slice, so it cannot be timed from outside without
- * side effects. This module is loaded by Node itself, so no protected hook file changes.
+ * The writer itself lives in lib/authority-trace-hook.mjs (installHookAuthorityTrace); the Agent PreToolUse hooks call it
+ * directly, so a dispatch needs only PIPELINE_AUTHORITY_TRACE=1 (+ PIPELINE_AUTHORITY_TRACE_FILE) and no NODE_OPTIONS. This
+ * preload remains for processes that do not call the installer; the installer is idempotent per process, so a process that
+ * has both writes ONE line.
  *
  * Use (PowerShell; start the runner from this shell so its hook processes inherit the variables):
  *   $env:PIPELINE_AUTHORITY_TRACE = '1'
  *   $env:PIPELINE_AUTHORITY_TRACE_FILE = "$env:TEMP\hook-authority-trace.jsonl"      # optional; default is stderr
  *   $env:NODE_OPTIONS = '--import file:///<plugin root>/scripts/authority-trace-preload.mjs'
- * Before the plugin that ships this file is installed, copy ONLY this file anywhere and add
+ * A copy of ONLY this file works with
  *   $env:PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT = '<installed plugin root>'      # the directory that holds lib/
- * and point --import at the copy.
- * Then run one Agent dispatch and read the file: one JSON line per Node process that ended, `pipeline.hook-authority-trace.v1`.
- * Nothing happens unless PIPELINE_AUTHORITY_TRACE is exactly "1". Stderr of a hook that exits 0 is not shown by the runner,
- * which is why the file route exists. The counters are process-local: this file imports the three counter modules by the
- * same relative paths the hooks use, so both see one module instance.
+ * Without it a copy still writes its line, with the counters reported as not loaded.
+ * Nothing happens unless PIPELINE_AUTHORITY_TRACE is exactly "1".
  */
 import { appendFileSync } from "node:fs";
 import { basename } from "node:path";
@@ -27,53 +24,39 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 if (process.env.PIPELINE_AUTHORITY_TRACE === "1") {
-  // The counter modules come from PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT when it is set (a directory holding lib/), so this one
-  // file can be copied anywhere and still read the counters of an INSTALLED plugin without a new install; otherwise from the
-  // plugin this file sits in. Both must be the root the hooks run from, or the counters belong to another module instance.
   const rootOverride = process.env.PIPELINE_AUTHORITY_TRACE_PLUGIN_ROOT;
   const base = typeof rootOverride === "string" && rootOverride !== ""
     ? pathToFileURL(rootOverride.endsWith("/") || rootOverride.endsWith("\\") ? rootOverride : `${rootOverride}/`)
     : new URL("../", import.meta.url);
-  const load = async (relative, name) => {
-    try { return (await import(new URL(relative, base).href))[name]; } catch { return null; }
-  };
-  const custody = await load("lib/worktree-lifecycle.mjs", "custodyInspectionStats");
-  const observed = await load("lib/windows-private-state.mjs", "nativeObservationStats");
-  const authority = await load("lib/windows-owned-authority-backend.mjs", "nativeAuthorityStats");
-  const startedAt = performance.now();
-  const preloadWorkMs = Math.round(startedAt);
-  let written = false;
-  process.on("exit", (code) => {
-    if (written) return;
-    written = true;
-    try {
-      const c = custody?.() ?? { count: 0, ms: 0, maxMs: 0 };
-      const o = observed?.() ?? { count: 0, ms: 0, maxMs: 0, failed: 0 };
-      const a = authority?.() ?? { count: 0, ms: 0, maxMs: 0, failed: 0, byOperation: {} };
-      const trace = {
-        schema: "pipeline.hook-authority-trace.v1",
-        hook: basename(process.argv[1] ?? "") || "(stdin)",
-        pid: process.pid,
-        exitCode: typeof code === "number" ? code : 0,
-        processMs: Math.round(performance.now()),
-        preloadMs: preloadWorkMs,
-        custodyInspections: { count: c.count ?? 0, ms: c.ms ?? 0, maxMs: c.maxMs ?? 0 },
-        nativeObservations: {
-          count: (o.count ?? 0) + (a.count ?? 0),
-          ms: (o.ms ?? 0) + (a.ms ?? 0),
-          maxMs: Math.max(o.maxMs ?? 0, a.maxMs ?? 0),
-          failed: (o.failed ?? 0) + (a.failed ?? 0),
-          byOperation: a.byOperation ?? {},
-        },
-        authorityMemo: { hits: a.authorityMemoHits ?? 0, misses: a.authorityMemoMisses ?? 0, size: a.authorityMemoSize ?? 0 },
-        counters: { custody: custody !== null, observed: observed !== null, authority: authority !== null },
-      };
-      const line = `${JSON.stringify(trace)}\n`;
-      const file = process.env.PIPELINE_AUTHORITY_TRACE_FILE;
-      if (typeof file === "string" && file !== "") appendFileSync(file, line);
-      else process.stderr.write(`AUTHORITY-TRACE ${line}`);
-    } catch { /* a diagnostic never changes the exit of the process it observes */ }
-  });
+  let installer = null;
+  try { installer = (await import(new URL("lib/authority-trace-hook.mjs", base).href)).installHookAuthorityTrace; } catch { installer = null; }
+  if (typeof installer === "function") {
+    await installer({ pluginRootUrl: base });
+  } else if (!globalThis[Symbol.for("pipeline.authority-trace-hook.installed")]) {
+    // A lone copy of this file with no reachable plugin: still leave the line, counters reported as not loaded.
+    globalThis[Symbol.for("pipeline.authority-trace-hook.installed")] = true;
+    process.on("exit", (code) => {
+      try {
+        const zero = { count: 0, ms: 0, maxMs: 0 };
+        const trace = {
+          schema: "pipeline.hook-authority-trace.v1",
+          hook: basename(process.argv[1] ?? "") || "(stdin)",
+          pid: process.pid,
+          exitCode: typeof code === "number" ? code : 0,
+          processMs: Math.round(performance.now()),
+          wallMs: Math.round(performance.now()),
+          custodyInspections: zero,
+          nativeObservations: { ...zero, failed: 0, byOperation: {} },
+          authorityMemo: { hits: 0, misses: 0, size: 0 },
+          counters: { custody: false, observed: false, authority: false },
+        };
+        const line = `${JSON.stringify(trace)}\n`;
+        const file = process.env.PIPELINE_AUTHORITY_TRACE_FILE;
+        if (typeof file === "string" && file !== "") appendFileSync(file, line);
+        else process.stderr.write(`AUTHORITY-TRACE ${line}`);
+      } catch { /* a diagnostic never changes the exit of the process it observes */ }
+    });
+  }
 }
 
 export const AUTHORITY_TRACE_PRELOAD_PATH = fileURLToPath(import.meta.url);
