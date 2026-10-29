@@ -12,6 +12,7 @@ import {
   validateReleaseCriticScopeAdmission,
 } from "./critic-review-lineage.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
+import { safePath } from "./critic-review-lineage-core.mjs";
 
 const H = (character) => character.repeat(64);
 const O = (character) => character.repeat(40);
@@ -185,6 +186,32 @@ check("ships a complete Draft-2020-12 schema parallel to the runtime root and ne
   assert.equal(releaseScopeSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
   assert.equal(releaseScopeSchema.$id, "pipeline.release-critic-review-scope.v1");
   assert.equal(releaseScopeSchema.additionalProperties, false);
+});
+
+check("schema path patterns accept every legitimate file name character and agree with safePath", () => {
+  const lineageSchema = JSON.parse(readFileSync(new URL("../scripts/critic-review-lineage.schema.json", import.meta.url), "utf8"));
+  const releaseSchema = JSON.parse(readFileSync(new URL("../scripts/release-critic-review-scope.schema.json", import.meta.url), "utf8"));
+  const cp = (value) => String.fromCodePoint(value);
+  const accepted = [
+    "src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx",
+    "src/with space/a.ts", `src/${cp(252)}ber/a.ts`, "src/a+b=c,d~e.ts", "src/a:b.ts", "src/a.ts ", "-lead/a.ts",
+  ];
+  const refused = [
+    `src/a${cp(10)}b.ts`, `src/a.ts${cp(10)}`, `src/a${cp(0)}b.ts`, `src/a${cp(0x85)}b.ts`, `src/a${cp(0x7f)}b.ts`,
+    `src/a${cp(92)}b.ts`, "/src/a.ts",
+  ];
+  const lineagePattern = new RegExp(lineageSchema.$defs.path.pattern);
+  const releasePattern = new RegExp(releaseSchema.$defs.path.pattern);
+  for (const path of accepted) {
+    assert.equal(lineagePattern.test(path), true, `lineage accepts ${JSON.stringify(path)}`);
+    assert.equal(releasePattern.test(path), true, `release accepts ${JSON.stringify(path)}`);
+    assert.equal(safePath(path), true, `safePath accepts ${JSON.stringify(path)}`);
+  }
+  for (const path of [...refused, "src//a.ts", "src/./a.ts", "src/../a.ts"]) {
+    assert.equal(lineagePattern.test(path), false, `lineage refuses ${JSON.stringify(path)}`);
+    assert.equal(safePath(path), false, `safePath refuses ${JSON.stringify(path)}`);
+  }
+  for (const path of refused) assert.equal(releasePattern.test(path), false, `release refuses ${JSON.stringify(path)}`);
 });
 
 check("retains pending incomplete/null coverage verbatim and admits only its exact compiled packet", () => {
@@ -723,5 +750,60 @@ check("release corrections bind the previous reviewed candidate, impact closure 
   assert.equal(validateReleaseCriticScopeAdmission(broad, packet2, broadScope).ok, true);
 });
 
-assert.equal(passed, 14);
-console.log(`${passed}/14 checks passed.`);
+// PF-97 F1 (PO decision 2026-10-28): every legitimate file name character is allowed in a repository path.
+const LEGITIMATE_PATHS = [
+  "src/app/(app)/(auth)/anmelden/page.tsx",
+  "src/app/[slug]/page.tsx",
+  "src/app/@modal/(.)photo/page.tsx",
+  "routes/$id.tsx",
+  "src/with space/file name.ts",
+  "src/über/ü.ts",
+  "src/a+b=c,d~e.ts",
+  "src/a:b.ts",
+  "src/trail .ts",
+  "src/-lead.ts",
+  "src/50%#done.ts",
+];
+const REFUSED_PATHS = [
+  "src/a\nb.ts",
+  "src/a.ts\n",
+  "src/a\rb.ts",
+  "src/a\u0000b.ts",
+  "src/a\u0085b.ts",
+  "src/a\u007fb.ts",
+  "src/a\u009fb.ts",
+  "src/a\u0001b.ts",
+  "src/a\\b.ts",
+  "/src/a.ts",
+  "src//a.ts",
+  "src/./a.ts",
+  "src/../a.ts",
+  "src/",
+  "",
+  ".",
+  "..",
+];
+check("allows every legitimate file name character in a repository path and refuses controls, backslash and bad segments", () => {
+  for (const path of LEGITIMATE_PATHS) assert.equal(safePath(path), true, JSON.stringify(path));
+  for (const path of REFUSED_PATHS) assert.equal(safePath(path), false, JSON.stringify(path));
+  assert.equal(safePath(`${"a/".repeat(255)}a`), true);
+  assert.equal(safePath("a".repeat(513)), false);
+  assert.equal(safePath("ü".repeat(257)), false);
+  assert.equal(safePath(null), false);
+});
+check("compiles and validates a lineage record whose packet diff path carries brackets, parentheses and an at sign", () => {
+  const paths = [
+    "src/app/(app)/(auth)/anmelden/page.tsx",
+    "src/app/@modal/(.)photo/page.tsx",
+    "src/app/[slug]/page.tsx",
+  ];
+  const packet = Object.freeze({ ...packet1, diffPaths: paths });
+  const record = compile({ packet });
+  assert.deepEqual(record.diff.changedPaths, paths);
+  assert.equal(validateCriticReviewLineage(record).ok, true);
+  assert.equal(validateCriticLineagePacketAdmission(record, packet).ok, true);
+  assert.throws(() => compile({ packet: Object.freeze({ ...packet1, diffPaths: ["src/a\nb.ts"] }) }), /CRL-COMPILE-SHAPE|CRL-V2-PACKET/u);
+});
+
+assert.equal(passed, 17);
+console.log(`${passed}/17 checks passed.`);

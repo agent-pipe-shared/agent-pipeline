@@ -136,6 +136,10 @@ for (const script of ["critic-diagnostic-evidence.mjs", "register-feature-packag
     assertRouteInOrder(result.stdout);
   });
 }
+test("PF97-F1 diagnosticPath accepts a colon and still refuses backslash, controls, absolute and bad segments", () => {
+  for (const ok of ["evidence/a:b.log", "src/app/(app)/[slug]/page.tsx", "evidence/x y.json"]) assert.equal(shared.diagnosticPath(ok), ok, ok);
+  for (const bad of ["evidence\\x.log", "evidence/a\nb.log", "evidence/a\u0000b.log", "/evidence/x.log", "evidence//x.log", "evidence/../x.log"]) assert.throws(() => shared.diagnosticPath(bad), /CDI-PATH/u, JSON.stringify(bad));
+});
 test("D41 malformed argv keeps its refusal codes and exit status", () => {
   const producer = spawnSync(process.execPath, [resolve("plugins/pipeline-core/scripts/critic-diagnostic-evidence.mjs"), "--help", "--root", "x"], { encoding: "utf8" });
   assert.equal(producer.status, 1);
@@ -210,4 +214,42 @@ test("PF88-S2 (iv) a base that is not a commit fails closed with a typed error",
     assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: "no-such-ref" })), /CDI-BASE/u);
     assert.throws(() => produceCriticDiagnostic(baseOptions(f, { baseRef: `${f.candidate.tree}` })), /CDI-BASE/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+import { REGISTER_FEATURE_PACKAGE_HELP } from "../scripts/register-feature-package.mjs";
+import { CRITIC_DIAGNOSTIC_EVIDENCE_HELP } from "../scripts/critic-diagnostic-evidence.mjs";
+const D2_PLUGIN = resolve(new URL("..", import.meta.url).pathname);
+function d2RequireBindingsText(text) {
+  assert.match(text, /critic-correction-input-bindings\.mjs derive/u);
+  assert.match(text, /correctionInputBindings/u);
+}
+test("D2 text (1) the diagnostic evidence route names the derive step and the request field and keeps the old step", () => {
+  const text = CRITIC_DIAGNOSTIC_EVIDENCE_HELP;
+  assert.match(text, /Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
+  d2RequireBindingsText(text);
+});
+test("D2 text (2) the registration route names the derive step and the request field and keeps both old steps", () => {
+  const text = REGISTER_FEATURE_PACKAGE_HELP;
+  assert.match(text, /5\. Rerun critic-dispatch-preflight\.mjs with --registration-commit <the manifest commit>\./u);
+  assert.match(text, /7\. Rerun critic-dispatch-preflight\.mjs with the arguments the verb prints\./u);
+  d2RequireBindingsText(text);
+  assert.ok((text.match(/critic-correction-input-bindings\.mjs derive/gu) ?? []).length >= 2);
+});
+test("D2 text (3) the push hint names the derive step and the request field and keeps the old hint", () => {
+  const src = readFileSync(join(D2_PLUGIN, "scripts/push-prepare.mjs"), "utf8");
+  const line = src.split("\n").find((l) => l.includes("scripts/critic-dispatch-preflight.mjs --base <merge base"));
+  assert.ok(line, "hint line present");
+  assert.ok(line.includes("then Verify that exact candidate"));
+  d2RequireBindingsText(line);
+});
+test("D2 text (4) the skill operator note names the flag, the request key, the same-value rule and the re-derive rule", () => {
+  const src = readFileSync(join(D2_PLUGIN, "skills/critic-review/SKILL.md"), "utf8");
+  const note = src.split("\n").find((l) => l.startsWith("**Operator note (ranges with state or retained results):**"));
+  assert.ok(note, "operator note present");
+  assert.ok(note.includes("critic-correction-input-bindings.mjs derive"));
+  assert.ok(note.includes("--correction-input-bindings"));
+  assert.ok(note.includes("review.correctionInputBindings"));
+  assert.match(note, /same value/u);
+  assert.match(note, /never null/u);
+  assert.match(note, /derive again/u);
 });

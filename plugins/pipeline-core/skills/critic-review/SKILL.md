@@ -289,7 +289,7 @@ tool or mutating command, do not delegate, and report the exposure as a
 residual host limitation. No staleness check (the dispatch fixed the SHA); no
 handover, no history — ever.
 
-**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record or retained prior result exclusion, never readable) and pass the file as the Correction input bindings field; never invent a role.
+**Operator note (ranges with state or retained results):** for any range that contains the calibration handover file, a handover file of the same naming, or a retained Critic result, first derive the bindings with `plugins/pipeline-core/scripts/critic-correction-input-bindings.mjs derive --root --base --head --out` (a project-state record or retained prior result exclusion, never readable) and pass the file as the Correction input bindings field; never invent a role. The exact names: preflight takes the flag `--correction-input-bindings <file>`; admit and finalize take the request key `review.correctionInputBindings` with the same value in both (omit the key when the range has no such paths, never null). The bindings file must still exist at finalize: if it was swept, derive again for the same range (derive is deterministic).
 
 **Lifecycle-Guard inspection form (hard):** When the functional-equivalent
 lane runs under a Lifecycle Guard, perform each repository inspection as one

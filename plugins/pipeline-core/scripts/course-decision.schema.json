@@ -11,7 +11,7 @@
     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "sha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
-    "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?![\\s\\S]*//)(?![\\s\\S]*(?:^|/)\\.{1,2}(?:/|$))(?![\\s\\S]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])[\\s\\S]{1,240}$" },
     "evidence": {
       "type": "object", "additionalProperties": false, "required": ["id", "sha256"],
       "properties": { "id": { "$ref": "#/$defs/safeId" }, "sha256": { "$ref": "#/$defs/sha256" } }

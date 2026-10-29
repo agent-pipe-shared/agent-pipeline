@@ -52,7 +52,7 @@
     "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
     "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
-    "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)[A-Za-z0-9._/-]{1,512}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?![\\s\\S]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])[\\s\\S]{1,512}$"},
     "paths": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
     "candidate": {
       "type": "object", "additionalProperties": false,

@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { addCriticDiagnosticEvidence } from "./feature-package-registration.mjs";
 import { runRegisterFeaturePackage } from "../scripts/register-feature-package.mjs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { readCriticCourseAdmission, criticCourseRepair, resolveRegisteredCriticCourseIdentity, classifyRegisteredEvidenceOnlyCommits, deriveCriticCourseAdmission, deriveRegisteredCriticCourseDecision, deriveRegisteredCriticCourseSource, resolveRegisteredCriticCourseHistory, CriticCourseAdmissionError } from "./critic-course-admission.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
@@ -734,7 +734,7 @@ const pf94Verdict = { findings: [], deliberately_not_flagged: ["scope"], traject
 const pf94Origin = (q) => ({ schema: "pipeline.session-critic-source-return.v1", issuer: "source", packetId: q.packetId, packetDigest: q.packetDigest, claimant: q.claimant, sessionId: q.sessionId, verdictSha256: q.verdictSha256, issuedAtMs: Date.now() - 1000, expiresAtMs: Date.now() + 60000 });
 /** course=true: the course path (claim written at admit). course=false: the previous behaviour, generic batch plus caller-authored fallback, no course claim. */
 // Options: course (true: course path with claim; false: generic batch + caller-authored fallback, no claim), failing (true: the round did NOT pass and carries one open major finding), featureId, logicalWorkIds, taskId.
-export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task" } = {}) {
+export function consumedCourseRoundFixture({ course = true, failing = false, featureId = "held-feature", logicalWorkIds = ["scope-one", "scope-two"], taskId = "feature-held-task", extraCandidateFiles = [] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pf94-course-round-"));
   git(root, ["init", "-q", "-b", "main"]);
   mkdirSync(join(root, ".claude"), { recursive: true }); mkdirSync(join(root, "governance", "guidelines"), { recursive: true }); mkdirSync(join(root, "governance", "policies"), { recursive: true });
@@ -761,6 +761,7 @@ export function consumedCourseRoundFixture({ course = true, failing = false, fea
   writeFileSync(join(root, specPath), "# Complete behavior\nAC-1: deliver complete behavior\nImplemented behavior.\n");
   manifest.artifacts[0].sha256 = hash(readFileSync(join(root, specPath)));
   writeFileSync(join(root, manifestPath), JSON.stringify(manifest));
+  for (const extra of extraCandidateFiles) { mkdirSync(dirname(join(root, extra)), { recursive: true }); writeFileSync(join(root, extra), `export const marker = 1;\n`); }
   const candidate = pf94Commit(root, "integrate feature behavior");
   const record = { schema: "pipeline.dispatch-record.v3", taskId, agentType: "default", model: "gpt-5.6-luna", effort: "medium", rulesetSha: "b7797309cf6abe175fd52b0a8749d82b43714ea0", dispatcher: "elephant", outcome: "completed", commits: [candidate], candidateCommit: candidate, resultSha256: "a".repeat(64), log: [{ phase: "implement", toolUseCount: 1 }], report: { text: "done", changedFiles: [specPath] }, criticRequired: { schema: "pipeline.critic-required-decision.v1", trigger: { schema: "pipeline.critic-trigger-input.v1", rigorLevel: 2, riskClass: "high", riskFlag: true, diff: { mechanical: false, architecture: false, guardrails: true, security: false } }, appliedRow: "T1" } };
   mkdirSync(join(root, "evidence"), { recursive: true });
@@ -813,6 +814,22 @@ test("PF94 LINEAGE (a) the verb registers the lineage of a real consumed course 
   // The fixture round PASSED, so the registered history of length 1 ends the course (RE-CONSUMED-PACKAGE-PASS); a round with findings asks for the delta request (CCA-DELTA-REQUIRED). Either way the history is read and CCA-REQUESTED-MODE is gone.
   assert.notEqual(after.decision.code, "CCA-REQUESTED-MODE", JSON.stringify(after.decision));
   assert.equal(after.decision.code, "RE-CONSUMED-PACKAGE-PASS", JSON.stringify(after.decision));
+});
+test("PF97 LINEAGE (special file names) the real registration route of a consumed course round accepts special file names up to the registered lineage", () => {
+  const specialPaths = ["src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx", "src/with space.ts", `src/m${String.fromCodePoint(252)}ller.ts`, "src/a+b=c,d~e.ts", "src/with:colon.ts"];
+  let fx;
+  assert.doesNotThrow(() => { fx = consumedCourseRoundFixture({ extraCandidateFiles: specialPaths }); }, "step fixture: preflight, admission and finalize accept the special paths");
+  const added = pf94Lineage(fx);
+  assert.equal(added.status, "lineage-added", `step addCriticReviewLineage: ${JSON.stringify(added)}`);
+  const lineage = JSON.parse(readFileSync(join(fx.root, added.lineagePath), "utf8"));
+  const expected = execFileSync("git", ["diff", "--name-only", "-z", fx.base, fx.candidate], { cwd: fx.root, encoding: "utf8" }).split("\0").filter(Boolean);
+  for (const p of specialPaths) assert.ok(expected.includes(p), `step expected range paths hold ${p}`);
+  assert.deepEqual(lineage.diff.changedPaths, expected, "step registered lineage diff paths equal the sorted candidate paths, unquoted");
+  pf94Commit(fx.root, "register the lineage");
+  const registration = git(fx.root, ["rev-parse", "HEAD"]);
+  const after = readCriticCourseAdmission({ ...fx.courseRequest, registrationCommit: registration, requestedMode: "delta" });
+  assert.notEqual(after.decision.code, "CCA-REQUESTED-MODE", `step next delta admission: ${JSON.stringify(after.decision)}`);
+  assert.doesNotMatch(JSON.stringify(after.decision), /path/iu, `step next delta admission refuses no path: ${JSON.stringify(after.decision)}`);
 });
 test("PF94 LINEAGE (b) replay is idempotent and names the same path", () => {
   const fx = consumedCourseRoundFixture();

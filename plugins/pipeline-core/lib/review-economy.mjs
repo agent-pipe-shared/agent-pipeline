@@ -62,7 +62,9 @@ export const PROGRESS_COMPONENTS = Object.freeze([
 const SHA256 = /^[a-f0-9]{64}$/;
 const SHA40 = /^[a-f0-9]{40}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-const SAFE_PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,240}$/;
+// Any legitimate file name character; refuses C0/DEL/C1 controls (line breaks and NUL included) and the backslash anywhere.
+const PATH_FORBIDDEN_ANYWHERE = "(?![^]*[\\u0000-\\u001f\\u007f-\\u009f\\\\])";
+const SAFE_PATH = new RegExp(`^(?!/)${PATH_FORBIDDEN_ANYWHERE}[^]{1,240}$`);
 const FAULT_DOMAINS = new Set(["product", "execution-environment", "unknown"]);
 const SIGNALS = new Set(["SIGABRT", "SIGBUS", "SIGFPE", "SIGHUP", "SIGILL", "SIGINT", "SIGKILL", "SIGPIPE", "SIGQUIT", "SIGSEGV", "SIGTERM", "SIGTRAP"]);
 
@@ -250,7 +252,7 @@ const CRITIC_VERDICT_STATUSES = Object.freeze(["pending", "no-findings", "findin
 const CRITIC_FINDING_SEVERITIES = Object.freeze(["critical", "high", "medium", "low"]);
 const CRITIC_FINDING_DISPOSITIONS = Object.freeze(["open", "fixed", "withdrawn", "superseded"]);
 const CRITIC_SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const CRITIC_SAFE_PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,512}$/;
+const CRITIC_SAFE_PATH = new RegExp(`^(?!/)${PATH_FORBIDDEN_ANYWHERE}[^]{1,512}$`);
 const CRITIC_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/;
 const CRITIC_INVALIDATION_REASONS = new Set([

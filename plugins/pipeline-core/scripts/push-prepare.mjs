@@ -749,7 +749,7 @@ export function pushPrepareReport(argv, deps = {}, options = {}) {
         message: review.ok ? "independent Critic and Verify bind this exact candidate"
           : `candidate qualification unavailable (${review.code ?? "unavailable"})`,
         ...(!review.ok ? { remedy: review.code === "private-critic-binding-unavailable"
-          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate"
+          ? "run node ${PIPELINE_PLUGIN_ROOT}/scripts/critic-dispatch-preflight.mjs --base <merge base of HEAD with the publication target> --candidate HEAD (a late-added review unit may use that merge base as its first base), then Verify that exact candidate. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value)."
           : "complete the independent Critic review and exact-candidate Verify lifecycle before publication" } : {}),
       });
     }

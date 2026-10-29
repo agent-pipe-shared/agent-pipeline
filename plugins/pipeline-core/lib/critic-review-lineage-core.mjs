@@ -42,7 +42,9 @@ export const CRITIC_INVALIDATION_REASONS = Object.freeze([
 const SHA = /^[a-f0-9]{64}$/u;
 export const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,512}$/u;
+// Any legitimate file name character; refuses C0/DEL/C1 controls (line breaks and NUL included) and the backslash anywhere.
+// The negated empty class matches line breaks too, unlike a dot.
+const PATH = /^(?!\/)(?![^]*[\u0000-\u001f\u007f-\u009f\\])[^]{1,512}$/u;
 const PACKET_ID = /^[a-f0-9]{32}$/u;
 const VERDICTS = new Set(["pending", "no-findings", "findings", "failed"]);
 const FAILURES = new Set(CRITIC_REVIEW_FAILURES);

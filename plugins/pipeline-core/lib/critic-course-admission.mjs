@@ -362,7 +362,7 @@ const V2_REQUEST_KEYS=['repoRoot','featureId','baseCommit','candidateCommit','re
 const V2_DELTA_KEYS=['schema','featureId','manifestPath','courseKey','acceptedEnvelopeSha256','genesisRecordSha256','historySha256','parent','candidate','changedPaths','changedBehaviorClaims','pathInvariantMap','pathInvariantMapSha256','coordinatorImpactConfirmed','trustBoundaryChanged','impactAmbiguous','deterministicEvidence'];
 const lineageSchema=v=>['pipeline.critic-review-lineage.v1','pipeline.critic-review-lineage.v2'].includes(v?.schema);
 const equal=(a,b)=>canonicalJson(a)===canonicalJson(b);
-const safe=v=>typeof v==='string' && v.length<=512 && !/[\\\0\r\n:]/u.test(v) && !v.startsWith('/') && v.split('/').every(p=>p && p!=='.' && p!=='..');
+const safe=v=>typeof v==='string' && v.length<=512 && !/[\\\0\r\n]/u.test(v) && !v.startsWith('/') && v.split('/').every(p=>p && p!=='.' && p!=='..');
 const goodEvidence=e=>object(e) && e.class==='candidate-evidence' && e.authority===false && e.mutability==='immutable' && e.retention==='retain' && safe(e.path) && SHA256.test(e.sha256??'');
 const ok=value=>({ok:true,value});
 const refused=(error)=>({ok:false,status:error?.status??'refused',code:error?.code??'CCA-RUNTIME-READBACK'});

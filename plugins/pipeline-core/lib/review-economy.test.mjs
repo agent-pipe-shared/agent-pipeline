@@ -25,6 +25,7 @@ import {
 } from "./review-economy.mjs";
 import reviewAttemptSchema from "../scripts/review-attempt.schema.json" with { type: "json" };
 import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
+import { safePath } from "./critic-review-lineage-core.mjs";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -532,6 +533,70 @@ ok("RE64 docs state write path fails", validateWorkflowFallbackReceipt({ ...fall
 ok("RE65 dot-segment alias fails before authority comparison", validateWorkflowFallbackReceipt({ ...fallbackReceipt, permissions: { ...fallbackReceipt.permissions, writePaths: ["specs/./result.md"] } }).ok === false);
 ok("RE66 dot-segment authority path itself fails", validateWorkflowFallbackReceipt({ ...fallbackReceipt, bindings: { ...fallbackReceipt.bindings, authorityPaths: { ...fallbackReceipt.bindings.authorityPaths, result: "specs/./result.md" } } }).ok === false);
 
+// PF-97 F1 (PO decision 2026-10-28): every legitimate file name character is allowed in a repository path.
+const legitimateEconomyPaths = [
+  "src/app/(app)/(auth)/anmelden/page.tsx",
+  "src/app/[slug]/page.tsx",
+  "src/app/@modal/(.)photo/page.tsx",
+  "routes/$id.tsx",
+  "src/with space/file name.ts",
+  "src/über/ü.ts",
+  "src/a+b=c,d~e.ts",
+  "src/a:b.ts",
+  "src/trail .ts",
+  "src/-lead.ts",
+];
+const refusedEconomyPaths = [
+  "src/a\nb.ts", "src/a.ts\n", "src/a\u0000b.ts", "src/a\u0085b.ts", "src/a\u007fb.ts",
+  "src/a\\b.ts", "/src/a.ts", "src//a.ts", "src/./a.ts", "src/../a.ts",
+];
+const economyDelta = (path) => {
+  const map = { [path]: ["INV-01"] };
+  return { ...delta, changedPaths: [path], pathInvariantMap: map, pathInvariantMapSha256: sha256Canonical(map) };
+};
+ok("RE70a validRepoPath (delta admission) accepts every legitimate file name character",
+  legitimateEconomyPaths.every((path) => admitReviewAttempt(economyDelta(path)).mode === "delta"));
+ok("RE70b validRepoPath (delta admission) refuses controls, backslash, leading slash and bad segments",
+  refusedEconomyPaths.every((path) => admitReviewAttempt(economyDelta(path)).mode === null));
+const compiledCriticRecord = (path) => compileCriticReviewLineage({
+  packet: { ...criticPacket1, diffPaths: [path] },
+  reviewId: "private:review:path",
+  parent: null,
+  packages: [{ id: "nova-a5", subjectSha256: A, changedPaths: [path], integrationEdges: [criticEdge] }],
+  coverage: { changedPaths: [path], acceptanceIds: ["NVA-A54-9"], integrationEdges: [criticEdge], complete: true, receiptSha256: B },
+  lane: { laneId: "private-lane-id", contextSha256: A, evidenceSha256: B },
+  verdict: { status: "findings", schemaValid: true, resultSha256: D, failure: null },
+  findings: [criticFinding],
+  correction: null,
+  invalidation: { kind: "none", reason: null, evidenceSha256: null },
+  reviewAttempt: { round: 1, correctionCommits: 0, requestedMode: "full" },
+});
+const economyCriticRecord = (path) => rehashCriticRecord(compiledCriticRecord("src/ok.ts"), (record) => {
+  record.diff.changedPaths = [path];
+  record.coverage.changedPaths = [path];
+  record.packages[0].changedPaths = [path];
+  // The projection also binds request.compiledSha256 to diff, packages and coverage: refresh it so only the path rule can decide.
+  record.request.compiledSha256 = sha256Canonical({
+    packetId: record.request.packetId,
+    candidate: record.candidate,
+    diff: record.diff,
+    references: record.references,
+    packages: record.packages,
+    coverage: {
+      changedPaths: record.coverage.changedPaths,
+      acceptanceIds: record.coverage.acceptanceIds,
+      integrationEdges: record.coverage.integrationEdges,
+    },
+    mode: record.request.mode,
+    admissionCode: record.request.admissionCode,
+  });
+});
+ok("RE70c criticPath (critic projection) accepts every legitimate file name character, control record is valid",
+  projectCriticReviewEconomy([compiledCriticRecord("src/ok.ts")]).ok === true
+  && legitimateEconomyPaths.every((path) => projectCriticReviewEconomy([economyCriticRecord(path)]).ok === true));
+ok("RE70d criticPath (critic projection) refuses controls, backslash, leading slash and bad segments",
+  refusedEconomyPaths.every((path) => projectCriticReviewEconomy([economyCriticRecord(path)]).ok === false));
+
 const reviewSchema = JSON.parse(readFileSync(join(scriptsDir, "review-attempt.schema.json"), "utf8"));
 const fallbackSchema = JSON.parse(readFileSync(join(scriptsDir, "workflow-fallback-receipt.schema.json"), "utf8"));
 const courseSchema = JSON.parse(readFileSync(join(scriptsDir, "course-decision.schema.json"), "utf8"));
@@ -541,6 +606,46 @@ ok("RE67c attempt budget schema admits three corrections", reviewAttemptSchema.p
 ok("RE67 review-attempt schema is a closed v1 root", reviewSchema.additionalProperties === false && reviewSchema.properties.schema.const === "pipeline.review-attempt.v1");
 ok("RE68 fallback receipt schema is Coordinator-only and non-delegating", fallbackSchema.properties.creatorDuty.const === "Coordinator" && fallbackSchema.properties.mayDelegate.const === false);
 ok("RE69 course schema owns exactly brief intent and receipt forms", Array.isArray(courseSchema.oneOf) && courseSchema.oneOf.length === 3 && courseSchema.$defs.brief.additionalProperties === false);
+
+// RE71: the four JSON schema path patterns accept every legitimate file name character (PF-97 F2).
+const findPathPattern = (node) => {
+  if (node === null || typeof node !== "object") return null;
+  if (typeof node.path === "object" && node.path !== null && typeof node.path.pattern === "string") return node.path.pattern;
+  for (const value of Object.values(node)) { const found = findPathPattern(value); if (found !== null) return found; }
+  return null;
+};
+const schemaPathPattern = (name) => findPathPattern(JSON.parse(readFileSync(join(scriptsDir, name), "utf8")));
+const schemaPathCases = [
+  { name: "review-attempt.schema.json", dots: true, doubleSlash: true },
+  { name: "course-decision.schema.json", dots: true, doubleSlash: true },
+  { name: "critic-review-lineage.schema.json", dots: true, doubleSlash: true },
+  { name: "release-critic-review-scope.schema.json", dots: false, doubleSlash: false },
+];
+const schemaPatternRegexes = schemaPathCases.map((entry) => ({ ...entry, pattern: schemaPathPattern(entry.name) }));
+const codePoint = (value) => String.fromCodePoint(value);
+const schemaAccepted = [
+  "src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx",
+  "src/with space/a.ts", `src/${codePoint(252)}ber/a.ts`, "src/a+b=c,d~e.ts", "src/a:b.ts", "src/a.ts ", "-lead/a.ts",
+];
+const schemaRefusedCommon = [
+  `src/a${codePoint(10)}b.ts`, `src/a.ts${codePoint(10)}`, `src/a${codePoint(0)}b.ts`, `src/a${codePoint(0x85)}b.ts`,
+  `src/a${codePoint(0x7f)}b.ts`, `src/a${codePoint(92)}b.ts`, "/src/a.ts",
+];
+const schemaRefusedStructural = ["src//a.ts", "src/./a.ts", "src/../a.ts"];
+ok("RE71a all four schema path definitions carry a pattern", schemaPatternRegexes.every((entry) => typeof entry.pattern === "string"));
+ok("RE71b schema path patterns accept every legitimate file name character",
+  schemaPatternRegexes.every((entry) => typeof entry.pattern === "string" && schemaAccepted.every((path) => new RegExp(entry.pattern).test(path))));
+ok("RE71c schema path patterns refuse controls, backslash and a leading slash",
+  schemaPatternRegexes.every((entry) => typeof entry.pattern === "string" && schemaRefusedCommon.every((path) => !new RegExp(entry.pattern).test(path))));
+ok("RE71d schema path patterns with segment lookaheads refuse empty and dot segments",
+  schemaPatternRegexes.filter((entry) => entry.dots).every((entry) => typeof entry.pattern === "string"
+    && schemaRefusedStructural.every((path) => !new RegExp(entry.pattern).test(path))));
+ok("RE71e lineage and release schema patterns agree with the exported safePath predicate",
+  schemaPatternRegexes.filter((entry) => !entry.dots || entry.name.startsWith("critic-review-lineage")).every((entry) => {
+    if (typeof entry.pattern !== "string") return false;
+    const samples = [...schemaAccepted, ...schemaRefusedCommon, ...(entry.dots ? schemaRefusedStructural : [])];
+    return samples.every((path) => new RegExp(entry.pattern).test(path) === (safePath(path) === true));
+  }));
 
 console.log(`\n${checks - failures}/${checks} checks passed.`);
 if (failures > 0) process.exitCode = 1;

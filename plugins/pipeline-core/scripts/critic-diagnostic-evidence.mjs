@@ -40,6 +40,7 @@ export const CRITIC_DIAGNOSTIC_EVIDENCE_HELP = [
   "  3. Register it: register-feature-package.mjs --root <root> --add-diagnostic-evidence <path>",
   "  4. Commit the manifest the registration names.",
   "  5. Rerun critic-dispatch-preflight.mjs with --registration-commit <the manifest commit>.",
+  "  6. If the range contains the handover file or a retained Critic result, first run critic-correction-input-bindings.mjs derive --root <root> --base <base> --head <candidate> --out <file under scratch/> and pass that file as --correction-input-bindings <file> (admit and finalize: review.correctionInputBindings, same value).",
   "",
 ].join("\n");
 if (isDirectInvocation(import.meta.url)) {

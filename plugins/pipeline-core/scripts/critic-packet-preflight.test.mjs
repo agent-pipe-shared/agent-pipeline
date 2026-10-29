@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, devNull } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -14,7 +14,9 @@ import {
   claimCandidatePacket,
   cleanupCandidatePacket,
   consumeCandidatePacket,
+  inspectCandidatePacket,
   inspectClaimedCandidatePacket,
+  normalizePacketPath,
   inspectClaimedSessionAdmission,
   prepareCandidatePacket,
   publishClaimedSessionAdmission,
@@ -23,7 +25,8 @@ import {
 } from "./critic-packet-preflight.mjs";
 import { createLocalDispatchEvidenceBinding } from "./check-critic-skip-coverage.mjs";
 import { runAttestedRequest } from "./dispatch-record-write.mjs";
-import { sha256Canonical } from "../lib/review-economy.mjs";
+import { projectCriticReviewEconomy, sha256Canonical } from "../lib/review-economy.mjs";
+import { diagnosticEvidenceLocation, diagnosticPath } from "../lib/critic-diagnostic-evidence.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 import { isSuccessfulSpawn } from "../lib/successful-spawn.mjs";
@@ -50,7 +53,7 @@ function git(root, args) {
   assert.equal(isSuccessfulSpawn(result), true, `git ${args.join(" ")}: ${String(result.stderr)}`);
   return String(result.stdout).trim();
 }
-function fixture() {
+function fixture(extraCandidateFiles = []) {
   const root = mkdtempSync(join(tmpdir(), "cpp-test-"));
   git(root, ["init", "--quiet"]);
   git(root, ["config", "user.email", "pipeline@example.invalid"]);
@@ -63,6 +66,10 @@ function fixture() {
   writeFileSync(join(root, "specs", "review.md"), "candidate\n");
   mkdirSync(join(root, "roles"));
   writeFileSync(join(root, "roles", "critic.md"), "critic contract\n");
+  for (const extra of extraCandidateFiles) {
+    mkdirSync(dirname(join(root, extra)), { recursive: true });
+    writeFileSync(join(root, extra), "added\n");
+  }
   git(root, ["add", "."]);
   git(root, ["commit", "--quiet", "-m", "candidate"]);
   const candidate = git(root, ["rev-parse", "HEAD"]);
@@ -306,14 +313,14 @@ check("binds an admissible closed Nova A5 lineage at claim and rejects a forged 
     const records = String(probe.output[3]).trim().split("\n").map((line) => JSON.parse(line));
     const disposed = records.filter((record) => record.event === "DISPOSED");
     assert.equal(records[0].event, "DECLARED");
-    assert.equal(records[0].caseCount, 17);
-    assert.equal(disposed.length, 17);
+    assert.equal(records[0].caseCount, 18);
+    assert.equal(disposed.length, 18);
     assert.equal(disposed.find((record) => record.id === "CPP02")?.disposition, "fail");
     assert.equal(disposed.find((record) => record.id === "CPP09")?.disposition, "pass");
     assert.equal(disposed.find((record) => record.id === "CPP10")?.disposition, "pass");
-    assert.deepEqual(records.at(-1).counts, { pass: 16, fail: 1, skip: 0, todo: 0 });
-    assert.equal(records.at(-1).declaredCount, 17);
-    assert.equal(records.at(-1).disposedCount, 17);
+    assert.deepEqual(records.at(-1).counts, { pass: 17, fail: 1, skip: 0, todo: 0 });
+    assert.equal(records.at(-1).declaredCount, 18);
+    assert.equal(records.at(-1).disposedCount, 18);
   }
 });
 
@@ -506,7 +513,45 @@ check("CPPA-5 chain: no dispatch history refuses, the reconstructed attested rec
   } finally { rmSync(f.root, { recursive: true, force: true }); rmSync(plain.root, { recursive: true, force: true }); }
 });
 
-assert.equal(cases.length, 17, "the complete candidate packet corpus must be registered before execution begins");
+check("CPPW-1 walk: a real candidate packet adding special file names passes the whole Critic route with the paths unchanged", () => {
+  const umlaut = `src/caf${String.fromCodePoint(252)}.ts`;
+  const added = [
+    "src/app/(app)/(auth)/anmelden/page.tsx", "src/app/[slug]/page.tsx", "src/app/@modal/(.)photo/page.tsx", "routes/$id.tsx",
+    "src/with space.ts", umlaut, "src/a+b=c,d~e.ts", "src/a:b.ts",
+  ];
+  let f;
+  try { f = fixture(added); } catch (error) { assert.fail(`host file system cannot create a special name: ${error.message}`); }
+  try {
+    const expected = ["roles/critic.md", "specs/review.md", ...added].sort();
+    // (1) prepare + inspect
+    const prepared = prepareCandidatePacket(options(f, "d".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 40) });
+    assert.deepEqual(prepared.packet.diffPaths, expected);
+    const inspected = inspectCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId }, { now: new Date("2026-07-18T12:00:30.000Z") });
+    assert.deepEqual(inspected.packet.diffPaths, expected);
+    for (const path of added) assert.ok(prepared.packet.diffPaths.includes(path), path);
+    // (2) claim, record, consume
+    assert.equal(claimCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, adapter: prepared.packet.route.adapter, claimantNonce: "a".repeat(64) }, { now: new Date("2026-07-18T12:01:00.000Z") }).code, "CPP-CLAIMED");
+    recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "pass" } }, { now: new Date("2026-07-18T12:02:00.000Z") });
+    assert.equal(consumeCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, receipt: { verdictStatus: "pass" } }, { now: new Date("2026-07-18T12:04:00.000Z") }).code, "CPP-CONSUMED");
+    assert.deepEqual(readConsumedCandidateReceipt({ controlRoot: f.control, packetId: prepared.packet.packetId }).receipt, { verdictStatus: "pass" });
+    // (3) lineage compile with the packet diff paths as packet, package and coverage paths
+    const record = lineage(prepared.packet, "walk-review");
+    assert.deepEqual(record.diff?.changedPaths ?? expected, expected);
+    // (4) economy projection of the compiled record
+    const projected = projectCriticReviewEconomy([record]);
+    assert.equal(projected.ok, true, JSON.stringify(projected));
+    // (5) generic batch path normalisation (paths() calls normalizePacketPath)
+    assert.deepEqual(expected.map((p) => normalizePacketPath(p)), expected);
+    // (6) evidence path rules of diagnostic evidence (course-admission's own rule is not exported: reachable only through its verbs)
+    for (const path of added) {
+      const evidence = `evidence/${path}`;
+      assert.equal(diagnosticPath(evidence), evidence);
+      assert.deepEqual(diagnosticEvidenceLocation(evidence), { featureId: null });
+    }
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+assert.equal(cases.length, 18,"the complete candidate packet corpus must be registered before execution begins");
 const completionFd = process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD === undefined
   ? openSync(devNull, "w")
   : Number(process.env.PIPELINE_VERIFY_CASE_COMPLETION_FD);

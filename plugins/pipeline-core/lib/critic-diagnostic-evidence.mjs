@@ -12,7 +12,7 @@ const exact = (value, keys) => value && typeof value === "object" && !Array.isAr
 export const diagnosticDigest = bytes => createHash("sha256").update(bytes).digest("hex");
 function fail(code, message = code) { const error = new Error(message === code ? code : `${code}: ${message}`); error.code = code; throw error; }
 export function diagnosticPath(path) {
-  if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f:]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
+  if (typeof path !== "string" || path.length > 240 || !path || isAbsolute(path) || /[\\\x00-\x1f]/u.test(path) || path.split("/").some(part => !part || part === "." || part === "..")) fail("CDI-PATH");
   return path;
 }
 export function readDiagnosticArtifact(root, path) {
