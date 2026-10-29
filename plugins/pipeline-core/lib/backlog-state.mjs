@@ -64,7 +64,9 @@ const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", 
 // is owned solely by check-backlog-done-predicate.mjs, which reports
 // MALFORMED itself; `sprint` is the precedent for this split (see
 // check-backlog-sprint-assignment.mjs).
-const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "sprint", "done_when", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
+// `priority` (P0..P3) and `release` (a version number) are the sprint planning pair every sprint item has carried since
+// 2026-10-25; they are checked for shape here and are not projected into the index.
+const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "sprint", "priority", "release", "done_when", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
 const ITEM_KEYS = new Set([...ITEM_REQUIRED, ...ITEM_OPTIONAL]);
 const ITEM_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u;
 const OWNER = /^(?:pipeline|project:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/u;
@@ -299,6 +301,8 @@ export function validateBacklogItem(item) {
   if (asString(metadata.source).trim().length === 0) errors.push(`${path}: source must be non-empty`);
   if (own(metadata, "tracking") && asString(metadata.tracking).trim().length === 0) errors.push(`${path}: tracking must be non-empty when present`);
   for (const key of ["due", "expires"]) if (own(metadata, key) && !validDate(asString(metadata[key]))) errors.push(`${path}: ${key} must be an ISO calendar date`);
+  if (own(metadata, "priority") && !/^P[0-3]$/u.test(asString(metadata.priority))) errors.push(`${path}: priority must be P0, P1, P2 or P3`);
+  if (own(metadata, "release") && !/^\d+\.\d+\.\d+$/u.test(asString(metadata.release))) errors.push(`${path}: release must be a version number`);
 
   const closureKeys = ["closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"];
   if (metadata.status === "closed") {

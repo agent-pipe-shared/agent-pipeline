@@ -506,6 +506,28 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
     `${validateBacklogItem(requirement).join("; ")} / ${validateBacklogItem(unknown).join("; ")}`);
 }
 {
+  // The sprint item convention (priority P0..P3, release as a version number) is a legal optional pair; anything else stays refused.
+  const planned = item({ priority: "P1", release: "0.7.1" });
+  const badPriority = item({ priority: "high" });
+  const badRelease = item({ release: "next" });
+  const emptyRelease = item({ release: "" });
+  const nonString = item({ priority: 1 });
+  const unknownField = item({ urgency: "P1" });
+  check("BS02h priority and release are accepted as optional fields with a closed value shape",
+    validateBacklogItem(planned).length === 0
+      && validateBacklogItem(item()).length === 0
+      && validateBacklogItem(badPriority).some((error) => error.includes("priority must be P0, P1, P2 or P3"))
+      && validateBacklogItem(badRelease).some((error) => error.includes("release must be a version number"))
+      && validateBacklogItem(emptyRelease).some((error) => error.includes("release must be a version number"))
+      && validateBacklogItem(nonString).some((error) => error.includes("priority must be a string"))
+      && validateBacklogItem(unknownField).some((error) => error.includes("unsupported field urgency")),
+    [planned, badPriority, badRelease, emptyRelease, nonString, unknownField].map((entry) => validateBacklogItem(entry).join("; ")).join(" / "));
+  const rendered = renderBacklogItem({ metadata: planned.metadata, body: planned.body });
+  check("BS02i a rendered item keeps priority and release in the canonical field order",
+    rendered.includes('\npriority: "P1"\n') && rendered.includes('\nrelease: "0.7.1"\n') && rendered.indexOf("priority:") < rendered.indexOf("release:"),
+    rendered);
+}
+{
   const here = dirname(fileURLToPath(import.meta.url));
   const repoRoot = resolve(here, "..", "..", "..");
   const schema = JSON.parse(readFileSync(join(repoRoot, "backlog/schemas/item.schema.json"), "utf8"));
