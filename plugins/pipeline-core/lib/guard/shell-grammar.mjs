@@ -1266,8 +1266,18 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
       index += 1;
     }
     if (index === 0) return false;
+    // PF-60: -o/-or/-a/-and join two closed predicates; one must sit between two of them.
+    let afterOperator = false;
+    let sawPredicate = false;
     while (index < args.length) {
       const option = args[index++];
+      if (["-o", "-or", "-a", "-and"].includes(option)) {
+        if (!sawPredicate || afterOperator) return false;
+        afterOperator = true;
+        continue;
+      }
+      sawPredicate = true;
+      afterOperator = false;
       if (option === "-print") continue;
       if (["-maxdepth", "-mindepth"].includes(option)) {
         if (!/^(?:0|[1-9][0-9]*)$/u.test(args[index++] ?? "")) return false;
@@ -1278,7 +1288,7 @@ export function isReadOnlySimpleWords(words, root, extraRoots = BOUNDED_PIPELINE
         index += 1;
       } else return false;
     }
-    return true;
+    return !afterOperator;
   }
   if (executable !== "git") return false;
   const applyCheck = readOnlyGitApplyCheckArguments(args);

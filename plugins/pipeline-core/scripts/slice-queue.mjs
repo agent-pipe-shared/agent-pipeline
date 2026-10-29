@@ -63,7 +63,12 @@ const usage = (message) => new CliError("SQ-USAGE", EXIT.USAGE, message);
 
 // ------------------------------------------------------------------ arguments
 
-const COMMON = ["queue", "now"];
+const COMMON = ["queue", "now", "root"];
+
+// PF-66: every verb accepts --root <dir>, the repository the queue and its governed course live in. Without it the
+// current directory is the root, as before. The value is held for the one invocation (parseArguments sets it).
+let invocationRoot = null;
+function queueRoot() { return invocationRoot ?? process.cwd(); }
 const LEDGER = ["session", "runner", "common-dir"];
 const VERBS = {
   validate: { positional: 0, flags: [...COMMON], repeatable: [] },
@@ -119,8 +124,17 @@ export function parseArguments(argv) {
     else if (Object.hasOwn(flags, name)) throw usage(`${verb}: --${name} given twice`);
     else flags[name] = value;
   }
+  invocationRoot = null;
+  if (flags.root !== undefined) {
+    const requested = resolve(flags.root);
+    let isDirectory = false;
+    try { isDirectory = statSync(requested).isDirectory(); } catch { isDirectory = false; }
+    if (!isDirectory) throw usage(`${verb}: --root must name an existing directory`);
+    invocationRoot = requested;
+    if (flags.queue !== undefined) flags.queue = resolve(requested, flags.queue);
+  }
   if (positional.length !== spec.positional) throw usage(`${verb}: expected ${spec.positional} positional argument(s), got ${positional.length}`);
-  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:process.cwd()});if(governed.status==='required')flags.queue=resolve(process.cwd(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
+  if(verb!=="pause"&&flags.queue===undefined){const governed=resolveGovernedItemQueue({root:queueRoot()});if(governed.status==='required')flags.queue=resolve(queueRoot(),governed.path);else if(governed.status==='refused'&&governed.code==='SQ-AUTHORITY-UNAVAILABLE')throw usage(`${verb}: --queue <path> is required: no governed course is resolvable from this directory (${governed.code}); repair: pass --queue <path>, or run from the repository root`);else if(governed.status==='refused')throw new CliError(governed.code,EXIT.INVALID,governed.repair??'Governed queue unavailable.');else throw usage(`${verb}: --queue <path> is required without an approved governed course`);}
   return { verb, positional, flags };
 }
 
@@ -157,9 +171,9 @@ function invalidQueue(loaded) {
 /** Temp file + rename in the same directory. A failure removes the temp file. */
 export function writeQueueAtomic(path,queue) {
   if(queue.schema!=='pipeline.slice-queue.v2')return writeQueueAtomicBytes(path,queue);
-  const governed=resolveGovernedItemQueue({root:process.cwd()});
-  if(governed.status!=='required'||resolve(process.cwd(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
-  const repository=inspectSignedDescriptorCustodyRepository(process.cwd());
+  const governed=resolveGovernedItemQueue({root:queueRoot()});
+  if(governed.status!=='required'||resolve(queueRoot(),governed.path)!==resolve(path))throw new CliError('SQ-ITEM-COURSE-WRITER-REQUIRED',EXIT.INVALID,'Use the authenticated approved-course continuation for item queue writes.');
+  const repository=inspectSignedDescriptorCustodyRepository(queueRoot());
   return withSessionAuthorityBoundary({repository},()=>{
     if(nativeManagedCurrentOwner(repository).association.state!=='bound')throw new CliError('SQ-ITEM-OWNER-REQUIRED',EXIT.INVALID,'An actual Source requester is required.');
     const expected=queuePreimages.get(resolve(path)),info=lstatSync(path);
@@ -263,7 +277,7 @@ function deriveStatus(flags, loaded) {
     ? []
     : ledgerCall(() => liveSlices({ ...target, evidenceDir, sliceIds, now, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) }));
   let integrationReadiness;
-  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:process.cwd()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
+  if(loaded.raw.schema==='pipeline.slice-queue.v2'){const observed=observeGovernedItemIntegrationReadiness({root:queueRoot()});if(observed.status!=='observed')throw new CliError(observed.code??'SQ-ITEM-INTEGRATION-READBACK-UNAVAILABLE',EXIT.INVALID,'Source integration readiness is unavailable.');integrationReadiness=observed.handle;}
   const status = readyAndLive({ queue: loaded.raw, records, live, now, integrationReadiness }, { platform: process.platform, ...(stale === undefined ? {} : { staleAfterMinutes: stale }) });
   return { status, target, now };
 }
@@ -386,9 +400,9 @@ function verbCancel({ positional, flags }) {
   const loaded = loadRaw(path);
   if (loaded.status !== "valid") throw invalidQueue(loaded);
   if (loaded.raw.schema === "pipeline.slice-queue.v2") {
-    const governed = resolveGovernedItemQueue({ root: process.cwd() });
-    if (governed.status !== "required" || resolve(process.cwd(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
-    const result = cancelUnstartedGovernedItemSlice({ root: process.cwd(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
+    const governed = resolveGovernedItemQueue({ root: queueRoot() });
+    if (governed.status !== "required" || resolve(queueRoot(), governed.path) !== path) throw new CliError("SQ-ITEM-COURSE-WRITER-REQUIRED", EXIT.INVALID, "an item queue is cancelled only in its governed course");
+    const result = cancelUnstartedGovernedItemSlice({ root: queueRoot(), sliceId: positional[0], reason, started: flags.started === true, cancelClass: verdict.cancelClass });
     if (result.status !== "cancelled") throw new CliError(result.code, result.code === "SQ-NOT-FOUND" ? EXIT.NOT_FOUND : EXIT.INVALID, result.reason ?? "the slice was not cancelled", { sliceId: positional[0], ...(result.repair ? { repair: result.repair } : {}) });
     return { sliceId: result.sliceId, state: "cancelled", cancelClass: result.cancelClass, released: result.released, ...(result.started ? { started: true, note: result.note } : {}) };
   }
@@ -496,7 +510,7 @@ export function runCli(argv) {
   } catch (error) {
     // D52 (2): a session-authority refusal names its typed code and the general repair, never only SQ-IO.
     const authority = typeof error?.code === "string" && error.code.startsWith("SDC-");
-    const repair = authority && !(error instanceof CliError && error.extra?.repair) ? { repair: `${sessionAuthorityRepairCommand(process.cwd())} names the cause and the command that clears it` } : {};
+    const repair = authority && !(error instanceof CliError && error.extra?.repair) ? { repair: `${sessionAuthorityRepairCommand(queueRoot())} names the cause and the command that clears it` } : {};
     if (error instanceof CliError) return { exit: error.exit, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: error.message, ...error.extra, ...repair } };
     if (authority) return { exit: EXIT.INVALID, output: { schema: CLI_SCHEMA, verb, ok: false, code: error.code, message: String(error.reason ?? error.message).slice(0, 240), ...repair } };
     return { exit: EXIT.IO, output: { schema: CLI_SCHEMA, verb, ok: false, code: "SQ-IO", message: `unexpected failure (${error?.code ?? error?.name ?? "error"})` } };
@@ -512,7 +526,9 @@ export function enterSessionOwnerFromEnvironment(env = process.env, root = proce
 }
 
 if (isDirectInvocation(import.meta.url)) {
-  enterSessionOwnerFromEnvironment();
+  const rootFlag = process.argv.findIndex((token) => token === "--root" || token.startsWith("--root="));
+  const rootValue = rootFlag === -1 ? undefined : (process.argv[rootFlag].split("=")[1] ?? process.argv[rootFlag + 1]);
+  enterSessionOwnerFromEnvironment(process.env, rootValue !== undefined && !rootValue.startsWith("--") ? resolve(rootValue) : process.cwd());
   const { exit, output } = runCli(process.argv.slice(2));
   process.stdout.write(`${JSON.stringify(output)}\n`);
   process.exitCode = exit;

@@ -341,7 +341,24 @@ check("report: queue.cancelClasses counts cancelled slices per class and counts 
   assert.deepEqual(counted.json.queue.cancelClasses, { budget: 2, "wrong-premise": 0, "review-defect": 0, "integrated-elsewhere": 0, superseded: 1, unclassified: 1 });
 });
 
-assert.equal(cases.length, 19, "the complete CLI corpus must be registered before execution begins");
+// PF-66 (report 05): every verb names its repository with --root, so a cancel needs no `cd`.
+check("root: --root points every verb at another repository and a relative --queue is read from it", () => {
+  const dir = sandbox();
+  const elsewhere = sandbox();
+  const path = writeQueue(dir, [slice("A", ["a.mjs"]), slice("B", ["b.mjs"])]);
+  const validated = cli(elsewhere, ["validate", "--root", dir, "--queue", REL]);
+  assert.equal(validated.status, 0, validated.stdout + validated.stderr);
+  const cancelled = cli(elsewhere, ["cancel", "A", "--root", dir, "--queue", REL, "--reason", "ends elsewhere", "--class", "integrated-elsewhere"]);
+  assert.equal(cancelled.status, 0, cancelled.stdout + cancelled.stderr);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).slices[0].state, "cancelled");
+  assert.equal(cli(elsewhere, ["report", "--root", dir, "--queue", REL, "--now", NOW]).json.queue.cancelClasses["integrated-elsewhere"], 1);
+  const missing = cli(elsewhere, ["validate", "--root", join(dir, "absent"), "--queue", REL]);
+  assert.equal(missing.status, 2);
+  assert.equal(missing.json.code, "SQ-USAGE");
+  assert.equal(cli(elsewhere, ["validate", "--root", dir, "--root", dir, "--queue", REL]).json.code, "SQ-USAGE", "--root given twice is a usage error");
+});
+
+assert.equal(cases.length, 20,"the complete CLI corpus must be registered before execution begins");
 process.on("exit", () => {
   for (const dir of sandboxes) rmSync(dir, { recursive: true, force: true });
 });
