@@ -1,7 +1,7 @@
 # State authority diagnostics and memo, and the Critic route path rule: verification and PO apply blocks (2026-10-29)
 
-Thirteen patches, applied in this order, in four commits (patch 4, `w7-state-authority-trace-memo-e3`, patch 9, `w7-critic-path-charset-f4`, patch 10, `w7-critic-range-bindings-operator-text-d2`, patch 11, `w7-pf95-admit-refusal-detail-c24`, and patches 12 and 13, `w7-pf94-round2-walk-h1` and `-h2`, were added after the first version of this note; patch 11 is its own topic and its own commit, patches 12 and 13 are one commit because 12 alone carries a red case). This is a set of HELD PATCHES: nothing in it is applied, stamped, installed, reviewed or accepted until the PO has done so. It supersedes the apply
-blocks of `STATE-AUTHORITY-DIAGNOSTICS-VERIFY-2026-10-28.md` (which covered only the first two patches). All thirteen apply on HEAD of the working branch in this order; the first patch of each commit must
+Fourteen patches, applied in this order, in five commits (patch 14, `w7-pf95-supersede-replay-moves-leftover-origins-k1`, is its own topic and its own commit; patch 4, `w7-state-authority-trace-memo-e3`, patch 9, `w7-critic-path-charset-f4`, patch 10, `w7-critic-range-bindings-operator-text-d2`, patch 11, `w7-pf95-admit-refusal-detail-c24`, and patches 12 and 13, `w7-pf94-round2-walk-h1` and `-h2`, were added after the first version of this note; patch 11 is its own topic and its own commit, patches 12 and 13 are one commit because 12 alone carries a red case). This is a set of HELD PATCHES: nothing in it is applied, stamped, installed, reviewed or accepted until the PO has done so. It supersedes the apply
+blocks of `STATE-AUTHORITY-DIAGNOSTICS-VERIFY-2026-10-28.md` (which covered only the first two patches). All fourteen apply on HEAD of the working branch in this order; the first patch of each commit must
 never be applied alone (the second corrects it).
 
 | # | Patch | Content |
@@ -19,6 +19,7 @@ never be applied alone (the second corrects it).
 | 11 | `w7-pf95-admit-refusal-detail-c24` | PF-95: a verb-first lead sentence in front of both `CGB-CONFLICT` details of an old batch, so the CLI detail (cut at 200 characters) shows `inspect-course-takeover` and `supersede-course-takeover`; case `PF95 admit refusal (1)`; the finalizer suite is 88 tests with only its known baseline failure |
 | 12 | `w7-pf94-round2-walk-h1` | PRODUCTION FIX found by walking round 2 of a Critic course on the real route: the round 2 admit on the course path was refused `CGB-PARENT` because the parent receipt digest was compared with a different digest function than the course projection records; one line in `critic-generic-batch.mjs`; carries the case `PF94 ROUND2 (a)` which is RED until patch 13 |
 | 13 | `w7-pf94-round2-walk-h2` | PRODUCTION FIX: the lineage of round 2 (`--add-review-lineage`) passed no delta request to the course compile and was refused `CCA-DELTA-REQUIRED`; the verb now names the registered delta request of the round candidate (or refuses with that code and writes nothing); cases `PF94 ROUND2 (a)` green and `(b)`; VCR01 pin 238 to 259 |
+| 14 | `w7-pf95-supersede-replay-moves-leftover-origins-k1` | PRODUCTION FIX: replaying the same `supersede-course-takeover` request of a takeover audited before the origins fix now also moves every origins entry still owned by the old batch (the audit is not rewritten), so the next admit no longer ends in `CGB-CONFLICT` at the delivery target; case `PF95 REPLAY (a)` in the finalizer suite, no pin change |
 
 ## What the Critic path rule is now (PO decision 2026-10-28)
 
@@ -47,6 +48,8 @@ percent, hash and non-ASCII letters are accepted. Bidirectional override charact
 recorded open baseline reds and unrelated to these patches. Full Verify is not run.
 
 Patches 12 and 13 were measured separately on a fresh clone of `50b4f5a4c` with patches 5 to 9 applied: critic-course-admission 68 of 68, critic-generic-batch 35, critic-dispatch-preflight 63, check-verify-case-completion 32, architecture overview current, finalizer 86 of 87 (known baseline red). With the one-line fix of patch 12 reverted both ROUND2 cases fail at the course admit; the file was restored byte for byte. The explicit-route `consumedParent` digest comparison was not examined.
+
+Patch 14 was measured on a fresh clone of `5cf6f2baa` with patches 5 to 9 and 11 to 13 applied in order: finalizer 89 tests, 88 pass, 1 fail (the same known baseline red), critic-generic-batch 35 of 35, critic-course-admission 68 of 68, check-verify-case-completion 32 of 32, architecture overview current. With the one production hunk reverted the new case fails at `the leftover delivery entry is no longer live`; restored, it passes.
 
 ## Named gaps and gates (not done)
 
@@ -89,6 +92,11 @@ Block 2c (round 2 of a Critic course, own commit, both patches together):
 `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-pf94-round2-walk-h2.patch`
 `git add -A -- plugins/pipeline-core harness/scripts`
 `git commit --no-verify -F scratch/commit-msg-po-apply-pf94-round2.txt`
+
+Block 2d (replay of an old takeover, own commit, after 2c):
+`git apply specs/sprint-alfred-epic/evidence/held-patches/w7-pf95-supersede-replay-moves-leftover-origins-k1.patch`
+`git add -A -- plugins/pipeline-core`
+`git commit --no-verify -F scratch/commit-msg-po-apply-pf95-replay.txt`
 
 Block 3, tell the Elephant: it stamps, you refresh the installed plugin copy and install, the Elephant reads the preflight back. The consumer then runs the failing round-2 registration again; a refusal that
 names a different place is reported with its exact code and message.
