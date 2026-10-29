@@ -1,0 +1,48 @@
+diff --git a/docs/guard-maintenance-window-threat-model.md b/docs/guard-maintenance-window-threat-model.md
+index dd33be443..dbcaedb0a 100644
+--- a/docs/guard-maintenance-window-threat-model.md
++++ b/docs/guard-maintenance-window-threat-model.md
+@@ -331,6 +331,9 @@ below assumes it holds and is written to catch a change that would break it.
+   `lib/critic-required-guardrails.mjs`, which are protected for the same reason.
+   The dispatch guard also imports `lib/briefing-file-reference.mjs` (the briefing file pointer of D183,
+   which decides the exact prompt bytes a dispatched Goldfish receives), protected for the same reason.
++  The lifecycle, dispatch and dispatch-budget hooks also load `lib/authority-trace-hook.mjs`
++  (the opt-in authority trace writer, active only when `PIPELINE_AUTHORITY_TRACE=1`), which runs inside those
++  kernel hook processes and is protected for the same reason.
+   Guards and close coordination import these modules to enforce verified feature close audit and critic lifecycle readback.
+ - The 2026-09-27 design-workflow, model-role and readiness closure adds:
+   `lib/design-workflow-package.mjs`, `lib/design-workflow-approval.mjs`,
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+index 2a4e4b3ae..830cd937d 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
+@@ -192,6 +192,15 @@ function stripCodeComments(source) {
+ // below), so an edge added or removed in the source without updating this table fails
+ // rather than silently stops being covered.
+ const DYNAMIC_IMPORT_EDGES = {
++  // The opt-in authority trace (PIPELINE_AUTHORITY_TRACE=1): three kernel hooks load the trace writer with one literal
++  // dynamic import each (the worktree-isolation hook does too, but is not a kernel file), and the writer loads its three counter modules through ONE computed site.
++  "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs": ["../lib/authority-trace-hook.mjs"],
++  "plugins/pipeline-core/hooks/guard-dispatch.mjs": ["../lib/authority-trace-hook.mjs"],
++  "plugins/pipeline-core/hooks/guard-dispatch-budget.mjs": ["../lib/authority-trace-hook.mjs"],
++  "plugins/pipeline-core/lib/authority-trace-hook.mjs": [{
++    computed: "new URL(relative, base).href",
++    alternatives: ["./worktree-lifecycle.mjs", "./windows-private-state.mjs", "./windows-owned-authority-backend.mjs"],
++  }],
+   // The generated Git hook admission contains four dynamic calls. Builtins count
+   // toward call-site parity but only the snapshot observer is a first-party edge.
+   "plugins/pipeline-core/lib/git-hook-snapshot-admission.mjs": [
+diff --git a/plugins/pipeline-core/lib/guard-maintenance-window.mjs b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+index 3d4da623e..0ca467b13 100644
+--- a/plugins/pipeline-core/lib/guard-maintenance-window.mjs
++++ b/plugins/pipeline-core/lib/guard-maintenance-window.mjs
+@@ -538,6 +538,9 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
+   // The dispatch guard hands a Goldfish exactly the verified bytes of a generated briefing file through
+   // this module (D183): changing it could alter the prompt a dispatched agent receives.
+   "plugins/pipeline-core/lib/briefing-file-reference.mjs",
++  // The dispatch and lifecycle hooks load the opt-in authority trace writer through this module when
++  // PIPELINE_AUTHORITY_TRACE=1 (Toolbox diagnosis): it runs inside kernel hook processes, so a window cannot change it.
++  "plugins/pipeline-core/lib/authority-trace-hook.mjs",
+   // The session Critic finalizer selects its admitted model through this
+   // route resolver. Keep both the resolver and its dynamically loaded
+   // host-managed bootstrap in the kernel: changing either could alter the
