@@ -196,6 +196,204 @@ index e11b5e46e..1d3c80c2f 100644
  test("readback refuses missing consumed review and forged private lifecycle fields", t => {
    const common = fixture(t);
    const source = critic();
+diff --git a/plugins/pipeline-core/lib/critic-verify-readiness.mjs b/plugins/pipeline-core/lib/critic-verify-readiness.mjs
+index 2608ffb07..2d5694b60 100644
+--- a/plugins/pipeline-core/lib/critic-verify-readiness.mjs
++++ b/plugins/pipeline-core/lib/critic-verify-readiness.mjs
+@@ -1,12 +1,33 @@
+ // SPDX-License-Identifier: SUL-1.0
+ /** Read-only final-candidate check: diagnostic Verify never asserts a Critic. */
+-import { lstatSync, readdirSync } from "node:fs";
++import { lstatSync, readdirSync, readFileSync } from "node:fs";
+ import { join } from "node:path";
+ import { readCriticVerifyLifecycle } from "./critic-verify-lifecycle.mjs";
++import { authorizeRecordedResidualAcceptanceByMode } from "./critical-action-authorization.mjs";
+ 
+ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+ const RECEIPT = /^[a-f0-9]{64}\.json$/u;
+ 
++// D190: a recorded PO acceptance of residual minor findings, read from the project state file. Inert
++// (null) when no record is bound to this candidate, so the passing-receipt path is unchanged; the
++// verifier re-checks the record in the configured approval mode (signature proof or chat waiver).
++function residualAcceptanceDeps(repoRoot, candidate) {
++  if (typeof repoRoot !== "string" || repoRoot.length === 0) return null;
++  try {
++    const state = JSON.parse(readFileSync(join(repoRoot, "project", "pipeline-state.json"), "utf8"));
++    const record = state?.residualAcceptance?.lastAccepted;
++    if (record === null || typeof record !== "object" || record.forCommit !== candidate.commit
++      || record.forTree !== candidate.tree) return null;
++    return {
++      residualAcceptance: { candidate: { commit: record.forCommit, tree: record.forTree },
++        criticReceiptSha256: record.criticReceiptSha256, findings: record.findings },
++      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256, findings }) =>
++        authorizeRecordedResidualAcceptanceByMode({ projectDir: repoRoot, state, candidate: bound,
++          criticReceiptSha256, findings, now: new Date().toISOString() }),
++    };
++  } catch { return null; }
++}
++
+ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, tree, worktreeState,
+   evidencePath = "evidence/verify-latest.json", evidence, requireClean = true,
+   readLifecycle = readCriticVerifyLifecycle } = {}) {
+@@ -40,9 +61,11 @@ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head,
+   } catch {
+     return { ...exact, code: "private-critic-binding-unavailable" };
+   }
++  const residualDeps = residualAcceptanceDeps(repoRoot, candidate);
+   for (const id of ids) {
+     try {
+-      readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
++      if (residualDeps === null) readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
++      else readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
+       return { ...exact, currentCheckoutOk: true, privateLifecycleBound: true,
+         receiptId: id, code: "critic-bound-verify-valid" };
+     } catch { /* Other candidates and invalid private records are not admission. */ }
+diff --git a/plugins/pipeline-core/lib/critical-action-approval-request.mjs b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+index de67cd03b..0657759fc 100644
+--- a/plugins/pipeline-core/lib/critical-action-approval-request.mjs
++++ b/plugins/pipeline-core/lib/critical-action-approval-request.mjs
+@@ -22,6 +22,7 @@ export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action
+ // `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
+ export const CRITICAL_ACTION_KINDS = Object.freeze([
+   "push", "deploy", "publication", "release-preflight", "governance-fork-disposition", "feature-package-reconcile", "interruption-promotion",
++  "accept-residual-critic-findings",
+ ]);
+ 
+ const SHA = /^[a-f0-9]{64}$/u;
+diff --git a/plugins/pipeline-core/lib/critical-action-authorization.mjs b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+index 6b8d4270d..33163ffdc 100644
+--- a/plugins/pipeline-core/lib/critical-action-authorization.mjs
++++ b/plugins/pipeline-core/lib/critical-action-authorization.mjs
+@@ -479,6 +479,129 @@ export function authorizeRecordedChatPush({
+   return { authorized: true, code: "PUSH-PROOF-WAIVED", mode: waiver.waiver.mode };
+ }
+ 
++const RESIDUAL_KIND = "accept-residual-critic-findings";
++const RESIDUAL_SEVERITIES = new Set(["blocker", "major", "minor"]);
++
++// Sorted, minimal copy of a finding list, or null when it is not a well-formed non-empty list.
++function residualFindingList(findings) {
++  if (!Array.isArray(findings) || findings.length === 0) return null;
++  const list = [];
++  for (const finding of findings) {
++    if (!object(finding) || !SHA256.test(finding.id ?? "") || !RESIDUAL_SEVERITIES.has(finding.severity)) return null;
++    list.push({ id: finding.id, severity: finding.severity });
++  }
++  return list.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
++}
++
++const residualInputValid = ({ projectDir, anchorDir, state, candidate, criticReceiptSha256, findings }) =>
++  typeof projectDir === "string" && typeof anchorDir === "string" && object(state) && validCandidate(candidate)
++  && SHA256.test(criticReceiptSha256 ?? "") && residualFindingList(findings) !== null;
++
++// The recorded acceptance must bind exactly this commit, tree, Critic receipt and finding list.
++function residualBindingCode(recorded, { candidate, criticReceiptSha256, findings }, prefix) {
++  if (!object(recorded) || recorded.forCommit !== candidate.commit) return `${prefix}-COMMIT-MISMATCH`;
++  const observed = residualFindingList(findings);
++  const bound = residualFindingList(recorded.findings);
++  if (recorded.forTree !== candidate.tree || recorded.criticReceiptSha256 !== criticReceiptSha256
++    || bound === null || JSON.stringify(bound) !== JSON.stringify(observed)) {
++    return `${prefix}-BINDING-MISMATCH`;
++  }
++  return null;
++}
++
++const residualSeverityRefused = (findings) => residualFindingList(findings).some((finding) => finding.severity !== "minor");
++
++/**
++ * D190: authorize the acceptance of residual MINOR Critic findings by a detached signature,
++ * modelled on `authorizeRecordedPush`. A major or blocker finding is refused here, never accepted.
++ * The record lives at `state.residualAcceptance.lastAccepted`.
++ */
++export function authorizeRecordedResidualAcceptance({
++  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, now, machinePlaneDeps = {},
++} = {}) {
++  const prefix = "RESIDUAL-PROOF";
++  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
++  if (!residualInputValid(input) || !validNow(now)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
++  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++
++  const trust = trustAnchorsFor(anchorDir, prefix);
++  if (!trust.ok) return { authorized: false, code: trust.code };
++  const localAnchor = localOperatorAnchorFor(trust, machinePlaneDeps);
++  if (trust.pinOnSuccess && localAnchor === null) return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
++
++  const approval = state?.residualAcceptance?.lastAccepted;
++  const recorded = approval?.criticalProof;
++  if (!object(approval) || !object(recorded)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
++  const binding = residualBindingCode(approval, input, prefix);
++  if (binding !== null) return { authorized: false, code: binding };
++  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++
++  const verified = verifySignedAction({
++    state, kind: RESIDUAL_KIND, prefix, candidate, recorded, anchors: trust.anchors, now,
++    subject: { criticReceiptSha256, findings: residualFindingList(findings) },
++  });
++  if (!verified.ok) return { authorized: false, code: verified.code };
++
++  const ledger = state?.criticalProofConsumption;
++  if (!Array.isArray(ledger)
++    || !ledger.some((entry) => object(entry) && entry.proofSha256 === recorded.proofSha256 && entry.kind === RESIDUAL_KIND)) {
++    return { authorized: false, code: `${prefix}-NOT-CONSUMED` };
++  }
++  if (trust.pinOnSuccess) {
++    if (localAnchor.publicKeySha256 !== verified.signer.publicKeySha256) {
++      return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
++    }
++    pinTrustAnchorOnFirstUse(anchorDir, trust.policy, RESIDUAL_KIND, verified.signer);
++  }
++  return { authorized: true, code: `${prefix}-VERIFIED`, mode: "signature",
++    keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256 };
++}
++
++/** Chat route of the same acceptance, modelled on `authorizeRecordedChatPush`; follows `gates.push_approval`. */
++export function authorizeRecordedChatResidualAcceptance({
++  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings,
++} = {}) {
++  const prefix = "RESIDUAL-PROOF";
++  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
++  if (!residualInputValid(input)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
++  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++  let waiver;
++  try { waiver = criticalProofWaiverFor(anchorDir, RESIDUAL_KIND); }
++  catch { return { authorized: false, code: `${prefix}-CHAT-POLICY-UNREADABLE` }; }
++  if (waiver?.waived !== true || !waiver.waiver) {
++    return { authorized: false, code: waiver?.code ?? `${prefix}-CHAT-NOT-WAIVED` };
++  }
++  // A residual acceptance is always an attribution record: the per-kind chat setting (waiver mode
++  // "chat") is recorded as chat-attributed-unattested with a humanApproval block.
++  const mode = waiver.waiver.mode === "chat" ? "chat-attributed-unattested" : waiver.waiver.mode;
++  const approval = state?.residualAcceptance?.lastAccepted;
++  if (!object(approval)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
++  const binding = residualBindingCode(approval, input, prefix);
++  if (binding !== null) return { authorized: false, code: binding };
++  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
++  if (approval.criticalProof !== null) return { authorized: false, code: `${prefix}-CHAT-RECORD-MISMATCH` };
++  const recordedWaiver = approval.criticalProofWaiver;
++  if (!object(recordedWaiver) || recordedWaiver.kind !== RESIDUAL_KIND
++    || recordedWaiver.mode !== mode || recordedWaiver.source !== waiver.waiver.source) {
++    return { authorized: false, code: `${prefix}-CHAT-ATTRIBUTION-MISSING` };
++  }
++  if (mode !== "chat-attributed-unattested") return { authorized: false, code: `${prefix}-CHAT-NOT-WAIVED` };
++  if (!object(approval.humanApproval) || approval.humanApproval.kind !== RESIDUAL_KIND
++    || approval.humanApproval.mode !== "chat-attributed-unattested") {
++    return { authorized: false, code: `${prefix}-CHAT-ATTRIBUTION-MISSING` };
++  }
++  return { authorized: true, code: `${prefix}-WAIVED`, mode };
++}
++
++/** Picks the chat route when the configured mode waives the proof, otherwise the signature route. */
++export function authorizeRecordedResidualAcceptanceByMode(input = {}) {
++  let waiver = null;
++  try { waiver = criticalProofWaiverFor(input.anchorDir ?? input.projectDir, RESIDUAL_KIND); } catch { waiver = null; }
++  return waiver?.waived === true
++    ? authorizeRecordedChatResidualAcceptance(input)
++    : authorizeRecordedResidualAcceptance(input);
++}
++
+ /**
+  * The release route's equivalent: is there a recorded, unused deploy approval for this
+  * artifact and environment whose detached proof verifies against the committed anchor?
 diff --git a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs b/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
 index a561598e8..43faf2156 100644
 --- a/plugins/pipeline-core/lib/critical-action-authorization.test.mjs
@@ -367,3 +565,20 @@ index a561598e8..43faf2156 100644
    process.stdout.write(`\n${checks}/${checks} critical-action authorization checks passed\n`);
  } finally {
    for (const root of roots) rmSync(root, { recursive: true, force: true });
+diff --git a/plugins/pipeline-core/lib/critical-human-proof-policy.mjs b/plugins/pipeline-core/lib/critical-human-proof-policy.mjs
+index a9052295e..c5b8104ee 100644
+--- a/plugins/pipeline-core/lib/critical-human-proof-policy.mjs
++++ b/plugins/pipeline-core/lib/critical-human-proof-policy.mjs
+@@ -47,10 +47,12 @@ export const DEFAULT_RECONCILE_APPROVAL_MODE = "signature";
+ const GATE_APPROVAL_MODE_KEYS = Object.freeze({
+   push: "push_approval",
+   "feature-package-reconcile": "reconcile_approval",
++  "accept-residual-critic-findings": "push_approval",
+ });
+ const GATE_APPROVAL_MODE_DEFAULTS = Object.freeze({
+   push: DEFAULT_PUSH_APPROVAL_MODE,
+   "feature-package-reconcile": DEFAULT_RECONCILE_APPROVAL_MODE,
++  "accept-residual-critic-findings": DEFAULT_PUSH_APPROVAL_MODE,
+ });
+ 
+ /**

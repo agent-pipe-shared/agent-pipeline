@@ -85,10 +85,38 @@ Status: setup done (clone = candidate + budget patch + this patch; clone2 = plai
 5. Then: RA1..RA8 GREEN; each touched suite whole in clone and clone2 with failing-name sets from FINISHED logs; revert proof for the production edits; regenerate the patch and `git apply --check` it on the third clone (it still applies at this checkpoint: the patch was generated from the clone against its own budget-patch commit).
 
 ### Not done in C4 (unchanged scope)
-authorize-critical and pipeline-state command surface, the push-prepare closing sentence and its pin. Kernel production files for the PO under a Guard Maintenance Window once done: `critic-verify-lifecycle.mjs`, `critical-action-approval-request.mjs`, `critical-action-authorization.mjs`, `critical-human-proof-policy.mjs`, `critic-verify-readiness.mjs`. Suite comparisons (lifecycle 12/12 green earlier in C2; everything else) were NOT run in C4; the plain-candidate clone2 comparison is owed. No `git apply --check` was run for the C4 patch (budget).
-
+authorize-critical and pipeline-state command surface, the push-prepare closing sentence and its pin. Kernel production files for the PO under a Guard Maintenance Window once done: `critic-verify-lifecycle.mjs`, `critical-action-approval-request.mjs`, `critical-action-authorization.mjs`, `critical-human-proof-policy.mjs`, `critic-verify-readiness.mjs`. Suite comparisons (lifecycle 12/12 green earlier in C2; everything else) were NOT run in C4; the plain-candidate clone2 comparison is owed.
 CONTINUATION CARD -- done: setup, fact re-verification of C3 notes (kind list gate and waiver chain hold), RA1..RA8 written and RED, waiver design chosen; remaining: steps 1-5 above; next step: apply the four production edits in a fresh clone (setup mode of the scratch driver rebuilds clone, then git apply the stacked patches), run RA cases GREEN.
 
 ### Operator flow (unchanged)
 
 Apply-diff budget patch, then this patch; `git add -u` with a path limit; commit as the PO; stamp; install. Kernel production file in the patch today: `critic-verify-lifecycle.mjs`, applied by the PO under a Guard Maintenance Window. An independent Critic review stays a parent-owned batch gate.
+
+## C5 slice: production edits made, RA1..RA8 GREEN, two suites RED (pins outside scope), checkpoint at the budget
+
+Status: targeted delivery for the eight authorization cases and the five lifecycle cases: green. Not complete as a feature: two suites are red because they pin the kind list and are outside the briefed files (below). Batch Critic, Full Verify and PO acceptance stay pending.
+
+### Changed (cumulative patch, regenerated: 7 files, +421/-9; `git apply --check` of the stack on a third clone of candidate plus budget patch: exit 0)
+- critical-action-approval-request.mjs: member `accept-residual-critic-findings` added to `CRITICAL_ACTION_KINDS` (+1).
+- critical-human-proof-policy.mjs: `accept-residual-critic-findings: push_approval` in `GATE_APPROVAL_MODE_KEYS` and `DEFAULT_PUSH_APPROVAL_MODE` in `GATE_APPROVAL_MODE_DEFAULTS` (+2). No project file edit.
+- critical-action-authorization.mjs (+123): exports `authorizeRecordedResidualAcceptance` (prefix RESIDUAL-PROOF, record `state.residualAcceptance.lastAccepted`, trust anchors, binding on commit, tree, receipt and sorted `{id, severity}` list, `verifySignedAction`, ledger entry, TOFU pin; major or blocker refused with `RESIDUAL-PROOF-SEVERITY` first), `authorizeRecordedChatResidualAcceptance` (`criticalProofWaiverFor`, same bindings, waiver and attribution block) and `authorizeRecordedResidualAcceptanceByMode`. Design note: the per-kind chat waiver for this kind carries mode `chat`; the function maps it to `chat-attributed-unattested` and always requires a `humanApproval` block (the RA5 contract), so a residual acceptance is always an attribution record.
+- critic-verify-readiness.mjs (+27): inert-by-default `residualAcceptanceDeps` reads `project/pipeline-state.json` under `repoRoot`; only when `residualAcceptance.lastAccepted` is bound to the candidate does it pass `{residualAcceptance, verifyResidualAcceptanceFn}` (calling the by-mode function) as the second argument to the lifecycle reader; otherwise the call is byte-identical to before. `readOpenFindingsFn` keeps the lifecycle default.
+
+### Evidence (clone, finished logs; logs live in the removed scratch dir)
+- `critical-action-authorization.test.mjs`: RED first (missing export, whole file); after edits exit 0, 49/49 checks, RA1..RA8 all ok. One own-error was fixed on the way (RA5: waiver mode `chat` vs recorded mode; mapping above).
+- `critic-verify-lifecycle.test.mjs`: tests 12, pass 12, fail 0 (run once with the first production edits, readiness wiring was added afterwards and this suite was NOT re-run).
+- `critical-human-proof-policy.test.mjs` (read only): 35 passed, 0 failed, so the table entry breaks no pin there; no PO edit needed for it.
+- `guard-maintenance-window-kernel-closure.test.mjs`: 11 passed, 0 failed (run before the readiness import edit landed in the same clone state? it ran after all four edits; yes after).
+- RED: `critical-action-approval-request.test.mjs` exit 1, `assert.deepEqual` at line 37 pins the exact `CRITICAL_ACTION_KINDS` list; the only difference is the new last member. Exact fix: append `"accept-residual-critic-findings"` to the expected array in that test (file is not protected TP but is outside the briefed files).
+- RED: `harness/scripts/check-auth-gate-inventory-drift.test.mjs` exit 1, case "the real repository state passes clean today"; cause NOT diagnosed (budget). Likely the same kind-list or inventory entry; read its log first next time. It was not compared with clone2.
+
+### NOT done
+- Revert proof for this slice's production edits (RA cases RED without them): not run; the earlier RED-against-original run (missing export) stands as the only RED evidence.
+- Clone2 (plain candidate) comparison of failing-name sets: not run for any suite; push-prepare, po-human-approval, session-critic-finalizer suites, the readiness-wired path, `generate-architecture-overview.mjs --check`, and a re-run of the lifecycle suite after the readiness edit are open.
+- Pin updates: the approval-request test above and the drift case (diagnose first).
+- authorize-critical and pipeline-state command surface, the push-prepare closing sentence and its pin.
+- Kernel production files for the PO under a Guard Maintenance Window: critic-verify-lifecycle.mjs, critical-action-approval-request.mjs, critical-action-authorization.mjs, critical-human-proof-policy.mjs, critic-verify-readiness.mjs. Operator flow: apply-diff budget patch, then this patch; `git add -u` with a path limit; commit as the PO; stamp; install. Independent Critic review stays a parent-owned batch gate.
+
+Proposed commit message unchanged: feat(critic): let the PO accept residual minor findings through the configured approval mode so the push gate can qualify the candidate
+
+CONTINUATION CARD -- done: four production edits, RA1..RA8 and lifecycle cases green, stacked patch regenerated and apply-checked; remaining: pin update in the approval-request test and the drift case diagnosis (briefing must add those files), re-run lifecycle and readiness path, revert proof, clone2 comparison, remaining suites; next step: rebuild clone with setup, apply the patch stack, read the drift test log first.
