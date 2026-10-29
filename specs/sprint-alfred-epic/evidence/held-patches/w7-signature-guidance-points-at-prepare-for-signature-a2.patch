@@ -1,0 +1,266 @@
+diff --git a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+index 967f3a10e..8374489e4 100644
+--- a/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs
+@@ -976,26 +976,8 @@ export async function runAntigravityPreToolGuard(rawInput) {
+               ),
+             ].join("\n")
+             : [
+-              `Then, in this session (pure digest computation against data already in the repository -- neither step needs the external key, ADR-0059 Decision 1):`,
+-              ceremonyCommand(
+-                "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+-              ),
+-              ceremonyCommand("emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>")),
+-              // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand;
+-              // only this command enters the attended private-key boundary.
+-              `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). sign-intent resolves the configured local approval directory itself, so this one command prints no private path and needs no second apply step:`,
+-              boundedCopySafeCommand({
+-                executable: process.execPath,
+-                argv: [
+-                  placeholder(JSON.stringify(PO_HUMAN_APPROVAL_SCRIPT)), "sign-intent",
+-                  "--repo-root", placeholder(JSON.stringify(overrideRepo)),
+-                  "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
+-                ],
+-              }).command,
+-              "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
+-              ceremonyCommand(
+-                "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
+-              ),
++              `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
++              ceremonyCommand("prepare-for-signature"),
+             ].join("\n");
+           overrideGuidance = [
+             "",
+diff --git a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+index 03bd3b816..83fe51895 100644
+--- a/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
++++ b/plugins/pipeline-core/hooks/codex-pretool-guard.mjs
+@@ -605,27 +605,9 @@ if (denials.length > 0) {
+             ]),
+           ].join("\n")
+           : [
+-            `Then, in this session (pure digest computation against data already in the repository -- neither step needs the external key, ADR-0059 Decision 1):`,
++            `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1); the person then receives exactly one sign-intent command, and the agent imports the proof with authorize-by-signature by the full path that command writes:`,
+             renderOverrideCommand(script, [
+-              "prepare-authorization", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
+-              "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+-            ]),
+-            renderOverrideCommand(script, [
+-              "emit-signature-digest", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
+-              "--plan-sha256", placeholder("<plan-sha256>"),
+-            ]),
+-            // Mirrors prepareHumanGuardOverrideForSignature().signIntentCommand: the
+-            // intent digest is the exact emitted value, and only this command crosses
+-            // into the attended terminal that holds the PO/operator's private key.
+-            `Then the PO/operator, in an attended external terminal with the human-held Ed25519 key, signs exactly the intentSha256 emitted above (gates.human_approval is "${approvalMode}"). sign-intent resolves the configured local approval directory itself, so this one command prints no private path and needs no second apply step:`,
+-            renderOverrideCommand(PO_HUMAN_APPROVAL_SCRIPT, [
+-              "sign-intent", "--repo-root", forcedQuote(overrideRepo),
+-              "--intent-sha256", placeholder("<intent-sha256-from-emit-signature-digest>"),
+-            ]),
+-            "Then, back in this session, the agent verifies the proof and consumes the exact one-time authorization (this step needs the proof path, not the private key):",
+-            renderOverrideCommand(script, [
+-              "authorize-by-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
+-              "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<proof-path-from-sign-intent>"),
++              "prepare-for-signature", "--repo", forcedQuote(overrideRepo), "--request-sha256", planned.requestSha256,
+             ]),
+           ].join("\n");
+         overrideGuidance = [
+diff --git a/plugins/pipeline-core/hooks/guard-testpath.mjs b/plugins/pipeline-core/hooks/guard-testpath.mjs
+index fe7f36999..9f498bfac 100644
+--- a/plugins/pipeline-core/hooks/guard-testpath.mjs
++++ b/plugins/pipeline-core/hooks/guard-testpath.mjs
+@@ -334,13 +334,8 @@ if (matched) {
+           "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+           "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+         );
+-        const prepareAuthorizationSignature = ceremonyCommand(
+-          "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+-        );
+-        const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+-        const authorizeBySignature = ceremonyCommand(
+-          "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+-        );
++        // Slice A2 (PO decision 2026-10-27): signature mode prints the one agent command.
++        const prepareForSignature = ceremonyCommand("prepare-for-signature", "prepare-for-signature");
+         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
+         // mode, not just the mode-common `plan` step -- mirrors the continuation
+         // codex-pretool-guard.mjs's own adapter prints, adapted to this guard's shorter
+@@ -354,14 +349,10 @@ if (matched) {
+             authorizeChat.text,
+           ].join("\n")
+           : [
+-            `Then, in this session (pure digest computation against data already in the ` +
+-              `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
+-            prepareAuthorizationSignature.text,
+-            emitSignatureDigest.text,
+-            `Then, outside this session (only the signature itself needs the external Ed25519 ` +
+-              `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
+-              `there is no in-session activate step for this mode):`,
+-            authorizeBySignature.text,
++            `Then, in this session, the agent runs prepare-for-signature (it needs no external key, ADR-0059 Decision 1); ` +
++              `the person then receives exactly one sign-intent command, and the agent imports the proof ` +
++              `with authorize-by-signature by the full path that command writes:`,
++            prepareForSignature.text,
+           ].join("\n");
+         overrideGuidance = [
+           "",
+diff --git a/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs b/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs
+index 921d077c6..549974245 100644
+--- a/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs
++++ b/plugins/pipeline-core/lib/pins/signature-ceremony-requires-operator-work-and-breaks.test.mjs
+@@ -124,6 +124,44 @@ test("signing command handed to the human is paste-safe for PowerShell and Bash:
+   } finally { rmSync(root, { recursive: true, force: true }); }
+ });
+ 
++// Slice A2 (PO decision 2026-10-27): every denial-guidance site prints the one-command signature flow
++// (prepare-for-signature) in signature mode; the former four-step sequence and the proof placeholder are gone.
++test("A2: render-copy-safe in signature mode prints plan then prepare-for-signature, no placeholder and no emit-signature-digest", () => {
++  const root = fixture({ born: true });
++  try {
++    const recorded = recordHumanGuardDenial({
++      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
++      toolInput: { file_path: "notes.md", content: "a2\n" },
++      denials: [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }],
++    });
++    assert.equal(recorded.status, "planned");
++    const out = io();
++    const status = main(["render-copy-safe", "--repo", root, "--request-sha256", recorded.requestSha256], out);
++    assert.equal(status, 0, out.stderr);
++    assert.match(out.stdout, /prepare-for-signature/u);
++    assert.doesNotMatch(out.stdout, /<external-proof\.json>/u);
++    assert.doesNotMatch(out.stdout, /emit-signature-digest|prepare-authorization/u);
++  } finally { rmSync(root, { recursive: true, force: true }); }
++});
++
++for (const site of ["hooks/guard-testpath.mjs", "hooks/codex-pretool-guard.mjs", "hooks/antigravity-pretool-guard.mjs"]) {
++  test(`A2: ${site} signature-mode guidance names prepare-for-signature, not the four-step sequence or the proof placeholder`, () => {
++    const src = readFileSync(join(PLUGIN_ROOT, site), "utf8");
++    assert.match(src, /"prepare-for-signature"/u);
++    assert.doesNotMatch(src, /<external-proof\.json>/u);
++    assert.doesNotMatch(src, /"emit-signature-digest"/u);
++    assert.doesNotMatch(src, /<intent-sha256-from-emit-signature-digest>/u);
++    assert.doesNotMatch(src, /<fixed HGO_SIGNATURE_REASON text>/u);
++  });
++}
++
++test("A2: repair-map.mjs signature-mode rows are prepare-for-signature then authorize-by-signature with no placeholder", () => {
++  const src = readFileSync(join(PLUGIN_ROOT, "scripts", "repair-map.mjs"), "utf8");
++  assert.match(src, /"prepare-for-signature"/u);
++  assert.doesNotMatch(src, /<external-proof\.json>/u);
++  assert.doesNotMatch(src, /"emit-signature-digest"/u);
++});
++
+ test("RED: a commit refused by the git pre-commit hook seeds a human-override request and prints a signing command", () => {
+   // Source of the gap: the generated hook impl in
+   // plugins/pipeline-core/scripts/pre-commit-hook-install.mjs (renderImpl template; the
+diff --git a/plugins/pipeline-core/scripts/guard-human-override.mjs b/plugins/pipeline-core/scripts/guard-human-override.mjs
+index 04aefcf31..f1a90a45e 100644
+--- a/plugins/pipeline-core/scripts/guard-human-override.mjs
++++ b/plugins/pipeline-core/scripts/guard-human-override.mjs
+@@ -379,16 +379,11 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
+         "authorize", "authorize", "--plan-sha256", placeholder("<plan-sha256>"), "--selection-sha256", placeholder("<selection-sha256>"),
+         "--reason", placeholder('"<human-reason>"'), "--reason-sha256", placeholder("<reason-sha256>"), "--activate",
+       );
+-      const prepareAuthorizationSignature = ceremonyCommand(
+-        "prepare-authorization", "prepare-authorization", "--plan-sha256", placeholder("<plan-sha256-from-plan>"), "--reason", placeholder('"<fixed HGO_SIGNATURE_REASON text>"'),
+-      );
+-      const emitSignatureDigest = ceremonyCommand("emit-signature-digest", "emit-signature-digest", "--plan-sha256", placeholder("<plan-sha256>"));
+-      const authorizeBySignature = ceremonyCommand(
+-        "authorize-by-signature", "authorize-by-signature", "--plan-sha256", placeholder("<plan-sha256>"), "--proof", placeholder("<external-proof.json>"),
+-      );
++      // Slice A2: signature mode prints the one agent command; the person gets one sign-intent command from it.
++      const prepareForSignature = ceremonyCommand("prepare-for-signature", "prepare-for-signature");
+       const ceremonySteps = approvalMode === "chat"
+         ? [planCommand, prepareAuthorizationChat, authorizeChat]
+-        : [planCommand, prepareAuthorizationSignature, emitSignatureDigest, authorizeBySignature];
++        : [planCommand, prepareForSignature];
+       write(`${globalChat ? "Committed global chat approval: chat-attributed-unattested; no terminal ceremony, key, or proof is required.\n\n" : ""}${ceremonySteps.map((step) => step.text).join("\n\n")}\n`);
+       return 0;
+     }
+diff --git a/plugins/pipeline-core/scripts/repair-map.mjs b/plugins/pipeline-core/scripts/repair-map.mjs
+index 8dd8ab9ec..995772fd2 100644
+--- a/plugins/pipeline-core/scripts/repair-map.mjs
++++ b/plugins/pipeline-core/scripts/repair-map.mjs
+@@ -132,36 +132,30 @@ function renderNextAction(nextAction) {
+ function overridePlanCommands(rootDir, requestSha256, approvalMode) {
+   const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+   const plan = { executable: process.execPath, argv: [script, "plan", "--repo", rootDir, "--request-sha256", requestSha256] };
++  // Slice A2: signature mode is plan, prepare-for-signature (the person then gets exactly one
++  // sign-intent command), then the agent's authorize-by-signature with the full proof path that
++  // command writes (described in prose by the row, not a placeholder token).
++  if (approvalMode !== "chat") {
++    return [
++      plan,
++      { executable: process.execPath, argv: [script, "prepare-for-signature", "--repo", rootDir, "--request-sha256", requestSha256] },
++      { executable: process.execPath, argv: [script, "authorize-by-signature", "--repo", rootDir, "--request-sha256", requestSha256,
++        "--plan-sha256", "the planSha256 printed by prepare-for-signature", "--proof", "the full proof path written by sign-intent"] },
++    ];
++  }
+   const prepare = {
+     executable: process.execPath,
+-    argv: approvalMode === "chat"
+-      ? [script, "prepare-authorization", "--repo", rootDir, "--request-sha256", requestSha256,
+-        "--plan-sha256", "<plan-sha256-from-plan>", "--reason", "<human-reason>"]
+-      : [script, "prepare-authorization", "--repo", rootDir, "--request-sha256", requestSha256,
+-        "--plan-sha256", "<plan-sha256-from-plan>", "--reason", "<fixed HGO_SIGNATURE_REASON text>"],
++    argv: [script, "prepare-authorization", "--repo", rootDir, "--request-sha256", requestSha256,
++      "--plan-sha256", "<plan-sha256-from-plan>", "--reason", "<human-reason>"],
+   };
+   const authorize = {
+     executable: process.execPath,
+-    argv: approvalMode === "chat"
+-      ? [script, "authorize", "--repo", rootDir, "--request-sha256", requestSha256,
+-        "--plan-sha256", "<plan-sha256>", "--selection-sha256", "<selection-sha256>",
+-        "--reason", "<human-reason>", "--reason-sha256", "<reason-sha256>", "--activate"]
+-      : [script, "authorize-by-signature", "--repo", rootDir, "--request-sha256", requestSha256,
+-        "--plan-sha256", "<plan-sha256>", "--proof", "<external-proof.json>"],
+-  };
+-  // NVA-SIGENTRY-2 F2: `signature` mode's only path from "prepared" to "signable" is
+-  // `emit-signature-digest`, run before the human is expected to sign anything
+-  // out-of-band -- omitting it here left this map's own signature-mode row incomplete in
+-  // exactly the way the original backlog item was filed to close. Chat mode has no
+-  // signing step at all (an in-session `--activate` IS the authorization), so it stays a
+-  // 3-command sequence; only the signature-mode sequence grows to 4.
+-  if (approvalMode === "chat") return [plan, prepare, authorize];
+-  const emitDigest = {
+-    executable: process.execPath,
+-    argv: [script, "emit-signature-digest", "--repo", rootDir, "--request-sha256", requestSha256,
+-      "--plan-sha256", "<plan-sha256>"],
++    argv: [script, "authorize", "--repo", rootDir, "--request-sha256", requestSha256,
++      "--plan-sha256", "<plan-sha256>", "--selection-sha256", "<selection-sha256>",
++      "--reason", "<human-reason>", "--reason-sha256", "<reason-sha256>", "--activate"],
+   };
+-  return [plan, prepare, emitDigest, authorize];
++  // Chat mode has no signing step at all (an in-session `--activate` IS the authorization).
++  return [plan, prepare, authorize];
+ }
+ 
+ /**
+diff --git a/plugins/pipeline-core/scripts/repair-map.test.mjs b/plugins/pipeline-core/scripts/repair-map.test.mjs
+index bcf35d20b..7910dc296 100644
+--- a/plugins/pipeline-core/scripts/repair-map.test.mjs
++++ b/plugins/pipeline-core/scripts/repair-map.test.mjs
+@@ -53,15 +53,17 @@ test("AC-7 (contract): every eligibility()-derived row matches a fresh, independ
+       assert.equal(row.liftable, "in-session-or-signed");
+       const freshMode = readPushApprovalMode(ROOT)?.mode ?? "signature";
+       assert.equal(row.approvalMode, freshMode, "the row's approval mode must track the live reader, not a stored value");
+-      // NVA-SIGENTRY-2 F2: signature mode's sequence grew a 4th command
+-      // (emit-signature-digest, run before the human signs anything out-of-band); chat
+-      // mode has no signing step at all and stays at 3.
+-      const expectedLength = freshMode === "chat" ? 3 : 4;
++      // Slice A2 (PO decision 2026-10-27): signature mode is plan, prepare-for-signature,
++      // authorize-by-signature (the former emit-signature-digest step and the proof placeholder are gone;
++      // equivalent assertion on the new sequence); chat mode has no signing step and stays at 3.
++      const expectedLength = 3;
+       assert.ok(Array.isArray(row.command) && row.command.length === expectedLength,
+         `expected ${expectedLength} commands for mode=${freshMode}, got ${row.command?.length}`);
+       if (freshMode !== "chat") {
+-        assert.equal(row.command[2].argv[1], "emit-signature-digest",
+-          "signature mode's 3rd command must be the digest-emission step, between prepare-authorization and authorize-by-signature");
++        assert.equal(row.command[1].argv[1], "prepare-for-signature",
++          "signature mode's 2nd command must be prepare-for-signature, followed by authorize-by-signature");
++        assert.equal(row.command[2].argv[1], "authorize-by-signature");
++        assert.ok(!JSON.stringify(row.command).includes("<external-proof.json>"), "no proof placeholder in signature-mode map rows");
+       }
+     } else if (fresh.authorCandidate) {
+       assert.equal(row.liftable, "author-repair-required");
