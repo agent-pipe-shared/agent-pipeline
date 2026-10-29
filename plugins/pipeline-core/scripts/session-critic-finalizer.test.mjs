@@ -37,6 +37,7 @@ import {
   SESSION_CRITIC_RECEIPT_SCHEMA,
   SessionCriticFinalizerError,
   admitSessionCriticReview,
+  describeCliError,
   exportSessionCriticEvidence,
   finalizeSessionCriticReview as finalizeRaw,
   runSessionCriticFinalizerCli,
@@ -1577,6 +1578,21 @@ test("PF94 TAKEOVER (1) real state: a consumed non-course batch makes the featur
     try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
     assert.equal(error?.code, "CGB-CONFLICT");
     assert.ok(error.message.includes("inspect-course-takeover") && error.message.includes("supersede-course-takeover"), error.message);
+  } finally { cleanup(fx); }
+});
+
+test("PF95 admit refusal (1) the CLI detail of a CGB-CONFLICT from an old batch names both takeover verbs", () => {
+  const fx = takeoverFixture();
+  try {
+    let error = null;
+    try { CGB.assertFeatureCriticReviewUnitOwnership({ repoRoot: fx.root, courseKey: featureCourseKey(fx), logicalWorkIds: ["AC-1", "AC-2"] }); } catch (e) { error = e; }
+    assert.equal(error?.code, "CGB-CONFLICT");
+    const detail = describeCliError(error);
+    assert.equal(typeof detail, "string");
+    assert.ok(detail.includes("inspect-course-takeover") && detail.includes("supersede-course-takeover"), detail);
+    assert.ok(!/[\r\n]/u.test(detail), detail);
+    assert.ok(!/(?:[A-Za-z]:\\|\/)[A-Za-z0-9_.-]/u.test(detail.replaceAll("<path>", "")), detail);
+    assert.ok(detail.length <= 220, String(detail.length));
   } finally { cleanup(fx); }
 });
 

@@ -733,7 +733,7 @@ export function readCriticReviewUnit(input) {
   });
 }
 // PF-94: the repair text of a refused feature-course ownership names both takeover verbs.
-const TAKEOVER_DETAIL = "The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
+const TAKEOVER_DETAIL = "Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The review unit's logical work ids are owned by a batch that is not this feature course. If that batch is fully consumed and the feature course has no registered history, inspect it with the session-critic-finalizer inspect-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-inspect-request.v1 and featureId), then retire its index entries with the supersede-course-takeover verb (--root <repo> --request <file> with schema pipeline.session-critic-course-takeover-supersede-request.v1, featureId, the inspected digestSha256 and a short reason). Nothing is deleted. The batch may belong to an earlier course key of this feature; the takeover verbs retire it when it is fully consumed and the feature has no registered lineage.";
 const TAKEOVER_REPAIR = {
   "CGB-TAKEOVER-NONE": "No batch owns these work ids; there is nothing to take over.",
   "CGB-TAKEOVER-PARTIAL": "Only part of the work ids (or a differently scoped batch) is owned; a takeover never splits a batch. Repair the batch scope first.",
@@ -879,7 +879,7 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
       const deliveryIndex=indexPath(c,"origins",targetForPacket(packet));
       if(existsSync(deliveryIndex)){
         const entry=stableJson(deliveryIndex);
-        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
+        if(!owned || !eq(entry.batchRef,owned.batchRef))fail("CGB-CONFLICT",`Retire the old batch with the session-critic-finalizer verbs inspect-course-takeover then supersede-course-takeover (nothing is deleted). The delivery target of this packet is already indexed under another batch (batch ${entry.batchRef?.batchId}, origin kind ${entry.identity?.kind}). If that batch is fully consumed and belongs to an earlier course of this feature, retire it with the session-critic-finalizer inspect-course-takeover and supersede-course-takeover verbs; nothing is deleted.`);
       }
       if (!owned) {
         if (projection.budgets.reviewRound !== 1) fail("CGB-REGISTRATION-REQUIRED");
