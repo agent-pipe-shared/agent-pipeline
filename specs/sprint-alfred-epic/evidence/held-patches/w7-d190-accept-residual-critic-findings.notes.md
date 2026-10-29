@@ -1,75 +1,41 @@
-# D190 residual-finding acceptance: partial slice (RED cases only)
+# D190 residual-finding acceptance: lifecycle slice implemented (C2)
 
-Status: CHECKPOINT. The patch contains ONLY the RED cases; no production edit exists. Targeted delivery: blocked (budget).
+Status: lifecycle production edit done and its five cases GREEN; authorization function, push-gate wiring and the remaining suite comparison are NOT done. Targeted delivery for the lifecycle check: green. Batch Critic, Full Verify and PO acceptance stay pending.
 
 ## Stacking
 
-The patch is the diff against the state "candidate 62532c7ff plus the committed budget patch
-(w7-d190-critic-delta-rounds-are-not-capped.patch)". Apply order: budget patch, then this patch.
-Apply check of the stacked patch was NOT run (no third-clone check done; the patch touches only
-plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs).
+The patch is the cumulative diff against "candidate a4d1e0d4d plus the budget patch (w7-d190-critic-delta-rounds-are-not-capped.patch)". Apply order: budget patch, then this patch. `git apply --check` of this patch on a third clone (plain candidate plus budget patch): exit 0.
 
-## Read results (verified in the repository)
+## Changed files (in the patch)
 
-- recordCriticVerifyLifecycle -> readBoundConsumedCriticReceipt refuses `reviewPass !== true` with
-  CVL-CRITIC-FAILED (critic-verify-lifecycle.mjs line 74). The same function runs on readback, so
-  readback needs the same acceptance dependency.
-- The receipt carries only `verdictSha256` and `findingCount`, NOT finding ids or severities. The open
-  findings live in the consumed result (`readConsumedCandidateResult(...).result.verdict.findings`),
-  and verdict findings have no `id` field (required: gap, risk, severity, evidence, spec_ref).
-  Recon premise "finding ids" therefore needs a derived id: chosen `residualFindingId(f) = sha256(canonicalJson(f))`.
-- Authorization route (critical-action-authorization.mjs): verifySignedAction is kind-generic
-  (kind, candidate, subject digest, intent, anchors); authorizeRecordedPush and authorizeRecordedDeploy
-  use it; authorizeRecordedChatPush is the chat route (waiver via criticalProofWaiverFor, record in
-  state.pushApproval.lastApproved). A recorded authorization binds commit, tree, a subject digest and
-  the plan/spec authority; modes diverge in push: signature = detached proof + ledger entry, chat =
-  waiver plus labelled attribution record. NOT verified: whether criticalActionSubjectSha256 accepts a
-  new kind without editing its module (a lookup of lib/critical-action.mjs failed, wrong filename).
+- plugins/pipeline-core/lib/critic-verify-lifecycle.mjs (+~50 lines): exports `residualFindingId` (sha256 of the module's existing `canonicalJson`), `CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA` (v3) and `RESIDUAL_ACCEPTANCE_BASIS`; a private `residualAcceptanceFor`; `readBoundConsumedCriticReceipt` lets a failed receipt through only via that function (so record and readback share one rule); record writes v3 with `residualAcceptance {basis, mode, acceptanceSha256, findings}`; readback accepts v3, requires the key set, and refuses drift (`CVL-CRITIC-DRIFT`) when the record kind and the recomputed acceptance disagree. Passing receipts keep v1, byte for byte. Carry-forward records never take the residual path (the inner carry read passes no acceptance, so a failed receipt stays CVL-CRITIC-FAILED).
+- plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs: the five RED cases of slice C1, now GREEN, one corrected (below).
 
-## Chosen design (not implemented)
+Rule implemented: a failed receipt passes only when the open findings (default reader: consumed result `verdict.findings`) are non-empty, count equals `findingCount`, every severity is `minor`, the acceptance binds the receipt's commit, tree, receipt sha256 and the exact sorted `{id, severity}` list, and `verifyResidualAcceptanceFn` returns `authorized: true` with a mode. Otherwise `CVL-CRITIC-FAILED` with its unchanged text. The recorded mode is the verify function's returned mode.
 
-1. New action kind `accept-residual-critic-findings`; subject = {candidate commit, tree,
-   criticReceiptSha256, sorted [{id, severity}]}. Authorized through a new function in
-   critical-action-authorization.mjs modelled on push (signature via verifySignedAction, chat via the waiver).
-2. recordCriticVerifyLifecycle/readCriticVerifyLifecycle get optional deps: `readOpenFindingsFn`
-   (default: consumed result verdict.findings), `residualAcceptance` (the recorded acceptance) and
-   `verifyResidualAcceptanceFn` (the proof/chat check, wired to the authorization function).
-   A failed receipt passes only if findings are non-empty, count equals receipt.findingCount, every
-   severity is "minor", the acceptance binds the same commit, tree, receipt sha and the exact sorted
-   id/severity list, and the verify function returns authorized. Otherwise CVL-CRITIC-FAILED stays.
-3. The written record uses schema `pipeline.critic-verify-lifecycle-receipt.v3` with an extra key
-   `residualAcceptance {basis: "po-acceptance-of-residual-minor-findings", mode, acceptanceSha256, findings}`;
-   a passing receipt keeps v1 and is byte-identical.
-4. push-prepare.mjs refusal (about line 752) gets one closing sentence naming the authorize-critical route
-   for this kind and that CCA-REVIEW-BUDGET-EXHAUSTED is a PO decision (pin in push-prepare.test.mjs is a text pin; not touched yet).
+## Case correction (written justification)
 
-## RED evidence
+Case "a missing or unverified acceptance..." recorded both modes in ONE fixture. The record is immutable and now carries the mode, so the second write hit the existing `CVL-RECEIPT-COLLISION` rule (same id, different bytes). That rule is a deliberate existing binding, not something to weaken; the case now uses a fresh fixture per mode. The PO decision (both approval modes qualify) is still pinned: both modes are asserted.
 
-Cases added to the existing lifecycle suite (5 new tests): (a) minor-only acceptance qualifies and the
-record is labelled, incl. readback; (b) a major finding is refused despite an acceptance; (c) other commit,
-tree, receipt, or finding list differing by one id refused; (d) missing/unverified acceptance refused, chat
-and signature modes both pass the injected verify; (f) a passing receipt unchanged.
-Run in the clone (budget patch applied): `node plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs`
-exit 1, SyntaxError: module does not provide an export named `residualFindingId`. The whole file is RED
-(import failure), so the cases are RED against the original code. They were not run GREEN.
+## Evidence (clone, machine-written logs in the scratch driver dir, removed with it)
 
-## NOT done
+- RED against original code: `node plugins/pipeline-core/lib/critic-verify-lifecycle.test.mjs` exit 1, SyntaxError: no export `residualFindingId` (whole file RED).
+- GREEN with edit: lifecycle suite tests 12, pass 12, fail 0, exit 0 (first run had 1 failure, the collision above).
+- Revert proof: with ONLY the lifecycle production edit reverted (tests kept) the file is RED again with the same import SyntaxError, exit 1; restore proven byte-identical.
+- Baseline (clone2 = candidate plus budget patch, NOT plain candidate; difference stated): lifecycle suite 7/7 pass; push-prepare 88/88 in both states.
+- scripts/push-prepare.test.mjs: patched 88/88, baseline 88/88, failing-name sets both empty.
+- lib/critic-verify-readiness.test.mjs: does not exist.
+- session-critic-finalizer, guard-maintenance-window-kernel-closure suites and `generate-architecture-overview.mjs --check`: were started in both clones but had NOT finished at the budget checkpoint; NOT verified here. Run them next.
 
-Production edits (lifecycle, authorization function, push-prepare sentence); authorization-suite and
-push-prepare-suite cases; GREEN runs; whole-suite failing-name comparison against clone2; kernel-closure,
-finalizer, push-prepare, po-human-approval, architecture-overview checks; revert proof; stacked apply
-check; po-human-approval/pipeline-state wiring to record the acceptance; production wiring of deps into
-critic-verify-readiness (needed for the push gate to qualify). Kernel-path listing not checked.
+## Not done
 
-## Operator flow (once completed)
+- critic-verify-readiness.mjs wiring: no readiness test file exists; wiring needs the authorization function, which does not exist. Dependencies stay injectable (`readOpenFindingsFn`, `residualAcceptance`, `verifyResidualAcceptanceFn`); the readiness reader still calls `readCriticVerifyLifecycle` without them. Next slice.
+- Authorization function for kind `accept-residual-critic-findings` in both approval modes (signature via the kind-generic signed-action verifier, chat via the waiver), the authorize-critical and pipeline-state wiring, the push-prepare closing sentence (~line 752) and its text pin.
+- Unverified from C1 notes: whether `criticalActionSubjectSha256` accepts a new kind without edits.
+- Failing-name comparison for finalizer, kernel-closure and architecture check (above).
 
-Apply budget patch, then this patch; `git add -u` with a path limit; commit as the PO; stamp; install.
-An independent Critic review stays a parent-owned batch gate.
+## Kernel production files and operator flow
+
+Production kernel file in this patch: plugins/pipeline-core/lib/critic-verify-lifecycle.mjs; the PO applies it under a Guard Maintenance Window. Flow: apply-diff budget patch, then this patch; `git add -u` with a path limit; commit as the PO; stamp; install. Independent Critic review stays a parent-owned batch gate.
 
 Proposed commit message: feat(critic): let the PO accept residual minor findings through the configured approval mode so the push gate can qualify the candidate
-
-## Continuation
-
-Next slice: implement the lifecycle branch and `residualFindingId` export (design item 2-3), run the new cases
-GREEN, then the authorization function and push-prepare sentence. The scratch driver and clones are removed
-at cleanup; recreate them from the patch.
