@@ -156,6 +156,23 @@ under `scratch/`, `evidence/` or `specs/`. Every path the commits changed must l
 `allowedPaths`, otherwise the writer refuses with `attested-scope`; nothing is defaulted. Use the task id of
 that record for every round (next section).
 
+## Real commits after a consumed PASS (D199)
+
+A consumed PASS ends the course only for the same candidate. Real (non-evidence) commits after the passed
+candidate are reviewed as one more diff round whose parent is the passed record; no round or
+correction-commit count refuses it (D190), and the rounds repeat until a PASS. Order:
+
+1. The passed round's lineage must be registered. If it is missing, run
+   `register-feature-package.mjs --root <root> --add-review-lineage --packet <packetId>` and commit the
+   manifest and the lineage file it names (a round past 2 needs no exception binding).
+2. The base is the passed round's candidate, never a later commit; evidence-only commits inside the range
+   carry forward. A request whose base is another commit is refused `CCA-PARENT`.
+3. Continue as in the next section: `--add-delta-request <input.json>`, preflight with the registered delta
+   request path, `session-critic-finalizer.mjs admit`, finalize, then register that round's lineage.
+
+A re-review of the same candidate, or a range with no real commit after the passed candidate, still ends
+with `RE-CONSUMED-PACKAGE-PASS` / `CGB-PASS-STOPS`.
+
 ## Continuing a Critic course after the first round (PF-94)
 
 Script paths resolve under the plugin root the bootstrap prints. **Every later round carries the `taskId`

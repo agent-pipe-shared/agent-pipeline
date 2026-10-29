@@ -972,8 +972,8 @@ const pf94WriteInput = (fx, value) => {
 };
 const pf94Delta = (fx, inputPath = "delta-input.json") => pf94Fpr.addCriticDeltaRequest({ root: fx.root, inputPath });
 /** Failing round, lineage registered and committed, a correction commit; with diagnostic=true the correction diagnostic is produced and registered the way PF94 LINEAGE (g) does. */
-function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true } = {}) {
-  const fx = consumedCourseRoundFixture({ failing: true });
+function pf94DeltaFixture({ lineage = true, correction = true, diagnostic = true, failing = true } = {}) {
+  const fx = consumedCourseRoundFixture({ failing });
   let lineageAdded = null;
   if (lineage) { lineageAdded = pf94Lineage(fx); assert.equal(lineageAdded.status, "lineage-added", JSON.stringify(lineageAdded)); pf94CommitPaths(fx.root, lineageAdded.commitPaths, "register the lineage"); }
   let correctionCommit = null, evidenceRegistration = null;
@@ -1007,6 +1007,19 @@ test("PF94 DELTA (a) after the lineage, the correction and its diagnostic, the v
   assert.equal(after.decision.mode, "delta");
   assert.equal(after.decision.code, "RE-DELTA-ADMITTED");
   assert.deepEqual(after.decision.affectedInvariantIds, ["inv-one"]);
+});
+test("D199 CONTINUATION a real commit after a consumed PASS is admitted as a diff round on the passed record (Glossover CCA-PARENT)", () => {
+  const fx = pf94DeltaFixture({ failing: false });
+  assert.equal(fx.lineageAdded.status, "lineage-added", JSON.stringify(fx.lineageAdded));
+  pf94WriteInput(fx);
+  const added = pf94Delta(fx);
+  assert.equal(added.status, "delta-request-added", `the delta request verb accepts a passed parent: ${JSON.stringify(added)}`);
+  const registration = pf94CommitPaths(fx.root, added.commitPaths, "register the delta request");
+  const after = readCriticCourseAdmission({ ...fx.courseRequest, baseCommit: fx.candidate, candidateCommit: fx.correctionCommit, registrationCommit: registration, requestedMode: "delta", deltaRequestPath: added.deltaRequestPath });
+  assert.equal(after.decision.status, "admitted", JSON.stringify(after.decision));
+  assert.equal(after.decision.mode, "delta");
+  assert.equal(after.budgets.reviewRound, 2);
+  // The unchanged cases stay pinned by "PF94 LINEAGE (a)" and the round 2 flow: no commit after the passed candidate ends the course (RE-CONSUMED-PACKAGE-PASS).
 });
 test("PF94 ROUND2 (a) the real route continues after the admitted delta: round 2 is preflighted, admitted on the course path, finalized and registered as lineage round 2", () => {
   const fx = pf94DeltaFixture();

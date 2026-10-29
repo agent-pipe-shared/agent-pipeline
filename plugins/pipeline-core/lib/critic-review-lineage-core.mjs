@@ -493,13 +493,14 @@ export function validateCriticReviewHistory(records) {
 }
 
 const COURSE_BINDING_KEYS=['courseKey','originalFeatureId','originalManifestSha256','genesisCandidate','submissionSha256','envelopeSha256','criterionSha256','deltaRequestSha256','deterministicEvidenceSha256','courseSourceSha256','courseDecisionSha256'];
-function v2BindingCode(record){
+export function v2BindingCode(record){
  const b=record.courseBinding,c=record.consumedResult;
  if(!exact(b,COURSE_BINDING_KEYS)||!identifier(b.originalFeatureId)||!digest(b.courseKey)||!digest(b.originalManifestSha256)
   ||!exact(b.genesisCandidate,['base','commit','tree'])||!Object.values(b.genesisCandidate).every(v=>OID.test(v??''))
   ||!['submissionSha256','envelopeSha256','criterionSha256','deltaRequestSha256'].every(k=>b[k]===null||digest(b[k]))
   ||!['deterministicEvidenceSha256','courseSourceSha256','courseDecisionSha256'].every(k=>digest(b[k])))return 'CRL-V2-COURSE-BINDING';
- if(record.course.reviewRound>2 && (!digest(b.submissionSha256)||!digest(b.envelopeSha256)||!digest(b.criterionSha256)))return 'CRL-V2-EXCEPTION-BINDING';
+ // D190 (PF-102): a diff round past round 2 is an ordinary round, not a PO exception; submission, envelope and criterion
+ // stay null or a digest (checked above) and the criterion is bound only when an accepted exception was actually read.
  if(record.course.reviewRound===1 ? b.deltaRequestSha256!==null : !digest(b.deltaRequestSha256))return 'CRL-V2-DELTA-BINDING';
  if(record.verdict.status==='pending')return c===null?null:'CRL-V2-PENDING-CONSUMED';
  if(!exact(c,['packetId','packetDigest','receiptSha256','resultSha256','verdictSha256','findingBindings'])||c.packetId!==record.request.packetId

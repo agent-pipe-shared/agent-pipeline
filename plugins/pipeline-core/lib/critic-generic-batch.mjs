@@ -438,12 +438,15 @@ function reservationAt(dir, mode, ordinal = mode === "full" ? 1 : 2) {
     || !SHA.test(r.sourceSha256) || !SHA.test(r.decisionSha256)) fail("CGB-RESERVATION");
   return r;
 }
+// D190: the PO decision removed the round cap for diff rounds; this bound only protects against a corrupt directory.
+const MAX_BATCH_DELTA_ORDINAL = 4096;
 function reservations(dir) {
-  if (readdirSync(dir).some(name => /^delta-[0-9]+-admission\.json$/u.test(name)
-    && Number(name.split("-")[1]) > CRITIC_DISPATCH_LIMITS.criticRounds)) fail("CGB-BUDGET");
+  // Round 2 is stored as delta-admission.json (reservationFile); later rounds carry their number.
+  const ordinals = readdirSync(dir).map(name => (name === "delta-admission.json" ? ["", "2"] : /^delta-([0-9]+)-admission\.json$/u.exec(name))).filter(Boolean).map(match => Number(match[1]));
+  if (ordinals.some(ordinal => ordinal > MAX_BATCH_DELTA_ORDINAL)) fail("CGB-BUDGET");
   const full = reservationAt(dir, "full");
   const rows = full ? [full] : [];
-  for (let ordinal = 2; ordinal <= CRITIC_DISPATCH_LIMITS.criticRounds; ordinal++) {
+  for (let ordinal = 2; ordinal <= Math.max(1, ...ordinals); ordinal++) {
     const r = reservationAt(dir, "delta", ordinal);
     if (r) { if (rows.length !== ordinal - 1) fail("CGB-HELD"); rows.push(r); }
   }
@@ -469,7 +472,7 @@ function deltaSource(root, s, correction, parent, round) {
   git(root, ["merge-base", "--is-ancestor", s.range.base, s.range.commit]);
   const changedPaths = git(root, ["diff", "--name-only", "-z", s.range.base, s.range.commit, "--"]).split("\0").filter(Boolean).map(normalizePacketPath).sort(compare);
   const commits = git(root, ["rev-list", "--reverse", `${s.range.base}..${s.range.commit}`]).trim().split("\n").filter(Boolean);
-  if (commits.length > CRITIC_DISPATCH_LIMITS.correctionCommits) fail("CGB-BUDGET");
+  // D190: no correction-commit count refuses a diff round.
   const attempt = { round, correctionCommits: commits.length, requestedMode: "delta", base: s.range.base, head: s.range.commit, tree: s.range.tree,
     changedPaths, changedBehaviorClaims: correction.changedBehaviorClaims, priorReceipt: { id: `critic-${parent.parent.packetId}`, sha256: parent.parent.receiptSha256 },
     pathInvariantMap: correction.pathInvariantMap, pathInvariantMapSha256: sha256Canonical(correction.pathInvariantMap),
@@ -495,10 +498,11 @@ function appendCorrection(input) {
       || s.scope.reviewUnit.reference.blobOid !== r.value.declaredScope.reviewUnit.reference.blobOid
       || !eq(s.scope.guardrails.map(x => x.path), r.value.declaredScope.guardrails.map(x => x.path))) fail("CGB-CONFLICT");
     const retained = reservations(r.dir);
-    if (!retained.length || retained.length >= CRITIC_DISPATCH_LIMITS.criticRounds) fail("CGB-BUDGET");
+    if (!retained.length) fail("CGB-BUDGET");
     const prior = retained.at(-1);
     const parent = consumedParent(c, prior, input.parent);
-    if (parent.result.verdict.pass) fail("CGB-PASS-STOPS");
+    // D199: a PASS ends the batch only for the same candidate; real commits after it continue as a diff round.
+    if (parent.result.verdict.pass && s.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
     // Delivery owner ends at integration; one fresh fix owner carries this same batch.
     if (s.target.kind !== "authored-delivery" && s.target.kind !== "orchestrator-attested-delivery") fail("CGB-CORRECTION-OWNER");
     if (prior.ordinal === 1) {
@@ -543,8 +547,7 @@ function admission(c, input, packet) {
   let parent = null, ordinal = 1, mode = "full", code = "CGB-FULL-ADMITTED";
   if (full) {
     parent = consumedParent(c, retained.at(-1));
-    if (parent.result.verdict.pass) fail("CGB-PASS-STOPS");
-    if (retained.length >= CRITIC_DISPATCH_LIMITS.criticRounds) fail("CGB-BUDGET");
+    if (parent.result.verdict.pass && m.value.range.commit === parent.packet.candidate.commit) fail("CGB-PASS-STOPS");
     if (m.value.kind !== "correction" || !eq(m.value.parent, parent.parent) || !m.value.delta
       || !eq(m.value.delta.diagnosticBundle, packet.diagnostics)) fail("CGB-DELTA");
     const attempt = admitReviewAttempt(m.value.delta.attempt);
@@ -581,7 +584,7 @@ function retainedReservation(c, input, observed) {
     const parent = mode === "delta" && full ? consumedParent(c, retained[r.ordinal - 2]) : null;
     const subject = { registration: m.registration, member: m.value, full, parent: parent?.parent ?? null, packetDigest: packetDigest(observed.packet) };
     const decision = { status: "admitted", mode, code: mode === "full" ? "CGB-FULL-ADMITTED" : "CGB-DELTA-ADMITTED" };
-    if ((mode === "full" ? m.value.kind !== "origin" : m.value.kind !== "correction" || parent === null || parent.result.verdict.pass)
+    if ((mode === "full" ? m.value.kind !== "origin" : m.value.kind !== "correction" || parent === null)
       || r.sourceSha256 !== sha256Canonical(subject) || r.decisionSha256 !== sha256Canonical(decision)
       || !eq(r.parent, parent?.parent ?? null)
       || r.deltaEvidenceSha256 !== (m.value.delta === null ? null : sha256Canonical(m.value.delta))) fail("CGB-RESERVATION");
@@ -907,9 +910,9 @@ export function reserveFeatureCriticReviewUnitOwnership(input) {
           || retained.sourceSha256!==input.sourceSha256 || retained.decisionSha256!==input.decisionSha256)fail("CGB-BUDGET");
         return {reservation:retained,replay:true};
       }
-      if(prior.length!==ordinal-1 || ordinal>CRITIC_DISPATCH_LIMITS.criticRounds)fail("CGB-BUDGET");
+      if(prior.length!==ordinal-1 || ordinal>MAX_BATCH_DELTA_ORDINAL)fail("CGB-BUDGET");
       const parent=prior.length?consumedParent(c,prior.at(-1)):null;
-      if(parent?.result.verdict.pass)fail("CGB-PASS-STOPS");
+      if(parent?.result.verdict.pass && packet.candidate.commit===parent.packet.candidate.commit)fail("CGB-PASS-STOPS");
       if(parent && (projection.parent?.packetId!==parent.parent.packetId || projection.parent.receiptSha256!==sha256Canonical(parent.receipt)))fail("CGB-PARENT");
       const member=writeMember(c,owned.batchRef,{schema:GENERIC_CRITIC_MEMBER_SCHEMA,...owned.batchRef,kind:ordinal===1?"origin":"correction",logicalWorkIds:work,
         target:targetForPacket(packet),parent:parent?.parent??null,range:packet.candidate,delta:ordinal===1?null:projection});

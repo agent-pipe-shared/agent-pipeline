@@ -406,7 +406,8 @@ export function preflightCriticDispatch({ root, base = null, candidate, specPath
     // policy can produce a packet-ready result for this registered batch.
     const round = admission.budgets?.reviewRound;
     const expectedMode = round === 1 ? "full" : Number.isSafeInteger(round) && round > 1 ? "delta" : null;
-    if (expectedMode === null || round > CRITIC_DISPATCH_LIMITS.criticRounds
+    // D190: no round count refuses a diff round; the mode must still match the round.
+    if (expectedMode === null
       || admission.budgets.maxReviewRounds !== CRITIC_DISPATCH_LIMITS.criticRounds
       || admission.decision.mode !== expectedMode
       || (context.deltaRequestPath === null ? "full" : "delta") !== expectedMode) {

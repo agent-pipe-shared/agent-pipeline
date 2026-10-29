@@ -65,15 +65,27 @@ test("one full and shared-limit changed diff corrections use consumed immediate 
       rejected(()=>register(fx,declaration(fx)),"CGB-CONFLICT");
     }
     assert.equal(CRITIC_DISPATCH_LIMITS.criticRounds,4);
-    const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),"over budget\n");git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","over budget"]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);
-    const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
-    rejected(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction}),"CGB-BUDGET");
+    // D190: the cap gates a full request only; diff rounds continue past it until a consumed PASS (Toolbox CGB-BUDGET at round 3).
+    for(const round of [5,6]){
+      const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),`correction ${round}\n`);git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm",`repair ${round}`]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);fx.reviewBase=prior;
+      writeFileSync(join(fx.root,"evidence/verify.json"),JSON.stringify(produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],command:[process.execPath,"-e","console.log(\"targeted pass\")"],logPath:`evidence/targeted-${round}.log`})));
+      const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
+      member=appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction});
+      parent=review(fx,member,round,round===6);
+    }
+    // Round 6 passed; what a PASS does to later commits is pinned in the next case (D199).
   }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
-test("genuinely consumed PASS stops corrections before the remaining budget",()=>{
- const fx=fixture();try{const member=register(fx),parent=review(fx,member,1,true);const prior=fx.candidate;writeFileSync(join(fx.root,"repair.txt"),"unneeded change\n");fx.candidate=commit(fx.root,"after pass");
+test("a consumed PASS stops a re-review of the same candidate and continues as a diff round on real commits after it (D199)",()=>{
+ const fx=fixture();try{const member=register(fx),parent=review(fx,member,1,true);const prior=fx.candidate;
+ const same={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
+ rejected(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction:same}),"CGB-PASS-STOPS");
+ writeFileSync(join(fx.root,"repair.txt"),"real change after pass\n");git(fx.root,["add","repair.txt"]);git(fx.root,["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","after pass"]);fx.candidate=git(fx.root,["rev-parse","HEAD"]);fx.reviewBase=prior;fx.taskId="correction-owner";
+ writeFileSync(join(fx.root,"evidence/verify.json"),JSON.stringify(produceCriticDiagnostic({root:fx.root,candidate:fx.candidate,specPath:"specs/spec.md",guardrailPaths:[".claude/pipeline.yaml"],command:[process.execPath,"-e","console.log(\"targeted pass\")"],logPath:"evidence/targeted-after-pass.log"})));
  const correction={...declaration(fx),baseCommit:prior,changedBehaviorClaims:["repair-boundary"],pathInvariantMap:{"repair.txt":["AC-1"]},coordinatorImpactConfirmed:true,trustBoundaryChanged:false,impactAmbiguous:false,evidencePaths:["evidence/verify.json"]};
- rejected(()=>appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction}),"CGB-PASS-STOPS");
+ const next=appendGenericCriticBatchCorrection({repoRoot:fx.root,controlRoot:join(fx.root,".git/agent-pipeline/critic-packets"),batchRef:member.batchRef,parent,correction});
+ const round2=review(fx,next,2,false);
+ assert.ok(round2.packetId,"the diff round after a PASS is admitted and finalized");
  }finally{rmSync(fx.root,{recursive:true,force:true});}
 });
 function declaration(fx, overrides={}) {

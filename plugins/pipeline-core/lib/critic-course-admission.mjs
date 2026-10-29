@@ -535,7 +535,7 @@ export function deriveCriticCourseAdmissionV2({source:bound,acceptedCriterion,co
  const source=bound.source,identity=bound.courseIdentity,parent=parentProjection(history.at(-1));
  const acceptance=acceptedCriterion?.ok?{basis:acceptedCriterion.acceptance.authorityBasis,cryptographicallyAuthenticated:acceptedCriterion.acceptance.cryptographicallyAuthenticated,envelopeSha256:acceptedCriterion.acceptance.envelopeSha256,criterionSourcePath:acceptedCriterion.source.path,criterionSourceSha256:acceptedCriterion.source.sha256,criterionId:acceptedCriterion.locator.criterionId,criterionExcerptSha256:acceptedCriterion.locator.excerptSha256,criterionParserVersion:acceptedCriterion.criterion.parserVersion??'pipeline.critic-criterion-parser.v1',sourceBindingsSha256:acceptedCriterion.acceptance.bindingSha256}:null;
  const projection={schema:'pipeline.critic-course-admission.v2',courseIdentity:identity,source,parent,acceptance,deltaRequestSha256:deltaRequest?.requestSha256??null,deterministicEvidenceSha256:evidence?.sha256??null,budgets,decision:{status:'refused',mode:null,code:'RE-COURSE-INCOMPLETE',affectedInvariantIds:[]}};
- const last=history.at(-1);if(last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
+ const last=history.at(-1);if(!deltaRequest && last?.consumed.receipt.reviewPass===true && last.record.coverage.complete && last.record.findings.every(f=>f.status!=='open')){projection.decision={status:'stopped-pass',mode:null,code:'RE-CONSUMED-PACKAGE-PASS',affectedInvariantIds:[]};return projection;}
  const d=deltaRequest?.request,attempt={round:budgets.reviewRound,correctionCommits:budgets.correctionCommitCount,requestedMode:history.length?'delta':'full',...(d?{base:d.candidate.base,head:d.candidate.commit,tree:d.candidate.tree,changedPaths:d.changedPaths,changedBehaviorClaims:d.changedBehaviorClaims,priorReceipt:{id:d.parent.reviewId,sha256:d.parent.receiptSha256},pathInvariantMap:d.pathInvariantMap,pathInvariantMapSha256:d.pathInvariantMapSha256,coordinatorImpactConfirmed:d.coordinatorImpactConfirmed,trustBoundaryChanged:d.trustBoundaryChanged,impactAmbiguous:d.impactAmbiguous}:{})};
  const admission=admitAuthenticatedReviewAttempt({attempt,acceptedCriterion});projection.decision={status:admission.courseGateRequired?'stopped-budget':admission.ok?'admitted':'refused',mode:admission.ok?admission.mode:null,code:admission.code,affectedInvariantIds:admission.affectedInvariantIds??[]};return projection;}
 // PF-75: the commit whose manifest is read for the review unit. The genesis base itself when its manifest already lists the unit path;
@@ -570,6 +570,9 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
  if(!exact(input,V2_REQUEST_KEYS)||!MODES.has(input.requestedMode)||![input.baseCommit,input.candidateCommit,input.registrationCommit].every(v=>OID.test(v??'')))fail('CCA-RUNTIME-SHAPE');
  const resolvedResult=resolveRegisteredCriticCourseIdentity(Object.fromEntries(['repoRoot','featureId','baseCommit','candidateCommit','registrationCommit','acceptedReference'].map(k=>[k,input[k]])));if(!resolvedResult.ok){if(resolvedResult.status==='unavailable')unavailable(resolvedResult.code);fail(resolvedResult.code);}const resolved=resolvedResult.value,history=consumedHistory(resolved),source=runtimeSource(input,resolved);
  const last=history.at(-1),pass=last?.consumed.receipt.reviewPass===true&&last.record.coverage.complete&&last.record.findings.every(f=>f.status!=='open');
+ // D199 (Glossover CCA-PARENT): real commits after a consumed PASS continue the course as a diff round whose parent is the passed
+ // record; the base must be that record's candidate. Without such commits (same candidate, evidence-only range) the PASS still ends the course.
+ const continuation=pass&&input.requestedMode==='delta'&&input.baseCommit===last.record.candidate.commit&&input.candidateCommit!==input.baseCommit&&source.correctionCommits.length>0;
  if(!pass && (history.length?input.requestedMode!=='delta':input.requestedMode!=='full'))fail('CCA-REQUESTED-MODE');
  if(last && !pass && last.record.candidate.commit!==input.baseCommit)fail('CCA-PARENT');
  const allCorrections=new Set();
@@ -581,7 +584,7 @@ function runtimeCompose(input,{preparing=false,evidencePaths=null}={}){
  const previousCount=allCorrections.size;
  const count=history.length?previousCount+source.correctionCommits.filter(oid=>!allCorrections.has(oid)).length:0;
  const budgets={reviewRound:history.length+1,correctionCommitCount:count,maxReviewRounds:CRITIC_DISPATCH_LIMITS.criticRounds,maxCorrectionCommits:CRITIC_DISPATCH_LIMITS.correctionCommits,executionBudgetEvidenceSha256:null};
- if(pass)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
+ if(pass&&!continuation)return {resolved,history,source,evidence:null,criterion:null,delta:null,budgets};
  // Source-owned immutable consumed history fixes the batch's next round.
  // An accepted actual-PASS criterion cannot authorize a fifth invocation.
  // D190: no round or correction-commit count refuses a diff round; a full request with history is refused at CCA-REQUESTED-MODE above.

@@ -12,7 +12,7 @@ import {
   validateReleaseCriticScopeAdmission,
 } from "./critic-review-lineage.mjs";
 import { projectCriticReviewEconomy, sha256Canonical } from "./review-economy.mjs";
-import { safePath } from "./critic-review-lineage-core.mjs";
+import { safePath, v2BindingCode } from "./critic-review-lineage-core.mjs";
 
 const H = (character) => character.repeat(64);
 const O = (character) => character.repeat(40);
@@ -857,5 +857,21 @@ check("D190 step rule: a delta round may step the correction count by more than 
   assert.equal(refused(() => [...records, next(records.at(-1), packet5, 6, 11)]), true);
 });
 
-assert.equal(passed, 18);
-console.log(`${passed}/18 checks passed.`);
+check("PF-102 a diff round past round 2 needs no exception binding; malformed bindings and the round-1 delta rule stay refused", () => {
+  const binding = (over = {}) => ({
+    courseKey: H("a"), originalFeatureId: "feature-one", originalManifestSha256: H("b"),
+    genesisCandidate: { base: O("1"), commit: O("2"), tree: O("3") },
+    submissionSha256: H("c"), envelopeSha256: H("d"), criterionSha256: null, deltaRequestSha256: H("e"),
+    deterministicEvidenceSha256: H("f"), courseSourceSha256: H("1"), courseDecisionSha256: H("2"), ...over,
+  });
+  const record = (round, over) => ({ course: { reviewRound: round }, courseBinding: binding(over), consumedResult: null, verdict: { status: "pending" } });
+  // Before D190 every round past 2 demanded a digest criterion and answered CRL-V2-EXCEPTION-BINDING (Glossover round 3).
+  for (const round of [2, 3, 4, 5, 9]) assert.equal(v2BindingCode(record(round)), null, `round ${round}`);
+  assert.equal(v2BindingCode(record(3, { criterionSha256: H("9") })), null, "an accepted exception criterion is still allowed");
+  assert.equal(v2BindingCode(record(3, { criterionSha256: "not-a-digest" })), "CRL-V2-COURSE-BINDING");
+  assert.equal(v2BindingCode(record(1)), "CRL-V2-DELTA-BINDING", "round 1 must not carry a delta request");
+  assert.equal(v2BindingCode(record(4, { deltaRequestSha256: null })), "CRL-V2-DELTA-BINDING", "a diff round must carry its delta request");
+});
+
+assert.equal(passed, 19);
+console.log(`${passed}/19 checks passed.`);
