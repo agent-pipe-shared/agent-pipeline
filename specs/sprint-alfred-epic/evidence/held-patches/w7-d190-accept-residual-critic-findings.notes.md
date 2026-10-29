@@ -120,3 +120,38 @@ Status: targeted delivery for the eight authorization cases and the five lifecyc
 Proposed commit message unchanged: feat(critic): let the PO accept residual minor findings through the configured approval mode so the push gate can qualify the candidate
 
 CONTINUATION CARD -- done: four production edits, RA1..RA8 and lifecycle cases green, stacked patch regenerated and apply-checked; remaining: pin update in the approval-request test and the drift case diagnosis (briefing must add those files), re-run lifecycle and readiness path, revert proof, clone2 comparison, remaining suites; next step: rebuild clone with setup, apply the patch stack, read the drift test log first.
+
+## C6 slice: pins and verification done; ONE stop item (drift case needs a docs file outside the allowed list)
+
+Status: targeted delivery green for lifecycle and authorization; NOT complete as a feature: `harness/scripts/check-auth-gate-inventory-drift.test.mjs` case "the real repository state passes clean today" stays RED with this patch (stop condition: file outside allowed list). Batch Critic, Full Verify and PO acceptance stay pending.
+
+### Changed in this slice (patch regenerated: 8 files, +422/-10; `git apply --check` on a clone of candidate plus budget patch: exit 0)
+- plugins/pipeline-core/lib/critical-action-approval-request.test.mjs line 37: `"accept-residual-critic-findings"` appended as the new LAST member of the expected array in the `CRITICAL_ACTION_KINDS` deepEqual. Deliberate pin change tied to the new kind, not a weakening (the check title still says "seven members"; left unchanged on purpose, rename is the PO's call). The file is not in the protected list (TP-1..TP-13) of the agent-obligations protected paths.
+
+### Pin two: baseline comparison and diagnosis
+- Baseline: the drift suite is GREEN (35/35) in clone2 (plain candidate) and clone3 (budget patch only). It is RED only with the acceptance patch, so it is not a baseline red.
+- Failure text: `AUTH-GATE-UNDOCUMENTED accept-residual-critic-findings (discovered in plugins/pipeline-core/lib/critical-action-approval-request.mjs / plugins/pipeline-core/scripts/po-human-approval.mjs kind family) is not acknowledged in docs/human-authorization-inventory.md`.
+- Exact change needed (PO or a dispatch whose scope includes it): `docs/human-authorization-inventory.md` needs an acknowledgement of the new kind: a row with an `<!-- inventory-id: ... -->` marker modelled on the `interruption-promotion` row (line ~45), the kind added to the enumerated `CRITICAL_ACTION_KINDS` list in the `critical-action-family` row (line ~46), and, if the check then demands it, a disposition row in the table at line ~132 (`interruption-promotion | legacy-renderer`) plus the terminal catalog entry. The doc was not edited; the exact set of required rows is found by re-running the drift suite after each addition.
+
+### GREEN (clone, finished logs)
+- critic-verify-lifecycle: tests 12, pass 12, fail 0 (after the readiness edit).
+- critical-action-authorization: 49/49 checks passed (RA1..RA8 included).
+- critical-action-approval-request: 7 tests passed (with the pin).
+- critical-human-proof-policy (read only): 35 passed, 0 failed.
+- push-prepare: 88/88. po-human-approval: 185/185. session-critic-finalizer: 90/90. guard-maintenance-window-kernel-closure: 11 passed, 0 failed (no kernel path added to its expectations; the suite did not demand it). generate-architecture-overview --check: exit 0.
+- Failing-name sets: clone (patched) = {the drift case above}; clone3 (budget patch) = empty; clone2 (plain candidate) = empty. Same suite list, finished logs.
+
+### Revert proof
+With the four production files (approval-request, human-proof-policy, authorization, readiness) restored to the budget-patch state and every test kept, `critical-action-authorization.test.mjs` exits 1: `SyntaxError: The requested module './critical-action-authorization.mjs' does not provide an export named 'authorizeRecordedChatResidualAcceptance'` (whole file RED, so RA1..RA8 cannot pass). Restore proof: after copying the files back, the same suite exits 0 (49/49).
+
+### NOT done
+- Drift-case fix (docs file above).
+- authorize-critical and pipeline-state command surface; push-prepare closing sentence and its pin.
+- Independent Critic review (parent-owned batch gate), Full Verify, PO acceptance.
+
+### Kernel production files and operator flow
+Kernel production files the PO applies under a Guard Maintenance Window: critic-verify-lifecycle.mjs, critical-action-approval-request.mjs, critical-action-authorization.mjs, critical-human-proof-policy.mjs, critic-verify-readiness.mjs. Flow: apply-diff the budget patch, then this patch; `git add -u` with a path limit; commit as the PO; stamp; install. Do not apply this patch without the docs acknowledgement above, or the drift suite stays red.
+
+Proposed commit message unchanged: feat(critic): let the PO accept residual minor findings through the configured approval mode so the push gate can qualify the candidate
+
+CONTINUATION CARD -- done: pins, comparisons, revert proof, patch; remaining: docs/human-authorization-inventory.md acknowledgement (scope must add it), command surface, push-prepare sentence; next step: setup clones, apply the stack, add the doc rows, re-run the drift suite.
