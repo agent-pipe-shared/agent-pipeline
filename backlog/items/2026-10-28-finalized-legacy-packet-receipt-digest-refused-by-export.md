@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.finalized-legacy-packet-receipt-digest-refused-by-export
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-28
+sprint: alfred
+source: "PO relay of a consumer session, 2026-10-28 (see the item body)"
+done_when: manual
+---
+
 # Export still ends in SCF-EXPORT-UNCONSUMED for a legacy packet finalized by the previous build: the receipt digest is not the one the readers compute (Glossover PF-93, third report, P0)
 
 Relayed 2026-10-28 by the PO from the Glossover session (section 8b of its `docs/pipeline-handover-pf93.md`, commit

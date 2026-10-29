@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.critic-packet-claimed-under-an-older-version-cannot-finalize
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-28
+sprint: alfred
+source: "PO relay of a consumer session, 2026-10-28 (see the item body)"
+done_when: manual
+---
+
 # A Critic packet claimed under an older plugin version cannot be finalized or released (Glossover PF-93, P0)
 
 Relayed 2026-10-28 by the PO from the Glossover session (handover `docs/pipeline-handover-pf93.md` in that

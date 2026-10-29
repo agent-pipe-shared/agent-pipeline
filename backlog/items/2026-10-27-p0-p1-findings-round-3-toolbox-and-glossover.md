@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.p0-p1-findings-round-3-toolbox-and-glossover
+type: workflow-improvement
+owner: pipeline
+status: open
+created: 2026-10-27
+sprint: alfred
+source: "PO intake message and the consumer hand-overs of 2026-10-27 (see the item body)"
+done_when: manual
+---
+
 # P0 and P1 findings, round 3: Toolbox D31-D52 and Glossover PF-82..PF-86
 
 Status: intake 2026-10-27 (PO message in the running session). Only P0 and P1 are taken into the delivery matrix; P2/P3 and low items (Toolbox D53 to D55, Glossover PF-87) stay here as a list and are not matrix rows.

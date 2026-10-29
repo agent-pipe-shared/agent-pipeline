@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.admit-refuses-on-a-held-packet-it-would-resume
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-28
+sprint: alfred
+source: "PO relay of a consumer session, 2026-10-28 (see the item body)"
+done_when: manual
+---
+
 # Critic batch admit refuses with CGB-HELD on the half-finished packet an earlier failed attempt left behind, and no sanctioned command discards it (Toolbox D60, P0)
 
 Relayed 2026-10-28 by the PO from the Toolbox session (its handover is

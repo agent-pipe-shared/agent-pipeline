@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.abandoned-generic-batch-lock-has-no-sanctioned-recovery-verb
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-28
+sprint: alfred
+source: "PO relay of a consumer session, 2026-10-28 (see the item body)"
+done_when: manual
+---
+
 # Admit still ends in CGB-HELD on a leftover generic-batch `transaction.lock` of a dead owner over an empty store, and no sanctioned command reaches the recovery that exists (Toolbox D61, P0)
 
 Relayed 2026-10-28 by the PO from the Toolbox session after the round-3 follow-up bundle. Build under test:

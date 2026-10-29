@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.critic-delta-round-has-no-sanctioned-way-to-build-its-delta-request
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-28
+sprint: alfred
+source: "PO relay of a consumer session, 2026-10-28 (see the item body)"
+done_when: manual
+---
+
 # The Critic delta round (round 2) needs a registered delta request that no script builds: `prepareRegisteredCriticDeltaRequest` has no caller (Glossover PF-94, P0)
 
 Relayed 2026-10-28 by the PO from the Glossover session after the round-3 follow-up bundle v2. Build under test:

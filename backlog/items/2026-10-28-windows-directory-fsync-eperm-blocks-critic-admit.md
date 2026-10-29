@@ -1,3 +1,15 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.windows-directory-fsync-eperm-blocks-critic-admit
+type: defect
+owner: pipeline
+status: open
+created: 2026-10-28
+sprint: alfred
+source: "PO relay of a consumer session, 2026-10-28 (see the item body)"
+done_when: manual
+---
+
 # On Windows the Critic batch admit aborts with CGB-PHYSICAL because the directory fsync is refused (Toolbox D58, P0), and the attested record scope refusal does not say how to repair it (D59)
 
 Relayed 2026-10-28 by the PO from the Toolbox session (its handover is in that repository, not readable here; the facts
