@@ -23,6 +23,7 @@
 | pipeline.a-feature-closes-over-a-slice-with-no-delivery-evidence | open | defect | pipeline | none | 2026-10-20 | — | — |
 | pipeline.a-fresh-clone-loses-all-machine-local-pipeline-state-with-no-provisioning-readback | closed | defect | pipeline | alfred | 2026-08-27 | — | — |
 | pipeline.a-hand-written-evidence-artifact-can-still-carry-an-absolute-host-path | closed | defect | pipeline | nova-b | 2026-09-04 | — | Nova B — the second of the two directions named by the RED-capture item. The first direction shipped as a capture tool; this one is what that tool structurally cannot cover, and it is the half that catches a human or an agent writing an artifact by hand. |
+| pipeline.a-large-tracked-inventory-reads-as-git-identity-unavailable-in-the-security-scan | open | defect | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair | closed | defect | pipeline | nova-b | 2026-09-01 | — | — |
 | pipeline.a-member-reserved-by-another-process-is-refused-as-unowned | open | defect | pipeline | none | 2026-10-19 | — | — |
 | pipeline.a-node-script-defeats-every-file-protection-guard | closed | defect | pipeline | nova | 2026-08-29 | — | — |
@@ -247,11 +248,14 @@
 | pipeline.core-verify-cannot-pass-under-the-ci-trimmed-path | closed | defect | pipeline | nova | 2026-08-28 | — | — |
 | pipeline.correction-critic-reuses-the-full-review-context | open | workflow-improvement | pipeline | none | 2026-10-12 | — | — |
 | pipeline.correction-review-bindings-are-built-by-hand | open | defect | pipeline | none | 2026-10-20 | — | — |
+| pipeline.course-key-of-the-lineage-files-is-flagged-by-the-generic-api-key-rule | open | defect | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock | closed | defect | pipeline | nova-b | 2026-09-12 | 2026-09-30 | — |
 | pipeline.critic-admission-requires-a-dispatch-record-a-project-cannot-have | open | defect | pipeline | alfred | 2026-10-27 | — | — |
 | pipeline.critic-and-verify-cadence-may-be-too-fine-grained | closed | workflow-improvement | pipeline | alfred | 2026-08-24 | 2026-08-31 | — |
+| pipeline.critic-bound-verify-gate-stops-every-windows-project-with-cbv-root | open | defect | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard | open | defect | pipeline | alfred | 2026-10-05 | — | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | — | 2026-07-20 | 2026-07-27 | — |
+| pipeline.critic-course-lineage-files-stop-every-delta-round-on-a-briefing-violation | open | defect | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.critic-delta-round-has-no-sanctioned-way-to-build-its-delta-request | open | defect | pipeline | alfred | 2026-10-28 | — | — |
 | pipeline.critic-diagnostic-evidence-has-no-sanctioned-route-into-the-feature-manifest | open | defect | pipeline | alfred | 2026-10-26 | — | — |
 | pipeline.critic-diagnostic-evidence-producer-and-registrar-disagree-on-the-location | open | defect | pipeline | alfred | 2026-10-26 | — | — |
@@ -382,6 +386,7 @@
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | — | 2026-08-07 | 2026-09-06 | — |
 | pipeline.gate-strength-shell-lane-refuses-any-command-containing-a-quoted-wildcard | closed | defect | pipeline | nova | 2026-08-27 | — | — |
 | pipeline.gate-strength-shell-refuses-admitted-reads | open | defect | pipeline | alfred | 2026-10-26 | — | — |
+| pipeline.generated-goldfish-briefing-names-a-repository-root-file-a-consumer-does-not-have | open | defect | pipeline | alfred | 2026-10-29 | — | — |
 | pipeline.gg-22-reads-the-shared-index-so-a-concurrent-dispatch-blocks-an-unrelated-ledger-commit | closed | defect | pipeline | nova-b | 2026-09-03 | — | Nova B — GG-22's disallowed-path check reads `git diff --cached`, the shared index, rather than the paths the blocked commit actually names. Under parallel dispatch that makes an unrelated agent's staged work block a correct ledger commit, with a denial text that names neither the real cause nor a route forward. |
 | pipeline.gg-22s-own-remediation-order-creates-unclearable-ledger-debt | closed | defect | pipeline | nova | 2026-08-29 | — | — |
 | pipeline.gg20-refuses-reading-the-hooks-path | open | defect | pipeline | none | 2026-10-20 | — | — |
@@ -1029,7 +1034,7 @@
 
 ## Counts
 
-- open: 333
+- open: 338
 - in_progress: 0
 - closed: 674
 - rejected: 3

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7d45f82aca3b0654442623d25c97555fdf2d2a84ffd55e07d1bd1e9e09b68c9e"
+    "transitionHead": "7edbdad82389d5132cf519fd76e65d1456aee53cc2a210ead63a672320cb855d"
   },
   "counts": {
-    "open": 333,
+    "open": 338,
     "in_progress": 0,
     "closed": 674,
     "rejected": 3,
@@ -251,6 +251,16 @@
       "closureRepository": "self",
       "closureCommit": "d0e04f13936314a770fb7fc617fd552a58763a18",
       "closureEvidence": "backlog/evidence/2026-09-18-evidence-host-path-guard-closure.md"
+    },
+    {
+      "id": "pipeline.a-large-tracked-inventory-reads-as-git-identity-unavailable-in-the-security-scan",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Elephant, 2026-10-29, own security scan of this repository (snapshot mode) stopped with git-identity-unavailable",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.a-ledger-entry-stores-an-abbreviated-oid-the-hash-chain-blocks-repair",
@@ -3071,6 +3081,16 @@
       "sprint": "none"
     },
     {
+      "id": "pipeline.course-key-of-the-lineage-files-is-flagged-by-the-generic-api-key-rule",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Glossover consumer handover PF-99, relayed by the PO 2026-10-29",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.crashed-hgo-writer-leaves-an-unrecoverable-audit-lock",
       "status": "closed",
       "type": "defect",
@@ -3111,6 +3131,16 @@
       "closureEvidence": "docs/operating-model.md"
     },
     {
+      "id": "pipeline.critic-bound-verify-gate-stops-every-windows-project-with-cbv-root",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Windows consumer finding N11, relayed by the PO 2026-10-29",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
       "id": "pipeline.critic-cannot-complete-a-security-review-under-the-dispatch-budget-guard",
       "status": "open",
       "type": "defect",
@@ -3133,6 +3163,16 @@
       "closureRepository": "self",
       "closureCommit": "47c6d7fcfafde2823be4111234a8e8482408fcab",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
+    },
+    {
+      "id": "pipeline.critic-course-lineage-files-stop-every-delta-round-on-a-briefing-violation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Glossover consumer handover PF-98, relayed by the PO 2026-10-29",
+      "deferred": false,
+      "sprint": "alfred"
     },
     {
       "id": "pipeline.critic-delta-round-has-no-sanctioned-way-to-build-its-delta-request",
@@ -4727,6 +4767,16 @@
       "owner": "pipeline",
       "created": "2026-10-26",
       "source": "Elephant session on the D163 hotfix candidate 0.7.0+claude.20261026134650.9ce6c23, 2026-10-26",
+      "deferred": false,
+      "sprint": "alfred"
+    },
+    {
+      "id": "pipeline.generated-goldfish-briefing-names-a-repository-root-file-a-consumer-does-not-have",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-10-29",
+      "source": "Glossover consumer handover PF-100, relayed by the PO 2026-10-29",
       "deferred": false,
       "sprint": "alfred"
     },
