@@ -1,6 +1,6 @@
 # State authority diagnostics and memo, and the Critic route path rule: verification and PO apply blocks (2026-10-29)
 
-Fourteen patches, applied in this order, in five commits (patch 14, `w7-pf95-supersede-replay-moves-leftover-origins-k1`, is its own topic and its own commit; patch 4, `w7-state-authority-trace-memo-e3`, patch 9, `w7-critic-path-charset-f4`, patch 10, `w7-critic-range-bindings-operator-text-d2`, patch 11, `w7-pf95-admit-refusal-detail-c24`, and patches 12 and 13, `w7-pf94-round2-walk-h1` and `-h2`, were added after the first version of this note; patch 11 is its own topic and its own commit, patches 12 and 13 are one commit because 12 alone carries a red case). This is a set of HELD PATCHES: nothing in it is applied, stamped, installed, reviewed or accepted until the PO has done so. It supersedes the apply
+Fifteen patches (patch 15, `w7-finalizer-baseline-red-assurance-m1`, is test only and independent: Block 2e), applied in this order, in five commits plus that one (patch 14, `w7-pf95-supersede-replay-moves-leftover-origins-k1`, is its own topic and its own commit; patch 4, `w7-state-authority-trace-memo-e3`, patch 9, `w7-critic-path-charset-f4`, patch 10, `w7-critic-range-bindings-operator-text-d2`, patch 11, `w7-pf95-admit-refusal-detail-c24`, and patches 12 and 13, `w7-pf94-round2-walk-h1` and `-h2`, were added after the first version of this note; patch 11 is its own topic and its own commit, patches 12 and 13 are one commit because 12 alone carries a red case). This is a set of HELD PATCHES: nothing in it is applied, stamped, installed, reviewed or accepted until the PO has done so. It supersedes the apply
 blocks of `STATE-AUTHORITY-DIAGNOSTICS-VERIFY-2026-10-28.md` (which covered only the first two patches). All fourteen apply on HEAD of the working branch in this order; the first patch of each commit must
 never be applied alone (the second corrects it).
 
@@ -20,6 +20,7 @@ never be applied alone (the second corrects it).
 | 12 | `w7-pf94-round2-walk-h1` | PRODUCTION FIX found by walking round 2 of a Critic course on the real route: the round 2 admit on the course path was refused `CGB-PARENT` because the parent receipt digest was compared with a different digest function than the course projection records; one line in `critic-generic-batch.mjs`; carries the case `PF94 ROUND2 (a)` which is RED until patch 13 |
 | 13 | `w7-pf94-round2-walk-h2` | PRODUCTION FIX: the lineage of round 2 (`--add-review-lineage`) passed no delta request to the course compile and was refused `CCA-DELTA-REQUIRED`; the verb now names the registered delta request of the round candidate (or refuses with that code and writes nothing); cases `PF94 ROUND2 (a)` green and `(b)`; VCR01 pin 238 to 259 |
 | 14 | `w7-pf95-supersede-replay-moves-leftover-origins-k1` | PRODUCTION FIX: replaying the same `supersede-course-takeover` request of a takeover audited before the origins fix now also moves every origins entry still owned by the old batch (the audit is not rewritten), so the next admit no longer ends in `CGB-CONFLICT` at the delivery target; case `PF95 REPLAY (a)` in the finalizer suite, no pin change |
+| 15 | `w7-finalizer-baseline-red-assurance-m1` | test only: the finalizer baseline red case expected the private dispatch evidence binding from before PF-93 (no `assurance`, old `snapshotId`); two lines; finalizer 87 of 87 on HEAD |
 
 ## What the Critic path rule is now (PO decision 2026-10-28)
 
@@ -97,6 +98,11 @@ Block 2d (replay of an old takeover, own commit, after 2c):
 `git apply specs/sprint-alfred-epic/evidence/held-patches/w7-pf95-supersede-replay-moves-leftover-origins-k1.patch`
 `git add -A -- plugins/pipeline-core`
 `git commit --no-verify -F scratch/commit-msg-po-apply-pf95-replay.txt`
+
+Block 2e (independent, test only, any time; it removes the finalizer baseline red, `w7-finalizer-baseline-red-assurance-m1`: the case `private task snapshot binds uppercase delivered-v3 bytes ...` expected the binding from before PF-93; patched 87 of 87 on HEAD):
+`git apply specs/sprint-alfred-epic/evidence/held-patches/w7-finalizer-baseline-red-assurance-m1.patch`
+`git add -A -- plugins/pipeline-core`
+`git commit --no-verify -F scratch/commit-msg-po-apply-finalizer-assurance.txt`
 
 Block 3, tell the Elephant: it stamps, you refresh the installed plugin copy and install, the Elephant reads the preflight back. The consumer then runs the failing round-2 registration again; a refusal that
 names a different place is reported with its exact code and message.

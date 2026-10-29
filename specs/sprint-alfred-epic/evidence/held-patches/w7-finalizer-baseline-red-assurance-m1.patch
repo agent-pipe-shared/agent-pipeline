@@ -1,0 +1,25 @@
+diff --git a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+--- a/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
++++ b/plugins/pipeline-core/scripts/session-critic-finalizer.test.mjs
+@@ -248,18 +248,20 @@
+     const recordSha256 = createHash("sha256").update(exactRecordBytes).digest("hex");
+     assert.equal(createHash("sha256").update(fx.recordBytes).digest("hex"), recordSha256);
+     assert.deepEqual(privateBinding, {
+       schema: "pipeline.local-dispatch-evidence.v1",
+       taskId: fx.taskId,
+       recordPath: fx.recordPath,
+       recordSha256,
+       sourceCandidateCommit: fx.historicalCandidate,
+       reviewCandidateCommit: fx.candidate,
++      assurance: null,
+       snapshotId: sha256Canonical({
+         schema: "pipeline.local-dispatch-evidence.v1", taskId: fx.taskId,
+         recordPath: fx.recordPath, recordSha256,
+         sourceCandidateCommit: fx.historicalCandidate, reviewCandidateCommit: fx.candidate,
++        assurance: null,
+       }),
+     });
+     assert.equal(JSON.parse(exactRecordBytes).candidateCommit, fx.historicalCandidate);
+     assert.deepEqual(request.preflightInput.evidencePaths, ["evidence/verify.json"]);
+   } finally { cleanup(fx); }
+ });
