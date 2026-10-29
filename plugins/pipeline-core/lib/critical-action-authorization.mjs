@@ -479,6 +479,129 @@ export function authorizeRecordedChatPush({
   return { authorized: true, code: "PUSH-PROOF-WAIVED", mode: waiver.waiver.mode };
 }
 
+const RESIDUAL_KIND = "accept-residual-critic-findings";
+const RESIDUAL_SEVERITIES = new Set(["blocker", "major", "minor"]);
+
+// Sorted, minimal copy of a finding list, or null when it is not a well-formed non-empty list.
+function residualFindingList(findings) {
+  if (!Array.isArray(findings) || findings.length === 0) return null;
+  const list = [];
+  for (const finding of findings) {
+    if (!object(finding) || !SHA256.test(finding.id ?? "") || !RESIDUAL_SEVERITIES.has(finding.severity)) return null;
+    list.push({ id: finding.id, severity: finding.severity });
+  }
+  return list.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+const residualInputValid = ({ projectDir, anchorDir, state, candidate, criticReceiptSha256, findings }) =>
+  typeof projectDir === "string" && typeof anchorDir === "string" && object(state) && validCandidate(candidate)
+  && SHA256.test(criticReceiptSha256 ?? "") && residualFindingList(findings) !== null;
+
+// The recorded acceptance must bind exactly this commit, tree, Critic receipt and finding list.
+function residualBindingCode(recorded, { candidate, criticReceiptSha256, findings }, prefix) {
+  if (!object(recorded) || recorded.forCommit !== candidate.commit) return `${prefix}-COMMIT-MISMATCH`;
+  const observed = residualFindingList(findings);
+  const bound = residualFindingList(recorded.findings);
+  if (recorded.forTree !== candidate.tree || recorded.criticReceiptSha256 !== criticReceiptSha256
+    || bound === null || JSON.stringify(bound) !== JSON.stringify(observed)) {
+    return `${prefix}-BINDING-MISMATCH`;
+  }
+  return null;
+}
+
+const residualSeverityRefused = (findings) => residualFindingList(findings).some((finding) => finding.severity !== "minor");
+
+/**
+ * D190: authorize the acceptance of residual MINOR Critic findings by a detached signature,
+ * modelled on `authorizeRecordedPush`. A major or blocker finding is refused here, never accepted.
+ * The record lives at `state.residualAcceptance.lastAccepted`.
+ */
+export function authorizeRecordedResidualAcceptance({
+  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings, now, machinePlaneDeps = {},
+} = {}) {
+  const prefix = "RESIDUAL-PROOF";
+  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
+  if (!residualInputValid(input) || !validNow(now)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
+  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+
+  const trust = trustAnchorsFor(anchorDir, prefix);
+  if (!trust.ok) return { authorized: false, code: trust.code };
+  const localAnchor = localOperatorAnchorFor(trust, machinePlaneDeps);
+  if (trust.pinOnSuccess && localAnchor === null) return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
+
+  const approval = state?.residualAcceptance?.lastAccepted;
+  const recorded = approval?.criticalProof;
+  if (!object(approval) || !object(recorded)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
+  const binding = residualBindingCode(approval, input, prefix);
+  if (binding !== null) return { authorized: false, code: binding };
+  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+
+  const verified = verifySignedAction({
+    state, kind: RESIDUAL_KIND, prefix, candidate, recorded, anchors: trust.anchors, now,
+    subject: { criticReceiptSha256, findings: residualFindingList(findings) },
+  });
+  if (!verified.ok) return { authorized: false, code: verified.code };
+
+  const ledger = state?.criticalProofConsumption;
+  if (!Array.isArray(ledger)
+    || !ledger.some((entry) => object(entry) && entry.proofSha256 === recorded.proofSha256 && entry.kind === RESIDUAL_KIND)) {
+    return { authorized: false, code: `${prefix}-NOT-CONSUMED` };
+  }
+  if (trust.pinOnSuccess) {
+    if (localAnchor.publicKeySha256 !== verified.signer.publicKeySha256) {
+      return { authorized: false, code: `${prefix}-TRUST-ANCHOR-MISSING` };
+    }
+    pinTrustAnchorOnFirstUse(anchorDir, trust.policy, RESIDUAL_KIND, verified.signer);
+  }
+  return { authorized: true, code: `${prefix}-VERIFIED`, mode: "signature",
+    keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256 };
+}
+
+/** Chat route of the same acceptance, modelled on `authorizeRecordedChatPush`; follows `gates.push_approval`. */
+export function authorizeRecordedChatResidualAcceptance({
+  projectDir, anchorDir = projectDir, state, candidate, criticReceiptSha256, findings,
+} = {}) {
+  const prefix = "RESIDUAL-PROOF";
+  const input = { projectDir, anchorDir, state, candidate, criticReceiptSha256, findings };
+  if (!residualInputValid(input)) return { authorized: false, code: `${prefix}-INPUT-INVALID` };
+  if (residualSeverityRefused(findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+  let waiver;
+  try { waiver = criticalProofWaiverFor(anchorDir, RESIDUAL_KIND); }
+  catch { return { authorized: false, code: `${prefix}-CHAT-POLICY-UNREADABLE` }; }
+  if (waiver?.waived !== true || !waiver.waiver) {
+    return { authorized: false, code: waiver?.code ?? `${prefix}-CHAT-NOT-WAIVED` };
+  }
+  // A residual acceptance is always an attribution record: the per-kind chat setting (waiver mode
+  // "chat") is recorded as chat-attributed-unattested with a humanApproval block.
+  const mode = waiver.waiver.mode === "chat" ? "chat-attributed-unattested" : waiver.waiver.mode;
+  const approval = state?.residualAcceptance?.lastAccepted;
+  if (!object(approval)) return { authorized: false, code: `${prefix}-RECORD-INCOMPLETE` };
+  const binding = residualBindingCode(approval, input, prefix);
+  if (binding !== null) return { authorized: false, code: binding };
+  if (residualSeverityRefused(approval.findings)) return { authorized: false, code: `${prefix}-SEVERITY` };
+  if (approval.criticalProof !== null) return { authorized: false, code: `${prefix}-CHAT-RECORD-MISMATCH` };
+  const recordedWaiver = approval.criticalProofWaiver;
+  if (!object(recordedWaiver) || recordedWaiver.kind !== RESIDUAL_KIND
+    || recordedWaiver.mode !== mode || recordedWaiver.source !== waiver.waiver.source) {
+    return { authorized: false, code: `${prefix}-CHAT-ATTRIBUTION-MISSING` };
+  }
+  if (mode !== "chat-attributed-unattested") return { authorized: false, code: `${prefix}-CHAT-NOT-WAIVED` };
+  if (!object(approval.humanApproval) || approval.humanApproval.kind !== RESIDUAL_KIND
+    || approval.humanApproval.mode !== "chat-attributed-unattested") {
+    return { authorized: false, code: `${prefix}-CHAT-ATTRIBUTION-MISSING` };
+  }
+  return { authorized: true, code: `${prefix}-WAIVED`, mode };
+}
+
+/** Picks the chat route when the configured mode waives the proof, otherwise the signature route. */
+export function authorizeRecordedResidualAcceptanceByMode(input = {}) {
+  let waiver = null;
+  try { waiver = criticalProofWaiverFor(input.anchorDir ?? input.projectDir, RESIDUAL_KIND); } catch { waiver = null; }
+  return waiver?.waived === true
+    ? authorizeRecordedChatResidualAcceptance(input)
+    : authorizeRecordedResidualAcceptance(input);
+}
+
 /**
  * The release route's equivalent: is there a recorded, unused deploy approval for this
  * artifact and environment whose detached proof verifies against the committed anchor?

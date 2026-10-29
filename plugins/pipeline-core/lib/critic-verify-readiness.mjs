@@ -1,11 +1,32 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Read-only final-candidate check: diagnostic Verify never asserts a Critic. */
-import { lstatSync, readdirSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readCriticVerifyLifecycle } from "./critic-verify-lifecycle.mjs";
+import { authorizeRecordedResidualAcceptanceByMode } from "./critical-action-authorization.mjs";
 
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const RECEIPT = /^[a-f0-9]{64}\.json$/u;
+
+// D190: a recorded PO acceptance of residual minor findings, read from the project state file. Inert
+// (null) when no record is bound to this candidate, so the passing-receipt path is unchanged; the
+// verifier re-checks the record in the configured approval mode (signature proof or chat waiver).
+function residualAcceptanceDeps(repoRoot, candidate) {
+  if (typeof repoRoot !== "string" || repoRoot.length === 0) return null;
+  try {
+    const state = JSON.parse(readFileSync(join(repoRoot, "project", "pipeline-state.json"), "utf8"));
+    const record = state?.residualAcceptance?.lastAccepted;
+    if (record === null || typeof record !== "object" || record.forCommit !== candidate.commit
+      || record.forTree !== candidate.tree) return null;
+    return {
+      residualAcceptance: { candidate: { commit: record.forCommit, tree: record.forTree },
+        criticReceiptSha256: record.criticReceiptSha256, findings: record.findings },
+      verifyResidualAcceptanceFn: ({ candidate: bound, criticReceiptSha256, findings }) =>
+        authorizeRecordedResidualAcceptanceByMode({ projectDir: repoRoot, state, candidate: bound,
+          criticReceiptSha256, findings, now: new Date().toISOString() }),
+    };
+  } catch { return null; }
+}
 
 export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, tree, worktreeState,
   evidencePath = "evidence/verify-latest.json", evidence, requireClean = true,
@@ -40,9 +61,11 @@ export function inspectCriticBoundVerify({ repoRoot = null, gitCommonDir, head, 
   } catch {
     return { ...exact, code: "private-critic-binding-unavailable" };
   }
+  const residualDeps = residualAcceptanceDeps(repoRoot, candidate);
   for (const id of ids) {
     try {
-      readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
+      if (residualDeps === null) readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence });
+      else readLifecycle({ repoRoot, gitCommonDir, id, candidate, evidencePath, evidence }, residualDeps);
       return { ...exact, currentCheckoutOk: true, privateLifecycleBound: true,
         receiptId: id, code: "critic-bound-verify-valid" };
     } catch { /* Other candidates and invalid private records are not admission. */ }

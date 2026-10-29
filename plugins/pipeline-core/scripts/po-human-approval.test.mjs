@@ -2395,8 +2395,8 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
     // for the same reason (ALF-B5-AC256, QG-04): prepare-critical composes it (the refused call reached the
     // clean-candidate check instead of the Usage refusal), so asserting Usage for it is a premise the source
     // no longer holds. This file holds NO positive-path test for interruption-promotion: that is a coverage
-    // gap, reported and not built here. Every other kind keeps the Usage assertion.
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion"].includes(entry))) {
+    // gap, reported and not built here. `accept-residual-critic-findings` (D190) is excluded for the same reason and has its own positive-path tests at the end of this file. Every other kind keeps the Usage assertion.
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight", "interruption-promotion", "accept-residual-critic-findings"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
@@ -6107,6 +6107,136 @@ test("the agent-facing approval gate cannot invoke authorize-critical: signing s
       /Usage:/u,
     );
     assert.equal(existsSync(criticalArtifacts(dirs).request), false, "the public control plane must not be able to reach authorize-critical at all");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * D190: accept-residual-critic-findings routed through the two critical
+ * commands. The finding list is computed from the consumed Critic packet
+ * (readers injected here), shown before the signature and rebuilt into the
+ * subject digest; it is never typed and never taken from a file.
+ * ------------------------------------------------------------------ */
+import { canonicalJson as residualRouteCanonicalJson, sha256 as residualRouteSha256 } from "./critic-packet-preflight.mjs";
+import { residualFindingId as residualRouteFindingId } from "../lib/critic-verify-lifecycle.mjs";
+
+const RESIDUAL_ROUTE_KIND = "accept-residual-critic-findings";
+const RESIDUAL_ROUTE_PACKET = "c".repeat(32);
+const RESIDUAL_ROUTE_RECEIPT = Object.freeze({ schema: "pipeline.session-critic-receipt.v1", reviewPass: false, findingCount: 2, packetId: RESIDUAL_ROUTE_PACKET });
+const RESIDUAL_ROUTE_MINOR = Object.freeze([
+  { severity: "minor", title: "wording of the refusal text", location: "plugins/pipeline-core/lib/example.mjs:10" },
+  { severity: "minor", title: "unused import", location: "plugins/pipeline-core/lib/example.mjs:2" },
+]);
+
+function residualRouteExpectedSubject(findings) {
+  return {
+    criticReceiptSha256: residualRouteSha256(residualRouteCanonicalJson(RESIDUAL_ROUTE_RECEIPT)),
+    findings: findings.map((finding) => ({ id: residualRouteFindingId(finding), severity: finding.severity }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+  };
+}
+
+function residualRouteDependencies(findings, extra = {}) {
+  return {
+    observeCandidate: () => ({ ...CANDIDATE }),
+    readConsumedCandidateReceiptFn: ({ packetId }) => {
+      assert.equal(packetId, RESIDUAL_ROUTE_PACKET);
+      return { packet: { packetId }, receipt: RESIDUAL_ROUTE_RECEIPT };
+    },
+    readOpenFindingsFn: ({ packetId }) => {
+      assert.equal(packetId, RESIDUAL_ROUTE_PACKET);
+      return findings;
+    },
+    ...extra,
+  };
+}
+
+function residualRouteArgv(command, dirs, extra = []) {
+  return [
+    command, "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+    "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+    "--kind", RESIDUAL_ROUTE_KIND, "--critic-packet", RESIDUAL_ROUTE_PACKET, "--expires-at", futureExpiry(),
+    ...extra,
+  ];
+}
+
+test("authorize-critical --kind accept-residual-critic-findings derives the subject digest from the consumed packet and shows every accepted finding before the signature", { skip: REQUIRES_OPENSSL }, () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const expected = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteExpectedSubject(RESIDUAL_ROUTE_MINOR) });
+    const prompts = [];
+    const result = runHumanApproval(residualRouteArgv("authorize-critical", dirs), residualRouteDependencies(RESIDUAL_ROUTE_MINOR, {
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+    }));
+    assert.equal(result.ok, true);
+    assert.equal(result.action.kind, RESIDUAL_ROUTE_KIND);
+    assert.equal(result.action.subjectSha256, expected, "the digest must be rebuilt from the packet, not supplied");
+    assert.equal(prompts.length, 1);
+    const subject = residualRouteExpectedSubject(RESIDUAL_ROUTE_MINOR);
+    assert.ok(prompts[0].includes(subject.criticReceiptSha256), "must show the Critic receipt digest");
+    for (const finding of subject.findings) assert.ok(prompts[0].includes(finding.id), "must list every accepted finding id");
+    assert.match(prompts[0], /accepts ONLY the minor findings listed above/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical --kind accept-residual-critic-findings refuses a non-minor finding before any prompt or write", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    let confirmationAsked = false;
+    const findings = [...RESIDUAL_ROUTE_MINOR, { severity: "major", title: "wrong precedence", location: "plugins/pipeline-core/lib/example.mjs:30" }];
+    assert.throws(
+      () => runHumanApproval(residualRouteArgv("authorize-critical", dirs), residualRouteDependencies(findings, {
+        readConfirmation: () => { confirmationAsked = true; return "approve"; },
+      })),
+      /RESIDUAL-PROOF-SEVERITY/u,
+    );
+    assert.equal(confirmationAsked, false);
+    assert.equal(existsSync(criticalArtifacts(dirs, RESIDUAL_ROUTE_KIND).request), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("accept-residual-critic-findings takes --critic-packet and never --subject or a typed --subject-sha256 mismatch; --critic-packet is refused for every other kind", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    writeFileSync(join(dirs.repoRoot, "subject.json"), `${JSON.stringify({ criticReceiptSha256: "d".repeat(64), findings: [] })}\n`);
+    assert.throws(
+      () => runHumanApproval(residualRouteArgv("prepare-critical", dirs, ["--subject", "subject.json"]), residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
+      /takes no --subject/u,
+    );
+    assert.throws(
+      () => runHumanApproval(residualRouteArgv("prepare-critical", dirs, ["--subject-sha256", "e".repeat(64)]), residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
+      /--subject-sha256 does not match the digest computed from the consumed Critic packet/u,
+    );
+    assert.throws(
+      () => runHumanApproval([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+        "--kind", "push", "--critic-packet", RESIDUAL_ROUTE_PACKET, "--subject-sha256", "a".repeat(64), "--expires-at", futureExpiry(),
+      ], residualRouteDependencies(RESIDUAL_ROUTE_MINOR)),
+      /--critic-packet is only valid for --kind accept-residual-critic-findings/u,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("prepare-critical --kind accept-residual-critic-findings writes a request bound to the packet-derived subject digest", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const expected = criticalActionSubjectSha256({ kind: RESIDUAL_ROUTE_KIND, candidate: CANDIDATE, subject: residualRouteExpectedSubject(RESIDUAL_ROUTE_MINOR) });
+    const result = runHumanApproval(residualRouteArgv("prepare-critical", dirs), residualRouteDependencies(RESIDUAL_ROUTE_MINOR));
+    assert.equal(result.ok, true);
+    assert.equal(result.action.subjectSha256, expected);
+    assert.equal(existsSync(criticalArtifacts(dirs, RESIDUAL_ROUTE_KIND).request), true);
   } finally {
     cleanup(dirs);
   }

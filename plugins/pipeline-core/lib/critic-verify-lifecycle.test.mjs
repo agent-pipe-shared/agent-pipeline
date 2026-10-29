@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { inspectConsumedCriticEvidenceCarryForward, recordCriticVerifyLifecycle, readCriticVerifyLifecycle } from "./critic-verify-lifecycle.mjs";
+import { inspectConsumedCriticEvidenceCarryForward, recordCriticVerifyLifecycle, readCriticVerifyLifecycle, residualFindingId } from "./critic-verify-lifecycle.mjs";
 import { inspectCriticBoundVerify } from "./critic-verify-readiness.mjs";
 import { canonicalJson, sha256 } from "../scripts/critic-packet-preflight.mjs";
 import { checkCurrentCriticBoundVerify } from "../scripts/check-critic-bound-verify.mjs";
@@ -66,6 +66,74 @@ test("refuses failed, stale, or forged Critic/Verify bindings", t => {
   assert.throws(() => readCriticVerifyLifecycle({ gitCommonDir: common, id: recorded.receipt.id, candidate, evidencePath: "evidence/verify.json", evidence: { ...evidence, startedAt: "forged" } }, {
     readConsumedCandidateReceiptFn: () => consumed(source),
   }), error => error.code === "CVL-VERIFY-DRIFT");
+});
+// Residual-finding acceptance (D190): a failed receipt qualifies only through a recorded PO acceptance
+// that lists exactly the open findings, every one of lowest severity (minor).
+const finding = (gap, severity) => ({ gap, risk: "r", severity, evidence: "e", spec_ref: "s" });
+function residualSetup(findings, mutate = a => a) {
+  const failed = critic({ reviewPass: false, findingCount: findings.length });
+  const consumedFn = () => consumed(failed);
+  const probe = recordReceiptSha(failed);
+  const acceptance = mutate({
+    schema: "pipeline.critic-residual-acceptance.v1", mode: "chat-attributed-unattested",
+    candidate: { ...candidate }, criticReceiptSha256: probe,
+    findings: findings.map(f => ({ id: residualFindingId(f), severity: f.severity })).sort((a, b) => a.id.localeCompare(b.id)),
+  });
+  return { failed, acceptance, deps: {
+    readConsumedCandidateReceiptFn: consumedFn,
+    readOpenFindingsFn: () => findings,
+    residualAcceptance: acceptance,
+    verifyResidualAcceptanceFn: () => ({ authorized: true, mode: acceptance.mode }),
+  } };
+}
+function recordReceiptSha(failed) { return sha256(canonicalJson(consumed(failed).receipt)); }
+const record = (common, failed, deps) => recordCriticVerifyLifecycle({ gitCommonDir: common, criticPacketId: failed.packetId, candidate, evidencePath: "evidence/verify.json", evidence }, deps);
+test("a failed receipt with only minor findings qualifies through an exactly matching PO acceptance, labelled as acceptance", t => {
+  const common = fixture(t);
+  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "minor")]);
+  const recorded = record(common, failed, deps);
+  assert.equal(recorded.receipt.residualAcceptance.basis, "po-acceptance-of-residual-minor-findings");
+  assert.equal(recorded.receipt.residualAcceptance.findings.length, 2);
+  const read = readCriticVerifyLifecycle({ gitCommonDir: common, id: recorded.receipt.id, candidate, evidencePath: "evidence/verify.json", evidence }, deps);
+  assert.equal(read.receiptSha256, recorded.receiptSha256);
+});
+test("a major finding is never acceptable, even when an acceptance lists it", t => {
+  const common = fixture(t);
+  const { failed, deps } = residualSetup([finding("a", "minor"), finding("b", "major")]);
+  assert.throws(() => record(common, failed, deps), error => error.code === "CVL-CRITIC-FAILED");
+});
+test("an acceptance bound to another commit, tree, receipt or finding list is refused", t => {
+  const common = fixture(t);
+  const one = [finding("a", "minor")];
+  const variants = [
+    a => ({ ...a, candidate: { ...a.candidate, commit: oid("9") } }),
+    a => ({ ...a, candidate: { ...a.candidate, tree: oid("9") } }),
+    a => ({ ...a, criticReceiptSha256: sha("9") }),
+    a => ({ ...a, findings: [{ id: sha("9"), severity: "minor" }] }),
+    a => ({ ...a, findings: [...a.findings, { id: sha("8"), severity: "minor" }] }),
+  ];
+  for (const mutate of variants) {
+    const { failed, deps } = residualSetup(one, mutate);
+    assert.throws(() => record(common, failed, deps), error => error.code === "CVL-CRITIC-FAILED");
+  }
+});
+test("a missing or unverified acceptance leaves the failed receipt refused", t => {
+  const common = fixture(t);
+  const { failed, deps } = residualSetup([finding("a", "minor")]);
+  assert.throws(() => record(common, failed, { ...deps, residualAcceptance: undefined }), error => error.code === "CVL-CRITIC-FAILED");
+  assert.throws(() => record(common, failed, { ...deps, verifyResidualAcceptanceFn: () => ({ authorized: false }) }), error => error.code === "CVL-CRITIC-FAILED");
+  // The lifecycle record is immutable and carries the mode (existing CVL-RECEIPT-COLLISION rule), so each mode gets its own fixture.
+  for (const mode of ["chat-attributed-unattested", "signature"]) {
+    const ok = record(fixture(t), failed,{ ...deps, verifyResidualAcceptanceFn: () => ({ authorized: true, mode }) });
+    assert.equal(ok.receipt.residualAcceptance.mode, mode);
+  }
+});
+test("a passing receipt is unchanged by the acceptance machinery", t => {
+  const common = fixture(t);
+  const source = critic();
+  const recorded = record(common, source, { readConsumedCandidateReceiptFn: () => consumed(source), residualAcceptance: { junk: true } });
+  assert.equal(recorded.receipt.residualAcceptance, undefined);
+  assert.equal(recorded.receipt.schema, "pipeline.critic-verify-lifecycle-receipt.v1");
 });
 test("readback refuses missing consumed review and forged private lifecycle fields", t => {
   const common = fixture(t);

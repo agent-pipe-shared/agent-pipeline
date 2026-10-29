@@ -47,10 +47,12 @@ export const DEFAULT_RECONCILE_APPROVAL_MODE = "signature";
 const GATE_APPROVAL_MODE_KEYS = Object.freeze({
   push: "push_approval",
   "feature-package-reconcile": "reconcile_approval",
+  "accept-residual-critic-findings": "push_approval",
 });
 const GATE_APPROVAL_MODE_DEFAULTS = Object.freeze({
   push: DEFAULT_PUSH_APPROVAL_MODE,
   "feature-package-reconcile": DEFAULT_RECONCILE_APPROVAL_MODE,
+  "accept-residual-critic-findings": DEFAULT_PUSH_APPROVAL_MODE,
 });
 
 /**

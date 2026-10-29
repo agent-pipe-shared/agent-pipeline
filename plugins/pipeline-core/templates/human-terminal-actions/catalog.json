@@ -218,6 +218,26 @@
       "platforms": null
     },
     {
+      "id": "accept-residual-critic-findings",
+      "inventoryId": "accept-residual-critic-findings",
+      "revision": 1,
+      "purpose": "Record the residual Critic findings acceptance terminal-template disposition",
+      "audience": "user",
+      "disposition": "legacy-renderer",
+      "templateId": null,
+      "builderId": null,
+      "producerRefs": [
+        "plugins/pipeline-core/scripts/pipeline-state.mjs#approve-residual-acceptance"
+      ],
+      "boundary": null,
+      "mutation": null,
+      "requiresPoApproval": null,
+      "slots": null,
+      "expectedReadback": null,
+      "runners": null,
+      "platforms": null
+    },
+    {
       "id": "critical-action-family",
       "inventoryId": "critical-action-family",
       "revision": 1,

@@ -25,6 +25,8 @@ import { classifyRegisteredEvidenceOnlyCommits } from "./critic-course-admission
 
 export const CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v1";
 export const CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v2";
+export const CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA = "pipeline.critic-verify-lifecycle-receipt.v3";
+export const RESIDUAL_ACCEPTANCE_BASIS = "po-acceptance-of-residual-minor-findings";
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const SHA = /^[a-f0-9]{64}$/u;
 const PACKET = /^[a-f0-9]{32}$/u;
@@ -43,6 +45,40 @@ export function criticVerifyLifecycleId({ candidate: sourceCandidate, criticPack
 function recordPath(privateRoot, id) {
   if (!SHA.test(id ?? "")) fail("CVL-IDENTITY", "Lifecycle receipt identity is invalid.");
   return join(privateRoot, "critic-verify-lifecycle", `${id}.json`);
+}
+
+/** Derived id of one open Critic finding (verdict findings carry no id of their own). */
+export function residualFindingId(finding) {
+  return sha256(canonicalJson(finding));
+}
+
+/** The subject a PO residual acceptance is bound to; one definition for the signature route and the chat route. */
+export function residualAcceptanceSubject({ receipt, findings }) {
+  return { criticReceiptSha256: sha256(canonicalJson(receipt)),
+    findings: findings.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) };
+}
+
+// A failed receipt qualifies only through a PO acceptance bound to the exact open findings, all minor.
+// Returns the record fragment, or null (the caller keeps CVL-CRITIC-FAILED) on any shortfall.
+function residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSha256 }, deps) {
+  const acceptance = deps.residualAcceptance;
+  if (acceptance === undefined || acceptance === null || typeof deps.verifyResidualAcceptanceFn !== "function") return null;
+  try {
+    const readOpen = deps.readOpenFindingsFn ?? (({ controlRoot, packetId }) => readConsumedCandidateResult({ controlRoot, packetId }).result.verdict.findings);
+    const open = readOpen({ controlRoot: join(common, "agent-pipeline", "critic-packets"), packetId: criticPacketId });
+    if (!Array.isArray(open) || open.length === 0 || open.length !== critic.findingCount
+      || !open.every(finding => finding !== null && typeof finding === "object" && finding.severity === "minor")) return null;
+    const expected = open.map(finding => ({ id: residualFindingId(finding), severity: finding.severity }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    if (acceptance.candidate?.commit !== critic.candidate.commit || acceptance.candidate?.tree !== critic.candidate.tree
+      || acceptance.criticReceiptSha256 !== criticReceiptSha256
+      || canonicalJson(acceptance.findings) !== canonicalJson(expected)) return null;
+    const verdict = deps.verifyResidualAcceptanceFn({ acceptance, candidate: { ...critic.candidate }, criticReceiptSha256, findings: expected });
+    if (verdict?.authorized !== true || typeof verdict.mode !== "string" || verdict.mode.length === 0) return null;
+    return Object.freeze({ basis: RESIDUAL_ACCEPTANCE_BASIS, mode: verdict.mode,
+      acceptanceSha256: bytesSha256(canonicalJson(acceptance)), findings: expected });
+  } catch { return null; }
 }
 
 /**
@@ -71,12 +107,20 @@ export function readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId, c
     || packet.diff?.commit !== critic.reviewRange.commit || packet.diff?.sha256 !== critic.reviewRange.diffSha256) {
     fail("CVL-CRITIC-PACKET-MISMATCH", "Private Critic receipt is not bound to its consumed packet.");
   }
-  if (critic.reviewPass !== true) fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+  const failedReceipt = critic.reviewPass !== true;
+  if (failedReceipt && (deps.residualAcceptance === undefined || deps.residualAcceptance === null)) {
+    fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+  }
   if (critic.candidate.commit !== sourceCandidate.commit || critic.candidate.tree !== sourceCandidate.tree
     || critic.reviewRange.commit !== sourceCandidate.commit) fail("CVL-CRITIC-STALE", "Private Critic receipt is not bound to the Verify candidate.");
   const criticReceiptSha256 = bytesSha256(canonicalJson(critic));
+  let residual = null;
+  if (failedReceipt) {
+    residual = residualAcceptanceFor({ common, criticPacketId, critic, criticReceiptSha256 }, deps);
+    if (residual === null) fail("CVL-CRITIC-FAILED", "Critic findings remain unresolved; Verify cannot attest this candidate.");
+  }
   const roleRoute = criticRouteVerdict({ gitCommonDir: common, criticPacketId, critic, criticReceiptSha256 }, deps);
-  return Object.freeze({ packet, critic, criticReceiptSha256, roleRoute });
+  return Object.freeze({ packet, critic, criticReceiptSha256, roleRoute, residual });
 }
 
 const CRITIC_HOST_OBSERVATION_SCHEMA = "pipeline.critic-host-observation.v1";
@@ -194,12 +238,14 @@ export function recordCriticVerifyLifecycle({ repoRoot = null, featureId = null,
   const criticReceiptSha256 = bound.criticReceiptSha256;
   const id = criticVerifyLifecycleId({ candidate: sourceCandidate, criticPacketId, verifyEvidenceSha256 });
   const receipt = Object.freeze({
-    schema: carry === null ? CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA : CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA,
+    schema: carry !== null ? CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA
+      : bound.residual !== null ? CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA : CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA,
     id,
     candidate: { ...sourceCandidate },
     critic: { packetId: criticPacketId, packetDigest: critic.packetDigest, receiptSha256: criticReceiptSha256, verdictSha256: critic.verdictSha256, reviewRange: { ...critic.reviewRange } },
     verify: { evidencePath, evidenceSha256: verifyEvidenceSha256, verifyRunTerminalSha256: evidence.verifyRun?.terminalSha256 ?? null },
     ...(carry === null ? {} : { carryForward: carry }),
+    ...(bound.residual === null ? {} : { residualAcceptance: bound.residual }),
   });
   const target = recordPath(privateRoot, id);
   mkdirSync(join(privateRoot, "critic-verify-lifecycle"), { recursive: true, mode: 0o700 });
@@ -225,9 +271,10 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
   let receipt;
   try { receipt = JSON.parse(readFileSync(target, "utf8")); } catch { fail("CVL-RECEIPT-UNAVAILABLE", "Private Critic/Verify lifecycle receipt is unavailable."); }
   const carrying = receipt?.schema === CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA;
-  const keys = ["schema", "id", "candidate", "critic", "verify", ...(carrying ? ["carryForward"] : [])];
+  const residualRecord = receipt?.schema === CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA;
+  const keys = ["schema", "id", "candidate", "critic", "verify", ...(carrying ? ["carryForward"] : []), ...(residualRecord ? ["residualAcceptance"] : [])];
   if (!exact(receipt, keys) || (![CRITIC_VERIFY_LIFECYCLE_RECEIPT_SCHEMA,
-    CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA].includes(receipt.schema))
+    CRITIC_VERIFY_CARRY_LIFECYCLE_RECEIPT_SCHEMA, CRITIC_VERIFY_RESIDUAL_LIFECYCLE_RECEIPT_SCHEMA].includes(receipt.schema))
     || receipt.id !== id || !candidate(receipt.candidate)
     || receipt.candidate.commit !== sourceCandidate.commit || receipt.candidate.tree !== sourceCandidate.tree
     || !exact(receipt.critic, ["packetId", "packetDigest", "receiptSha256", "verdictSha256", "reviewRange"])
@@ -266,6 +313,10 @@ export function readCriticVerifyLifecycle({ repoRoot = null, gitCommonDir, id,
   }
   const bound = readBoundConsumedCriticReceipt({ gitCommonDir, criticPacketId: receipt.critic.packetId,
     candidate: carry === null ? sourceCandidate : carry.proof.reviewedCandidate }, deps);
+  if ((bound.residual === null) !== !residualRecord
+    || (residualRecord && canonicalJson(receipt.residualAcceptance) !== canonicalJson(bound.residual))) {
+    fail("CVL-CRITIC-DRIFT", "Private lifecycle residual acceptance differs from the consumed review and acceptance.");
+  }
   if (receipt.critic.packetDigest !== bound.critic.packetDigest
     || receipt.critic.receiptSha256 !== bound.criticReceiptSha256
     || receipt.critic.verdictSha256 !== bound.critic.verdictSha256
